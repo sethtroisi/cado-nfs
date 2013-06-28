@@ -134,11 +134,105 @@ class Polynomial(object):
     def create_file(self, filename, params):
         # Write polynomial to a file, and add lines with parameters such as 
         # "alim" if supplied in params 
-        with open(filename, "w") as f:
+        with open(str(filename), "w") as f:
             f.write(str(self))
             for key in self.paramnames:
                 if key in params:
                     f.write(key + ": %s\n" % params[key])
+
+
+class FilePath(object):
+    """ A class that represents a path to a file, where the path should be
+    somewhat relocateable.
+    
+    In particular, we separate the path to the working directory, and the file
+    path relative to the working directory. For persistent storage in the DB,
+    the path relative to the workdir should be used, whereas for any file
+    accesses, the full path needs to be used.
+    """
+    def __init__(self, workdir, filepath):
+        self.workdir = workdir.rstrip(os.sep)
+        self.filepath = filepath
+    def __str__(self):
+        return "%s%s%s" % (self.workdir, os.sep, self.filepath)
+    def get_relative(self):
+        return self.filepath
+
+
+class WorkDir(object):
+    """ A class that allows generating file and directory names under a 
+    working directory.
+    
+    The directory layout is as follows:
+    The current project (i.e., the factorization) has a jobname, e.g.,
+    "RSA512". Each task has a name, e.g., "sieving".
+    A task can create various files under 
+    workdir/jobname.taskname.file
+    or put them in a subdirectory
+    workdir/jobname.taskname/file
+    or, for multiple subdirectories,
+    workdir/jobname.taskname/subdir/file
+    
+    >>> f = WorkDir("/foo/bar", "jobname", "taskname")
+    >>> str(f.make_dirname())
+    '/foo/bar/jobname.taskname/'
+    >>> str(f.make_dirname('subdir'))
+    '/foo/bar/jobname.taskname/subdir/'
+    >>> str(f.make_filename('file'))
+    '/foo/bar/jobname.taskname.file'
+    >>> str(f.make_filename('file', use_subdir=True))
+    '/foo/bar/jobname.taskname/file'
+    >>> str(f.make_filename('file', use_subdir=True, subdir='subdir'))
+    '/foo/bar/jobname.taskname/subdir/file'
+    """
+    def __init__(self, workdir, jobname, taskname):
+        self.workdir = workdir.rstrip(os.sep)
+        self.jobname = jobname
+        self.taskname = taskname
+    
+    def path_in_workdir(self, filename):
+        return FilePath(self.workdir, filename)
+    
+    def _make_path(self, extra):
+        """ Make a path of the form: "workdir/jobname.taskname""extra" """
+        return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname, extra))
+    
+    def make_dirname(self, subdir = None):
+        """ Make a directory name of the form workdir/jobname.taskname/ if 
+        subdir is not given, or workdir/jobname.taskname/subdir/ if it is
+        """
+        if subdir:
+            return self._make_path("%s%s%s" % (os.sep, subdir, os.sep))
+        else:
+            return self._make_path(os.sep)
+    
+    def make_filename(self, name, use_subdir = False, subdir = None):
+        """ If use_subdir is False, make a filename of the form 
+        workdir/jobname.taskname.name 
+        If use_subdir is True and subdir is None, make a filename of the form 
+        workdir/jobname.taskname/name
+        If use_subdir is True and subdir is a string, make a filename of the form 
+        workdir/jobname.taskname/subdir/name
+        """
+        if use_subdir:
+            if subdir:
+                return self._make_path("%s%s%s%s" % (os.sep, subdir, os.sep, name))
+            else:
+                return self._make_path("%s%s" % (os.sep, name))
+        else:
+            assert subdir is None
+            return self._make_path(".%s" % name)
+    
+    def make_directories(self, subdirs = None):
+        dirname = str(self.make_dirname())
+        if not os.path.isdir(dirname):
+            os.mkdir(dirname)
+        if subdirs:
+            for subdir in subdirs:
+                dirname = str(self.make_dirname(subdir))
+                if not os.path.isdir(dirname):
+                    os.mkdir(dirname)
+        return
 
 
 class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
@@ -171,7 +265,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         # Sub-classes need to define a property 'paramnames' which returns a
         # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
-        return ("name", "workdir")
+        return ("name", )
     
     def __init__(self, *args, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -208,8 +302,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
             raise Exception("%s is not valid for an SQL table name" % name)
     
     def make_tablename(self, extra = None):
-        """ Return the table name for the DB-backed dictionary with the state
-        for the current task """
+        """ Return a table name for the DB-backed dictionary """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
         # Could be tricky to avoid collisions
         name = self.name
@@ -217,42 +310,12 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
             name = name + '_' + extra
         self.check_tablename(name)
         return name
-    
-    def _make_basename(self):
-        """
-        >>> class C(object):
-        ...     pass
-        >>> f = C()
-        >>> f.params = {"workdir": "/foo/bar", "name": "jobname"}
-        >>> f.name = "taskname"
-        >>> Task._make_basename(f)
-        '/foo/bar/jobname.taskname'
-        """
-        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
-                              self.params["name"], self.name)
-    
-    def make_output_filename(self, name, subdir = False, dirextra = None):
-        """ Make a filename of the form workdir/jobname.taskname.name """
-        if subdir:
-            return self.make_output_dirname(dirextra) + name
-        else:
-            assert dirextra is None
-            return "%s.%s" % (self._make_basename(), name)
 
-    def make_output_dirname(self, extra = None):
-        """ Make a directory name of the form workdir/jobname.taskname/ if 
-        extra is not given, or workdir/jobname.taskname/extra/ if it is
-        """
-        r = self._make_basename() + os.sep
-        if extra:
-            r += "%s%s" % (extra, os.sep)
-        return r
-    
     def translate_input_filename(self, filename):
         return filename
 
     def test_outputfile_exists(self, filename):
-        return os.path.isfile(filename)
+        return os.path.isfile(str(filename))
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
@@ -262,24 +325,13 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         Raise IOError if any check fails, return None
         """
         for f in filenames:
-            exists = os.path.isfile(f)
+            exists = os.path.isfile(str(f))
             if shouldexist and not exists:
                 raise IOError("%s file %s does not exist" % (filedesc, f))
             elif not shouldexist and exists:
                 raise IOError("%s file %s already exists" % (filedesc, f))
         return
     
-    @staticmethod
-    def make_directories(basedir, extra = None):
-        if not os.path.isdir(basedir):
-            os.mkdir(basedir)
-        if extra:
-            for subdir in extra:
-                dirname = basedir + os.sep + subdir
-                if not os.path.isdir(dirname):
-                    os.mkdir(dirname)
-        return
-
     # These two function go together, one produces a workunit name from the 
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
@@ -378,7 +430,7 @@ class ClientServerTask(Task, patterns.Observer):
         super().__init__(*args, **kwargs)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", "100")
+        self.params.setdefault("maxwu", "10")
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -443,10 +495,12 @@ class PolyselTask(ClientServerTask):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("adrange", "P", "N", "admin", "admax")
+            ("workdir", "adrange", "P", "N", "admin", "admax")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
     
@@ -547,12 +601,12 @@ class PolyselTask(ClientServerTask):
         polyselect_params = self.progparams[0].copy()
         polyselect_params["admin"] = str(adstart)
         polyselect_params["admax"] = str(adend)
-        outputfile = self.make_output_filename("%d-%d" % (adstart, adend))
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = self.programs[0](None, polyselect_params, stdout = outputfile)
+            p = self.programs[0](None, polyselect_params, stdout = str(outputfile))
             self.submit_command(p, "%d-%d" % (adstart, adend))
         self.state["adnext"] = adend
 
@@ -566,6 +620,8 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
         super().__init__(*args, **kwargs)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"])
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         if "outputfile" in self.state:
             assert "poly" in self.state
             # The target file must correspond to the polynomial "poly"
@@ -593,30 +649,30 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
         if not "outputfile" in self.state:
             self.logger.info("Starting")
             # Write polynomial to a file
-            polyfile = self.make_output_filename("poly")
-            poly.create_file(polyfile, self.params)
+            polyfilename = self.workdir.make_filename("poly")
+            poly.create_file(polyfilename, self.params)
             
             # Make file name for factor base/free relations file
-            outputfile = self.make_output_filename(self.target)
+            outputfilename = self.workdir.make_filename(self.target)
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = polyfile
-            p = self.programs[0](None, kwargs, stdout = outputfile)
+            kwargs["poly"] = str(polyfilename)
+            p = self.programs[0](None, kwargs, stdout = str(outputfilename))
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
             self.parse_stderr(stderr)
             
-            self.state["outputfile"] = outputfile
+            self.state["outputfile"] = outputfilename.get_relative()
             self.logger.info("Finished")
 
-        self.check_files_exist([self.state["outputfile"]], "output", 
+        self.check_files_exist([self.get_filename()], "output", 
                                shouldexist=True)
     
     def get_filename(self):
         if "outputfile" in self.state:
-            return self.state["outputfile"]
+            return str(self.workdir.path_in_workdir(self.state["outputfile"]))
         else:
             return None
     
@@ -639,7 +695,7 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", )
+            ("workdir", "alim", )
     target = "roots"
     def parse_stderr(self, stderr):
         pass
@@ -659,7 +715,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("lpba", "lpbr")
+            ("workdir", "lpba", "lpbr")
     target = "freerel"
     
     def parse_stderr(self, stderr):
@@ -694,12 +750,14 @@ class SievingTask(ClientServerTask, FilesCreator):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
+            ("workdir", "qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         qmin = int(self.params.get("qmin", 0))
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
@@ -708,7 +766,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
-        self.params.setdefault("maxwu", "100")
+        self.params.setdefault("maxwu", "10")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
@@ -725,20 +783,20 @@ class SievingTask(ClientServerTask, FilesCreator):
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
-        polyfile = self.make_output_filename("poly")
-        poly.create_file(polyfile, self.params)
+        polyfilename = self.workdir.make_filename("poly")
+        poly.create_file(polyfilename, self.params)
         
         while self.state["rels_found"] < int(self.state["rels_wanted"]):
             kwargs = self.progparams[0].copy()
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
-            outputfile = self.make_output_filename("%d-%d" % (q0, q1))
-            self.check_files_exist([outputfile], "output", shouldexist=False)
+            outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
+            self.check_files_exist([outputfilename], "output", shouldexist=False)
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
-            kwargs["poly"] = polyfile
+            kwargs["poly"] = str(polyfilename)
             kwargs["factorbase"] = self.send_request(Request.GET_FACTORBASE_FILENAME)
-            kwargs["out"] = outputfile
+            kwargs["out"] = str(outputfilename)
             p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
@@ -780,6 +838,7 @@ class SievingTask(ClientServerTask, FilesCreator):
         if filename is None:
             return self.state["rels_found"]
         else:
+            # Fixme: don't access self.output_files directly
             return self.output_files[filename]
     
     def request_more_relations(self, target):
@@ -809,10 +868,12 @@ class Duplicates1Task(Task, FilesCreator):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("nslices_log",)
+            ("workdir", "nslices_log",)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
@@ -860,8 +921,7 @@ class Duplicates1Task(Task, FilesCreator):
             self.logger.info("No new files to split")
         else:
             self.logger.info("Splitting %d new files", len(newfiles))
-            basedir = self.make_output_dirname()
-            self.make_directories(basedir, map(str, range(0, self.nr_slices)))
+            self.workdir.make_directories(map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
@@ -876,7 +936,7 @@ class Duplicates1Task(Task, FilesCreator):
                     # having another copy of the data on disk. Since we don't
                     # process the file at all, we need to ask the Siever task
                     # for the relation count in this file
-                    current_counts = [self.send_request(Request.GET_SIEVER_RELNUMBER, f)]
+                    current_counts = [self.send_request(Request.GET_SIEVER_RELCOUNT, f)]
                 else:
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
@@ -884,7 +944,7 @@ class Duplicates1Task(Task, FilesCreator):
                     self.check_files_exist(outfilenames.keys(), "output", 
                                             shouldexist=False)
                     kwargs = self.progparams[0].copy()
-                    kwargs["out"] = self.make_output_dirname()
+                    kwargs["out"] = str(self.workdir.make_dirname())
                     p = self.programs[0]((f,), kwargs)
                     (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
                     if rc:
@@ -919,7 +979,7 @@ class Duplicates1Task(Task, FilesCreator):
             r = {}
             basename = os.path.basename(name)
             for i in range(0, self.nr_slices):
-                r[self.make_output_filename(basename, True, str(i))] = i
+                r[str(self.workdir.make_filename(basename, use_subdir=True, subdir=str(i)))] = i
             return r;
     
     def parse_slice_counts(self, stderr):
@@ -964,10 +1024,12 @@ class Duplicates2Task(Task, FilesCreator):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("nslices_log",)
+            ("workdir", "nslices_log",)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
@@ -996,11 +1058,10 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            basedir = self.make_output_dirname()
-            self.make_directories(basedir, str(i))
+            self.workdir.make_directories(str(i))
             kwargs = self.progparams[0].copy()
             kwargs["rel_count"] = str(rel_count * 12 // 10)
-            kwargs["output_directory"] = self.make_output_dirname(str(i))
+            kwargs["output_directory"] = str(self.workdir.make_dirname(str(i)))
             p = self.programs[0](files, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1020,7 +1081,7 @@ class Duplicates2Task(Task, FilesCreator):
     
     def make_output_filename(self, f, i):
         basename = os.path.basename(f)
-        return super().make_output_filename(basename, True, str(i))
+        return str(self.workdir.make_filename(basename, use_subdir=True, subdir=str(i)))
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1075,7 +1136,7 @@ class PurgeTask(Task):
     """ Removes singletons and computes excess """
     @property
     def name(self):
-        return "singletons"
+        return "purge"
     @property
     def title(self):
         return "Filtering - Singleton removal"
@@ -1085,10 +1146,12 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("keep", ) + Polynomial.paramnames
+            ("workdir", "keep", ) + Polynomial.paramnames
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         self.state.setdefault("input_nrels", 0)
     
     def run(self):
@@ -1097,7 +1160,7 @@ class PurgeTask(Task):
                           self.state)
         
         poly = self.send_request(Request.GET_POLYNOMIAL)
-        polyfile = self.make_output_filename("poly")
+        polyfile = str(self.workdir.make_filename("poly"))
         poly.create_file(polyfile, self.params)
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -1115,7 +1178,7 @@ class PurgeTask(Task):
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, nrels))
-        purgedfile = self.make_output_filename("purged.gz")
+        purgedfile = str(self.workdir.make_filename("purged.gz"))
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         args = unique_filenames + [freerel_filename]
@@ -1280,7 +1343,7 @@ class MergeTask(Task):
     """ Merges relations """
     @property
     def name(self):
-        return "merging"
+        return "merge"
     @property
     def title(self):
         return "Filtering - Merging"
@@ -1290,10 +1353,12 @@ class MergeTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+            ("workdir", "skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1309,7 +1374,7 @@ class MergeTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            historyfile = self.make_output_filename("history")
+            historyfile = str(self.workdir.make_filename("history"))
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["mat"] = purged_filename
@@ -1319,8 +1384,8 @@ class MergeTask(Task):
             if rc:
                 raise Exception("Program failed")
             
-            indexfile = self.make_output_filename("index")
-            mergedfile = self.make_output_filename("small.bin")
+            indexfile = str(self.workdir.make_filename("index"))
+            mergedfile = str(self.workdir.make_filename("small.bin"))
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
@@ -1339,7 +1404,7 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % mergedfile)
             self.state["indexfile"] = indexfile
             self.state["mergedfile"] = mergedfile
-            densefilename = self.make_output_filename("small.dense.bin")
+            densefilename = str(self.workdir.make_filename("small.dense.bin"))
             if os.path.isfile(densefilename):
                 self.state["densefile"] = densefilename
             
@@ -1369,10 +1434,11 @@ class LinAlgTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ()
-    # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
+            ("workdir", )
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1380,8 +1446,8 @@ class LinAlgTask(Task):
         
         if not "dependency" in self.state:
             self.logger.info("Starting")
-            workdir = self.make_output_dirname()
-            self.make_directories(workdir)
+            workdir = str(self.workdir.make_dirname())
+            self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             args = ()
             kwargs = self.progparams[0].copy()
@@ -1393,7 +1459,7 @@ class LinAlgTask(Task):
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
-            dependencyfilename = self.make_output_filename("W", subdir = True)
+            dependencyfilename = str(self.workdir.make_filename("W", use_subdir = True))
             if not os.path.isfile(dependencyfilename):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.state["dependency"] =  dependencyfilename
@@ -1421,10 +1487,12 @@ class CharactersTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            Polynomial.paramnames
+            ("workdir", ) + Polynomial.paramnames
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1432,10 +1500,10 @@ class CharactersTask(Task):
         
         if not "kernel" in self.state:
             self.logger.info("Starting")
-            polyfilename = self.make_output_filename("poly")
+            polyfilename = str(self.workdir.make_filename("poly"))
             poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
-            kernelfilename = self.make_output_filename("kernel")
+            kernelfilename = str(self.workdir.make_filename("kernel"))
             
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
@@ -1479,10 +1547,12 @@ class SqrtTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("N",)
+            ("workdir", "N",)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
         self.add_factor(int(self.params["N"]))
     
@@ -1491,7 +1561,7 @@ class SqrtTask(Task):
                           self.state)
         if not self.is_done():
             self.logger.info("Starting")
-            polyfilename = self.make_output_filename("poly")
+            polyfilename = str(self.workdir.make_filename("poly"))
             poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
             

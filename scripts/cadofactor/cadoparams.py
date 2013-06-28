@@ -37,6 +37,68 @@ class Parameters(object):
     # all parameters have been accessed, so that a warning can be printed
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
+    
+    translate_old_key =  {
+        "alambda": "tasks.sieve.alambda",
+        "alim": "alim",
+        "bwc_interleaving": "tasks.linalg.interleaving", 
+        "bwc_interval": "tasks.linalg.interval",
+        "bwc_mm_impl": None, # This parameter seems to be gone
+        "bwc_mn": "tasks.linalg.mn",
+        "bwc_shuffled_product": "tasks.linalg.shuffled_product",
+        "bwmt": "tasks.linalg.threads",
+        "bwstrat": "tasks.filter.forbw",
+        "checkrange": None,
+        "coverNmax": "tasks.merge.coverNmax",
+        "degree": "tasks.polyselect.degree",
+        "delay": None,
+        "dup_rm": "tasks.filter.duplicates2.rm",
+        "excesspurge": "excesspurge",
+        "filterlastrels": None, # FIXME: implement this behaviour
+        "firstcheck": "tasks.sieve.rels_wanted",
+        "hosts": None, # FIXME: how to implement this
+        "I": "tasks.sieve.I",
+        "keep": "tasks.filter.merge.keep",
+        "keeppurge": "tasks.filter.purge.keep",
+        "keeprelfiles": None,
+        "linalg" : None, # Should we allow different linalg packages?
+        "lpba": "lpba",
+        "lpbr": "lpbr",
+        "machines": None, # FIXME: how to handle this?
+        "maxlevel": "tasks.filter.maxlevel",
+        "mfba": "mfba",
+        "mfbr": "mfbr",
+        "mpi": None, # FIXME: Implement this
+        "n": "N",
+        "name": "name",
+        "nchar": "tasks.linalg.nchar",
+        "nkermax": None, # FIXME: implement this
+        "nslices_log": "tasks.purge.nslices_log",
+        "nthchar": "tasks.characters.nthchar",
+        "poly_max_threads": "tasks.polyselect.threads", 
+        "parallel": None, # We (currently) always use client/server
+        "polsel_admax": "tasks.polyselect.admax",
+        "polsel_admin": "tasks.polyselect.admin",
+        "polsel_adrange": "tasks.polyselect.adrange",
+        "polsel_delay": None,
+        "polsel_incr": "tasks.polyselect.incr",
+        "polsel_maxnorm": "tasks.polyselect.maxnorm",
+        "polsel_nice": None,
+        "polsel_nq": "tasks.polyselect.nq",
+        "polsel_P": "tasks.polyselect.P",
+        "qmin": "tasks.sieve.qmin",
+        "qrange": "tasks.sieve.qrange",
+        "ratio": "tasks.filter.ratio",
+        "ratq": "tasks.sieve.ratq",
+        "rlambda": "tasks.sieve.rlambda",
+        "rlim": "rlim",
+        "sieve_max_threads": "tasks.sieve.threads",
+        "sievenice": None,
+        "skip": "tasks.purge.skip",
+        "wdir": "workdir",
+        "expected_factorization": None
+    }
+
     def __init__(self, *args, **kwargs):
         self.data = dict(*args, **kwargs)
     
@@ -201,19 +263,21 @@ class Parameters(object):
             else:
                 dic[key] = self._subst_reference(path, key, dic[key])
     
-    def _readfile(self, infile):
+    def readfile(self, infile, old_format = False):
         """ 
         Read configuration file lines from infile, which must be an iterable.
         An open file handle, or an array of strings, work.
         
         >>> p = Parameters()
-        >>> p._readfile(DEFAULTS)
+        >>> p.readfile(DEFAULTS)
         >>> p.data["tasks"]["parallel"]
         '0'
         >>> p.myparams(["degree", "incr", "parallel"], "tasks.polyselect") == \
         {'parallel': '0', 'incr': '60', 'degree': '5'}
         True
         """
+        if old_format and not infile is DEFAULTS_OLD:
+            self.readfile(DEFAULTS_OLD, True)
         for line in infile:
             line2 = line.split('#', 1)[0].strip()
             if not line2:
@@ -223,6 +287,10 @@ class Parameters(object):
             # Which one is worse?
             # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
             (key, value) = (s.strip() for s in line2.split('=', 1))
+            if old_format:
+                key = self.translate_old_key[key]
+                if key is None:
+                    continue
             value = self.subst_env_var(key, value)
             self._insertkey(key, value)
         self._subst_references(self.data, [])
@@ -245,6 +313,7 @@ class Parameters(object):
     def __str__(self):
         r = Parameters.__str_internal__(self.data, "")
         return "\n".join(r)
+
 
 class UseParameters(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
@@ -342,10 +411,91 @@ DEFAULTS = (
     # characters
     "tasks.sqrt.nkermax = 30",
     "tasks.sqrt.nchar = 50",
-    "tasks.sqrt.nthchar = 2"
+    "tasks.sqrt.nthchar = 2",
     )
 
+DEFAULTS_OLD = (
+    # global
+    #'wdir         = undef',
+    #'bindir      = undef',
+    #'name         = undef',
+    #'machines     = undef',
+    #'n                = undef',
+    'parallel     = 0',
 
+    # polyselect using Kleinjung's algorithm
+    'degree         = 5',
+    'polsel_nq      = 1000',
+    'polsel_incr    = 60',
+    'polsel_admin   = 0',
+    #'polsel_admax   = undef',
+    'polsel_adrange = 1e7',
+    'polsel_delay   = 120',
+    #'polsel_P       = undef',
+    'polsel_maxnorm = 1e9',
+    'polsel_nice    = 10',
+
+    # sieve
+    'rlim         = 8000000',
+    'alim         = 8000000',
+    'lpbr         = 29',
+    'lpba         = 29',
+    'mfbr         = 58',
+    'mfba         = 58',
+    'rlambda      = 2.3',
+    'alambda      = 2.3',
+    'I            = 13',
+    'qmin         = 12000000',
+    'qrange       = 1000000',
+    'checkrange   = 1',
+    'firstcheck   = 1',
+
+    'delay        = 120',
+    'sievenice    = 19',
+    'keeprelfiles = 0',
+    'sieve_max_threads = 2',
+    'poly_max_threads = 1',
+    'ratq	 = 0',
+
+    # filtering
+    'skip         = -1', # should be about bwc_mn - 32
+    'keep         = -1', # should be 128 + skip
+    'keeppurge    = 208', # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
+    'maxlevel     = 15',
+    'ratio        = 1.5',
+    'bwstrat      = 3',
+    'coverNmax    = 100',
+    'nslices_log  = 1',
+    'filterlastrels = 1',
+    'dup_rm = $on_mingw', # Give -rm parameter to dup2 when on MinGW
+
+    # linalg
+    'linalg       = bwc',
+    'bwmt         = 2',
+    'mpi          = 0',
+    'hosts	 = ""',
+    'bwc_interval = 1000',
+    'bwc_mm_impl = bucket',
+    'bwc_interleaving = 0',
+    # bwc_mn should be 64 or 128
+    'bwc_mn       = 64',
+    # shuffled product is expected to be better in most cases', at least
+    # when we use MPI. Since it is the preferred communication algorithm
+    # for large runs', we prefer to force its use also for mid-range
+    # examples.
+    'bwc_shuffled_product = 1',
+
+    # characters
+    'nkermax      = 30',
+    'nchar        = 50',
+    'nthchar      = 2',
+
+    # holy grail
+    #'expected_factorization = undef',
+
+    # logfile
+    #'logfile = undef',
+)
 
 if __name__ == "__main__":
     import doctest

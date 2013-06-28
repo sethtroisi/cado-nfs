@@ -226,9 +226,6 @@ ropt_polyselect ( mpz_t *f,
                   mpz_t N ,
                   int verbose )
 {
-  /* detect L1 cache size */
-  ropt_L1_cachesize ();
-
   int i;
   ropt_poly_t poly;
   ropt_poly_init (poly);

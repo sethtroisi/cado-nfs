@@ -471,7 +471,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     }
 }
 
-/* define FOR_MSIEVE to generate the *.cyc file needed by msieve to construct
+/* if for_msieve=1, generate the *.cyc file needed by msieve to construct
    its matrix, which is of the following (binary) format:
       small_nrows
       n1 i1 i2 ... in1
@@ -483,19 +483,20 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
    n1 is the number of relations in the first relation-set,
    i1 is the index of the first relation in the first relation-set
    (should correspond to line i1+2 in *.purged.gz), and so on */
-// #define FOR_MSIEVE
 
 // Feed sparsemat with M_purged
 static void
-readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
+readPurged (typerow_t **sparsemat, purgedfile_stream ps, int verbose,
+            int for_msieve)
 {
-#ifndef FOR_MSIEVE
-  fprintf(stderr, "Reading sparse matrix from purged file\n");
-  for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-      if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+  if (for_msieve == 0)
+    {
+      fprintf(stderr, "Reading sparse matrix from purged file\n");
+      for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+        if (verbose && purgedfile_stream_disp_progress_now_p(ps))
           fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
-                          ps->rrows,ps->dt);
-	    if(ps->nc == 0)
+                  ps->rrows,ps->dt);
+        if(ps->nc == 0)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
       sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
@@ -514,24 +515,24 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           }
         }
       rowLength(sparsemat, i) = j-1;
-  }
-#else /* FOR_MSIEVE */
-  /* to generate the .cyc file for msieve, we only need to start from the
-     identity matrix with newnrows relation-sets, where relation-set i
-     contains only relation i. Thus we only need to read the first line of
-     the purged file, to get the number of relations-sets. */
-
-  {
-    long i;
-
-    for (i = 0; i < ps->nrows; i++)
-      {
-        sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
-        rowCell(sparsemat, i, 1) = i;
-        rowLength(sparsemat, i) = 1;
       }
-  }
-#endif /* FOR_MSIEVE */
+    }
+  else /* for_msieve */
+    {
+      /* to generate the .cyc file for msieve, we only need to start from the
+         identity matrix with newnrows relation-sets, where relation-set i
+         contains only relation i. Thus we only need to read the first line of
+         the purged file, to get the number of relations-sets. */
+
+      long i;
+
+      for (i = 0; i < ps->nrows; i++)
+        {
+          sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
+          rowCell(sparsemat, i, 1) = i;
+          rowLength(sparsemat, i) = 1;
+        }
+    }
 }
 
 static void 
@@ -561,7 +562,6 @@ writeIndex(const char *indexname, index_data_t index_data,
     fclose_maybe_compressed(indexfile, indexname);
 }
 
-#ifdef FOR_MSIEVE
 void
 generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 {
@@ -591,13 +591,13 @@ generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 
   fclose (outfile);
 }
-#endif /* FOR_MSIEVE */
 
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
               uint64_t bwcostmin, int nrows, int ncols, int skip, int bin,
-              const char *idealsfilename, const char *outdelfilename)
+              const char *idealsfilename, const char *outdelfilename,
+              int for_msieve)
 {
     FILE *hisfile;
     int *colweight;
@@ -611,7 +611,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     rp = fgets (str, STRLENMAX, hisfile);
 
     // 1st pass: read the relations in *.purged and put them in newrows[][]
-    readPurged(newrows, ps, 1);
+    readPurged(newrows, ps, 1, for_msieve);
 #if DEBUG >= 1
     // [PG]: FIXME: seems to be broken for FFS ?
     for(int i = 0; i < nrows; i++){
@@ -685,18 +685,30 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
                      100 * (double) count[0]/nonzero);
 #endif
 
-#ifdef FOR_MSIEVE
-    /* generate the <dat_file_name>.cyc file in "indexname" */
-    ASSERT_ALWAYS(skip == 0); /* for simplicity */
-    generate_cyc (sparsename, newrows, small_nrows);
-#else
-    /* renumber columns after sorting them by decreasing weight */
-    small_ncols = toFlush(sparsename, newrows, colweight, ncols,
-			  small_nrows, skip, bin, idealsfilename);
-    // Create the index
-    if (indexname != NULL) 
-        writeIndex(indexname, index_data, small_nrows, small_ncols);
-#endif /* FOR_MSIEVE */
+    if (for_msieve)
+      {
+        /* generate the <dat_file_name>.cyc file in "indexname" */
+        if (skip != 0)
+          {
+            fprintf (stderr, "Error, skip should be 0 with --for_msieve\n");
+            exit (1);
+          }
+        if (bin != 0)
+          {
+            fprintf (stderr, "Error, --binary incompatible with --for_msieve\n");
+            exit (1);
+          }
+        generate_cyc (sparsename, newrows, small_nrows);
+      }
+    else
+      {
+        /* renumber columns after sorting them by decreasing weight */
+        small_ncols = toFlush(sparsename, newrows, colweight, ncols,
+                              small_nrows, skip, bin, idealsfilename);
+        // Create the index
+        if (indexname != NULL) 
+          writeIndex(indexname, index_data, small_nrows, small_ncols);
+      }
 
     // Free.
     free (colweight);
@@ -751,6 +763,7 @@ main(int argc, char *argv[])
     int bin=0;
     int skip = SKIP_DEFAULT;
     int noindex = 0;
+    int for_msieve = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
 
@@ -770,6 +783,7 @@ main(int argc, char *argv[])
     param_list_configure_switch(pl, "--verbose", &verbose);
     param_list_configure_switch(pl, "--binary", &bin);
     param_list_configure_switch(pl, "--noindex", &noindex);
+    param_list_configure_switch(pl, "--for_msieve", &for_msieve);
     param_list_configure_alias(pl, "--verbose", "-v");
 
     for( ; argc ; ) {
@@ -859,7 +873,7 @@ main(int argc, char *argv[])
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
                    bwcostmin, nrows, ncols, skip, bin, 
-                   idealsfilename, outdelfilename);
+                   idealsfilename, outdelfilename, for_msieve);
 
 
     purgedfile_stream_closefile(ps);

@@ -64,7 +64,8 @@ class Command(object):
     
     def wait(self):
         ''' Wait for command to finish executing, capturing stdout and stderr 
-        in output tuple '''
+        in output tuple
+        '''
         (stdout, stderr) = self.child.communicate()
         if self.child.returncode != 0:
             logger.warning("Process with PID %d finished with return code %d",
@@ -78,13 +79,12 @@ class Command(object):
         if stderr:
             logger.debug("Process with PID %d stderr: %s", 
                          self.child.pid, stderr)
-        self.returncode = self.child.returncode
         
         self._close_or_not(self.stdin, self.program.get_stdin())
         self._close_or_not(self.stdout, self.program.get_stdout())
         self._close_or_not(self.stderr, self.program.get_stderr())
         
-        return (self.returncode, stdout, stderr)
+        return (self.child.returncode, stdout, stderr)
 
 class RemoteCommand(Command):
     def __init__(self, program, host, parameters, path_prefix, *args, **kwargs):

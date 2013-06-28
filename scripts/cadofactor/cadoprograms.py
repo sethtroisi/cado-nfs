@@ -458,6 +458,8 @@ class BWC(Program):
         ParameterEq("mpiexec"),
         ParameterEq("hosts"),
         ParameterEq("hostfile"),
+        ParameterEq("interleaving"),
+        ParameterEq("shuffled_product"),
         ParameterEq("bwc_bindir")
         )
 

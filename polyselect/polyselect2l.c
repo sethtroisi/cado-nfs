@@ -23,8 +23,7 @@
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
-#define MAX_THREADS 16
-#define INIT_FACTOR 7UL
+#define INIT_FACTOR 8UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
@@ -396,7 +395,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -418,20 +423,25 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -439,9 +449,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -453,9 +460,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
     if (E > best_E)
     {
       best_E = E;
@@ -758,7 +762,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -780,20 +790,25 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -801,9 +816,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -815,9 +827,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-		pthread_mutex_lock (&lock);
-#endif
     if (E > best_E)
     {
       best_E = E;
@@ -2156,6 +2165,9 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, too small value of P\n");
     exit (1);
   }
+
+  /* detect L1 cache size */
+  ropt_L1_cachesize ();
 
   st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);

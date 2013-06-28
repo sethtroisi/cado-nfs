@@ -31,7 +31,7 @@ class Workunit(object):
         for line in text.splitlines():
             # Drop leading/trailing whitespace, incl. CR/LF. Split first word 
             # and rest of line
-            s = line.lstrip().rstrip().split(" ", 1)
+            s = line.strip().split(" ", 1)
             key = s[0]
 
             if not key in KEYS:
@@ -97,7 +97,12 @@ class Workunit(object):
         return str
     
     def get_id(self):
+        """ Get the Workunit ID """
         return self.wudata["WORKUNIT"]
+
+    def get(self, *args, **kwargs):
+        """ Delegates to the wudata dictionary """
+        return self.wudata.get(*args, **kwargs)
 
 def wu_test():
     """ Dummy function to test workunit parser 
