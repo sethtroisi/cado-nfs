@@ -1,5 +1,6 @@
 #include "cado.h"
 #include "renumber.h"
+#include "gzip.h" /* for fopen_maybe_compress */
 #include <ctype.h>
 
 
@@ -26,7 +27,7 @@ static const int ugly[256] = {
 static int
 copy_bad_ideals(const char * filename, FILE *out, index_t *size)
 {
-  FILE *file = fopen(filename, "r");
+  FILE *file = fopen(filename, "r"); /* never compressed, always small */
   ASSERT_ALWAYS(file != NULL);
   char str[RENUMBER_MAXLINE], *ret;
   int n = 0, nb, count, t;
@@ -326,7 +327,7 @@ renumber_read_table (renumber_t tab, const char * filename)
 
   //open file for reading
   fprintf (stderr, "Opening %s to read the renumbering table\n", filename);
-  tab->file = fopen(filename, "r");
+  tab->file = fopen_maybe_compressed (filename, "r");
   ASSERT_ALWAYS(tab->file != NULL);
 
   // read size of renumbering table
@@ -416,7 +417,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   fprintf(stderr, "Renumbering struct: first_not_cached=%"PRid"\n",
                                                         tab->first_not_cached);
 
-  fclose(tab->file);
+  fclose_maybe_compressed (tab->file, filename);
 }
 
 int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p, 
