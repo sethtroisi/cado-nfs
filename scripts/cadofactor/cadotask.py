@@ -1375,17 +1375,25 @@ class MergeTask(Task):
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             historyfile = str(self.workdir.make_filename("history"))
+            progname = self.programs[0].name
+            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
+            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["mat"] = purged_filename
             kwargs["out"] = historyfile
-            p = self.programs[0](args, kwargs)
+            p = self.programs[0](args, kwargs,
+                                 stdout = str(stdoutfilename), append_stdout = True, 
+                                 stderr = str(stderrfilename), append_stderr = True)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
             
             indexfile = str(self.workdir.make_filename("index"))
             mergedfile = str(self.workdir.make_filename("small.bin"))
+            progname = self.programs[1].name
+            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
+            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
@@ -1393,7 +1401,9 @@ class MergeTask(Task):
             kwargs["history"] = historyfile
             kwargs["index"] = indexfile
             kwargs["out"] = mergedfile
-            p = self.programs[1](args, kwargs)
+            p = self.programs[1](args, kwargs,
+                                 stdout = str(stdoutfilename), append_stdout = True, 
+                                 stderr = str(stderrfilename), append_stderr = True)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1449,13 +1459,18 @@ class LinAlgTask(Task):
             workdir = str(self.workdir.make_dirname())
             self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+            progname = self.programs[0].name
+            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
+            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["complete"] = "1"
             kwargs["matrix"] = os.path.realpath(mergedfile)
             kwargs["wdir"] = os.path.realpath(workdir)
             kwargs.setdefault("nullspace", "left")
-            p = self.programs[0](args, kwargs)
+            p = self.programs[0](args, kwargs,
+                                 stdout = str(stdoutfilename), append_stdout = True, 
+                                 stderr = str(stderrfilename), append_stderr = True)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1510,6 +1525,9 @@ class CharactersTask(Task):
             densefilename = self.send_request(Request.GET_DENSE_FILENAME)
             dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
             
+            progname = self.programs[0].name
+            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
+            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfilename
@@ -1519,7 +1537,9 @@ class CharactersTask(Task):
             kwargs["out"] = kernelfilename
             if not densefilename is None:
                 kwargs["heavyblock"] = densefilename
-            p = self.programs[0](args, kwargs)
+            p = self.programs[0](args, kwargs,
+                                 stdout = str(stdoutfilename), append_stdout = True, 
+                                 stderr = str(stderrfilename), append_stderr = True)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
