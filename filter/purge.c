@@ -609,7 +609,7 @@ thread_insert (buf_arg_t *arg)
 
     if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num))
     {
-      arg->nprimes+=insert_relation_in_table (my_rel, arg->min_index, 
+      arg->nprimes+=insert_rel_in_table_no_e (my_rel, arg->min_index,
                                      boutfilerel, rel_compact, ideals_weight);
 #ifdef STAT
       arg->W += (double) my_rel->nb_above_min_index;

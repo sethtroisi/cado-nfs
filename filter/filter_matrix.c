@@ -173,7 +173,7 @@ thread_insert (buf_arg_t *arg)
       nanosleep (&wait_classical, NULL);
 
     //FIXME big bug this does not take into account the exponent....
-    arg->nprimes += insert_relation_in_table (my_rel, 0, 0, rel_compact, 
+    arg->nprimes += insert_rel_in_table_no_e (my_rel, 0, 0, rel_compact,
                                                       ideals_weight);
     arg->W += (double) my_rel->nb;
 

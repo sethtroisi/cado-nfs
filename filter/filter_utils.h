@@ -9,6 +9,12 @@ typedef struct {
   exponent_t e;
 } prime_t;
 
+typedef struct {
+  index_t id;
+  int32_t e; //or exponent_t ??
+} ideal_merge_t;
+
+
 #define DEBUG 1
 
 #define CA_DUP2 271828182845904523UL
@@ -21,8 +27,10 @@ typedef struct {
 #include "filter_memalloc.h"
 
 
-index_t insert_relation_in_table (buf_rel_t *, index_t, uint8_t, index_t **,
+index_t insert_rel_in_table_no_e (buf_rel_t *, index_t, uint8_t, index_t **,
                                   weight_t *);
+index_t insert_rel_in_table_with_e (buf_rel_t *, index_t, uint8_t,
+                                    ideal_merge_t **, weight_t *);
 void print_relation (FILE *, buf_rel_t *);
 uint32_t insert_relation_in_dup_hashtable (uint32_t *, unsigned long, buf_rel_t*,
                                            double *, unsigned int *);
