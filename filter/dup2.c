@@ -486,7 +486,6 @@ usage(const char *argv0)
     fprintf (stderr, "     -K <K>        - size of the hashtable\n");
     fprintf (stderr, "\nOther command line options:\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
-    fprintf (stderr, "    -bz          - shortcut for -outfmt .bz2\n");
     fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
 #ifndef FOR_FFS
     fprintf (stderr, "    -dl          - do not reduce exponents modulo 2\n");
@@ -515,9 +514,6 @@ main (int argc, char *argv[])
     param_list pl;
     param_list_init(pl);
     argv++,argc--;
-
-    int bz = 0;
-    param_list_configure_switch(pl, "bz", &bz);
 
 #ifndef FOR_FFS
     int is_for_dl = 0; /* Be default we do dup2 for factorization */
@@ -585,14 +581,6 @@ main (int argc, char *argv[])
     if (K == 0)
         usage(argv0);
 
-    if (bz) {
-        if (outfmt) {
-            fprintf(stderr, "-bz and -outfmt are mutually exclusive");
-            usage(argv0);
-        } else {
-            outfmt = ".bz2";
-        }
-    }
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
         usage(argv0);

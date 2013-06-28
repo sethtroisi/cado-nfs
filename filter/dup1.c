@@ -156,7 +156,6 @@ usage(const char *argv0)
     fprintf (stderr, "    -only        - do only slice i (default all)\n");
     fprintf (stderr, "    -ab          - only print a and b in the ouput\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
-    fprintf (stderr, "    -bz          - shortcut for -outfmt .bz2\n");
     fprintf (stderr, "    -abhexa      - read a and b as hexa no decimal\n");
     exit (1);
 }
@@ -171,9 +170,7 @@ main (int argc, char * argv[])
     param_list_init(pl);
     argv++,argc--;
 
-    int bz = 0;
     int ab_hexa = 0;
-    param_list_configure_switch(pl, "bz", &bz);
     param_list_configure_switch(pl, "ab", &only_ab);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
@@ -211,14 +208,6 @@ main (int argc, char * argv[])
 
     if (!dirname)
         usage(argv0);
-    if (bz) {
-        if (outfmt) {
-            fprintf(stderr, "-bz and -outfmt are exclusive");
-            usage(argv0);
-        } else {
-            outfmt = ".bz2";
-        }
-    }
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
         usage(argv0);
