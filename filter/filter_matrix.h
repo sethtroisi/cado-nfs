@@ -61,7 +61,7 @@ extern void initMat(filter_matrix_t *mat);
 extern void clearMat (filter_matrix_t *mat);
 extern void filter_matrix_read_weights(filter_matrix_t *mat, purgedfile_stream_ptr);
 extern void fillmat(filter_matrix_t *mat);
-extern void filter_matrix_read (filter_matrix_t *, int, const char *);
+extern void filter_matrix_read (filter_matrix_t *, const char *);
 
 extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);

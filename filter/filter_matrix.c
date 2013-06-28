@@ -197,14 +197,13 @@ thread_insert (buf_arg_t *arg)
 */
 
 void
-filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
+filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
     int nh = 0;
     int32_t j;
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
-            mat->nrows, mat->ncols, mat->nrows - mat->ncols);
-    mat->rem_nrows = mat->nrows;
+            mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
     mat->weight = 0;
 
     buf_arg_t buf_arg;
@@ -220,26 +219,32 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
 
     SFREE(buf_rel);
 
+    ASSERT_ALWAYS (buf_arg.nprimes == (index_t) mat->rem_ncols);
+    ASSERT_ALWAYS (buf_arg.nrels == (index_t) mat->rem_nrows);
 
-    /* heavy columns already have wt < 0 */
-    int bmin = mat->nrows, bmax = 0;
-
-    // Buried the 'skip'-first cols (should be the heaviest by construction)
-    mat->nburied = skip;
-    for (j = 0; j < skip; j++)
+    if (mat->nburied)
     {
-      int wc = -mat->wt[j];
-      ASSERT_ALWAYS (wc > 0);
-      if (wc > bmax)
-        bmax = wc;
-      if (wc < bmin)
-        bmin = wc;
+      // Buried the 'nburied'-first cols (should be the heaviest by construction)
+      /* heavy columns already have wt < 0 */
+      int bmin = mat->nrows, bmax = 0;
+
+      for (j = 0; j < mat->nburied; j++)
+      {
+        int wc = -mat->wt[j];
+        ASSERT_ALWAYS (wc > 0);
+        if (wc > bmax)
+          bmax = wc;
+        if (wc < bmin)
+          bmin = wc;
 #if DEBUG >= 1
-      fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
+        fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
 #endif
+      }
+      fprintf(stderr, "# Number of buried columns is %"PRid"", mat->nburied);
+      fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
     }
-    fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
-    fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
+    else
+      fprintf(stderr, "# No columns were buried.\n");
 
     typerow_t buf[REL_MAX_SIZE];
     int32_t i;
@@ -265,7 +270,7 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
         else
 #endif
         {
-          if (j >= skip) 
+          if (j >= mat->nburied)
           {
             mat->weight++;
             setCell(buf[next], j, 1); 
@@ -295,7 +300,6 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
       }
     }
     fprintf(stderr, "Number of heavy rows: %d\n", nh);
-    mat->rem_ncols = mat->ncols;
 }
 
 void

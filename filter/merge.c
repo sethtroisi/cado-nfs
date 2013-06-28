@@ -185,6 +185,7 @@ main (int argc, char *argv[])
     mat->rwmax = INT_MAX;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
+    mat->nburied = skip;
 
     initMat (mat);
 
@@ -210,6 +211,10 @@ main (int argc, char *argv[])
           if (w <= maxlevel)
             nbm[w] ++;
         }
+
+      mat->rem_nrows = mat->nrows;
+      mat->rem_ncols = mat->ncols - nbm[0];
+
       printf ("Total matrix weight: %lu\n", total_weight);
       for (j = 0; j <= (unsigned long) maxlevel; j++)
         if (nbm[j] != 0)
@@ -221,7 +226,7 @@ main (int argc, char *argv[])
     fillmat (mat);
 
     tt = wct_seconds ();
-    filter_matrix_read (mat, skip, purgedname);
+    filter_matrix_read (mat, purgedname);
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
