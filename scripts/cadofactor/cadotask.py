@@ -419,7 +419,13 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         """
         request = Request(self, key, *args)
         return super().send_request(request)
-
+    
+    def get_number_outstanding_wus(self):
+        return 0
+    
+    def verification(self, message, ok):
+        pass
+    
 
 class ClientServerTask(Task, patterns.Observer):
     @abc.abstractproperty
@@ -481,7 +487,7 @@ class ClientServerTask(Task, patterns.Observer):
             time.sleep(1)
 
 
-class PolyselTask(ClientServerTask):
+class PolyselTask(ClientServerTask, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -736,7 +742,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return self.state["nfree"]
 
 
-class SievingTask(ClientServerTask, FilesCreator):
+class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
