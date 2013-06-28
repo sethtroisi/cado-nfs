@@ -18,17 +18,7 @@ typedef struct {
 //tmp
 index_t **rel_compact;
 weight_t *ideals_weight;
-perm_t *ideals_permutation;
 
-
-static int
-compare_perm (const void *a, const void *b)
-{
-  weight_t wa = (*((perm_t *) a)).w; 
-  weight_t wb = (*((perm_t *) b)).w; 
-
-  return wa < wb;
-}
 
 unsigned int weight_ffs (int e)
 {
@@ -70,7 +60,6 @@ initMat (filter_matrix_t *mat)
     rel_compact = (index_t **) malloc (mat->nrows * sizeof (index_t *));
     ideals_weight = (weight_t *) malloc (mat->ncols * sizeof (weight_t));
     MEMSETZERO(ideals_weight, mat->ncols);
-    ideals_permutation = (perm_t *) malloc (mat->ncols * sizeof (perm_t));
 }
 
 void
@@ -88,7 +77,6 @@ clearMat (filter_matrix_t *mat)
 
   free(rel_compact);
   free(ideals_weight);
-  free(ideals_permutation);
 }
 
 void
@@ -184,6 +172,7 @@ thread_insert (buf_arg_t *arg)
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       nanosleep (&wait_classical, NULL);
 
+    //FIXME big bug this does not take into account the exponent....
     arg->nprimes += insert_relation_in_table (my_rel, 0, 0, rel_compact, 
                                                       ideals_weight);
     arg->W += (double) my_rel->nb;
@@ -231,16 +220,6 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
 
     SFREE(buf_rel);
 
-
-    for (j = 0; j < mat->ncols; j++)
-      ideals_permutation[j] = (perm_t) {.i = j, .w = ideals_weight[j]};
-
-    qsort(ideals_permutation, mat->ncols, sizeof (perm_t), compare_perm);
-
-
-    fprintf (stderr, "TMP:%u %u\n", buf_arg.nprimes, buf_arg.nrels); 
-    fprintf (stderr, "TMP:%u %u\n", ideals_permutation[0].i, ideals_permutation[0].w); 
-    fprintf(stderr, "TMP:j=32 (wt=%d)\n", -mat->wt[32]);
 
     /* heavy columns already have wt < 0 */
     int bmin = mat->nrows, bmax = 0;
