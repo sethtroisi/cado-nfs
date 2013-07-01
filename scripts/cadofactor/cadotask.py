@@ -388,8 +388,8 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         stdout = message.get_stdout(0)
         stderr = message.get_stderr(0)
         output_files = message.get_output_files()
-        self.logger.debug("%s: Received notification for wuid=%s, rc=%d, output_files=[%s]",
-                         self.name, wuid, rc, ", ".join(output_files))
+        self.logger.message("%s: Received notification for wuid=%s, rc=%d, output_files=[%s]",
+                            self.name, wuid, rc, ", ".join(output_files))
         if rc != 0:
             self.logger.error("Return code is: %d", rc)
         if stdout:
@@ -397,13 +397,13 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         if stderr:
             self.logger.debug("stderr is: %s", stderr)
         if output_files:
-            self.logger.debug("Output files are: %s", ", ".join(output_files))
+            self.logger.message("Output files are: %s", ", ".join(output_files))
         (name, task, identifier) = self.split_wuname(wuid)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
             self.logger.debug("%s: Notification is not for me", self.name)
             return
-        self.logger.debug("%s: Notification is for me", self.name)
+        self.logger.message("%s: Notification is for me", self.name)
         return identifier
     
     def send_notification(self, key, value):
@@ -2117,8 +2117,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         sender = message.get_sender()
         key = message.get_key()
         value = message.get_value()
-        self.logger.debug("Received notification from %s, key = %s, value = %s",
-                           sender, Notification.reverse_lookup(key), value)
+        self.logger.message("Received notification from %s, key = %s, value = %s",
+                            sender, Notification.reverse_lookup(key), value)
         """ The relay for letting Tasks talk to us and each other """
         if key == Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
@@ -2174,8 +2174,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         sender = request.get_sender()
         key = request.get_key()
         value = request.get_value()
-        self.logger.debug("Received request from %s, key = %s, values = %s",
-                           sender, Request.reverse_lookup(key), value)
+        self.logger.message("Received request from %s, key = %s, values = %s",
+                            sender, Request.reverse_lookup(key), value)
         if not key in self.request_map:
             raise KeyError("Unknown Request key %s from sender %s" %
                            (str(key), str(sender)))

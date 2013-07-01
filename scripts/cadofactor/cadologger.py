@@ -1,7 +1,9 @@
 import logging
 
 from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+MESSAGE = DEBUG - 1
 COMMAND = DEBUG + 1
+logging.addLevelName(MESSAGE, "Message")
 logging.addLevelName(COMMAND, "COMMAND")
 
 
@@ -33,6 +35,7 @@ class ScreenFormatter(logging.Formatter):
     """ Class for formatting logger records for screen output, optionally
     with colorized logger level name (like cadofct.pl used to). """
     colours = {
+        MESSAGE: ANSI.GREEN,
         INFO : ANSI.BRIGHTGREEN,
         WARNING : ANSI.BRIGHTYELLOW,
         ERROR : ANSI.BRIGHTRED,
@@ -134,6 +137,11 @@ class MyLogger(logging.Logger):
         extra["childpid"] = pid
         
         self.log(COMMAND, msg, *args, extra=extra, **kwargs)
+    
+    def message(self, msg, *args, **kwargs):
+        """ Log a message with a level of cadologger.MESSAGE """
+        self.log(MESSAGE, msg, *args, **kwargs)
+
 
 logging.setLoggerClass(MyLogger)
 root = logging.getLogger()
