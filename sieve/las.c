@@ -1676,7 +1676,6 @@ but which of these two (if any) do we sieve? */
             continue; /* Simply don't consider that (p,r) for now.
 FIXME: can we find the locations to sieve? */
         }
-
         unsigned int bound0 = plattice_bound0(&pli, si);
         unsigned int bound1 = plattice_bound1(&pli, si);
 
@@ -1686,12 +1685,15 @@ FIXME: can we find the locations to sieve? */
 	  if (x >= IJ) continue;
 	  unsigned int \
 	    bep = ((unsigned int) bucket_encode_prime (p)) << 16,
-            inc_a = (unsigned int) plattice_a(&pli, si),
+	    inc_a = (unsigned int) plattice_a(&pli, si),
 	    inc_c = (unsigned int) plattice_c(&pli, si);
+
 	  /* To put all in registers for x86_64 */
+	  /*
 #ifdef __x86_64
 	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
 #endif
+	  */
 	  // ASSERT_ALWAYS(inc_a == pli.a);
 	  // ASSERT_ALWAYS(inc_c == pli.c);
 	  do {
@@ -1703,12 +1705,12 @@ FIXME: can we find the locations to sieve? */
 	    /* i-coordinate = (x % I) - I/2
 	       (I/2) % 3 == (-I) % 3, hence
 	       3|i-coordinate iff (x%I+I) % 3 == 0 */
-	    if (MOD2_CLASSES_BS || (x & even_mask) 
+	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
 		&& (!is_divisible_3_u32 (i + I) ||
 		    !is_divisible_3_u32 ((uint32_t) (x >> logI)))
 #endif
-		       )
+		       ))
 	      {
 		unsigned int u;
 		bucket_update_t **ppu, *pu;
@@ -2987,10 +2989,14 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
         thread_data_ptr th = thrs[i];
         for(int side = 0 ; side < 2 ; side++) {
             thread_side_data_ptr ts = th->sides[side];
-
             int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
-
-            ts->BA = init_bucket_array(thrs[i]->si->nb_buckets, bucket_limit);
+	    int nb_buckets = thrs[i]->si->nb_buckets;
+	    int uniform = (pagesize() / nb_buckets) & (~1U);
+	    if (uniform < 2)
+	      bucket_limit |= 2;
+	    else
+	      bucket_limit += uniform; 
+            ts->BA = init_bucket_array(nb_buckets, bucket_limit);
         }
     }
 }

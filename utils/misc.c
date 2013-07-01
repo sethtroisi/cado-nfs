@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <emmintrin.h>
 /* For MinGW Build */
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -30,6 +31,30 @@ void
         abort ();
       }
     return p;
+}
+
+void
+*physical_malloc (const size_t x, const int affect)
+{
+  void *p;
+  p = malloc_check(x);
+  if (affect) {
+    size_t i, m;
+#ifdef HAVE_SSE2
+    const __m128i a = (__m128i) {0, 0};
+#endif    
+    i = ((size_t) p + 15) & (~15ULL);
+    m = ((size_t) p + x - 1) & (~15ULL);
+    while (i < m) {
+#ifdef HAVE_SSE2
+      _mm_stream_si128((__m128i *)i, a);
+#else
+      *(unsigned char *) i = 0;
+#endif
+      i += (size_t) pagesize;
+    }
+  }
+  return p;
 }
 
 /* Not everybody has posix_memalign. In order to provide a viable
