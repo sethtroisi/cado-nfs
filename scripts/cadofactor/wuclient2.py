@@ -34,7 +34,6 @@ if sys.version_info[0] == 3 and sys.version_info[1] < 4:
     # In Python 3.[012], use a fixed BytesGenerator which accepts a bytes 
     # input. The fact that the BytesGenerator in Python 3.[012] doesn't 
     # is a bug, see http://bugs.python.org/issue16564
-    print ("Using work-around")
     class FixedBytesGenerator(email.generator.BytesGenerator):
         # pylint: disable=W0232
         # pylint: disable=E1101
@@ -107,15 +106,14 @@ class WuMIMEMultipart(MIMEMultipart):
     def flatten(self, debug = 0):
         ''' Flatten the mimedata with BytesGenerator and return bytes array '''
         if debug >= 2:
-            print("Headers of mimedata as a dictionary:")
-            print(dict(self.items()))
+            logging.debug("Headers of mimedata as a dictionary: %s", 
+                          dict(self.items()))
         bio = BytesIO()
         gen = FixedBytesGenerator(bio)
         gen.flatten(self, unixfrom=False)
         postdata = bio.getvalue() + b"\n"
         if debug >= 2:
-            print("Postdata as a bytes array:")
-            print(postdata)
+            logging.debug("Postdata as a bytes array: %s", postdata)
         return postdata
 
 
@@ -605,5 +603,9 @@ if __name__ == '__main__':
 
     client_ok = True
     while client_ok:
-        client = WorkunitClient(settings = SETTINGS)
-        client_ok = client.process()
+        try:
+            client = WorkunitClient(settings = SETTINGS)
+            client_ok = client.process()
+        except BaseException:
+            logging.exception("Exception occurred")
+            break
