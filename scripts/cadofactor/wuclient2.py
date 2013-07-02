@@ -510,13 +510,13 @@ class WorkunitClient(object):
 
 
 # Settings which we require on the command line (no defaults)
-REQUIRED_SETTINGS = {"CLIENTID" : (None, "Unique ID for this client"), 
-                     "SERVER" : (None, "Base URL for WU server")}
+REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
 # Optional settings with defaults, overrideable on command line, 
 # and a help text
 OPTIONAL_SETTINGS = {"WU_FILENAME" : 
                      (None, "Filename under which to store WU files"), 
+                     "CLIENTID" : (None, "Unique ID for this client"), 
                      "DLDIR" : ('download/', "Directory for downloading files"),
                      "WORKDIR" : (None, "Directory for result files"),
                      "BASEPATH" : (None, "Base directory for download and work "
@@ -569,6 +569,14 @@ if __name__ == '__main__':
                                 % arg.lower())
 
     parse_cmdline()
+    # If no client id is given, we use <hostname>.<randomstr>
+    if SETTINGS["CLIENTID"] is None:
+        import random
+        hostname = socket.gethostname()
+        random.seed()
+        random_str = hex(random.randrange(0, 2**32)).strip('0x')
+        SETTINGS["CLIENTID"] = "%s.%s" % (hostname, random_str)
+
     # If no working directory is given, we use <clientid>.work/
     if SETTINGS["WORKDIR"] is None:
         SETTINGS["WORKDIR"] = SETTINGS["CLIENTID"] + '.work/'
