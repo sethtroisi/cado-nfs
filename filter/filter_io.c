@@ -15,7 +15,7 @@ static char *pmin, *pminlessone;
 static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
 static char rep_cado[PATH_MAX];           /* directory of cado */
 
-inline int 
+inline int
 is_finish ()
 {
   return end_insertRelation;
@@ -30,7 +30,7 @@ set_antebuffer_path (char * argv0, const char *path_antebuffer)
 
 
 void
-prempt_load (prempt_t prempt_data) 
+prempt_load (prempt_t prempt_data)
 {
   char **p_files = prempt_data->files, *pprod;
   FILE *f;
@@ -120,7 +120,7 @@ prempt_load (prempt_t prempt_data)
   pthread_exit (NULL);
 }
 
-static inline void 
+static inline void
 realloc_buffer_primes (buf_rel_t *buf)
 {
   if (buf->nb_alloc == NB_PRIMES_OPT)
@@ -203,7 +203,7 @@ read_a (int64_t *a, char **p, int ab_hexa)
   uint64_t n;
 
   LOAD_ONE(*p);
-  if (c == '-') 
+  if (c == '-')
   {
     *a = -1;
     LOAD_ONE(*p);
@@ -422,10 +422,10 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
   mybufrel->nb_above_min_index = nb_above_min_index;
 }
 
-int
-prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *), 
-                       buf_arg_t * callback_arg,
-                       void* (*thread_root)(fr_t *))
+info_mat_t
+process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
+              void* (*thread_root)(fr_t *), index_t min_index, FILE **outfd,
+              bit_vector_ptr rel_used, unsigned int needed)
 {
   char *pcons, *pcons_old, *pcons_max, *p, **ff;
   pthread_attr_t attr;
@@ -436,17 +436,24 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
   unsigned int length_line, i, k;
   int err, needr = (thread_root != NULL);
   char c;
-  buf_rel_t *buf_rel = callback_arg->buf_data;
+  unsigned int need_del_rels = (outfd != NULL && outfd[1] != NULL) ? 1 : 0;
+
+  buf_arg_t buf_arg;
+  memset (&buf_arg, 0, sizeof(buf_arg_t));
+  buf_arg.min_index = min_index;
+  buf_arg.fd = outfd;
+  buf_arg.rel_used = rel_used;
 
   if (fic[0] == NULL) // to avoid a seg fault in the case the filelist is empty
   {
     fprintf (stderr, "End of read: 0 relation (filelist was empty)\n");
-    return 0;
+    return buf_arg.info;
   }
 
-  callback_arg->nrels = 0;
-  callback_arg->nprimes = 0;
-  callback_arg->W = 0.0;
+  buf_arg.rels = (buf_rel_t *) malloc (SIZE_BUF_REL * sizeof (buf_rel_t));
+  ASSERT_ALWAYS(buf_arg.rels != NULL);
+  fprintf (stderr, "Allocated buffer for rels of %zuMb\n",
+                                  (SIZE_BUF_REL * sizeof (buf_rel_t)) >> 20);
 
 #ifdef STAT
   __stat_weight = 0;
@@ -457,17 +464,17 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
 #endif
 
   MEMSETZERO(fr, (1<<NFR));
-  for (i = (1<<NFR); i--; ) 
-    fr[i].buf_data = buf_rel;
+  for (i = (1<<NFR); i--; )
+    fr[i].buf_data = buf_arg.rels;
 
-  MEMSETZERO(buf_rel, SIZE_BUF_REL);
-  for (i = SIZE_BUF_REL; i--; ) 
+  MEMSETZERO(buf_arg.rels, SIZE_BUF_REL);
+  for (i = SIZE_BUF_REL; i--; )
   {
-    buf_rel[i].primes = buf_rel[i].primes_data;
-    buf_rel[i].nb_alloc = NB_PRIMES_OPT;
+    buf_arg.rels[i].primes = buf_arg.rels[i].primes_data;
+    buf_arg.rels[i].nb_alloc = NB_PRIMES_OPT;
   }
-  
-  ASSERT_ALWAYS (callback_arg->needed <= MAX_NEEDED);
+
+  ASSERT_ALWAYS (needed <= MAX_NEEDED);
 
   end_insertRelation = 0;
   cpt_rel_a = cpt_rel_b = 0;
@@ -491,13 +498,13 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
 
   if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
   {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n", 
+    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n",
                      err, strerror (errno));
     exit (1);
   }
 
   err = pthread_create (&thread_callback, &attr, (void* (*)(void*))callback_fct,
-                        (void*) callback_arg);
+                        (void*) &buf_arg);
   if (err)
   {
     fprintf (stderr, "prempt_scan_relations: pthread_create error 2: %d. %s\n",
@@ -591,22 +598,22 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
         if (cpy_cpt_rel_a + 1 == cpt_rel_b + SIZE_BUF_REL)
           NANOSLEEP;
 
-        buf_rel[k].num = rs->nrels++;
+        buf_arg.rels[k].num = rs->nrels++;
 
-        if (callback_arg->rel_used == NULL || callback_arg->f_deleted != NULL ||
-            bit_vector_getbit(callback_arg->rel_used, (size_t) buf_rel[k].num))
+        if (buf_arg.rel_used == NULL || need_del_rels ||
+            bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
         {
-          if (callback_arg->needed == NEEDED_ABP)
-            relation_get_fast_abp (prempt_data, &(buf_rel[k]));
-          else if (callback_arg->needed == NEEDED_AB)
-            relation_get_fast_ab (prempt_data, &(buf_rel[k]));
-          else if (callback_arg->needed == NEEDED_H)
-            relation_get_fast_h (prempt_data, &(buf_rel[k]));
-          else if (callback_arg->needed == NEEDED_ABH)
-            relation_get_fast_abh (prempt_data, &(buf_rel[k]));
-          else if (callback_arg->needed == NEEDED_HMIN)
-            relation_get_fast_hmin (prempt_data, &(buf_rel[k]),
-                                                     callback_arg->min_index);
+          if (needed == NEED_ABP)
+            relation_get_fast_abp (prempt_data, &(buf_arg.rels[k]));
+          else if (needed == NEED_AB)
+            relation_get_fast_ab (prempt_data, &(buf_arg.rels[k]));
+          else if (needed == NEED_H)
+            relation_get_fast_h (prempt_data, &(buf_arg.rels[k]));
+          else if (needed == NEED_ABH)
+            relation_get_fast_abh (prempt_data, &(buf_arg.rels[k]));
+          else if (needed == NEED_HMIN)
+            relation_get_fast_hmin (prempt_data, &(buf_arg.rels[k]),
+                                                     buf_arg.min_index);
         }
         /* Delayed find root computation by block of 1<<NNFR */
         if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
@@ -614,7 +621,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
           if (needr)
           {
             i = (k>>NNFR) & ((1<<NFR)-1);
-            while (fr[i].ok) 
+            while (fr[i].ok)
               NANOSLEEP;
             if (k)
             {
@@ -670,22 +677,22 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
  end_of_files:
   if (needr)
   {
-    if (cpy_cpt_rel_a) 
+    if (cpy_cpt_rel_a)
     {
       k = (unsigned int) ((cpy_cpt_rel_a - 1) & (SIZE_BUF_REL - 1));
-      if (k & ((1<<NNFR)-1)) 
+      if (k & ((1<<NNFR)-1))
       {
         i = ((k>>NNFR)+1) & ((1<<NFR)-1);
-        while (fr[i].ok) 
+        while (fr[i].ok)
           NANOSLEEP;
         fr[i].num = k & ~((1<<NNFR)-1);
         fr[i].end = k;
         fr[i].ok = 1;
       }
     }
-    for (i = 0; i < (1<<NFR); i++) 
+    for (i = 0; i < (1<<NFR); i++)
     {
-      while (fr[i].ok) 
+      while (fr[i].ok)
         NANOSLEEP;
       fr[i].ok = 2;
       pthread_join(thread_fr[i], NULL);
@@ -707,13 +714,16 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
   for (ff = prempt_data->files; *ff; free(*ff++));
   free (prempt_data->files);
   for (i = SIZE_BUF_REL; i-- ; )
-    if (buf_rel[i].nb_alloc != NB_PRIMES_OPT ) SFREE(buf_rel[i].primes);
+    if (buf_arg.rels[i].nb_alloc != NB_PRIMES_OPT )
+      SFREE(buf_arg.rels[i].primes);
+
+  free(buf_arg.rels);
 
   relation_stream_trigger_disp_progress(rs);
   fprintf (stderr, "End of read: %"PRid" relations in %.1fs -- %.1f MB/s -- "
                    "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
 
-  callback_arg->nrels = rs->nrels;
+  buf_arg.info.nrels = rs->nrels;
 
   relation_stream_clear(rs);
 
@@ -726,11 +736,11 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
     for (i = 0; i <= STAT_VALUES_COEFF_LEN; i++)
       tot += __stat_nbcoeffofvalue[i];
 
-    fprintf (stderr, "STAT: coeffs with non-zero values: %"PRIu64"\n", 
+    fprintf (stderr, "STAT: coeffs with non-zero values: %"PRIu64"\n",
                      __stat_weight);
     for (i = 1; i <= STAT_VALUES_COEFF_LEN; i++)
       fprintf (stderr, "STAT: coeffs of abs value %d: %"PRIu64" (%.2f%%)\n",
-               i, __stat_nbcoeffofvalue[i], 
+               i, __stat_nbcoeffofvalue[i],
                100 * (double) __stat_nbcoeffofvalue[i]/tot);
     fprintf (stderr, "STAT: coeffs of abs value > %d: %"PRIu64" (%.2f%%)\n",
              STAT_VALUES_COEFF_LEN, __stat_nbcoeffofvalue[0],
@@ -739,7 +749,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
 #endif
 #endif
 
-  return 1;
+  return buf_arg.info;
 }
 
 

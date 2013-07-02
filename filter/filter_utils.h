@@ -14,6 +14,11 @@ typedef struct {
   int32_t e; //or exponent_t ??
 } ideal_merge_t;
 
+typedef struct {
+  index_t nrels;
+  index_t nprimes;
+  double W; //weight of the active part of the matrix
+} info_mat_t;
 
 #define DEBUG 1
 

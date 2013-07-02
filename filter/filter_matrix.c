@@ -167,15 +167,15 @@ thread_insert (buf_arg_t *arg)
     }
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->buf_data[j]);
+    my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       nanosleep (&wait_classical, NULL);
 
     //FIXME big bug this does not take into account the exponent....
-    arg->nprimes += insert_rel_in_table_no_e (my_rel, 0, 0, rel_compact,
+    arg->info.nprimes += insert_rel_in_table_no_e (my_rel, 0, 0, rel_compact,
                                                       ideals_weight);
-    arg->W += (double) my_rel->nb;
+    arg->info.W += (double) my_rel->nb;
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -197,26 +197,17 @@ void
 filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
     int32_t j;
+    info_mat_t info;
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
             mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
     mat->weight = 0;
 
-    buf_arg_t buf_arg;
-    buf_rel_t *buf_rel;
-    SMALLOC (buf_rel,SIZE_BUF_REL,"buf_rel");
-    MEMSETZERO(&buf_arg, 1);
-    buf_arg.f_deleted = NULL;
-    buf_arg.buf_data = buf_rel;
-    buf_arg.rel_used = NULL;
-    buf_arg.needed = NEEDED_H;
     char *fic[2] = {(char *) purgedname, NULL};
-    prempt_scan_relations (fic, &thread_insert, &buf_arg, NULL);
+    info = process_rels (fic, &thread_insert, NULL, 0, NULL, NULL, NEED_H);
 
-    SFREE(buf_rel);
-
-    ASSERT_ALWAYS (buf_arg.nprimes == (index_t) mat->rem_ncols);
-    ASSERT_ALWAYS (buf_arg.nrels == (index_t) mat->rem_nrows);
+    ASSERT_ALWAYS (info.nprimes == (index_t) mat->rem_ncols);
+    ASSERT_ALWAYS (info.nrels == (index_t) mat->rem_nrows);
 
     if (mat->nburied)
     {

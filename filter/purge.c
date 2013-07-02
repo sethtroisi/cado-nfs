@@ -155,7 +155,7 @@ delete_relation (index_t i)
   {
     o = &(ideals_weight[*tab]);
     ASSERT(*o);
-    if (*o<UMAX(*o) && !(--(*o))) 
+    if (*o<UMAX(*o) && !(--(*o)))
       nremoveprimes++;
   }
 
@@ -276,14 +276,14 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
   /* first collect sums for primes with weight 2, and compute total weight */
   memset (sum2_index, 0, nprimemax * sizeof(index_t));
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i)) 
+    if (bit_vector_getbit(rel_used, (size_t) i))
     {
       for (myrelcompact = rel_compact[i]; (h = *myrelcompact++) != UMAX(h); )
-        if (ideals_weight[h] == 2) 
+        if (ideals_weight[h] == 2)
           sum2_index[h] += i;
       N += 1.0;
     }
-  
+
   ASSERT_ALWAYS(N == (double) *nrels);
 
   /* now initialize bit table for relations used */
@@ -294,7 +294,7 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
 
   for (i = 0; i < nrelmax; i++)
   {
-    if (!bit_vector_getbit(Tbv, (size_t) i)) 
+    if (!bit_vector_getbit(Tbv, (size_t) i))
     {
       w_ccc = 0.0;
       h = compute_connected_component (i);
@@ -348,8 +348,8 @@ onepass_singleton_removal (index_t *nrels, index_t *nprimes)
     if (bit_vector_getbit(rel_used, (size_t) i))
     {
       for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
-      {  
-        if (ideals_weight[*tab] == 1) 
+      {
+        if (ideals_weight[*tab] == 1)
         {
           nremoveprimes += delete_relation(i);
           nremoverels++;
@@ -455,7 +455,7 @@ remove_all_singletons (index_t *nrels, index_t *nprimes, int64_t *excess)
   *excess = (((int64_t) *nrels) - *nprimes);
   fprintf (stderr, "  nrels=%"PRid" nprimes=%"PRid" excess=%"PRId64"\n",
                    *nrels, *nprimes, *excess);
-  do 
+  do
   {
     oldnrels = *nrels;
 #ifdef HAVE_SYNC_FETCH
@@ -489,13 +489,13 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
   if ((double) excess < required_excess * ((double) *nprimes))
   {
     fprintf(stderr, "(excess / nprimes) = %.2f < %.2f. See -required_excess "
-                    "argument.\n", ((double) excess / (double) *nprimes), 
+                    "argument.\n", ((double) excess / (double) *nprimes),
                     required_excess);
     exit (2);
   }
 
   index_t chunk = excess / npass;
-  
+
   //npass pass of clique removal + singletons removal
   for (count = 0; count < npass && excess > 0; count++)
   {
@@ -516,7 +516,7 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
 
   /* May need an extra pass of clique removal + singletons removal if excess is
     still larger than keep. It may happen due to the fact that each clique does
-    not make the excess go down by one but can (rarely) left the excess 
+    not make the excess go down by one but can (rarely) left the excess
     unchanged. */
   if (excess > keep)
   {
@@ -602,17 +602,17 @@ thread_insert (buf_arg_t *arg)
     }
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->buf_data[j]);
+    my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       NANOSLEEP;
 
     if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num))
     {
-      arg->nprimes+=insert_rel_in_table_no_e (my_rel, arg->min_index,
+      arg->info.nprimes+=insert_rel_in_table_no_e (my_rel, arg->min_index,
                                      boutfilerel, rel_compact, ideals_weight);
 #ifdef STAT
-      arg->W += (double) my_rel->nb_above_min_index;
+      arg->info.W += (double) my_rel->nb_above_min_index;
 #endif
     }
 
@@ -641,7 +641,7 @@ thread_print(buf_arg_t *arg)
           pthread_exit(NULL);
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->buf_data[j]);
+    my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       NANOSLEEP;
@@ -654,11 +654,11 @@ thread_print(buf_arg_t *arg)
     }
     else if (aff)
     {
-      arg->W += (double) my_rel->nb;
-      print_relation (arg->f_remaining, my_rel);
+      arg->info.W += (double) my_rel->nb;
+      print_relation (arg->fd[0], my_rel);
     }
-    else if (!boutfilerel && arg->f_deleted != NULL)
-      print_relation (arg->f_deleted, my_rel);
+    else if (!boutfilerel && arg->fd[1] != NULL)
+      print_relation (arg->fd[1], my_rel);
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -769,10 +769,10 @@ void
 purge_parse_npt_param (param_list pl)
 {
   const char * snpt = param_list_lookup_string(pl, "npthr");
-  if (snpt) 
+  if (snpt)
   {
     char *p, oldp;
-    if ((p = strchr(snpt, 'x'))) 
+    if ((p = strchr(snpt, 'x')))
     {
       unsigned int x, y;
       oldp = *p;
@@ -785,7 +785,7 @@ purge_parse_npt_param (param_list pl)
         fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
         usage(argv0);
       }
-    } 
+    }
     else if (!sscanf(snpt, "%u", &npt))
     {
       fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
@@ -803,11 +803,10 @@ main (int argc, char **argv)
   int k;
   size_t rel_used_nb_bytes;
   param_list pl;
-  buf_arg_t buf_arg;
-  buf_rel_t *buf_rel;
   uint64_t min_index = UMAX(uint64_t);
   index_t nrels, nprimes;
   size_t tot_alloc_bytes = 0, cur_alloc;
+  FILE *f_remaining = NULL, *f_deleted = NULL;
 
   double wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -934,7 +933,7 @@ main (int argc, char **argv)
   /* For the last byte of rel_used, put the bits to 0 if it does not
    * correspond to a rel num */
   if (nrelmax & (BV_BITS - 1))
-    rel_used->p[nrelmax>>LN2_BV_BITS] &= 
+    rel_used->p[nrelmax>>LN2_BV_BITS] &=
                                 (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   if (!boutfilerel)
@@ -960,40 +959,27 @@ main (int argc, char **argv)
                      cur_alloc >> 20, tot_alloc_bytes >> 20);
   }
 
-  cur_alloc = SIZE_BUF_REL * sizeof (buf_rel_t);
-  buf_rel = (buf_rel_t *) malloc (cur_alloc);
-  ASSERT_ALWAYS (buf_rel != NULL);
-  tot_alloc_bytes += cur_alloc;
-  fprintf (stderr, "Allocated buf_rel of %zuMb (total %zuMb so far)\n",
-                    cur_alloc >> 20, tot_alloc_bytes >> 20);
-
-  memset (&buf_arg, 0, sizeof(buf_arg_t));
-  buf_arg.f_deleted = NULL;
-  buf_arg.min_index = (index_t) min_index;
-  buf_arg.buf_data = buf_rel;
-  buf_arg.rel_used = rel_used;
-  buf_arg.needed = NEEDED_HMIN;
-
-
   /**********************Start interessing stuff *****************************/
-  if (!boutfilerel) 
+  info_mat_t info;
+  if (!boutfilerel)
     fprintf (stderr, "Pass 1, reading and storing ideals with index h >= "
                      "%"PRIu64"\n", min_index);
   else
-    fprintf (stderr, "Pass 1, reading ideals with index h >= %"PRIu64"\n", 
+    fprintf (stderr, "Pass 1, reading ideals with index h >= %"PRIu64"\n",
                      min_index);
 
   /* first pass over relations in files */
-  prempt_scan_relations (fic, &thread_insert, &buf_arg, NULL);
-  nprimes = buf_arg.nprimes;
-  
+  info = process_rels (fic, &thread_insert, NULL, min_index, NULL, rel_used,
+                       NEED_HMIN);
+  nprimes = info.nprimes;
+
   tot_alloc_bytes += get_my_malloc_bytes();
   fprintf (stderr, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
                    get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
 #ifdef STAT
   {
   size_t tmp = ((uint64_t) buf_arg.W + nrelmax) * sizeof(index_t);
-  double ratio = 100.0 * (double) (((double) tmp) / 
+  double ratio = 100.0 * (double) (((double) tmp) /
                                    ((double) get_my_malloc_bytes() ));
   fprintf (stderr, "STAT: W_active=%1.0f\nSTAT: Should take %zuMB in memory, "
                    "take %zuMB (%.2f %%)\n", buf_arg.W, tmp >> 20,
@@ -1001,15 +987,15 @@ main (int argc, char **argv)
   }
 #endif
 
-  if (buf_arg.nrels != nrelmax) 
+  if (info.nrels != nrelmax)
   {
     fprintf (stderr, "Error, -nrels value should match the number of scanned "
                      "relations\nexpected %"PRIu64" relations, found %"PRid"\n",
-                     nrelmax, buf_arg.nrels);
+                     nrelmax, info.nrels);
     exit (1);
   }
 
-  if (!boutfilerel) 
+  if (!boutfilerel)
   {
     singletons_and_cliques_removal (&nrels, &nprimes);
     if (nrels < nprimes)
@@ -1043,7 +1029,7 @@ main (int argc, char **argv)
                        nrels, nprimes, ((int64_t) nrels) - nprimes);
     else
       fprintf (stderr, "   nrels=%"PRid" (out of %"PRIu64") nprimes=%"PRid" "
-                       "excess=%"PRId64"\n", nrels, nrelmax, nprimes, 
+                       "excess=%"PRId64"\n", nrels, nrelmax, nprimes,
                        ((int64_t) nrels) - nprimes);
   }
 
@@ -1052,15 +1038,14 @@ main (int argc, char **argv)
 
   /* reread the relation files and convert them to the new coding */
   fprintf (stderr, "Storing remaining relations...\n");
-  
-  buf_arg.min_index = 0;
-  if (!(buf_arg.f_remaining = fopen_maybe_compressed (purgedname, "w")))
+
+  if (!(f_remaining = fopen_maybe_compressed (purgedname, "w")))
   {
     fprintf (stderr, "Error, cannot open file %s for writing.\n", purgedname);
     exit (1);
   }
   if (deletedname != NULL)
-    if (!(buf_arg.f_deleted = fopen_maybe_compressed (deletedname, "w")))
+    if (!(f_deleted = fopen_maybe_compressed (deletedname, "w")))
     {
       fprintf (stderr, "Error, cannot open file %s for writing.\n",deletedname);
       exit (1);
@@ -1073,21 +1058,23 @@ main (int argc, char **argv)
     while (ideals_weight[last_used] == 0)
       last_used--;
 
-    fprintf (buf_arg.f_remaining, "# %"PRid" %"PRid"\n", nrels, last_used + 1);
+    fprintf (f_remaining, "# %"PRid" %"PRid"\n", nrels, last_used + 1);
   }
-  
+
   /* second pass over relations in files */
-  buf_arg.needed = NEEDED_ABH;
-  prempt_scan_relations (fic, &thread_print, &buf_arg, NULL);
+  FILE *outfd[2] = {f_remaining, f_deleted};
+  //FIXME just need the line in char*; no need to parse it in integers
+  info = process_rels (fic, &thread_print, NULL, 0, outfd, rel_used,
+                       NEED_ABH);
 
 
   if (!boutfilerel)
   {
     /* write final values to stdout */
     fprintf(stdout, "Final values:\nnrels=%"PRid" nprimes=%"PRid" "
-                    "excess=%"PRId64"\nweight=%1.0f weight*nrels=%1.2e\n", 
-                    nrels, nprimes, ((int64_t) nrels) - nprimes, buf_arg.W, 
-                    buf_arg.W * (double) nrels);
+                    "excess=%"PRId64"\nweight=%1.0f weight*nrels=%1.2e\n",
+                    nrels, nprimes, ((int64_t) nrels) - nprimes, info.W,
+                    info.W * (double) nrels);
     fflush (stdout);
   }
   else
@@ -1098,7 +1085,7 @@ main (int argc, char **argv)
     /* For the last byte of rel_used, put the bits to 0 if it does not
     * correspond to a rel num */
     if (nrelmax & (BV_BITS - 1))
-      rel_used->p[nrelmax>>LN2_BV_BITS] &= 
+      rel_used->p[nrelmax>>LN2_BV_BITS] &=
                                   (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
     fprintf (stderr, "Deleted %"PRid" relations with singleton(s)\n"
@@ -1106,14 +1093,14 @@ main (int argc, char **argv)
                      "Writing rel_used file %s, %zu bytes\n",
                      relsup, prisup, outfilerel, rel_used_nb_bytes);
 
-    if (!(out = fopen_maybe_compressed (outfilerel, "w"))) 
+    if (!(out = fopen_maybe_compressed (outfilerel, "w")))
     {
       fprintf (stderr, "Error, cannot open file %s for writing.\n", outfilerel);
       exit (1);
     }
     p = (void *) rel_used->p;
     for (pf = p + rel_used_nb_bytes; p != pf; p += fwrite(p, 1, pf - p, out));
-    
+
     fclose_maybe_compressed (out, outfilerel);
   }
 
@@ -1122,9 +1109,6 @@ main (int argc, char **argv)
   if (ideals_weight != NULL)
     free(ideals_weight);
   ideals_weight = NULL;
-  if (buf_rel != NULL)
-    free(buf_rel);
-  buf_rel = NULL;
   if (sum2_index != NULL)
     free(sum2_index);
   sum2_index = NULL;
@@ -1136,9 +1120,9 @@ main (int argc, char **argv)
   if (filelist)
     filelist_clear(fic);
 
-  fclose_maybe_compressed (buf_arg.f_remaining, purgedname);
-  if (buf_arg.f_deleted != NULL)
-    fclose_maybe_compressed (buf_arg.f_deleted, deletedname);
+  fclose_maybe_compressed (f_remaining, purgedname);
+  if (f_deleted != NULL)
+    fclose_maybe_compressed (f_deleted, deletedname);
 
   param_list_clear(pl);
 

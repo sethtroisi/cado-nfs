@@ -52,11 +52,11 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 
 
 /* What part of relations do we read */
-#define NEEDED_ABP 0 //read a,b:p0,...,pk:p'0,...,p'l
-#define NEEDED_AB 1  //read a,b
-#define NEEDED_H 2 //read a,b:h0,...,hk
-#define NEEDED_HMIN 3 //read h0,...,hk only if hi >= min_index
-#define NEEDED_ABH 4 //read a,b:h0,...,hk
+#define NEED_ABP 0 //read a,b:p0,...,pk:p'0,...,p'l
+#define NEED_AB 1  //read a,b
+#define NEED_H 2 //read a,b:h0,...,hk
+#define NEED_HMIN 3 //read h0,...,hk only if hi >= min_index
+#define NEED_ABH 4 //read a,b:h0,...,hk
 #define MAX_NEEDED 4
 
 typedef struct {
@@ -71,14 +71,10 @@ typedef struct {
 } buf_rel_t;
 
 typedef struct {
-  index_t nrels;       // nb of rels read
-  index_t nprimes;     // nb of primes read
-  buf_rel_t *buf_data; // buffer for I/O
-  unsigned int needed; // ABP, AB, H, ABHMIN
+  info_mat_t info;     // nb of rels & primes read; wiehgt of the matrix
+  buf_rel_t *rels;     // buffer for rels for I/O
   index_t min_index;   // store only primes with index >= min_index
-  double W;            // Weight (nb of non-zero) of primes >= min_index
-  FILE *f_remaining;   // File for writing remaining rels
-  FILE *f_deleted;     // File for writing deleted rels
+  FILE **fd;           // output files
   bit_vector_ptr rel_used; // If not all rels are processed
 } buf_arg_t;
 
@@ -116,9 +112,8 @@ static const unsigned char ugly[256] = {
 int nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
 void prempt_load (prempt_t);
-void relation_stream_get_fast (prempt_t, buf_rel_t *, index_t);
-int prempt_scan_relations (char **, void* (*)(buf_arg_t *), buf_arg_t *,
-                           void* (*)(fr_t *));
+info_mat_t process_rels (char **, void* (*)(buf_arg_t *), void* (*)(fr_t *),
+                         index_t, FILE **, bit_vector_ptr, unsigned int);
 void test_and_print_progress_now ();
 int is_finish ();
 void set_antebuffer_path (char *, const char *);

@@ -373,7 +373,7 @@ thread_only_hash (buf_arg_t *arg)
     }
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->buf_data[j]);
+    my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       NANOSLEEP;
@@ -412,13 +412,13 @@ thread_print(buf_arg_t *arg)
           pthread_exit(NULL);
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->buf_data[j]);
+    my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       NANOSLEEP;
 
     if (my_rel->nb != 0)
-      print_relation (arg->f_deleted, my_rel); //FIXME where do we print
+      print_relation (arg->fd[0], my_rel); //FIXME where do we print
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -497,8 +497,6 @@ int
 main (int argc, char *argv[])
 {
   argv0 = argv[0];
-  buf_arg_t buf_arg;
-  buf_rel_t *buf_rel;
   p_r_values_t pmin;
   index_t min_index;
   cado_poly cpoly;
@@ -695,14 +693,9 @@ main (int argc, char *argv[])
 
  //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
 
-  SMALLOC(buf_rel,SIZE_BUF_REL, "buf_rel");
-  MEMSETZERO(&buf_arg, 1);
-  buf_arg.buf_data = buf_rel;
-  buf_arg.needed = NEEDED_AB;
-  
   fprintf (stderr, "Reading files already renumbered:\n");
-  prempt_scan_relations (files_already_renumbered, &thread_only_hash, &buf_arg,
-                         NULL);
+  process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,
+                NEED_AB);
 
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;
@@ -738,7 +731,6 @@ main (int argc, char *argv[])
     filelist_clear(files);
   SFREE(files_already_renumbered);
   SFREE(files_new);
-  SFREE(buf_rel);
 
   param_list_clear(pl);
   renumber_free (renumber_table);
