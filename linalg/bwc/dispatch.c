@@ -5,6 +5,7 @@
  * and prep into one would be difficult and/or artificial, because they
  * handle different data widths.
  */
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <string.h>
 #include "bwc_config.h"

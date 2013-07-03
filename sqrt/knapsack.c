@@ -1,8 +1,8 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
 #include "knapsack.h"

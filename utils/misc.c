@@ -9,7 +9,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
+#ifdef HAVE_SSE2
 #include <emmintrin.h>
+#endif
 /* For MinGW Build */
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
