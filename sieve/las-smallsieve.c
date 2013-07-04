@@ -118,9 +118,9 @@ void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s
     memset(r, 0, sizeof(small_sieve_data_t));
     r->nb_ssp = bounds[1] - bounds[0];
     r->ssp = (ssp_t *) malloc (r->nb_ssp * sizeof (ssp_t));
-    FATAL_ERROR_CHECK(r->ssp == NULL, "malloc failed");
+    FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->ssp == NULL, "malloc failed");
     r->logp = malloc (r->nb_ssp);
-    FATAL_ERROR_CHECK(r->logp == NULL, "malloc failed");
+    FATAL_ERROR_CHECK(r->nb_ssp > 0 && r->logp == NULL, "malloc failed");
     r->markers = NULL;
     int r_nmarkers = 0;
 
