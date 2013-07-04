@@ -144,7 +144,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         } else {
             uint32_t dw = 0;
             uint32_t sw = 0;
-	    for(int j = 1; j <= rowLength(sparsemat, i); j++){
+	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
 		if (code[rowCell(sparsemat, i, j)]-1 < skip) {
                     dw++;
                     DW++;
@@ -183,7 +183,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         }
 #endif
 
-	    for(int j = 1; j <= rowLength(sparsemat, i); j++){
+	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
 #if DEBUG >= 1
 		ASSERT(code[rowCell(sparsemat, i, j)] > 0);
 #endif
@@ -381,7 +381,7 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
       //destroy initial row!
 #ifdef FOR_DL
       fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
-      for (int k = 1; k <= rowLength(newrows, i0); k++)
+      for (unsigned int k = 1; k <= rowLength(newrows, i0); k++)
           fprintf (outdelfile, " %x:%d", newrows[i0][k].id, newrows[i0][k].e);
       fprintf (outdelfile, "\n");
 #endif
@@ -505,7 +505,7 @@ readPurged (typerow_t **sparsemat, purgedfile_stream ps, int verbose,
       for(int k = 0; k < ps->nc; k++)
         {
 #ifdef FOR_DL
-          if (j > 1 && sparsemat[i][j-1].id == ps->cols[k])
+          if (j > 1 && (int) sparsemat[i][j-1].id == ps->cols[k])
             sparsemat[i][j-1].e++;
           else
 #endif
@@ -546,7 +546,7 @@ writeIndex(const char *indexname, index_data_t index_data,
     for (int i = 0; i < small_nrows; ++i) {
         ASSERT (index_data[i].n > 0);
         fprintf(indexfile, "%d", index_data[i].n);
-        for (int j = 0; j < index_data[i].n; ++j) {
+        for (unsigned int j = 0; j < index_data[i].n; ++j) {
 #ifdef FOR_DL
             fprintf(indexfile, " " PURGE_INT_FORMAT ":%d",
                     index_data[i].rels[j].ind_row,
@@ -646,7 +646,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     memset (colweight, 0, ncols * sizeof(int *));
     for (int i = 0; i < nrows; i++)
       if (newrows[i] != NULL)
-        for(int k = 1; k <= rowLength(newrows, i); k++)
+        for(unsigned int k = 1; k <= rowLength(newrows, i); k++)
           colweight[rowCell(newrows, i, k)] += 1;
 
     /* crunch empty rows */

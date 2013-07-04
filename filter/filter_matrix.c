@@ -47,13 +47,13 @@ incrS (int w)
 void
 initMat (filter_matrix_t *mat)
 {
-    int32_t **R;
+    index_t **R;
 
     mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
     ASSERT_ALWAYS (mat->rows != NULL);
     mat->wt = (int*) malloc (mat->ncols * sizeof (int));
     memset (mat->wt, 0, mat->ncols * sizeof (int));
-    R = (int32_t **) malloc (mat->ncols * sizeof(int32_t *));
+    R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
 
@@ -132,20 +132,25 @@ filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
 void
 fillmat (filter_matrix_t *mat)
 {
-  int32_t j, *Rj, jmin = 0, jmax = mat->ncols, wj;
+  index_t j, jmin = 0, jmax = mat->ncols;
+  int wj;
+  index_t *Rj;
 
-    for(j = jmin; j < jmax; j++){
-        wj = mat->wt[j];
-	if (wj <= mat->cwmax){
-	    Rj = (int32_t *) malloc((wj + 1) * sizeof(int32_t));
-	    Rj[0] = 0; /* last index used */
-	    mat->R[j] = Rj;
-	}
-	else{ /* weight is larger than cwmax */
-            mat->wt[j] = -mat->wt[j]; // trick!!!
-	    mat->R[j] = NULL;
-	}
+  for(j = jmin; j < jmax; j++)
+  {
+    wj = mat->wt[j];
+    if (wj <= mat->cwmax)
+    {
+      Rj = (index_t *) malloc((wj + 1) * sizeof(index_t));
+      Rj[0] = 0; /* last index used */
+      mat->R[j] = Rj;
     }
+    else /* weight is larger than cwmax */
+    {
+      mat->wt[j] = -mat->wt[j]; // trick!!!
+      mat->R[j] = NULL;
+    }
+  }
 }
 
 void *
@@ -255,7 +260,8 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
           buf[next] = j;
           ASSERT(rel_compact[i][k].e == 1);
 #else
-          buf[next] = rel_compact[i][k];
+          buf[next].id = rel_compact[i][k].id;
+          buf[next].e = rel_compact[i][k].e;
 #endif
           next++;
           if(mat->wt[j] > 0)
@@ -298,21 +304,23 @@ freeRj(filter_matrix_t *mat, int j)
 void
 remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
 {
-    // be dumb for a while
-    int k;
+  // be dumb for a while
+  unsigned int k;
 
-    if(mat->R[j] == NULL){
-	fprintf(stderr, "Row %d already empty\n", j);
-	return;
-    }
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] == i){
+  if(mat->R[j] == NULL)
+  {
+	  fprintf(stderr, "Row %d already empty\n", j);
+	  return;
+  }
+  for(k = 1; k <= mat->R[j][0]; k++)
+	  if((int) mat->R[j][k] == i)
+    {
 #if DEBUG >= 2
-	    fprintf(stderr, "Removing row %d from R[%d]\n", i, j);
+      fprintf(stderr, "Removing row %d from R[%d]\n", i, j);
 #endif
-	    mat->R[j][k] = -1;
-	    break;
-	}
+      mat->R[j][k] = UMAX(index_t);
+      break;
+	  }
 }
 
 // cell M[i, j] is incorporated in the data structure. It is used
@@ -320,28 +328,30 @@ remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
 void
 add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
-    // be semi-dumb for a while
-    int k;
+  // be semi-dumb for a while
+  unsigned int k;
     
 #if DEBUG >= 2
-    fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
+  fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] == -1)
-	    break;
-    if(k <= mat->R[j][0]){
-	// we have found a place where it is -1
-	mat->R[j][k] = i;
-    }
-    else{
+  for(k = 1; k <= mat->R[j][0]; k++)
+    if(mat->R[j][k] == UMAX(index_t))
+      break;
+  if(k <= mat->R[j][0])
+  {
+  // we have found a place where it is -1
+  mat->R[j][k] = i;
+  }
+  else
+  {
 #if DEBUG >= 2
-	fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
+    fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
-	int l = mat->R[j][0]+2;
-	mat->R[j] = (int32_t *)realloc(mat->R[j], l * sizeof(int32_t));
-	mat->R[j][l-1] = i;
-	mat->R[j][0] = l-1;
-    }
+    int l = mat->R[j][0]+2;
+    mat->R[j] = (index_t *)realloc(mat->R[j], l * sizeof(index_t));
+    mat->R[j][l-1] = i;
+    mat->R[j][0] = l-1;
+  }
 }
 
 // Remove j from R[i] and crunch R[i].
@@ -388,12 +398,12 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 #ifdef FOR_DL /* look for the exponents of j in i1 i2*/
     int e1 = 0, e2 = 0;
     int d;
-    int l;
+    unsigned int l;
     for (l = 1 ; l <= matLengthRow(mat, i1) ; l++)
-        if (matCell(mat, i1, l) == j)
+        if ((int) matCell(mat, i1, l) == j)
             e1 = mat->rows[i1][l].e;
     for (l = 1 ; l <= matLengthRow(mat, i2) ; l++)
-        if (matCell(mat, i2, l) == j)
+        if ((int) matCell(mat, i2, l) == j)
             e2 = mat->rows[i2][l].e;
 
     ASSERT (e1 != 0 && e2 != 0);
@@ -455,10 +465,12 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 int
 fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
 {
-  int ni = 0, k, i, w = 0;
+  int ni = 0, w = 0;
+  unsigned int k;
+  index_t i;
 
   for (k = 1; k <= mat->R[j][0]; k++)
-    if ((i = mat->R[j][k]) != -1)
+    if ((i = mat->R[j][k]) != UMAX(index_t))
       {
         ind[ni++] = i;
         w += matLengthRow(mat, i);

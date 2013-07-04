@@ -81,12 +81,12 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
 #ifdef FOR_DL /* look for the exponents of j in i1 i2*/
     e1 = 0, e2 = 0;
     int d;
-    int l;
+    unsigned int l;
     for (l = 1 ; l <= rowLength(rows, i1) ; l++)
-        if (rowCell(rows, i1, l) == j)
+        if ((int) rowCell(rows, i1, l) == j)
             e1 = rows[i1][l].e;
     for (l = 1 ; l <= rowLength(rows, i2) ; l++)
-        if (rowCell(rows, i2, l) == j)
+        if ((int) rowCell(rows, i2, l) == j)
             e2 = rows[i2][l].e;
 
     ASSERT (e1 != 0 && e2 != 0);

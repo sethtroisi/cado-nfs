@@ -37,13 +37,14 @@ typedef struct {
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
   int keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
-  int32_t **R;           /* R[j][k] contains the indices of the rows containing
+  index_t **R;           /* R[j][k] contains the indices of the rows containing
                             the ideal of index j, 0 <= j < ncols,
                             1 <= k <= R[j][0], for weight(j) <= cwmax.
-                        R[j][k] = -1 if the corresponding row has been deleted.
+                        R[j][k] = UMAX(index_t) if the corresponding row has
+                                                                  been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
-  int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
+  index_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
                             otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted) */
@@ -70,9 +71,11 @@ extern void print_row(filter_matrix_t *mat, int i);
 #ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
+#define setCell(cell, v, c) cell = (ideal_merge_ffs_t) {.id = v, .e = c}
 #else
 #define matLengthRow(mat, i) (mat)->rows[(i)][0]
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)]
+#define setCell(cell, v, c) cell = v
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 

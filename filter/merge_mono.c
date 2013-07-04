@@ -92,10 +92,10 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
 static void
 removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 {
-    int32_t k;
+  unsigned int k;
 
     for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] != -1){
+	if(mat->R[j][k] != UMAX(index_t)){
 # if TRACE_COL >= 0
 	    if(j == TRACE_COL)
 		printf ("deleteAllCols: row is %d\n",mat->R[j][k]);
@@ -455,7 +455,8 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
                 filter_matrix_t *mat, int m, int32_t j, int useMST)
 {
     int32_t ind[MERGE_LEVEL_MAX];
-    int ni, k;
+    unsigned int k;
+    int ni;
 
 # if 0
     // let's be cautious...
@@ -482,7 +483,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #endif
 
     for(ni = 0, k = 1; k <= mat->R[j][0]; k++){
-	if(mat->R[j][k] != -1){
+	if(mat->R[j][k] != UMAX(index_t)){
 	    ind[ni++] = mat->R[j][k];
       if (ni == m)
               break; /* early abort, since we know there are m rows */
