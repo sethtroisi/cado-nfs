@@ -528,7 +528,7 @@ class WorkunitClient(object):
         if dlpath == None:
             filename = urlpath.split("/")[-1]
             dlpath = os.path.join(self.settings["DLDIR"], filename)
-        url = self.settings["SERVER"] + "/" + urlpath
+        url = self.settings["SERVER"].rstrip("/") + "/" + urlpath
         if options:
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)
@@ -659,7 +659,7 @@ class WorkunitClient(object):
         logging.debug("POST data: %s", mimedata)
 
         url = self.settings["SERVER"].rstrip("/") + "/" + \
-                self.settings["POSTRESULTPATH"]
+                self.settings["POSTRESULTPATH"].lstrip("/")
         logging.info("Sending result for workunit %s to %s", 
                      self.workunit.get_id(), url)
         request = urllib_request.Request(url, data=postdata, 
