@@ -204,7 +204,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     mat->weight = 0;
 
     char *fic[2] = {(char *) purgedname, NULL};
-    info = process_rels (fic, &thread_insert, NULL, 0, NULL, NULL, NEED_H);
+    info = process_rels (fic, &thread_insert, NULL, 0, NULL, NULL, STEP_MERGE);
 
     ASSERT_ALWAYS (info.nprimes == (index_t) mat->rem_ncols);
     ASSERT_ALWAYS (info.nrels == (index_t) mat->rem_nrows);

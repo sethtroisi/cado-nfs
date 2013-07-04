@@ -655,10 +655,10 @@ thread_print(buf_arg_t *arg)
     else if (aff)
     {
       arg->info.W += (double) my_rel->nb;
-      print_relation (arg->fd[0], my_rel);
+      fputs (my_rel->line, arg->fd[0]);
     }
     else if (!boutfilerel && arg->fd[1] != NULL)
-      print_relation (arg->fd[1], my_rel);
+      fputs (my_rel->line, arg->fd[1]);
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -970,7 +970,7 @@ main (int argc, char **argv)
 
   /* first pass over relations in files */
   info = process_rels (fic, &thread_insert, NULL, min_index, NULL, rel_used,
-                       NEED_HMIN);
+                       STEP_PURGE_PASS1);
   nprimes = info.nprimes;
 
   tot_alloc_bytes += get_my_malloc_bytes();
@@ -1063,9 +1063,8 @@ main (int argc, char **argv)
 
   /* second pass over relations in files */
   FILE *outfd[2] = {f_remaining, f_deleted};
-  //FIXME just need the line in char*; no need to parse it in integers
   info = process_rels (fic, &thread_print, NULL, 0, outfd, rel_used,
-                       NEED_ABH);
+                       STEP_PURGE_PASS2);
 
 
   if (!boutfilerel)

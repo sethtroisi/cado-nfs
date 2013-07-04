@@ -9,7 +9,7 @@ add_dependencies(filterutils antebuffer)
 
 # the utils library is already linked with -lgmp and -lm
 add_executable(dup1 dup1.c)
-target_link_libraries(dup1 utils)
+target_link_libraries(dup1 filterutils)
 
 add_executable(dup2 dup2.c)
 target_link_libraries(dup2 filterutils)
@@ -31,6 +31,8 @@ add_executable(replay-dl replay.c sparse.c)
 target_link_libraries(replay-dl filterutils)
 set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
+#add_executable(reconstructlog-dl reconstructlog.c)
+#target_link_libraries(reconstructlog-dl filterutils)
 
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 

@@ -15,8 +15,7 @@
 
 #include "cado.h"
 
-#define CA 314159265358979323UL
-#define CB 271828182845904523UL
+#define MAX_NSLICES 32
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,6 +34,8 @@
 #include "utils.h"
 #include "relation.h"
 
+#include "filter_utils.h"
+
 /* Only (a,b) are parsed on input. This flags control whether we copy the
  * rest of the relation data to the output file, or if we content
  * ourselves with smaller .ab files */
@@ -45,16 +46,16 @@ static int only_ab = 0;
 int split_relfile (relation_stream_ptr rs, const char *name,
                    const char *dirname, const char * outfmt,
                    int *do_slice, int nslices_log, int nslices, 
-                   unsigned int ab_base, unsigned long *nr_rels)
+                   unsigned int ab_base, index_t *nr_rels)
 {
     FILE * f_in;
     int p_in;
     const char * suffix_in;
 
     int ok MAYBE_UNUSED;
-    char * oname[nslices];
-    FILE * ofile[nslices];
-    int p_out[nslices];
+    char * oname[MAX_NSLICES];
+    FILE * ofile[MAX_NSLICES];
+    int p_out[MAX_NSLICES];
 
     uint64_t h;
 
@@ -90,7 +91,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
 
 	ok = 1;
 
-        h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
+        h = CA_DUP1 * (uint64_t) rs->rel.a + CB_DUP1 * rs->rel.b;
         /* Using the low bit of h is not a good idea, since then
            odd values of i are twice more likely. The second low bit
            also gives a small bias with RSA768 (but not for random
@@ -196,6 +197,8 @@ main (int argc, char * argv[])
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
+  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+  set_antebuffer_path (argv0, path_antebuffer);
 
     if (param_list_warn_unused(pl)) {
         exit(1);
@@ -213,7 +216,7 @@ main (int argc, char * argv[])
         usage(argv0);
     }
 
-    int do_slice[nslices];
+    int do_slice[MAX_NSLICES];
 
     if (only_slice == -1) { /* split all slices */
         for (int i = 0; i < nslices; i++)
@@ -229,8 +232,10 @@ main (int argc, char * argv[])
     }
 
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
-    unsigned long nr_rels[nslices];
-    memset (nr_rels, 0, sizeof(unsigned long) * nslices);
+    index_t nr_rels[MAX_NSLICES];
+    memset (nr_rels, 0, sizeof(index_t) * nslices);
+
+    //process_rels (files, &thread_dup1, NULL, 0, NULL, NULL, STEP_DUP1);
 
     relation_stream rs;
     relation_stream_init(rs);
@@ -244,12 +249,12 @@ main (int argc, char * argv[])
             "# split %" PRid " relations in %.1fs"
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+
     for (int i = 0; i < nslices; i++) {
-        fprintf (stderr,
-                "# slice %d received %lu relations\n",
-                i, nr_rels[i]);
+        fprintf (stderr, "# slice %d received %"PRid" relations\n", i,
+                                                                    nr_rels[i]);
     }
-    relation_stream_clear(rs);
+    //relation_stream_clear(rs);
 
     if (filelist) filelist_clear(files);
 

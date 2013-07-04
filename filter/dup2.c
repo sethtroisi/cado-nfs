@@ -695,7 +695,7 @@ main (int argc, char *argv[])
 
   fprintf (stderr, "Reading files already renumbered:\n");
   process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,
-                NEED_AB);
+                STEP_DUP2_PASS1);
 
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;

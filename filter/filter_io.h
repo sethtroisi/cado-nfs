@@ -29,7 +29,7 @@
    Stocks the sentences precomputed but not insered. 
    About 64K sentences for the optimal.
 */
-#define SIZE_BUF_REL MAX((1<<(NNFR+2)),(1<<6))
+#define SIZE_BUF_REL MAX((1<<(NFR+NNFR+1+(NFR==0))),(1<<6))
 
 /* The realistic minimal non-CPU waiting with nanosleep is about
    10 to 40 µs (1<<13 for nanosleep).
@@ -51,13 +51,15 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 #endif
 
 
-/* What part of relations do we read */
-#define NEED_ABP 0 //read a,b:p0,...,pk:p'0,...,p'l
-#define NEED_AB 1  //read a,b
-#define NEED_H 2 //read a,b:h0,...,hk
-#define NEED_HMIN 3 //read h0,...,hk only if hi >= min_index
-#define NEED_ABH 4 //read a,b:h0,...,hk
-#define MAX_NEEDED 4
+/* For which step do we read the rels */
+#define STEP_DUP1 0
+#define STEP_DUP2_PASS1 1
+#define STEP_DUP2_PASS2 2
+#define STEP_PURGE_PASS1 3
+#define STEP_PURGE_PASS2 4
+#define STEP_MERGE 5
+#define STEP_REPLAY 6
+#define MAX_STEP 6
 
 typedef struct {
   int64_t a;
@@ -68,6 +70,7 @@ typedef struct {
   weight_t nb_alloc;     /* allocated space for primes */
   weight_t nb_above_min_index; /* nb of primes above min_index, must be <=nb */
   index_t num;          /* Relation number */
+  char *line;   /* If not NULL, contains the relations with a '\n' at the end */
 } buf_rel_t;
 
 typedef struct {

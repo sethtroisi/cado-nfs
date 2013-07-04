@@ -350,38 +350,48 @@ relation_get_fast_ab (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_h (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_abline (prempt_t prempt_data, buf_rel_t *mybufrel)
+{
+  char *p, *begin;
+  unsigned char c;
+  unsigned int i = 0;
+
+  p = (char *) prempt_data->pcons;
+  begin = p;
+
+#ifndef FOR_FFS
+  c = read_a (&(mybufrel->a), &p, 0);
+  c = read_b (&(mybufrel->b), &p, 0);
+#else
+  c = read_a (&(mybufrel->a), &p, 1);
+  c = read_b (&(mybufrel->b), &p, 1);
+#endif
+
+  do
+  {
+    LOAD_ONE(begin);
+    mybufrel->line[i++] = c;
+  } while (c != '\n');
+
+  mybufrel->line[i] = '\0';
+}
+
+static inline void
+relation_get_fast_line (prempt_t prempt_data, buf_rel_t *mybufrel)
 {
   char *p;
-  unsigned int nb_primes_read;
-  index_t pr;
   unsigned char c;
+  unsigned int i = 0;
 
   p = (char *) prempt_data->pcons;
 
-  c = skip_ab(&p);
-
-  nb_primes_read = 0;
-  for ( c = 0 ; ; )
+  do
   {
-    if (c == '\n')
-      break;
+    LOAD_ONE(p);
+    mybufrel->line[i++] = c;
+  } while (c != '\n');
 
-    c = read_one_prime(&pr, &p);
-
-    if (nb_primes_read > 0 && mybufrel->primes[nb_primes_read-1].h == pr)
-        mybufrel->primes[nb_primes_read-1].e++;
-    else
-    {
-      if (mybufrel->nb_alloc == nb_primes_read)
-        realloc_buffer_primes (mybufrel);
-
-      mybufrel->primes[nb_primes_read++] = (prime_t) { .h = pr, .p = 0, .e = 1};
-    }
-  }
-
-  mybufrel->nb = nb_primes_read;
-  mybufrel->nb_above_min_index = nb_primes_read + 1;
+  mybufrel->line[i] = '\0';
 }
 
 static inline void
@@ -425,7 +435,7 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
 info_mat_t
 process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
               void* (*thread_root)(fr_t *), index_t min_index, FILE **outfd,
-              bit_vector_ptr rel_used, unsigned int needed)
+              bit_vector_ptr rel_used, unsigned int step)
 {
   char *pcons, *pcons_old, *pcons_max, *p, **ff;
   pthread_attr_t attr;
@@ -436,7 +446,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   unsigned int length_line, i, k;
   int err, needr = (thread_root != NULL);
   char c;
-  unsigned int need_del_rels = (outfd != NULL && outfd[1] != NULL) ? 1 : 0;
+  unsigned int need_del_rels = 0;
 
   buf_arg_t buf_arg;
   memset (&buf_arg, 0, sizeof(buf_arg_t));
@@ -448,6 +458,16 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   {
     fprintf (stderr, "End of read: 0 relation (filelist was empty)\n");
     return buf_arg.info;
+  }
+
+  ASSERT_ALWAYS (step <= MAX_STEP);
+
+  if (step == STEP_PURGE_PASS2)
+  {
+    ASSERT_ALWAYS(buf_arg.fd != NULL);
+    ASSERT_ALWAYS(buf_arg.rel_used != NULL);
+    if (buf_arg.fd[1] != NULL)
+      need_del_rels = 1;
   }
 
   buf_arg.rels = (buf_rel_t *) malloc (SIZE_BUF_REL * sizeof (buf_rel_t));
@@ -474,7 +494,15 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
     buf_arg.rels[i].nb_alloc = NB_PRIMES_OPT;
   }
 
-  ASSERT_ALWAYS (needed <= MAX_NEEDED);
+  if (step == STEP_DUP1 || step == STEP_PURGE_PASS2)
+  {
+    size_t tmp_alloc = RELATION_MAX_BYTES * sizeof(char);
+    for (i = SIZE_BUF_REL; i--; )
+    {
+      buf_arg.rels[i].line = (char *) malloc (tmp_alloc);
+      ASSERT_ALWAYS (buf_arg.rels[i].line != NULL);
+    }
+  }
 
   end_insertRelation = 0;
   cpt_rel_a = cpt_rel_b = 0;
@@ -600,21 +628,31 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
 
         buf_arg.rels[k].num = rs->nrels++;
 
-        if (buf_arg.rel_used == NULL || need_del_rels ||
-            bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
+        if (step == STEP_DUP1)
+          relation_get_fast_abline (prempt_data, &(buf_arg.rels[k]));
+        else if (step == STEP_DUP2_PASS1)
+          relation_get_fast_ab (prempt_data, &(buf_arg.rels[k]));
+        else if (step == STEP_DUP2_PASS2)
+          relation_get_fast_abp (prempt_data, &(buf_arg.rels[k]));
+        else if (step == STEP_PURGE_PASS1)
         {
-          if (needed == NEED_ABP)
-            relation_get_fast_abp (prempt_data, &(buf_arg.rels[k]));
-          else if (needed == NEED_AB)
-            relation_get_fast_ab (prempt_data, &(buf_arg.rels[k]));
-          else if (needed == NEED_H)
-            relation_get_fast_h (prempt_data, &(buf_arg.rels[k]));
-          else if (needed == NEED_ABH)
-            relation_get_fast_abh (prempt_data, &(buf_arg.rels[k]));
-          else if (needed == NEED_HMIN)
+          if (buf_arg.rel_used != NULL &&
+              bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
             relation_get_fast_hmin (prempt_data, &(buf_arg.rels[k]),
                                                      buf_arg.min_index);
         }
+        else if (step == STEP_MERGE)
+          relation_get_fast_hmin (prempt_data, &(buf_arg.rels[k]),
+                                                     buf_arg.min_index);
+        else if (step == STEP_PURGE_PASS2)
+        {
+          if (need_del_rels ||
+              bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
+                relation_get_fast_line (prempt_data, &(buf_arg.rels[k]));
+        }
+        else if (step == STEP_REPLAY)
+          relation_get_fast_abh (prempt_data, &(buf_arg.rels[k]));
+
         /* Delayed find root computation by block of 1<<NNFR */
         if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
         {
@@ -716,6 +754,10 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   for (i = SIZE_BUF_REL; i-- ; )
     if (buf_arg.rels[i].nb_alloc != NB_PRIMES_OPT )
       SFREE(buf_arg.rels[i].primes);
+
+  if (step == STEP_DUP1 || step == STEP_PURGE_PASS2)
+    for (i = SIZE_BUF_REL; i--; )
+      free(buf_arg.rels[i].line);
 
   free(buf_arg.rels);
 
