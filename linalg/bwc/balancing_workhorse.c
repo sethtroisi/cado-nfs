@@ -1,7 +1,7 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>

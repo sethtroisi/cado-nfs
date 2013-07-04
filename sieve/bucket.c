@@ -26,7 +26,7 @@ init_bucket_array(const int n_bucket, const int bucket_size)
     {
       size_t alloc = (size_t)n_bucket * (size_t)bucket_size
           * sizeof(bucket_update_t);
-      BA.bucket_start[0] = (bucket_update_t *) malloc_check (alloc);
+      BA.bucket_start[0] = (bucket_update_t *) physical_malloc (alloc, 1);
     }
 #endif
 

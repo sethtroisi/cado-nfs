@@ -1526,7 +1526,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
                     if (k <= delta[j]) {
                         abfprint(ab, f, polymat_coeff(f_red, i, jj, delta[j]-k));
                     } else {
-                        printf("0");
+                        fprintf(f, "0");
                     }
                 }
                 fprintf(f, "\n");

@@ -1,4 +1,6 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
+#include <inttypes.h>
 #include "renumber.h"
 
 
@@ -33,7 +35,7 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
 void
 renumber_print_info (FILE * f, renumber_t renumber_info)
 {
-  fprintf (f, "Renumbering struct: size=%lu, nb_bytes=%u, sizeof(*table)=%lu, "
+  fprintf (f, "Renumbering struct: size=%"PRIu64", nb_bytes=%u, sizeof(*table)=%lu, "
               "rat=%d\n", (uint64_t) renumber_info->size,
               renumber_info->nb_bytes, sizeof(*(renumber_info->table)),
               renumber_info->rat);
@@ -71,7 +73,7 @@ renumber_close_write (renumber_t renumber_info)
   rewind (renumber_info->file);
   fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1, 
           renumber_info->file);
-  fprintf (stderr, "Renumbering struct: size=%lu\n", (uint64_t) 
+  fprintf (stderr, "Renumbering struct: size=%"PRIu64"\n", (uint64_t) 
                                                      renumber_info->size);
   
   fclose(renumber_info->file);
@@ -133,7 +135,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
         mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
       else
         mb_s = 0.0;
-      fprintf(stderr, "Renumbering table: read %lu values from file in %.1fs "
+      fprintf(stderr, "Renumbering table: read %"PRIu64" values from file in %.1fs "
                       "-- %.1f MB/s\n", (uint64_t) ret, dt, mb_s);
     }
   }
@@ -143,7 +145,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
     mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
   else
     mb_s = 0.0;
-  fprintf(stderr, "Renumbering table: end of read. Read %lu values from file "
+  fprintf(stderr, "Renumbering table: end of read. Read %"PRIu64" values from file "
                   "in %.1fs -- %.1f MB/s\n", (uint64_t) ret, dt, mb_s);
   ASSERT_ALWAYS(ret == renumber_info->size);
 

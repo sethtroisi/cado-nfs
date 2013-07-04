@@ -29,6 +29,8 @@ AC_SUBST([gf2x_lib_version], [1:0:0])
 
 AM_INIT_AUTOMAKE
 
+AM_MAINTAINER_MODE([disable])
+
 LT_INIT()
 
 AC_ARG_ENABLE([ntl-checks],

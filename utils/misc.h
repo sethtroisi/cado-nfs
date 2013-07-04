@@ -63,6 +63,7 @@ extern char ** filelist_from_file(const char * basepath, const char * filename,
 extern void filelist_clear(char ** filelist);
 
 extern void * malloc_check(const size_t x);
+extern void * physical_malloc(const size_t x, const int affect);
 
 extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);

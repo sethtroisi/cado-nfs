@@ -1,8 +1,8 @@
 #ifndef RENUMBER_H_
 #define RENUMBER_H_
 
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 #include "hashpair.h"
 #include "cado_poly.h"

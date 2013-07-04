@@ -19,6 +19,7 @@
 */
 
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
