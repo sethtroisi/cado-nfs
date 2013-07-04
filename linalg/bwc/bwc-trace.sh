@@ -29,7 +29,7 @@ mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
 # The test matrix may be created by:
-# $bins/random 1000 1000 15 --kleft 4 > $mats/t1000.txt
+# $bins/random_matrix 1000 1000 15 --kleft 4 > $mats/t1000.txt
 # $bins/mf_scan $mats/t1000.txt ofile=$mats/t1000.bin --binary-out --freq
 #
 # For the purpose of this complete test, a very tiny matrix is a good

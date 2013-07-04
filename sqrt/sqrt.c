@@ -1097,7 +1097,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         ASSERT_ALWAYS(i < ps->nrows);
         for(unsigned int j = 0 ; j < nonzero_deps ; j++) {
             if (abs[i] & dep_masks[j]) {
-                fprintf(dep_files[j], "%"PRId64" %"PRIu64"\n", ps->a, ps->b);
+                fprintf(dep_files[j], "%" PRId64 " %" PRIu64 "\n", ps->a, ps->b);
                 dep_counts[j]++;
             }
         }

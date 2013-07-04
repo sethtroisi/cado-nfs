@@ -2282,7 +2282,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# about to print relation for (%"PRId64",%"PRIu64")\n",a,b);
+                fprintf(stderr, "# about to print relation for (%" PRId64 ",%" PRIu64 ")\n",a,b);
             }
 #endif
             /* since a,b both even were not sieved, either a or b should
@@ -2332,7 +2332,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
+                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
                 trial_div (&factors[side], norm[side], N, x,
@@ -2343,7 +2343,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
+                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
                 }
 #endif
             }
@@ -2405,7 +2405,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                   cof_fails[side][nbits[side]] ++;
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b) && pass == 0)
-                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
+                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%" PRId64 ",%" PRIu64 "), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
 #endif
               }
 
@@ -2430,7 +2430,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
                     if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%"PRId64",%"PRIu64")\n",
+                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%" PRId64 ",%" PRIu64 ")\n",
                                 mpz_sizeinbase(f[side]->data[i], 2), a, b);
                     for (unsigned int j = 0; j < m[side]->data[i]; j++) {
                         relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
@@ -2443,7 +2443,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# Relation for (%"PRId64",%"PRIu64") printed\n", a, b);
+                fprintf(stderr, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
 
@@ -3414,7 +3414,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
-            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"; raw_J=%u;\n",
+            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
                     sidenames[si->conf->side],
                     si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
                     si->J);
@@ -3422,7 +3422,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 
 
-        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64";",
+        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
                 sidenames[si->conf->side],
                 si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
         if (si->doing->depth) {

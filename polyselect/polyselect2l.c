@@ -195,8 +195,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, E;
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%"PRId64") (%lu,%"PRId64") for "
-	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
+  gmp_printf ("Found match: (%lu,%" PRId64 ") (%lu,%" PRId64 ") for "
+	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
@@ -516,10 +516,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
@@ -560,8 +560,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
 
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%"PRIu32",%"PRId64") (%"PRIu32",%"PRId64") for "
-	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
+  gmp_printf ("Found match: (%" PRIu32 ",%" PRId64 ") (%" PRIu32 ",%" PRId64 ") for "
+	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
@@ -882,10 +882,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
                     logmu, ad, l, m, logmu0c3, logmu0c4);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
@@ -1876,7 +1876,7 @@ gmp_collision_on_sq ( header_t header,
   // less than lq special primes having roots for this ad
   if (N == 0 || N < K) {
     fprintf (stderr, "# Info: binomial(%lu, %lu) error in "
-             "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
+             "collision_on_sq(). ad=%" PRIu64 ".\n", N, K, header->ad);
     return;
   }
 

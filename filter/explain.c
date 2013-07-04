@@ -265,7 +265,7 @@ main (int argc, char **argv)
                 r = fscanf(f, "%x", &k);
                 ASSERT_ALWAYS(r == 1);
                 ASSERT_ALWAYS(k < n_ab);
-                fprintf(outfile, "%"PRId64" %"PRIu64"\n", abs[k].a, abs[k].b);
+                fprintf(outfile, "%" PRId64 " %" PRIu64 "\n", abs[k].a, abs[k].b);
                 int * ff = mmi_translate(abs[k].mmi_index);
                 if (fac_size + *ff > fac_alloc) {
                     fac_alloc += *ff + 64 + fac_alloc / 2;

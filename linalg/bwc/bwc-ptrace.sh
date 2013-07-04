@@ -50,7 +50,7 @@ fi
 
 # -c 10 imposes a bound on the coefficients.
 
-$bins/random  1000 -c 10 --kright 10 > $mats/t1000p.txt
+$bins/random_matrix  1000 -c 10 --kright 10 > $mats/t1000p.txt
 matrix_txt=$mats/t1000p.txt
 matrix=$mats/t1000p.bin
 

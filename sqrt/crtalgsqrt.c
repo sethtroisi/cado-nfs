@@ -1922,7 +1922,7 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
             mpz_clear(w);
         }
         if (sk >= 2 * ks->bound || sk < 0) {
-            fprintf(stderr, "[%s] recombination of coeff in X^%d yields noise (%"PRIu64")\n",signs, k, sk);
+            fprintf(stderr, "[%s] recombination of coeff in X^%d yields noise (%" PRIu64 ")\n",signs, k, sk);
             spurious++;
             // break;
         }
@@ -1977,10 +1977,10 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
     mpz_clear(e);
 
     if (spurious) {
-        fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [SPURIOUS]\n",
+        fprintf(stderr, "# [%2.2lf] %lx (%s) %" PRId64 " [SPURIOUS]\n",
                 WCT, v, signs, (int64_t) x);
     } else {
-        gmp_fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [%Zd]\n",
+        gmp_fprintf(stderr, "# [%2.2lf] %lx (%s) %" PRId64 " [%Zd]\n",
                 WCT, v, signs, (int64_t) x, cks->sqrt_modN);
     }
     free(signs);
@@ -1998,7 +1998,7 @@ void crtalgsqrt_knapsack_prepare(struct crtalgsqrt_knapsack * cks, size_t lc_exp
             for(int j =  0 ; j < glob.n ; j++) {
                 for(int k = 0 ; k < glob.n ; k++) {
                     int64_t c = contribs64[ ((i * glob.n) + j) * glob.n + k];
-                    printf(" %"PRId64, c);
+                    printf(" %" PRId64, c);
                 }
                 for(int s = 0 ; s < glob.m * glob.n ; s++) {
                     printf(" %d", s == (i * glob.n + j));

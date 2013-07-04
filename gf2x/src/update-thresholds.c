@@ -218,11 +218,11 @@ void prepare_and_push_hash_define_fft_tbl(const char *name,
             // 64bit cpu on a 32bit box shouldn't break the meaning of
             // the data).
             h += snprintf(table_string + h, sz - h,
-                    "{ INT64_C(%"PRId64"), %d }, ",
+                    "{ INT64_C(%" PRId64 "), %d }, ",
                     tbl[i].sz, tbl[i].method);
         } else {
             h += snprintf(table_string + h, sz - h,
-                    "{ %"PRId64", %d }, ",
+                    "{ %" PRId64 ", %d }, ",
                     tbl[i].sz, tbl[i].method);
         }
     }

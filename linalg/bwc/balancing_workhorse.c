@@ -1382,10 +1382,10 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
                     fprintf(stderr, "d->noderow = %d\n", d->noderow);
                     fprintf(stderr, "i=%d\n", i);
                     fprintf(stderr,
-                            "m->sent_rows[d->noderow + i] = %"PRIu32"\n",
+                            "m->sent_rows[d->noderow + i] = %" PRIu32 "\n",
                             m->sent_rows[d->noderow + i]);
                     fprintf(stderr,
-                            "m->exp_rows[d->noderow + i] = %"PRIu32"\n",
+                            "m->exp_rows[d->noderow + i] = %" PRIu32 "\n",
                             m->exp_rows[d->noderow + i]);
                 }
                 ASSERT_ALWAYS(m->sent_rows[d->noderow + i] <=
@@ -1535,7 +1535,7 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
     mf_pipe(input, output, "main");
     uint32_t r = output->r;
 
-    printf("Master loop finished ; read %"PRIu32" rows\n", r);
+    printf("Master loop finished ; read %" PRIu32 " rows\n", r);
     ASSERT_ALWAYS(r == m->bal->h->nrows);
     /* complete from nrows to maxdim if necessary ! */
     for (; output->r < m->bal->trows;) {

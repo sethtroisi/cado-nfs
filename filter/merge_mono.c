@@ -660,7 +660,7 @@ print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
   if (forbw == 2)
     printf (" bw=%e", bwcost);
   else if (forbw == 3)
-    printf (" w*N=%"PRIu64"",
+    printf (" w*N=%" PRIu64 "",
                         ((uint64_t)mat->rem_nrows) * ((uint64_t)mat->weight));
   else if (forbw <= 1)
     printf (" w*N=%e", bwcost);

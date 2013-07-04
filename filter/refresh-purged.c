@@ -64,7 +64,7 @@ main (int argc, char **argv)
         }
         char * p;
         ASSERT_ALWAYS((p = strchr(line, ' ')) != NULL);
-        fprintf(out,"%d %"PRId64" %"PRIu64"%s", ps->nodup_index, rs->rel.a, rs->rel.b, p);
+        fprintf(out,"%d %" PRId64 " %" PRIu64 "%s", ps->nodup_index, rs->rel.a, rs->rel.b, p);
         if (purgedfile_stream_disp_progress_now_p(ps)) {
             fprintf(stderr, "Treated %d/%d purged relations\n",
                     ps->rrows, ps->nrows);

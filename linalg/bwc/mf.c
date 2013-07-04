@@ -296,9 +296,9 @@ void matrix_read_pass(
                 if (m_out->f) {
                     if (!cskip) {
                         if (m_out->ascii) {
-                            fprintf(m_out->f, " %"PRIu32, c);
+                            fprintf(m_out->f, " %" PRIu32, c);
                             if (withcoeffs) {
-                                fprintf(m_out->f, " %"PRId32, coeff);
+                                fprintf(m_out->f, " %" PRId32, coeff);
                             }
                         } else {
                             rc = fwrite32_little(&c, 1, m_out->f);
@@ -317,7 +317,7 @@ void matrix_read_pass(
             }/*}}}*/
 
             if (exp_nc && c >= exp_nc) {
-                fprintf(stderr, "Warning: column index %"PRIu32" exceeds header value %u\n", c, exp_nc);
+                fprintf(stderr, "Warning: column index %" PRIu32 " exceeds header value %u\n", c, exp_nc);
             }
             if (cw_out) {
                 if (c-cskip >= cw_out->alloc) {
@@ -338,12 +338,12 @@ void matrix_read_pass(
                     fprintf(m_out->f, "%" PRIu32, w);
                     if (withcoeffs) {
                         for(j = 0 ; j < ww ; ) {
-                            fprintf(m_out->f, " %"PRIu32, temp->p[j++]);
-                            fprintf(m_out->f, " %"PRId32, temp->p[j++]);
+                            fprintf(m_out->f, " %" PRIu32, temp->p[j++]);
+                            fprintf(m_out->f, " %" PRId32, temp->p[j++]);
                         }
                     } else {
                         for(j = 0 ; j < w ; j++) {
-                            fprintf(m_out->f, " %"PRIu32, temp->p[j]);
+                            fprintf(m_out->f, " %" PRIu32, temp->p[j]);
                         }
                     }
                 } else {
@@ -365,7 +365,7 @@ void matrix_read_pass(
             if (rw_out->p) rw_out->p[i]=w;
             if (rw_out->f) {
                 if (rw_out->ascii) {
-                    fprintf(rw_out->f, "%"PRIu32"\n", w);
+                    fprintf(rw_out->f, "%" PRIu32 "\n", w);
                 } else {
                     rc = fwrite32_little(&w, 1, rw_out->f);
                 }
@@ -400,7 +400,7 @@ row_done:
             if (cw_out->ascii) {
                 uint32_t j;
                 for(j = 0 ; j < cw_out->size ; j++) {
-                    fprintf(cw_out->f, "%"PRIu32"\n", cw_out->p[j]);
+                    fprintf(cw_out->f, "%" PRIu32 "\n", cw_out->p[j]);
                 }
             } else {
                 rc = fwrite32_little(cw_out->p, cw_out->size, cw_out->f);

@@ -108,7 +108,7 @@ printPrimes ( uint32_t *primes,
 {
   unsigned long i;
   for (i = 0; i < size; i++) {
-    fprintf (stderr, "(%lu, %"PRIu32") ", i, primes[i]);
+    fprintf (stderr, "(%lu, %" PRIu32 ") ", i, primes[i]);
     if ((i+1) % 5 == 0)
       fprintf (stderr, "\n");
   }
@@ -214,7 +214,7 @@ proots_print ( proots_t R,
     }
     else {
       for (j = 0; j < R->nr[i]; j ++)
-        fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
+        fprintf (stderr, "%" PRIu64 " ", R->roots[i][j]);
       fprintf (stderr, "\n");
     }
   }
@@ -334,7 +334,7 @@ qroots_print (qroots_t R)
   for (i = 0; i < R->size; i++) {
     fprintf (stderr, "q: %u, r: ", R->q[i]);
     for (j = 0; j < R->nr[i]; j ++)
-      fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
+      fprintf (stderr, "%" PRIu64 " ", R->roots[i][j]);
     fprintf (stderr, "\n");
   }
 }

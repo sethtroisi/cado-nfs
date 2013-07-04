@@ -902,7 +902,7 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
     /* The average dj is quite easy */
     L->dj_avg = mb->ncols_t / (double) L->hdr->ncoeffs;
 
-    printf(" w=%"PRIu64", avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
+    printf(" w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
             L->hdr->ncoeffs, L->dj_avg, L->dj_max, LSL_NBUCKETS_MAX * L->dj_avg);
 
     if (mb->mm->methods.something_beyond("large")) {
@@ -1214,7 +1214,7 @@ int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, ui
     /* The average dj is quite easy */
     H->dj_avg = mb->ncols_t / (double) H->hdr->ncoeffs;
 
-    printf(" w=%"PRIu64", avg dj=%.1f, max dj=%u, bucket block hit=1/%.1f\n",
+    printf(" w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket block hit=1/%.1f\n",
             H->hdr->ncoeffs, H->dj_avg, H->dj_max,
             H->nlarge * H->dj_avg);
 
@@ -1381,7 +1381,7 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
          * the end. */
         V->steps.erase(V->steps.begin() + k);
         if (merge_with_next) {
-            printf("strip %"PRIu32"+%lu merged with next\n",
+            printf("strip %" PRIu32 "+%lu merged with next\n",
                     old_ii, w);
             ASSERT_ALWAYS(k < V->steps.size());
             V->steps[k].nrows += w;
@@ -1389,7 +1389,7 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
             // don't increment ii either.
         } else {
             ASSERT_ALWAYS(merge_with_previous);
-            printf("strip %"PRIu32"+%lu merged with previous\n",
+            printf("strip %" PRIu32 "+%lu merged with previous\n",
                     old_ii, w);
             V->steps[k-1].nrows += w;
             // don't increment k here.
@@ -1454,7 +1454,7 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
             cm += V->dispatch[d].sub[s].hdr->ncoeffs;
             if (cm >= m) m = cm;
         }
-        printf("Rows %"PRIu32"+%"PRIu32, old_ii, V->steps[s].nrows);
+        printf("Rows %" PRIu32 "+%" PRIu32, old_ii, V->steps[s].nrows);
         if (V->steps[s].density_upper_bound != UINT_MAX) {
             printf(": d < %u", V->steps[s].density_upper_bound);
         }
@@ -1489,7 +1489,7 @@ int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0
     V->hdr->nchildren = nvstrips;
 
     uint32_t width = iceildiv(V->hdr->j1 - V->hdr->j0, nvstrips);
-    printf("%u vstrips of width %"PRIu32"\n", nvstrips, width);
+    printf("%u vstrips of width %" PRIu32 "\n", nvstrips, width);
 
     // prepare the dispatch slice headers
     for(uint32_t j = V->hdr->j0 ; j < V->hdr->j1 ; j += width) {
@@ -1940,7 +1940,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
         unsigned long count = compressed_size(s, defer);
         /*
         printf("straight-order (defer %u, vstrip #%u)"
-                ": @%"PRIu64" combine(%"PRIu64"), sum=%x\n",
+                ": @%" PRIu64 " combine(%" PRIu64 "), sum=%x\n",
                 V->steps[csizes[i].first.second].defer, csizes[i].first.first,
                 csizes[i].second.first, csizes[i].second.second,
                 idiotic_sum((void*) &*(mm->t8.begin() + o8 + csizes[i].second.first), csizes[i].second.second));
@@ -1953,7 +1953,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
     for(unsigned int i = 0 ; i < csizes.size() ; i++) {
         /*
         printf("straight-order (defer %u, vstrip #%u)"
-                ": @%"PRIu64" combine(%"PRIu64"), sum=%x\n",
+                ": @%" PRIu64 " combine(%" PRIu64 "), sum=%x\n",
                 V->steps[csizes[i].first.second].defer, csizes[i].first.first,
                 csizes[i].second.first, csizes[i].second.second,
                 idiotic_sum((void*) &*(mm->t8.begin() + o8 + csizes[i].second.first), csizes[i].second.second));
@@ -1994,7 +1994,7 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
         builder_do_all_huge_slices(mb, &main_i0, fence, mm->scratch2size);
     }
     if (main_i0 < fence) {
-        fprintf(stderr, "ARGH ! only created a submatrix (%"PRIu32" < %"PRIu32") !!\n", main_i0, fence);
+        fprintf(stderr, "ARGH ! only created a submatrix (%" PRIu32 " < %" PRIu32 ") !!\n", main_i0, fence);
         exit(1);
     }
 
@@ -2887,7 +2887,7 @@ static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
     /*
     for(uint16_t h = 0 ; h < mm->headers.size() ; h++) {
         slice_header_t * hdr = & (mm->headers[h]);
-        printf("block %d %s [%d..%d[ x [%d..%d[, %d cld, %"PRIu64" coeffs\n",
+        printf("block %d %s [%d..%d[ x [%d..%d[, %d cld, %" PRIu64 " coeffs\n",
                 h, slice_name(hdr->t),
                 hdr->i0, hdr->i1,
                 hdr->j0, hdr->j1,
@@ -2952,7 +2952,7 @@ static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
                     /*
                     for(unsigned int s = 0 ; s < V->steps.size() ; s++) {
                         unsigned int defer = V->steps[s].defer;
-                        printf("Rows %"PRIu32"+%"PRIu32, mm->headers[Ridx++].i0, V->steps[s].nrows);
+                        printf("Rows %" PRIu32 "+%" PRIu32, mm->headers[Ridx++].i0, V->steps[s].nrows);
                         if (V->steps[s].density_upper_bound != UINT_MAX) {
                             printf(": d < %u", V->steps[s].density_upper_bound);
                         }
@@ -3188,14 +3188,14 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
         nc = dtime[l].first;
         t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
-        printf("defer\t%.2fs        ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("defer\t%.2fs        ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
         nc = ctime[l].first;
         t = ctime[l].second / scale0;
         a = 1.0e9 * t / nc;
         *p_t_total += t;
-        printf("      + %.2fs [%.2fs] ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("      + %.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, *p_t_total, nc, a, scale, a * scale);
     }
@@ -3208,7 +3208,7 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
 
-    printf("n %"PRIu64"\n", mm->public_->ncoeffs);
+    printf("n %" PRIu64 "\n", mm->public_->ncoeffs);
 
     vector<slice_header_t>::iterator hdr;
 
@@ -3224,7 +3224,7 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
         t /= scale0;
         t_total += t;
         double a = 1.0e9 * t / nc;
-        printf("%s\t%.2fs [%.2fs] ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("%s\t%.2fs [%.2fs] ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             slice_name(hdr->t), t, t_total,
             nc, a, scale, a * scale);
@@ -3243,7 +3243,7 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
         if (nc == 0) continue;
         t /= scale0;
         double a = 1.0e9 * t / nc;
-        printf("%s\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("%s\t%.2fs ; n=%-9" PRIu64 " ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             slice_name(i), t,
             nc, a, scale, a * scale);

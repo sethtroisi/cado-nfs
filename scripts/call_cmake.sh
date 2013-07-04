@@ -73,6 +73,7 @@ export GF2X_CONFIGURE_EXTRA
 export GMP
 export GMP_INCDIR
 export GMP_LIBDIR
+export ECM
 export PTHREADS
 export CURL
 export CURL_INCDIR

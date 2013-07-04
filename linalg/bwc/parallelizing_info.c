@@ -793,7 +793,7 @@ static void pi_log_print_backend(pi_wiring_ptr wr, const char * myname, char ** 
         struct pi_log_entry * e = &(lb->t[i]);
 
         ASSERT_ALWAYS(*n < alloc);
-        rc = asprintf(&(strings[*n]), "%"PRIu64".%06u (%s) %s %s", 
+        rc = asprintf(&(strings[*n]), "%" PRIu64 ".%06u (%s) %s %s", 
                 (uint64_t) e->tv->tv_sec,
                 (unsigned int) e->tv->tv_usec,
                 myname,
