@@ -1058,7 +1058,8 @@ main (int argc, char **argv)
     while (ideals_weight[last_used] == 0)
       last_used--;
 
-    fprintf (f_remaining, "# %"PRid" %"PRid"\n", nrels, last_used + 1);
+    fprintf (f_remaining, "# %" PRid " %" PRid " %" PRid "\n", nrels, 
+                          last_used + 1, nprimes);
   }
 
   /* second pass over relations in files */

@@ -2375,7 +2375,7 @@ sub do_purge {
         info "Purge has already been done\n";
     }
     # Get the number of rows and columns from the .purged.gz file
-    my ($a,$nrows,$ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
+    my ($a,$nrows,$b,$ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
     my $excess = $nrows - $ncols;
     $tab_level++;
     info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";

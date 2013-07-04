@@ -33,7 +33,7 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);
     }
-    int rc = fscanf (ps->source, "# %d %d\n", &ps->nrows, &ps->ncols);
+    int rc = fscanf (ps->source, "# %d %d %*d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
     ps->rrows = 0;
 }
