@@ -28,42 +28,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "sparse.h"
 #include "report.h"
 
-/* initialize the rep data structure
-   outname is the name of the output (history) file
-   mat is the input matrix
-   type = 2 does nothing
-*/
-void
-init_rep (report_t *rep, const char *outname, filter_matrix_t *mat, int type,
-	  int bufsize)
-{
-    int32_t** tmp, i;
-
-    rep->type = type;
-    if (type == 2) /* do nothing...! */
-      return;
-    rep->outfile = fopen_maybe_compressed (outname, "w");
-    switch (type)
-      {
-      case 0: /* classical one: output to a file */
-	break;
-      case 1: /* mostly for MPI */
-	/* FIXME: probably a clear_rep function is needed to free tmp */
-	tmp = (int32_t **) malloc (mat->nrows * sizeof(int32_t *));
-	for(i = 0; i < mat->nrows; i++)
-	    tmp[i] = NULL;
-	rep->history = tmp;
-	rep->mark = -1;
-	rep->bufsize = bufsize;
-	break;
-      default:
-	{
-	  fprintf(stderr, "Unknown type: %d\n", type);
-	  exit (1);
-	}
-      }
-}
-
 /* terrific hack: everybody on the same line
    the first is to be destroyed in replay!!! */
 void

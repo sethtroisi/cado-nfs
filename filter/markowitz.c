@@ -222,12 +222,12 @@ MkzIsHeap(int32_t *Q)
 static void
 MkzCheck(filter_matrix_t *mat)
 {
-    int32_t dj;
+  index_t dj;
     int maxlevel = mat->mergelevelmax;
 
     for(dj = 0; dj < mat->ncols - 0; dj++)
       if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
-	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
+	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (int32_t) dj)
               {
 		fprintf(stderr, "GASP: %d <> %d in MkzCheck\n",
                         MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
@@ -258,7 +258,7 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 #ifdef COUNT_CANCELLED_IDEALS
 	int i0 = 0;
 #endif
-        int w0;
+    index_t w0;
 
         /* approximate traditional Markowitz count: we assume we add the
 	   lightest row to all other rows */
@@ -298,7 +298,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 static int
 lightColAndMkz(filter_matrix_t *mat, int32_t j)
 {
-    int mkz, k, i, wj, cte;
+    int k, i, wj, cte;
+    index_t mkz;
     int32_t ind[MERGE_LEVEL_MAX];
     double tfill, tMST;
 
@@ -386,7 +387,8 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
 void
 MkzInit(filter_matrix_t *mat)
 {
-    int32_t j, mkz;
+    int32_t mkz;
+    index_t j;
     int sz = 0;
     int maxlevel = mat->mergelevelmax;
 

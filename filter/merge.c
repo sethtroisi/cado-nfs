@@ -230,7 +230,9 @@ main (int argc, char *argv[])
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
-    init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
+    rep->type = 0;
+    rep->outfile = fopen_maybe_compressed (outname, "w");
+    ASSERT_ALWAYS(rep->outfile != NULL);
     /* output the matrix dimensions in the history file */
     report2 (rep, mat->nrows, mat->ncols, -1);
 

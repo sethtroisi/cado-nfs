@@ -169,7 +169,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 static void
 removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 {
-    int k;
+  unsigned int k;
 
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
@@ -190,7 +190,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 static void
 addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
-    int k;
+  unsigned int k;
 
     mat->weight += matLengthRow(mat, i);
     for(k = 1; k <= matLengthRow(mat, i); k++)
@@ -213,7 +213,7 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 static int
 removeSingletons(report_t *rep, filter_matrix_t *mat)
 {
-    int32_t j;
+  index_t j;
     int njrem = 0;
 
     for(j = 0; j < mat->ncols; j++)
@@ -556,7 +556,7 @@ deleteScore(filter_matrix_t *mat, int32_t i)
 static int
 findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat)
 {
-    int i, itmp;
+    index_t i, itmp;
 
     for(i = 0, itmp = 0; i < mat->nrows; i++)
         if(!isRowNull(mat, i)){
@@ -581,10 +581,10 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
   if (m <= 2)
     return 0; /* it is not worth removing rows during level-2 merges */
 
-  if ((mat->rem_nrows - mat->rem_ncols) <= keep)
+  if ((int) (mat->rem_nrows - mat->rem_ncols) <= keep)
     return 0;
 
-  if (niremmax > (mat->rem_nrows - mat->rem_ncols) - keep)
+  if (niremmax > (int) (mat->rem_nrows - mat->rem_ncols) - keep)
     niremmax = (mat->rem_nrows - mat->rem_ncols) - keep;
 
   ntmp = mat->rem_nrows << 1;
@@ -750,7 +750,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 	if((forbw == 0) || (forbw == 2)){
           double r = bwcost / bwcostmin;
 	    if(r > ratio){
-		if(mat->rem_nrows-mat->rem_ncols > mat->keep){
+		if((int) (mat->rem_nrows-mat->rem_ncols) > mat->keep){
 		    // drop all remaining columns at once
 		    ni2rem = mat->rem_nrows-mat->rem_ncols+mat->keep;
 		    printf ("Dropping %d rows at once\n", ni2rem);
@@ -767,7 +767,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 	}
 	else if (forbw == 3 && bwcost >= coverNmax)
           {
-            int nrows = mat->rem_nrows;
+            index_t nrows = mat->rem_nrows;
 
             /* if the excess is still larger than what is wanted,
                remove the heaviest rows and loop again */
@@ -893,7 +893,7 @@ resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
     char str[RELATION_MAX_BYTES];
     unsigned long addread = 0;
     int nactivej;
-    int32_t j;
+    index_t j;
     char * rp;
     int REPORT = 10000;
 

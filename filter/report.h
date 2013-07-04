@@ -12,7 +12,6 @@ typedef struct{
     int bufsize; // says it!
 } report_t;
 
-extern void init_rep(report_t *rep, const char *outname, filter_matrix_t *mat, int type, int bufsize);
 extern void report1(report_t *rep, int32_t i, int32_t j);
 extern void report2(report_t *rep, int32_t i1, int32_t i2, int32_t j);
 extern void reportn(report_t *rep, int32_t *ind, int n, int32_t j);

@@ -361,7 +361,7 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
     fprintf(stderr, "\n");
 #endif
     for(k = 1; k <= matLengthRow(mat, i); k++)
-	if(matCell(mat, i, k) == j)
+	if((int) matCell(mat, i, k) == j)
 	    break;
     ASSERT(k <= matLengthRow(mat, i));
     // crunch
