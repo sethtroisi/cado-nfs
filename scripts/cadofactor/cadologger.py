@@ -52,6 +52,7 @@ class ScreenFormatter(logging.Formatter):
         '%(padding)s%(levelnametitle)s:%(name)s: %(message)s'
     
     def __init__(self, colour = True):
+        self.useColour = colour
         if colour:
             super().__init__(fmt=self.colourformatstr)
         else:
@@ -59,15 +60,13 @@ class ScreenFormatter(logging.Formatter):
     
     def format(self, record):
         # Add attributes to record that our format string expects
-        if record.levelno in self.colours:
-            record.colour = self.colours[record.levelno]
-        else:
-            record.colour = ANSI.NORMAL
+        if self.useColour:
+            record.colour = self.colours.get(record.levelno, ANSI.NORMAL)
+            record.nocolour = ANSI.NORMAL
         if record.levelno == COMMAND:
             record.levelnametitle = 'Running Command'
         else:
             record.levelnametitle = record.levelname.title()
-        record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
             record.padding = " " * record.indent
         else:
@@ -86,7 +85,7 @@ class FileFormatter(logging.Formatter):
         return super().format(record)
     
     def __init__(self):
-        super().__init__(fmt=self.__class__.formatstr)
+        super().__init__(fmt=self.formatstr)
 
 
 class CmdFileFormatter(logging.Formatter):
@@ -97,7 +96,7 @@ class CmdFileFormatter(logging.Formatter):
        '# PPID%(process)s PID%(childpid)s %(asctime)s\n%(message)s' 
     
     def __init__(self):
-        super().__init__(fmt=self.__class__.formatstr)
+        super().__init__(fmt=self.formatstr)
 
 
 class ScreenHandler(logging.StreamHandler):
