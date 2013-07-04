@@ -254,14 +254,7 @@ configure_file(
 
 install(PROGRAMS scripts/cpu_time.sh DESTINATION bin)
 
-configure_file(
-    ${CADO_NFS_SOURCE_DIR}/scripts/fixup_params_file.sh.in
-    ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh
-    ESCAPE_QUOTES
-    @ONLY)
-
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
-install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
   include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")

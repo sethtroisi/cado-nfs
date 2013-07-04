@@ -127,8 +127,6 @@ fi
 
 cp $file $t/param
 
-$bindir/fixup_params_file.sh $t/param
-
 # Sets the machine description file
 if [ -z "$CADO_USEHOST" ] ; then
    host=localhost

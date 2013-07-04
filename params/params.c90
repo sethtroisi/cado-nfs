@@ -85,8 +85,6 @@ bwstrat=3
 
 bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
                         # <m>x<n> for bwc, or only one integer for bw.
-                        # Note that this will be substituted with 1x1
-                        # unless PTHREADS have been enabled.
 bwc_interval=100        # checkpointing interval for bwc.
 
 ###########################################################################

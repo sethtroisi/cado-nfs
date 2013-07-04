@@ -561,7 +561,6 @@ scripts/cluster/las_loop
 scripts/cluster/merge.pl
 scripts/cluster/run_oarjobs
 scripts/cpu_time.sh
-scripts/fixup_params_file.sh.in
 scripts/install-cmake.sh
 scripts/version.sh
 sieve/CMakeLists.txt
