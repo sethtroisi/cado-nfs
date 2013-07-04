@@ -65,7 +65,7 @@ elif tuple(sys.version_info[:2]) >= (3, 4):
     FixedBytesGenerator = email.generator.BytesGenerator
 
 
-def createDaemon(workdir = None, umask = None):
+def create_daemon(workdir = None, umask = None):
     """Disk And Execution MONitor (Daemon)
 
     Configurable daemon behaviors:
@@ -96,6 +96,22 @@ def createDaemon(workdir = None, umask = None):
 
     __revision__ = "$Id$"
     __version__ = "0.2"
+    
+    import signal
+    # Use a one-element array to fool Python into not binding a local
+    # name in handler(). Python3 has 'nonlocal' for that
+    sigusr1_received = [False]
+    def handler(signum, frame):
+        if signum == signal.SIGUSR1:
+            sigusr1_received[0] = True
+
+    # The pid of the original process, used for sending a SIGUSR1 later
+    original_pid = os.getpid()
+
+    # We need to install the signal handler before forking, to guarantee that
+    # the original process has the signal handler installed at the time its
+    # grand-child sends the signal
+    old_handler = signal.signal(signal.SIGUSR1, handler)
 
     # Default daemon parameters.
 
@@ -119,6 +135,9 @@ def createDaemon(workdir = None, umask = None):
         raise Exception, "%s [%d]" % (e.strerror, e.errno)
 
     if (pid == 0):	# The first child.
+        # Un-install the signal handler in the child process
+        signal.signal(signal.SIGUSR1, signal.SIG_DFL)
+
         # To become the session leader of this new session and the process group
         # leader of the new process group, we call os.setsid().  The process is
         # also guaranteed not to have a controlling terminal.
@@ -184,6 +203,13 @@ def createDaemon(workdir = None, umask = None):
             # exit() or _exit()?  See below.
             os._exit(0)	# Exit parent (the first child) of the second child.
     else:
+        # Wait for the child to send a SIGUSR1 signal. This gives the grand-
+        # child time to print its PID to stdout, before the original process
+        # exits and possibly closes the SSH connection which started the
+        # client - we want to read the PID over the SSH connection, after all.
+        while not sigusr1_received[0]:
+            signal.pause()
+
         # exit() or _exit()?
         # _exit is like exit(), but it doesn't call any functions registered
         # with atexit (and on_exit) or any registered signal handlers.  It also
@@ -192,6 +218,15 @@ def createDaemon(workdir = None, umask = None):
         # unexpectedly removed.  It's therefore recommended that child branches
         # of a fork() and the parent branch(es) of a daemon use _exit().
         os._exit(0)	# Exit parent of the first child.
+
+    # Print the daemon's PID. We inherited the file descriptors from the
+    # original process so this should go over the SSH connection, if we
+    # were started via SSH.
+    sys.stdout.write("PID: %d\n" % os.getpid())
+    sys.stdout.flush()
+    
+    # Tell the original process that it's ok to terminate now
+    os.kill(original_pid, signal.SIGUSR1)
 
     # Close all open file descriptors.  This prevents the child from keeping
     # open any file descriptors inherited from the parent.  There is a variety
@@ -782,7 +817,7 @@ if __name__ == '__main__':
     # Daemonize before we open the log file, or we close the log file's 
     # file descriptor
     if options.daemon:
-        createDaemon(umask = 0)
+        create_daemon(umask = 0)
 
     loglevel = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
     if not isinstance(loglevel, int):
