@@ -356,7 +356,7 @@ linalg/bwc/pad.h
 linalg/bwc/parallelizing_info.c
 linalg/bwc/parallelizing_info.h
 linalg/bwc/prep.c
-linalg/bwc/random.c
+linalg/bwc/random_matrix.c
 linalg/bwc/raw_matrix_u32.h
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h

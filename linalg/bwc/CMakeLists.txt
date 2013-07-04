@@ -21,7 +21,7 @@ install(TARGETS mf_bal RUNTIME DESTINATION bin/linalg/bwc)
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
-add_executable(random ${EXCLUDE_FROM_RELEASE_BUILD} random.c)
+add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 
 # balancing.c itself is in fact standalone, and lightweight. We prefer to
 # avoid having the whole thing entangled with too many dependencies all
@@ -32,7 +32,7 @@ add_executable(acollect acollect.c bw-common.c)
 
 install(TARGETS split acollect RUNTIME DESTINATION bin/linalg/bwc)
 
-target_link_libraries(random utils m)
+target_link_libraries(random_matrix utils m)
 target_link_libraries(split utils)
 target_link_libraries(acollect utils)
 
