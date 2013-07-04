@@ -521,7 +521,7 @@ class Characters(Program):
         Parameter("index"),
         Parameter("heavyblock"),
         Parameter("nchar"),
-        Parameter("nthchar", "t"),
+        Parameter("threads", "t"),
         Parameter("out"),
         PositionalParameter("wfile")
     )
