@@ -382,6 +382,7 @@ relation_get_fast_line (prempt_t prempt_data, buf_rel_t *mybufrel)
   char *p;
   unsigned char c;
   unsigned int i = 0;
+  unsigned int nb_primes = 0;
 
   p = (char *) prempt_data->pcons;
 
@@ -389,9 +390,13 @@ relation_get_fast_line (prempt_t prempt_data, buf_rel_t *mybufrel)
   {
     LOAD_ONE(p);
     mybufrel->line[i++] = c;
+    if (c == ':' || c == ',')
+      nb_primes++;
+      
   } while (c != '\n');
 
   mybufrel->line[i] = '\0';
+  mybufrel->nb = nb_primes;
 }
 
 static inline void

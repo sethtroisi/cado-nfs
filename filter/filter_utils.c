@@ -95,7 +95,7 @@ insert_rel_in_table_with_e (buf_rel_t *my_br, index_t min_index,
   ideal_merge_t *my_tmp;
   index_t h;
 
-  itmp = 1;
+  itmp = 0;
   if (no_storage)
     my_tmp = NULL;
   else
@@ -118,14 +118,15 @@ insert_rel_in_table_with_e (buf_rel_t *my_br, index_t min_index,
 
     if (!no_storage && h >= min_index)
     {
-      my_tmp[itmp++].id = h;
-      my_tmp[itmp++].e = my_br->primes[i].e;
+      my_tmp[itmp].id = h;
+      my_tmp[itmp].e = my_br->primes[i].e;
+      itmp++;
     }
   }
 
   if (!no_storage)
   {
-    my_tmp[0].id = my_br->nb;
+    my_tmp[itmp].id = UMAX(my_tmp[itmp].id); /* sentinel */
     rel_compact[my_br->num] = my_tmp;
   }
 

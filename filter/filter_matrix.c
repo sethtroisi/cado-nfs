@@ -16,7 +16,7 @@ typedef struct {
 } perm_t;
 
 //tmp
-index_t **rel_compact;
+ideal_merge_t **rel_compact;
 weight_t *ideals_weight;
 
 
@@ -57,7 +57,7 @@ initMat (filter_matrix_t *mat)
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
 
-    rel_compact = (index_t **) malloc (mat->nrows * sizeof (index_t *));
+    rel_compact = (ideal_merge_t **) malloc (mat->nrows*sizeof(ideal_merge_t*));
     ideals_weight = (weight_t *) malloc (mat->ncols * sizeof (weight_t));
     MEMSETZERO(ideals_weight, mat->ncols);
 }
@@ -173,7 +173,7 @@ thread_insert (buf_arg_t *arg)
       nanosleep (&wait_classical, NULL);
 
     //FIXME big bug this does not take into account the exponent....
-    arg->info.nprimes += insert_rel_in_table_no_e (my_rel, 0, 0, rel_compact,
+    arg->info.nprimes += insert_rel_in_table_with_e (my_rel, 0, 0, rel_compact,
                                                       ideals_weight);
     arg->info.W += (double) my_rel->nb;
 
@@ -239,14 +239,14 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     {
       weight_t w = 0;
       weight_t next = 0;
-      index_t *p;
-      for (p = rel_compact[i]; *p != UMAX(*p); p++)
+      ideal_merge_t *p;
+      for (p = rel_compact[i]; p->id != UMAX(p->id); p++)
         w++;
       ASSERT_ALWAYS (w != 0);
 
       for(int k = 0 ; k < w; k++) 
       {
-        int32_t j = rel_compact[i][k];
+        int32_t j = (int32_t) rel_compact[i][k].id;
         ASSERT_ALWAYS (0 <= j && j < mat->ncols);
 #ifdef FOR_DL
         if (next > 0 && buf[next-1].id == j)
