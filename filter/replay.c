@@ -159,10 +159,10 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 if (skip) fwrite32_little(&dw, 1, dmatfile);
                 if (skip) fwrite32_little(&dw, 1, drwfile);
             } else {
-                fprintf(smatfile, "%"PRIu32"", sw);
-                fprintf(srwfile, "%"PRIu32"\n", sw);
-                if (skip) fprintf(dmatfile, "%"PRIu32"", dw);
-                if (skip) fprintf(drwfile, "%"PRIu32"\n", dw);
+                fprintf(smatfile, "%" PRIu32 "", sw);
+                fprintf(srwfile, "%" PRIu32 "\n", sw);
+                if (skip) fprintf(dmatfile, "%" PRIu32 "", dw);
+                if (skip) fprintf(drwfile, "%" PRIu32 "\n", dw);
             }
 
 
@@ -194,7 +194,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                     if (bin) {
                         fwrite32_little(&x, 1, dmatfile);
                     } else {
-                        fprintf(dmatfile, " %"PRIu32"", x);
+                        fprintf(dmatfile, " %" PRIu32 "", x);
                     }
                 } else {
                     x-=skip;
@@ -205,7 +205,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                         fwrite32_little(&e, 1, smatfile);
 #endif
                     } else {
-                        fprintf(smatfile, " %"PRIu32"", x);
+                        fprintf(smatfile, " %" PRIu32 "", x);
 #ifdef FOR_FFS
                         fprintf(smatfile, ":%d", sparsemat[i][j].e);
 #endif
@@ -244,7 +244,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             if (bin) {
                 fwrite32_little(&x, 1, dcwfile);
             } else {
-                fprintf(dcwfile, "%"PRIu32"\n", x);
+                fprintf(dcwfile, "%" PRIu32 "\n", x);
             }
         }
         fclose_maybe_compressed(dcwfile, dcwname);
@@ -259,7 +259,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             if (bin) {
                 fwrite32_little(&x, 1, scwfile);
             } else {
-                fprintf(scwfile, "%"PRIu32"\n", x);
+                fprintf(scwfile, "%" PRIu32 "\n", x);
             }
         }
         fclose_maybe_compressed(scwfile, scwname);
@@ -458,12 +458,12 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
 	    doAllAdds(newrows, str, outdelfile, index_data);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
-		sscanf(str+8, "%"PRIu64"", &bwcost);
-		//	fprintf(stderr, "Read bwcost=%"PRIu64"\n", bwcost);
+		sscanf(str+8, "%" PRIu64 "", &bwcost);
+		//	fprintf(stderr, "Read bwcost=%" PRIu64 "\n", bwcost);
 		if((bwcostmin != 0) && (bwcost == bwcostmin)){
 		    // what a damn tricky feature!!!!!!!
 		    fprintf(stderr, "Activating tricky stopping feature");
-		    fprintf(stderr, " since I reached %"PRIu64"\n", bwcostmin);
+		    fprintf(stderr, " since I reached %" PRIu64 "\n", bwcostmin);
 		    break;
 		}
 	    }

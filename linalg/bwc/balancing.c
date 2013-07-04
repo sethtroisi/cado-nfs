@@ -110,7 +110,7 @@ void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest
         }
     }
     char * filename;
-    int rc = asprintf(&filename, "%s%s.%dx%d.%08"PRIx32".bin",
+    int rc = asprintf(&filename, "%s%s.%dx%d.%08" PRIx32 ".bin",
             d,q, bal->h->nh, bal->h->nv, bal->h->checksum);
 
     ASSERT_ALWAYS(rc >= 0);

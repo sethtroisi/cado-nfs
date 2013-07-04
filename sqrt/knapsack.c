@@ -171,7 +171,7 @@ int knapsack_solve(knapsack_object_ptr ks)
 	int64_t last_x = s1[u1].x + s2[u2].x;
 	for (; u1 < n1; u1++) {
 	    int64_t x = s1[u1].x + s2[u2].x;
-	    // printf("x=%"PRId64"\n", x);
+	    // printf("x=%" PRId64 "\n", x);
 	    /* if there is _no_ element in s2 such that x1+x2 >= 0, then
 	     * we'll notice this since x will drop _below_ last_x. In
 	     * such a case, we know that we have a gap of size mor than
@@ -192,7 +192,7 @@ int knapsack_solve(knapsack_object_ptr ks)
 	    if (x >= ebound || x < 0)
 		break;
 	    unsigned long v = s2[u2].v << k1 | s1[u1 + h].v;
-	    // fprintf(stderr, "u1=%u u2=%u h=%u: %"PRId64"\n", u1,u2,h,x);
+	    // fprintf(stderr, "u1=%u u2=%u h=%u: %" PRId64 "\n", u1,u2,h,x);
 	    assert(x >= 0);
 	    assert(x < ebound);
 	    res += cb(cb_arg, v, x - bound);

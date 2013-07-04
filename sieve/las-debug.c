@@ -68,7 +68,7 @@ void trace_per_sq_init(sieve_info_srcptr si MAYBE_UNUSED)
     if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
         IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
     } else {
-        fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
+        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
         trace_ij.i=0;
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
@@ -83,14 +83,14 @@ void trace_per_sq_init(sieve_info_srcptr si MAYBE_UNUSED)
 #endif
 
     if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
-        fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
+        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
         trace_ij.i=0;
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
         trace_Nx.x=UINT_MAX;
     }
     if (trace_ij.i || trace_ij.j < UINT_MAX) {
-        fprintf(stderr, "# Tracing relation (a,b)=(%"PRId64",%"PRIu64") (i,j)=(%d,%u), (N,x)=(%u,%u)\n",
+        fprintf(stderr, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") (i,j)=(%d,%u), (N,x)=(%u,%u)\n",
                 trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N, trace_Nx.x);
     }
 
