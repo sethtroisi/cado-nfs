@@ -4,11 +4,9 @@
 #include <stdint.h> /* for int32_t */
 
 #ifndef FOR_DL
-#define typerow_t int32_t
 #define rowLength(rows, i) rows[(i)][0]
 #define rowCell(rows, i, k) rows[(i)][(k)]
 #else
-#define typerow_t ideal_merge_ffs_t
 #define rowLength(rows, i) rows[(i)][0].id
 #define rowCell(rows, i, k) rows[(i)][(k)].id
 #endif
@@ -32,7 +30,7 @@ typedef struct {
 } multirel_t;
 
 typedef struct {
-    int n;
+    unsigned int n;
     multirel_t * rels;
 } relset_t;
 

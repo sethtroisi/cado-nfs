@@ -65,7 +65,7 @@ initMat (filter_matrix_t *mat)
 void
 clearMat (filter_matrix_t *mat)
 {
-  int32_t i, j;
+  index_t i, j;
 
   for (i = 0; i < mat->nrows; i++)
     free (mat->rows[i]);
@@ -82,7 +82,7 @@ clearMat (filter_matrix_t *mat)
 void
 checkData(filter_matrix_t *mat)
 {
-    int j, nbj = 0;
+  index_t j, nbj = 0;
 
     for(j = 0; j < mat->ncols; j++)
 	if(mat->wt[j])
@@ -196,7 +196,7 @@ thread_insert (buf_arg_t *arg)
 void
 filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
-    int32_t j;
+    index_t j;
     info_mat_t info;
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
@@ -234,7 +234,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       fprintf(stderr, "# No columns were buried.\n");
 
     typerow_t buf[REL_MAX_SIZE];
-    int32_t i;
+    index_t i;
     for (i = 0; i < mat->nrows; i++)
     {
       weight_t w = 0;
@@ -244,26 +244,24 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
         w++;
       ASSERT_ALWAYS (w != 0);
 
-      for(int k = 0 ; k < w; k++) 
+      for(unsigned int k = 0 ; k < w; k++) 
       {
-        int32_t j = (int32_t) rel_compact[i][k].id;
-        ASSERT_ALWAYS (0 <= j && j < mat->ncols);
-#ifdef FOR_DL
-        if (next > 0 && buf[next-1].id == j)
-          buf[next-1].e++;
-        else
-#endif
+        index_t j = rel_compact[i][k].id;
+        ASSERT_ALWAYS (j < mat->ncols);
+        if (j >= mat->nburied)
         {
-          if (j >= mat->nburied)
+          mat->weight++;
+#ifndef FOR_DL
+          buf[next] = j;
+          ASSERT(rel_compact[i][k].e == 1);
+#else
+          buf[next] = rel_compact[i][k];
+#endif
+          next++;
+          if(mat->wt[j] > 0)
           {
-            mat->weight++;
-            setCell(buf[next], j, 1); 
-            next++;
-            if(mat->wt[j] > 0)
-            {
-              mat->R[j][0]++;
-              mat->R[j][mat->R[j][0]] = i;
-            }
+            mat->R[j][0]++;
+            mat->R[j][mat->R[j][0]] = i;
           }
         }
       }
@@ -350,7 +348,7 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 void
 remove_j_from_row(filter_matrix_t *mat, int i, int j)
 {
-    int k;
+  unsigned int k;
 
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -381,7 +379,7 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
 int
 weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 {
-    int k1, k2, w, len1, len2;
+  unsigned int k1, k2, w, len1, len2;
 
     len1 = (isRowNull(mat, i1) ? 0 : matLengthRow(mat, i1));
     len2 = (isRowNull(mat, i2) ? 0 : matLengthRow(mat, i2));

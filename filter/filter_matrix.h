@@ -5,7 +5,7 @@
 #include "typedefs.h"
 
 typedef struct {
-  int32_t id;
+  index_t id;
   int32_t e;
 } ideal_merge_ffs_t;
 
@@ -13,7 +13,7 @@ typedef struct {
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
 #ifndef FOR_DL
-#define typerow_t int32_t
+#define typerow_t index_t
 #else
 #define typerow_t ideal_merge_ffs_t
 #endif
@@ -21,17 +21,17 @@ typedef struct {
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
-  int nrows;
-  int ncols;
-  int rem_nrows;     /* number of remaining rows */
-  int rem_ncols;     /* number of remaining columns */
+  index_t nrows;
+  index_t ncols;
+  index_t rem_nrows;     /* number of remaining rows */
+  index_t rem_ncols;     /* number of remaining columns */
   typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
                          with 1 <= k <= rows[i][0] */
                         /* FOR_DL: struct containing also the exponent */
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
-  int nburied;     /* the number of buried columns */
+  index_t nburied;     /* the number of buried columns */
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
@@ -70,11 +70,9 @@ extern void print_row(filter_matrix_t *mat, int i);
 #ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
-#define setCell(v, j, c) v = (typerow_t) {.id = j, .e = c}
 #else
 #define matLengthRow(mat, i) (mat)->rows[(i)][0]
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)]
-#define setCell(v, j, e) v = j
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 

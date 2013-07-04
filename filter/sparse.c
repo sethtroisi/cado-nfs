@@ -23,7 +23,7 @@
 void
 fprintRow(FILE *file, typerow_t *row)
 {
-    int i;
+  index_t i;
 #ifdef FOR_DL
     fprintf(file, "[%d]", row[0].id);
     for(i = 1; i <= row[0].id; i++)
@@ -61,7 +61,7 @@ void
 addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
         MAYBE_UNUSED int32_t j)
 {
-    int32_t k1, k2, k, len;
+    uint32_t k1, k2, k, len;
     typerow_t *tmp;
 
     ASSERT(rows[i1] != NULL);
