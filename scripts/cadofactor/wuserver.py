@@ -85,7 +85,7 @@ class HtmlGen(io.BytesIO):
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
-    cgi_directories = ['/cgi-bin']
+    # Overrides http.server.CGIHTTPRequestHandler.cgi_directories
     clientid_pattern = re.compile("^[\w.-]*$")
     
     def log(self, lvl, format, *args, **kwargs):
@@ -104,7 +104,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
-        self.log(logging.DEBUG, '"%s" %d %d', self.requestline, code, size)
+        self.log(logging.DEBUG, '"%s" %s %s', 
+                 self.requestline, code, size)
 
     def log_error(self, format, *args):
         # Log errors with WARNING level, except messages about no work being
@@ -121,22 +122,17 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def translate_path(self, path):
         """ Translate path in request URL to local file system, taking into 
         account registered file names.
-        Overrides SimpleHTTPRequestHandler.translate_path()
+        Overrides SimpleHTTPRequestHandler.translate_path(); paths that are not
+        in registered_filenames are delegated to super().translate_path()
         """
         # Path in url always starts with '/'
         relpath = self.path.lstrip('/')
-        # We always translate path == /cgi-bin/upload.py to just upload.py
-        # so that no cgi-bin/ directory needs to be created. TODO: should we
-        # allow specifying the directory where upload.py lives? Currently
-        # assumed the current working directory
-        if self.is_upload():
-            return "upload.py"
         if relpath in self.registered_filenames:
-            self.log(logging.DEBUG, "Translated file name %s to %s", relpath, self.registered_filenames[relpath])
+            self.log(logging.DEBUG, "Translated path %s to %s", relpath, 
+                     self.registered_filenames[relpath])
             return self.registered_filenames[relpath]
-        else:
-            self.log(logging.DEBUG, "Not translating file name %s ", relpath)
-            return super().translate_path(path)
+        self.log(logging.DEBUG, "Not translating path %s ", relpath)
+        return super().translate_path(path)
     
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
@@ -159,11 +155,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
            and call CGI handler to run upload CGI script"""
         self.splitpath = urllib.parse.urlsplit(self.path)
         if self.is_upload():
-            if False:
-                self.send_response(200, "Script output follows")
-                upload.do_upload(self.dbfilename, input = self.rfile, output = self.wfile)
-            else:
-                super().do_POST()
+            super().do_POST()
         else:
             self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
@@ -171,7 +163,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def is_upload(self):
         """Test whether request is a file upload."""
         if self.command == 'POST' and self.is_cgi() and \
-                self.splitpath.path in ['/upload.py']:
+                self.splitpath.path == self.upload_path:
             return True
         return False
 
@@ -292,11 +284,11 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 class ServerLauncher(object):
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, bg = False,
-                use_db_pool = True):
+                use_db_pool = True, scriptdir = None):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.NOTSET)
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -316,15 +308,26 @@ class ServerLauncher(object):
         else:
             self.db_pool = None
         # Generate a class with parameters stored in class variables
+        upload_url_path = "/cgi-bin/upload.py"
         handler_params = {
             "registered_filenames": registered_filenames,
             "logger": self.logger,
             "dbfilename": dbfilename,
             "db_pool": self.db_pool, 
-            "uploaddir": uploaddir
+            "uploaddir": uploaddir,
+            "cgi_directories" : ['/cgi-bin'],
+            "upload_path": upload_url_path
         }
         MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
         
+        # Find the upload.py script
+        upload_path = self.findscript("upload.py", scriptdir)
+        # Always register the upload script
+        if upload_path is None:
+            raise IOError("upload.py script not found")
+        self.logger.debug("Found upload.py at %s" % upload_path)
+        registered_filenames[upload_url_path.lstrip('/')] = upload_path
+
         # Set shell environment variables which the upload.py script needs if
         # spawned as subprocess
         os.environ[upload.DBFILENAMEKEY] = dbfilename
@@ -356,7 +359,22 @@ class ServerLauncher(object):
         if self.db_pool:
             self.db_pool.terminate()
         #self.logger.removeHandler(self.ch)
-        
+    
+    @staticmethod
+    def findscript(scriptname, scriptdir = None):
+        # If scriptdir is specified, use that unconditionally
+        if not scriptdir is None:
+            return scriptdir + os.sep + scriptname
+        # Try the CWD
+        if os.path.isfile(scriptname):
+            return scriptname
+        # Try the directory that contains wuserver.py
+        if not __file__ is None:
+            dirname = os.path.dirname(os.path.realpath(__file__))
+            if os.path.isfile(dirname + os.sep + scriptname):
+                return dirname + os.sep + scriptname
+        # Not found
+        return None
 
 if __name__ == '__main__':
     import argparse
@@ -364,9 +382,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-address", help="Listen address", default="localhost")
     parser.add_argument("-port", help="Listen port", default="8001")
-    parser.add_argument("-uploaddir", help="Upload directory", default="upload/")
+    parser.add_argument("-uploaddir", help="Upload directory", 
+                        default="upload/")
     parser.add_argument("-dbfile", help="Database file name", required=True)
-    parser.add_argument("-threaded", help="Use threaded server", action="store_true", default=False)
+    parser.add_argument("-threaded", help="Use threaded server", 
+                        action="store_true", default=False)
     args = parser.parse_args()
 
     PORT = int(args.port)
@@ -377,7 +397,8 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
 
-    httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, registered_filenames, args.uploaddir)
+    httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, 
+                           registered_filenames, args.uploaddir)
     
     try:
         httpd.serve()
