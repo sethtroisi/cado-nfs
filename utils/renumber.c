@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <inttypes.h>
+#include "portability.h"
 #include "renumber.h"
 #include "gzip.h" /* for fopen_maybe_compress */
 #include <ctype.h>
