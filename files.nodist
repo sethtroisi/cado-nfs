@@ -51,10 +51,6 @@ scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/CMakeLists-nodist.txt
 sieve/ecm/CMakeLists-nodist.txt
-sieve/linesieve.c
-sieve/linesieve.h
-sieve/linesieve-fb.c
-sieve/linesieve-fb.h
 sieve/ecm/ecm_avg_exp.gp
 sieve/ecm/find_primes_hit.c
 sieve/ecm/getprime.c
