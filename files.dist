@@ -45,6 +45,8 @@ config/sync_fetch.cmake
 config/mingw.cmake
 config/test-rand.c
 config/test-rand.cmake
+config/endian.c
+config/endian.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile

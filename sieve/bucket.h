@@ -72,8 +72,13 @@
 #define PRIME_HINT uint16_t
 
 typedef struct {
+#if (IS_BIG_ENDIAN == 0)
     uint16_t x;
     PRIME_HINT p;
+#else
+    PRIME_HINT p;
+    uint16_t x;
+#endif
 } bucket_update_t;
 
 
