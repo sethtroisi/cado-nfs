@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <limits.h>
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #else
@@ -19,7 +20,7 @@
 
 typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
 #define FBPRIME_FORMAT "%u"
-#define FBPRIME_MAX 4294967295U
+#define FBPRIME_MAX UINT_MAX
 #define FBPRIME_BITS 32
 typedef fbprime_t fbroot_t;
 #define FBROOT_FORMAT "%u"
