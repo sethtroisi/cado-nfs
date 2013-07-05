@@ -166,7 +166,7 @@ thread_insert (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        nanosleep (&wait_classical, NULL);
+        NANOSLEEP;
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -175,7 +175,7 @@ thread_insert (buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      nanosleep (&wait_classical, NULL);
+      NANOSLEEP;
 
     //FIXME big bug this does not take into account the exponent....
     arg->info.nprimes += insert_rel_in_table_with_e (my_rel, 0, 0, rel_compact,
@@ -223,7 +223,8 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       for (j = 0; j < mat->nburied; j++)
       {
         int wc = -mat->wt[j];
-        ASSERT_ALWAYS (wc > 0);
+        // not sure an assert is relevant; maybe just a warning
+        //ASSERT_ALWAYS (wc > 0);
         if (wc > bmax)
           bmax = wc;
         if (wc < bmin)
