@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <stdio.h>
 #include "portability.h"
 #include "utils.h"
 #include "filter_memalloc.h"
