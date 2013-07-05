@@ -50,6 +50,12 @@ config/endian.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
+filter/filter_io.c
+filter/filter_io.h
+filter/filter_utils.c
+filter/filter_utils.h
+filter/filter_memalloc.c
+filter/filter_memalloc.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c
@@ -724,6 +730,8 @@ utils/purgedfile.h
 utils/random_integer.c
 utils/relation.c
 utils/relation.h
+utils/renumber.c
+utils/renumber.h
 utils/rootfinder.c
 utils/rootfinder.h
 utils/roots.c
@@ -739,6 +747,7 @@ utils/testbase-rootfinder.quick
 utils/testmpz-rootfinder.quick
 utils/timing.c
 utils/timing.h
+utils/typedefs.h
 utils/ularith.h
 utils/usp.c
 utils/usp.h

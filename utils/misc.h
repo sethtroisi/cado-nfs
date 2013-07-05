@@ -31,7 +31,7 @@ extern "C" {
     if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
       fprintf (stderr, "%s: malloc error (%zu MB): %s\n",		\
 	       M, mysize>>20, strerror(errno));				\
-      exit (1);								\
+      abort();								\
     }									\
   } while (0)
   

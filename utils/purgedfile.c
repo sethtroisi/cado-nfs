@@ -7,10 +7,16 @@
 #include "gzip.h"
 #include "portability.h"
 
+#define NB_PRIMES_OPT 31
+
 void purgedfile_stream_init(purgedfile_stream_ptr ps)
 {
     memset(ps, 0, sizeof(purgedfile_stream));
     ps->t0 = ps->t1 = wct_seconds();
+
+    ps->cols = NULL;
+    ps->nc_alloc = NB_PRIMES_OPT;
+    ps->cols = (int *) realloc(ps->cols, ps->nc_alloc * sizeof(int));
 }
 
 void purgedfile_stream_clear(purgedfile_stream_ptr ps)
@@ -27,7 +33,7 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);
     }
-    int rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
+    int rc = fscanf (ps->source, "# %d %d %*d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
     ps->rrows = 0;
 }
@@ -93,14 +99,6 @@ void purgedfile_stream_rewind(purgedfile_stream_ptr ps)
 }
 
 
-static void purgedfile_stream_provision_for_primes(purgedfile_stream_ptr ps, int nc)
-{
-    if (nc > 0 && ps->nc_alloc < nc) {
-        ps->nc_alloc = nc + nc / 2;
-        ps->cols = (int *) realloc(ps->cols, ps->nc_alloc * sizeof(int));
-    }
-}
-
 #define STORE(p, v)     do { if (p) *p++=(v); else (v);  nread++; } while (0)
 
 int purgedfile_stream_get(purgedfile_stream_ptr ps, char * line)
@@ -143,29 +141,18 @@ another_line:
         goto another_line;
     }
 
-    /* parse nodup_index */
-    {
-        int v, * w = &ps->nodup_index;
-        for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-            *w=*w*10+v;
-            STORE(p, c=fgetc(f));
-        }
-    }
-    ASSERT_ALWAYS(c == ' ');
-    STORE(p, c=fgetc(f));
-
     /* parse a */
     {
         int64_t * w = &ps->a;
         int v, s = 1;
         if (c == '-') { s=-1; STORE(p, c=fgetc(f)); }
         for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-            *w=*w*10+v;
+            *w=(*w << 4) + v;
             STORE(p, c=fgetc(f));
         }
         *w*=s;
     }
-    ASSERT_ALWAYS(c == ' ');
+    ASSERT_ALWAYS(c == ',');
     STORE(p, c=fgetc(f));
 
     /* parse b */
@@ -173,42 +160,39 @@ another_line:
         uint64_t * w = &ps->b;
         int v;
         for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-            *w=*w*10+v;
+            *w=(*w << 4) + v;
             STORE(p, c=fgetc(f));
         }
     }
-    ASSERT_ALWAYS(c == ' ');
+    ASSERT_ALWAYS(c == ':');
     STORE(p, c=fgetc(f));
 
     if (!ps->parse_only_ab) {
+        int i = 0;
 
-        /* parse nc */
+        while (c != '\n') 
         {
-            int v, * w = &ps->nc;
+          /* parse prime */
+          if (i != 0)
+          {
+            ASSERT_ALWAYS(c == ',');
+            STORE(p, c=fgetc(f));
+          }
+          if (i == ps->nc_alloc)
+          {
+            ps->nc_alloc += ps->nc_alloc >> 1;
+            ps->cols = (int *) realloc(ps->cols, ps->nc_alloc * sizeof(int));
+          }
+          {
+            int v, * w = &ps->cols[i];
             for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-                *w=*w*10+v;
+                *w=(*w << 4) + v;
                 STORE(p, c=fgetc(f));
             }
+          }
+          i++;
         }
-        /* don't advance the file pointer right now, do it from within
-         * the loop instead.
-         */
-
-        purgedfile_stream_provision_for_primes(ps, ps->nc);
-
-        for(int i = 0 ; i < ps->nc ; i++) {
-            /* parse prime */
-            ASSERT_ALWAYS(c == ' ');
-            STORE(p, c=fgetc(f));
-            {
-                int v, * w = &ps->cols[i];
-                for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-                    *w=*w*16+v;
-                    STORE(p, c=fgetc(f));
-                }
-            }
-        }
-        ASSERT_ALWAYS(c == '\n');
+        ps->nc = i;
     }
 
     /* skip rest of line -- a no-op if we've been told to parse

@@ -244,7 +244,6 @@ my @default_param = (
     coverNmax    => 100,
     nslices_log  => 1,
     filterlastrels => 1,
-    dup_rm => $on_mingw, # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     linalg       => 'bwc',
@@ -2188,6 +2187,7 @@ sub do_freerels {
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
+              "-renumber $param{'prefix'}.renumber ".
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2301,14 +2301,11 @@ sub dup {
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
-        my $rm_param = "";
-        if ($param{'dup_rm'} != 0) {
-          $rm_param = "-rm "
-        };
         cmd("$param{'bindir'}/filter/dup2 ".
-            "-K $K -out $param{'prefix'}.nodup/$i ".
+            "-K $K -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.filelist ".
-            "-basepath $param{'prefix'}.nodup/$i ". $rm_param,
+            "-renumber $param{'prefix'}.renumber ".
+            "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
             });
@@ -2331,6 +2328,8 @@ sub purge {
     $nslices = 2**$param{'nslices_log'};
     my $nbrels = 0;
     my $last = 0;
+    my $nprimes = 0;
+    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
@@ -2339,6 +2338,12 @@ sub purge {
             s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
                 $last = $1;
+            }
+            if ( $_ =~ /nprimes=(\d+)/ ) {
+                $nprimes = $1;
+            }
+            if ( $_ =~ /min_index=(\d+)/ ) {
+                $min_index = $1;
             }
         }
         close FILE;
@@ -2350,8 +2355,9 @@ sub purge {
     info "Removing singletons...";
     $tab_level++;
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
-                  "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                  "-keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
+                  "-nprimes $nprimes -minindex $min_index ".
                   "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
@@ -2369,7 +2375,7 @@ sub do_purge {
         info "Purge has already been done\n";
     }
     # Get the number of rows and columns from the .purged.gz file
-    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
+    my ($a,$nrows,$b,$ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
     my $excess = $nrows - $ncols;
     $tab_level++;
     info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
