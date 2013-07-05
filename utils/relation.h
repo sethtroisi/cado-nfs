@@ -8,6 +8,8 @@ static const int RELATION_MAX_BYTES = 4096;
 #include <stdint.h>
 #include <stdio.h>
 
+#include "typedefs.h"
+
 typedef struct {
   unsigned long p;      /* rational prime */
   int e;                /* exponent (may want negative exponent in sqrt) */
@@ -47,8 +49,8 @@ struct relation_stream_s {
     
     // various stats stuff. May be used by the caller.
     size_t pos;
-    unsigned long nrels;
-    unsigned long lnum;
+    index_t nrels;
+    index_t lnum;
     // only valid after relation_stream_trigger_disp_progress
     // of relation_stream_disp_progress_now_p
     double dt, mb_s, rels_s;
@@ -76,6 +78,7 @@ extern void computeroots(relation_t * rel);
 extern char * u64toa16 (char *p, uint64_t m);
 extern char * u64toa10 (char *p, uint64_t m);
 extern char * d64toa10 (char *p, int64_t m);
+extern char * d64toa16 (char *p, int64_t m);
 
 
 extern void fprint_relation(FILE *file, relation_t * rel);

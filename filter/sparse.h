@@ -3,16 +3,19 @@
 
 #include <stdint.h> /* for int32_t */
 
-#ifndef FOR_FFS
-#define typerow_t int32_t
+#ifndef FOR_DL
 #define rowLength(rows, i) rows[(i)][0]
 #define rowCell(rows, i, k) rows[(i)][(k)]
 #else
-#define typerow_t ideal_merge_ffs_t
 #define rowLength(rows, i) rows[(i)][0].id
 #define rowCell(rows, i, k) rows[(i)][(k)].id
 #endif
 
+#ifndef FOR_DL
+#define SKIP_DEFAULT 32
+#else
+#define SKIP_DEFAULT 0
+#endif
 
 // Structures for the data to create the index file.
 // This is an array of relation-sets.
@@ -27,7 +30,7 @@ typedef struct {
 } multirel_t;
 
 typedef struct {
-    int n;
+    unsigned int n;
     multirel_t * rels;
 } relset_t;
 

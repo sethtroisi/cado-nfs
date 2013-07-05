@@ -7,6 +7,7 @@
 
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
+#include "cado-endian.h"
 
 // #define SAFE_BUCKETS
 #ifdef SAFE_BUCKETS
@@ -72,8 +73,13 @@
 #define PRIME_HINT uint16_t
 
 typedef struct {
+#ifdef CADO_LITTLE_ENDIAN
     uint16_t x;
     PRIME_HINT p;
+#else
+    PRIME_HINT p;
+    uint16_t x;
+#endif
 } bucket_update_t;
 
 

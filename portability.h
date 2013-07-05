@@ -200,6 +200,17 @@ fprintf_subst_zu (FILE * const stream, const char * const format, ...)
 #define printf  printf_subst_zu
 #define fprintf fprintf_subst_zu
 
+static inline size_t
+strnlen_mingw (const char *s, size_t maxlen)
+{
+  size_t ret = 0;
+  for (; ret < maxlen && *s; s++)
+    ret++;
+  return ret;
+}
+
+#define strnlen strnlen_mingw
+
 #endif /* ifdef HAVE_MINGW */
 
 #ifndef HAVE_ASPRINTF

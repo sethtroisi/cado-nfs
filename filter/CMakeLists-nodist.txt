@@ -1,3 +1,32 @@
+set (sources
+        filter_utils.c filter_io.c filter_memalloc.c
+        utils_ffs.c
+)
+
+link_directories (${CADO_NFS_BINARY_DIR}/ffs/f2)
+link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
+include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
+#link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
+
+add_library (ffs-f2 EXCLUDE_FROM_ALL ${sources})
+target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a)
+#target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a gf2x)
+set_target_properties(ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+add_dependencies(ffs-f2 antebuffer)
+#add_dependencies(ffs-f2 gf2x-build)
+
+add_library (ffs-f3 EXCLUDE_FROM_ALL ${sources})
+target_link_libraries(ffs-f3 utils pthread m libfppol-f2.a)
+set_target_properties(ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
+add_dependencies(ffs-f3 antebuffer)
+
+add_executable(dup2-ffs-f2 EXCLUDE_FROM_ALL dup2.c)
+target_link_libraries(dup2-ffs-f2 ffs-f2)
+set_target_properties(dup2-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+
+add_executable(dup2-ffs-f3 EXCLUDE_FROM_ALL dup2.c)
+target_link_libraries(dup2-ffs-f3 ffs-f3)
+set_target_properties(dup2-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
 add_executable(refresh-purged refresh-purged.c)
 target_link_libraries(refresh-purged utils)
@@ -5,34 +34,13 @@ target_link_libraries(refresh-purged utils)
 add_executable(explain explain.c)
 target_link_libraries(explain utils)
 
-link_directories (${CADO_NFS_BINARY_DIR}/ffs/f2)
-link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
-include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
+add_executable(print_table EXCLUDE_FROM_ALL print_table.c)
+target_link_libraries(print_table utils)
 
-#link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
-
-add_executable(purge-nfs-dl EXCLUDE_FROM_ALL purge.c)
-target_link_libraries(purge-nfs-dl utils pthread)
-set_property(TARGET purge-nfs-dl APPEND PROPERTY COMPILE_FLAGS "-DFOR_NFS_DL")
-add_dependencies(purge-nfs-dl antebuffer)
-
-add_executable(purge-ffs-f2 EXCLUDE_FROM_ALL purge.c utils_ffs.c)
-#target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a gf2x)
-target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a)
-set_property(TARGET purge-ffs-f2 APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
-#add_dependencies(purge-ffs-f2 gf2x-build)
-add_dependencies(purge-ffs-f2 antebuffer)
-
-add_executable(purge-ffs-f3 EXCLUDE_FROM_ALL purge.c utils_ffs.c)
-target_link_libraries(purge-ffs-f3 utils pthread libfppol-f3.a)
-set_property(TARGET purge-ffs-f3 APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
-add_dependencies(purge-ffs-f3 antebuffer)
-
-add_executable(merge-ffs EXCLUDE_FROM_ALL merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
-target_link_libraries(merge-ffs utils)
-set_property(TARGET merge-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
-
-add_executable(replay-ffs EXCLUDE_FROM_ALL replay.c sparse.c)
-target_link_libraries(replay-ffs utils)
-set_property(TARGET replay-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
+add_executable(print_table-ffs-f2 EXCLUDE_FROM_ALL print_table.c)
+target_link_libraries(print_table-ffs-f2 ffs-f2)
+set_target_properties(print_table-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+add_executable(print_table-ffs-f3 EXCLUDE_FROM_ALL print_table.c)
+target_link_libraries(print_table-ffs-f3 ffs-f3)
+set_target_properties(print_table-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 # vim: ft=cmake:

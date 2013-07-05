@@ -1,10 +1,10 @@
-BIN = sieve makefb normstats checkrels freerels testirred descent_init
+BIN = sieve makefb normstats checkrels testirred descent_init
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
 	    fppol_arith.o fppol_mul.o fppol_div.o fppol_mod.o \
 	    fppol_gcd.o fppol_io.o fppol_facttools.o fppol_internal.o \
-	    fppol_conv.o
+	    fppol_conv.o polyfactor.o
 
 sieve_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o fb.o qlat.o    \
 	    buckets.o norm.o latsieve.o polyfactor.o smoothness.o sieve.o \
@@ -39,11 +39,19 @@ WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
-CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0
+CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0 -I../utils -I..
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
 LDLIBS      = -lm
+
+#begin for freerels
+BIN += freerels
+LDFLAGS  += -L$(BUILDDIR)/../utils #for freerels
+LDLIBS   += -rdynamic $(BUILDDIR)/../utils/libutils.so #for freerels
+RPATH     = $(shell readlink -f $(BUILDDIR)/../utils) #for freerels
+LDLIBS   += -Wl,-rpath,${RPATH} #for freerels
+#end for freerels
 
 # Override variables in here!
 # See Makefile.local.example for a small documentation about compile

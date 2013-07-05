@@ -84,8 +84,6 @@ endif(CMAKE_COMPILER_IS_GNUCC)
 
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
-# same for GMP-ECM
-include(${CADO_NFS_SOURCE_DIR}/config/ecm.cmake)
 
 #####
 
