@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include <string.h> /* for strcmp */
 
 #include "portability.h"

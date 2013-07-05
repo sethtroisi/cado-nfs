@@ -58,6 +58,7 @@ Exit value:
 #include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include <math.h>
 #include <unistd.h>
 #include <string.h>
