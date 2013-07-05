@@ -808,6 +808,10 @@ main (int argc, char **argv)
   size_t tot_alloc_bytes = 0, cur_alloc;
   FILE *f_remaining = NULL, *f_deleted = NULL;
 
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
   double wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (k = 1; k < argc; k++)

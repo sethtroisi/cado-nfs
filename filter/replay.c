@@ -767,6 +767,10 @@ main(int argc, char *argv[])
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
 
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 

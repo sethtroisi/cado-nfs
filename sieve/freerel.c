@@ -395,6 +395,10 @@ main (int argc, char *argv[])
     renumber_t renumber_table;
     int add_full_col = 0;
 
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
     fbfilename = NULL;
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)

@@ -101,6 +101,10 @@ main (int argc, char *argv[])
                                /* use real MST minimum for wt[j] <= wmstmax*/
     uint32_t itermax = 0;
 
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
     double tt;
     double wct0 = wct_seconds ();
     param_list pl;
