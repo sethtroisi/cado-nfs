@@ -312,6 +312,7 @@ renumber_close_write (renumber_t tab)
 
   fclose(tab->file);
 
+  fprintf(stderr, "Renumbering struct: nprimes=%"PRid"\n", tab->size);
   renumber_free(tab);
 }
 
