@@ -298,9 +298,9 @@ static unsigned long MAYBE_UNUSED
 allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
                   renumber_t renumber_table)
 {
-  unsigned long lpb[2], p, *roots[2], nfree = 0;
+  unsigned long lpb[2], p, *roots[2], nfree = 0, minlim;
   int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
-  index_t old_table_size = renumber_table->size;
+  index_t old_table_size = renumber_table->size, min_index = UMAX(index_t);
 
   rat_side = renumber_table->rat;
   alg_side = 1 - rat_side;
@@ -332,6 +332,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   fprintf (stderr, "Generating renumber table for 2 <= p <= %lu\n",
                    lpb[max_side]);
 
+  minlim = MIN (pol->pols[0]->lim, pol->pols[1]->lim);
+
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {
     /* first compute the roots */
@@ -362,9 +364,15 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
       printf ("\n");
       nfree++;
     }
+
+    /* compute minindex */
+    if (p >= minlim && min_index == UMAX(index_t))
+      min_index = old_table_size;
+
     old_table_size = renumber_table->size;
   }
   
+  fprintf (stderr, "Renumbering struct: min_index=%" PRid "\n", min_index);
   getprime (0);
   free (roots[0]);
   free (roots[1]);
