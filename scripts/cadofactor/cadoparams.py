@@ -93,11 +93,12 @@ class Parameters(object):
         "ratq": "tasks.sieve.ratq",
         "rlambda": "tasks.sieve.rlambda",
         "rlim": "rlim",
+        "scriptpath": "slaves.scriptpath",
         "sieve_max_threads": "tasks.sieve.threads",
         "sievenice": None,
         "slaves": "slaves.hostnames",
         "skip": "tasks.purge.skip",
-        "wdir": "workdir",
+        "wdir": "tasks.workdir",
         "expected_factorization": None
     }
 
