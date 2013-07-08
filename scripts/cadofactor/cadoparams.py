@@ -41,6 +41,7 @@ class Parameters(object):
     translate_old_key =  {
         "alambda": "tasks.sieve.alambda",
         "alim": "alim",
+        "bindir": "tasks.execpath",
         "bwc_interleaving": "tasks.linalg.interleaving", 
         "bwc_interval": "tasks.linalg.interval",
         "bwc_mm_impl": None, # This parameter seems to be gone
@@ -74,7 +75,7 @@ class Parameters(object):
         "nchar": "tasks.linalg.nchar",
         "nkermax": None, # FIXME: implement this
         "nslices_log": "tasks.filter.nslices_log",
-        "nthchar": "tasks.characters.nthchar",
+        "nthchar": "tasks.characters.threads",
         "poly_max_threads": "tasks.polyselect.threads", 
         "parallel": None, # We (currently) always use client/server
         "polsel_admax": "tasks.polyselect.admax",

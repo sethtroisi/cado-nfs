@@ -24,40 +24,58 @@ options:
                     selection and sieve steps on localhost. For broader
                     use on several machines, use the advanced script
                     cadofactor.pl
+    -py           - use Python cadofactor script as worker
 EOF
 }
 
+# Set "t" to a temp directory, if not already set.
+# The ":" shell built-in causes variable expansion but nothing else to happen
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
+# Make temp dir writable by us and readable by everyone
 chmod 755 $t
 
 n=$1
 shift
 if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
+  echo "Error, first parameter must be the number to factor" >&2
   usage
   exit 1
 fi
 
-ssh=0
+ssh=false
+python=false
 cores=1
-for ((i=1; i<=2; i=i+1)) ; do
+for ((i=1; i<=3; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
+      echo "Error, number of cores '$cores' is not an integer" >&2
       usage
       exit 1
     fi
     shift 2
-  fi
-  if [ "$1" = "-ssh" ]; then
-    ssh=1
+  elif [ "$1" = "-ssh" ]; then
+    ssh=true
     shift
+  elif [ "$1" = "-py" ]; then
+    python=true
+    shift
+  else
+    break
   fi
 done
 
 
 #########################################################################
 # Set paths properly.
+
+# Try to find out from which location this script is running:
+# the install directory (i.e., where 'make install' put it),
+# the build directory (where 'cmake' put it, substituting the 
+# CMake variables below), or in the source directory tree.
 cado_prefix="@CMAKE_INSTALL_PREFIX@"
+cado_source_dir="@CADO_NFS_SOURCE_DIR@"
+cado_build_dir="@CADO_NFS_BINARY_DIR@"
 example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
@@ -65,31 +83,54 @@ if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     # We're called in the install tree.
     paramdir="$cado_prefix/$example_subdir"
     bindir="$cado_prefix/bin"
-    cadofactor="$bindir/cadofactor.pl"
+    if $python
+    then
+    	scriptpath="$bindir"
+    	cadofactor="$scriptpath/cadofactor.py"
+    else
+    	cadofactor="$bindir/cadofactor.pl"
+    fi
     cputime="$bindir/cpu_time.sh"
-elif [ "$0" -ef "@CADO_NFS_BINARY_DIR@/factor.sh" ] ; then
+elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
-    paramdir="@CADO_NFS_SOURCE_DIR@/params"
-    cputime="@CADO_NFS_SOURCE_DIR@/scripts/cpu_time.sh"
-    cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
+    paramdir="$cado_source_dir/params"
+    cputime="$cado_source_dir/scripts/cpu_time.sh"
+    if $python
+    then
+    	scriptpath="$cado_source_dir/scripts/cadofactor"
+        cadofactor="$scriptpath/cadofactor.py"
+    else
+        cadofactor="$cado_source_dir/cadofactor.pl"
+    fi
     # Make the path absolute.
-    bindir="@CADO_NFS_BINARY_DIR@"
+    bindir="$cado_build_dir"
 elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     # Otherwise we're called from the source tree (or we hope so)
     srcdir=$(cd "`dirname $0`" ; pwd)
     call_cmake="`dirname $0`/scripts/call_cmake.sh"
-    if ! [ -x "$call_cmake" ] ; then
-        echo "I don't know where I am !" >&2
+    unset build_tree
+    if [ -x "$call_cmake" ] ; then
+      # This should set $build_tree:
+      eval `cd $srcdir ; $call_cmake show`
     fi
-    eval `cd $srcdir ; $call_cmake show`
-    paramdir="${srcdir}/params/"
-    cputime="$srcdir/scripts/cpu_time.sh"
-    cadofactor="${srcdir}/cadofactor.pl"
-    # Make the path absolute.
-    bindir=`cd "$build_tree" ; pwd`
-else
+    if ! [ -z "$build_tree" ] ; then
+      paramdir="${srcdir}/params/"
+      cputime="$srcdir/scripts/cpu_time.sh"
+      if $python
+      then
+          scriptpath="${srcdir}/scripts/cadofactor"
+          cadofactor="${scriptpath}/cadofactor.py"
+      else
+          cadofactor="${srcdir}/cadofactor.pl"
+      fi
+      # Make the path absolute.
+      bindir=`cd "$build_tree" ; pwd`
+    fi
+fi
+if [ -z "$cadofactor" ] ; then
     echo "I don't know where I am !" >&2
-    # but I do care
+    # but I do care!
+    exit 1
 fi
 
 if ! [ -d "$paramdir" ] ; then
@@ -125,6 +166,10 @@ fi
 #########################################################################
 [ "$CADO_DEBUG" ] && echo "(debug mode, temporary files will be kept in $t)"
 
+# This copy is not strictly necessary (it used to be when we used the
+# fixup_params_file.sh script), but it might not be a bad idea to have the
+# parameter file together with the rest in the working directory, which also
+# allows for easy modification of parameters for the specific factorization.
 cp $file $t/param
 
 # Sets the machine description file
@@ -136,21 +181,27 @@ fi
 
 mkdir $t/tmp
 
-cat > $t/mach_desc <<EOF
+
+if $python; then
+  $cadofactor --old "$t/param" n=$n bindir="$bindir" \
+  sieve_max_threads=$cores nthchar=$cores \
+  bwmt=$cores wdir="$t" slaves="$host" scriptpath="$scriptpath" "$@"
+else
+  cat > $t/mach_desc <<EOF
 [local]
 tmpdir=$t/tmp
 bindir=$bindir
 $host cores=$cores
 EOF
-
-if [ $ssh -eq 0 ]; then
-  $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
-  sieve_max_threads=$cores nthchar=$cores\
-  bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
-else
-  $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
-  machines=$t/mach_desc nthchar=$cores bwmt=$bwmt wdir=$t \
-  sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+  if ! $ssh; then
+    $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
+    sieve_max_threads=$cores nthchar=$cores\
+    bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+  else
+    $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
+    machines=$t/mach_desc nthchar=$cores bwmt=$bwmt wdir=$t \
+    sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+  fi
 fi
 
 rc=$?

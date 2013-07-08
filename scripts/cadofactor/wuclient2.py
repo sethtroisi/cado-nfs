@@ -528,7 +528,7 @@ class WorkunitClient(object):
         if dlpath == None:
             filename = urlpath.split("/")[-1]
             dlpath = os.path.join(self.settings["DLDIR"], filename)
-        url = self.settings["SERVER"] + "/" + urlpath
+        url = self.settings["SERVER"].rstrip("/") + "/" + urlpath
         if options:
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)
@@ -659,7 +659,7 @@ class WorkunitClient(object):
         logging.debug("POST data: %s", mimedata)
 
         url = self.settings["SERVER"].rstrip("/") + "/" + \
-                self.settings["POSTRESULTPATH"]
+                self.settings["POSTRESULTPATH"].lstrip("/")
         logging.info("Sending result for workunit %s to %s", 
                      self.workunit.get_id(), url)
         request = urllib_request.Request(url, data=postdata, 
@@ -730,7 +730,9 @@ REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 # and a help text
 OPTIONAL_SETTINGS = {"WU_FILENAME" : 
                      (None, "Filename under which to store WU files"), 
-                     "CLIENTID" : (None, "Unique ID for this client"), 
+                     "CLIENTID" : (None, "Unique ID for this client. If not "
+                                   "specified, a default of "
+                                   "<hostname>.<random hex number> is used"), 
                      "DLDIR" : ('download/', "Directory for downloading files"),
                      "WORKDIR" : (None, "Directory for result files"),
                      "BASEPATH" : (None, "Base directory for download and work "
@@ -744,11 +746,13 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                      "DEBUG" : ("0", "Debugging verbosity"),
                      "ARCH" : ("", "Architecture string for this client"),
                      "DOWNLOADRETRY" : 
-                     ("300", "Time to wait before download retries"),
+                     ("10", "Time to wait before download retries"),
                      "NICENESS" : 
                      ("0", "Run subprocesses under this niceness"),
                      "LOGLEVEL" : ("INFO", "Verbosity of logging"),
-                     "LOGFILE" : (None, "File to which to write log output")
+                     "LOGFILE" : (None, "File to which to write log output. "
+                                  "In demon mode, if no file is specified, a "
+                                  "default of <workdir>/<clientid>.log is used")
                      }
 # Merge the two, removing help string
 SETTINGS = dict([(a, b) for (a, (b, c)) in list(REQUIRED_SETTINGS.items()) + \
