@@ -227,7 +227,7 @@ class Parameters(object):
         shell environment variables
         """
         while True:
-            match = re.search("^(.*)\$\{(.*)\}(.*)$", value)
+            match = re.search(r"^(.*)\$\{(.*)\}(.*)$", value)
             if not match:
                 break
             (prefix, varname, postfix) = match.groups()
@@ -247,7 +247,7 @@ class Parameters(object):
         results in foo.bar.k = 5 and k = 3
         """
         while True:
-            match = re.search("^(.*)\$\((.*)\)(.*)$", value)
+            match = re.search(r"^(.*)\$\((.*)\)(.*)$", value)
             if not match:
                 break
             (prefix, varname, postfix) = match.groups()
@@ -286,7 +286,7 @@ class Parameters(object):
         for line in infile:
             line2 = line.split('#', 1)[0].strip()
             if not line2:
-               continue
+                continue
             if not '=' in line2:
                 raise Exception('Invalid line, missing "=": %s' % line)
             # Which one is worse?
@@ -384,17 +384,17 @@ DEFAULTS = (
     "tasks.sieve.ratq = 0",
 
     # filtering
-    "tasks.purge.skip = -1", # should be about bwc_mn - 32
+    # "tasks.purge.skip = -1", # should be about bwc_mn - 32
     "tasks.purge.keep = 208", # should be 160 + #ideals <= FINAL_BOUND 
                               # (cf purge.c)
     "tasks.purge.nslices_log = 1",
     "tasks.purge.filterlastrels = 1",
     
-    "tasks.merge.skip = -1", # should be about bwc_mn - 32
+    # "tasks.merge.skip = -1", # should be about bwc_mn - 32
     "tasks.merge.forbw = 3",
     "tasks.merge.coverNmax = 100",
     "tasks.merge.ratio = 1.5",
-    "tasks.merge.keep = -1", # should be 128 + skip
+    # "tasks.merge.keep = -1", # should be 128 + skip
     "tasks.merge.maxlevel = 15",
 
     # linalg
@@ -463,8 +463,8 @@ DEFAULTS_OLD = (
     'ratq	 = 0',
 
     # filtering
-    'skip         = -1', # should be about bwc_mn - 32
-    'keep         = -1', # should be 128 + skip
+    # 'skip         = -1', # should be about bwc_mn - 32
+    # 'keep         = -1', # should be 128 + skip
     'keeppurge    = 208', # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     'maxlevel     = 15',
     'ratio        = 1.5',

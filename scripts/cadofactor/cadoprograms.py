@@ -164,6 +164,10 @@ class Program(object):
         
         self.args = args
         self.parameters = parameters
+        known_keys = self.get_config_keys()
+        for key in parameters:
+            if not key in known_keys:
+                raise Exception("Unknown parameter %s" % key)
         
         self.stdin = stdin
         self.stdout = stdout
@@ -374,7 +378,9 @@ class FreeRel(Program):
         Toggle("verbose", "v"), 
         Parameter("pmin"), 
         Parameter("pmax"),
-        Parameter("poly", is_input_file = True)
+        Parameter("poly", is_input_file = True),
+        Parameter("badideals", is_output_file = True),
+        Parameter("renumber", is_output_file = True)
         )
 
 class Las(Program):
@@ -425,10 +431,10 @@ class Duplicates2(Program):
     name = binary
     subdir = "filter"
     params_list = (
-        Toggle("remove", "rm"),
-        Parameter("output_directory", "out"), 
         Parameter("filelist", is_input_file = True), 
-        Parameter("rel_count", "K")
+        Parameter("rel_count", "K"),
+        Parameter("poly", is_input_file = True),
+        Parameter("renumber", is_input_file = True)
         )
 
 class Purge(Program):
@@ -436,14 +442,12 @@ class Purge(Program):
     name = binary
     subdir = "filter"
     params_list = (
-        Parameter("poly", is_input_file = True),
         Parameter("out", is_output_file = True), 
         Parameter("nrels"), 
         Parameter("outdel", is_output_file = True), 
         Parameter("sos", is_output_file = True), 
         Parameter("keep"), 
-        Parameter("minpa"), 
-        Parameter("minpr"), 
+        Parameter("minindex"), 
         Parameter("nprimes"), 
         Toggle("raw"), 
         Parameter("npthr"), 

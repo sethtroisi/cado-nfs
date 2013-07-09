@@ -617,11 +617,23 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         self.state["adnext"] = adend
 
 
-class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
-    """ Common base class for programs that produce one output file from 
-    the polynomial, i.e., factorbase and freerel 
-    """
-    
+class FactorBaseTask(Task):
+    """ Generates the factor base for the polynomial(s) """
+    @property
+    def name(self):
+        return "factorbase"
+    @property
+    def title(self):
+        return "Generate Factor Base"
+    @property
+    def programs(self):
+        return (cadoprograms.MakeFB,)
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("workdir", "alim", )
+
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
@@ -659,7 +671,7 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             poly.create_file(polyfilename, self.params)
             
             # Make file name for factor base/free relations file
-            outputfilename = self.workdir.make_filename(self.target)
+            outputfilename = self.workdir.make_filename("roots")
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
@@ -668,7 +680,6 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
-            self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfilename.get_relative()
             self.logger.info("Finished")
@@ -681,33 +692,8 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             return str(self.workdir.path_in_workdir(self.state["outputfile"]))
         else:
             return None
-    
-    @abc.abstractmethod
-    def parse_stderr(self, stderr):
-        pass
 
-
-class FactorBaseTask(FactorBaseOrFreerelTask):
-    """ Generates the factor base for the polynomial(s) """
-    @property
-    def name(self):
-        return "factorbase"
-    @property
-    def title(self):
-        return "Generate Factor Base"
-    @property
-    def programs(self):
-        return (cadoprograms.MakeFB,)
-    @property
-    def paramnames(self):
-        return super().paramnames + \
-            ("workdir", "alim", )
-    target = "roots"
-    def parse_stderr(self, stderr):
-        pass
-
-
-class FreeRelTask(FactorBaseOrFreerelTask):
+class FreeRelTask(Task):
     """ Generates free relations for the polynomial(s) """
     @property
     def name(self):
@@ -721,26 +707,109 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("workdir", "lpba", "lpbr")
-    target = "freerel"
+            ("workdir", "lpba", "lpbr") + Polynomial.paramnames
+    wanted_regex = {
+        'nfree': ('# Free relations: (\d+)', int),
+        'nprimes': ('Renumbering struct: nprimes=(\d+)', int),
+        'minindex': ('Renumbering struct: min_index=(\d+)', int)
+    }
     
-    def parse_stderr(self, stderr):
-        if "nfree" in self.state:
-            del(self.state["nfree"])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Invariant: if we have a result (in self.state["freerelfilename"])
+        # then we must also have a polynomial (in self.state["poly"])
+        self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+                               self.name)
+        if "freerelfilename" in self.state:
+            assert "poly" in self.state
+            # The target file must correspond to the polynomial "poly"
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        
+        # Get best polynomial found by polyselect
+        poly = self.send_request(Request.GET_POLYNOMIAL)
+        if not poly:
+            raise Exception("FactorBaseOrFreerelTask(): no polynomial "
+                            "received from PolyselTask")
+        
+        # Check if we have already computed the target file for this polynomial
+        if "poly" in self.state:
+            prevpoly = Polynomial(self.state["poly"].splitlines())
+            if poly != prevpoly:
+                if "freerelfilename" in self.state:
+                    self.logger.info("Received different polynomial, discarding old one")
+                    del(self.state["freerelfilename"])
+                    del(self.state["renumberfilename"])
+                self.state["poly"] = str(poly)
+        else:
+            self.state["poly"] = str(poly)
+        
+        if not "freerelfilename" in self.state:
+            self.logger.info("Starting")
+            # Write polynomial to a file
+            polyfilename = self.workdir.make_filename("poly")
+            poly.create_file(polyfilename, self.params)
+            
+            # Make file name for factor base/free relations file
+            freerelfilename = self.workdir.make_filename("freerel")
+            renumberfilename = self.workdir.make_filename("renumber")
+
+            # Run command to generate factor base/free relations file
+            kwargs = self.progparams[0].copy()
+            kwargs["poly"] = str(polyfilename)
+            kwargs["renumber"] = str(renumberfilename)
+            p = self.programs[0](None, kwargs, stdout = str(freerelfilename))
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
+            found = self.parse_file(stderr)
+            self.state.update(found)
+            self.logger.info("Found %d free relations" % self.state["nfree"])
+            
+            self.state["freerelfilename"] = freerelfilename.get_relative()
+            self.state["renumberfilename"] = renumberfilename.get_relative()
+            self.logger.info("Finished")
+
+        self.check_files_exist([self.get_freerel_filename(),
+                                self.get_renumber_filename()], "output", 
+                               shouldexist=True)
+
+    def parse_file(self, stderr):
+        found = {}
         for line in stderr.decode("ascii").splitlines():
-            match = re.match('# Free relations: (\d+)', line)
-            if match:
-                if "nfree" in self.state:
-                    raise Exception("Received two values for number of free relations")
-                self.state["nfree"] = int(match.group(1))
-        if not "nfree" in self.state:
-            raise Exception("Received no value for number of free relations")
-        self.logger.info("Found %d free relations" % self.state["nfree"])
-        return
+            for (key, (regex, datatype)) in self.wanted_regex.items():
+                match = re.match(regex, line)
+                if match:
+                    if key in found:
+                        raise Exception("Received two values for %s" % key)
+                    found[key] = datatype(match.group(1))
+        
+        for key in self.wanted_regex:
+            if not key in found:
+                raise Exception("Received no value for %s" % key)
+        return found
+    
+    def get_freerel_filename(self):
+        if "freerelfilename" in self.state:
+            return str(self.workdir.path_in_workdir(self.state["freerelfilename"]))
+        else:
+            return None
+    
+    def get_renumber_filename(self):
+        if "renumberfilename" in self.state:
+            return str(self.workdir.path_in_workdir(self.state["renumberfilename"]))
+        else:
+            return None
     
     def get_nrels(self):
         return self.state["nfree"]
+    
+    def get_nprimes(self):
+        return self.state["nprimes"]
 
+    def get_minindex(self):
+        return self.state["minindex"]
 
 class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
@@ -986,7 +1055,7 @@ class Duplicates1Task(Task, FilesCreator):
             basename = os.path.basename(name)
             for i in range(0, self.nr_slices):
                 r[str(self.workdir.make_filename(basename, use_subdir=True, subdir=str(i)))] = i
-            return r;
+            return r
     
     def parse_slice_counts(self, stderr):
         """ Takes lines of text and looks for slice counts as printed by dup1
@@ -1030,7 +1099,7 @@ class Duplicates2Task(Task, FilesCreator):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("workdir", "nslices_log",)
+            ("workdir", "nslices_log",) + Polynomial.paramnames
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1049,6 +1118,10 @@ class Duplicates2Task(Task, FilesCreator):
         self.logger.info("Starting")
         input_nrel = 0
         for i in range(0, self.nr_slices):
+            poly = self.send_request(Request.GET_POLYNOMIAL)
+            polyfilename = self.workdir.make_filename("poly")
+            poly.create_file(polyfilename, self.params)
+            renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
             rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
             input_nrel += rel_count
@@ -1064,10 +1137,11 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            self.workdir.make_directories(str(i))
+            # self.workdir.make_directories(str(i)) OBSOLETE
             kwargs = self.progparams[0].copy()
+            kwargs["poly"] = str(polyfilename)
             kwargs["rel_count"] = str(rel_count * 12 // 10)
-            kwargs["output_directory"] = str(self.workdir.make_dirname(str(i)))
+            kwargs["renumber"] = str(renumber_filename)
             p = self.programs[0](files, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1076,7 +1150,7 @@ class Duplicates2Task(Task, FilesCreator):
             # Mark input file names and output file names
             for f in files:
                 self.already_done_input[f] = True
-            outfilenames = {self.make_output_filename(f, i):i for f in files}
+            outfilenames = {f:i for f in files}
             self.add_output_files(outfilenames)
             self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
@@ -1084,10 +1158,6 @@ class Duplicates2Task(Task, FilesCreator):
         self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
-    
-    def make_output_filename(self, f, i):
-        basename = os.path.basename(f)
-        return str(self.workdir.make_filename(basename, use_subdir=True, subdir=str(i)))
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1165,16 +1235,15 @@ class PurgeTask(Task):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        poly = self.send_request(Request.GET_POLYNOMIAL)
-        polyfile = str(self.workdir.make_filename("poly"))
-        poly.create_file(polyfile, self.params)
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+        minindex = self.send_request(Request.GET_RENUMBER_MININDEX)
+        nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         if not nunique:
             raise Exception("No unique relation count received")
-        nrels = nfree + nunique
+        input_nrels = nfree + nunique
         
-        if "purgedfile" in self.state and nrels == self.state["input_nrels"]:
+        if "purgedfile" in self.state and input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
             return
@@ -1183,24 +1252,25 @@ class PurgeTask(Task):
         self.state.pop("input_nrels", None)
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
-                         % (nunique, nfree, nrels))
+                         % (nunique, nfree, input_nrels))
         purgedfile = str(self.workdir.make_filename("purged.gz"))
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         args = unique_filenames + [freerel_filename]
         kwargs = self.progparams[0].copy()
-        kwargs["poly"] = polyfile
         kwargs["keep"] = self.params["keep"]
-        kwargs["nrels"] = str(nrels)
+        kwargs["nrels"] = str(input_nrels)
         kwargs["out"] = purgedfile
+        kwargs["minindex"] = str(minindex)
+        kwargs["nprimes"] = str(nprimes)
         p = self.programs[0](args, kwargs)
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-        if self.parse_stderr(stderr, nrels):
-            [nrows, weight, excess] = self.parse_stdout(stdout)
-            self.logger.info("After purge, %d relations remain with weight %s and excess %s"
-                             % (nrows, weight, excess))
+        if self.parse_stderr(stderr, input_nrels):
+            stats = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations with %d primes remain "
+                             "with weight %s and excess %s", *stats)
             # Update both atomically
-            self.state.update({"purgedfile": purgedfile, "input_nrels": nrels})
+            self.state.update({"purgedfile": purgedfile, "input_nrels": input_nrels})
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -1326,18 +1396,21 @@ class PurgeTask(Task):
         self.state.update(update) 
     
     def parse_stdout(self, stdout):
-        # Program output is expected in the form:
-        # b'NROWS:27372 WEIGHT:406777 WEIGHT*NROWS=1.11e+10\nEXCESS: 160\n'
+        # Program stdout is expected in the form:
+        #   Final values:
+        #   nrels=23105 nprimes=22945 excess=160
+        #   weight=382433 weight*nrels=8.84e+09
         # but we allow some extra whitespace
-        # If output ends with 
-        # b'excess < 0.10 * #primes. See -required_excess argument.'
-        # then we need more relations from filtering and return False
         r = {}
-        keys = ("NROWS", "WEIGHT", "EXCESS")
+        keys = ("nrels", "nprimes", "weight", "excess")
         for line in stdout.decode("ascii").splitlines():
             for key in keys:
-                match = re.search("%s\s*:\s*(\d+)" % key, line)
+                # Match the key at the start of a line, or after a whitespace
+                # Note: (?:) is non-capturing group
+                match = re.search(r"(?:^|\s)%s\s*=\s*(\d+)" % key, line)
                 if match:
+                    if key in r:
+                        raise Exception("Found multiple values for %s" % key)
                     r[key] = int(match.group(1))
         for key in keys:
             if not key in r:
@@ -1365,6 +1438,9 @@ class MergeTask(Task):
         super().__init__(*args, **kwargs)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
+        skip = int(self.progparams[0].get("skip", 32))
+        self.progparams[0].setdefault("skip", str(skip))
+        self.progparams[0].setdefault("keep", str(skip + 128))
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1909,7 +1985,10 @@ class Request(Message):
     GET_POLYNOMIAL = 0
     GET_FACTORBASE_FILENAME = 1
     GET_FREEREL_FILENAME = 2
+    GET_RENUMBER_FILENAME = 19
     GET_FREEREL_RELCOUNT = 3
+    GET_RENUMBER_PRIMECOUNT = 20
+    GET_RENUMBER_MININDEX = 21
     GET_SIEVER_FILENAMES = 4
     GET_SIEVER_RELCOUNT = 5
     GET_DUP1_FILENAMES = 6
@@ -1935,7 +2014,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     
     CAN_CANCEL_WUS = 0
     
-    def __init__ (self, *args, path_prefix, **kwargs):
+    def __init__(self, *args, path_prefix, **kwargs):
         super().__init__(*args, path_prefix = path_prefix, **kwargs)
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.myparams(("name", "workdir"))
@@ -2024,8 +2103,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.request_map = {
             Request.GET_POLYNOMIAL: self.polysel.get_poly,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
-            Request.GET_FREEREL_FILENAME: self.freerel.get_filename,
+            Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,
+            Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
             Request.GET_FREEREL_RELCOUNT: self.freerel.get_nrels,
+            Request.GET_RENUMBER_PRIMECOUNT: self.freerel.get_nprimes,
+            Request.GET_RENUMBER_MININDEX: self.freerel.get_minindex,
             Request.GET_SIEVER_FILENAMES: self.sieving.get_output_filenames,
             Request.GET_SIEVER_RELCOUNT: self.sieving.get_nrels,
             Request.GET_DUP1_FILENAMES: self.dup1.get_output_filenames,
@@ -2139,17 +2221,17 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             if isinstance(sender, ClientServerTask):
                 self.register_filename(value)
             else:
-              raise Exception("Got REGISTER_FILENAME, but not from a ClientServerTask")
+                raise Exception("Got REGISTER_FILENAME, but not from a ClientServerTask")
         elif key == Notification.SUBMIT_WU:
             if isinstance(sender, ClientServerTask):
                 self.add_wu(value)
             else:
-              raise Exception("Got SUBMIT_WU, but not from a ClientServerTask")
+                raise Exception("Got SUBMIT_WU, but not from a ClientServerTask")
         elif key == Notification.VERIFY_WU:
             if isinstance(sender, ClientServerTask):
                 self.verify_wu(value)
             else:
-              raise Exception("Got VERIFY_WU, but not from a ClientServerTask")
+                raise Exception("Got VERIFY_WU, but not from a ClientServerTask")
         elif key == Notification.WANT_TO_RUN:
             if sender in self.tasks_that_want_to_run:
                 raise Exception("Got request from %s to run, but it was in run queue already",
