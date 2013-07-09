@@ -12,18 +12,10 @@
 #include "utils_ffs.h"
 #endif
 
-//static uint64_t ncols_matrix = 0; /* number of column in the matrix */
-//static renumber_t renumber_table;
-//index_t nrels = 0;
-//index_t *matrix_indexing = NULL;
-
 static ideal_merge_t **rel_purged;
 static weight_t *ideals_weight;
 mpz_t vlog, invert_coeff;
 
-/* ncols : number of columns in the matrix
-   nprimes : number of primes in the renumbering table
-*/
 void
 read_matrix_indexing (index_t *tab, FILE *file, index_t ncols, index_t nprimes)
 {
@@ -97,7 +89,7 @@ static int
 compute_log (index_t i, mpz_t *log, mpz_t q)
 {
   int32_t coeff = 0;
-  index_t unknown_ideal = UMAX(index_t), h;
+  index_t unknown_ideal, h;
   ideal_merge_t *p = rel_purged[i];
 
   mpz_set_ui (vlog, 0); 
@@ -107,7 +99,7 @@ compute_log (index_t i, mpz_t *log, mpz_t q)
     h = p->id;
     if (mpz_cmp_si(log[h], -1) <= 0) // we do not know the log if this ideal
     {
-      if (unknown_ideal == UMAX(index_t)) //first time we see an unknown ideal
+      if (coeff == 0) //first time we see an unknown ideal
       {
         coeff = p->e;
         unknown_ideal = h;
@@ -122,14 +114,14 @@ compute_log (index_t i, mpz_t *log, mpz_t q)
       mpz_add (vlog, vlog, log[h]);
   }
 
-  if (unknown_ideal == UMAX(index_t)) //no unknown ideal, sum should be zero
+  if (coeff == 0) //no unknown ideal, sum should be zero
   {
     mpz_mod (vlog, vlog, q);
     if (mpz_cmp_ui (vlog, 0) != 0)
     {
       gmp_fprintf (stderr, "    No unknow log in rel %u and sum of log is not "
                            "zero (sum is %Zd), error!\n", i, vlog);
-      //exit (1);
+      exit (1);
     }
 #if DEBUG >= 1
     else
@@ -147,7 +139,7 @@ compute_log (index_t i, mpz_t *log, mpz_t q)
     mpz_mul (vlog, vlog, invert_coeff);
     mpz_mod (log[unknown_ideal], vlog, q);
 #if DEBUG >= 2
-    fprintf (stderr, "  New logarithm computed for index %" PRid ".\n",
+    fprintf (stderr, "    New logarithm computed for index %" PRid ".\n",
                                                                 unknown_ideal);
 #endif
   }
