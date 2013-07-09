@@ -5,8 +5,6 @@
 debug=1
 
 import cgi, os
-if debug > 0:
-  import cgitb; cgitb.enable()
 import sys
 from tempfile import mkstemp
 import sqlite3
@@ -109,17 +107,24 @@ def do_upload(dbfilename, input = sys.stdin, output = sys.stdout):
             # strip leading path from file name to avoid directory traversal attacks
             basename = os.path.basename(f.filename)
             # Make a file name which does not exist yet and create the file
-            (fd, filename) = mkstemp(suffix='', prefix=basename, 
+            (fd, filename) = mkstemp(prefix=basename + '.', 
                 dir=os.environ[UPLOADDIRKEY])
             filestuple = (f.filename, filename)
+            if False:
+                filestuple = (f.filename, os.basename(filename))
             filetuples.append(filestuple)
-        
+            
             # fd is a file descriptor, make a file object from it
             file = os.fdopen(fd, "wb")
             file.write(f.file.read())
             bytes = file.tell()
             file.close()
-
+            
+            # Example output:
+            # upload.py: The file "testrun.polyselect.0-5000" for work unit 
+            # testrun_polyselect_0-5000 was uploaded successfully by client 
+            # localhost and stored as /localdisk/kruppaal/work/testrun.upload/
+            # testrun.polyselect.0-5000.kcudj7, received 84720 bytes.
             message = message + 'The file "' + basename + '" for work unit ' + WUid.value + \
                 ' was uploaded successfully by client ' + clientid.value + \
                 ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.\n'
@@ -129,8 +134,8 @@ def do_upload(dbfilename, input = sys.stdin, output = sys.stdout):
                       failedcommand)
         except wudb.StatusUpdateError:
             message = 'Workunit ' + WUid.value + 'was not currently assigned'
-
-        message = message + 'Workunit ' + WUid.value + ' completed.\n'
+        else:
+            message = message + 'Workunit ' + WUid.value + ' completed.\n'
 
     diag (0, sys.argv[0] + ': ', message.rstrip("\n"))
     if output == sys.stdout:
@@ -141,6 +146,9 @@ def do_upload(dbfilename, input = sys.stdin, output = sys.stdout):
 
 # If this file is run directly by Python, call do_upload()
 if __name__ == '__main__':
+    if debug > 0:
+      import cgitb; cgitb.enable()
+
     if DBFILENAMEKEY not in os.environ:
         message = 'Script error: Environment variable ' + DBFILENAMEKEY + ' not set'
     dbfilename = os.environ[DBFILENAMEKEY]
