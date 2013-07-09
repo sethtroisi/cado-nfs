@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import os
+import sys
 import argparse
 import logging
 import cadologger
 import cadotask
 import cadoparams
+from cadocommand import shellquote
 
 if __name__ == '__main__':
     # Parse command line arguments
@@ -48,6 +50,9 @@ if __name__ == '__main__':
     filehandler = cadologger.FileHandler(filename = logfilename, lvl = filelvl)
     logger.addHandler(filehandler)
     
+    logger.info("Command line parameters: %s", 
+                " ".join(map(shellquote, sys.argv)))
+
     logger.debug("Root parameter dictionary:\n%s", parameters)
     
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
