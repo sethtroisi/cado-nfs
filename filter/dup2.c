@@ -204,15 +204,20 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             ASSERT_ALWAYS(rc >= 0);
             rc = asprintf(&oname, "%s/%s%s", dirname, path_basename(newname), suffix_out);
             ASSERT_ALWAYS(rc >= 0);
-
-            f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
-            if (f_out == NULL) {
-              fprintf (stderr, "Could not open file %s for writing: %s\n", 
-                       oname_tmp, strerror(errno));
-              exit (EXIT_FAILURE);
-            }
         } else {
-            f_out = NULL;
+            int rc;
+            rc = asprintf(&oname_tmp, "%s.tmp.%s", path_basename(newname), suffix_out);
+            ASSERT_ALWAYS(rc >= 0);
+            rc = asprintf(&oname, "%s%s", path_basename(newname), suffix_out);
+            ASSERT_ALWAYS(rc >= 0);
+        }
+
+        f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
+        if (f_out == NULL)
+        {
+          fprintf (stderr, "Could not open file %s for writing: %s\n",
+                           oname_tmp, strerror(errno));
+          exit (EXIT_FAILURE);
         }
         free(newname);
 
@@ -328,15 +333,15 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
-        if (dirname) {
-            int ret = rename(oname_tmp, oname);
-            if (ret) {
-                perror("Problem renaming result file");
-                fprintf(stderr, "Let's hope that it's ok to continue!\n");
-            }
-            free(oname);
-            free(oname_tmp);
+        int ret = rename(oname_tmp, oname);
+        if (ret)
+        {
+          perror("Problem renaming result file");
+          fprintf(stderr, "Let's hope that it's ok to continue!\n");
         }
+        free(oname);
+        free(oname_tmp);
+
         fprintf (stderr, "%s: %"PRid" relations, %"PRid" duplicates, "
                          "remains %"PRid"\n", path_basename(name),
                  nodu + dupl - (nodu0 + dupl0), dupl - dupl0, nodu - nodu0);
