@@ -20,8 +20,6 @@ typedef struct {
   double W; //weight of the active part of the matrix
 } info_mat_t;
 
-#define DEBUG 1
-
 #define CA_DUP1 314159265358979323UL
 #define CB_DUP1 271828182845904523UL
 
