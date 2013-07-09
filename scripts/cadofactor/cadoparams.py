@@ -1,8 +1,3 @@
-import sys
-import os
-import re
-import abc
-
 """
 Parameter file format
 
@@ -30,7 +25,13 @@ other programs run during the sieving tasks, if there are any. The name of
 the node of a program is equal to the name of the binary executable.
 """
 
+import os
+import re
+import abc
+
 class Parameters(object):
+    """ Class that stores parameters for cadofactor in hierarchical dictionaries
+    """
     # TODO: Add a self.used dictionary with the same structure and keys as
     # self.data, but booleans as the values which indicate whether a parameter
     # has ever been access with myparams(). Add a function that tests that
@@ -167,11 +168,9 @@ class Parameters(object):
         source = self._get_subdict(path)
         if not source:
             source = {}
-        result = []
         pattern = re.compile(regex)
-        for l in self._recurse_iter(source, path):
-            if pattern.search(l[1]):
-                result.append([l[0], l[1]])
+        result = [[l[0], l[1]] for l in self._recurse_iter(source, path)
+            if pattern.search(l[1])]
         return result
     
     def _insertkey(self, path, value):

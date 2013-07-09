@@ -88,6 +88,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     # Overrides http.server.CGIHTTPRequestHandler.cgi_directories
     clientid_pattern = re.compile("^[\w.-]*$")
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.no_work_available = False
+    
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
             We add the client address (as a string) to the log record so the 
@@ -110,9 +114,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def log_error(self, format, *args):
         # Log errors with WARNING level, except messages about no work being
         # available, as those are frequent and kinda spammy
-        level = logging.WARNING
-        if hasattr(self, "error_is_no_work_available"):
-            level = logging.DEBUG
+        level = logging.DEBUG if self.no_work_available else logging.WARNING
         self.log(level, format, *args)
 
     def send_body(self, body):
@@ -137,7 +139,6 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
-        self.splitpath = urllib.parse.urlsplit(self.path)
         if self.is_cgi():
             if self.is_getwu():
                 self.send_WU()
@@ -153,7 +154,6 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
-        self.splitpath = urllib.parse.urlsplit(self.path)
         if self.is_upload():
             super().do_POST()
         else:
@@ -162,18 +162,21 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def is_upload(self):
         """Test whether request is a file upload."""
+        splitpath = urllib.parse.urlsplit(self.path)
         if self.command == 'POST' and self.is_cgi() and \
-                self.splitpath.path == self.upload_path:
+                splitpath.path == self.upload_path:
             return True
         return False
 
     def is_getwu(self):
         """Test whether request is for a new WU."""
-        return self.command == 'GET' and self.splitpath.path in ['/getwu']
+        splitpath = urllib.parse.urlsplit(self.path)
+        return self.command == 'GET' and splitpath.path in ['/getwu']
 
     def is_getstatus(self):
         """Test whether request is for a a status page."""
-        return self.command == 'GET' and self.splitpath.path in ['/status']
+        splitpath = urllib.parse.urlsplit(self.path)
+        return self.command == 'GET' and splitpath.path in ['/status']
 
     def guess_type(self, path):
         type = super().guess_type(path)
@@ -204,7 +207,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             wu_text = wudb.WuAccess(self.dbfilename).assign(clientid)
         if not wu_text:
             # This flag is to downgrade the logging level. Ugly.
-            self.error_is_no_work_available = True
+            self.no_work_available = True
             return self.send_error(404, "No work available")
         
         self.log_message("Sending work unit " + Workunit(wu_text).get_id() + 

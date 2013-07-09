@@ -121,9 +121,9 @@ class SendFile(Command):
 if __name__ == '__main__':
     import cadoparams
 
-    parameters = {"long": True}
-    program = cadoprograms.Ls("/", parameters)
-    c = Command(program)
+    ls_parameters = {"long": True}
+    ls_program = cadoprograms.Ls("/", ls_parameters)
+    c = Command(ls_program)
     (rc, out, err) = c.wait()
     if out:
         print("Stdout: " + str(out, encoding="utf-8"))
@@ -131,9 +131,9 @@ if __name__ == '__main__':
         print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
 
-    program = cadoprograms.Ls("/", parameters, stdout = "ls.out")
+    ls_program = cadoprograms.Ls("/", ls_parameters, stdout = "ls.out")
     ssh_parameters = cadoparams.Parameters({"verbose": False})
-    c = RemoteCommand(program, "localhost", ssh_parameters, [])
+    c = RemoteCommand(ls_program, "localhost", ssh_parameters, [])
     (rc, out, err) = c.wait()
     print("Stdout: " + str(out, encoding="utf-8"))
     print("Stderr: " + str(err, encoding="utf-8"))
