@@ -351,8 +351,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
 //
 // If given, j is the index of the column used for pivoting (used in DL).
 static void
-doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
-        index_data_t index_data)
+doAllAdds(typerow_t **newrows, char *str, index_data_t index_data)
 {
   int32_t j;
   int32_t ind[MERGE_LEVEL_MAX], i0;
@@ -380,12 +379,6 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
   if(destroy)
     {
       //destroy initial row!
-#ifdef FOR_DL
-      fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
-      for (unsigned int k = 1; k <= rowLength(newrows, i0); k++)
-          fprintf (outdelfile, " %x:%d", newrows[i0][k].id, newrows[i0][k].e);
-      fprintf (outdelfile, "\n");
-#endif
       free(newrows[i0]);
       newrows[i0] = NULL;
 
@@ -427,22 +420,11 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
 
 static void
 build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
-                        const char* outdelfilename, index_data_t index_data)
+                        index_data_t index_data)
 {
     uint64_t bwcost;
     unsigned long addread = 0;
     char str[STRLENMAX];
-
-    FILE *outdelfile = NULL;
-    if (outdelfilename != NULL)
-      {
-        outdelfile = fopen (outdelfilename, "w+");
-        if (outdelfile == NULL)
-          {
-            fprintf (stderr, "Error, cannot open file %s.\n", outdelfilename);
-            exit(1);
-          }
-      }
 
     fprintf(stderr, "Reading row additions\n");
     double tt = wct_seconds();
@@ -456,7 +438,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
 	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(newrows, str, outdelfile, index_data);
+	    doAllAdds(newrows, str, index_data);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
 		sscanf(str+8, "%" PRIu64 "", &bwcost);
@@ -597,8 +579,7 @@ static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
               uint64_t bwcostmin, int nrows, int ncols, int skip, int bin,
-              const char *idealsfilename, const char *outdelfilename,
-              int for_msieve)
+              const char *idealsfilename, int for_msieve)
 {
     FILE *hisfile;
     int *colweight;
@@ -638,8 +619,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
       index_data = NULL;
 
     // read merges in the *.merge.his file and replay them
-    build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename,
-            index_data);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, index_data);
 
     /* compute column weights */
     colweight = (int*) malloc (ncols * sizeof(int *));
@@ -741,7 +721,6 @@ usage (const char *argv0)
   fprintf (stderr, "   --noindex\n");
   fprintf (stderr, "   -index <file>  - if and only if there is no --noindex\n");
   fprintf (stderr, "   -ideals\n");
-  fprintf (stderr, "   -outdel\n");
   exit (1);
 }
 
@@ -801,7 +780,6 @@ main(int argc, char *argv[])
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
-    const char * outdelfilename = param_list_lookup_string(pl, "outdel");
     param_list_parse_int(pl, "skip", &skip);
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
 
@@ -843,11 +821,6 @@ main(int argc, char *argv[])
         fprintf (stderr, "Error, for DL -ideals should be non null\n");
         exit (1);
       }
-    if (outdelfilename == NULL)
-      {
-        fprintf (stderr, "Error, for DL -outdel should be non null\n");
-        exit (1);
-      }
 #endif
 
     purgedfile_stream ps;
@@ -878,7 +851,7 @@ main(int argc, char *argv[])
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
                    bwcostmin, nrows, ncols, skip, bin, 
-                   idealsfilename, outdelfilename, for_msieve);
+                   idealsfilename, for_msieve);
 
 
     purgedfile_stream_closefile(ps);
