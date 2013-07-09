@@ -1328,13 +1328,13 @@ class PurgeTask(Task):
         # then we need more relations from filtering and return False
         input_nprimes = None
         have_enough = True
-        not_enough1 = re.compile("excess < (\d+.\d+) \* #primes")
-        not_enough2 = re.compile("number of relations <= number of ideals")
-        nrels_nprimes = re.compile("\s*nrels=(\d+), nprimes=(\d+); excess=(-?\d+)")
+        # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
+        not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. See -required_excess argument.")
+        not_enough2 = re.compile(r"number of relations <= number of ideals")
+        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); excess=(-?\d+)")
         for line in stderr.decode("ascii").splitlines():
             match = not_enough1.match(line)
             if match:
-                self.required_excess = float(match.group(1))
                 have_enough = False
                 break
             if not_enough2.match(line):
