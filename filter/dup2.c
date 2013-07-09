@@ -206,9 +206,9 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             ASSERT_ALWAYS(rc >= 0);
         } else {
             int rc;
-            rc = asprintf(&oname_tmp, "%s.tmp.%s", path_basename(newname), suffix_out);
+            rc = asprintf(&oname_tmp, "%s.tmp%s", newname, suffix_out);
             ASSERT_ALWAYS(rc >= 0);
-            rc = asprintf(&oname, "%s%s", path_basename(newname), suffix_out);
+            rc = asprintf(&oname, "%s%s", newname, suffix_out);
             ASSERT_ALWAYS(rc >= 0);
         }
 
