@@ -59,6 +59,7 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 #define STEP_PURGE_PASS2 4
 #define STEP_MERGE 5
 #define STEP_REPLAY 6
+#define STEP_RECONSTRUCT STEP_MERGE
 #define MAX_STEP 6
 
 typedef struct {
