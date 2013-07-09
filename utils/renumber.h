@@ -55,7 +55,7 @@ void renumber_read_table (renumber_t, const char *);
 void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);
 void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
-                                                            index_t, cado_poly);
+                                                    int *, index_t, cado_poly);
 //for DEBUG, should be remove later
 void renumber_debug_print_tab (FILE *, const char *, cado_poly);
 #endif

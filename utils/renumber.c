@@ -217,6 +217,34 @@ report_read (double t, index_t nread, size_t bytes_read, int end)
 
 }
 
+/* return zero if no roots mod p, else non-zero */
+static int
+get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
+{
+  int k;
+  unsigned long *roots = NULL;
+
+  // if there is a proj root, this the largest (r = p by convention)
+  if (mpz_divisible_ui_p (pol[deg], p))
+  {
+    *r = p;
+    return 1;
+  }
+
+  roots = (unsigned long*) malloc (deg * sizeof (unsigned long));
+  k = poly_roots_ulong(roots, pol, deg, p);
+  if (k > 0)
+  {
+    sort(roots, k);
+    *r = roots[0];
+    free(roots);
+    return 2;
+  }
+
+  free(roots);
+  return 0;
+}
+
 /*********************** End internal functions  ******************************/
 
 
@@ -596,10 +624,10 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   return i;
 }
 
-// TODO should also return side in the case where there are two alg sides
 void
 renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
-                             p_r_values_t * r, index_t i, cado_poly pol)
+                             p_r_values_t * r, int *side, index_t i,
+                             cado_poly pol)
 {
   index_t j;
   p_r_values_t *tab = renumber_info->table;
@@ -609,21 +637,32 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
 
   if (renumber_info->rat == -1)
   {
-    *p = (tab[j] - 1) > 1;
+    *p = (tab[j] - 1) >> 1;
     if (i == j)
     {
-      // TODO Case with two alg sides
-      // If nb of roots over p pol[1] is 0 then
-      // *r = largest roots of pol[0]
-      //else
-      // *r = largest roots of pol[1]
+      int ret;
+      //if we have at least one root on side 1, it is the largest
+      if (get_largest_root_mod_p(r, pol->pols[1]->f, pol->pols[1]->degree, *p))
+        *side = 1;
+      else // else this is the largest on side 0
+      {
+        ret=get_largest_root_mod_p(r, pol->pols[0]->f, pol->pols[0]->degree, *p);
+        ASSERT_ALWAYS (ret > 0);
+        *side = 0;
+      }
     }
     else
     {
       if (tab[i] <= *p)
+      {
         *r = tab[i];
+        *side = 0;
+      }
       else
+      {
         *r = tab[i] - *p - 1;
+        *side = 1;
+      }
     }
   }
   else
@@ -633,23 +672,20 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
-      int k, d = pol->alg->degree;
-      unsigned long *roots;
-
-      // if there is a proj root, this the largest (r = p by convention)
-      if (mpz_divisible_ui_p (pol->alg->f[d], *p))
-        *r = *p;
-      else
-      {
-        roots = (unsigned long*) malloc (d * sizeof (unsigned long));
-        k = poly_roots_ulong(roots, pol->alg->f, d, *p);
-        ASSERT_ALWAYS (k > 0);
-        sort(roots, k);
-        *r = roots[0];
-      }
+      int ret = get_largest_root_mod_p(r, pol->alg->f, pol->alg->degree, *p);
+      ASSERT_ALWAYS (ret > 0);
+      *side = 1 - renumber_info->rat;
+    }
+    else if (i == j)
+    {
+      *r = *p + 1; // old convention (r = p+1 in rat side). Has no meaning now.
+      *side = renumber_info->rat;
     }
     else
+    {
       *r = tab[i];
+      *side = 1 - renumber_info->rat;
+    }
   }
 }
 
@@ -660,6 +696,7 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
   renumber_t tab;
   index_t i;
   p_r_values_t p, r;
+  int side;
 
   renumber_init (tab, pol);
   renumber_read_table (tab, filename);
@@ -675,24 +712,24 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
     }
     else
     {
-      renumber_get_p_r_from_index (tab, &p, &r, i, pol);
+      renumber_get_p_r_from_index (tab, &p, &r, &side, i, pol);
       fprintf (output, "i=%"PRid" tab[i]=%"PRpr" p=%"PRpr, i, tab->table[i], p);
-      if (r == p + 1)
+      if (side == tab->rat)
         fprintf (output, " rat side\n");
       else if (r == p)
-        fprintf (output, " r=%"PRpr" alg side proj\n", r);
+        fprintf (output, " r=%" PRpr " alg side proj\n", r);
       else
-        fprintf (output, " r=%"PRpr" alg side\n", r);
+        fprintf (output, " r=%" PRpr " alg side\n", r);
     }
   }
 
   if (tab->bad_ideals.n != 0) {
     fprintf (output, "Bad ideals:\n");
     for (int i = 0; i < tab->bad_ideals.n; ++i) {
-      unsigned long p = tab->bad_ideals.p[i];
-      unsigned long r = tab->bad_ideals.r[i];
-      unsigned long nb = tab->bad_ideals.nb[i];
-      fprintf(output, "p=%lu r=%lu nb=%lu\n", p, r, nb);
+      p_r_values_t p = tab->bad_ideals.p[i];
+      p_r_values_t r = tab->bad_ideals.r[i];
+      int nb = tab->bad_ideals.nb[i];
+      fprintf(output, "p=%" PRpr " r=%" PRpr " nb=%d\n", p, r, nb);
     }
   }
 
