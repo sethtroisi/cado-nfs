@@ -6,23 +6,22 @@ import cadologger
 
 logger = logging.getLogger("Command")
 
+def shellquote(s):
+    ''' Quote a command line argument
+    
+    Currently does it the hard way: encloses the argument in single
+    quotes, and escapes any single quotes that are part of the argument
+    '''
+    # If only characters that are known to be shell-safe occur, don't quote
+    if re.match("^[a-zA-Z0-9_.:@/+-]*$", s):
+        return s
+    return "'" + s.replace("'", "'\\''") + "'"
+
 class Command(object):
     ''' Represents a running subprocess
     
     The subprocess is started when the instance is initialised
     '''
-    @staticmethod
-    def _shellquote(s):
-        ''' Quote a command line argument
-        
-        Currently does it the hard way: encloses the argument in single
-        quotes, and escapes any single quotes that are part of the argument
-        '''
-        # If only characters that are known to be shell-safe occur, don't quote
-        if re.match("^[a-zA-Z0-9+-_.:@/]*$", s):
-            return s
-        return "'" + s.replace("'", "'\\''") + "'"
-    
     @staticmethod
     def is_same(a,b):
         """ Return true if a and b are the same object and not None """
@@ -103,7 +102,7 @@ class RemoteCommand(Command):
         self.prog = cadoprograms.SSH
         progparams = parameters.myparams(self.prog.get_config_keys(),
                                          path_prefix + [self.prog.name])
-        ssh = self.prog([host, "env", "sh", "-c", Command._shellquote(cmdline)],
+        ssh = self.prog([host, "env", "sh", "-c", shellquote(cmdline)],
             progparams)
         super().__init__(ssh, *args, **kwargs)
 

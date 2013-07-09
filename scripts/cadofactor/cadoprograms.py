@@ -138,18 +138,6 @@ class Program(object):
     path = '.'
     subdir = ""
     
-    @staticmethod
-    def _shellquote(s):
-        ''' Quote a command line argument
-        
-        Currently does it the hard way: encloses the argument in single
-        quotes, and escapes any single quotes that are part of the argument
-        '''
-        # If only characters that are known to be shell-safe occur, don't quote
-        if re.match("^[a-zA-Z0-9+-_.:@/]*$", s):
-            return s
-        return "'" + s.replace("'", "'\\''") + "'"
-    
     def __init__(self, args, parameters, stdin = None, stdout = None,
                  append_stdout = False, stderr = None, append_stderr = False,
                  bg = False):
@@ -305,17 +293,17 @@ class Program(object):
         are added to the command line.
         """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
-        cmdline = " ".join(map(Program._shellquote, cmdarr))
+        cmdline = " ".join(map(cadocommand.shellquote, cmdarr))
         if isinstance(self.stdin, str):
-            cmdline += ' < ' + Program._shellquote(self.translate_path(self.stdin, inputpath))
+            cmdline += ' < ' + cadocommand.shellquote(self.translate_path(self.stdin, inputpath))
         if isinstance(self.stdout, str):
             redir = ' >> ' if self.append_stdout else ' > '
-            cmdline += redir + Program._shellquote(self.translate_path(self.stdout, outputpath))
+            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stdout, outputpath))
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         elif isinstance(self.stderr, str):
             redir = ' 2>> ' if self.append_stderr else ' 2> '
-            cmdline += redir + Program._shellquote(self.translate_path(self.stderr, outputpath))
+            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stderr, outputpath))
         if self.bg:
             cmdline += " & echo $!" # FIXME: the echo does not belong here
         return cmdline
