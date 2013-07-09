@@ -181,7 +181,6 @@ DELRELSFILE="${DIR}/${NAME}.rels.deleted"
 HISFILE="${DIR}/${NAME}.merge.his"
 
 PREFIX_MATRIX="${DIR}/${NAME}.matrix"
-MERGEDRELSFILE="${DIR}/${NAME}.rels.merged"
 INDEX_ID_MERGE="${DIR}/${NAME}.id.replay.index"
 
 BIN_FREE="${CADO_BUILD}/ffs/f${GF}/freerels";
@@ -357,8 +356,7 @@ fi
 ###### REPLAY ######
 if [ "${DO_REPLAY}" -eq "1" ] ; then
   argsr0="--noindex -purged ${RELSFILE} -his ${HISFILE} "
-  argsr1="-out ${PREFIX_MATRIX} -ideals ${INDEX_ID_MERGE} "
-  argsr2="-outdel ${MERGEDRELSFILE} -skip 0"
+  argsr1="-out ${PREFIX_MATRIX} -ideals ${INDEX_ID_MERGE} -skip 0"
 
   CMD="${BIN_REPLAY} $argsr0 $argsr1 $argsr2"
   run_cmd "${CMD}" "${LOGR}" "${LOGR}" "${VERBOSE}" "${REPLAYDONE}"
@@ -374,6 +372,6 @@ if [ "${TIDY}" -eq "1" ] ; then
   rm ${PARAMFILE} ${FILELIST} ${SUBDIRLIST}
   rm "${RELSFILE}" "${NRELSFILE}"
   rm "${DELRELSFILE}"
-  rm "${HISFILE}" "${MERGEDRELSFILE}"
+  rm "${HISFILE}"
   rm "${INDEX_ID_MERGE}"
 fi

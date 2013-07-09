@@ -31,8 +31,8 @@ add_executable(replay-dl replay.c sparse.c)
 target_link_libraries(replay-dl filterutils)
 set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
-#add_executable(reconstructlog-dl reconstructlog.c)
-#target_link_libraries(reconstructlog-dl filterutils)
+add_executable(reconstructlog-dl reconstructlog.c)
+target_link_libraries(reconstructlog-dl filterutils)
 
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 
