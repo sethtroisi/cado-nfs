@@ -365,6 +365,16 @@ else
 fi
 ####################
 
+# Help: output the command line needed to recontruct all logarithms from the
+# ones computed by linear algebra
+
+BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
+OUTLOG="${DIR}/${NAME}.logarithms.values"
+argsre0="-ideals ${INDEX_ID_MERGE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
+argsre1="-relspurged ${RELSFILE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
+argsre2="-out ${OUTLOG} -log <file> -q <modulus>"
+echo "${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2 "
+
 ###### If tidy is asked ######
 
 if [ "${TIDY}" -eq "1" ] ; then
