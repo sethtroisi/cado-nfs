@@ -46,11 +46,11 @@ LDFLAGS     =
 LDLIBS      = -lm
 
 #begin for freerels
-BIN += freerels
-LDFLAGS  += -L$(BUILDDIR)/../utils #for freerels
-LDLIBS   += -rdynamic $(BUILDDIR)/../utils/libutils.so #for freerels
-RPATH     = $(shell readlink -f $(BUILDDIR)/../utils) #for freerels
-LDLIBS   += -Wl,-rpath,${RPATH} #for freerels
+#BIN += freerels
+#LDFLAGS  += -L$(BUILDDIR)/../utils #for freerels
+#LDLIBS   += -rdynamic $(BUILDDIR)/../utils/libutils.so #for freerels
+#RPATH     = $(shell readlink -f $(BUILDDIR)/../utils) #for freerels
+#LDLIBS   += -Wl,-rpath,${RPATH} #for freerels
 #end for freerels
 
 # Override variables in here!
