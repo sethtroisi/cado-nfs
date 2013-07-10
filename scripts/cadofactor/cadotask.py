@@ -970,7 +970,7 @@ class Duplicates1Task(Task, FilesCreator):
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
-            if int(parts) != self.nr_slices:
+            if parts != self.nr_slices:
                 # TODO: ask interactively (or by -recover) whether to delete 
                 # old output files and generate new ones, if input file is 
                 # still available
@@ -978,7 +978,7 @@ class Duplicates1Task(Task, FilesCreator):
                 # parts are, we could join them again... not sure if want
                 raise Exception("%s was previously split into %d parts, "
                                 "now %d parts requested",
-                                infile, int(parts), self.nr_slices)
+                                infile, parts, self.nr_slices)
             for outfile in self.make_output_filenames(infile):
                 if not outfile in self.output_files:
                     # TODO: How to recover from this error? Just re-split again?
@@ -1007,39 +1007,58 @@ class Duplicates1Task(Task, FilesCreator):
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
             # Split the new files
-            for f in newfiles:
-                outfilenames = self.make_output_filenames(f)
-                if self.nr_slices == 1:
-                    # If we should split into only 1 part, we don't actually
-                    # split at all. We simply write the input file name
-                    # to the table of output files, so the next stages will 
-                    # read the original siever output file, thus avoiding 
-                    # having another copy of the data on disk. Since we don't
-                    # process the file at all, we need to ask the Siever task
-                    # for the relation count in this file
-                    current_counts = [self.send_request(Request.GET_SIEVER_RELCOUNT, f)]
+            if self.nr_slices == 1:
+                # If we should split into only 1 part, we don't actually
+                # split at all. We simply write the input file name
+                # to the table of output files, so the next stages will 
+                # read the original siever output file, thus avoiding 
+                # having another copy of the data on disk. Since we don't
+                # process the file at all, we need to ask the Siever task
+                # for the relation count in this file
+                # TODO: pass a list or generator expression in the request
+                # here?
+                total = 0
+                for f in newfiles:
+                    count = self.send_request(Request.GET_SIEVER_RELCOUNT, f)
+                    total += count
+                self.slice_relcounts["0"] += total
+                update = dict(zip(newfiles, [self.nr_slices] * len(newfiles)))
+                self.already_split_input.update(update)
+                update = dict(zip(newfiles, [0] * len(newfiles)))
+                self.add_output_files(update)
+            else:
+                outfilenames = {}
+                for f in newfiles:
+                    outfilenames.update(self.make_output_filenames(f))
+                # TODO: how to recover from existing output files?
+                # Simply re-split? Check whether they all exist and assume 
+                # they are correct if they do?
+                self.check_files_exist(outfilenames.keys(), "output", 
+                                        shouldexist=False)
+                kwargs = self.progparams[0].copy()
+                kwargs["out"] = str(self.workdir.make_dirname())
+                if len(newfiles) <= 10:
+                    p = self.programs[0](newfiles, kwargs)
                 else:
-                    # TODO: how to recover from existing output files?
-                    # Simply re-split? Check whether they all exist and assume 
-                    # they are correct if they do?
-                    self.check_files_exist(outfilenames.keys(), "output", 
-                                            shouldexist=False)
-                    kwargs = self.progparams[0].copy()
-                    kwargs["out"] = str(self.workdir.make_dirname())
-                    p = self.programs[0]((f,), kwargs)
-                    (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-                    if rc:
-                        raise Exception("Program failed")
+                    filelistname = self.workdir.make_filename("filelist")
+                    with open(str(filelistname), "w") as filelistfile:
+                        filelistfile.write("\n".join(newfiles))
+                    kwargs["filelist"] = str(filelistname)
+                    p = self.programs[0]((), kwargs)
+                (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+                if rc:
+                    raise Exception("Program failed")
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
                     # exception
-                    self.check_files_exist(outfilenames.keys(), "output", 
-                                           shouldexist=True)
-                    current_counts = self.parse_slice_counts(stderr)
-                for (idx, count) in enumerate(current_counts):
-                    self.slice_relcounts[str(idx)] += count
-                self.already_split_input[f] = self.nr_slices
+                self.check_files_exist(outfilenames.keys(), "output", 
+                                       shouldexist=True)
+                current_counts = self.parse_slice_counts(stderr)
+                for idx in range(self.nr_slices):
+                    self.slice_relcounts[str(idx)] += current_counts[idx]
+                update = dict(zip(newfiles, [self.nr_slices] * len(newfiles)))
+                self.already_split_input.update(update)
                 self.add_output_files(outfilenames)
         totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
                   for i in range(0, self.nr_slices)]
@@ -1149,7 +1168,14 @@ class Duplicates2Task(Task, FilesCreator):
             kwargs["poly"] = str(polyfilename)
             kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["renumber"] = str(renumber_filename)
-            p = self.programs[0](files, kwargs)
+            if len(files) <= 10:
+                p = self.programs[0](files, kwargs)
+            else:
+                filelistname = self.workdir.make_filename("filelist")
+                with open(str(filelistname), "w") as filelistfile:
+                    filelistfile.write("\n".join(files))
+                kwargs["filelist"] = str(filelistname)
+                p = self.programs[0]((), kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1264,14 +1290,21 @@ class PurgeTask(Task):
         purgedfile = str(self.workdir.make_filename("purged.gz"))
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
-        args = unique_filenames + [freerel_filename]
+        files = unique_filenames + [freerel_filename]
         kwargs = self.progparams[0].copy()
         kwargs["keep"] = self.params["keep"]
         kwargs["nrels"] = str(input_nrels)
         kwargs["out"] = purgedfile
         kwargs["minindex"] = str(minindex)
         kwargs["nprimes"] = str(nprimes)
-        p = self.programs[0](args, kwargs)
+        if len(files) <= 10:
+            p = self.programs[0](files, kwargs)
+        else:
+            filelistname = self.workdir.make_filename("filelist")
+            with open(str(filelistname), "w") as filelistfile:
+                filelistfile.write("\n".join(files))
+            kwargs["filelist"] = str(filelistname)
+            p = self.programs[0]((), kwargs)
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)

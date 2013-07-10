@@ -430,7 +430,10 @@ class Purge(Program):
     name = binary
     subdir = "filter"
     params_list = (
-        Parameter("out", is_output_file = True), 
+        Parameter("out", is_output_file = True),
+        Parameter("filelist", is_input_file = True),
+        Parameter("basepath"),
+        Parameter("subdirlist"),
         Parameter("nrels"), 
         Parameter("outdel", is_output_file = True), 
         Parameter("sos", is_output_file = True), 
