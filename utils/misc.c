@@ -163,6 +163,10 @@ void chomp(char *s) {
         *p = '\0';
 }
 
+/* Return a NULL-terminated list of file names read from filename.
+   Empty lines and comment lines (starting with '#') are skipped.
+   If basepath != NULL, it is used as path before each read filename
+*/
 char ** filelist_from_file(const char * basepath, const char * filename,
                            int typ)
 {
