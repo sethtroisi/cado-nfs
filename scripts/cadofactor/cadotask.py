@@ -51,7 +51,7 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
         if condition is None:
             return list(self.output_files.keys())
         else:
-            return [f for (f,s) in self.output_files.items() if condition(s)]
+            return [f for (f, s) in self.output_files.items() if condition(s)]
     
     def forget_output_filenames(self, filenames):
         for f in filenames:
@@ -84,11 +84,11 @@ class Polynomial(object):
             # If there is a "No polynomial found" message anywhere in the
             # file, we assume that there is no polynomial. This assumption
             # will be false if, e.g., files get concatenated
-            if re.match("No polynomial found", line):
+            if re.match(r"No polynomial found", line):
                 return
             # If this is a comment line telling the Murphy E value, 
             # extract the value and store it
-            match = re.match("\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
+            match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
             if match:
                 self.E = float(match.group(1))
                 continue
@@ -265,7 +265,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         # Parameters that all tasks use
         return ("name", )
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -273,7 +273,8 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         parameter dictionary.
         '''
         
-        super().__init__(*args, **kwargs)
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.logger = logging.getLogger(self.title)
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
@@ -430,8 +431,9 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.params.setdefault("maxwu", "10")
@@ -501,12 +503,17 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return super().paramnames + \
             ("workdir", "adrange", "P", "N", "admin", "admax")
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
+        self.bestpoly = None
+        if "bestpoly" in self.state:
+            self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
+            self.bestpoly.setE(self.state["bestE"])
     
     def run(self):
         self.logger.info("Starting")
@@ -516,14 +523,11 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.logger.info("Polynomial selection already finished - nothing to do")
             return
         
-        if "bestpoly" in self.state:
-            self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
-            self.bestpoly.setE(self.state["bestE"])
+        if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g", 
                              self.state["bestfile"], self.bestpoly.E)
         else:
-            self.bestpoly = None
             self.logger.info("No polynomial was previously found")
         
         # Submit all the WUs we need to reach admax
@@ -534,7 +538,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         while self.get_number_outstanding_wus() > 0:
             self.wait()
         
-        if not self.bestpoly:
+        if self.bestpoly is None:
             self.logger.error ("No polynomial found. Consider increasing the "
                                "search range bound admax, or maxnorm")
             return
@@ -543,7 +547,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return
     
     def is_done(self):
-        return "bestpoly" in self.state and not self.need_more_wus() and \
+        return not self.bestpoly is None and not self.need_more_wus() and \
             self.get_number_outstanding_wus() == 0
     
     def updateObserver(self, message):
@@ -574,11 +578,11 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.logger.error("Polynomial in file %s has no Murphy E value" 
                               % outputfile)
             return False
-        if not self.bestpoly or poly.E > self.bestpoly.E:
+        if self.bestpoly is None or poly.E > self.bestpoly.E:
             self.bestpoly = poly
-            self.state["bestE"] = poly.E
-            self.state["bestpoly"] = str(poly)
-            self.state["bestfile"] = outputfile
+            update = {"bestE": poly.E, "bestpoly": str(poly),
+                      "bestfile": outputfile}
+            self.state.update(update)
             self.logger.info("New best polynomial from file %s:"
                              " Murphy E = %g" % (outputfile, poly.E))
             self.logger.debug("New best polynomial is:\n%s", poly)
@@ -632,8 +636,9 @@ class FactorBaseTask(Task):
             ("workdir", "alim", )
 
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"])
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
@@ -707,13 +712,14 @@ class FreeRelTask(Task):
         return super().paramnames + \
             ("workdir", "lpba", "lpbr") + Polynomial.paramnames
     wanted_regex = {
-        'nfree': ('# Free relations: (\d+)', int),
-        'nprimes': ('Renumbering struct: nprimes=(\d+)', int),
-        'minindex': ('Renumbering struct: min_index=(\d+)', int)
+        'nfree': (r'# Free relations: (\d+)', int),
+        'nprimes': (r'Renumbering struct: nprimes=(\d+)', int),
+        'minindex': (r'Renumbering struct: min_index=(\d+)', int)
     }
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"])
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
@@ -827,8 +833,9 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         qmin = int(self.params.get("qmin", 0))
@@ -893,7 +900,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         with open(filename, "r") as f:
             f.seek(max(size - self.file_end_offset, 0))
             for line in f:
-                match = re.match("# Total (\d+) reports ", line)
+                match = re.match(r"# Total (\d+) reports ", line)
                 if match:
                     rels = int(match.group(1))
                     self.add_output_files({filename: rels})
@@ -943,8 +950,9 @@ class Duplicates1Task(Task, FilesCreator):
         return super().paramnames + \
             ("workdir", "nslices_log",)
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         self.nr_slices = 2**int(self.params["nslices_log"])
@@ -1060,7 +1068,7 @@ class Duplicates1Task(Task, FilesCreator):
         """
         counts = [None] * self.nr_slices
         for line in stderr.decode("ascii").splitlines():
-            match = re.match('# slice (\d+) received (\d+) relations', line)
+            match = re.match(r'# slice (\d+) received (\d+) relations', line)
             if match:
                 (slicenr, nrrels) = map(int, match.groups())
                 if not counts[slicenr] is None:
@@ -1099,8 +1107,9 @@ class Duplicates2Task(Task, FilesCreator):
         return super().paramnames + \
             ("workdir", "nslices_log",) + Polynomial.paramnames
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         self.nr_slices = 2**int(self.params["nslices_log"])
@@ -1160,7 +1169,7 @@ class Duplicates2Task(Task, FilesCreator):
     def parse_remaining(self, text):
         # "     112889 remaining relations"
         for line in text:
-            match = re.match('\s*(\d+) remaining relations', line)
+            match = re.match(r'\s*(\d+) remaining relations', line)
             if match:
                 remaining = int(match.group(1))
                 return remaining
@@ -1222,8 +1231,9 @@ class PurgeTask(Task):
         return super().paramnames + \
             ("workdir", "keep", ) + Polynomial.paramnames
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         self.state.setdefault("input_nrels", 0)
@@ -1277,7 +1287,7 @@ class PurgeTask(Task):
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
     def request_more_relations(self, nunique):
-        """
+        r"""
         We want an excess of $e = 0.1 n_p$, 
         with $n_p$ primes among $n_r$ relations in the output file.
         
@@ -1432,8 +1442,9 @@ class MergeTask(Task):
         return super().paramnames + \
             ("workdir", "skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         skip = int(self.progparams[0].get("skip", 32))
@@ -1525,8 +1536,9 @@ class LinAlgTask(Task):
     def paramnames(self):
         return super().paramnames + \
             ("workdir", )
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
     
@@ -1584,8 +1596,9 @@ class CharactersTask(Task):
         return super().paramnames + \
             ("workdir", ) + Polynomial.paramnames
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
     
@@ -1649,8 +1662,9 @@ class SqrtTask(Task):
         return super().paramnames + \
             ("workdir", "N",)
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
@@ -1695,7 +1709,7 @@ class SqrtTask(Task):
                 if rc:
                     raise Exception("Program failed")
                 if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    factorlist = list(map(int, stdout.decode("ascii").split()))
                     # FIXME: Can sqrt print more/less than 2 factors?
                     assert len(factorlist) == 2
                     self.add_factor(factorlist[0])
@@ -1814,8 +1828,9 @@ class StartClientsTask(Task):
         return super().paramnames + \
             ('hostnames', 'scriptpath', "nrclients")
     
-    def __init__(self, address, port, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, address, port, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"))
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
@@ -1831,7 +1846,7 @@ class StartClientsTask(Task):
         
         # If hostnames are of the form @file, read host names from file,
         # one host name per line
-        match = re.match("@(.*)", self.params["hostnames"])
+        match = re.match(r"@(.*)", self.params["hostnames"])
         if match:
             with open(match.group(1)) as f:
                 self.hosts_to_launch = [line for line in f]
@@ -2005,15 +2020,14 @@ class Request(Message):
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
-    """ Runs the square root """
     @property
     def name(self):
         return "tasks"
     
     CAN_CANCEL_WUS = 0
     
-    def __init__(self, *args, path_prefix, **kwargs):
-        super().__init__(*args, path_prefix = path_prefix, **kwargs)
+    def __init__(self, db, parameters, path_prefix):
+        super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
@@ -2035,59 +2049,61 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         # Init client lists
         self.clients = []
         for (path, key) in self.get_parameters().find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(serveraddress, serverport, *args, 
+            self.clients.append(StartClientsTask(serveraddress, serverport, 
                                                  mediator = self,
-                                                 path_prefix = path, **kwargs))
+                                                 db = db, 
+                                                 parameters = parameters, 
+                                                 path_prefix = path))
         
         parampath = self.get_param_path()
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
-        self.polysel = PolyselTask(*args,
-                                   mediator = self,
-                                   path_prefix = parampath,
-                                   **kwargs)
-        self.fb = FactorBaseTask(*args,
-                                 mediator = self,
-                                 path_prefix = sievepath, 
-                                 **kwargs)
-        self.freerel = FreeRelTask(*args,
-                                   mediator = self,
-                                   path_prefix = sievepath,
-                                   **kwargs)
-        self.sieving = SievingTask(*args,
-                                   mediator = self,
-                                   path_prefix = sievepath,
-                                   **kwargs)
-        self.dup1 = Duplicates1Task(*args,
-                                    mediator = self,
-                                    path_prefix = filterpath,
-                                    **kwargs)
-        self.dup2 = Duplicates2Task(*args,
-                                    mediator = self,
-                                    path_prefix = filterpath,
-                                    **kwargs)
-        self.purge = PurgeTask(*args,
-                               mediator = self,
-                               path_prefix = filterpath,
-                               **kwargs)
-        self.merge = MergeTask(*args,
-                               mediator = self,
-                               path_prefix = filterpath, 
-                               **kwargs)
-        self.linalg = LinAlgTask(*args,
-                                 mediator = self,
-                                 path_prefix = linalgpath, 
-                                 **kwargs)
-        self.characters = CharactersTask(*args,
-                                         mediator = self,
-                                         path_prefix = linalgpath,
-                                         **kwargs)
-        self.sqrt = SqrtTask(*args,
-                             mediator = self,
-                             path_prefix = parampath,
-                             **kwargs)
+        self.polysel = PolyselTask(mediator = self,
+                                   db = db, 
+                                   parameters = parameters, 
+                                   path_prefix = parampath)
+        self.fb = FactorBaseTask(mediator = self,
+                                 db = db, 
+                                 parameters = parameters, 
+                                 path_prefix = sievepath)
+        self.freerel = FreeRelTask(mediator = self,
+                                   db = db, 
+                                   parameters = parameters, 
+                                   path_prefix = sievepath)
+        self.sieving = SievingTask(mediator = self,
+                                   db = db, 
+                                   parameters = parameters, 
+                                   path_prefix = sievepath)
+        self.dup1 = Duplicates1Task(mediator = self,
+                                    db = db, 
+                                    parameters = parameters, 
+                                    path_prefix = filterpath)
+        self.dup2 = Duplicates2Task(mediator = self,
+                                    db = db, 
+                                    parameters = parameters, 
+                                    path_prefix = filterpath)
+        self.purge = PurgeTask(mediator = self,
+                               db = db, 
+                               parameters = parameters, 
+                               path_prefix = filterpath)
+        self.merge = MergeTask(mediator = self,
+                               db = db, 
+                               parameters = parameters, 
+                               path_prefix = filterpath)
+        self.linalg = LinAlgTask(mediator = self,
+                                 db = db, 
+                                 parameters = parameters, 
+                                 path_prefix = linalgpath)
+        self.characters = CharactersTask(mediator = self,
+                                         db = db, 
+                                         parameters = parameters, 
+                                         path_prefix = linalgpath)
+        self.sqrt = SqrtTask(mediator = self,
+                             db = db, 
+                             parameters = parameters, 
+                             path_prefix = parampath)
         
         # Defines an order on tasks in which tasks that want to run should be run
         self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
