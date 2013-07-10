@@ -138,18 +138,6 @@ class Program(object):
     path = '.'
     subdir = ""
     
-    @staticmethod
-    def _shellquote(s):
-        ''' Quote a command line argument
-        
-        Currently does it the hard way: encloses the argument in single
-        quotes, and escapes any single quotes that are part of the argument
-        '''
-        # If only characters that are known to be shell-safe occur, don't quote
-        if re.match("^[a-zA-Z0-9+-_.:@/]*$", s):
-            return s
-        return "'" + s.replace("'", "'\\''") + "'"
-    
     def __init__(self, args, parameters, stdin = None, stdout = None,
                  append_stdout = False, stderr = None, append_stderr = False,
                  bg = False):
@@ -164,6 +152,10 @@ class Program(object):
         
         self.args = args
         self.parameters = parameters
+        known_keys = self.get_config_keys()
+        for key in parameters:
+            if not key in known_keys:
+                raise Exception("Unknown parameter %s" % key)
         
         self.stdin = stdin
         self.stdout = stdout
@@ -301,17 +293,17 @@ class Program(object):
         are added to the command line.
         """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
-        cmdline = " ".join(map(Program._shellquote, cmdarr))
+        cmdline = " ".join(map(cadocommand.shellquote, cmdarr))
         if isinstance(self.stdin, str):
-            cmdline += ' < ' + Program._shellquote(self.translate_path(self.stdin, inputpath))
+            cmdline += ' < ' + cadocommand.shellquote(self.translate_path(self.stdin, inputpath))
         if isinstance(self.stdout, str):
             redir = ' >> ' if self.append_stdout else ' > '
-            cmdline += redir + Program._shellquote(self.translate_path(self.stdout, outputpath))
+            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stdout, outputpath))
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         elif isinstance(self.stderr, str):
             redir = ' 2>> ' if self.append_stderr else ' 2> '
-            cmdline += redir + Program._shellquote(self.translate_path(self.stderr, outputpath))
+            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stderr, outputpath))
         if self.bg:
             cmdline += " & echo $!" # FIXME: the echo does not belong here
         return cmdline
@@ -374,7 +366,9 @@ class FreeRel(Program):
         Toggle("verbose", "v"), 
         Parameter("pmin"), 
         Parameter("pmax"),
-        Parameter("poly", is_input_file = True)
+        Parameter("poly", is_input_file = True),
+        Parameter("badideals", is_output_file = True),
+        Parameter("renumber", is_output_file = True)
         )
 
 class Las(Program):
@@ -425,10 +419,10 @@ class Duplicates2(Program):
     name = binary
     subdir = "filter"
     params_list = (
-        Toggle("remove", "rm"),
-        Parameter("output_directory", "out"), 
         Parameter("filelist", is_input_file = True), 
-        Parameter("rel_count", "K")
+        Parameter("rel_count", "K"),
+        Parameter("poly", is_input_file = True),
+        Parameter("renumber", is_input_file = True)
         )
 
 class Purge(Program):
@@ -436,14 +430,12 @@ class Purge(Program):
     name = binary
     subdir = "filter"
     params_list = (
-        Parameter("poly", is_input_file = True),
         Parameter("out", is_output_file = True), 
         Parameter("nrels"), 
         Parameter("outdel", is_output_file = True), 
         Parameter("sos", is_output_file = True), 
         Parameter("keep"), 
-        Parameter("minpa"), 
-        Parameter("minpr"), 
+        Parameter("minindex"), 
         Parameter("nprimes"), 
         Toggle("raw"), 
         Parameter("npthr"), 

@@ -212,6 +212,10 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             ASSERT_ALWAYS(rc >= 0);
         }
 
+        if (0)
+            fprintf (stderr, "Input file name: %s, temporary output file name:"
+                     " %s, final output file name: %s\n",
+                     name, oname_tmp, oname);
         f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
         if (f_out == NULL)
         {
@@ -501,10 +505,10 @@ usage(const char *argv0)
 int
 main (int argc, char *argv[])
 {
-  argv0 = argv[0];
-  p_r_values_t pmin;
-  index_t min_index;
-  cado_poly cpoly;
+    argv0 = argv[0];
+    p_r_values_t pmin;
+    index_t min_index;
+    cado_poly cpoly;
     const char *renumberfilename = NULL;
     char **p;
 
@@ -519,7 +523,7 @@ main (int argc, char *argv[])
     argv++,argc--;
 
 #ifndef FOR_FFS
-    int is_for_dl = 0; /* Be default we do dup2 for factorization */
+    int is_for_dl = 0; /* By default we do dup2 for factorization */
     param_list_configure_switch(pl, "dl", &is_for_dl);
 #else
     int is_for_dl = 1; /* With FFS, not for dl is meaningless */
@@ -543,7 +547,7 @@ main (int argc, char *argv[])
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
     renumberfilename = param_list_lookup_string(pl, "renumber");
-  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     param_list_parse_ulong(pl, "K", &K);
 
@@ -557,7 +561,13 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
-    pmin = ulong_nextprime (MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim));
+    unsigned long minlim = MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim);
+    if (minlim == 0) {
+        fprintf(stderr, "Neither alim nor rlim specified in polynomial file %s\n",
+                polyfilename);
+        exit(EXIT_FAILURE);
+    }
+    pmin = ulong_nextprime (minlim);
 #else
     if (!ffs_poly_read (cpoly, polyfilename))
     {
@@ -581,8 +591,10 @@ main (int argc, char *argv[])
         exit(1);
     }
 
-    if (K == 0)
+    if (K == 0) {
+        fprintf (stderr, "The K parameter is required\n");
         usage(argv0);
+    }
 
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
@@ -682,10 +694,14 @@ main (int argc, char *argv[])
     for (unsigned int i = 0; i < strlen (s); i++)
       count += s[i] == ':';
     
-    if (count == 2)
-      files_new[nb_f_new++] = *p;
-    else
+    if (count == 1)
       files_already_renumbered[nb_f_renumbered++] = *p;
+    else if (count == 2)
+      files_new[nb_f_new++] = *p;
+    else {
+      fprintf (stderr, "Error: invalid line (has %u colons): %s", count, s);
+      exit(EXIT_FAILURE);
+    }
 
     fclose_maybe_compressed (f_tmp, *p);
   }
@@ -696,7 +712,7 @@ main (int argc, char *argv[])
                    nb_f_new, nb_f_renumbered);
 
 
- //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
+  //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
 
   fprintf (stderr, "Reading files already renumbered:\n");
   process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,

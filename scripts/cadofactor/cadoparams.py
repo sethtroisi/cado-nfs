@@ -1,8 +1,3 @@
-import sys
-import os
-import re
-import abc
-
 """
 Parameter file format
 
@@ -30,7 +25,13 @@ other programs run during the sieving tasks, if there are any. The name of
 the node of a program is equal to the name of the binary executable.
 """
 
+import os
+import re
+import abc
+
 class Parameters(object):
+    """ Class that stores parameters for cadofactor in hierarchical dictionaries
+    """
     # TODO: Add a self.used dictionary with the same structure and keys as
     # self.data, but booleans as the values which indicate whether a parameter
     # has ever been access with myparams(). Add a function that tests that
@@ -93,11 +94,12 @@ class Parameters(object):
         "ratq": "tasks.sieve.ratq",
         "rlambda": "tasks.sieve.rlambda",
         "rlim": "rlim",
+        "scriptpath": "slaves.scriptpath",
         "sieve_max_threads": "tasks.sieve.threads",
         "sievenice": None,
         "slaves": "slaves.hostnames",
         "skip": "tasks.purge.skip",
-        "wdir": "workdir",
+        "wdir": "tasks.workdir",
         "expected_factorization": None
     }
 
@@ -166,11 +168,9 @@ class Parameters(object):
         source = self._get_subdict(path)
         if not source:
             source = {}
-        result = []
         pattern = re.compile(regex)
-        for l in self._recurse_iter(source, path):
-            if pattern.search(l[1]):
-                result.append([l[0], l[1]])
+        result = [[l[0], l[1]] for l in self._recurse_iter(source, path)
+            if pattern.search(l[1])]
         return result
     
     def _insertkey(self, path, value):
@@ -226,7 +226,7 @@ class Parameters(object):
         shell environment variables
         """
         while True:
-            match = re.search("^(.*)\$\{(.*)\}(.*)$", value)
+            match = re.search(r"^(.*)\$\{(.*)\}(.*)$", value)
             if not match:
                 break
             (prefix, varname, postfix) = match.groups()
@@ -246,7 +246,7 @@ class Parameters(object):
         results in foo.bar.k = 5 and k = 3
         """
         while True:
-            match = re.search("^(.*)\$\((.*)\)(.*)$", value)
+            match = re.search(r"^(.*)\$\((.*)\)(.*)$", value)
             if not match:
                 break
             (prefix, varname, postfix) = match.groups()
@@ -285,7 +285,7 @@ class Parameters(object):
         for line in infile:
             line2 = line.split('#', 1)[0].strip()
             if not line2:
-               continue
+                continue
             if not '=' in line2:
                 raise Exception('Invalid line, missing "=": %s' % line)
             # Which one is worse?
@@ -383,17 +383,17 @@ DEFAULTS = (
     "tasks.sieve.ratq = 0",
 
     # filtering
-    "tasks.purge.skip = -1", # should be about bwc_mn - 32
+    # "tasks.purge.skip = -1", # should be about bwc_mn - 32
     "tasks.purge.keep = 208", # should be 160 + #ideals <= FINAL_BOUND 
                               # (cf purge.c)
     "tasks.purge.nslices_log = 1",
     "tasks.purge.filterlastrels = 1",
     
-    "tasks.merge.skip = -1", # should be about bwc_mn - 32
+    # "tasks.merge.skip = -1", # should be about bwc_mn - 32
     "tasks.merge.forbw = 3",
     "tasks.merge.coverNmax = 100",
     "tasks.merge.ratio = 1.5",
-    "tasks.merge.keep = -1", # should be 128 + skip
+    # "tasks.merge.keep = -1", # should be 128 + skip
     "tasks.merge.maxlevel = 15",
 
     # linalg
@@ -462,8 +462,8 @@ DEFAULTS_OLD = (
     'ratq	 = 0',
 
     # filtering
-    'skip         = -1', # should be about bwc_mn - 32
-    'keep         = -1', # should be 128 + skip
+    # 'skip         = -1', # should be about bwc_mn - 32
+    # 'keep         = -1', # should be 128 + skip
     'keeppurge    = 208', # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     'maxlevel     = 15',
     'ratio        = 1.5',
