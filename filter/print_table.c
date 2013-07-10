@@ -16,7 +16,8 @@
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -renumberfile outfile\n", argv0);
+  fprintf (stderr, "Usage: %s [-check] -poly xxx.poly -renumberfile outfile\n",
+                   argv0);
   exit (1);
 }
 
@@ -90,16 +91,15 @@ main (int argc, char *argv[])
     int side;
     for (i = 0; i < tab->size; i++)
     {
-      renumber_get_p_r_from_index(tab, &p, &r, i, cpoly); 
-      if (tab->rat != -1)
-        side = (r == p+1) ? tab->rat : 1-tab->rat;
-      else
-        side = (r > p) ? 1 : 0;
-      j = renumber_get_index_from_p_r (tab, p, r, side);
-      if (i == j)
-        fprintf (stderr, "## %"PRid":Ok\n", i);
-      else
-        fprintf (stderr, "#### %"PRid":Error:%"PRid"\n", i, j);
+      if (tab->table[i] != RENUMBER_SPECIAL_VALUE)
+      {
+        renumber_get_p_r_from_index(tab, &p, &r, &side, i, cpoly);
+        j = renumber_get_index_from_p_r (tab, p, r, side);
+        if (i == j)
+          fprintf (stderr, "## %"PRid":Ok\n", i);
+        else
+          fprintf (stderr, "#### %"PRid":Error:%"PRid"\n", i, j);
+      }
     }
 
     renumber_free (tab);
