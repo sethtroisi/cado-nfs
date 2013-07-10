@@ -181,7 +181,7 @@ DELRELSFILE="${DIR}/${NAME}.rels.deleted"
 HISFILE="${DIR}/${NAME}.merge.his"
 
 PREFIX_MATRIX="${DIR}/${NAME}.matrix"
-INDEX_ID_MERGE="${DIR}/${NAME}.id.replay.index"
+INDEX_ID_MERGE="${DIR}/${NAME}.ideals"
 
 BIN_FREE="${CADO_BUILD}/ffs/f${GF}/freerels";
 BIN_DUP1="${CADO_BUILD}/filter/dup1";
