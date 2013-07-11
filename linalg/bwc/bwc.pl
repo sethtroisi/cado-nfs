@@ -604,21 +604,56 @@ sub get_mpi_hosts_torque {
     }
 }
 
+sub get_mpi_hosts_sge {
+    print STDERR "Building hosts file from $ENV{PE_HOSTFILE}\n";
+    my @x = split /^/, eval { local $/=undef; open F, "$ENV{PE_HOSTFILE}"; <F> };
+    my $cores_on_node = {};
+    for my $line (@x) {
+        my ($node, $ncores, $toto, $tata) = split ' ', $line;
+        print STDERR "$node: +$ncores cores\n";
+        $cores_on_node->{$node}+=$ncores;
+    }
+    my $values_for_cores_on_node = {};
+    local $_;
+    $values_for_cores_on_node->{$_}=1 for (values %$cores_on_node);
+
+    die "Not always the same number of cores obtained on the different nodes, as per \$PE_HOSTFILE" if keys %$values_for_cores_on_node != 1;
+
+    my $ncores_obtained = (keys %$values_for_cores_on_node)[0];
+    my $nnodes = scalar keys %$cores_on_node;
+    print STDERR "Obtained $ncores_obtained cores on $nnodes nodes\n";
+
+    my $nthr = $thr_split[0] * $thr_split[1];
+    my $nmpi = $mpi_split[0] * $mpi_split[1];
+
+    die "Not enough cores ($ncores_obtained) obtained: want $nthr\n" if $nthr > $ncores_obtained;
+
+    @hosts=();
+    push @hosts, $_ for keys %$cores_on_node;
+
+    die "Not enough mpi nodes ($nnodes): want $nmpi\n" if $nmpi > $nnodes;
+}
+
 if ($mpi_needed) {
+	print STDERR "Inherited environment:\n";
+	print STDERR "$_=$ENV{$_}\n" for keys %$ENV;
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
 
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
-        print STDERR "OAR environment detected, setting hostfile.\n";
-        system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
-        $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    print STDERR "OAR environment detected, setting hostfile.\n";
+	    system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+    } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+	    get_mpi_hosts_torque;
+    } elsif (exists($ENV{'PE_HOSTFILE'}) && exists($ENV{'NSLOTS'})) {
+            print STDERR "Oracle/SGE environment detected, setting hostfile.\n";
+	    get_mpi_hosts_sge;
     }
-	elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
-        print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
-        get_mpi_hosts_torque;
-	}
+
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.
