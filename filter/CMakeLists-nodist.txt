@@ -16,7 +16,7 @@ add_dependencies(ffs-f2 antebuffer)
 #add_dependencies(ffs-f2 gf2x-build)
 
 add_library (ffs-f3 EXCLUDE_FROM_ALL ${sources})
-target_link_libraries(ffs-f3 utils pthread m libfppol-f2.a)
+target_link_libraries(ffs-f3 utils pthread m libfppol-f3.a)
 set_target_properties(ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 add_dependencies(ffs-f3 antebuffer)
 

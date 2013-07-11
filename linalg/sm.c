@@ -29,6 +29,8 @@ Output
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <pthread.h>
+
 #include "utils.h"
 #include "timing.h"
 
@@ -179,6 +181,148 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   return rels;
 }
 
+struct thread_info {
+  int offset;
+  int nb;
+  relset_srcptr rels;
+  poly_srcptr F;
+  mpz_srcptr eps;
+  mpz_srcptr ell2;
+  mpz_srcptr invl2;
+  poly_t *sm;
+};
+
+void * thread_start(void *arg) {
+  struct thread_info *ti = (struct thread_info *) arg;
+  relset_srcptr rels = ti->rels;
+  poly_srcptr F = ti->F;
+  mpz_srcptr eps = ti->eps;
+  mpz_srcptr ell2 = ti->ell2;
+  mpz_srcptr invl2 = ti->invl2;
+  poly_t *sm = ti->sm;
+  int offset = ti->offset;
+
+  poly_t SMn, SMd;
+  poly_alloc(SMn, F->deg);
+  poly_alloc(SMd, F->deg);
+
+  for (int i = 0; i < ti->nb; i++) {
+    poly_power_mod_f_mod_mpz_Barrett(SMn, rels[offset+i].num,
+        F, eps, ell2, invl2);
+    poly_sub_ui(SMn, 1);
+
+    poly_power_mod_f_mod_mpz_Barrett(SMd, rels[offset+i].denom,
+        F, eps, ell2, invl2);
+    poly_sub_ui(SMd, 1);
+
+    poly_sub_mod_mpz(sm[i], SMn, SMd, ell2);
+  }
+  poly_free(SMn);
+  poly_free(SMd);
+  return NULL;
+}
+
+#define SM_BLOCK 500
+
+void mt_sm(int nt, const char * outname, relset_srcptr rels, int sr, poly_t F,
+    const mpz_t eps, const mpz_t ell, const mpz_t ell2)
+{
+  // allocate space for results of threads
+  poly_t **SM;
+  SM = (poly_t **) malloc(nt*sizeof(poly_t *));
+  for (int i = 0; i < nt; ++i) {
+    SM[i] = (poly_t *) malloc(SM_BLOCK*sizeof(poly_t));
+    for (int j = 0; j < SM_BLOCK; ++j)
+      poly_alloc(SM[i][j], F->deg);
+  }
+
+  // We'll use a rotating buffer of thread id.
+  pthread_t *threads;
+  threads = (pthread_t *) malloc(nt*sizeof(pthread_t));
+  int active_threads = 0;  // number of running threads
+  int threads_head = 0;    // next thread to wait / restart.
+  
+  // Prepare the main loop
+  int i = 0; // counter of relation-sets.
+  int out_cpt = 0; // counter of already printed relation-sets;
+  FILE * out = fopen(outname, "w");
+  fprintf(out, "%d\n", sr);
+  mpz_t invl2;
+  mpz_init(invl2);
+  barrett_init(invl2, ell2);
+
+  // Arguments for threads
+  struct thread_info *tis;
+  tis = (struct thread_info*) malloc(nt*sizeof(struct thread_info));
+  for (int i = 0; i < nt; ++i) {
+    tis[i].rels = rels;
+    tis[i].F = F;
+    tis[i].eps = eps;
+    tis[i].ell2 = ell2;
+    tis[i].invl2 = invl2;
+    tis[i].sm = SM[i];
+    // offset and nb must be adjusted.
+  }
+
+  // Main loop
+  while ((i < sr) || (active_threads > 0)) {
+    // Start / restart threads as many threads as allowed
+    if ((active_threads < nt) && (i < sr)) { 
+      tis[threads_head].offset = i;
+      tis[threads_head].nb = MIN(SM_BLOCK, sr-i);
+      pthread_create(&threads[threads_head], NULL, 
+          &thread_start, (void *)(&tis[threads_head]));
+      i += SM_BLOCK;
+      active_threads++;
+      threads_head++; 
+      if (threads_head == nt) 
+        threads_head = 0;
+      continue;
+    }
+    // Wait for the next thread to finish in order to print result.
+    pthread_join(threads[threads_head], NULL);
+    active_threads--;
+    for (int k = 0; k < SM_BLOCK; ++k) {
+      if (out_cpt >= sr)
+        break;
+      poly_ptr sm = SM[threads_head][k];
+      for(int j=0; j<F->deg; j++) {
+        if (j > sm->deg) {
+          fprintf(out, "0 ");
+          continue;
+        }
+        ASSERT_ALWAYS(mpz_divisible_p(sm->coeff[j], ell));
+        mpz_divexact(sm->coeff[j], sm->coeff[j], ell);
+        ASSERT_ALWAYS(mpz_cmp(ell, sm->coeff[j])>0);
+
+        mpz_out_str(out, 10, sm->coeff[j]);
+        fprintf(out, " ");
+      }
+      fprintf(out, "\n");
+      out_cpt++;
+    }
+    // If we are at the end, no job will be restarted, but head still
+    // must be incremented.
+    if (i >= sr) { 
+      threads_head++;
+      if (threads_head == nt) 
+        threads_head = 0;
+    }
+  }
+
+  mpz_clear(invl2);
+  fclose(out);
+  free(tis);
+  free(threads);
+  for (int i = 0; i < nt; ++i) {
+    for (int j = 0; j < SM_BLOCK; ++j) {
+      poly_free(SM[i][j]);
+    }
+    free(SM[i]);
+  }
+  free(SM);
+}
+
 
 void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
@@ -247,7 +391,9 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 
 void usage(const char * me)
 {
-  fprintf(stderr, "Usage: %s --poly polyname --purged purgedname --index indexname --out outname --gorder group-order --smexp sm-exponent\n", me);
+  fprintf(stderr, "Usage: %s --poly polyname --purged purgedname "
+      "--index indexname --out outname --gorder group-order "
+      "--smexp sm-exponent [-mt nb_thread]\n", me);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -269,6 +415,7 @@ int main (int argc, char **argv)
   relset_ptr rels;
   int sr;
   mpz_t ell, ell2, eps;
+  int mt = 1;
 
   double t0;
 
@@ -304,6 +451,7 @@ int main (int argc, char **argv)
   outname = param_list_lookup_string(pl, "out");
   group_order = param_list_lookup_string(pl, "gorder");
   sm_exponent = param_list_lookup_string(pl, "smexp");
+  param_list_parse_int(pl, "mt", &mt);
 
   cado_poly_init (pol);
 
@@ -327,6 +475,7 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(indexname != NULL);
   ASSERT_ALWAYS(group_order != NULL);
   ASSERT_ALWAYS(sm_exponent != NULL);
+  ASSERT_ALWAYS(mt >= 1);
 
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
@@ -349,7 +498,10 @@ int main (int argc, char **argv)
 
   fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
 
-  shirokauer_maps(outname, rels, sr, F, eps, ell, ell2);
+  if (mt == 1)
+    shirokauer_maps(outname, rels, sr, F, eps, ell, ell2);
+  else
+    mt_sm(mt, outname, rels, sr, F, eps, ell, ell2);
 
   fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
 
