@@ -164,7 +164,7 @@ usage(const char *argv0)
 int
 main (int argc, char * argv[])
 {
-  char * argv0 = argv[0];
+    char * argv0 = argv[0];
     int had_error = 0;
 
     param_list pl;
@@ -197,8 +197,8 @@ main (int argc, char * argv[])
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
-  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
-  set_antebuffer_path (argv0, path_antebuffer);
+    const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    set_antebuffer_path (argv0, path_antebuffer);
 
     if (param_list_warn_unused(pl)) {
         exit(1);
