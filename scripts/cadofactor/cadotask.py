@@ -604,7 +604,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
     
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
-        self.bestpoly.create_file(str(filename), self.params)
+        self.bestpoly.create_file(filename, self.params)
         self.state["polyfilename"] = filename.get_relative()
     
     def get_poly(self):
@@ -623,8 +623,8 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         adend = adstart + int(self.params["adrange"])
         adend = min(adend, int(self.params["admax"]))
         polyselect_params = self.progparams[0].copy()
-        polyselect_params["admin"] = str(adstart)
-        polyselect_params["admax"] = str(adend)
+        polyselect_params["admin"] = adstart
+        polyselect_params["admax"] = adend
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
@@ -690,7 +690,7 @@ class FactorBaseTask(Task):
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = str(polyfilename)
+            kwargs["poly"] = polyfilename
             p = self.programs[0](None, kwargs, stdout = str(outputfilename))
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -768,8 +768,8 @@ class FreeRelTask(Task):
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = str(polyfilename)
-            kwargs["renumber"] = str(renumberfilename)
+            kwargs["poly"] = polyfilename
+            kwargs["renumber"] = renumberfilename
             p = self.programs[0](None, kwargs, stdout = str(freerelfilename))
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -863,11 +863,11 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             q1 = q0 + int(self.params["qrange"])
             outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
-            kwargs["q0"] = str(q0)
-            kwargs["q1"] = str(q1)
-            kwargs["poly"] = str(self.send_request(Request.GET_POLYNOMIAL_FILENAME))
-            kwargs["factorbase"] = str(self.send_request(Request.GET_FACTORBASE_FILENAME))
-            kwargs["out"] = str(outputfilename)
+            kwargs["q0"] = q0
+            kwargs["q1"] = q1
+            kwargs["poly"] = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            kwargs["factorbase"] = self.send_request(Request.GET_FACTORBASE_FILENAME)
+            kwargs["out"] = outputfilename
             p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
@@ -1025,14 +1025,14 @@ class Duplicates1Task(Task, FilesCreator):
                 self.check_files_exist(outfilenames.keys(), "output", 
                                         shouldexist=False)
                 kwargs = self.progparams[0].copy()
-                kwargs["out"] = str(self.workdir.make_dirname())
+                kwargs["out"] = self.workdir.make_dirname()
                 if len(newfiles) <= 10:
                     p = self.programs[0](newfiles, kwargs)
                 else:
                     filelistname = self.workdir.make_filename("filelist")
                     with open(str(filelistname), "w") as filelistfile:
                         filelistfile.write("\n".join(newfiles))
-                    kwargs["filelist"] = str(filelistname)
+                    kwargs["filelist"] = filelistname
                     p = self.programs[0]((), kwargs)
                 (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
                 if rc:
@@ -1149,16 +1149,16 @@ class Duplicates2Task(Task, FilesCreator):
             del(self.slice_relcounts[str(i)])
             # self.workdir.make_directories(str(i)) OBSOLETE
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = str(polyfilename)
-            kwargs["rel_count"] = str(rel_count * 12 // 10)
-            kwargs["renumber"] = str(renumber_filename)
+            kwargs["poly"] = polyfilename
+            kwargs["rel_count"] = rel_count * 12 // 10
+            kwargs["renumber"] = renumber_filename
             if len(files) <= 10:
                 p = self.programs[0](files, kwargs)
             else:
                 filelistname = self.workdir.make_filename("filelist")
                 with open(str(filelistname), "w") as filelistfile:
                     filelistfile.write("\n".join(files))
-                kwargs["filelist"] = str(filelistname)
+                kwargs["filelist"] = filelistname
                 p = self.programs[0]((), kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1274,17 +1274,17 @@ class PurgeTask(Task):
         files = unique_filenames + [str(freerel_filename)]
         kwargs = self.progparams[0].copy()
         kwargs["keep"] = self.params["keep"]
-        kwargs["nrels"] = str(input_nrels)
-        kwargs["out"] = str(purgedfile)
-        kwargs["minindex"] = str(minindex)
-        kwargs["nprimes"] = str(nprimes)
+        kwargs["nrels"] = input_nrels
+        kwargs["out"] = purgedfile
+        kwargs["minindex"] = minindex
+        kwargs["nprimes"] = nprimes
         if len(files) <= 10:
             p = self.programs[0](files, kwargs)
         else:
             filelistname = self.workdir.make_filename("filelist")
             with open(str(filelistname), "w") as filelistfile:
                 filelistfile.write("\n".join(files))
-            kwargs["filelist"] = str(filelistname)
+            kwargs["filelist"] = filelistname
             p = self.programs[0]((), kwargs)
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
         if self.parse_stderr(stderr, input_nrels):
@@ -1484,8 +1484,8 @@ class MergeTask(Task):
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["mat"] = str(purged_filename)
-            kwargs["out"] = str(historyfile)
+            kwargs["mat"] = purged_filename
+            kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs,
                                  stdout = str(stdoutfilename), append_stdout = True, 
                                  stderr = str(stderrfilename), append_stderr = True)
@@ -1501,10 +1501,10 @@ class MergeTask(Task):
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
-            kwargs["purged"] = str(purged_filename)
-            kwargs["history"] = str(historyfile)
-            kwargs["index"] = str(indexfile)
-            kwargs["out"] = str(mergedfile)
+            kwargs["purged"] = purged_filename
+            kwargs["history"] = historyfile
+            kwargs["index"] = indexfile
+            kwargs["out"] = mergedfile
             p = self.programs[1](args, kwargs,
                                  stdout = str(stdoutfilename), append_stdout = True, 
                                  stderr = str(stderrfilename), append_stderr = True)
@@ -1515,7 +1515,7 @@ class MergeTask(Task):
             if not os.path.isfile(str(indexfile)):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not os.path.isfile(str(mergedfile)):
-                raise Exception("Output file %s does not exist" % str(mergedfile))
+                raise Exception("Output file %s does not exist" % mergedfile)
             self.state["indexfile"] = indexfile.get_relative()
             self.state["mergedfile"] = mergedfile.get_relative()
             densefilename = self.workdir.make_filename("small.dense.bin")
@@ -1560,7 +1560,7 @@ class LinAlgTask(Task):
         
         if not "dependency" in self.state:
             self.logger.info("Starting")
-            workdir = str(self.workdir.make_dirname())
+            workdir = self.workdir.make_dirname()
             self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             progname = self.programs[0].name
@@ -1630,13 +1630,13 @@ class CharactersTask(Task):
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = str(polyfilename)
-            kwargs["purged"] = str(purgedfilename)
-            kwargs["index"] = str(indexfilename)
-            kwargs["wfile"] = str(dependencyfilename)
-            kwargs["out"] = str(kernelfilename)
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["wfile"] = dependencyfilename
+            kwargs["out"] = kernelfilename
             if not densefilename is None:
-                kwargs["heavyblock"] = str(densefilename)
+                kwargs["heavyblock"] = densefilename
             p = self.programs[0](args, kwargs,
                                  stdout = str(stdoutfilename), append_stdout = True, 
                                  stderr = str(stderrfilename), append_stderr = True)
@@ -1644,7 +1644,7 @@ class CharactersTask(Task):
             if rc:
                 raise Exception("Program failed")
             if not os.path.isfile(str(kernelfilename)):
-                raise Exception("Output file %s does not exist" % str(kernelfilename))
+                raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename.get_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return
@@ -1688,11 +1688,11 @@ class SqrtTask(Task):
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["ab"] = "1"
-            kwargs["poly"] = str(polyfilename)
-            kwargs["purged"] = str(purgedfilename)
-            kwargs["index"] = str(indexfilename)
-            kwargs["kernel"] = str(kernelfilename)
-            kwargs["prefix"] = str(prefix)
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["kernel"] = kernelfilename
+            kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1704,7 +1704,7 @@ class SqrtTask(Task):
                 kwargs["rat"] = "1"
                 kwargs["alg"] = "1"
                 kwargs["gcd"] = "1"
-                kwargs["dep"] = str(self.state["next_dep"])
+                kwargs["dep"] = self.state["next_dep"]
                 p = self.programs[0](args, kwargs)
                 (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "dep%d" % self.state["next_dep"])
@@ -1975,7 +1975,7 @@ class StartClientsTask(Task):
         host = self.hosts[clientid]
         params = {}
         if not signal is None:
-            params["signal"] = str(signal)
+            params["signal"] = signal
         kill = cadoprograms.Kill((pid,), params)
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.get_param_prefix())
         return process.wait()
@@ -2295,7 +2295,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                             sender, Request.reverse_lookup(key), value)
         if not key in self.request_map:
             raise KeyError("Unknown Request key %s from sender %s" %
-                           (str(key), str(sender)))
+                           (key, sender))
         if value is None:
             return self.request_map[key]()
         else:

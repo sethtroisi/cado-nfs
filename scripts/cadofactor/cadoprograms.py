@@ -173,9 +173,9 @@ class Program(object):
         
         # Look for location of the binary executable at __init__, to avoid 
         # calling os.path.isfile() multiple times
-        path = self.parameters.get("execpath", self.path)
-        subdir = self.parameters.get("execsubdir", self.subdir)
-        binary = self.parameters.get("execbin", self.binary)
+        path = str(self.parameters.get("execpath", self.path))
+        subdir = str(self.parameters.get("execsubdir", self.subdir))
+        binary = str(self.parameters.get("execbin", self.binary))
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
         if execsubfile != execfile and os.path.isfile(execsubfile):
@@ -233,7 +233,7 @@ class Program(object):
             key = p.get_key()
             if key in self.parameters:
                 if p.is_input_file:
-                    input_files.append(self.parameters[key])
+                    input_files.append(str(self.parameters[key]))
         return input_files
     
     def get_output_files(self):
@@ -246,7 +246,7 @@ class Program(object):
             key = p.get_key()
             if key in self.parameters:
                 if p.is_output_file:
-                    output_files.append(self.parameters[key])
+                    output_files.append(str(self.parameters[key]))
         return output_files
     
     def get_exec_file(self):
@@ -262,7 +262,8 @@ class Program(object):
         else:
             return path.rstrip(os.sep) + os.sep + os.path.basename(filename)
     
-    def make_command_array(self, binpath = None, inputpath = None, outputpath = None):
+    def make_command_array(self, binpath = None, inputpath = None,
+                           outputpath = None):
         # Begin command line with program to execute
         command = [self.translate_path(self.get_exec_file(), binpath)]
         
@@ -271,13 +272,13 @@ class Program(object):
             key = p.get_key()
             if key in self.parameters:
                 assert not (p.is_input_file and p.is_output_file)
-                argument = self.parameters[key]
+                argument = str(self.parameters[key])
                 # If this is an input or an output file name, we may have to
                 # translate it, e.g., for workunits
                 if p.is_input_file:
-                    argument = self.translate_path(self.parameters[key], inputpath)
+                    argument = self.translate_path(argument, inputpath)
                 elif p.is_output_file:
-                    argument = self.translate_path(self.parameters[key], outputpath)
+                    argument = self.translate_path(argument, outputpath)
                 command += p.map(argument)
         
         # Add positional command line parameters
@@ -305,7 +306,7 @@ class Program(object):
             redir = ' 2>> ' if self.append_stderr else ' 2> '
             cmdline += redir + cadocommand.shellquote(self.translate_path(self.stderr, outputpath))
         if self.bg:
-            cmdline += " & echo $!" # FIXME: the echo does not belong here
+            cmdline += " &"
         return cmdline
     
     def make_wu(self, wuname):
