@@ -680,16 +680,24 @@ main (int argc, char *argv[])
     FILE *f_tmp = fopen_maybe_compressed (*p, "r");
     ASSERT_ALWAYS(f_tmp != NULL);
 
-    char *ret = fgets (s, 1024, f_tmp);
-    if (ret == NULL)
-    {
-      fprintf (stderr, "Error while reading %s\n", *p);
-      exit (1);
-    }
-    if (strlen (s) >= 1023)
-    {
-      fprintf (stderr, "Too long line while reading %s\n", *p);
-      exit (1);
+    /* Look for first non-comment line */
+    while (1) {
+      char *ret = fgets (s, 1024, f_tmp);
+      if (ret == NULL)
+      {
+        fprintf (stderr, "Error while reading %s\n", *p);
+        exit (1);
+      }
+      if (strlen (s) >= 1023)
+      {
+        fprintf (stderr, "Too long line while reading %s\n", *p);
+        exit (1);
+      }
+      size_t i = 0;
+      while (s[i] == ' ')
+        i++;
+      if (s[i] != '#')
+        break;
     }
     for (unsigned int i = 0; i < strlen (s); i++)
       count += s[i] == ':';
