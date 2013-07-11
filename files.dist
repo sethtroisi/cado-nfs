@@ -752,6 +752,7 @@ utils/ularith.h
 utils/usp.c
 utils/usp.h
 utils/utils.h
+utils/varlist.h
 utils/roots_mod.c
 utils/test_roots_mod.c
 utils/test_omega.c
