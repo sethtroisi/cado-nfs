@@ -185,7 +185,8 @@ mkdir $t/tmp
 if $python; then
   $cadofactor --old "$t/param" n=$n bindir="$bindir" \
   sieve_max_threads=$cores poly_max_threads=$cores nthchar=$cores \
-  bwmt=$cores wdir="$t" slaves="$host" scriptpath="$scriptpath" "$@"
+  bwmt=$cores wdir="$t" slaves="$host" scriptpath="$scriptpath" \
+  serveraddress=localhost "$@"
 else
   cat > $t/mach_desc <<EOF
 [local]
