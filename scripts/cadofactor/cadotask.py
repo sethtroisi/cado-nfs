@@ -501,7 +501,8 @@ class PolyselTask(ClientServerTask, patterns.Observer):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("workdir", "adrange", "P", "N", "admin", "admax")
+            ("workdir", "adrange", "P", "N", "admin", "admax") + \
+            Polynomial.paramnames
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -544,6 +545,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             return
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.E)
+        self.write_poly_file()
         return
     
     def is_done(self):
@@ -590,15 +592,23 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.logger.info("Best polynomial from file %s with E=%g is "
                              "no better than current best with E=%g",
                              outputfile, poly.E, self.bestpoly.E)
-        # print(poly)
         return True
     
-    def get_poly(self):
-        if "bestpoly" in self.state:
-            return Polynomial(self.state["bestpoly"].splitlines())
-        else:
-            return None
+    def write_poly_file(self):
+        filename = self.workdir.make_filename("poly")
+        self.bestpoly.create_file(str(filename), self.params)
+        self.state["polyfilename"] = filename.get_relative()
     
+    def get_poly(self):
+        if not "bestpoly" in self.state:
+            return None
+        return Polynomial(self.state["bestpoly"].splitlines())
+    
+    def get_poly_filename(self):
+        if not "polyfilename" in self.state:
+            return None
+        return self.workdir.path_in_workdir(self.state["polyfilename"])
+
     def need_more_wus(self):
         return self.state["adnext"] < int(self.params["admax"])
     
@@ -669,9 +679,7 @@ class FactorBaseTask(Task):
         
         if not "outputfile" in self.state:
             self.logger.info("Starting")
-            # Write polynomial to a file
-            polyfilename = self.workdir.make_filename("poly")
-            poly.create_file(polyfilename, self.params)
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
             outputfilename = self.workdir.make_filename("roots")
@@ -691,10 +699,9 @@ class FactorBaseTask(Task):
                                shouldexist=True)
     
     def get_filename(self):
-        if "outputfile" in self.state:
-            return str(self.workdir.path_in_workdir(self.state["outputfile"]))
-        else:
+        if not "outputfile" in self.state:
             return None
+        return str(self.workdir.path_in_workdir(self.state["outputfile"]))
 
 class FreeRelTask(Task):
     """ Generates free relations for the polynomial(s) """
@@ -710,7 +717,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("workdir", "lpba", "lpbr") + Polynomial.paramnames
+            ("workdir", "lpba", "lpbr")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int),
@@ -752,8 +759,7 @@ class FreeRelTask(Task):
         if not "freerelfilename" in self.state:
             self.logger.info("Starting")
             # Write polynomial to a file
-            polyfilename = self.workdir.make_filename("poly")
-            poly.create_file(polyfilename, self.params)
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
             freerelfilename = self.workdir.make_filename("freerel")
@@ -795,16 +801,14 @@ class FreeRelTask(Task):
         return found
     
     def get_freerel_filename(self):
-        if "freerelfilename" in self.state:
-            return str(self.workdir.path_in_workdir(self.state["freerelfilename"]))
-        else:
+        if not "freerelfilename" in self.state:
             return None
+        return str(self.workdir.path_in_workdir(self.state["freerelfilename"]))
     
     def get_renumber_filename(self):
-        if "renumberfilename" in self.state:
-            return str(self.workdir.path_in_workdir(self.state["renumberfilename"]))
-        else:
+        if not "renumberfilename" in self.state:
             return None
+        return str(self.workdir.path_in_workdir(self.state["renumberfilename"]))
     
     def get_nrels(self):
         return self.state["nfree"]
@@ -829,7 +833,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("workdir", "qmin", "qrange", "rels_wanted") + Polynomial.paramnames
+            ("workdir", "qmin", "qrange", "rels_wanted", "alim")
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
@@ -843,7 +847,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
             self.state["qnext"] = int(self.params.get("qmin", self.params["alim"]))
-            
+        
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("maxwu", "10")
@@ -858,15 +862,9 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        # Get best polynomial found by polyselect
-        poly = self.send_request(Request.GET_POLYNOMIAL)
-        if not poly:
-            raise Exception("SievingTask(): no polynomial received")
-        # Write polynomial to a file
-        polyfilename = self.workdir.make_filename("poly")
-        poly.create_file(polyfilename, self.params)
+        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
         
-        while self.state["rels_found"] < int(self.state["rels_wanted"]):
+        while self.state["rels_found"] < self.state["rels_wanted"]:
             kwargs = self.progparams[0].copy()
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
@@ -880,8 +878,8 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
-        self.logger.info("Reached target of %s relations, now have %d",
-                         int(self.state["rels_wanted"]), self.state["rels_found"])
+        self.logger.info("Reached target of %d relations, now have %d",
+                         self.state["rels_wanted"], self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
     
@@ -1123,8 +1121,7 @@ class Duplicates2Task(Task, FilesCreator):
         return (cadoprograms.Duplicates2,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("workdir", "nslices_log",) + Polynomial.paramnames
+        return super().paramnames + ("workdir", "nslices_log",)
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1144,9 +1141,7 @@ class Duplicates2Task(Task, FilesCreator):
         self.logger.info("Starting")
         input_nrel = 0
         for i in range(0, self.nr_slices):
-            poly = self.send_request(Request.GET_POLYNOMIAL)
-            polyfilename = self.workdir.make_filename("poly")
-            poly.create_file(polyfilename, self.params)
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
             rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
@@ -1254,8 +1249,7 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("workdir", "keep", ) + Polynomial.paramnames
+        return super().paramnames + ("workdir", "keep", )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1626,8 +1620,7 @@ class CharactersTask(Task):
         return (cadoprograms.Characters,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("workdir", ) + Polynomial.paramnames
+        return super().paramnames + ("workdir", )
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1641,10 +1634,8 @@ class CharactersTask(Task):
         
         if not "kernel" in self.state:
             self.logger.info("Starting")
-            polyfilename = str(self.workdir.make_filename("poly"))
-            poly = self.send_request(Request.GET_POLYNOMIAL)
-            poly.create_file(polyfilename, self.params)
-            kernelfilename = str(self.workdir.make_filename("kernel"))
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            kernelfilename = self.workdir.make_filename("kernel")
             
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
@@ -1656,27 +1647,29 @@ class CharactersTask(Task):
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = polyfilename
-            kwargs["purged"] = purgedfilename
-            kwargs["index"] = indexfilename
-            kwargs["wfile"] = dependencyfilename
-            kwargs["out"] = kernelfilename
+            kwargs["poly"] = str(polyfilename)
+            kwargs["purged"] = str(purgedfilename)
+            kwargs["index"] = str(indexfilename)
+            kwargs["wfile"] = str(dependencyfilename)
+            kwargs["out"] = str(kernelfilename)
             if not densefilename is None:
-                kwargs["heavyblock"] = densefilename
+                kwargs["heavyblock"] = str(densefilename)
             p = self.programs[0](args, kwargs,
                                  stdout = str(stdoutfilename), append_stdout = True, 
                                  stderr = str(stderrfilename), append_stderr = True)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
-            if not os.path.isfile(kernelfilename):
-                raise Exception("Output file %s does not exist" % kernelfilename)
-            self.state["kernel"] = kernelfilename
+            if not os.path.isfile(str(kernelfilename)):
+                raise Exception("Output file %s does not exist" % str(kernelfilename))
+            self.state["kernel"] = kernelfilename.get_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return
     
     def get_kernel_filename(self):
-        return self.state.get("kernel")
+        if not "kernel" in self.state:
+            return None
+        return self.workdir.path_in_workdir(self.state["kernel"])
 
 
 class SqrtTask(Task):
@@ -1708,10 +1701,7 @@ class SqrtTask(Task):
                           self.state)
         if not self.is_done():
             self.logger.info("Starting")
-            polyfilename = str(self.workdir.make_filename("poly"))
-            poly = self.send_request(Request.GET_POLYNOMIAL)
-            poly.create_file(polyfilename, self.params)
-            
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
@@ -1719,10 +1709,10 @@ class SqrtTask(Task):
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["ab"] = "1"
-            kwargs["poly"] = polyfilename
-            kwargs["purged"] = purgedfilename
-            kwargs["index"] = indexfilename
-            kwargs["kernel"] = kernelfilename
+            kwargs["poly"] = str(polyfilename)
+            kwargs["purged"] = str(purgedfilename)
+            kwargs["index"] = str(indexfilename)
+            kwargs["kernel"] = str(kernelfilename)
             kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
@@ -2045,6 +2035,7 @@ class Request(Message):
     # Lacking a proper enum before Python 3.3, we generate dummy objects
     # which have separate identity and can be used as dict keys
     GET_POLYNOMIAL = object()
+    GET_POLYNOMIAL_FILENAME = object()
     GET_FACTORBASE_FILENAME = object()
     GET_FREEREL_FILENAME = object()
     GET_RENUMBER_FILENAME = object()
@@ -2166,6 +2157,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         
         self.request_map = {
             Request.GET_POLYNOMIAL: self.polysel.get_poly,
+            Request.GET_POLYNOMIAL_FILENAME: self.polysel.get_poly_filename,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
