@@ -2030,40 +2030,42 @@ class Message(object):
 
 
 class Notification(Message):
-    FINISHED_POLYNOMIAL_SELECTION = 0
-    WANT_MORE_RELATIONS = 1
-    HAVE_ENOUGH_RELATIONS = 2
-    REGISTER_FILENAME = 3
-    UNREGISTER_FILENAME = 4
-    SUBMIT_WU = 5
-    VERIFY_WU = 6
-    WANT_TO_RUN = 7
-    SUBSCRIBE_WU_NOTIFICATIONS = 8
-    CHECK_TIMEDOUT_WUS = 9
+    FINISHED_POLYNOMIAL_SELECTION = object()
+    WANT_MORE_RELATIONS = object()
+    HAVE_ENOUGH_RELATIONS = object()
+    REGISTER_FILENAME = object()
+    UNREGISTER_FILENAME = object()
+    SUBMIT_WU = object()
+    VERIFY_WU = object()
+    WANT_TO_RUN = object()
+    SUBSCRIBE_WU_NOTIFICATIONS = object()
+    CHECK_TIMEDOUT_WUS = object()
 
 class Request(Message):
-    GET_POLYNOMIAL = 0
-    GET_FACTORBASE_FILENAME = 1
-    GET_FREEREL_FILENAME = 2
-    GET_RENUMBER_FILENAME = 19
-    GET_FREEREL_RELCOUNT = 3
-    GET_RENUMBER_PRIMECOUNT = 20
-    GET_RENUMBER_MININDEX = 21
-    GET_SIEVER_FILENAMES = 4
-    GET_SIEVER_RELCOUNT = 5
-    GET_DUP1_FILENAMES = 6
-    GET_DUP1_RELCOUNT = 7
-    GET_UNIQUE_RELCOUNT = 8
-    GET_UNIQUE_FILENAMES = 9
-    GET_PURGED_FILENAME = 10
-    GET_MERGED_FILENAME = 11
-    GET_INDEX_FILENAME = 12
-    GET_DENSE_FILENAME = 13
-    GET_DEPENDENCY_FILENAME = 14
-    GET_LINALG_PREFIX = 15
-    GET_KERNEL_FILENAME = 16
-    GET_WU_RESULT = 17
-    GET_NR_AVAILABLE_WU = 18
+    # Lacking a proper enum before Python 3.3, we generate dummy objects
+    # which have separate identity and can be used as dict keys
+    GET_POLYNOMIAL = object()
+    GET_FACTORBASE_FILENAME = object()
+    GET_FREEREL_FILENAME = object()
+    GET_RENUMBER_FILENAME = object()
+    GET_FREEREL_RELCOUNT = object()
+    GET_RENUMBER_PRIMECOUNT = object()
+    GET_RENUMBER_MININDEX = object()
+    GET_SIEVER_FILENAMES = object()
+    GET_SIEVER_RELCOUNT = object()
+    GET_DUP1_FILENAMES = object()
+    GET_DUP1_RELCOUNT = object()
+    GET_UNIQUE_RELCOUNT = object()
+    GET_UNIQUE_FILENAMES = object()
+    GET_PURGED_FILENAME = object()
+    GET_MERGED_FILENAME = object()
+    GET_INDEX_FILENAME = object()
+    GET_DENSE_FILENAME = object()
+    GET_DEPENDENCY_FILENAME = object()
+    GET_LINALG_PREFIX = object()
+    GET_KERNEL_FILENAME = object()
+    GET_WU_RESULT = object()
+    GET_NR_AVAILABLE_WU = object()
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
@@ -2264,7 +2266,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.logger.message("Received notification from %s, key = %s, value = %s",
                             sender, Notification.reverse_lookup(key), value)
         """ The relay for letting Tasks talk to us and each other """
-        if key == Notification.WANT_MORE_RELATIONS:
+        if key is Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
                 self.dup2.request_more_relations(value)
             elif sender is self.dup2:
@@ -2273,39 +2275,39 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 self.sieving.request_more_relations(value)
             else:
                 raise Exception("Got WANT_MORE_RELATIONS from unknown sender")
-        elif key == Notification.HAVE_ENOUGH_RELATIONS:
+        elif key is Notification.HAVE_ENOUGH_RELATIONS:
             if sender is self.purge:
                 # TODO: cancel only sieving WUs?
                 self.chores.append(self.CAN_CANCEL_WUS)
             else:
                 raise Exception("Got HAVE_ENOUGH_RELATIONS from unknown sender")
-        elif key == Notification.REGISTER_FILENAME:
+        elif key is Notification.REGISTER_FILENAME:
             if isinstance(sender, ClientServerTask):
                 self.register_filename(value)
             else:
                 raise Exception("Got REGISTER_FILENAME, but not from a ClientServerTask")
-        elif key == Notification.SUBMIT_WU:
+        elif key is Notification.SUBMIT_WU:
             if isinstance(sender, ClientServerTask):
                 self.add_wu(value)
             else:
                 raise Exception("Got SUBMIT_WU, but not from a ClientServerTask")
-        elif key == Notification.VERIFY_WU:
+        elif key is Notification.VERIFY_WU:
             if isinstance(sender, ClientServerTask):
                 self.verify_wu(value)
             else:
                 raise Exception("Got VERIFY_WU, but not from a ClientServerTask")
-        elif key == Notification.WANT_TO_RUN:
+        elif key is Notification.WANT_TO_RUN:
             if sender in self.tasks_that_want_to_run:
                 raise Exception("Got request from %s to run, but it was in run queue already",
                                 sender)
             else:
                 self.tasks_that_want_to_run.append(sender)
-        elif key == Notification.SUBSCRIBE_WU_NOTIFICATIONS:
+        elif key is Notification.SUBSCRIBE_WU_NOTIFICATIONS:
             if isinstance(sender, ClientServerTask):
                 return self.db_listener.subscribeObserver(sender)
             else:
                 raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
-        elif key == Notification.CHECK_TIMEDOUT_WUS:
+        elif key is Notification.CHECK_TIMEDOUT_WUS:
             if isinstance(sender, ClientServerTask):
                 return self.check_timedout_wus(sender)
             else:
