@@ -264,7 +264,6 @@ void mt_sm(int nt, const char * outname, relset_srcptr rels, int sr, poly_t F,
     // offset and nb must be adjusted.
   }
 
-
   // Main loop
   while ((i < sr) || (active_threads > 0)) {
     // Start / restart threads as many threads as allowed
@@ -313,10 +312,16 @@ void mt_sm(int nt, const char * outname, relset_srcptr rels, int sr, poly_t F,
 
   mpz_clear(invl2);
   fclose(out);
-
-  // TODO: more free
+  free(tis);
+  free(threads);
+  for (int i = 0; i < nt; ++i) {
+    for (int j = 0; j < SM_BLOCK; ++j) {
+      poly_free(SM[i][j]);
+    }
+    free(SM[i]);
+  }
+  free(SM);
 }
-
 
 
 void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2)
