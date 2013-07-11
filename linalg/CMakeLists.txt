@@ -6,7 +6,7 @@ add_executable(characters characters.c gauss.c blockmatrix.c
 add_executable(sm sm.c)
 
 target_link_libraries(characters utils pthread)
-target_link_libraries(sm utils)
+target_link_libraries(sm utils pthread)
 
 install(TARGETS characters RUNTIME DESTINATION bin/linalg)
 install(TARGETS sm RUNTIME DESTINATION bin/linalg)
