@@ -48,14 +48,14 @@ read_log (mpz_t *log, index_t *mat_renum, FILE *logfile, mpz_t q, index_t ncols)
   {
     if (mpz_cmp_ui (vlog, 0) < 0)
     {
-      fprintf (stderr, "  Warning, log is negative for cols %"PRxid"\n", i);
+      fprintf (stderr, "  Warning, log is negative for cols %" PRid "\n", i);
       mpz_mod (vlog, vlog, q);
     }
     else if (mpz_cmp_ui (vlog, 0) == 0)
-      fprintf (stderr, "  Warning, log is zero for cols %"PRxid"\n", i);
+      fprintf (stderr, "  Warning, log is zero for cols %" PRid "\n", i);
     else if (mpz_cmp (vlog, q) >= 0)
     {
-      fprintf (stderr, "  Warning, log >= q for cols %"PRxid"\n", i);
+      fprintf (stderr, "  Warning, log >= q for cols %" PRid "\n", i);
       mpz_mod (vlog, vlog, q);
     }
 
