@@ -122,7 +122,7 @@ compute_log (index_t i, mpz_t *log, mpz_t q)
       }
     }
     else
-      mpz_addmul_ui (vlog, log[h], (unsigned int) coeff);
+      mpz_addmul_ui (vlog, log[h], (unsigned int) p->e);
   }
 
   if (coeff == 0) //no unknown ideal, sum should be zero
