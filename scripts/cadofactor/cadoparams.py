@@ -95,6 +95,7 @@ class Parameters(object):
         "rlambda": "tasks.sieve.rlambda",
         "rlim": "rlim",
         "scriptpath": "slaves.scriptpath",
+        "serveraddress": "server.address",
         "sieve_max_threads": "tasks.sieve.threads",
         "sievenice": None,
         "slaves": "slaves.hostnames",
