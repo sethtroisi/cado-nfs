@@ -1931,8 +1931,9 @@ class StartClientsTask(Task):
     # Client was started, but does not exist any more. Remove from state, then start and add again
     # Client was started, and does still exists. Nothing to do.
     
-    def launch_one_client(self, host):
-        clientid = self.make_unique_id(host)
+    def launch_one_client(self, host, clientid = None):
+        if clientid is None:
+            clientid = self.make_unique_id(host)
         # Check if client is already running
         if clientid in self.pids:
             assert self.hosts[clientid] == host
@@ -1948,12 +1949,15 @@ class StartClientsTask(Task):
                 del(self.hosts[clientid])
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
-        self.progparams[0]['clientid'] = clientid
-        wuclient = cadoprograms.WuClient([], self.progparams[0],
-            stdout = "wuclient.%s.stdout" % clientid,
-            stderr = "wuclient.%s.stderr" % clientid, bg=True)
-        process = cadocommand.RemoteCommand(wuclient, host, self.get_parameters(), 
-                                            self.get_param_prefix())
+        kwargs = self.progparams[0].copy()
+        kwargs['clientid'] = clientid
+        kwargs['daemon'] = True
+        wuclient = cadoprograms.WuClient([], kwargs)
+        if host == "localhost":
+            process = cadocommand.Command(wuclient)
+        else:
+            process = cadocommand.RemoteCommand(wuclient, host, self.get_parameters(), 
+                                                self.get_param_prefix())
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
@@ -1962,8 +1966,18 @@ class StartClientsTask(Task):
             if stderr:
                 self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
             return
+        match = None
+        if not stdout is None:
+            match = re.match(r"PID: (\d+)", stdout.decode("ascii"))
+        if not match:
+            self.logger.warning("Client did not print PID")
+            if not stdout is None:
+                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+            if not stderr is None:
+                self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+            return
         self.used_ids[clientid] = True
-        self.pids[clientid] = int(stdout)
+        self.pids[clientid] = int(match.group(1))
         self.hosts[clientid] = host
 
     def kill_all_clients(self):

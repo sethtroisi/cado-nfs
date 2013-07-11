@@ -543,6 +543,7 @@ class WuClient(Program):
     name = "wuclient"
     subdir = "scripts/cadofactor"
     params_list = (
+        Toggle("daemon", prefix='--'),
         Parameter("dldir", prefix='--'),
         Parameter("workdir", prefix='--'),
         Parameter("clientid", prefix='--'),
