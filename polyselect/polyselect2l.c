@@ -20,6 +20,7 @@
 #include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
+#include "mpz_poly.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
@@ -433,6 +434,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
     } // raw and sopt only ?
 
+    /* check that the algebraic polynomial has content 1, otherwise skip it */
+    mp_poly_content (t, f, d);
+    if (mpz_cmp_ui (t, 1) != 0)
+      goto skip;
+
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
@@ -511,6 +517,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       }
   }
   else {
+  skip:
     if (verbose >= 1) {
 #ifdef MAX_THREADS
 		  pthread_mutex_lock (&lock);
