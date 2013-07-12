@@ -41,13 +41,13 @@
 */
 #ifndef HAVE_NANOSLEEP
 #ifdef HAVE_USLEEP
-#define NANOSLEEP usleep((unsigned long) (1<<21 / 1000UL))
+#define NANOSLEEP() usleep((unsigned long) (1<<21 / 1000UL))
 #else
-#define NANOSLEEP sleep(0)
+#define NANOSLEEP() sleep(0)
 #endif
 #else
 static const struct timespec wait_classical = { 0, 1<<21 };
-#define NANOSLEEP nanosleep(&wait_classical, NULL)
+#define NANOSLEEP() nanosleep(&wait_classical, NULL)
 #endif
 
 

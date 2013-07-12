@@ -166,7 +166,7 @@ thread_insert (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -175,7 +175,7 @@ thread_insert (buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     //FIXME big bug this does not take into account the exponent....
     arg->info.nprimes += insert_rel_in_table_with_e (my_rel, 0, 0, rel_compact,

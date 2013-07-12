@@ -576,9 +576,9 @@ no_singleton(buf_rel_t *br)
    The only << solution >> without synchronous barrier or (pre)processor
    order is a nanosleep after the end of the waiting loop.
    * empty buffer :
-       if (A == B + 1) NANOSLEEP;
+       if (A == B + 1) NANOSLEEP();
    * full buffer :
-       if (A + 1 == B + SIZEBUF) NANOSLEEP;
+       if (A + 1 == B + SIZEBUF) NANOSLEEP();
    It's very dirty!
 */
 
@@ -597,7 +597,7 @@ thread_insert (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -606,7 +606,7 @@ thread_insert (buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num))
     {
@@ -637,7 +637,7 @@ thread_print(buf_arg_t *arg)
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
           pthread_exit(NULL);
 
@@ -645,7 +645,7 @@ thread_print(buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
     if (boutfilerel && aff)

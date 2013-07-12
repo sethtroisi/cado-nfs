@@ -376,7 +376,7 @@ thread_only_hash (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -385,7 +385,7 @@ thread_only_hash (buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     i = insert_relation_in_dup_hashtable (H, K, my_rel, &cost, &is_dup);
 #if DEBUG >= 1
@@ -416,7 +416,7 @@ thread_print(buf_arg_t *arg)
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
           pthread_exit(NULL);
 
@@ -424,7 +424,7 @@ thread_print(buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     if (my_rel->nb != 0)
       print_relation (arg->fd[0], my_rel); //FIXME where do we print
@@ -449,7 +449,7 @@ thread_root(fr_t *mfr)
     switch(mfr->ok) 
     {
       case 0:
-        NANOSLEEP;
+        NANOSLEEP();
         break;
       case 1 :
         for (j = mfr->num; j <= mfr->end; j++)

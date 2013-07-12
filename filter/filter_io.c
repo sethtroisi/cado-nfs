@@ -87,7 +87,7 @@ prempt_load (prempt_t prempt_data)
     (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
       (PREMPT_BUF - 1)) <= PREMPT_ONE_READ))
         {
-          NANOSLEEP;
+          NANOSLEEP();
         }
       else
       {
@@ -568,12 +568,12 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
 
       while (pcons == prempt_data->pprod)
         if (!prempt_data->end)
-          NANOSLEEP;
+          NANOSLEEP();
         else if (pcons == prempt_data->pprod)
           goto end_of_files;
 
       if (pcons == prempt_data->pprod + sizeof(*pcons))
-        NANOSLEEP;
+        NANOSLEEP();
 
       rs->lnum++;
       if (*pcons != '#')
@@ -581,7 +581,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
         while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
                ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
      !prempt_data->end)
-        NANOSLEEP;
+        NANOSLEEP();
 
         if (pcons > prempt_data->pprod)
         {
@@ -625,11 +625,11 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
         }
 
         while (cpy_cpt_rel_a == cpt_rel_b + SIZE_BUF_REL)
-          NANOSLEEP;
+          NANOSLEEP();
 
         k = (unsigned int) (cpy_cpt_rel_a & (SIZE_BUF_REL - 1));
         if (cpy_cpt_rel_a + 1 == cpt_rel_b + SIZE_BUF_REL)
-          NANOSLEEP;
+          NANOSLEEP();
 
         buf_arg.rels[k].num = rs->nrels++;
 
@@ -665,7 +665,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
           {
             i = (k>>NNFR) & ((1<<NFR)-1);
             while (fr[i].ok)
-              NANOSLEEP;
+              NANOSLEEP();
             if (k)
             {
               fr[i].num = k - (1<<NNFR);
@@ -692,7 +692,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
           while (pcons == prempt_data->pprod)
           {
             if (!prempt_data->end)
-              NANOSLEEP;
+              NANOSLEEP();
             else if (pcons == prempt_data->pprod)
             {
               fprintf (stderr, "prempt_scan_relations: at the end of files,"
@@ -727,7 +727,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
       {
         i = ((k>>NNFR)+1) & ((1<<NFR)-1);
         while (fr[i].ok)
-          NANOSLEEP;
+          NANOSLEEP();
         fr[i].num = k & ~((1<<NNFR)-1);
         fr[i].end = k;
         fr[i].ok = 1;
@@ -736,7 +736,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
     for (i = 0; i < (1<<NFR); i++)
     {
       while (fr[i].ok)
-        NANOSLEEP;
+        NANOSLEEP();
       fr[i].ok = 2;
       pthread_join(thread_fr[i], NULL);
     }
@@ -744,7 +744,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
 
   cpt_rel_a = cpy_cpt_rel_a;
   while (cpy_cpt_rel_a != cpt_rel_b)
-    NANOSLEEP;
+    NANOSLEEP();
 
   end_insertRelation = 1;
   pthread_join(thread_callback, NULL);
