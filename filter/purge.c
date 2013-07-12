@@ -766,35 +766,6 @@ usage (const char *argv0)
   exit (1);
 }
 
-void
-purge_parse_npt_param (param_list pl)
-{
-  const char * snpt = param_list_lookup_string(pl, "npthr");
-  if (snpt)
-  {
-    char *p, oldp;
-    if ((p = strchr(snpt, 'x')))
-    {
-      unsigned int x, y;
-      oldp = *p;
-      *p = 0;
-      if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
-        npt = x * y;
-      else
-      {
-        *p = oldp;
-        fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
-        usage(argv0);
-      }
-    }
-    else if (!sscanf(snpt, "%u", &npt))
-    {
-      fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
-      usage(argv0);
-    }
-  }
-}
-
 /*************************** main ********************************************/
 
 int
@@ -837,7 +808,7 @@ main (int argc, char **argv)
   param_list_parse_uint64(pl, "nprimes", &nprimemax);
   param_list_parse_int64(pl, "keep", &keep);
   param_list_parse_uint64(pl, "minindex", &min_index);
-  purge_parse_npt_param (pl);
+  param_list_parse_uint(pl, "npthr", &npt);
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
   const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
