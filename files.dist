@@ -20,7 +20,7 @@ config/asm_sample.c
 config/ccwrap.pl.in
 config/curl.cmake
 config/cxxwrap.pl.in
-config/gcc-assembly.cmake
+config/gcc-inline-assembly.cmake
 config/gcc-ubuntu-bug.c
 config/gcc-ubuntu-bug.cmake
 config/gmp.cmake
@@ -45,8 +45,6 @@ config/sync_fetch.cmake
 config/mingw.cmake
 config/test-rand.c
 config/test-rand.cmake
-config/endian.c
-config/endian.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
@@ -170,7 +168,6 @@ gf2x/gf2x/gf2x-impl.h
 gf2x/gf2x/gf2x-small.h
 gf2x/gf2x/gf2x-tfft.h
 gf2x/inject-ntl-5.4.2
-gf2x/macros.h
 gf2x/patch-wrt-ntl-5.4.2
 gf2x/src/Makefile.am
 gf2x/src/Makefile.in
@@ -673,10 +670,8 @@ utils/fix-endianness.c
 utils/fix-endianness.h
 utils/fpoly.c
 utils/fpoly.h
-utils/gcd_int64.c
-utils/gcd_int64.h
-utils/gcd_uint64.c
-utils/gcd_uint64.h
+utils/gcd.c
+utils/gcd.h
 utils/getprime.c
 utils/getprime.h
 utils/gmp_aux.c
