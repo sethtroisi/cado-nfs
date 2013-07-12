@@ -318,8 +318,8 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             ASSERT(j1 >= j0);
             ASSERT(j1 % ssp->g == 0);
             /* Now we'd like to avoid row number 0 (so j1 == 0).  */
-            /* Note that we avoid it entirely -- we could fathom sieving
-             * (1,0), but it's probably not really worth it */
+            /* The position (1,0) is updated with a special code in the */
+            /* sieving code below */
             if (j1 == 0) {
                 j1 += ssp->g;
             }
@@ -702,6 +702,18 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                    with g|j, beginning with the line starting at S[ssdpos] */
                 unsigned long logps;
                 unsigned int i0 = ssdpos[i];
+                // The following is for the case where p divides the norm
+                // at the position (i,j) = (1,0).
+                if (UNLIKELY(N == 0 && i0 == ssp->g * I)) {
+#ifdef TRACE_K
+                    if (trace_on_spot_Nx(w->N, 1+(I>>1))) {
+                        WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
+                        unsigned int v = logp;
+                        sieve_increase_logging(S + w->x, v, w);
+                    }
+#endif
+                    S[1+(I>>1)] += logp;
+                }
                 ASSERT (ssp->U == 0);
                 ASSERT (i0 % I == 0);
                 ASSERT (I % (4 * sizeof (unsigned long)) == 0);
@@ -921,6 +933,15 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
 
             /* Test every p-th line, starting at S[ssdpos] */
             unsigned int i0 = ssdpos[i];
+            // This block is for the case where p divides at (1,0).
+            if (UNLIKELY(N == 0 && i0 == ssp->g * I)) {
+                bucket_prime_t prime;
+                prime.p = g;
+                prime.x = 1+(I>>1);
+                ASSERT(prime.p >= si->td_thresh);
+                push_bucket_prime (BP, prime);
+            }
+
             unsigned int ii;
             ASSERT (i0 % I == 0); /* make sure ssdpos points at start
                                      of line */
