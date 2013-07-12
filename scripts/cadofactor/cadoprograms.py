@@ -1,9 +1,6 @@
 import os
-import sys
 import platform
 import abc
-import logging
-import re
 import cadocommand
 import cadologger
 
@@ -17,18 +14,25 @@ class Option(metaclass=abc.ABCMeta):
     else:
         prefix = '-'
     
-    def __init__(self, config, arg = None, prefix  = None, is_input_file = False, is_output_file = False):
-        """ Define a mapping from a parameter dictionary to command line parameters.
+    def __init__(self, config, arg=None, prefix=None, is_input_file=False,
+                 is_output_file = False):
+        """ Define a mapping from a parameter dictionary to command line
+        parameters.
         
-        config is the key name of the parameter in the parameter dictionary, e.g., 'verbose', or 'threads'
-        arg is the command line parameter to which this should map, e.g., 'v' or 'thr'. If not specified,
-            it defaults to the same string as config.
-        prefix is the command line parameter prefix to use; the default is the class variable which currently is '-'.
-            Some programs, e.g. bwc.pl, want some parameters with a different prefix, e.g., ':complete'
-        is_input_file must be set to True if this parameter gives the filename of an input file to the command.
-            This will be used to generate FILE lines in workunits.
-        is_output_file must be set to True if this parameter gives the filename of an output file of the command.
-            This will be used to generate RESULT lines in workunits.
+        config is the key name of the parameter in the parameter dictionary,
+            e.g., 'verbose', or 'threads'
+        arg is the command line parameter to which this should map, e.g.,
+            'v' or 'thr'. If not specified, it defaults to the same string as
+            config.
+        prefix is the command line parameter prefix to use; the default is the
+            class variable which currently is '-'. Some programs, e.g. bwc.pl,
+            want some parameters with a different prefix, e.g., ':complete'
+        is_input_file must be set to True if this parameter gives the filename
+            of an input file to the command. This will be used to generate FILE
+            lines in workunits.
+        is_output_file must be set to True if this parameter gives the filename
+            of an output file of the command. This will be used to generate
+            RESULT lines in workunits.
         """
         self.config = config
         self.is_input_file = is_input_file
@@ -134,9 +138,13 @@ class Program(object):
     '/bin/ls >> foo 2>&1'
     '''
     
-    params_list = ("execpath", "execsubdir", "execbin")
     path = '.'
     subdir = ""
+    paramnames = ("execpath", "execsubdir", "execbin")
+    # These should be abstract properties, but we want to reference them as
+    # class attributes, which properties can't. Ergo dummy variables
+    binary = None
+    params_list = None
     
     def __init__(self, args, parameters, stdin = None, stdout = None,
                  append_stdout = False, stderr = None, append_stderr = False,
@@ -163,11 +171,11 @@ class Program(object):
         self.stderr = stderr
         self.append_stderr = append_stderr
         
-        # If we are to run in background, we add " & echo $!" to the command
+        # If we are to run in background, we add " &" to the command
         # line to print the pid of the spawned process. We require that stdout
         # and stderr are redirected to files.
-        self.bg = bg
-        if bg and (stdout is None or stderr is None):
+        self.background = bg
+        if self.background and (stdout is None or stderr is None):
             raise Exception("Programs to run in background must redirect "
                             "stdout and stderr")
         
@@ -198,8 +206,8 @@ class Program(object):
         including those that don't directly map to command line parameters,
         like those specifying search paths.
         """
-        l = list(Program.params_list) + cls.get_param_keys()
-        return l
+        keys = list(Program.paramnames) + cls.get_param_keys()
+        return keys
     
     def get_stdin(self):
         return self.stdin
@@ -221,18 +229,18 @@ class Program(object):
         The third entry is like the second, but for stderr.
         """
         return (self.stdin,
-            (self.stdout, self.append_stdout),
-            (self.stderr, self.append_stderr)
-        )
+                (self.stdout, self.append_stdout),
+                (self.stderr, self.append_stderr)
+            )
     
     def get_input_files(self):
         input_files = []
         if isinstance(self.stdin, str):
             input_files.append(self.stdin)
-        for p in self.params_list:
-            key = p.get_key()
+        for param in self.params_list:
+            key = param.get_key()
             if key in self.parameters:
-                if p.is_input_file:
+                if param.is_input_file:
                     input_files.append(str(self.parameters[key]))
         return input_files
     
@@ -242,10 +250,10 @@ class Program(object):
             output_files.append(self.stdout)
         if isinstance(self.stderr, str):
             output_files.append(self.stderr)
-        for p in self.params_list:
-            key = p.get_key()
+        for param in self.params_list:
+            key = param.get_key()
             if key in self.parameters:
-                if p.is_output_file:
+                if param.is_output_file:
                     output_files.append(str(self.parameters[key]))
         return output_files
     
@@ -268,18 +276,18 @@ class Program(object):
         command = [self.translate_path(self.get_exec_file(), binpath)]
         
         # Add keyword command line parameters
-        for p in self.params_list:
-            key = p.get_key()
+        for param in self.params_list:
+            key = param.get_key()
             if key in self.parameters:
-                assert not (p.is_input_file and p.is_output_file)
+                assert not (param.is_input_file and param.is_output_file)
                 argument = str(self.parameters[key])
                 # If this is an input or an output file name, we may have to
                 # translate it, e.g., for workunits
-                if p.is_input_file:
+                if param.is_input_file:
                     argument = self.translate_path(argument, inputpath)
-                elif p.is_output_file:
+                elif param.is_output_file:
                     argument = self.translate_path(argument, outputpath)
-                command += p.map(argument)
+                command += param.map(argument)
         
         # Add positional command line parameters
         # FIXME: how to identify input/output files here?
@@ -287,42 +295,45 @@ class Program(object):
             command += self.args
         return command
     
-    def make_command_line(self, binpath = None, inputpath = None, outputpath = None):
+    def make_command_line(self, binpath=None, inputpath=None, outputpath=None):
         """ Make a shell command line for this program.
         
-        If files are given for stdio redirection, the corresponding redirection tokens
-        are added to the command line.
+        If files are given for stdio redirection, the corresponding redirection
+        tokens are added to the command line.
         """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
         cmdline = " ".join(map(cadocommand.shellquote, cmdarr))
         if isinstance(self.stdin, str):
-            cmdline += ' < ' + cadocommand.shellquote(self.translate_path(self.stdin, inputpath))
+            translated = self.translate_path(self.stdin, inputpath)
+            cmdline += ' < ' + cadocommand.shellquote(translated)
         if isinstance(self.stdout, str):
             redir = ' >> ' if self.append_stdout else ' > '
-            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stdout, outputpath))
+            translated = self.translate_path(self.stdout, outputpath)
+            cmdline += redir + cadocommand.shellquote(translated)
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         elif isinstance(self.stderr, str):
             redir = ' 2>> ' if self.append_stderr else ' 2> '
-            cmdline += redir + cadocommand.shellquote(self.translate_path(self.stderr, outputpath))
-        if self.bg:
+            translated = self.translate_path(self.stderr, outputpath)
+            cmdline += redir + cadocommand.shellquote(translated)
+        if self.background:
             cmdline += " &"
         return cmdline
     
     def make_wu(self, wuname):
-        wu = ['WORKUNIT %s' % wuname]
-        for f in self.get_input_files():
-            wu.append('FILE %s' % os.path.basename(f))
-        wu.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
+        workunit = ['WORKUNIT %s' % wuname]
+        for filename in self.get_input_files():
+            workunit.append('FILE %s' % os.path.basename(filename))
+        workunit.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
         cmdline = self.make_command_line(binpath = "${DLDIR}",
             inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
-        wu.append('COMMAND %s' % cmdline)
-        for f in self.get_output_files():
-            wu.append('RESULT %s' % os.path.basename(f))
-        wu.append("") # Make a trailing newline
-        return '\n'.join(wu)
-    
-    
+        workunit.append('COMMAND %s' % cmdline)
+        for filename in self.get_output_files():
+            workunit.append('RESULT %s' % os.path.basename(filename))
+        workunit.append("") # Make a trailing newline
+        return '\n'.join(workunit)
+
+
 class Polyselect2l(Program):
     binary = "polyselect2l"
     name = binary
@@ -470,7 +481,7 @@ class Merge(Program):
 
 # Todo: define is_input_file/is_output_file for remaining programs
 class Replay(Program):
-    binary= "replay"
+    binary = "replay"
     name = binary
     subdir = "filter"
     params_list = (
@@ -508,7 +519,7 @@ class BWC(Program):
         )
 
 class Characters(Program):
-    binary= "characters"
+    binary = "characters"
     name = binary
     subdir = "linalg"
     params_list = (
