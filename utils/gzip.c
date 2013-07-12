@@ -169,7 +169,7 @@ void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char 
    [empty string]
 */
 char **
-prempt_open_compressed_rs (char *antebuffer, char **ficname)
+preempt_open_compressed_rs (char *antebuffer, char **ficname)
 {
   const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
   char **cmd;
@@ -201,7 +201,7 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
 	memset(&cmd[s_cmds], 0, sizeof(unsigned char *) * s_cmds);
 	s_cmds <<= 1;
       }
-      if (!(cmd[p_cmds] = malloc(PREMPT_S_CMD))) {
+      if (!(cmd[p_cmds] = malloc(PREEMPT_S_CMD))) {
 	fprintf (stderr, "fopen_compressed_rs: malloc erreur : %s\n", strerror(errno));
 	exit (1);
       }
@@ -212,8 +212,8 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
       strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
       strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
       suffix_choice = 1;
-      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
-	fprintf(stderr, "prempt_open_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
+      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREEMPT_S_CMD) {
+	fprintf(stderr, "preempt_open_compressed_rs: PREEMPT_S_CMD (%d) too small. Please * 2\n", PREEMPT_S_CMD);
 	exit (1);
       }
       strcat (cmd[p_cmds], fic_realpath);
@@ -221,7 +221,7 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
     }
     else {
       if (has_suffix (fic_realpath, cp_r->suffix) &&
-	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREMPT_S_CMD))
+	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREEMPT_S_CMD))
 	{
 	  strcat (cmd[p_cmds], " ");
 	  strcat (cmd[p_cmds], fic_realpath);

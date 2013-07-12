@@ -507,13 +507,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* overrides default only if parameter is given */
     param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
 
-    si->td_thresh = si->I;	/* default value */
+    si->td_thresh = 1024;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
-    if (si->td_thresh < si->I)
-      {
-        fprintf (stderr, "Using tdthresh < I not allowed due to bug #15897\n");
-        exit (1);
-      }
 
     /* Initialize the number of buckets */
 
@@ -2282,7 +2277,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# about to print relation for (%" PRId64 ",%" PRIu64 ")\n",a,b);
+                fprintf(stderr, "# about to start cofactorization for (%" PRId64 ",%" PRIu64 ")  %d %u\n",a,b, x, SS[x]);
             }
 #endif
             /* since a,b both even were not sieved, either a or b should
@@ -2863,14 +2858,10 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds ();
-#if defined(TRACE_K) && defined(TRACE_Nx)
-            if (trace_on_spot_N(w->N))
-              fprintf (stderr, "before init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif
             init_rat_norms_bucket_region(S[side], i, si);
-#if defined(TRACE_K) && defined(TRACE_Nx)
+#if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "after init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             rep->tn[side] += seconds ();
 
@@ -2886,6 +2877,10 @@ void * process_bucket_region(thread_data_ptr th)
             /* Sieve small rational primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on rational side, N=%u rat_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         {
@@ -2901,6 +2896,10 @@ void * process_bucket_region(thread_data_ptr th)
             unsigned char * xS = S[side ^ 1];
             init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
 
             /* Apply algebraic buckets */
             rep->ttbuckets_apply -= seconds();
@@ -2914,6 +2913,10 @@ void * process_bucket_region(thread_data_ptr th)
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on algebraic side, N=%u alg_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         /* Factor survivors */

@@ -41,13 +41,13 @@
 */
 #ifndef HAVE_NANOSLEEP
 #ifdef HAVE_USLEEP
-#define NANOSLEEP usleep((unsigned long) (1<<21 / 1000UL))
+#define NANOSLEEP() usleep((unsigned long) (1<<21 / 1000UL))
 #else
-#define NANOSLEEP sleep(0)
+#define NANOSLEEP() sleep(0)
 #endif
 #else
 static const struct timespec wait_classical = { 0, 1<<21 };
-#define NANOSLEEP nanosleep(&wait_classical, NULL)
+#define NANOSLEEP() nanosleep(&wait_classical, NULL)
 #endif
 
 
@@ -115,7 +115,7 @@ static const unsigned char ugly[256] = {
 #ifndef HAVE_NANOSLEEP
 int nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
-void prempt_load (prempt_t);
+void preempt_load (preempt_t);
 info_mat_t process_rels (char **, void* (*)(buf_arg_t *), void* (*)(fr_t *),
                          index_t, FILE **, bit_vector_ptr, unsigned int);
 void test_and_print_progress_now ();

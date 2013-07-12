@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <libgen.h>
-#include "prempt.h"
+#include "preempt.h"
 
 #ifdef __cplusplus
 extern "C" {
