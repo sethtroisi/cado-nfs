@@ -188,7 +188,7 @@ thread_insert (buf_arg_t *arg)
   }
 }
 
-/* Callback function called by prempt_scan_relations */
+/* Callback function called by preempt_scan_relations */
 /* Reads a matrix file.
 
    mat->wt is already filled:

@@ -720,7 +720,7 @@ main (int argc, char *argv[])
                    nb_f_new, nb_f_renumbered);
 
 
-  //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
+  //call preempt_scan_rel 2 times with two diff filelist and two diff callback fct
 
   fprintf (stderr, "Reading files already renumbered:\n");
   process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,
@@ -729,7 +729,7 @@ main (int argc, char *argv[])
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;
   //buf_arg.needed = NEEDED_ABP;
-  //prempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
+  //preempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
   /* pass 1: we read new files, remove duplicates, and renumber them */
 #ifndef FOR_FFS
   rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 10,

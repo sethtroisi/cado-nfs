@@ -30,12 +30,12 @@ set_antebuffer_path (char * argv0, const char *path_antebuffer)
 
 
 void
-prempt_load (prempt_t prempt_data)
+preempt_load (preempt_t preempt_data)
 {
-  char **p_files = prempt_data->files, *pprod;
+  char **p_files = preempt_data->files, *pprod;
   FILE *f;
   size_t try_load, load;
-  char *pmax = &(prempt_data->buf[PREMPT_BUF]);
+  char *pmax = &(preempt_data->buf[PREEMPT_BUF]);
 
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -44,7 +44,7 @@ prempt_load (prempt_t prempt_data)
   {
     if (!(f = popen (*p_files, "r")))
     {
-      fprintf (stderr, "prempt_load: popen error. %s\n", strerror (errno));
+      fprintf (stderr, "preempt_load: popen error. %s\n", strerror (errno));
       exit (1);
     }
 #if DEBUG >= 1
@@ -80,25 +80,25 @@ prempt_load (prempt_t prempt_data)
     }
 #endif
 
-    pprod = (char *) prempt_data->pprod;
+    pprod = (char *) preempt_data->pprod;
     for ( ; ; )
     {
-      if ((pprod != prempt_data->pcons) &&
-    (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
-      (PREMPT_BUF - 1)) <= PREMPT_ONE_READ))
+      if ((pprod != preempt_data->pcons) &&
+    (((((PREEMPT_BUF + ((size_t) preempt_data->pcons))) - ((size_t) pprod)) &
+      (PREEMPT_BUF - 1)) <= PREEMPT_ONE_READ))
         {
           NANOSLEEP();
         }
       else
       {
         try_load =
-         MIN((PREMPT_BUF + ((size_t)pmin)) - ((size_t) pprod), PREMPT_ONE_READ);
+         MIN((PREEMPT_BUF + ((size_t)pmin)) - ((size_t) pprod), PREEMPT_ONE_READ);
         if ((load = fread (pprod, 1, try_load, f)))
         {
           pprod += load;
           if (pprod == pmax)
             pprod = pmin;
-          prempt_data->pprod = pprod;
+          preempt_data->pprod = pprod;
         }
         else if (feof(f))  // we go to the next batch of files
         {
@@ -109,14 +109,14 @@ prempt_load (prempt_t prempt_data)
         }
         else // error
         {
-          fprintf (stderr, "prempt_load: load error (%s) from\n%s\n",
+          fprintf (stderr, "preempt_load: load error (%s) from\n%s\n",
                            strerror (errno), *p_files);
           exit (1);
         }
       }
     }
   }
-  prempt_data->end = 1;
+  preempt_data->end = 1;
   pthread_exit (NULL);
 }
 
@@ -142,7 +142,7 @@ realloc_buffer_primes (buf_rel_t *buf)
 }
 
 #define LOAD_ONE(P) { c = *P;  \
-       P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin;}
+       P = ((size_t) (P - pminlessone) & (PREEMPT_BUF - 1)) + pmin;}
 
 
 static inline unsigned char
@@ -252,7 +252,7 @@ skip_ab (char **p)
 #endif
 
 static inline void
-relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_abp (preempt_t preempt_data, buf_rel_t *mybufrel)
 {
   char *p;
   unsigned int nb_primes_read;
@@ -261,7 +261,7 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
   unsigned char c;
   int side = -1;
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
 
 #ifndef FOR_FFS
   c = read_a (&(mybufrel->a), &p, 0);
@@ -299,14 +299,14 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_abh (preempt_t preempt_data, buf_rel_t *mybufrel)
 {
   char *p;
   unsigned int nb_primes_read;
   index_t pr;
   unsigned char c;
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
 
   c = read_a (&(mybufrel->a), &p, 1);
   c = read_b (&(mybufrel->b), &p, 1);
@@ -335,12 +335,12 @@ relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_ab (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_ab (preempt_t preempt_data, buf_rel_t *mybufrel)
 {
   char *p;
   unsigned char c;
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
 
   c = read_a (&(mybufrel->a), &p, 1);
   c = read_b (&(mybufrel->b), &p, 1);
@@ -350,13 +350,13 @@ relation_get_fast_ab (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_abline (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_abline (preempt_t preempt_data, buf_rel_t *mybufrel)
 {
   char *p, *begin;
   unsigned char c;
   unsigned int i = 0;
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
   begin = p;
 
 #ifndef FOR_FFS
@@ -377,14 +377,14 @@ relation_get_fast_abline (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_line (prempt_t prempt_data, buf_rel_t *mybufrel)
+relation_get_fast_line (preempt_t preempt_data, buf_rel_t *mybufrel)
 {
   char *p;
   unsigned char c;
   unsigned int i = 0;
   unsigned int nb_primes = 0;
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
 
   do
   {
@@ -400,7 +400,7 @@ relation_get_fast_line (prempt_t prempt_data, buf_rel_t *mybufrel)
 }
 
 static inline void
-relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
+relation_get_fast_hmin (preempt_t preempt_data, buf_rel_t *mybufrel, index_t min)
 {
   char *p;
   unsigned int nb_primes_read;
@@ -409,7 +409,7 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
   weight_t nb_above_min_index = 1; // count the -1 at the end of the relations
                                    // in rel_compact
 
-  p = (char *) prempt_data->pcons;
+  p = (char *) preempt_data->pcons;
 
   c = skip_ab(&p);
 
@@ -446,7 +446,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   pthread_attr_t attr;
   pthread_t thread_load, thread_callback, thread_fr[(1<<NFR)];
   fr_t fr[(1<<NFR)];
-  prempt_t prempt_data;
+  preempt_t preempt_data;
   unsigned long cpy_cpt_rel_a;
   unsigned int length_line, i, k;
   int err, needr = (thread_root != NULL);
@@ -515,23 +515,23 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   relation_stream_init (rs);
   rs->pipe = 1;
   length_line = 0;
-  prempt_data->files = prempt_open_compressed_rs (antebuffer, fic);
+  preempt_data->files = preempt_open_compressed_rs (antebuffer, fic);
 
-  SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations prempt_data");
-  pmin = prempt_data->buf;
+  SMALLOC (preempt_data->buf, PREEMPT_BUF, "preempt_scan_relations preempt_data");
+  pmin = preempt_data->buf;
   pminlessone = pmin - 1;
-  prempt_data->pcons = pmin;
-  prempt_data->pprod = pmin;
-  pcons_max = &(prempt_data->buf[PREMPT_BUF]);
-  prempt_data->end = 0;
+  preempt_data->pcons = pmin;
+  preempt_data->pprod = pmin;
+  pcons_max = &(preempt_data->buf[PREEMPT_BUF]);
+  preempt_data->end = 0;
   pthread_attr_init (&attr);
   pthread_attr_setstacksize (&attr, 1<<16);
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
 
 
-  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
+  if ((err = pthread_create (&thread_load, &attr, (void *) preempt_load, preempt_data)))
   {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n",
+    fprintf (stderr, "preempt_scan_relations: pthread_create error 1: %d. %s\n",
                      err, strerror (errno));
     exit (1);
   }
@@ -540,7 +540,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
                         (void*) &buf_arg);
   if (err)
   {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 2: %d. %s\n",
+    fprintf (stderr, "preempt_scan_relations: pthread_create error 2: %d. %s\n",
                      err, strerror (errno));
     exit (1);
   }
@@ -552,38 +552,38 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
       err = pthread_create (&(thread_fr[i]), &attr,(void*)thread_root, &(fr[i]));
       if (err)
       {
-        fprintf (stderr, "prempt_scan_relations: pthread_create error 3: %d. "
+        fprintf (stderr, "preempt_scan_relations: pthread_create error 3: %d. "
                          "%s\n", err, strerror (errno));
         exit (1);
       }
     }
   }
 
-  pcons = (char *) prempt_data->pcons;
+  pcons = (char *) preempt_data->pcons;
   for ( ; ; )
     {
       rs->pos += length_line;
       length_line = 0;
-      prempt_data->pcons = pcons;
+      preempt_data->pcons = pcons;
 
-      while (pcons == prempt_data->pprod)
-        if (!prempt_data->end)
+      while (pcons == preempt_data->pprod)
+        if (!preempt_data->end)
           NANOSLEEP();
-        else if (pcons == prempt_data->pprod)
+        else if (pcons == preempt_data->pprod)
           goto end_of_files;
 
-      if (pcons == prempt_data->pprod + sizeof(*pcons))
+      if (pcons == preempt_data->pprod + sizeof(*pcons))
         NANOSLEEP();
 
       rs->lnum++;
       if (*pcons != '#')
       {
-        while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
-               ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
-     !prempt_data->end)
+        while ((((PREEMPT_BUF + ((size_t) preempt_data->pprod)) -
+               ((size_t) pcons)) & (PREEMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
+     !preempt_data->end)
         NANOSLEEP();
 
-        if (pcons > prempt_data->pprod)
+        if (pcons > preempt_data->pprod)
         {
           p = &(pcons_max[-1]);
           c = *p;
@@ -601,7 +601,7 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
             goto testendline;
         }
 
-        p = &(((char *) prempt_data->pprod)[-1]);
+        p = &(((char *) preempt_data->pprod)[-1]);
         c = *p;
         *p = '\n';
         pcons_old = pcons;
@@ -610,15 +610,15 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
         length_line += (pcons - pcons_old);
 
       testendline:
-        if (c != '\n' && pcons == prempt_data->pprod)
+        if (c != '\n' && pcons == preempt_data->pprod)
         {
-          fprintf (stderr, "prempt_scan_relations: "
+          fprintf (stderr, "preempt_scan_relations: "
                            "the last line has not a carriage return\n");
           exit(1);
         }
         if (length_line > ((unsigned int) RELATION_MAX_BYTES))
         {
-          fprintf (stderr, "prempt_scan_relations: relation line size"
+          fprintf (stderr, "preempt_scan_relations: relation line size"
                            " (%u) is greater than RELATION_MAX_BYTES (%d)\n",
                            length_line, RELATION_MAX_BYTES);
           exit(1);
@@ -634,29 +634,29 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
         buf_arg.rels[k].num = rs->nrels++;
 
         if (step == STEP_DUP1)
-          relation_get_fast_abline (prempt_data, &(buf_arg.rels[k]));
+          relation_get_fast_abline (preempt_data, &(buf_arg.rels[k]));
         else if (step == STEP_DUP2_PASS1)
-          relation_get_fast_ab (prempt_data, &(buf_arg.rels[k]));
+          relation_get_fast_ab (preempt_data, &(buf_arg.rels[k]));
         else if (step == STEP_DUP2_PASS2)
-          relation_get_fast_abp (prempt_data, &(buf_arg.rels[k]));
+          relation_get_fast_abp (preempt_data, &(buf_arg.rels[k]));
         else if (step == STEP_PURGE_PASS1)
         {
           if (buf_arg.rel_used != NULL &&
               bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
-            relation_get_fast_hmin (prempt_data, &(buf_arg.rels[k]),
+            relation_get_fast_hmin (preempt_data, &(buf_arg.rels[k]),
                                                      buf_arg.min_index);
         }
         else if (step == STEP_MERGE)
-          relation_get_fast_hmin (prempt_data, &(buf_arg.rels[k]),
+          relation_get_fast_hmin (preempt_data, &(buf_arg.rels[k]),
                                                      buf_arg.min_index);
         else if (step == STEP_PURGE_PASS2)
         {
           if (need_del_rels ||
               bit_vector_getbit(buf_arg.rel_used, (size_t) buf_arg.rels[k].num))
-                relation_get_fast_line (prempt_data, &(buf_arg.rels[k]));
+                relation_get_fast_line (preempt_data, &(buf_arg.rels[k]));
         }
         else if (step == STEP_REPLAY)
-          relation_get_fast_abh (prempt_data, &(buf_arg.rels[k]));
+          relation_get_fast_abh (preempt_data, &(buf_arg.rels[k]));
 
         /* Delayed find root computation by block of 1<<NNFR */
         if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
@@ -689,19 +689,19 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
       {
         do
         {
-          while (pcons == prempt_data->pprod)
+          while (pcons == preempt_data->pprod)
           {
-            if (!prempt_data->end)
+            if (!preempt_data->end)
               NANOSLEEP();
-            else if (pcons == prempt_data->pprod)
+            else if (pcons == preempt_data->pprod)
             {
-              fprintf (stderr, "prempt_scan_relations: at the end of files,"
+              fprintf (stderr, "preempt_scan_relations: at the end of files,"
                                " a line without \\n ?\n");
               exit (1);
             }
           }
 
-          p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod
+          p = ((pcons <= preempt_data->pprod) ? (char *) preempt_data->pprod
                                              : pcons_max) - 1;
           c = *p;
           *p = '\n';
@@ -753,9 +753,9 @@ process_rels (char **fic, void* (*callback_fct)(buf_arg_t *),
   pthread_join(thread_load, NULL);
   pthread_attr_destroy(&attr);
 
-  free (prempt_data->buf);
-  for (ff = prempt_data->files; *ff; free(*ff++));
-  free (prempt_data->files);
+  free (preempt_data->buf);
+  for (ff = preempt_data->files; *ff; free(*ff++));
+  free (preempt_data->files);
   for (i = SIZE_BUF_REL; i-- ; )
     if (buf_arg.rels[i].nb_alloc != NB_PRIMES_OPT )
       SFREE(buf_arg.rels[i].primes);

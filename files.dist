@@ -724,7 +724,7 @@ utils/plain_poly.c
 utils/plain_poly.h
 utils/poly.c
 utils/poly.h
-utils/prempt.h
+utils/preempt.h
 utils/purgedfile.c
 utils/purgedfile.h
 utils/random_integer.c

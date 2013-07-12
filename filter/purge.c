@@ -582,7 +582,7 @@ no_singleton(buf_rel_t *br)
    It's very dirty!
 */
 
-/* Callback function called by prempt_scan_relations */
+/* Callback function called by preempt_scan_relations */
 
 void *
 thread_insert (buf_arg_t *arg)
@@ -623,7 +623,7 @@ thread_insert (buf_arg_t *arg)
   }
 }
 
-/* Callback function called by prempt_scan_relations */
+/* Callback function called by preempt_scan_relations */
 
 static void *
 thread_print(buf_arg_t *arg)
