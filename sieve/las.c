@@ -95,8 +95,6 @@ double cof_calls[2][256] = {{0},{0}};
 double cof_fails[2][256] = {{0},{0}};
 /* }}} */
 
-/* {{{ Forward decl of some functions  */
-static void usage (const char *argv0, const char * missing);
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
@@ -3071,50 +3069,33 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
 
 /*************************** main program ************************************/
 
-/* {{{ usage */
-static void
-usage (const char *argv0, const char * missing)
-{
-  fprintf (stderr, "Usage: %s [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
-           argv0);
-  fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
-  fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
-  fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
-  fprintf (stderr, "          -q0 nnn         left bound of special-q range\n");
-  fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
-  fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
-  fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
-  fprintf (stderr, "          -bkthresh nnn   bucket-sieve primes p >= nnn\n");
-  fprintf (stderr, "          -rlim     nnn   rational factor base bound nnn\n");
-  fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
-  fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
-  fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
-  fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
-  fprintf (stderr, "          -rpowlim  nnn   limit on powers on rat side is nnn\n");
-  fprintf (stderr, "          -apowlim  nnn   limit on powers on alg side is nnn\n");
-  fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
-  fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
-  fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
-  fprintf (stderr, "          -mt nnn   use nnn threads\n");
-  fprintf (stderr, "          -ratq           use rational special-q\n");
-  fprintf (stderr, "          The following are for benchs:\n");
-  fprintf (stderr, "          -bench          activate bench mode\n");
-  fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
-  fprintf (stderr, "          -bench2         activate alternate bench mode\n");
-  fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
-  fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
-  fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
-  fprintf (stderr, "          -sievestats xxx write sieve statistics to file xxx\n");
-  if (missing) {
-      fprintf(stderr, "\nError: missing parameter %s\n", missing);
-  }
-  exit (EXIT_FAILURE);
-}
-/* }}} */
 
+static void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "poly", "polynomial file");
+  param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "q0",   "left bound of special-q range");
+  param_list_decl_usage(pl, "q1",   "right bound of special-q range");
+  param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
+  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+  param_list_decl_usage(pl, "rlim", "rational factor base bound");
+  param_list_decl_usage(pl, "alim", "algebraic factor base bound");
+  param_list_decl_usage(pl, "lpbr", "set rational large prime bound to 2^lpbr");
+  param_list_decl_usage(pl, "lpba", "set algebraic large prime bound to 2^lpba");
+  param_list_decl_usage(pl, "mfbr",  "set rational cofactor bound 2^mfbr");
+  param_list_decl_usage(pl, "mfba",  "set algebraic cofactor bound 2^mfba");
+  param_list_decl_usage(pl, "rlambda", "rational lambda value");
+  param_list_decl_usage(pl, "alambda", "algebraic lambda value");
+  param_list_decl_usage(pl, "rpowlim", "limit on powers on rat side");
+  param_list_decl_usage(pl, "apowlim", "limit on powers on alg side");
+  param_list_decl_usage(pl, "S",     "skewness");
+  param_list_decl_usage(pl, "v",     "(switch) verbose mode");
+  param_list_decl_usage(pl, "out",   "filename where relations are written, instead of stdout");
+  param_list_decl_usage(pl, "mt",    "number of threads to use");
+  param_list_decl_usage(pl, "ratq",  "(switch) use rational special-q");
+}
 
 int main (int argc0, char *argv0[])/*{{{*/
 {
@@ -3145,6 +3126,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list pl;
     param_list_init(pl);
 
+    declare_usage(pl);
+
     /* Passing NULL is allowed here. Find value with
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
@@ -3170,7 +3153,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             continue;
         }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        usage(argv0[0],NULL);
+        param_list_print_usage(pl, argv0[0], stderr);
+        exit(EXIT_FAILURE);
     }
 
 

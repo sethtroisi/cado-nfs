@@ -7,6 +7,14 @@
 
 #include "macros.h"
 
+struct param_list_doc_s {
+    char * key;
+    char * doc;
+};
+typedef struct param_list_doc_s param_list_doc[1];
+typedef struct param_list_doc_s * param_list_doc_ptr;
+typedef struct param_list_doc_s const * param_list_doc_srcptr;
+
 /* This is by increasing order of priority */
 enum parameter_origin { PARAMETER_FROM_FILE, PARAMETER_FROM_CMDLINE };
 
@@ -36,13 +44,20 @@ struct param_list_switch_s {
 typedef struct param_list_switch_s param_list_switch[1];
 
 struct param_list_s {
+    // documented parameters
+    int ndocs;
+    int ndocs_alloc;
+    param_list_doc * docs;
+    // parameters given by user
     unsigned int alloc;
     unsigned int size;
     parameter * p;
     int consolidated;
+    // aliases
     param_list_alias * aliases;
     int naliases;
     int naliases_alloc;
+    // switches
     param_list_switch * switches;
     int nswitches;
     int nswitches_alloc;
@@ -50,6 +65,8 @@ struct param_list_s {
      * been given to us */
     int cmdline_argc0;
     char ** cmdline_argv0;
+    // did the user use the doc functionality ?
+    int use_doc;
 };
 
 typedef struct param_list_s param_list[1];
@@ -66,6 +83,10 @@ extern "C" {
 extern void param_list_init(param_list pl);
 extern void param_list_clear(param_list pl);
 
+// document the usage of a parameter.
+extern void param_list_decl_usage(param_list pl, const char * key,
+        const char * doc);
+extern void param_list_print_usage(param_list pl, const char * argv0, FILE *f);
 
 // takes a file, in the Cado-NFS params format, and stores the dictionary
 // of parameters to pl.

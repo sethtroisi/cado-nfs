@@ -15,6 +15,10 @@
 void param_list_init(param_list pl)
 {
     memset(pl, 0, sizeof(param_list));
+    pl->ndocs_alloc = 16;
+    pl->ndocs = 0;
+    pl->docs = (param_list_doc *) malloc(pl->ndocs_alloc *
+            sizeof(param_list_doc));
     pl->alloc = 16;
     pl->p = (parameter *) malloc(pl->alloc * sizeof(parameter));
     pl->consolidated = 1;
@@ -25,10 +29,16 @@ void param_list_init(param_list pl)
     pl->switches = NULL;
     pl->nswitches = 0;
     pl->nswitches_alloc = 0;
+    ASSERT_ALWAYS(pl->docs != NULL && pl->p != NULL);
 }
 
 void param_list_clear(param_list pl)
 {
+    for(int i = 0 ; i < pl->ndocs ; i++) {
+        free(pl->docs[i]->key);
+        free(pl->docs[i]->doc);
+    }
+    free(pl->docs);
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (pl->p[i]->key) free(pl->p[i]->key);
         free(pl->p[i]->value);
@@ -43,6 +53,38 @@ void param_list_clear(param_list pl)
     }
     free(pl->switches);
     memset(pl, 0, sizeof(pl[0]));
+}
+
+void param_list_decl_usage(param_list pl, const char * key, const char * doc)
+{
+    if (pl->ndocs == pl->ndocs_alloc) {
+        pl->ndocs_alloc += 16;
+        pl->docs = (param_list_doc *) realloc(pl->docs,
+                pl->ndocs_alloc * sizeof(param_list_doc));
+        ASSERT_ALWAYS(pl->docs != NULL);
+    }
+    int i = pl->ndocs;
+    pl->ndocs++;
+    pl->docs[i]->key = strdup(key);
+    pl->docs[i]->doc = strdup(doc);
+    ASSERT_ALWAYS(pl->docs[i]->key != NULL && pl->docs[i]->doc != NULL);
+    pl->use_doc = 1;
+}
+
+void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
+{
+    fprintf(f, "Usage: %s <parameters>\n", argv0);
+    fprintf(f, "The available parameters are the following:\n");
+    char whites[20];
+    for (int i = 0; i < 20; ++i)
+        whites[i] = ' ';
+    for (int i = 0; i < pl->ndocs; ++i) {
+        int l = strlen(pl->docs[i]->key);
+        l = MAX(1, 10-l);
+        whites[l] ='\0';
+        fprintf(f, "    -%s%s%s\n", pl->docs[i]->key, whites, pl->docs[i]->doc);
+        whites[l] =' ';
+    }
 }
 
 static void make_room(param_list pl, unsigned int more)
