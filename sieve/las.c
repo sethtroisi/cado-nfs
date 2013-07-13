@@ -3076,29 +3076,34 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
 
 static void declare_usage(param_list pl)
 {
-  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb",   "factor base file");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
-  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
-  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+  param_list_decl_usage(pl, "v",    "(switch) verbose mode");
+  param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
+  param_list_decl_usage(pl, "mt",   "number of threads to use");
+  param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
+
+  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "skew", "(alias S) skewness");
   param_list_decl_usage(pl, "rlim", "rational factor base bound");
   param_list_decl_usage(pl, "alim", "algebraic factor base bound");
   param_list_decl_usage(pl, "lpbr", "set rational large prime bound to 2^lpbr");
   param_list_decl_usage(pl, "lpba", "set algebraic large prime bound to 2^lpba");
-  param_list_decl_usage(pl, "mfbr",  "set rational cofactor bound 2^mfbr");
-  param_list_decl_usage(pl, "mfba",  "set algebraic cofactor bound 2^mfba");
+  param_list_decl_usage(pl, "mfbr", "set rational cofactor bound 2^mfbr");
+  param_list_decl_usage(pl, "mfba", "set algebraic cofactor bound 2^mfba");
   param_list_decl_usage(pl, "rlambda", "rational lambda value");
   param_list_decl_usage(pl, "alambda", "algebraic lambda value");
   param_list_decl_usage(pl, "rpowlim", "limit on powers on rat side");
   param_list_decl_usage(pl, "apowlim", "limit on powers on alg side");
-  param_list_decl_usage(pl, "S",     "skewness");
-  param_list_decl_usage(pl, "v",     "(switch) verbose mode");
-  param_list_decl_usage(pl, "out",   "filename where relations are written, instead of stdout");
-  param_list_decl_usage(pl, "mt",    "number of threads to use");
-  param_list_decl_usage(pl, "ratq",  "(switch) use rational special-q");
+  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+
+  param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
+  param_list_decl_usage(pl, "mkhint", "(switch) ???");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
