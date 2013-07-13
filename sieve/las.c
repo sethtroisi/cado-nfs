@@ -875,6 +875,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
 	param_list_read_file(pl, tmp);
+    } else {
+        fprintf(stderr, "Error: -poly is missing\n");
+        param_list_print_usage(pl, NULL, stderr);
+        exit(EXIT_FAILURE);
     }
 
     if (!cado_poly_set_plist(las->cpoly, pl)) {

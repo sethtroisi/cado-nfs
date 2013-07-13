@@ -73,7 +73,8 @@ void param_list_decl_usage(param_list pl, const char * key, const char * doc)
 
 void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
 {
-    fprintf(f, "Usage: %s <parameters>\n", argv0);
+    if (argv0 != NULL)
+        fprintf(f, "Usage: %s <parameters>\n", argv0);
     fprintf(f, "The available parameters are the following:\n");
     char whites[20];
     for (int i = 0; i < 20; ++i)
@@ -908,5 +909,6 @@ void param_list_print_command_line(FILE * stream, param_list pl)
 {
     /* remember that the API for calling param_list functions mandates
      * that the binary name $0 is stripped from the provided lists */
-    print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
+    if (pl->cmdline_argv0 != NULL)
+        print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
 }
