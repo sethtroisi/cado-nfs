@@ -250,7 +250,7 @@ under Windows:
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
   under Windows. Those instructions should work for CADO-NFS too.
-  See howto-MinGW.txt.
+  See dev_docs/howto-MinGW.txt.
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.
