@@ -313,7 +313,7 @@ check_unknown_log (mpz_t *log, index_t nprimes)
 }
 #endif
 
-/* Callback function called by prempt_scan_relations */
+/* Callback function called by preempt_scan_relations */
 void *
 thread_insert (buf_arg_t *arg)
 {

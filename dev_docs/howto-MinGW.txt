@@ -23,6 +23,8 @@ to fstab by /postinstall/pi.sh)
 8. Install GMP for MinGW with: (don't install msys-libgmp!)
 mingw-get install mingw32-libgmp
 
+8a. Install the autotools: mingw-get install mingw32-autotools
+
 9. Download and install CMake from 
 http://www.cmake.org/cmake/resources/software.html
 

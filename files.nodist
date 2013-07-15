@@ -4,6 +4,7 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
+Toolchain-MinGW64.cmake
 WhoDunit
 gf2x/gf2x-fft/cantor128.m
 dev_docs/
@@ -12,15 +13,16 @@ TODO
 files.dist
 files.nodist
 files.unknown
+linalg/CMakeLists-nodist.txt
 linalg/bwc/bind_threads.sh
 linalg/bwc/bwc.sty
 linalg/bwc/convert_magma.pl
 linalg/bwc/sketch.tex
 linalg/tex.c
-filter/debug.c
-filter/debug.h
 filter/merge_mpi.c
 filter/merge_mpi.h
+filter/print_table.c
+filter/purge-mt.c
 scripts/nightly-test
 scripts/polsel_effort
 polyselect/alpha.mpl
@@ -49,7 +51,6 @@ scripts/benchsieve.pl
 scripts/benchsievessh.pl
 scripts/check_file_lists.pl
 scripts/dist.sh
-sieve/CMakeLists-nodist.txt
 sieve/ecm/CMakeLists-nodist.txt
 sieve/ecm/ecm_avg_exp.gp
 sieve/ecm/find_primes_hit.c
@@ -76,18 +77,21 @@ polyselect/CMakeLists-nodist.txt
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
+filter/debug-tools.sh
 filter/refresh-purged.c
 params/params.rsa100
 params/rsa155.poly
 params/rsa155.poly2
 params/rsa155.poly3
 params/rsa155.poly4
+params/rsa155.poly5
 params/rsa180.poly
 params/rsa190.poly
 params/rsa704.poly
 params/mach_desc.rsa100
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
+scripts/polsel_params.sage
 linalg/bwc/bwc-trace.sh
 linalg/bwc/bwc-trace.m
 scripts/cluster/analyze-bwclogfile.pl
@@ -99,10 +103,13 @@ linalg/bwc/test_hello.c
 linalg/bwc/shell.c
 linalg/bwc/tool.sh
 misc/README
+misc/cachesim.c
 misc/contains_zerochar.c
 misc/convert_rels.c
 misc/phi.c
+misc/cacheline.c
+misc/get_valid_lines.c
 filter/out-of-core/Makefile
+filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
-dev_docs/USING_GRID5000_FOR_BENCHES.txt
 utils/qrange_to_qlist.c
