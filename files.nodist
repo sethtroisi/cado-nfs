@@ -21,6 +21,8 @@ linalg/bwc/sketch.tex
 linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
+filter/print_table.c
+filter/purge-mt.c
 scripts/nightly-test
 scripts/polsel_effort
 polyselect/alpha.mpl
@@ -75,6 +77,7 @@ polyselect/CMakeLists-nodist.txt
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
+filter/debug-tools.sh
 filter/refresh-purged.c
 params/params.rsa100
 params/rsa155.poly
@@ -100,11 +103,13 @@ linalg/bwc/test_hello.c
 linalg/bwc/shell.c
 linalg/bwc/tool.sh
 misc/README
+misc/cachesim.c
 misc/contains_zerochar.c
 misc/convert_rels.c
 misc/phi.c
 misc/cacheline.c
 misc/get_valid_lines.c
 filter/out-of-core/Makefile
+filter/out-of-core/clique.c
 filter/out-of-core/singleton.c
 utils/qrange_to_qlist.c

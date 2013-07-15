@@ -51,6 +51,7 @@ config/test-rand.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
+filter/filter_badideals.h
 filter/filter_io.c
 filter/filter_io.h
 filter/filter_utils.c
@@ -71,6 +72,8 @@ filter/merge_opts.h
 filter/mst.c
 filter/mst.h
 filter/purge.c
+filter/README.fileformat
+filter/reconstructlog.c
 filter/replay.c
 filter/report.c
 filter/report.h
