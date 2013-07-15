@@ -1,4 +1,4 @@
-/* Very efficient antebuffer to prempt the file(s) load.
+/* Very efficient antebuffer to preempt the file(s) load.
    Syntax: antebuffer X file [file] | YourCommand
    with buffer size = 2^X.
    The files are written on stdout.
