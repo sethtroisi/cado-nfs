@@ -704,7 +704,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 unsigned int i0 = ssdpos[i];
                 // The following is for the case where p divides the norm
                 // at the position (i,j) = (1,0).
-                if (UNLIKELY(N == 0 && i0 == ssp->g * I)) {
+                if (UNLIKELY(N == 0 && i0 == ssp->g << si->conf->logI)) {
 #ifdef TRACE_K
                     if (trace_on_spot_Nx(w->N, 1+(I>>1))) {
                         WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
@@ -934,7 +934,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             /* Test every p-th line, starting at S[ssdpos] */
             unsigned int i0 = ssdpos[i];
             // This block is for the case where p divides at (1,0).
-            if (UNLIKELY(N == 0 && i0 == ssp->g * I)) {
+            if (UNLIKELY(N == 0 && i0 == ssp->g << si->conf->logI)) {
                 bucket_prime_t prime;
                 prime.p = g;
                 prime.x = 1+(I>>1);
