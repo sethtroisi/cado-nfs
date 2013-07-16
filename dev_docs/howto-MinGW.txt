@@ -2,9 +2,9 @@ How to set up MinGW for compiling CADO on a Windows Virtual machine
 
 ==== System-wide installation and settings ====
 
-1. Set up a VM as described in howto-windows.txt
+1. Set up a Windows virtual machine
 
-2. Disable popups for aborted programs in Widows Action Center (HOW?) or
+2. Disable popups for aborted programs in Windows Action Center (HOW?) or
 they keep popping up during configuration test runs
 
 3. Install MinGW:
