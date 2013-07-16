@@ -139,7 +139,7 @@ static inline unsigned char read_one_prime(p_r_values_t * pr, char **p)
     if (c != ',' && c != '\n')
       {
         fprintf (stderr, "Unexpected character '%c' in relation\n", c);
-        exit (1);
+        abort ();
       }
 
     return c;
