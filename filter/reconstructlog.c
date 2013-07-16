@@ -5,6 +5,7 @@
 
 #include "utils.h"
 #include "filter_utils.h"
+#include "filter_io.h"
 
 #ifdef FOR_FFS
 #include "fppol.h"
@@ -327,13 +328,13 @@ thread_insert (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        nanosleep (&wait_classical, NULL);
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      nanosleep (&wait_classical, NULL);
+      NANOSLEEP();
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
     my_rel = &(arg->rels[j]);

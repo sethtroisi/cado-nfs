@@ -632,30 +632,27 @@ ularith_invmod (const unsigned long n)
   /* Newton iteration */
   r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
   r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-  if (sizeof (unsigned long) == 4)
-    {
-      r = 2UL * r - r * r * n;
-    }
-  else
-    {
-      r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+#if LONG_BIT == 32
+  r = 2UL * r - r * r * n;
+#else /* LONG_BIT == 32 */
+  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
 #if 0
-      r = 2UL * r - r * r * n;
+  r = 2UL * r - r * r * n;
 #else
-      /*
-        r*n = k*2^32 + 1
+  /*
+    r*n = k*2^32 + 1
         
-        r' = 2 * r - r * r * n
-        r' = 2 * r - r * (k*2^32 + 1)
-        r' = 2 * r - r * k*2^32 - r
-        r' = r - r * k*2^32
-        r' = r - ((r * k) % 2^32) * 2^32
-      */
-      unsigned int k = r * n >> 32;
-      k *= (unsigned int) r;
-      r = r - ((unsigned long)k << 32);
+    r' = 2 * r - r * r * n
+    r' = 2 * r - r * (k*2^32 + 1)
+    r' = 2 * r - r * k*2^32 - r
+    r' = r - r * k*2^32
+    r' = r - ((r * k) % 2^32) * 2^32
+  */
+  unsigned int k = r * n >> 32;
+  k *= (unsigned int) r;
+  r = r - ((unsigned long)k << 32);
 #endif
-    }
+#endif /* LONG_BIT == 32 */
 
   return r;
 }

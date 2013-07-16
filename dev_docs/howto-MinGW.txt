@@ -25,6 +25,8 @@ mingw-get install mingw32-libgmp
 
 8a. Install the autotools: mingw-get install mingw32-autotools
 
+8b. Install the coreutils: mingw-get install msys-coreutils
+
 9. Download and install CMake from 
 http://www.cmake.org/cmake/resources/software.html
 

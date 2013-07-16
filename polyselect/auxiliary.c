@@ -2295,8 +2295,6 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
    mpz_out_str (fp, 10, p->m);
    fprintf (fp, "\n");
 
-   if (strlen (p->type) != 0)
-      fprintf (fp, "type: %s\n", p->type);
    fprintf (fp, "skew: %1.3f\n", p->skew);
 
    logmu = L2_lognorm (p->alg->f, p->alg->degree, p->skew, DEFAULT_L2_METHOD);

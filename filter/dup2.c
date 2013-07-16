@@ -188,7 +188,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
         const char * name = *files;
         index_t nodu0 = nodu, dupl0 = dupl;
 
-        f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
+        f_in = fopen_maybe_compressed2 (name, "rb", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
 
         suffix_out = outfmt ? outfmt : suffix_in;
@@ -216,7 +216,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             fprintf (stderr, "Input file name: %s, temporary output file name:"
                      " %s, final output file name: %s\n",
                      name, oname_tmp, oname);
-        f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
+        f_out = fopen_maybe_compressed2 (oname_tmp, "wb", &p_out, NULL);
         if (f_out == NULL)
         {
           fprintf (stderr, "Could not open file %s for writing: %s\n",
@@ -433,6 +433,7 @@ thread_print(buf_arg_t *arg)
     cpy_cpt_rel_b++;
     cpt_rel_b = cpy_cpt_rel_b;
   }
+  return NULL;
 }
 
 
@@ -677,7 +678,7 @@ main (int argc, char *argv[])
   {
     unsigned int count = 0;
     char s[1024];
-    FILE *f_tmp = fopen_maybe_compressed (*p, "r");
+    FILE *f_tmp = fopen_maybe_compressed (*p, "rb");
     ASSERT_ALWAYS(f_tmp != NULL);
 
     /* Look for first non-comment line */
