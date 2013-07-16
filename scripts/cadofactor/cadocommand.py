@@ -49,9 +49,9 @@ class Command(object):
         progargs = self.program.make_command_array()
         
         # Each of stdin, stdout, stderr is one of these three:
-        # - subprocess.PIPE, if program.get_std*() returned None
-        # - subprocess.STDOUT for stderr if program.get_stdout() and
-        #   program.get_stdin() return the same object
+        # - subprocess.PIPE, if program.std* is None
+        # - subprocess.STDOUT for stderr if program.stdout and program.stdin
+        #   are the same object
         # - a newly opened file handle which needs to be closed later
         (stdin, (stdout, append_out), (stderr, append_err)) = \
             self.program.get_stdio()
@@ -86,9 +86,9 @@ class Command(object):
             logger.debug("Process with PID %d stderr: %s", 
                          self.child.pid, stderr)
         
-        self._close_or_not(self.stdin, self.program.get_stdin())
-        self._close_or_not(self.stdout, self.program.get_stdout())
-        self._close_or_not(self.stderr, self.program.get_stderr())
+        self._close_or_not(self.stdin, self.program.stdin)
+        self._close_or_not(self.stdout, self.program.stdout)
+        self._close_or_not(self.stderr, self.program.stderr)
         
         return (self.child.returncode, stdout, stderr)
 
@@ -99,11 +99,10 @@ class RemoteCommand(Command):
         # to the command line with and the redirection happens on the remote
         # host
         cmdline = program.make_command_line()
-        self.prog = cadoprograms.SSH
-        progparams = parameters.myparams(self.prog.get_config_keys(),
-                                         path_prefix + [self.prog.name])
-        ssh = self.prog([host, "env", "sh", "-c", shellquote(cmdline)],
-            progparams)
+        progparams = parameters.myparams(cadoprograms.SSH.get_accepted_keys(),
+                                         path_prefix + [cadoprograms.SSH.name])
+        ssh = cadoprograms.SSH(progparams, host,
+                               "env", "sh", "-c", shellquote(cmdline))
         super().__init__(ssh, *args, **kwargs)
 
 class SendFile(Command):
@@ -114,14 +113,17 @@ class SendFile(Command):
             target = hostpath
         else:
             target = hostname + ":" + hostpath
-        rsync = cadoprograms.RSync([localfile, target], parameters)
+        rsync = cadoprograms.RSync(parameters, localfile, target)
         super().__init__(rsync, *args, **kwargs)
 
 if __name__ == '__main__':
     import cadoparams
 
+    cadologger.init_test_logger()
+    logger.setLevel(logging.NOTSET)
+
     ls_parameters = {"long": True}
-    ls_program = cadoprograms.Ls("/", ls_parameters)
+    ls_program = cadoprograms.Ls(ls_parameters, "/")
     c = Command(ls_program)
     (rc, out, err) = c.wait()
     if out:
@@ -130,7 +132,7 @@ if __name__ == '__main__':
         print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
 
-    ls_program = cadoprograms.Ls("/", ls_parameters, stdout = "ls.out")
+    ls_program = cadoprograms.Ls(ls_parameters, "/", stdout = "ls.out")
     ssh_parameters = cadoparams.Parameters({"verbose": False})
     c = RemoteCommand(ls_program, "localhost", ssh_parameters, [])
     (rc, out, err) = c.wait()
