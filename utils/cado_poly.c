@@ -30,7 +30,6 @@ void cado_poly_init(cado_poly poly)
     }
     mpz_init_set_ui(poly->n, 0);
     mpz_init_set_ui(poly->m, 0);
-    poly->type[0] = '\0';
 }
 
 void cado_poly_clear(cado_poly poly)
@@ -61,7 +60,6 @@ cado_poly_set (cado_poly p, cado_poly q)
             mpz_set (ps->f[i], qs->f[i]);
     }
     mpz_set (p->m, q->m);
-    memcpy (p->type, q->type, sizeof(p->type));
 }
 
 int cado_poly_set_plist(cado_poly poly, param_list pl)
@@ -87,8 +85,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
         snprintf(tag, sizeof(tag), "Y%d", i);
         have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->f[i]);
     }
-    param_list_parse_string(pl, "type", poly->type, sizeof(poly->type));
-
     param_list_parse_ulong(pl, "rlim", &(poly->rat->lim));
     param_list_parse_int(pl, "lpbr", &(poly->rat->lpb));
     param_list_parse_int(pl, "mfbr", &(poly->rat->mfb));
@@ -99,7 +95,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     param_list_parse_int(pl, "mfba", &(poly->alg->mfb));
     param_list_parse_double(pl, "alambda", &(poly->alg->lambda));
 
-    param_list_parse_int(pl, "qintsize", &(poly->qintsize));
     mpz_set_ui (poly->m, 0);
     param_list_parse_mpz(pl, "m", poly->m);
     have_m = mpz_cmp_ui (poly->m, 0);

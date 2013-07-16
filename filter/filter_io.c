@@ -136,7 +136,11 @@ static inline unsigned char read_one_prime(p_r_values_t * pr, char **p)
 	*pr = (*pr << 4) + v;
 	LOAD_ONE(*p);
     }
-    ASSERT_ALWAYS(c == ',' || c == '\n');
+    if (c != ',' && c != '\n')
+      {
+        fprintf (stderr, "Unexpected character '%c' in relation\n", c);
+        abort ();
+      }
 
     return c;
 }
