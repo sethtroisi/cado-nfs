@@ -303,8 +303,10 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             compensate += j0 * ssp->r;
             ssdpos[i] = compensate %ssp->p;
         }
-        if (event & SSP_DISCARD) continue;
         if (event & SSP_END) break;
+        // Remark: even in the case of discard, we want to precompute the
+        // data (we are in the projective case), for the (rare) case
+        // where we have to update the (i,j)=(1,0) position.
         if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             /* Compute the next multiple of g above j0 */
@@ -677,8 +679,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             ASSERT_ALWAYS(fence == ssd->nb_ssp);
             break;
         }
-        if (event & SSP_DISCARD)
-            continue;
         if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             const fbprime_t g = ssp->g;
@@ -717,6 +717,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #endif
                     S[1+(I>>1)] += logp;
                 }
+                // The event SSP_DISCARD might have occurred due to
+                // the first row to sieve being larger than J. The row
+                // number 0 must still be sieved in that case, but once
+                // it's done, we can indeed skip the next part of
+                // sieving.
+                if (event & SSP_DISCARD)
+                    continue;
                 ASSERT (ssp->U == 0);
                 ASSERT (i0 % I == 0);
                 ASSERT (I % (4 * sizeof (unsigned long)) == 0);
@@ -925,10 +932,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         if (event == SSP_END) {
             break;
         }
-        if (event == SSP_DISCARD) {
-            continue;
-        }
-        if (event == SSP_PROJ) {
+        if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t * ) &(ssd->ssp[i]);
             const fbprime_t g = ssp->g;
             const fbprime_t gI = g << si->conf->logI;
@@ -945,6 +949,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 ASSERT(prime.p >= si->td_thresh);
                 push_bucket_prime (BP, prime);
             }
+            // Same as in sieving: we discard after checking for row 0.
+            if (event == SSP_DISCARD)
+                continue;
 
             unsigned int ii;
             ASSERT (i0 % I == 0); /* make sure ssdpos points at start
