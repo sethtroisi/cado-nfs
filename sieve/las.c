@@ -527,7 +527,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
-    si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
+    si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
@@ -685,7 +685,7 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
   sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets */
-  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
+  si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
@@ -1604,7 +1604,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         const unsigned int logI = si->conf->logI;
 	const uint32_t maskI = I-1;
 	const uint64_t even_mask = (1U << logI) | 1U;
-	const uint64_t IJ = I * si->J;
+	const uint64_t IJ = si->J << logI;
         // TODO: should be line sieved in the non-bucket phase?
         // Or should we have a bucket line siever?
         if (UNLIKELY(r == 0))

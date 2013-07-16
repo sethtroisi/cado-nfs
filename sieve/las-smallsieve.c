@@ -353,6 +353,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
     if (skip == 0) return;
 
     ssp_marker_t * next_marker = ssd->markers;
+    unsigned int skipI = skip << si->conf->logI;
 
     for(int i = 0 ; i < ssd->nb_ssp ; i++) {
         int fence;
@@ -379,7 +380,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
             if (j >= skip) {
                 /* The ``ssdpos'' is still ahead of us, so there's
                  * no adjustment to make */
-                x -= skip*I;
+              x -= skipI;
             } else {
                 /* We've hit something in this bucket, but the
                  * ssdpos field lands in the blank space between
@@ -390,7 +391,7 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
                 unsigned int i = x & imask;
                 unsigned int jI = x - i;
                 unsigned int nskip = iceildiv(skip-j, ssp->g);
-                jI = jI + (nskip * ssp->g - skip) * I;
+                jI = jI + ((nskip * ssp->g - skip) << si->conf->logI);
                 i = (i + nskip * ssp->U) % ssp->q;
                 x = jI + i;
             }
@@ -483,7 +484,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     /* Skip two lines above, since we sieve only odd lines.
                      * Even lines would correspond to useless reports.
                      */
-                    i0 = ((i0 + 2 * ssd->ssp[n].r) & (p - 1)) + 2 * I;
+                    i0 = ((i0 + 2 * ssd->ssp[n].r) & (p - 1))
+                      + (2 << si->conf->logI);
                 }
                 /* In this loop, ssdpos gets updated to the first 
                    index to sieve relative to the start of the next line, 
@@ -499,8 +501,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         /* Apply the pattern */
         if (pattern[0] || pattern[1]) {
-            unsigned long *S_ptr = (unsigned long *) (S + j * I);
-            const unsigned long *end = (unsigned long *)(S + j * I + I);
+          unsigned long *S_ptr = (unsigned long *) (S + (j << si->conf->logI));
+          const unsigned long *end = (unsigned long *)(S + (j << si->conf->logI) + I);
 
 #ifdef TRACE_K /* {{{ */
             if (trace_on_range_Nx(w->N, w->j*I, w->j*I+I)) {
@@ -585,8 +587,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         }
 
         if (pattern[0]) {
-            unsigned long *S_ptr = (unsigned long *) (S + j * I);
-            const unsigned long *end = (unsigned long *)(S + j * I + I) - 2;
+          unsigned long *S_ptr = (unsigned long *) (S + (j << si->conf->logI));
+          const unsigned long *end = (unsigned long *)(S + (j << si->conf->logI) + I) - 2;
             
 #ifdef TRACE_K /* {{{ */
             if (trace_on_range_Nx(w->N, w->j*I, w->j*I+I)) {
@@ -680,6 +682,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         if (event & SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             const fbprime_t g = ssp->g;
+            const fbprime_t gI = ssp->g << si->conf->logI;
             const fbprime_t q = ssp->q;
             const fbprime_t U = ssp->U;
             const fbprime_t p MAYBE_UNUSED = g * q;
@@ -704,7 +707,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 unsigned int i0 = ssdpos[i];
                 // The following is for the case where p divides the norm
                 // at the position (i,j) = (1,0).
-                if (UNLIKELY(N == 0 && i0 == ssp->g << si->conf->logI)) {
+                if (UNLIKELY(N == 0 && i0 == gI)) {
 #ifdef TRACE_K
                     if (trace_on_spot_Nx(w->N, 1+(I>>1))) {
                         WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
@@ -748,7 +751,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         *(S_ptr + 3) += logps2;
                         S_ptr += 4;
                     }
-                    i0 += ssp->g * I;
+                    i0 += gI;
                 }
                 ssdpos[i] = i0 - (1U << LOG_BUCKET_REGION);
             } else {
@@ -783,7 +786,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         }
                     }
 
-                    linestart += g * I;
+                    linestart += gI;
                     lineoffset += U;
                     if (lineoffset >= q)
                         lineoffset -= q;
@@ -818,11 +821,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ASSERT(i0 < p);
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < I; i += p) {
-                        WHERE_AM_I_UPDATE(w, x, j * I + i);
+                        WHERE_AM_I_UPDATE(w, x, j << si->conf->logI + i);
                         sieve_increase (S_ptr + i, logp, w);
                     }
                     // odd lines only.
-                    i0 = ((i0 + 2 * r) & (p - 1)) + 2 * I;
+                    i0 = ((i0 + (r << 1)) & (p - 1)) + (2 << si->conf->logI);
                 }
                 i0 -= I;
                 linestart += I;
@@ -928,13 +931,14 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
         if (event == SSP_PROJ) {
             ssp_bad_t * ssp = (ssp_bad_t * ) &(ssd->ssp[i]);
             const fbprime_t g = ssp->g;
+            const fbprime_t gI = g << si->conf->logI;
 
-            WHERE_AM_I_UPDATE(w, p, ssp->g * ssp->q);
+            WHERE_AM_I_UPDATE(w, p, g * ssp->q);
 
             /* Test every p-th line, starting at S[ssdpos] */
             unsigned int i0 = ssdpos[i];
             // This block is for the case where p divides at (1,0).
-            if (UNLIKELY(N == 0 && i0 == ssp->g << si->conf->logI)) {
+            if (UNLIKELY(N == 0 && i0 == gI)) {
                 bucket_prime_t prime;
                 prime.p = g;
                 prime.x = 1+(I>>1);
@@ -992,7 +996,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                         }
                     }
                 }
-                i0 += g * I;
+                i0 += gI;
             }
             ssdpos[i] = i0 - bucket_region;
             if (resieve_very_verbose_bad) {
