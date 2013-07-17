@@ -214,8 +214,10 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   modul_neg (r1, r1, m); /* r1 = - poly[0] / poly[1] */
 
   fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
-  if (p % 2 != 0)
+  if (p % 2 != 0) {
+    ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
     fb_entry->invp = - ularith_invmod (modul_getmod_ul (m));
+  }
 
   modul_clear (r0, m);
   modul_clear (r1, m);
@@ -342,7 +344,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
   if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
     {
       fb_cur->p = FB_END;
-      fb_cur->invp = -1L;
+      fb_cur->invp = -(redc_invp_t)1;
       fb_cur->nr_roots = 0;
       if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
 	free (fb);
@@ -678,6 +680,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
 
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
+            ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
             fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
         }
 
@@ -705,7 +708,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
     if (!error) {
         /* If nothing went wrong so far, put the end-of-fb markers */
         fb_cur->p = FB_END;
-        fb_cur->invp = -1L;
+        fb_cur->invp = -(redc_invp_t)1;
         fb_cur->nr_roots = 0;
         
         
