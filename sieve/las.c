@@ -1687,17 +1687,17 @@ FIXME: can we find the locations to sieve? */
 
 	  /* fprintf (stderr, "bound0=%u bound1=%u inc_a=%u inc_c=%u maskI=%x\n", bound0, bound1, inc_a, inc_c, maskI); */
 	  /* To put all in registers for x86_64 */
-
+	  /*
 #ifdef __x86_64
 	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
 #endif
+	  */
 
 	  // ASSERT_ALWAYS(inc_a == pli.a);
 	  // ASSERT_ALWAYS(inc_c == pli.c);
 	  do {
 	    /*******************************************************************/
-	    unsigned int i = x & maskI;
-	    /* i = x & maskI; */  // x mod I
+	    unsigned int i = x & maskI; /* x mod I */
 	    /* if both i = x % I and j = x / I are even, then
 	       both a, b are even, thus we can't have a valid relation */
 	    /* i-coordinate = (x % I) - I/2
@@ -1836,9 +1836,7 @@ FIXME: can we find the locations to sieve? */
 	    }
 	    if (i >= bound1) x += inc_a;
 	    if (i < bound0)  x += inc_c;
-	    if (UNLIKELY (x >= IJ)) break;
 	    /*******************************************************************/
-
 	  } while (x < IJ);
         }
     }
