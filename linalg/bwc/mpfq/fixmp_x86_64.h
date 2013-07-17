@@ -21,7 +21,19 @@ addmul1_nc_1(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   : "+rm" (z[0]), "+rm" (z[1])
   : "rm" (x[0]), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx");
+  /* Code suggested by Alex Kruppa. Less clutter wrt register reloading.
+   * But as such it's bogus. */
+  /*
+    unsigned long dummy, t = x[0];
+    __asm__ volatile(
+    " mull %[mult]\n"
+    " addq %%rax, %0\n"
+    " adcq %%rdx, %1\n"
+    : "+rm" (z[0]), "+rm" (z[1]), "+a" (t), "=d" (dummy)
+    : [mult] "rm3" (c));
+  */
 }
+
 
 #define HAVE_NATIVE_ADDMUL1_NC_2 1
 static void

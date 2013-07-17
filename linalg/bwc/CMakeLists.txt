@@ -71,7 +71,7 @@ endforeach(v)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v p_1 p_3 p_4)
+foreach(v p_1 p_3 p_4 p_8)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
@@ -189,6 +189,7 @@ if (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib(p_1 basicp)
     configure_matmul_lib(p_3 basicp)
     configure_matmul_lib(p_4 basicp)
+    configure_matmul_lib(p_8 basicp)
     endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 else (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib("u64k1" "bucket")
@@ -258,7 +259,7 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 4)
+set(plingen_prime_nwords 8)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL

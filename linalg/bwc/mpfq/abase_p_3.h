@@ -44,6 +44,7 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -51,6 +52,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -105,7 +107,7 @@ typedef abase_p_3_elt * abase_p_3_src_vec;
 typedef abase_p_3_elt_ur * abase_p_3_vec_ur;
 typedef abase_p_3_elt_ur * abase_p_3_dst_vec_ur;
 typedef abase_p_3_elt_ur * abase_p_3_src_vec_ur;
-/* Extra types defined by implementation: */
+
 typedef struct {
   abase_p_3_vec c;
   unsigned int alloc;
@@ -156,12 +158,9 @@ void abase_p_3_get_mpz(abase_p_3_dst_field, mpz_t, abase_p_3_src_elt);
 
 /* Assignment of random values */
 static inline
-void abase_p_3_normalize(abase_p_3_dst_field, abase_p_3_dst_elt);
-static inline
 void abase_p_3_random(abase_p_3_dst_field, abase_p_3_dst_elt, gmp_randstate_t);
-#define HAVE_abase_p_3_random2
 static inline
-void abase_p_3_random2(abase_p_3_dst_field, abase_p_3_dst_elt);
+void abase_p_3_random2(abase_p_3_dst_field, abase_p_3_dst_elt, gmp_randstate_t);
 
 /* Arithmetic operations on elements */
 static inline
@@ -201,6 +200,8 @@ void abase_p_3_elt_ur_clear(abase_p_3_dst_field, abase_p_3_elt_ur *);
 static inline
 void abase_p_3_elt_ur_set(abase_p_3_dst_field, abase_p_3_dst_elt_ur, abase_p_3_src_elt_ur);
 static inline
+void abase_p_3_elt_ur_set_elt(abase_p_3_dst_field, abase_p_3_dst_elt_ur, abase_p_3_src_elt);
+static inline
 void abase_p_3_elt_ur_set_zero(abase_p_3_dst_field, abase_p_3_dst_elt_ur);
 static inline
 void abase_p_3_elt_ur_set_ui(abase_p_3_dst_field, abase_p_3_dst_elt_ur, unsigned long);
@@ -216,6 +217,9 @@ static inline
 void abase_p_3_sqr_ur(abase_p_3_dst_field, abase_p_3_dst_elt_ur, abase_p_3_src_elt);
 static inline
 void abase_p_3_reduce(abase_p_3_dst_field, abase_p_3_dst_elt, abase_p_3_dst_elt_ur);
+#define HAVE_abase_p_3_normalize
+static inline
+void abase_p_3_normalize(abase_p_3_dst_field, abase_p_3_dst_elt);
 #define HAVE_abase_p_3_addmul_si_ur
 static inline
 void abase_p_3_addmul_si_ur(abase_p_3_dst_field, abase_p_3_dst_elt_ur, abase_p_3_src_elt, long);
@@ -266,9 +270,8 @@ static inline
 void abase_p_3_vec_conv(abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_src_vec, unsigned int, abase_p_3_src_vec, unsigned int);
 static inline
 void abase_p_3_vec_random(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int, gmp_randstate_t);
-#define HAVE_abase_p_3_vec_random2
 static inline
-void abase_p_3_vec_random2(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int);
+void abase_p_3_vec_random2(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int, gmp_randstate_t);
 static inline
 int abase_p_3_vec_cmp(abase_p_3_dst_field, abase_p_3_src_vec, abase_p_3_src_vec, unsigned int);
 static inline
@@ -283,6 +286,8 @@ int abase_p_3_vec_fscan(abase_p_3_dst_field, FILE *, abase_p_3_vec *, unsigned i
 void abase_p_3_vec_ur_init(abase_p_3_dst_field, abase_p_3_vec_ur *, unsigned int);
 static inline
 void abase_p_3_vec_ur_set_zero(abase_p_3_dst_field, abase_p_3_dst_vec_ur, unsigned int);
+static inline
+void abase_p_3_vec_ur_set_vec(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec, unsigned int);
 void abase_p_3_vec_ur_reinit(abase_p_3_dst_field, abase_p_3_vec_ur *, unsigned int, unsigned int);
 void abase_p_3_vec_ur_clear(abase_p_3_dst_field, abase_p_3_vec_ur *, unsigned int);
 static inline
@@ -296,6 +301,10 @@ void abase_p_3_vec_ur_add(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_s
 static inline
 void abase_p_3_vec_ur_sub(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec_ur, abase_p_3_src_vec_ur, unsigned int);
 static inline
+void abase_p_3_vec_ur_neg(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec_ur, unsigned int);
+static inline
+void abase_p_3_vec_ur_rev(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec_ur, unsigned int);
+static inline
 void abase_p_3_vec_scal_mul_ur(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec, abase_p_3_src_elt, unsigned int);
 static inline
 void abase_p_3_vec_conv_ur_n(abase_p_3_dst_field, abase_p_3_dst_vec_ur, abase_p_3_src_vec, abase_p_3_src_vec, unsigned int);
@@ -306,6 +315,62 @@ static inline
 void abase_p_3_vec_reduce(abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_dst_vec_ur, unsigned int);
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, Mpfq::gfp::elt, Mpfq::gfp */
 #define abase_p_3_vec_elt_stride(K, n)	((n)*sizeof(abase_p_3_elt))
+
+/* Polynomial functions */
+static inline
+void abase_p_3_poly_init(abase_p_3_dst_field, abase_p_3_poly, unsigned int);
+static inline
+void abase_p_3_poly_clear(abase_p_3_dst_field, abase_p_3_poly);
+static inline
+void abase_p_3_poly_set(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly);
+void abase_p_3_poly_setmonic(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_setcoef(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_elt, unsigned int);
+static inline
+void abase_p_3_poly_setcoef_ui(abase_p_3_dst_field, abase_p_3_dst_poly, unsigned long, unsigned int);
+static inline
+void abase_p_3_poly_getcoef(abase_p_3_dst_field, abase_p_3_dst_elt, abase_p_3_src_poly, unsigned int);
+static inline
+int abase_p_3_poly_deg(abase_p_3_dst_field, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_add(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_sub(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_add_ui(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, unsigned long);
+static inline
+void abase_p_3_poly_sub_ui(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, unsigned long);
+static inline
+void abase_p_3_poly_neg(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_scal_mul(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_elt);
+static inline
+void abase_p_3_poly_mul(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+void abase_p_3_poly_divmod(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+void abase_p_3_poly_precomp_mod(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly);
+void abase_p_3_poly_mod_pre(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_gcd(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_xgcd(abase_p_3_dst_field, abase_p_3_dst_poly, abase_p_3_dst_poly, abase_p_3_dst_poly, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_random(abase_p_3_dst_field, abase_p_3_dst_poly, unsigned int, gmp_randstate_t);
+static inline
+void abase_p_3_poly_random2(abase_p_3_dst_field, abase_p_3_dst_poly, unsigned int, gmp_randstate_t);
+static inline
+int abase_p_3_poly_cmp(abase_p_3_dst_field, abase_p_3_src_poly, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_poly);
+static inline
+void abase_p_3_poly_print(abase_p_3_dst_field, abase_p_3_src_poly);
+static inline
+int abase_p_3_poly_sscan(abase_p_3_dst_field, abase_p_3_dst_poly, const char *);
+static inline
+int abase_p_3_poly_fscan(abase_p_3_dst_field, FILE *, abase_p_3_dst_poly);
+static inline
+int abase_p_3_poly_scan(abase_p_3_dst_field, abase_p_3_dst_poly);
 
 /* Functions related to SIMD operation */
 /* *simd_gfp::code_for_groupsize */
@@ -459,18 +524,6 @@ void abase_p_3_get_mpz(abase_p_3_dst_field k MAYBE_UNUSED, mpz_t z, abase_p_3_sr
 
 /* *Mpfq::gfp::elt::code_for_random, Mpfq::gfp */
 static inline
-void abase_p_3_normalize(abase_p_3_dst_field k, abase_p_3_dst_elt x)
-{
-    if (cmp_3(x,k->p)>=0) {
-      mp_limb_t q[3+1];
-      abase_p_3_elt r;
-      mpn_tdiv_qr(q, r, 0, x, 3, k->p, 3);
-      abase_p_3_set(k, x, r);
-    }
-}
-
-/* *Mpfq::gfp::elt::code_for_random, Mpfq::gfp */
-static inline
 void abase_p_3_random(abase_p_3_dst_field k, abase_p_3_dst_elt x, gmp_randstate_t state)
 {
       mpz_t z;
@@ -483,9 +536,13 @@ void abase_p_3_random(abase_p_3_dst_field k, abase_p_3_dst_elt x, gmp_randstate_
 
 /* *Mpfq::gfp::elt::code_for_random2, Mpfq::gfp */
 static inline
-void abase_p_3_random2(abase_p_3_dst_field k, abase_p_3_dst_elt x)
+void abase_p_3_random2(abase_p_3_dst_field k, abase_p_3_dst_elt x, gmp_randstate_t state)
 {
-    mpn_random2(x, 3);
+      mpz_t z;
+      mpz_init(z);
+      mpz_rrandomb(z, state, 3 * GMP_LIMB_BITS);
+      memcpy(x, z->_mp_d, 3 * sizeof(mp_limb_t));  /* UGLY */
+      mpz_clear(z);
     abase_p_3_normalize(k, x);
 }
 
@@ -689,6 +746,13 @@ void abase_p_3_elt_ur_set(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_elt_
         z[i] = x[i];
 }
 
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
+static inline
+void abase_p_3_elt_ur_set_elt(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_elt_ur r, abase_p_3_src_elt s)
+{
+    memset(r, 0, sizeof(abase_p_3_elt_ur)); memcpy(r,s,sizeof(abase_p_3_elt));
+}
+
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
 static inline
 void abase_p_3_elt_ur_set_zero(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_elt_ur r)
@@ -768,6 +832,18 @@ void abase_p_3_reduce(abase_p_3_dst_field k, abase_p_3_dst_elt z, abase_p_3_dst_
     mpn_tdiv_qr(q, z, 0, x, 7, k->p, 3);
 }
 
+/* *Mpfq::gfp::elt::code_for_normalize, Mpfq::gfp */
+static inline
+void abase_p_3_normalize(abase_p_3_dst_field k, abase_p_3_dst_elt x)
+{
+    if (cmp_3(x,k->p)>=0) {
+      mp_limb_t q[3+1];
+      abase_p_3_elt r;
+      mpn_tdiv_qr(q, r, 0, x, 3, k->p, 3);
+      abase_p_3_set(k, x, r);
+    }
+}
+
 /* *simd_gfp::code_for_addmul_si_ur */
 static inline
 void abase_p_3_addmul_si_ur(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_elt_ur w, abase_p_3_src_elt u, long v)
@@ -818,7 +894,7 @@ int abase_p_3_is_zero(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_src_elt r)
 static inline
 void abase_p_3_vec_set(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec r, abase_p_3_src_vec s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_p_3_elt));
+    if (r != s) memmove(r, s, n*sizeof(abase_p_3_elt));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
@@ -925,11 +1001,11 @@ void abase_p_3_vec_random(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec 
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 static inline
-void abase_p_3_vec_random2(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec w, unsigned int n)
+void abase_p_3_vec_random2(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        abase_p_3_random2(K, w[i]);
+        abase_p_3_random2(K, w[i],state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
@@ -945,7 +1021,7 @@ int abase_p_3_vec_cmp(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_src_vec u, a
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 static inline
 int abase_p_3_vec_is_zero(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_src_vec r, unsigned int n)
 {
@@ -963,11 +1039,20 @@ void abase_p_3_vec_ur_set_zero(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst
     memset(r, 0, n*sizeof(abase_p_3_elt_ur));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+static inline
+void abase_p_3_vec_ur_set_vec(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec_ur w, abase_p_3_src_vec u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; i+=1)
+        abase_p_3_elt_ur_set_elt(K, w[i], u[i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
 static inline
 void abase_p_3_vec_ur_set(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec_ur r, abase_p_3_src_vec_ur s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_p_3_elt_ur));
+    if (r != s) memmove(r, s, n*sizeof(abase_p_3_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
@@ -1000,6 +1085,33 @@ void abase_p_3_vec_ur_sub(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec_
     unsigned int i;
     for(i = 0; i < n; i+=1)
         abase_p_3_elt_ur_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+static inline
+void abase_p_3_vec_ur_neg(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec_ur w, abase_p_3_src_vec_ur u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; ++i)
+        abase_p_3_elt_ur_neg(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+static inline
+void abase_p_3_vec_ur_rev(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec_ur w, abase_p_3_src_vec_ur u, unsigned int n)
+{
+    unsigned int nn = n >> 1;
+    abase_p_3_elt_ur tmp[1];
+    abase_p_3_elt_ur_init(K, tmp);
+    unsigned int i;
+    for(i = 0; i < nn; ++i) {
+        abase_p_3_elt_ur_set(K, tmp[0], u[i]);
+        abase_p_3_elt_ur_set(K, w[i], u[n-1-i]);
+        abase_p_3_elt_ur_set(K, w[n-1-i], tmp[0]);
+    }
+    if (n & 1)
+        abase_p_3_elt_ur_set(K, w[nn], u[nn]);
+    abase_p_3_elt_ur_clear(K, tmp);
 }
 
 /* *Mpfq::defaults::vec::mul::code_for_vec_scal_mul_ur, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
@@ -1164,6 +1276,418 @@ void abase_p_3_vec_reduce(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec 
     unsigned int i;
     for(i = 0; i < n; i+=1)
         abase_p_3_reduce(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_init, Mpfq::gfp */
+static inline
+void abase_p_3_poly_init(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_poly p, unsigned int n)
+{
+    abase_p_3_vec_init(k, &(p->c), n);
+    p->alloc=n;
+    p->size=0;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_clear, Mpfq::gfp */
+static inline
+void abase_p_3_poly_clear(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_poly p)
+{
+    abase_p_3_vec_clear(k, &(p->c), p->alloc);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_set, Mpfq::gfp */
+static inline
+void abase_p_3_poly_set(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u)
+{
+    if (w->alloc < u->size) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, u->size);
+        w->alloc = u->size;
+    }
+    abase_p_3_vec_set(k, w->c, u->c, u->size);
+    w->size = u->size;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_setcoef, Mpfq::gfp */
+static inline
+void abase_p_3_poly_setcoef(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_elt x, unsigned int i)
+{
+    if (w->alloc < i+1) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, i+1);
+        w->alloc = i+1;
+    }
+    abase_p_3_vec_setcoef(k, w->c, x, i);
+    if (w->size < i+1)
+        w->size = i+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_setcoef_ui, Mpfq::gfp */
+static inline
+void abase_p_3_poly_setcoef_ui(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, unsigned long x, unsigned int i)
+{
+    if (w->alloc < i+1) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, i+1);
+        w->alloc = i+1;
+    }
+    abase_p_3_vec_setcoef_ui(k, w->c, x, i);
+    if (w->size < i+1)
+        w->size = i+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_getcoef, Mpfq::gfp */
+static inline
+void abase_p_3_poly_getcoef(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_elt x, abase_p_3_src_poly w, unsigned int i)
+{
+    assert (w->size > i);
+    abase_p_3_vec_getcoef(k, x, w->c, i);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_deg, Mpfq::gfp */
+static inline
+int abase_p_3_poly_deg(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_src_poly w)
+{
+    if (w->size == 0)
+        return -1;
+    int deg = w->size-1;
+    while ((deg >= 0) && (abase_p_3_cmp_ui(K, (w->c)[deg], 0) == 0))
+        deg--;
+    return deg;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_add, Mpfq::gfp */
+static inline
+void abase_p_3_poly_add(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, abase_p_3_src_poly v)
+{
+    unsigned int minsize MAYBE_UNUSED = MIN(u->size, v->size);
+    unsigned int maxsize MAYBE_UNUSED = MAX(u->size, v->size);
+    if (w->alloc < maxsize) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, maxsize);
+        w->alloc = maxsize;
+    }
+    if (u->size <= v->size) {
+        abase_p_3_vec_add(k, w->c, u->c, v->c, u->size);
+        abase_p_3_vec_set(k, (w->c)+(u->size), (v->c)+(u->size), v->size-u->size);
+    } else {
+        abase_p_3_vec_add(k, w->c, u->c, v->c, v->size);
+        abase_p_3_vec_set(k, (w->c)+(v->size), (u->c)+(v->size), u->size-v->size);
+    }
+    w->size=maxsize;
+    unsigned int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_sub, Mpfq::gfp */
+static inline
+void abase_p_3_poly_sub(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, abase_p_3_src_poly v)
+{
+    unsigned int minsize MAYBE_UNUSED = MIN(u->size, v->size);
+    unsigned int maxsize MAYBE_UNUSED = MAX(u->size, v->size);
+    if (w->alloc < maxsize) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, maxsize);
+        w->alloc = maxsize;
+    }
+    if (u->size <= v->size) {
+        abase_p_3_vec_sub(k, w->c, u->c, v->c, u->size);
+        unsigned int i;
+        for (i = u->size; i < v->size; ++i)
+            abase_p_3_neg(k, (w->c)[i], (v->c)[i]);
+    } else {
+        abase_p_3_vec_sub(k, w->c, u->c, v->c, v->size);
+        abase_p_3_vec_set(k, (w->c)+(v->size), (u->c)+(v->size), u->size-v->size);
+    }
+    w->size=maxsize;
+    unsigned int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_add_ui, Mpfq::gfp */
+static inline
+void abase_p_3_poly_add_ui(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, unsigned long x)
+{
+    if (u->size == 0) {
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            abase_p_3_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        w->size = 1;
+        abase_p_3_vec_setcoef_ui(k, w->c, x, 0);
+        return;
+    }
+    if (w->alloc < u->size) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, u->size);
+        w->alloc = u->size;
+    }
+    abase_p_3_add_ui(k, (w->c)[0], (u->c)[0], x);
+    abase_p_3_vec_set(k, (w->c)+1, (u->c)+1, u->size - 1);
+    w->size=u->size;
+    unsigned int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_sub_ui, Mpfq::gfp */
+static inline
+void abase_p_3_poly_sub_ui(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, unsigned long x)
+{
+    if (u->size == 0) {
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            abase_p_3_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        w->size = 1;
+        abase_p_3_vec_setcoef_ui(k, w->c, x, 0);
+        abase_p_3_neg(k, (w->c)[0], (w->c)[0]);
+        return;
+    }
+    if (w->alloc < u->size) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, u->size);
+        w->alloc = u->size;
+    }
+    abase_p_3_sub_ui(k, (w->c)[0], (u->c)[0], x);
+    abase_p_3_vec_set(k, (w->c)+1, (u->c)+1, u->size - 1);
+    w->size=u->size;
+    unsigned int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_neg, Mpfq::gfp */
+static inline
+void abase_p_3_poly_neg(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u)
+{
+    if (w->alloc < u->size) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, u->size);
+        w->alloc = u->size;
+    }
+    abase_p_3_vec_neg(k, w->c, u->c, u->size);
+    w->size = u->size;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_scal_mul, Mpfq::gfp */
+static inline
+void abase_p_3_poly_scal_mul(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, abase_p_3_src_elt x)
+{
+    if (abase_p_3_cmp_ui(k, x, 0) == 0) {
+        w->size = 0;
+        return;
+    }
+    unsigned int n = u->size;
+    if (w->alloc < n) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, n);
+        w->alloc = n;
+    }
+    abase_p_3_vec_scal_mul(k, w->c, u->c, x, n);
+    w->size=n;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_mul, Mpfq::gfp */
+static inline
+void abase_p_3_poly_mul(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_poly w, abase_p_3_src_poly u, abase_p_3_src_poly v)
+{
+    unsigned int usize = abase_p_3_poly_deg(K, u)+1;
+    unsigned int vsize = abase_p_3_poly_deg(K, v)+1;
+    if ((usize == 0) || (vsize == 0)) {
+        w->size = 0;
+        return;
+    }
+    unsigned int wsize = usize + vsize - 1;
+    if (w->alloc < wsize) {
+        abase_p_3_vec_reinit(K, &(w->c), w->alloc, wsize);
+        w->alloc = wsize;
+    }
+    abase_p_3_vec_conv(K, w->c, u->c, usize, v->c, vsize);
+    w->size=wsize;
+}
+
+/* *Mpfq::defaults::polygcd::code_for_poly_gcd, Mpfq::defaults::poly, Mpfq::gfp */
+static inline
+void abase_p_3_poly_gcd(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly g, abase_p_3_src_poly a0, abase_p_3_src_poly b0)
+{
+    abase_p_3_poly a,b,q,r;
+    int da0=abase_p_3_poly_deg(k,a0), db0=abase_p_3_poly_deg(k,b0);
+    if (db0==-1)
+     abase_p_3_poly_set(k,g,a0);
+    else {
+     abase_p_3_poly_init(k,a,da0+1);
+     abase_p_3_poly_init(k,b,db0+1);
+     abase_p_3_poly_init(k,q,1);
+     abase_p_3_poly_init(k,r,db0);
+     abase_p_3_poly_set(k,a,a0);
+     abase_p_3_poly_set(k,b,b0);
+     while (abase_p_3_poly_deg(k,b)>=0) {
+      abase_p_3_poly_divmod(k,q,r,a,b);
+      abase_p_3_poly_set(k,a,b);
+      abase_p_3_poly_set(k,b,r); 
+     }
+     abase_p_3_poly_setmonic(k,g,a);
+    abase_p_3_poly_clear(k,a);
+    abase_p_3_poly_clear(k,b);
+    abase_p_3_poly_clear(k,q);
+    abase_p_3_poly_clear(k,r);
+    }
+}
+
+/* *Mpfq::defaults::polygcd::code_for_poly_xgcd, Mpfq::defaults::poly, Mpfq::gfp */
+static inline
+void abase_p_3_poly_xgcd(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly g, abase_p_3_dst_poly u0, abase_p_3_dst_poly v0, abase_p_3_src_poly a0, abase_p_3_src_poly b0)
+{
+    abase_p_3_poly a,b,u,v,w,x,q,r;
+    abase_p_3_elt c;
+    abase_p_3_init(k,&c);
+    int da0=abase_p_3_poly_deg(k,a0), db0=abase_p_3_poly_deg(k,b0), dega;
+    if (db0==-1) {
+     if (da0==-1) {
+      abase_p_3_poly_set(k,u0,a0);
+      abase_p_3_poly_set(k,v0,b0);
+      abase_p_3_poly_set(k,g,a0);
+     } else {
+      abase_p_3_poly_getcoef(k,c,a0,da0);
+      abase_p_3_inv(k,c,c);
+      abase_p_3_poly_scal_mul(k,g,a0,c);
+      abase_p_3_poly_set(k,v0,b0);
+      abase_p_3_poly_set(k,u0,b0);
+      abase_p_3_poly_setcoef(k,u0,c,0);
+     }
+    }
+    else {
+     abase_p_3_poly_init(k,a,da0+1);
+     abase_p_3_poly_init(k,b,db0+1);
+     abase_p_3_poly_init(k,q,1);
+     abase_p_3_poly_init(k,r,db0);
+     abase_p_3_poly_set(k,a,a0);
+     abase_p_3_poly_set(k,b,b0);
+     abase_p_3_poly_init(k,u,1);
+     abase_p_3_poly_init(k,v,1);
+     abase_p_3_poly_init(k,w,1);
+     abase_p_3_poly_init(k,x,1);
+     abase_p_3_poly_setcoef_ui(k,u,1,0);
+     abase_p_3_poly_setcoef_ui(k,x,1,0);
+     /* u*a_initial + v*b_initial = a */
+     /* w*a_initial + x*b_initial = b */
+     while (abase_p_3_poly_deg(k,b)>=0) {
+      abase_p_3_poly_divmod(k,q,r,a,b);
+      abase_p_3_poly_set(k,a,b);  /* a,b <- b,a-qb=r */
+      abase_p_3_poly_set(k,b,r);
+      abase_p_3_poly_mul(k,r,q,w);
+      abase_p_3_poly_sub(k,r,u,r);
+      abase_p_3_poly_set(k,u,w);   /* u,w <- w,u-qw */
+      abase_p_3_poly_set(k,w,r);
+      abase_p_3_poly_mul(k,r,q,x); /* v,x <- x,v-qx */
+      abase_p_3_poly_sub(k,r,v,r);
+      abase_p_3_poly_set(k,v,x);
+      abase_p_3_poly_set(k,x,r);
+     }
+     dega=abase_p_3_poly_deg(k,a);
+     abase_p_3_poly_getcoef(k,c,a,dega);
+     abase_p_3_inv(k,c,c);
+     abase_p_3_poly_scal_mul(k,g,a,c);
+     abase_p_3_poly_scal_mul(k,u0,u,c);
+     abase_p_3_poly_scal_mul(k,v0,v,c);
+     abase_p_3_poly_clear(k,a);
+     abase_p_3_poly_clear(k,b);
+     abase_p_3_poly_clear(k,u);
+     abase_p_3_poly_clear(k,v);
+     abase_p_3_poly_clear(k,w);
+     abase_p_3_poly_clear(k,x);
+     abase_p_3_poly_clear(k,q);
+     abase_p_3_poly_clear(k,r);
+    }
+    abase_p_3_clear(k,&c);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_random, Mpfq::gfp */
+static inline
+void abase_p_3_poly_random(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, unsigned int n, gmp_randstate_t state)
+{
+    n++;
+    if (w->alloc < n) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, n);
+        w->alloc = n;
+    }
+    abase_p_3_vec_random(k, w->c, n,state);
+    w->size=n;
+    int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_random2, Mpfq::gfp */
+static inline
+void abase_p_3_poly_random2(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, unsigned int n, gmp_randstate_t state)
+{
+    n++;
+    if (w->alloc < n) {
+        abase_p_3_vec_reinit(k, &(w->c), w->alloc, n);
+        w->alloc = n;
+    }
+    abase_p_3_vec_random2(k, w->c, n,state);
+    w->size=n;
+    int wdeg = abase_p_3_poly_deg(k, w);
+    w->size=wdeg+1;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_cmp, Mpfq::gfp */
+static inline
+int abase_p_3_poly_cmp(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_src_poly u, abase_p_3_src_poly v)
+{
+    if (u->size != v->size)
+        return (int)(u->size) - (int)(v->size);
+    else
+        return abase_p_3_vec_cmp(k, u->c, v->c, u->size);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_asprint, Mpfq::gfp */
+static inline
+void abase_p_3_poly_asprint(abase_p_3_dst_field k MAYBE_UNUSED, char * * pstr, abase_p_3_src_poly w)
+{
+    abase_p_3_vec_asprint(k, pstr, w->c, w->size);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_fprint, Mpfq::gfp */
+static inline
+void abase_p_3_poly_fprint(abase_p_3_dst_field k MAYBE_UNUSED, FILE * file, abase_p_3_src_poly w)
+{
+    abase_p_3_vec_fprint(k, file, w->c, w->size);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_print, Mpfq::gfp */
+static inline
+void abase_p_3_poly_print(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_src_poly w)
+{
+    abase_p_3_vec_print(k, w->c, w->size);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_sscan, Mpfq::gfp */
+static inline
+int abase_p_3_poly_sscan(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w, const char * str)
+{
+    int ret;
+    ret = abase_p_3_vec_sscan(k, &(w->c), &(w->alloc), str);
+    w->size = w->alloc;
+    return ret;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_fscan, Mpfq::gfp */
+static inline
+int abase_p_3_poly_fscan(abase_p_3_dst_field k MAYBE_UNUSED, FILE * file, abase_p_3_dst_poly w)
+{
+    int ret;
+    ret = abase_p_3_vec_fscan(k, file, &(w->c), &(w->alloc));
+    w->size = w->alloc;
+    return ret;
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_scan, Mpfq::gfp */
+static inline
+int abase_p_3_poly_scan(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_poly w)
+{
+    int ret;
+    ret = abase_p_3_vec_scan(k, &(w->c), &(w->alloc));
+    w->size = w->alloc;
+    return ret;
 }
 
 /* *simd_gfp::code_for_set_ui_at */
