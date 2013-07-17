@@ -30,7 +30,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 #endif
 
 /* fb_root_in_qlattice returns (R*b1-a1)/(a0-R*b0) mod p */
-#if defined(DLP_DESCENT) || defined(SUPPORT_LARGE_Q)
+#if defined(SUPPORT_LARGE_Q)
 #ifndef  HAVE_redc_64
 #error  "Please implement redc_64"
 #else
