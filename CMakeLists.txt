@@ -107,29 +107,34 @@ include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/alloca.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/posix.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/mingw.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
 
-if(MINGW)
+string(COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "" DISABLE_SHARED)
+
+set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
+
+if(DISABLE_SHARED OR MINGW)
     unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
-else(MINGW)
-    set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
-endif(MINGW)
+endif (DISABLE_SHARED OR MINGW)
 
 if(BUILD_DYNAMICALLY_LINKABLE_BWC)
     set(CADO_SHARED SHARED)
 else(BUILD_DYNAMICALLY_LINKABLE_BWC)
     set(CADO_SHARED)
 endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
+
+
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
@@ -158,7 +163,7 @@ include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
 # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU CC
 # idioms. As it is not used in production yet, we don't want to expose it
 # on 32-bit platforms.
-set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_ASM})
+set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_INLINE_ASM})
 
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 
@@ -255,14 +260,7 @@ configure_file(
 
 install(PROGRAMS scripts/cpu_time.sh DESTINATION bin)
 
-configure_file(
-    ${CADO_NFS_SOURCE_DIR}/scripts/fixup_params_file.sh.in
-    ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh
-    ESCAPE_QUOTES
-    @ONLY)
-
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
-install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
   include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")

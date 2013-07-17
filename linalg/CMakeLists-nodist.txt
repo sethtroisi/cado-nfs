@@ -1,0 +1,4 @@
+
+add_executable(sm sm.c)
+target_link_libraries(sm utils pthread)
+

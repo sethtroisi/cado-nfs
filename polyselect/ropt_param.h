@@ -76,11 +76,11 @@ extern const double exp_alpha[];
 
 extern const unsigned int default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES];
 
-const unsigned long default_sublattice_prod[NUM_DEFAULT_SUBLATTICE];
+extern const unsigned long default_sublattice_prod[NUM_DEFAULT_SUBLATTICE];
 
-const unsigned int size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES];
+extern const unsigned int size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES];
 
-const unsigned int size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
+extern const unsigned int size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
 extern const unsigned int size_total_sublattices[8][2];
 

@@ -25,8 +25,7 @@
 #include "cado_poly.h"
 #include "rootfinder.h"
 #include "params.h"
-#include "gcd_int64.h"
-#include "gcd_uint64.h"
+#include "gcd.h"
 #include "discriminant.h"
 #include "mpz_array.h"
 #include "gzip.h"
@@ -40,5 +39,6 @@
 #include "fix-endianness.h"
 #include "memusage.h"
 #include "bit_vector.h"
+#include "renumber.h"
 
 #endif	/* CADO_UTILS_H_ */

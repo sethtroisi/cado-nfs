@@ -893,7 +893,7 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
     unsigned int m = d->m;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
-    FILE * f = fopen(filename, "w");
+    FILE * f = fopen(filename, ascii ? "w" : "wb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
@@ -938,7 +938,7 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
                     if (k <= delta[j]) {
                         abfprint(ab, f, matpoly_coeff(f_red, i, jj, delta[j]-k));
                     } else {
-                        printf("0");
+                        fprintf(f, "0");
                     }
                 }
                 fprintf(f, "\n");
@@ -1013,7 +1013,7 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
     ASSERT(!A->m && !A->n && !A->alloc);
     matpoly_init(ab, A, m, n, guess_len);
 
-    FILE *f = fopen(input_file, "r");
+    FILE *f = fopen(input_file, ascii_input ? "r" : "rb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
 
     unsigned int k = 0;
@@ -1184,7 +1184,8 @@ int main(int argc, char *argv[])
          * same node together. So we pick them by bunches of size
          * thr[0]*thr[1].
          */
-        printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
+        if (rank == 0)
+            printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
         ASSERT_ALWAYS(size == mpi[0] * mpi[1] * thr[0] * thr[1]);
         /* The mpi and thr command line argument lead to the same number
          * of working processes than with krylov. Except that here, we're
@@ -1198,6 +1199,16 @@ int main(int argc, char *argv[])
          */
         bm->mpi_dims[0] *= thr[0];
         bm->mpi_dims[1] *= thr[1];
+        if (bm->mpi_dims[0] != bm->mpi_dims[1]) {
+            if (rank == 0)
+                fprintf(stderr, "The current plingen code is limited to square splits ; here, we received a %d x %x split, which will not work\n",
+                    bm->mpi_dims[0], bm->mpi_dims[1]);
+            abort();
+        } else if ((m % bm->mpi_dims[0] != 0) || (n % bm->mpi_dims[0] != 0)) {
+            if (rank == 0)
+                fprintf(stderr, "The process grid dimensions must divide gcd(m,n)\n");
+            abort();
+        }
         int tl_grank = rank % (thr[0] * thr[1]); // thread-level global rank
         int tl_irank = tl_grank / thr[1];
         int tl_jrank = tl_grank % thr[1];

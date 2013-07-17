@@ -12,7 +12,7 @@ SET(ENV{GF2X_CONFIGURE_EXTRA_FLAGS} "--host=x86_64-w64-mingw32")
 SET(ENV{PREFIX} "$ENV{HOME}/mingw-w64/usr/local/")
 
 # adjust the default behaviour of the FIND_XXX() commands:
-# search headers and libraries in the target environment, search 
+# search headers and libraries in the target environment, search
 # programs in the host environment
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)

@@ -2,9 +2,9 @@ How to set up MinGW for compiling CADO on a Windows Virtual machine
 
 ==== System-wide installation and settings ====
 
-1. Set up a VM as described in howto-windows.txt
+1. Set up a Windows virtual machine
 
-2. Disable popups for aborted programs in Widows Action Center (HOW?) or
+2. Disable popups for aborted programs in Windows Action Center (HOW?) or
 they keep popping up during configuration test runs
 
 3. Install MinGW:
@@ -22,6 +22,10 @@ to fstab by /postinstall/pi.sh)
 
 8. Install GMP for MinGW with: (don't install msys-libgmp!)
 mingw-get install mingw32-libgmp
+
+8a. Install the autotools: mingw-get install mingw32-autotools
+
+8b. Install the coreutils: mingw-get install msys-coreutils
 
 9. Download and install CMake from 
 http://www.cmake.org/cmake/resources/software.html

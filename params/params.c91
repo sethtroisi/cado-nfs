@@ -56,9 +56,6 @@ polsel_P=16000               # choose lc(g) with two prime factors in [P,2P]
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
-polsel_lq=2                  # special-q in lc(g) has such many factors
-    # Setting a large value will enumerate/check more potential polynomials
-    # for each ad, which however will also increase the size of lc(g).
 polsel_maxnorm=33.4          # max. lognorm of polynomials (before rootsieve)
     # If not set, a default value of 1e9 (in practice infinity) is used.
     # Setting this value right might speed up a lot the polynomial
@@ -204,8 +201,6 @@ bwstrat=3               # bwstrat=0: stops the merge when the weight of
 # usage has to go by hand.
 bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
                         # <m>x<n> for bwc, or only one integer for bw.
-                        # Note that this will be substituted with 1x1
-                        # unless PTHREADS have been enabled.
 bwc_interval=100        # checkpointing interval for bwc.
 
 ###########################################################################

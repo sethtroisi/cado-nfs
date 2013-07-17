@@ -40,6 +40,7 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -47,6 +48,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -146,6 +148,7 @@ void abase_u64k1_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_elt);
 /* Assignment of random values */
 static inline
 void abase_u64k1_random(abase_u64k1_dst_field, abase_u64k1_dst_elt, gmp_randstate_t);
+/* missing random2 */
 
 /* Arithmetic operations on elements */
 static inline
@@ -229,6 +232,7 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1
 /* missing vec_conv */
 static inline
 void abase_u64k1_vec_random(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int, gmp_randstate_t);
+/* missing vec_random2 */
 static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
 static inline
@@ -257,6 +261,10 @@ static inline
 void abase_u64k1_vec_ur_add(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 static inline
 void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static inline
+void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static inline
+void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 /* missing vec_scal_mul_ur */
 /* missing vec_conv_ur */
 /* missing vec_reduce */
@@ -285,6 +293,7 @@ void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase
 /* missing poly_gcd */
 /* missing poly_xgcd */
 /* missing poly_random */
+/* missing poly_random2 */
 /* missing poly_cmp */
 /* missing poly_asprint */
 /* missing poly_fprint */
@@ -511,7 +520,7 @@ int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_ve
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, simd_flat */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec r, unsigned int n)
 {
@@ -575,6 +584,33 @@ void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     unsigned int i;
     for(i = 0; i < n; i+=1)
         abase_u64k1_elt_ur_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; ++i)
+        abase_u64k1_elt_ur_neg(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
+{
+    unsigned int nn = n >> 1;
+    abase_u64k1_elt_ur tmp[1];
+    abase_u64k1_elt_ur_init(K, tmp);
+    unsigned int i;
+    for(i = 0; i < nn; ++i) {
+        abase_u64k1_elt_ur_set(K, tmp[0], u[i]);
+        abase_u64k1_elt_ur_set(K, w[i], u[n-1-i]);
+        abase_u64k1_elt_ur_set(K, w[n-1-i], tmp[0]);
+    }
+    if (n & 1)
+        abase_u64k1_elt_ur_set(K, w[nn], u[nn]);
+    abase_u64k1_elt_ur_clear(K, tmp);
 }
 
 /* *simd_flat::code_for_set_ui_at */

@@ -2,11 +2,11 @@
 set (sources 
         cado_poly.c relation.c timing.c plain_poly.c getprime.c mod_ul.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
-        mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
+        mpz_poly.c fpoly.c rootfinder.c params.c gcd.c
         discriminant.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
-        cachesize_cpuid.c cachesize_guess.c roots_mod.c
+        cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
 )
 
 # the utils library is used by some shared objects (prominently the
@@ -34,6 +34,7 @@ add_executable(test_modredc_15ul ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_15ul
 add_executable(test_modredc_2ul2 ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_2ul2.c)
 add_executable(test-rootfinder ${EXCLUDE_FROM_RELEASE_BUILD} test-rootfinder.c)
 add_executable(test_roots_mod ${EXCLUDE_FROM_RELEASE_BUILD} test_roots_mod.c)
+add_executable(test_omega ${EXCLUDE_FROM_RELEASE_BUILD} test_omega.c)
 add_executable(gmp_prob_prime gmp_prob_prime.c)
 add_executable(gmp_nextprime gmp_nextprime.c)
 add_executable(random_integer random_integer.c)
@@ -53,6 +54,7 @@ target_link_libraries(test_roots_mod utils)
 target_link_libraries(gmp_prob_prime ${gmp_libname})
 target_link_libraries(gmp_nextprime ${gmp_libname})
 target_link_libraries(random_integer ${gmp_libname})
+target_link_libraries(test_omega utils)
 target_link_libraries(antebuffer pthread)
 
 include(CMakeLists-nodist.txt OPTIONAL)

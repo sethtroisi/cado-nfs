@@ -78,7 +78,7 @@ static gf2x_mul_pool_t global_pool;
 
 void gf2x_mul_pool_init(gf2x_mul_pool_t p)
 {
-    memset(p, 0, sizeof(p));
+    memset(p, 0, sizeof(gf2x_mul_pool_t));
 }
 
 void gf2x_mul_pool_clear(gf2x_mul_pool_t p)

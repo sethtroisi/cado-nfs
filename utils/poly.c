@@ -234,13 +234,20 @@ poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
    ---------------- */
 
 
-/* Allocate a polynomial that can contain d+1 coeffs and set to zero. */
+/* Allocate a polynomial that can contain d+1 coeffs and set to zero.
+   We allow d=-1.
+ */
 void poly_alloc(poly_t f, int d) {
   int i;
   f->alloc = d+1;
   f->deg = -1;
-  f->coeff = (mpz_t *)malloc((d+1)*sizeof(mpz_t));
-  ASSERT (f->coeff != NULL);
+  if (d == -1)
+    f->coeff = (mpz_t *) NULL;
+  else
+    {
+      f->coeff = (mpz_t *) malloc ((d+1)*sizeof(mpz_t));
+      ASSERT (f->coeff != NULL);
+    }
   for (i = 0; i <= d; ++i)
     mpz_init(f->coeff[i]);
 }
@@ -303,7 +310,7 @@ void poly_set_zero(poly_t f) {
   f->deg = -1;
 }
 
-/* Set coefficient for the i-th term. */
+/* Set mpz_t coefficient for the i-th term. */
 void poly_setcoeff(poly_t f, int i, const mpz_t z) {
   int j;
   if (i >= f->alloc) {
@@ -314,6 +321,21 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
     f->alloc = i+1;
   }
   mpz_set(f->coeff[i], z);
+  if (i >= f->deg)
+    cleandeg(f, i);
+}
+
+/* Set signed int coefficient for the i-th term. */
+void poly_setcoeff_si(poly_t f, int i, int z) {
+  int j;
+  if (i >= f->alloc) {
+    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (j = f->alloc; j <= i; ++j)
+      mpz_init(f->coeff[j]);
+    f->alloc = i+1;
+  }
+  mpz_set_si(f->coeff[i], z);
   if (i >= f->deg)
     cleandeg(f, i);
 }

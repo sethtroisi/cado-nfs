@@ -119,7 +119,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                     A->mpi_datatype(A),
                     0, pi->m->pals);
             ASSERT_ALWAYS(!err);
-            FILE * f = fopen(filename, "w");
+            FILE * f = fopen(filename, "wb");
             ASSERT_ALWAYS(f);
             int rc = fwrite(y, A->vec_elt_stride(A,1), unpadded, f);
             ASSERT_ALWAYS(rc == (int) unpadded);

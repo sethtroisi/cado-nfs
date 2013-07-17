@@ -21,14 +21,7 @@ install(TARGETS mf_bal RUNTIME DESTINATION bin/linalg/bwc)
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
-# test_hello does not compile. harmless
-#add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
-#target_link_libraries(test_hello utils)
-#set_target_properties(test_hello PROPERTIES
-#    COMPILE_FLAGS "--mpi"
-#    LINK_FLAGS "--mpi")
-
-add_executable(random ${EXCLUDE_FROM_RELEASE_BUILD} random.c)
+add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
 
 # balancing.c itself is in fact standalone, and lightweight. We prefer to
 # avoid having the whole thing entangled with too many dependencies all
@@ -39,7 +32,7 @@ add_executable(acollect acollect.c bw-common.c)
 
 install(TARGETS split acollect RUNTIME DESTINATION bin/linalg/bwc)
 
-target_link_libraries(random utils m)
+target_link_libraries(random_matrix utils m)
 target_link_libraries(split utils)
 target_link_libraries(acollect utils)
 
@@ -78,7 +71,7 @@ endforeach(v)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v p_1 p_3 p_4)
+foreach(v p_1 p_3 p_4 p_8)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
@@ -142,7 +135,7 @@ macro(configure_matmul_lib v i)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
     set(sources matmul-common.c matmul_facade.c ${matmul_${i}_sources})
     if(doing_u64 AND doing_bucket)
-        if(HAVE_GCC_STYLE_AMD64_ASM)
+        if(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
             set(sources ${sources}
                     matmul-sub-small1.S
                     matmul-sub-small2.S
@@ -157,7 +150,7 @@ macro(configure_matmul_lib v i)
             set_property(SOURCE matmul-sub-large-fbd.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-dispatch.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-combine.S PROPERTY LANGUAGE C)
-        endif(HAVE_GCC_STYLE_AMD64_ASM)
+        endif(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
     endif(doing_u64 AND doing_bucket)
 
     add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
@@ -196,6 +189,7 @@ if (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib(p_1 basicp)
     configure_matmul_lib(p_3 basicp)
     configure_matmul_lib(p_4 basicp)
+    configure_matmul_lib(p_8 basicp)
     endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 else (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib("u64k1" "bucket")
@@ -265,7 +259,7 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 4)
+set(plingen_prime_nwords 8)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)

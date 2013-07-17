@@ -2,12 +2,79 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <assert.h>
 #include <sys/time.h>
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
 #include "getprime.h"
 #include "portability.h"
+
+void
+trialdiv_stdinput(const unsigned long pmax, const int verbose)
+{
+  fbprime_t *primes;
+  trialdiv_divisor_t *d;
+  unsigned long *factors;
+  int nr_primes = 0;
+  unsigned long p;
+  const size_t max_div = 32;
+  mpz_t N;
+  
+  for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
+    nr_primes++;
+  primes = malloc (nr_primes * sizeof (fbprime_t));
+
+  getprime(0UL);
+  nr_primes = 0;
+  for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
+    primes[nr_primes++] = p;
+
+  d = trialdiv_init (primes, nr_primes);
+  free (primes);
+  factors = (unsigned long *) malloc (max_div * sizeof (unsigned long));
+  
+  mpz_init(N);
+  while (!feof(stdin)) {
+    size_t t, i;
+    mp_bitcnt_t bit;
+    
+    if (mpz_inp_str (N, stdin, 10) == 0)
+      break;
+    
+    if (mpz_sgn(N) == 0)
+      break;
+    
+    if (mpz_sgn(N) < 0)
+      mpz_neg (N, N);
+
+    /* Now N is positive */
+    bit = mpz_scan1(N, 0);
+    if (bit > 0)
+      mpz_tdiv_q_2exp (N, N, bit);
+
+    /* Now N is positive and odd */
+    if (mpz_cmp_ui(N, 1UL) == 0) {
+      printf ("1\n");
+      continue;
+    }
+    t = trialdiv (factors, N, d, max_div);
+    assert (t <= max_div);
+
+    if (verbose) {
+      for (i = 0; i < bit; i++) {
+        printf ("2 ");
+      }
+      for (i = 0; i < t; i++)
+        printf ("%lu ", (unsigned long) factors[i]);
+    }
+    gmp_printf ("%Zd\n", N);
+  }
+  
+  mpz_clear (N);
+  trialdiv_clear (d);
+}
+
 
 int main (int argc, char **argv)
 {
@@ -19,14 +86,24 @@ int main (int argc, char **argv)
   unsigned long expect = 0, nr_div = 0;
   mpz_t M, N, pk, t1, t2;
   double usrtime;
-  int verbose = 0;
+  int verbose = 0, input = 0;
   
-  if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'v')
-    {
-      verbose = 1;
-      argc--;
-      argv++;
-    }
+  while (1) {
+    if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'v')
+      {
+        verbose = 1;
+        argc--;
+        argv++;
+      }
+    else if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'i')
+      {
+        input = 1;
+        argc--;
+        argv++;
+      }
+    else
+      break;
+  }
 
   if (argc > 1)
     len = atoi (argv[1]);
@@ -37,6 +114,12 @@ int main (int argc, char **argv)
   if (argc > 3)
     nr_primes = atoi (argv[3]);
   
+  if (input) {
+    /* First parameter is pmax, and is stored in len */
+    trialdiv_stdinput (len, verbose);
+    exit (EXIT_SUCCESS);
+  }
+
   if (len > TRIALDIV_MAXLEN)
     {
       printf ("Error, trialdiv not implemented for input sizes greater than "

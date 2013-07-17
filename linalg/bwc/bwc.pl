@@ -158,24 +158,66 @@ sub detect_mpi {
         }
     }
 
+    my $maybe_mvapich2=1;
+    my $maybe_mpich2=1;
+    my $maybe_openmpi=1;
+
     if (defined($mpi)) {
         SEVERAL_CHECKS: {
+            # first check the alternatives system, which is fairly
+            # commonplace.
+            my $mpiexec = "$mpi/mpiexec";
+            while (-l $mpiexec) {
+                my $target=readlink($mpiexec);
+                print STDERR "readlink($mpiexec)->$target\n";
+                if ($target =~ m{^/}) {
+                    $mpiexec = $target;
+                } else {
+                    $mpiexec =~ s{[^/]+$}{$target};
+                }
+                if ($mpiexec =~ /openmpi/) {
+                    print STDERR "Auto-detecting openmpi based on alternatives\n";
+                    $maybe_mvapich2=0;
+                    $maybe_mpich2=0;
+                    last;
+                } elsif ($mpiexec =~ /mpich2/) {
+                    print STDERR "Auto-detecting mpich2(old) based on alternatives\n";
+                    $maybe_mvapich2=0;
+                    $maybe_openmpi=0;
+                    last;
+                } elsif ($mpiexec =~ /hydra/) {
+                    # Newer mvapich2 uses hydra as well...
+                    print STDERR "Auto-detecting mpich or mvapich2 (hydra) based on alternatives\n";
+                    $maybe_mvapich2='hydra';
+                    $maybe_mpich2='hydra';
+                    $maybe_openmpi=0;
+                } elsif ($mpiexec =~ /mvapich2/) {
+                    print STDERR "Auto-detecting mvapich2 based on alternatives\n";
+                    $maybe_mpich2=0;
+                    $maybe_openmpi=0;
+                    last;
+                }
+            }
             CHECK_MVAPICH2: {
-                if (-x "$mpi/mpiname") {
+                if ($maybe_mvapich2 && -x "$mpi/mpiname") {
                     my $v = `$mpi/mpiname -n -v`;
                     chomp($v);
                     if ($v =~ /MVAPICH2\s+([\d\.]+)((?:\D\w*)?)/) {
-                        $mpi_ver="mvapich2-$1$2";
-                        $needs_mpd = ($1 < 1.6) || ($1 == 1.6 && $2 =~ /^rc\d/);
                         # Presently all versions of mvapich2 up
                         # until 1.6rc3 included need mpd daemons.
                         # Released version 1.6 uses hydra.
+                        $mpi_ver="mvapich2-$1$2";
+                        if (($1 < 1.6) || ($1 == 1.6 && $2 =~ /^rc\d/)) {
+                            $needs_mpd = 1;
+                        } else {
+                            $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
+                        }
                         last SEVERAL_CHECKS;
                     }
                 }
             }
             CHECK_MPICH2_VERSION: {
-                if (-x "$mpi/mpich2version") {
+                if ($maybe_mpich2 && -x "$mpi/mpich2version") {
                     my $v = `$mpi/mpich2version -v`;
                     chomp($v);
                     if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
@@ -192,11 +234,15 @@ sub detect_mpi {
                         $mpi_ver .= "+hydra";
                         $needs_mpd=0;
                     }
-                        last SEVERAL_CHECKS;
+                    if ($maybe_mpich2 eq 'hydra') {
+                        $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
+                        $needs_mpd=0;
+                    }
+                    last SEVERAL_CHECKS;
                 }
             }
             CHECK_OMPI_VERSION: {
-                if (-x "$mpi/ompi_info") {
+                if ($maybe_openmpi && -x "$mpi/ompi_info") {
                     my @v = `$mpi/ompi_info`;
                     my @vv = grep { /Open MPI:/; } @v;
                     last CHECK_OMPI_VERSION unless scalar @vv == 1;
@@ -282,16 +328,33 @@ while (defined($_ = shift @ARGV)) {
     }
 }
 
+# If number of threads is given as a single integer, we split it into factors 
+# as close as possible to to the square root, smaller one first.
 sub set_mpithr_param {
     my $v = shift @_;
+    if ($v=~/^(\d+)$/) {
+        my $nthreads = $1;
+        my $s = int(sqrt($nthreads));
+        for (; $s >= 1; $s--) {
+            $nthreads % $s or return ($s, $nthreads / $s);
+        }
+        die "No possible thread split?";
+    }
     $v=~/(\d+)x(\d+)$/ or usage "bad splitting value '$v'";
     return ($1, $2);
 }
 
 # Some parameters are more important than the others because they
 # participate to the default value for wdir.
-if ($param->{'mpi'}) { @mpi_split = set_mpithr_param $param->{'mpi'}; }
-if ($param->{'thr'}) { @thr_split = set_mpithr_param $param->{'thr'}; }
+if ($param->{'mpi'}) { 
+    @mpi_split = set_mpithr_param $param->{'mpi'}; 
+    # Write back to params as that may have been a single int
+    $param->{'mpi'} = join "x", @mpi_split;
+}
+if ($param->{'thr'}) { 
+    @thr_split = set_mpithr_param $param->{'thr'}; 
+    $param->{'thr'} = join "x", @thr_split;
+}
 if ($param->{'wdir'}) { $wdir=$param->{'wdir'}; }
 if ($param->{'matrix'}) { $matrix=$param->{'matrix'}; }
 if ($param->{'matpath'}) { $matpath=$param->{'matpath'}; }
@@ -545,21 +608,56 @@ sub get_mpi_hosts_torque {
     }
 }
 
+sub get_mpi_hosts_sge {
+    print STDERR "Building hosts file from $ENV{PE_HOSTFILE}\n";
+    my @x = split /^/, eval { local $/=undef; open F, "$ENV{PE_HOSTFILE}"; <F> };
+    my $cores_on_node = {};
+    for my $line (@x) {
+        my ($node, $ncores, $toto, $tata) = split ' ', $line;
+        print STDERR "$node: +$ncores cores\n";
+        $cores_on_node->{$node}+=$ncores;
+    }
+    my $values_for_cores_on_node = {};
+    local $_;
+    $values_for_cores_on_node->{$_}=1 for (values %$cores_on_node);
+
+    die "Not always the same number of cores obtained on the different nodes, as per \$PE_HOSTFILE" if keys %$values_for_cores_on_node != 1;
+
+    my $ncores_obtained = (keys %$values_for_cores_on_node)[0];
+    my $nnodes = scalar keys %$cores_on_node;
+    print STDERR "Obtained $ncores_obtained cores on $nnodes nodes\n";
+
+    my $nthr = $thr_split[0] * $thr_split[1];
+    my $nmpi = $mpi_split[0] * $mpi_split[1];
+
+    die "Not enough cores ($ncores_obtained) obtained: want $nthr\n" if $nthr > $ncores_obtained;
+
+    @hosts=();
+    push @hosts, $_ for keys %$cores_on_node;
+
+    die "Not enough mpi nodes ($nnodes): want $nmpi\n" if $nmpi > $nnodes;
+}
+
 if ($mpi_needed) {
+	print STDERR "Inherited environment:\n";
+	print STDERR "$_=$ENV{$_}\n" for keys %$ENV;
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
 
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
-        print STDERR "OAR environment detected, setting hostfile.\n";
-        system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
-        $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    print STDERR "OAR environment detected, setting hostfile.\n";
+	    system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
+	    $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+    } elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+	    print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+	    get_mpi_hosts_torque;
+    } elsif (exists($ENV{'PE_HOSTFILE'}) && exists($ENV{'NSLOTS'})) {
+            print STDERR "Oracle/SGE environment detected, setting hostfile.\n";
+	    get_mpi_hosts_sge;
     }
-	elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
-        print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
-        get_mpi_hosts_torque;
-	}
+
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.
@@ -714,15 +812,13 @@ sub drive {
         chdir $wdir;
         die "Won't wipe cwd" if $pwd eq getcwd;
         print STDERR "Doing cleanup in $wdir\n";
+        opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
+        my @rmfiles= grep {/^[A-Z]/ && $_ ne 'H1' } readdir DIR;
+        close DIR;
         if ($show_only) {
-            print "find $wdir -name '[A-Z]*' | xargs -r rm";
-            print "(cd $wdir ; rm -f bw.cfg)";
+            print "rm -f $wdir/$_\n" for @rmfiles;
         } else {
-            opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
-            my @rmfiles= grep /^[A-Z]/, readdir DIR;
-            close DIR;
-            unlink "$wdir/$_" for (@rmfiles);
-            unlink "$wdir/bw.cfg";
+            unlink "$wdir/$_" for @rmfiles;
         }
         chdir $pwd;
         return;

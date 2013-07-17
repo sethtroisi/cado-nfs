@@ -1,39 +1,19 @@
 /* Contains functions used when doing filter step for FFS instead of NFS */
 
 #include "cado.h"
-#include "fppol.h"
 #include "portability.h"
 #include "utils.h"
-#include "filter_matrix.h"
-#include "sparse.h"
-#include "utils_ffs.h"
+#include "fppol.h"
 
-unsigned int weight_ffs (int e)
-{
-  if (e == 0)
-      return 0;
-  else
-      return 1; /* Should depend on e, for now jsut constant*/
-}
+#include "types.h"
+#include "polyfactor.h"
 
-unsigned int weight_rel_ffs (relation_t rel)
-{
-  int i;
-  unsigned int w = 0;
 
-  for (i = 0; i < rel.nb_rp; i++)
-    w += weight_ffs (rel.rp[i].e);
-
-  for (i = 0; i < rel.nb_ap; i++)
-    w += weight_ffs (rel.ap[i].e);
-
-  return w;
-}
 
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
-HT_T
-findroot_ffs (int64_t a, uint64_t b, HT_T p)
+p_r_values_t
+findroot_ffs (int64_t a, uint64_t b, p_r_values_t p)
 {
   fppol64_t pol_a, pol_b, pol_p;
   fppol64_t pol_r;
@@ -52,19 +32,60 @@ findroot_ffs (int64_t a, uint64_t b, HT_T p)
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
   if (!fppol64_invmod (pol_b, pol_b, pol_p))
-      return (HT_T) p;
+      return (index_t) p;
 
   fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
 
-  return (HT_T) fppol64_get_ui_sparse(pol_r);
+  return (index_t) fppol64_get_ui_sparse(pol_r);
+}
+
+int sq_is_irreducible(sq_srcptr p)
+{
+  fppol_t P;
+  fppol_init(P);
+  fppol_set_sq(P, p);
+  int ret = fppol_is_irreducible(P);
+  fppol_clear(P);
+  return ret;
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)
 {
-  param_list_parse_ulong(pl, "fbb0", &(poly->rat->lim));
-  param_list_parse_int(pl, "lpb0", &(poly->rat->lpb));
-  param_list_parse_ulong(pl, "fbb1", &(poly->alg->lim));
-  param_list_parse_int(pl, "lpb1", &(poly->alg->lpb));
+  unsigned long lim;
+  int lpb, deg;
+  const char *s;
+
+  param_list_parse_ulong(pl, "fbb0", &lim);
+  poly->pols[0]->lim = lim;
+  param_list_parse_ulong(pl, "fbb1", &lim);
+  poly->pols[1]->lim = lim;
+  
+  param_list_parse_int(pl, "lpb0", &lpb);
+  poly->pols[0]->lpb = __FP_BITS + __FP_BITS * lpb;
+  param_list_parse_int(pl, "lpb1", &lpb);
+  poly->pols[1]->lpb = __FP_BITS + __FP_BITS * lpb;
+  
+  s = param_list_lookup_string(pl, "pol0");
+  for (deg = 0; *s != '\0'; s++)
+    if (*s == ',')
+      deg++;
+  poly->pols[0]->degree = deg;
+  s = param_list_lookup_string(pl, "pol1");
+  for (deg = 0; *s != '\0'; s++)
+    if (*s == ',')
+      deg++;
+  poly->pols[1]->degree = deg;
+
+  if (poly->pols[1]->degree == 1)
+  {
+    poly->rat  = poly->pols[1];
+    poly->alg  = poly->pols[0];
+  }
+  else if (poly->pols[0]->degree == 1)
+  {
+    poly->rat  = poly->pols[0];
+    poly->alg  = poly->pols[1];
+  }
 
   return 1;
 }
@@ -80,7 +101,7 @@ int ffs_poly_read(cado_poly poly, const char *filename)
     if (file == NULL) 
       {
 	      fprintf(stderr, "read_polynomial: could not open %s\n", filename);
-	      exit(0);
+	      exit(1);
       }
     
     param_list_init(pl);

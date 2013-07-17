@@ -11,7 +11,8 @@
   If the raw polynomial is not good enough, we will still stream
   it to STDERR for further reference.
 
-  Please report bugs to shi.bai AT anu.edu.au.
+  Please report bugs to the Bug Tracking System on:
+  https://gforge.inria.fr/tracker/?atid=7442&group_id=2065&func=browse
 */
 
 #define EMIT_ADDRESSABLE_shash_add
@@ -19,11 +20,11 @@
 #include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
+#include "mpz_poly.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
-#define MAX_THREADS 16
-#define INIT_FACTOR 7UL
+#define INIT_FACTOR 8UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
@@ -137,10 +138,14 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
 
   maxP = (double) Primes[lenPrimes - 1];
   if (2.0 * pow (maxP, 4.0) * maxq >= (double) d * mpz_get_d (m0))
-      return 0;
+    return 0;
+
+  if (maxq > pow (maxP, 2.0))
+    return 0;
 
   return 1;
 }
+
 
 /* print poly info */
 void
@@ -170,6 +175,7 @@ print_poly_info ( mpz_t *f,
           nroots);
 }
 
+
 /* the number of expected collisions is 8*lenPrimes^2/2/(2P)^2 */
 static double
 expected_collisions (uint32_t twoP)
@@ -190,8 +196,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, E;
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%"PRId64") (%lu,%"PRId64") for "
-	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
+  gmp_printf ("Found match: (%lu,%" PRId64 ") (%lu,%" PRId64 ") for "
+	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
@@ -335,14 +341,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-  /* raw poly */
-  if (logmu <= max_norm)
-    {
-      printf ("# Raw polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold, 1);
-    }
-
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
@@ -398,7 +396,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -420,20 +424,30 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
+
+    /* check that the algebraic polynomial has content 1, otherwise skip it */
+    mp_poly_content (t, f, d);
+    if (mpz_cmp_ui (t, 1) != 0)
+      goto skip;
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -441,9 +455,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -455,9 +466,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
     if (E > best_E)
     {
       best_E = E;
@@ -487,6 +495,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
+        printf ("# Raw polynomial:\n");
+        gmp_printf ("n: %Zd\n", N);
+        print_poly_info (fold, d, gold, 1);
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -497,16 +511,26 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
                 BOUND_F, BOUND_G, AREA, E, best_E);
         printf ("\n");
         fflush (stdout);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
       }
   }
   else {
+  skip:
     if (verbose >= 1) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
     }
   }
 
@@ -543,8 +567,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
 
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%"PRIu32",%"PRId64") (%"PRIu32",%"PRId64") for "
-	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
+  gmp_printf ("Found match: (%" PRIu32 ",%" PRId64 ") (%" PRIu32 ",%" PRId64 ") for "
+	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
@@ -745,7 +769,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -767,20 +797,25 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -788,9 +823,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -802,9 +834,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
     if (E > best_E)
     {
       best_E = E;
@@ -831,8 +860,11 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_unlock (&lock);
 #endif
 
-    /* raw poly */
-    if (raw) {
+    /* print optimized (maybe size- or size-root- optimized) polynomial */
+      if (verbose >= 0) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
       print_poly_info (fold, d, gold, 1);
@@ -840,27 +872,31 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       gmp_printf ("# Optimized polynomial:\n");
-    }
-
-    /* print optimized (maybe size- or size-root- optimized) polynomial */
-    if (verbose >= 0)
-      {
-        gmp_printf ("n: %Zd\n", N);
-        print_poly_info (f, d, g, 0);
-        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-                BOUND_F, BOUND_G, AREA, E, best_E);
-        printf ("\n");
-        fflush (stdout);
+      gmp_printf ("n: %Zd\n", N);
+      print_poly_info (f, d, g, 0);
+      printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
+              BOUND_F, BOUND_G, AREA, E, best_E);
+      printf ("\n");
+      fflush (stdout);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
       }
   }
   else {
-    if (verbose >= 0) {
+    if (verbose >= 1) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
                     logmu, ad, l, m, logmu0c3, logmu0c4);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
+#ifdef MAX_THREADS
+    pthread_mutex_unlock (&lock);
+#endif
     }
   }
 
@@ -1294,7 +1330,7 @@ collision_on_each_sq_r ( header_t header,
         modredcul_sub (res_rp, res_rp, res_rqi, modpp);
         /* res_rp = (rp - rq) / q[i]^2 */
         modredcul_mul (res_rp, res_rp, res_tmp, modpp);
-        tinv_qq[k][c] = modredcul_intget_ul (res_rp, modpp);
+        tinv_qq[k][c] = modredcul_intget_ul (res_rp);
       }
       c -= nr;
     }
@@ -1486,7 +1522,7 @@ collision_on_batch_sq ( header_t header,
     modredcul_sqr (qq, tmp, modpp);
     /* B/q^2 (mod pp) */
     modredcul_intinv (tmp, qq, modpp);
-    invqq[nprimes] = modredcul_intget_ul (tmp, modpp);
+    invqq[nprimes] = modredcul_intget_ul (tmp);
 
     modredcul_clear (tmp, modpp);
     modredcul_clear (qq, modpp);
@@ -1847,7 +1883,7 @@ gmp_collision_on_sq ( header_t header,
   // less than lq special primes having roots for this ad
   if (N == 0 || N < K) {
     fprintf (stderr, "# Info: binomial(%lu, %lu) error in "
-             "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
+             "collision_on_sq(). ad=%" PRIu64 ".\n", N, K, header->ad);
     return;
   }
 
@@ -1960,27 +1996,29 @@ static void
 usage (const char *argv, const char * missing)
 {
   fprintf (stderr, "Usage: %s [options] P\n", argv);
-  fprintf (stderr, "Required parameters and options:\n");
-  fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
-  fprintf (stderr, "                 two prime factors in [P,2P]\n");
-  fprintf (stderr, "-v           --- verbose mode\n");
-  fprintf (stderr, "-q           --- quiet mode\n");
-  fprintf (stderr, "-r           --- size-optimize polynomial only (skip ropt)\n");
-  fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
-  fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
-  fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
-  fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
-  fprintf (stderr, "-N nnn       --- input number\n");
-  fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-  fprintf (stderr, "-nq nnn      --- maximum number of special-q's considered\n");
-  fprintf (stderr, "                 for each ad (default %d)\n", INT_MAX);
-  fprintf (stderr, "-save xxx    --- save state in file xxx\n");
-  fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
-  fprintf (stderr, "-maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
-  fprintf (stderr, "-maxtime xxx --- stop the search after xxx seconds\n");
-  fprintf (stderr, "-out xxx     --- for msieve-format output\n");
-  fprintf (stderr, "-s xxx       --- time intervals (seconds) for printing\n");
-  fprintf (stderr, "                 out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, "Required:\n");
+  fprintf (stderr, " -degree nnn  --- polynomial degree (maximum 6)\n");
+  fprintf (stderr, " -N nnn       --- input number\n");
+  fprintf (stderr, " P            --- degree-1 coefficient of g(x) has\n");
+  fprintf (stderr, "                  two prime factors in [P,2P]\n");
+  fprintf (stderr, "Optional:\n");
+  fprintf (stderr, " -admax nnn   --- stop at ad=nnn\n");
+  fprintf (stderr, " -admin nnn   --- start from ad=nnn (default 0)\n");
+  fprintf (stderr, " -incr nnn    --- forced factor of ad (default 60)\n");
+  fprintf (stderr, " -maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
+  fprintf (stderr, " -maxtime xxx --- stop the search after xxx seconds\n");
+  fprintf (stderr, " -nq nnn      --- maximum number of special-q's considered\n");
+  fprintf (stderr, "                  for each ad (default %d)\n", INT_MAX);
+  fprintf (stderr, " -out xxx     --- for msieve-format output\n");
+  fprintf (stderr, " -q           --- quiet mode\n");
+  fprintf (stderr, " -r           --- size-optimize polynomial only (skip root-optimization)\n");
+  fprintf (stderr, " -resume xxx  --- resume state from file xxx\n");
+  fprintf (stderr, " -s xxx       --- time intervals (seconds) for printing\n");
+  fprintf (stderr, "                  out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, " -save xxx    --- save state in file xxx\n");
+  fprintf (stderr, " -t nnn       --- use n threads (default 1)\n");
+  fprintf (stderr, " -v           --- verbose mode\n");
+
   if (missing) {
       fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
               missing);
@@ -1998,7 +2036,8 @@ main (int argc, char *argv[])
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 0, admax = ULONG_MAX;
+  unsigned long P, admin, admax;
+  double admin_d, admax_d;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
@@ -2050,14 +2089,23 @@ main (int argc, char *argv[])
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
-  param_list_parse_ulong (pl, "admin", &admin);
-  param_list_parse_ulong (pl, "admax", &admax);
+  if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
+    admin = 0;
+  else
+    admin = (unsigned long) admin_d;
+  if (param_list_parse_double (pl, "admax", &admax_d) == 0) /* no -admax */
+    admax = ULONG_MAX;
+  else
+    admax = (unsigned long) admax_d;
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxnorm", &max_norm);
   param_list_parse_double (pl, "maxtime", &maxtime);
   save = param_list_lookup_string (pl, "save");
   resume = param_list_lookup_string (pl, "resume");
   out = param_list_lookup_string (pl, "out");
+
+  if (param_list_warn_unused(pl))
+    usage (argv0[0],NULL);
 
   /* print command line */
   param_list_print_command_line (stdout, pl);
@@ -2124,6 +2172,9 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, too small value of P\n");
     exit (1);
   }
+
+  /* detect L1 cache size */
+  ropt_L1_cachesize ();
 
   st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);

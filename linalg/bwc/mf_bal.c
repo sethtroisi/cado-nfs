@@ -353,7 +353,7 @@ int main(int argc, char * argv[])
     uint32_t padding = nv * nh * elem_block - maxdim;
 
     fprintf(stderr,
-            "Using %" PRIu32" padding %ss to obtain %u blocks of %u*%"PRIu32"=%"PRIu32" %ss\n",
+            "Using %" PRIu32 " padding %ss to obtain %u blocks of %u*%" PRIu32 "=%" PRIu32 " %ss\n",
                 padding, "col", nv, nh, elem_block, cslice_size, "col");
 
 
@@ -371,7 +371,7 @@ int main(int argc, char * argv[])
         bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
         if (withcoeffs) {
             if (bal->h->ncoeffs & 1) {
-                fprintf(stderr, "Matrix with coefficient must have an even number of 32-bit entries for all (col index, coeff). Here, %"PRIu64" is odd.\n", bal->h->ncoeffs);
+                fprintf(stderr, "Matrix with coefficient must have an even number of 32-bit entries for all (col index, coeff). Here, %" PRIu64 " is odd.\n", bal->h->ncoeffs);
                 abort();
             }
             bal->h->ncoeffs /= 2;
@@ -492,17 +492,17 @@ int main(int argc, char * argv[])
     if (bal->h->ncoeffs) {
         if (tw != bal->h->ncoeffs) {
             fprintf(stderr, "Inconsistency in number of coefficients\n"
-                    "From %s: %"PRIu64", from file sizes; %"PRIu64"\n",
+                    "From %s: %" PRIu64 ", from file sizes; %" PRIu64 "\n",
                     cwfile, tw, bal->h->ncoeffs);
             fprintf(stderr, "Maybe use the --withcoeffs option for DL matrices ?\n");
             exit(1);
         }
     } else {
         bal->h->ncoeffs = tw;
-        fprintf(stderr, "%"PRIu64" coefficients counted\n", tw);
+        fprintf(stderr, "%" PRIu64 " coefficients counted\n", tw);
     }
 
-    fprintf(stderr, "%"PRIu32" cols ; avg %.1f sdev %.1f [scan time %.1f s]\n",
+    fprintf(stderr, "%" PRIu32 " cols ; avg %.1f sdev %.1f [scan time %.1f s]\n",
             bal->h->ncols, avg, sdev, t_cw);
 
     if (display_correlation) {
@@ -540,7 +540,7 @@ int main(int argc, char * argv[])
         double dcov = rc_decorr / n - ravg * cavg;
         double dcorr = dcov / csdev / rsdev;
 
-        fprintf(stderr, "%"PRIu32" rows ; avg %.1f sdev %.1f [scan time %.1f s]\n",
+        fprintf(stderr, "%" PRIu32 " rows ; avg %.1f sdev %.1f [scan time %.1f s]\n",
                 bal->h->nrows, ravg, rsdev, t_rw);
         fprintf(stderr, "row-column correlation coefficient is %.4f\n",
                 pcorr);

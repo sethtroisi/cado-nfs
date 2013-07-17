@@ -6,7 +6,7 @@
 
 MPFQ:=$$HOME/Mp/mpfq/src
 
-mpfq_tag_list:=u64k1 u64k2 p_1 p_3 p_4
+mpfq_tag_list:=u64k1 u64k2 p_1 p_3 p_4 p_8
 
 all: basic binary-fields prime-fields
 

@@ -1399,7 +1399,7 @@ void mzd_check_mem(mzd_t * M, uint64_t * s, unsigned int n)
     for(size_t i = 0 ; i < M->nrows ; i++) {
         uint64_t * ptr = (uint64_t *) M->rows[i];
         if (ptr[0] != sometimes_bitrev(s[i])) {
-            fprintf(stderr, "Rows %zu differ: %016"PRIx64" != %016"PRIx64"\n",
+            fprintf(stderr, "Rows %zu differ: %016" PRIx64 " != %016" PRIx64 "\n",
                     i, sometimes_bitrev(ptr[0]), s[i]);
             abort();
         }

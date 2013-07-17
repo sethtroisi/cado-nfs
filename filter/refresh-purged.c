@@ -58,13 +58,13 @@ main (int argc, char **argv)
         for( ; rn < ps->nodup_index ; rn++) {
             ASSERT_ALWAYS(relation_stream_get(rs, NULL, 0, 10));
             if (relation_stream_disp_progress_now_p(rs)) {
-                fprintf(stderr, "Read %lu relations in %.1f s -- %.1f MB/s\n",
+                fprintf(stderr, "Read %u relations in %.1f s -- %.1f MB/s\n",
                         rs->nrels, rs->dt, rs->mb_s);
             }
         }
         char * p;
         ASSERT_ALWAYS((p = strchr(line, ' ')) != NULL);
-        fprintf(out,"%d %"PRId64" %"PRIu64"%s", ps->nodup_index, rs->rel.a, rs->rel.b, p);
+        fprintf(out,"%d %" PRId64 " %" PRIu64 "%s", ps->nodup_index, rs->rel.a, rs->rel.b, p);
         if (purgedfile_stream_disp_progress_now_p(ps)) {
             fprintf(stderr, "Treated %d/%d purged relations\n",
                     ps->rrows, ps->nrows);

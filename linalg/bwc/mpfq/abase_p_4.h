@@ -44,6 +44,7 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -51,6 +52,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -157,9 +159,8 @@ void abase_p_4_get_mpz(abase_p_4_dst_field, mpz_t, abase_p_4_src_elt);
 /* Assignment of random values */
 static inline
 void abase_p_4_random(abase_p_4_dst_field, abase_p_4_dst_elt, gmp_randstate_t);
-#define HAVE_abase_p_4_random2
 static inline
-void abase_p_4_random2(abase_p_4_dst_field, abase_p_4_dst_elt);
+void abase_p_4_random2(abase_p_4_dst_field, abase_p_4_dst_elt, gmp_randstate_t);
 
 /* Arithmetic operations on elements */
 static inline
@@ -269,9 +270,8 @@ static inline
 void abase_p_4_vec_conv(abase_p_4_dst_field, abase_p_4_dst_vec, abase_p_4_src_vec, unsigned int, abase_p_4_src_vec, unsigned int);
 static inline
 void abase_p_4_vec_random(abase_p_4_dst_field, abase_p_4_dst_vec, unsigned int, gmp_randstate_t);
-#define HAVE_abase_p_4_vec_random2
 static inline
-void abase_p_4_vec_random2(abase_p_4_dst_field, abase_p_4_dst_vec, unsigned int);
+void abase_p_4_vec_random2(abase_p_4_dst_field, abase_p_4_dst_vec, unsigned int, gmp_randstate_t);
 static inline
 int abase_p_4_vec_cmp(abase_p_4_dst_field, abase_p_4_src_vec, abase_p_4_src_vec, unsigned int);
 static inline
@@ -300,6 +300,10 @@ static inline
 void abase_p_4_vec_ur_add(abase_p_4_dst_field, abase_p_4_dst_vec_ur, abase_p_4_src_vec_ur, abase_p_4_src_vec_ur, unsigned int);
 static inline
 void abase_p_4_vec_ur_sub(abase_p_4_dst_field, abase_p_4_dst_vec_ur, abase_p_4_src_vec_ur, abase_p_4_src_vec_ur, unsigned int);
+static inline
+void abase_p_4_vec_ur_neg(abase_p_4_dst_field, abase_p_4_dst_vec_ur, abase_p_4_src_vec_ur, unsigned int);
+static inline
+void abase_p_4_vec_ur_rev(abase_p_4_dst_field, abase_p_4_dst_vec_ur, abase_p_4_src_vec_ur, unsigned int);
 static inline
 void abase_p_4_vec_scal_mul_ur(abase_p_4_dst_field, abase_p_4_dst_vec_ur, abase_p_4_src_vec, abase_p_4_src_elt, unsigned int);
 static inline
@@ -351,9 +355,8 @@ static inline
 void abase_p_4_poly_xgcd(abase_p_4_dst_field, abase_p_4_dst_poly, abase_p_4_dst_poly, abase_p_4_dst_poly, abase_p_4_src_poly, abase_p_4_src_poly);
 static inline
 void abase_p_4_poly_random(abase_p_4_dst_field, abase_p_4_dst_poly, unsigned int, gmp_randstate_t);
-#define HAVE_abase_p_4_poly_random2
 static inline
-void abase_p_4_poly_random2(abase_p_4_dst_field, abase_p_4_dst_poly, unsigned int);
+void abase_p_4_poly_random2(abase_p_4_dst_field, abase_p_4_dst_poly, unsigned int, gmp_randstate_t);
 static inline
 int abase_p_4_poly_cmp(abase_p_4_dst_field, abase_p_4_src_poly, abase_p_4_src_poly);
 static inline
@@ -533,9 +536,13 @@ void abase_p_4_random(abase_p_4_dst_field k, abase_p_4_dst_elt x, gmp_randstate_
 
 /* *Mpfq::gfp::elt::code_for_random2, Mpfq::gfp */
 static inline
-void abase_p_4_random2(abase_p_4_dst_field k, abase_p_4_dst_elt x)
+void abase_p_4_random2(abase_p_4_dst_field k, abase_p_4_dst_elt x, gmp_randstate_t state)
 {
-    mpn_random2(x, 4);
+      mpz_t z;
+      mpz_init(z);
+      mpz_rrandomb(z, state, 4 * GMP_LIMB_BITS);
+      memcpy(x, z->_mp_d, 4 * sizeof(mp_limb_t));  /* UGLY */
+      mpz_clear(z);
     abase_p_4_normalize(k, x);
 }
 
@@ -994,11 +1001,11 @@ void abase_p_4_vec_random(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec 
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 static inline
-void abase_p_4_vec_random2(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec w, unsigned int n)
+void abase_p_4_vec_random2(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        abase_p_4_random2(K, w[i]);
+        abase_p_4_random2(K, w[i],state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
@@ -1014,7 +1021,7 @@ int abase_p_4_vec_cmp(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_src_vec u, a
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 static inline
 int abase_p_4_vec_is_zero(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_src_vec r, unsigned int n)
 {
@@ -1078,6 +1085,33 @@ void abase_p_4_vec_ur_sub(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec_
     unsigned int i;
     for(i = 0; i < n; i+=1)
         abase_p_4_elt_ur_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+static inline
+void abase_p_4_vec_ur_neg(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec_ur w, abase_p_4_src_vec_ur u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; ++i)
+        abase_p_4_elt_ur_neg(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+static inline
+void abase_p_4_vec_ur_rev(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_vec_ur w, abase_p_4_src_vec_ur u, unsigned int n)
+{
+    unsigned int nn = n >> 1;
+    abase_p_4_elt_ur tmp[1];
+    abase_p_4_elt_ur_init(K, tmp);
+    unsigned int i;
+    for(i = 0; i < nn; ++i) {
+        abase_p_4_elt_ur_set(K, tmp[0], u[i]);
+        abase_p_4_elt_ur_set(K, w[i], u[n-1-i]);
+        abase_p_4_elt_ur_set(K, w[n-1-i], tmp[0]);
+    }
+    if (n & 1)
+        abase_p_4_elt_ur_set(K, w[nn], u[nn]);
+    abase_p_4_elt_ur_clear(K, tmp);
 }
 
 /* *Mpfq::defaults::vec::mul::code_for_vec_scal_mul_ur, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
@@ -1582,13 +1616,14 @@ void abase_p_4_poly_random(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_dst_pol
 
 /* *Mpfq::defaults::poly::code_for_poly_random2, Mpfq::gfp */
 static inline
-void abase_p_4_poly_random2(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_dst_poly w, unsigned int n)
+void abase_p_4_poly_random2(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_dst_poly w, unsigned int n, gmp_randstate_t state)
 {
+    n++;
     if (w->alloc < n) {
         abase_p_4_vec_reinit(k, &(w->c), w->alloc, n);
         w->alloc = n;
     }
-    abase_p_4_vec_random2(k, w->c, n);
+    abase_p_4_vec_random2(k, w->c, n,state);
     w->size=n;
     int wdeg = abase_p_4_poly_deg(k, w);
     w->size=wdeg+1;

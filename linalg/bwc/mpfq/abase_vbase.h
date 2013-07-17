@@ -34,7 +34,7 @@ struct abase_vbase_s {
     void (*get_mpn)(abase_vbase_ptr, mp_limb_t *, const void *);
     void (*get_mpz)(abase_vbase_ptr, mpz_t, const void *);
     void (*random)(abase_vbase_ptr, void *, gmp_randstate_t);
-    void (*random2)(abase_vbase_ptr, void *);
+    void (*random2)(abase_vbase_ptr, void *, gmp_randstate_t);
     void (*add)(abase_vbase_ptr, void *, const void *, const void *);
     void (*sub)(abase_vbase_ptr, void *, const void *, const void *);
     void (*neg)(abase_vbase_ptr, void *, const void *);
@@ -87,7 +87,7 @@ struct abase_vbase_s {
     void (*vec_scal_mul)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_conv)(abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int);
     void (*vec_random)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
-    void (*vec_random2)(abase_vbase_ptr, void *, unsigned int);
+    void (*vec_random2)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     int (*vec_cmp)(abase_vbase_ptr, const void *, const void *, unsigned int);
     int (*vec_is_zero)(abase_vbase_ptr, const void *, unsigned int);
     void (*vec_asprint)(abase_vbase_ptr, char * *, const void *, unsigned int);
@@ -106,6 +106,8 @@ struct abase_vbase_s {
     void (*vec_ur_getcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_ur_add)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_ur_sub)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
+    void (*vec_ur_neg)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_ur_rev)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_scal_mul_ur)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_conv_ur)(abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int);
     void (*vec_reduce)(abase_vbase_ptr, void *, void *, unsigned int);
@@ -131,7 +133,7 @@ struct abase_vbase_s {
     void (*poly_gcd)(abase_vbase_ptr, void *, const void *, const void *);
     void (*poly_xgcd)(abase_vbase_ptr, void *, void *, void *, const void *, const void *);
     void (*poly_random)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
-    void (*poly_random2)(abase_vbase_ptr, void *, unsigned int);
+    void (*poly_random2)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     int (*poly_cmp)(abase_vbase_ptr, const void *, const void *);
     void (*poly_asprint)(abase_vbase_ptr, char * *, const void *);
     void (*poly_fprint)(abase_vbase_ptr, FILE *, const void *);

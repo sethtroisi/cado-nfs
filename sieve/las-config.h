@@ -47,7 +47,7 @@
  *  ALG_LAZY, !ALG_RAT : SSE: x19.9 faster,       non SSE: x11.6 
  */
  
-/* define PROFILE to keep certain function from being inlined, in order to
+/* define PROFILE to keep certain functions from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE
 
@@ -84,6 +84,11 @@
 
 /* TRACE_K *requires* TRACK_CODE_PATH -- or it displays rubbish */
 #if defined(TRACE_K) && !defined(TRACK_CODE_PATH)
+#define TRACK_CODE_PATH
+#endif
+
+/* idem for CHECK_UNDERFLOW */
+#if defined(CHECK_UNDERFLOW) && !defined(TRACK_CODE_PATH)
 #define TRACK_CODE_PATH
 #endif
 
@@ -140,40 +145,17 @@
    or when memory is tight */
 // #define SKIP_GCD3
 
-/* These parameters control the size of the buckets. 
- * The number of updates that a bucket can accumulate is estimated as
- *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
- *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD
- * We don't store updates where 2 divides gcd(i,j) which reduces the number 
- * of updates to about (1-1/4)=3/4, so 0.8 should be safe.
- * If we don't store updates where 3 divides gcd(i,j) either, their number
- * is reduced to about (1-1/4)*(1-1/9)=2/3, then 0.7 should be ok
- *
- * A significant part of the inaccuracy in predicting the bucket sizes
- * stems from the use of the Mertens estimate in lieu of proper sums. Now
- * that we _do_ compute this sum, we gain some precision.
- */
-
-#ifndef BUCKET_LIMIT_FACTOR
-#ifdef SKIP_GCD3
-#define BUCKET_LIMIT_FACTOR (2.0/3.0 * 1.05)
-#else
-#define BUCKET_LIMIT_FACTOR (3.0/4.0 * 1.05)
-#endif
-#endif
-
-#ifndef BUCKET_LIMIT_ADD
-#define BUCKET_LIMIT_ADD 0
-#endif
-
 /* Guard for the logarithms of norms, so that the value does not wrap around
    zero due to roundoff errors. */
-#define GUARD 4.0
+#define GUARD 1
 
 /* GUARD+LOG_MAX should be as near as possible from 256, to get more accuracy
    in the norm computations, but not too much, otherwise a norm might be
    rounded to zero. */
 #define LOG_MAX (255.9 - (double) GUARD)
+
+/* total number of curves used in cofactorization is NB_CURVES+3 */
+#define NB_CURVES 24
 
 /* See PROFILE flag above */
 /* Some functions should not be inlined when we profile or it's hard or

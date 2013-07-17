@@ -1,7 +1,7 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -848,7 +848,7 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
 	// we'll use an auxiliary file. In this case, we only care about
 	// having the write window reasonably large.
 	s->rq_size = disk_io_window_size;
-	s->auxfile = fopen(s->tmatfile_aux, "w");
+	s->auxfile = fopen(s->tmatfile_aux, "wb");
 	FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
     */
@@ -1382,10 +1382,10 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
                     fprintf(stderr, "d->noderow = %d\n", d->noderow);
                     fprintf(stderr, "i=%d\n", i);
                     fprintf(stderr,
-                            "m->sent_rows[d->noderow + i] = %"PRIu32"\n",
+                            "m->sent_rows[d->noderow + i] = %" PRIu32 "\n",
                             m->sent_rows[d->noderow + i]);
                     fprintf(stderr,
-                            "m->exp_rows[d->noderow + i] = %"PRIu32"\n",
+                            "m->exp_rows[d->noderow + i] = %" PRIu32 "\n",
                             m->exp_rows[d->noderow + i]);
                 }
                 ASSERT_ALWAYS(m->sent_rows[d->noderow + i] <=
@@ -1497,7 +1497,7 @@ data_dest_ptr master_dispatcher_alloc(master_data m, parallelizing_info_ptr pi, 
 void master_dispatcher_setup_check_vector(data_dest_ptr xd, const char * name)
 {
     master_dispatcher_ptr d = (master_dispatcher_ptr) xd;
-    d->check_vector = fopen(name, "w");
+    d->check_vector = fopen(name, "wb");
     ASSERT_ALWAYS(d->check_vector != NULL);
 }
 
@@ -1535,7 +1535,7 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
     mf_pipe(input, output, "main");
     uint32_t r = output->r;
 
-    printf("Master loop finished ; read %"PRIu32" rows\n", r);
+    printf("Master loop finished ; read %" PRIu32 " rows\n", r);
     ASSERT_ALWAYS(r == m->bal->h->nrows);
     /* complete from nrows to maxdim if necessary ! */
     for (; output->r < m->bal->trows;) {

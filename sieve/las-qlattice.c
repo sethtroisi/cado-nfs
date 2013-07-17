@@ -29,9 +29,21 @@ int mpz_rdiv_q(mpz_ptr q, mpz_t a, mpz_t b)
 }
 
 /* We work with two vectors v0=(a0,b0) and v1=(a1,b1). The quadratic form
- * is a0^2+sigma*b0^2 */
-int generic_skew_gauss(mpz_t a[2], mpz_t b[2], mpz_t sigma)
+ * is proportional to a0^2+skewness^2*b0^2 */
+static int 
+generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
 {
+    // skewness^2 can be written as a one-word (actually, 53 bits)
+    // integer times a power of two, which is presumably larger than
+    // 2^-53 in the most common case, since we expect skewness > 1.
+    double mantissa;
+    int64_t mantissa_z;
+    int exponent;
+    /* These are provided by c99 */
+    mantissa = frexp(skewness * skewness, &exponent);
+    mantissa_z = ldexp(mantissa, 53);
+    exponent -= 53;
+
     mpz_t N[2], S, q, tmp;
     mpz_init(N[0]);
     mpz_init(N[1]);
@@ -40,14 +52,17 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], mpz_t sigma)
     mpz_init(tmp);
 
     /* Compute the two norms, and the dot products */
-    mpz_mul(tmp, a[0], a[0]); mpz_set(N[0], tmp);
-    mpz_mul(tmp, b[0], b[0]); mpz_addmul(N[0], tmp, sigma);
-
-    mpz_mul(tmp, a[1], a[1]); mpz_set(N[1], tmp);
-    mpz_mul(tmp, b[1], b[1]); mpz_addmul(N[1], tmp, sigma);
-
-    mpz_mul(tmp, a[0], a[1]); mpz_set(S, tmp);
-    mpz_mul(tmp, b[0], b[1]); mpz_addmul(S, tmp, sigma);
+#define QUADFORM(dst, i0, i1) do {					\
+    mpz_mul(dst, a[i0], a[i1]);						\
+    mpz_mul(tmp, b[i0], b[i1]);						\
+    if (exponent < 0) mpz_mul_2exp(dst, dst, -exponent);		\
+    if (exponent > 0) mpz_mul_2exp(tmp, tmp, exponent);			\
+    mpz_addmul_int64(dst, tmp, mantissa_z);				\
+} while (0)
+    
+    QUADFORM(N[0], 0, 0);
+    QUADFORM(N[1], 1, 1);
+    QUADFORM(S,    0, 1);
 
     /* After a reduction step (e.g. v0-=q*v1), N[0], N[1], and S are
      * updated using the following algorithm.
@@ -108,49 +123,32 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], mpz_t sigma)
     return 1;
 }
 
-void mpz_set_square_of_d(mpz_t sigma, double skewness)
+int
+SkewGauss (sieve_info_ptr si, double skewness)
 {
-    /* Truncate the square, not the square root... */
-    mpq_t qsigma;
-    mpq_init(qsigma);
-    mpq_set_d(qsigma, skewness);
-    mpq_mul(qsigma, qsigma, qsigma);
-    mpz_rdiv_q(sigma, mpq_numref(qsigma), mpq_denref(qsigma));
-    mpq_clear(qsigma);
-}
-
-int SkewGauss(sieve_info_ptr si, double skewness)
-{
-    mpz_t sigma;
-    mpz_init(sigma);
-    mpz_set_square_of_d(sigma, skewness);
-
     mpz_t a[2], b[2];
-    mpz_init_set(a[0], si->doing->p);
-    mpz_init_set(a[1], si->doing->r);
-    mpz_init_set_ui(b[0], 0);
-    mpz_init_set_ui(b[1], 1);
-    generic_skew_gauss(a, b, sigma);
-    int fits = 1;
-    fits = fits && mpz_fits_int64_p(a[0]);
-    fits = fits && mpz_fits_int64_p(b[0]);
-    fits = fits && mpz_fits_int64_p(a[1]);
-    fits = fits && mpz_fits_int64_p(b[1]);
-    fits = fits && mpz_fits_int64_p(a[0]);
-    fits = fits && mpz_fits_int64_p(b[0]);
-    fits = fits && mpz_fits_int64_p(a[1]);
-    fits = fits && mpz_fits_int64_p(b[1]);
-    if (fits) {
-        si->a0 = mpz_get_int64(a[0]);
-        si->a1 = mpz_get_int64(a[1]);
-        si->b0 = mpz_get_int64(b[0]);
-        si->b1 = mpz_get_int64(b[1]);
-    }
-    mpz_clear(a[0]);
-    mpz_clear(a[1]);
-    mpz_clear(b[0]);
-    mpz_clear(b[1]);
-    mpz_clear(sigma);
+    int fits;
+
+    mpz_init_set (a[0], si->doing->p);
+    mpz_init_set (a[1], si->doing->r);
+    mpz_init_set_ui (b[0], 0);
+    mpz_init_set_ui (b[1], 1);
+    generic_skew_gauss (a, b, skewness);
+    fits = mpz_fits_int64_p (a[0]);
+    fits = fits && mpz_fits_int64_p (b[0]);
+    fits = fits && mpz_fits_int64_p (a[1]);
+    fits = fits && mpz_fits_int64_p (b[1]);
+    if (fits)
+      {
+        si->a0 = mpz_get_int64 (a[0]);
+        si->a1 = mpz_get_int64 (a[1]);
+        si->b0 = mpz_get_int64 (b[0]);
+        si->b1 = mpz_get_int64 (b[1]);
+      }
+    mpz_clear (a[0]);
+    mpz_clear (a[1]);
+    mpz_clear (b[0]);
+    mpz_clear (b[1]);
     /* FIXME: That error convention looks odd */
     return fits ? 0 : 1;
 }

@@ -367,6 +367,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
 
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
+  mod_init_noset0 (lambda, m);
 
   mod_sub (u, Q->y, P->y, m);
   mod_sub (v, Q->x, P->x, m);
@@ -403,6 +404,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
       r = 1;
   }
 
+  mod_clear (lambda, m);
   mod_clear (v, m);
   mod_clear (u, m);
   return r;
@@ -639,7 +641,7 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    Return 1 if it worked, 0 if a modular inverse failed. 
    If a modular inverse failed, the non-invertible value is stored in x.
 
-   The elliptic curve is B y^2 = x^2 + A x^2 + x
+   The elliptic curve is B y^2 = x^3 + A x^2 + x
    
    with A = (-3*a^4-6*a^2+1)/(4*a^3) = (1/a - 3*a*(a^2 + 2))/(2*a)^2
    and B = (a^2-1)^2/(4*a^3).
@@ -649,9 +651,20 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    A and x are obtained from u and v such that (u,v) = k*P on the curve
    v^2 = u^3 - 12*u, where P = (-2, 4).
 
+   In Sage notation:
+   E=EllipticCurve([-12,0])
+   P=E(-2,4)
+   k=2
+   kP=k*P; u=kP[0]; v=kP[1]
+   t2 = (u^2-12)/(4*u)
+   a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12)
+   A = (-3*a^4-6*a^2+1)/(4*a^3)
+   B = (a^2-1)^2/(4*a^3)
+   x = (3*a^2+1)/(4*a)
+
    We want t^2 = (u^2-12)/4u, and a=(t^2-1)/(t^2+3), thus
    a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
-   We need both $a$ and $1/a$, so we can compute the inverses of both
+   We need both a and 1/a, so we can compute the inverses of both
    u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion.
 
    For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, 
@@ -680,15 +693,31 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
 
   if (k == 2)
     {
-      mod_add (a, one, one, m); /* a = 2 */
-      mod_add1 (a, a, m);       /* a = 3 */
-      mod_add (v, a, a, m);     /* v = 6 */
-      mod_add (v, v, v, m);     /* v = 12 */
-      mod_add1 (v, v, m);       /* v = 13 */
-      mod_neg (v, v, m);        /* v = -13 */
-      mod_div3 (v, v, m);       /* v = -13/3 = 1/a */
-      mod_neg (a, a, m);        /* a = -3 */
-      mod_div13 (a, a, m);      /* a = -3/13 */
+      /* For k=2, we need A=-4798/351 = -13 - 1/13 - 16/27 
+         and x=-49/39 = 1/13 - 1/3 - 1. */
+      mod_div13 (u, one, m);    /* u = 1/13 */
+      mod_div3 (v, one, m);     /* v = 1/3 */
+      mod_sub (x, u, v, m);     /* x = 1/13 - 1/3 = -10/39 */
+      mod_sub (x, x, one, m);   /* x = -10/39 - 1 = -49/39 */
+      mod_sub (A, one, v, m);   /* A = 1 - 1/3 = 2/3 */
+      mod_div3 (A, A, m);       /* A = 2/9 */
+      mod_add1 (A, A, m);       /* A = 11/9 */
+      mod_div3 (A, A, m);       /* A = 11/27 */
+      mod_sub (A, A, one, m);   /* A = -16/27 */
+      mod_sub (A, A, u, m);     /* A = -16/27 - 1/13 = -235/351 */
+      mod_add (u, one, one, m); /* u = 2 */
+      mod_add (u, u, one, m);   /* u = 3 */
+      mod_add (u, u, u, m);     /* u = 6 */
+      mod_add (u, u, u, m);     /* u = 12 */
+      mod_add1 (u, u, m);       /* u = 13 */
+      mod_sub (A, A, u, m);     /* A = -235/351 - 13 = -4798/351 */
+
+      mod_clear (one, m);
+      mod_clear (t2, m);
+      mod_clear (v, m);
+      mod_clear (u, m);
+      mod_clear (a, m);
+      return 1;
     }
   else if (k == 3)
     {
@@ -1175,9 +1204,9 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
           }
       }
     
+    ellM_init (Pd, m);
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
-    ellM_init (Pd, m);
     ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
 #else
     ASSERT ((unsigned) (i1 + i5) == plan->d);
@@ -1253,6 +1282,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         k++; i++;
       }
 
+    ellM_clear (Pd, m);
     ellM_clear (Pid, m);
     ellM_clear (Pid1, m);
   }
@@ -1349,27 +1379,26 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   mod_set (r, a, m);
   
   /* Clear everything */
-  for (i = 0; i < plan->s1; i++)
-    mod_clear (Pj_z[i], m);
-  free (Pj_z);
-  Pj_z = NULL;
-  for (i = 0; i < plan->i1 - plan->i0; i++)
-    mod_clear (Pid_z[i], m);
-  free (Pid_z);
-  Pid_z = NULL;
   
-   for (i = 0; i < plan->s1; i++)
+  for (i = 0; i < plan->s1; i++)
     {
-      mod_clear (Pj_x[k], m);
-      mod_clear (Pj_z[k], m);
-    }
- for (i = 0; i < plan->i1 - plan->i0; i++)
-    {
-      mod_clear (Pid_x[k], m);
-      mod_clear (Pid_z[k], m);
+      mod_clear (Pj_x[i], m);
+      mod_clear (Pj_z[i], m);
     }
   free (Pj_x);
+  Pj_x = NULL;
+  free (Pj_z);
+  Pj_z = NULL;
+
+  for (i = 0; i < plan->i1 - plan->i0; i++)
+    {
+      mod_clear (Pid_x[i], m);
+      mod_clear (Pid_z[i], m);
+    }
   free (Pid_x);
+  Pid_x = NULL;
+  free (Pid_z);
+  Pid_z = NULL;
   
   ellM_clear (Pt, m);
   mod_clear (t, m);
@@ -1548,7 +1577,8 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
   ASSERT (known_r < known_m);
 
-  mod_getmod_uls (tm, m);
+  mod_intinit (tm);
+  mod_getmod_int (tm, m);
   mod_init (A, m);
   mod_init (x, m);
   mod_init (a, m);
@@ -1575,11 +1605,15 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   if (verbose >= 2)
     {
       modint_t tA, tx;
-      mod_get_uls (tA, A, m);
-      mod_get_uls (tx, x, m);
+      mod_intinit (tA);
+      mod_intinit (tx);
+      mod_get_int (tA, A, m);
+      mod_get_int (tx, x, m);
       /* FIXME need multiple precision print */
       printf ("Curve parameters: A = %lu, x = %ld (mod %ld)\n", 
-              tA[0], tx[0], tm[0]); 
+              mod_intget_ul(tA), mod_intget_ul(tx), mod_intget_ul(tm)); 
+      mod_intclear (tA);
+      mod_intclear (tx);
     }
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
@@ -1588,19 +1622,26 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   if (verbose >= 2)
     {
       modint_t tx1, ty1, ta;
-      mod_get_uls (tx1, P[0].x, m);
-      mod_get_uls (ty1, P[0].y, m);
-      mod_get_uls (ta, a, m);
+      mod_intinit (tx1);
+      mod_intinit (ty1);
+      mod_intinit (ta);
+      mod_get_int (tx1, P[0].x, m);
+      mod_get_int (ty1, P[0].y, m);
+      mod_get_int (ta, a, m);
       /* FIXME need multiple precision print */
       printf ("Finding order of point (%ld, %ld) on curve "
               "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
-              tx1[0], ty1[0], ta[0], tm[0]);
+              mod_intget_ul(tx1), mod_intget_ul(ty1), mod_intget_ul(ta), 
+              mod_intget_ul(tm));
+      mod_intclear (tx1);
+      mod_intclear (ty1);
+      mod_intclear (ta);
     }
   
   /* FIXME deal with multiple precision modulus */
-  i = (unsigned long) (2. * sqrt((double) tm[0]));
-  min = tm[0] - i;
-  max = tm[0] + i;
+  i = (unsigned long) (2. * sqrt((double) mod_intget_ul(tm)));
+  min = mod_intget_ul(tm) - i;
+  max = mod_intget_ul(tm) + i;
 
   /* Giant steps visit values == r (mod m), baby steps values == 0 (mod m) */
   giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
@@ -1696,7 +1737,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
       fprintf (stderr, "ell_order: Error, no match found for p = %lu, "
                "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n", 
-               tm[0], min, max, giant_step, giant_min);
+               mod_intget_ul(tm), min, max, giant_step, giant_min);
       abort ();
   }
 
@@ -1706,11 +1747,17 @@ found_inf:
   if (ellW_mul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
-      mod_get_uls (tx1, P[0].x, m);
-      mod_get_uls (ty1, P[0].y, m);
+      mod_intinit (tx1); 
+      mod_intinit (ty1); 
+      mod_get_int (tx1, P[0].x, m);
+      mod_get_int (ty1, P[0].y, m);
+#ifndef MODMPZ_MAXBITS
       fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
                "not the point at infinity\n", 
                i, tx1[0], ty1[0], tm[0]);
+#endif
+      mod_intclear (tx1); 
+      mod_intclear (ty1); 
       return 0UL;
     }
   
@@ -1758,10 +1805,14 @@ found_inf:
   if (ellW_mul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;
-      mod_get_uls (tx1, P[0].x, m);
-      mod_get_uls (ty1, P[0].y, m);
+      mod_intinit (tx1); 
+      mod_intinit (ty1); 
+      mod_get_int (tx1, P[0].x, m);
+      mod_get_int (ty1, P[0].y, m);
       fprintf (stderr, "ell_order: Error, final order %ld is wrong\n", 
                order);
+      mod_intclear (tx1); 
+      mod_intclear (ty1); 
       abort ();
     }
   
@@ -1772,6 +1823,7 @@ found_inf:
   mod_clear (A, m);
   mod_clear (x, m);
   mod_clear (a, m);
+  mod_intclear (tm);
   ellW_clear (P, m);
   ellW_clear (Pi, m);
   ellW_clear (Pg, m);
@@ -1805,7 +1857,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 
   order = 2; /* One for (0, 0, 1), one for the point at infinity */
   /* FIXME deal with multi-word modulus */
-  mod_getmod_uls (tm, m);
+  mod_getmod_int (tm, m);
   for (i = 1; mod_intcmp_ul (tm, i) > 0; i++)
     {
       mod_set_ul (x, i, m);
@@ -1837,7 +1889,7 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
   unsigned long order;
 
   mod_intset_ul (lm, m_par);
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_set_ul (sigma, sigma_par, m);
 
   if (parameterization == BRENT12)

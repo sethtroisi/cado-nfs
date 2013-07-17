@@ -35,6 +35,16 @@ mpi_njobs_other=$((Mh*Mv))
 prime=4148386731260605647525186547488842396461625774241327567978137
 bits_per_coeff=256
 
+if ! echo "$prime-2^$bits_per_coeff" | bc | grep -q '^-' ; then
+    echo "2^bits_per_coeff must be above the prime" >&2
+    echo "Please fix $0" >&2
+    exit 1
+elif echo "$prime-2^($bits_per_coeff-64)" | bc | grep -q '^-' ; then
+    echo "2^(bits_per_coeff-64) must be below the prime" >&2
+    echo "Please fix $0" >&2
+    exit 1
+fi
+
 # The test matrix may be created by:
 #
 # Pay attention to the fact that when the implementation layers expect the
@@ -43,7 +53,7 @@ bits_per_coeff=256
 
 # -c 10 imposes a bound on the coefficients.
 
-$bins/random  1000 -c 10 --density 50 --kright 1 > $mats/t1000p.txt
+$bins/random_matrix  1000 -c 10 --kright 10 > $mats/t1000p.txt
 matrix_txt=$mats/t1000p.txt
 matrix=$mats/t1000p.bin
 

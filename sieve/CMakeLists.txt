@@ -16,9 +16,8 @@ add_executable (las las.c fb.c trialdiv.c
     las-qlattice.c las-descent-helpers.cpp)
 target_link_libraries (las facul utils ${pthread_libs})
 
-add_executable(trialdiv EXCLUDE_FROM_ALL trialdiv.c)
-target_link_libraries (trialdiv utils)
-set_property(TARGET trialdiv APPEND PROPERTY COMPILE_FLAGS -DTESTDRIVE)
+add_executable(test_trialdiv EXCLUDE_FROM_ALL test_trialdiv.c trialdiv.c)
+target_link_libraries (test_trialdiv utils)
 
 add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)

@@ -21,7 +21,7 @@ void las_report_copy(las_report_ptr p, las_report_ptr q)
 {
     unsigned long (*ss)[256] = p->survivor_sizes;
     unsigned long (*rs)[256] = p->report_sizes;
-    memcpy(p, q, sizeof(las_report_ptr));
+    memcpy(p, q, sizeof(las_report));
     p->survivor_sizes = ss;
     p->report_sizes = rs;
     memcpy(p->survivor_sizes, q->survivor_sizes, sizeof(unsigned long) << 16);

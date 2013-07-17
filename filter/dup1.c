@@ -15,8 +15,7 @@
 
 #include "cado.h"
 
-#define CA 314159265358979323UL
-#define CB 271828182845904523UL
+#define MAX_NSLICES 32
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -28,11 +27,14 @@
 #include <limits.h> /* for CHAR_BIT */
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "macros.h"
 #include "utils.h"
 #include "relation.h"
+
+#include "filter_utils.h"
 
 /* Only (a,b) are parsed on input. This flags control whether we copy the
  * rest of the relation data to the output file, or if we content
@@ -40,23 +42,24 @@
 static int only_ab = 0;
 
 /* output relations in dirname/0/name, ..., dirname/31/name */
+/* Adds the number of relation added to each slice to *nr_rels */
 int split_relfile (relation_stream_ptr rs, const char *name,
                    const char *dirname, const char * outfmt,
                    int *do_slice, int nslices_log, int nslices, 
-                   unsigned int ab_base)
+                   unsigned int ab_base, index_t *nr_rels)
 {
     FILE * f_in;
     int p_in;
     const char * suffix_in;
 
     int ok MAYBE_UNUSED;
-    char * oname[nslices];
-    FILE * ofile[nslices];
-    int p_out[nslices];
+    char * oname[MAX_NSLICES];
+    FILE * ofile[MAX_NSLICES];
+    int p_out[MAX_NSLICES];
 
     uint64_t h;
 
-    f_in = fopen_maybe_compressed2(name, "r", &p_in, &suffix_in);
+    f_in = fopen_maybe_compressed2 (name, "rb", &p_in, &suffix_in);
     ASSERT_ALWAYS(f_in != NULL);
 
     char * newname = strdup(name);
@@ -70,7 +73,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
                 only_ab ? "%s/%d/%s.ab%s" : "%s/%d/%s%s",
                 dirname, i, path_basename(newname), suffix_out);
         ASSERT_ALWAYS(rc >= 0);
-        ofile[i] = fopen_maybe_compressed2(oname[i], "w", &p_out[i], NULL);
+        ofile[i] = fopen_maybe_compressed2 (oname[i], "wb", &p_out[i], NULL);
         ASSERT_ALWAYS(ofile[i] != NULL);
     }
     free(newname);
@@ -88,14 +91,14 @@ int split_relfile (relation_stream_ptr rs, const char *name,
 
 	ok = 1;
 
-        h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
+        h = CA_DUP1 * (uint64_t) rs->rel.a + CB_DUP1 * rs->rel.b;
         /* Using the low bit of h is not a good idea, since then
            odd values of i are twice more likely. The second low bit
            also gives a small bias with RSA768 (but not for random
            coprime a, b). We use here the nslices_log high bits.
         */
         int i = h >> (64 - nslices_log);
-
+        nr_rels[i]++;
         /* print relation */
         if (do_slice[i]) {
             if (only_ab) {
@@ -115,7 +118,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
 
         if (relation_stream_disp_progress_now_p(rs)) {
             fprintf (stderr,
-                    "# split %lu relations in %.1fs"
+                    "# split %" PRid " relations in %.1fs"
                     " -- %.1f MB/s -- %.1f rels/s\n",
                     rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
         }
@@ -136,25 +139,45 @@ int split_relfile (relation_stream_ptr rs, const char *name,
     return 0;
 }
 
+/*
 void usage()
 {
-    fprintf(stderr, "Usage: ./dup1 [-outfmt <fmt> | -bz] [-only <i>] [-n <nslices_log>] -out <output_dir> [files...]\n");
+    fprintf(stderr, "Usage: ./dup1 [-only <i>] [-n <nslices_log>] -out <output_dir> [files...]\n");
+}
+*/
+static void
+usage(const char *argv0)
+{
+    fprintf (stderr, "Usage: %s [options] ", argv0);
+    fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
+    fprintf (stderr, "Mandatory command line options:\n");
+    fprintf (stderr, "     -out <dir>  - output directory\n");
+    fprintf (stderr, "\nOther command line options:\n");
+    fprintf (stderr, "    -n           - log of number of slices (default 1)\n");
+    fprintf (stderr, "    -only        - do only slice i (default all)\n");
+    fprintf (stderr, "    -ab          - only print a and b in the ouput\n");
+    fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
+    fprintf (stderr, "    -abhexa      - read a and b as hexa no decimal\n");
+    exit (1);
 }
 
 int
 main (int argc, char * argv[])
 {
+    char * argv0 = argv[0];
     int had_error = 0;
 
     param_list pl;
     param_list_init(pl);
     argv++,argc--;
 
-    int bz = 0;
     int ab_hexa = 0;
-    param_list_configure_switch(pl, "bz", &bz);
     param_list_configure_switch(pl, "ab", &only_ab);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -174,6 +197,8 @@ main (int argc, char * argv[])
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
+    const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    set_antebuffer_path (argv0, path_antebuffer);
 
     if (param_list_warn_unused(pl)) {
         exit(1);
@@ -185,21 +210,13 @@ main (int argc, char * argv[])
     }
 
     if (!dirname)
-        usage();
-    if (bz) {
-        if (outfmt) {
-            fprintf(stderr, "-bz and -outfmt are exclusive");
-            usage();
-        } else {
-            outfmt = ".bz2";
-        }
-    }
+        usage(argv0);
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
-        usage();
+        usage(argv0);
     }
 
-    int do_slice[nslices];
+    int do_slice[MAX_NSLICES];
 
     if (only_slice == -1) { /* split all slices */
         for (int i = 0; i < nslices; i++)
@@ -211,23 +228,33 @@ main (int argc, char * argv[])
 
     if ((filelist != NULL) + (argc != 0) != 1) {
         fprintf(stderr, "Provide either -filelist or freeform file names\n");
-        usage();
+        usage(argv0);
     }
 
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
+    index_t nr_rels[MAX_NSLICES];
+    memset (nr_rels, 0, sizeof(index_t) * nslices);
+
+    //process_rels (files, &thread_dup1, NULL, 0, NULL, NULL, STEP_DUP1);
 
     relation_stream rs;
     relation_stream_init(rs);
     for (char ** fp = files ; *fp ; fp++) {
         had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice,
-                                    nslices_log, nslices, (ab_hexa)?16:10);
+                                    nslices_log, nslices, (ab_hexa)?16:10, 
+                                    nr_rels);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
-            "# split %lu relations in %.1fs"
+            "# split %" PRid " relations in %.1fs"
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    relation_stream_clear(rs);
+
+    for (int i = 0; i < nslices; i++) {
+        fprintf (stderr, "# slice %d received %"PRid" relations\n", i,
+                                                                    nr_rels[i]);
+    }
+    //relation_stream_clear(rs);
 
     if (filelist) filelist_clear(files);
 

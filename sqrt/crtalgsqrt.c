@@ -5,6 +5,16 @@
  *
  */
 
+/*
+  Usage within CADO-NFS:
+  1) run: crtalgsqrt -v -depfile c75.dep.000 -ratdepfile c75.dep.rat.000 -polyfile c75.poly
+     and let "alg" be the last integer value printed, for example 271...279:
+# [83.72] c7 (+++---++) -2 [271185940941113750637336882505937475494764983427230684073069569288946725279]
+  2) let "rat" be the value of the rational square root (given by sqrt)
+  3) compute gcd(alg-rat, n) and gcd(alg+rat, n)
+  4) if this fails, try another dependency
+ */
+
 /* TODO list.
  *
  * This program seems to work, but is not complete.
@@ -43,6 +53,7 @@
  */
 
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -275,7 +286,7 @@ typedef struct cachefile_s * cachefile_ptr;
 
 void cachefile_vinit(cachefile_ptr c, const char * fmt, va_list ap)
 {
-    memset(c, 0, sizeof(c));
+    memset(c, 0, sizeof(*c));
     vsnprintf(c->basename, sizeof(c->basename), fmt, ap);
 }
 
@@ -614,6 +625,17 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         ab->prefix[magic-fname]='\0';
         magic++;
         if (sscanf(magic, "dep.alg.%d", &ab->depnum) == 1) {
+            ab->nfiles = 0;
+        } else {
+            FATAL_ERROR_CHECK(1, "error in parsing filename");
+        }
+    } else if ((magic = strstr(fname, ".dep.")) != NULL) {
+        // assume cado format (means only one file, so we don't need to
+        // parse, really.
+        strncpy(ab->prefix, fname, magic-fname);
+        ab->prefix[magic-fname]='\0';
+        magic++;
+        if (sscanf(magic, "dep.%d", &ab->depnum) == 1) {
             ab->nfiles = 0;
         } else {
             FATAL_ERROR_CHECK(1, "error in parsing filename");
@@ -1900,7 +1922,7 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
             mpz_clear(w);
         }
         if (sk >= 2 * ks->bound || sk < 0) {
-            fprintf(stderr, "[%s] recombination of coeff in X^%d yields noise (%"PRIu64")\n",signs, k, sk);
+            fprintf(stderr, "[%s] recombination of coeff in X^%d yields noise (%" PRIu64 ")\n",signs, k, sk);
             spurious++;
             // break;
         }
@@ -1955,10 +1977,10 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
     mpz_clear(e);
 
     if (spurious) {
-        fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [SPURIOUS]\n",
+        fprintf(stderr, "# [%2.2lf] %lx (%s) %" PRId64 " [SPURIOUS]\n",
                 WCT, v, signs, (int64_t) x);
     } else {
-        gmp_fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [%Zd]\n",
+        gmp_fprintf(stderr, "# [%2.2lf] %lx (%s) %" PRId64 " [%Zd]\n",
                 WCT, v, signs, (int64_t) x, cks->sqrt_modN);
     }
     free(signs);
@@ -1976,7 +1998,7 @@ void crtalgsqrt_knapsack_prepare(struct crtalgsqrt_knapsack * cks, size_t lc_exp
             for(int j =  0 ; j < glob.n ; j++) {
                 for(int k = 0 ; k < glob.n ; k++) {
                     int64_t c = contribs64[ ((i * glob.n) + j) * glob.n + k];
-                    printf(" %"PRId64, c);
+                    printf(" %" PRId64, c);
                 }
                 for(int s = 0 ; s < glob.m * glob.n ; s++) {
                     printf(" %d", s == (i * glob.n + j));

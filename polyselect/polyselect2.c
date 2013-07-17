@@ -1152,6 +1152,9 @@ main (int argc, char *argv[])
 	 /* force admin to be divisible by incr */
 	 admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
 
+         /* detect L1 cache size */
+         ropt_L1_cachesize ();
+
 	 while (admin <= admax && seconds () - st0 <= maxtime)
 	 {
 		  for (i = 0; i < nthreads ; i++)

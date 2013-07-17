@@ -81,6 +81,7 @@
 #include <gmp.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -108,7 +109,6 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
     /* FIXME: do better. E.g. use 16-bit primes, and a look-up table. Could
      * beat this. */
     uint64_t v = 0;
-    unsigned long aux;
     for(int i = 0 ; i < 64 ; i++) {
         alg_prime_t * ch = chars + i;
         int res;
@@ -146,20 +146,46 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
                 abort();
             }
         } else {
+            /* Compute b*r-a (mod p) */
+            residueul_t ra, rb, rr;
+            modulusul_t mp;
+            modul_initmod_ul(mp, ch->p);
+            modul_init(ra, mp);
+            modul_init(rb, mp);
+            modul_init(rr, mp);
             if (a < 0) {
-                unsigned long ua = ((unsigned long) (-a)) % ch->p;
-                unsigned long ub = b % ch->p;
-                modul_mul(&aux, &ub, &ch->r, &ch->p);
-                modul_add(&aux, &ua, &aux, &ch->p);
-                modul_neg(&aux, &aux, &ch->p);
-                res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
+                ASSERT((uint64_t)(-a) <= ULONG_MAX);
+                modul_set_ul(ra, (unsigned long)(-a), mp);
+                modul_neg(ra, ra, mp);
             } else {
-                unsigned long ua = ((unsigned long) (a)) % ch->p;
-                unsigned long ub = b % ch->p;
-                modul_mul(&aux, &ub, &ch->r, &ch->p);
-                modul_sub(&aux, &ua, &aux, &ch->p);
-                res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
+                ASSERT((uint64_t)a <= ULONG_MAX);
+                modul_set_ul(ra, a, mp);
             }
+            ASSERT(b <= ULONG_MAX);
+            modul_set_ul(rb, (unsigned long)b, mp);
+            modul_set_ul_reduced(rr, ch->r, mp);
+            modul_mul(rr, rb, rr, mp);
+            modul_sub(rr, rr, ra, mp);
+            res = modul_jacobi(rr, mp);
+            modul_clear(ra, mp);
+            modul_clear(rb, mp);
+            modul_clear(rr, mp);
+            modul_clearmod(mp);
+            
+            // If res is 0, it means that ch->p divides the norm, which
+            // should not be, unless the special-q has been chosen to be
+            // larger than lpb.
+            // A fix, for that case that should not happen in real life
+            // would be to artificially enlarge the large prime bound
+            // if we had to sieve beyond it, so that subsequent program
+            // (including characters) behaves correctly.
+            if (res == 0) {
+                fprintf (stderr, "Error, Jacobi symbol is 0 for a = %" PRId64 
+                         ", b = %" PRIu64 ", p = %lu, r = %lu\n", 
+                         a, b, ch->p, ch->r);
+                ASSERT_ALWAYS(res != 0);
+            }
+            res = res < 0;   // -1->1, 1->0
         }
         v |= ((uint64_t) res) << i;
     }
@@ -343,7 +369,7 @@ static blockmatrix small_character_matrix(blockmatrix bcmat, const char * indexn
 static blockmatrix
 read_heavyblock_matrix_binary(const char * heavyblockname)
 {
-    FILE * f = fopen(heavyblockname, "r");
+    FILE * f = fopen(heavyblockname, "rb");
 
     if (f == NULL) {
         fprintf(stderr, "Warning: %s not found, assuming empty\n", heavyblockname);

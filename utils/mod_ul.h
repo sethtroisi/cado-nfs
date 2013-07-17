@@ -13,6 +13,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -47,6 +48,22 @@ typedef unsigned long modulusul_t[MODUL_SIZE];
 
 MAYBE_UNUSED
 static inline void
+modul_intinit (modintul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intclear (modintul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modul_intset (modintul_t r, const modintul_t s)
 {
   r[0] = s[0];
@@ -58,6 +75,41 @@ static inline void
 modul_intset_ul (modintul_t r, const unsigned long s)
 {
   r[0] = s;
+}
+
+
+/* The two mod*_uls() functions import/export modint_t from/to an array of 
+   unsigned longs. For modul_intset_ul, the size of the array is passed as
+   a parameter n. For mod_intget_uls(), the required array size can be 
+   determined via mod_intbits(); if the modint_t is zero, mod_intget_uls()
+   writes 0 to the first output unsigned long. It returns the number of 
+   unsigned longs written. */
+MAYBE_UNUSED
+static inline void
+modul_intset_uls (modintul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline unsigned long 
+modul_intget_ul (const modintul_t s)
+{
+  return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t 
+modul_intget_uls (unsigned long *r, const modintul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 
@@ -95,6 +147,16 @@ modul_intcmp_ul (const modintul_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modul_intcmp_uint64 (const modintul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
 modul_intfits_ul (const modintul_t a MAYBE_UNUSED)
 {
   return 1;
@@ -117,20 +179,31 @@ modul_intsub (modintul_t r, const modintul_t a, const modintul_t b)
 }
 
 
+MAYBE_UNUSED
+static inline void
+modul_intshr (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] >> i;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intshl (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] << i;
+}
+
+
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
    For n==0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modul_intbits (const modintul_t a)
 {
-  int bits = 0;
-  unsigned long n = a[0];
-  while (n > 0UL) /* TODO: use clzl */
-    {
-      bits++;
-      n >>= 1;
-    }
-  return bits;
+  if (a[0] == 0)
+    return 0;
+  return LONG_BIT - ularith_clz (a[0]);
 }
 
 
@@ -165,7 +238,7 @@ modul_initmod_ul (modulusul_t m, const unsigned long s)
 
 MAYBE_UNUSED
 static inline void
-modul_initmod_uls (modulusul_t m, const modintul_t s)
+modul_initmod_int (modulusul_t m, const modintul_t s)
 {
   m[0] = s[0];
 }
@@ -181,7 +254,7 @@ modul_getmod_ul (const modulusul_t m)
 
 MAYBE_UNUSED
 static inline void
-modul_getmod_uls (modintul_t r, const modulusul_t m)
+modul_getmod_int (modintul_t r, const modulusul_t m)
 {
   r[0] = m[0];
 }
@@ -260,7 +333,7 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modul_set_uls (residueul_t r, const modintul_t s, 
+modul_set_int (residueul_t r, const modintul_t s, 
 		   const modulusul_t m)
 {
   r[0] = s[0] % m[0];
@@ -269,7 +342,7 @@ modul_set_uls (residueul_t r, const modintul_t s,
 
 MAYBE_UNUSED
 static inline void
-modul_set_uls_reduced (residueul_t r, const modintul_t s, 
+modul_set_int_reduced (residueul_t r, const modintul_t s, 
 		       const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT (s[0] < m[0]);
@@ -327,7 +400,7 @@ modul_get_ul (const residueul_t s, const modulusul_t m MAYBE_UNUSED)
 
 MAYBE_UNUSED
 static inline void
-modul_get_uls (modintul_t r, const residueul_t s, 
+modul_get_int (modintul_t r, const residueul_t s, 
 		   const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0]);
@@ -373,7 +446,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long t = a[0] - m[0], tr = a[0] + b[0];
     
@@ -429,7 +502,7 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long tr, t = a[0];
     __asm__ (
@@ -602,7 +675,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   
   ASSERT_EXPENSIVE(a[0] <= m[0]);
   slow = b;
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   {
     unsigned char sb;
     __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
@@ -741,7 +814,7 @@ MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   unsigned long s = a[0], t = m[0];
   ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
 
@@ -803,8 +876,5 @@ int modul_sprp2 (const modulusul_t);
 int modul_isprime (const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
-
-/* Cruft: this belongs in modredc_*.h, not here  */
-unsigned long modul_invmodlong (unsigned long n);
 
 #endif  /* MOD_UL_H */

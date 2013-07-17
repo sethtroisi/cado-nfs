@@ -1427,7 +1427,7 @@ static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list p
      * transposed because this is what the cache building code prefers to
      * receive.
      */
-    int rc = asprintf(&mmt->locfile, "%s.%dx%d.%08"PRIx32".h%d.v%d", base, nslices[1], nslices[0], mmt->bal->h->checksum, ix[1], ix[0]);
+    int rc = asprintf(&mmt->locfile, "%s.%dx%d.%08" PRIx32 ".h%d.v%d", base, nslices[1], nslices[0], mmt->bal->h->checksum, ix[1], ix[0]);
     free(base);
     ASSERT_ALWAYS(rc >= 0);
 }
@@ -1547,7 +1547,7 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
                 info, mmt->pi->m->ncores * (len+1), MPI_BYTE,
                 mmt->pi->m->pals);
         if (mmt->pi->m->jrank == 0) {
-            FILE * f = fopen(cachelist, "w");
+            FILE * f = fopen(cachelist, "wb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", cachelist);
             for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
                 unsigned int j0 = j * mmt->pi->m->ncores;
@@ -1658,7 +1658,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         param_list_parse_int(pl, "save_submatrices", &ssm);
         if (ssm) {
             fprintf(stderr, "DEBUG: creating %s\n", mmt->locfile);
-            FILE * f = fopen(mmt->locfile, "w");
+            FILE * f = fopen(mmt->locfile, "wb");
             fwrite(m->p, sizeof(uint32_t), m->size, f);
             fclose(f);
         }

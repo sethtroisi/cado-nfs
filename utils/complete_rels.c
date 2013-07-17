@@ -57,7 +57,8 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
   return 1;
 }
 
-int complete_relation_files(char ** files, cado_poly_ptr cpoly)
+int
+complete_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
 {
     relation_stream rs;
     relation_stream_init(rs);
@@ -70,7 +71,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         unsigned long l0 = rs->lnum;
         unsigned long ok0 = ok;
         unsigned long bad0 = bad;
-        for( ; relation_stream_get(rs, line, 0, 10) >= 0 ; ) {
+        for( ; relation_stream_get(rs, line, forced_read, 10) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (complete_relation(&rs->rel, cpoly)) {
                 fprint_relation (stdout, &rs->rel);
@@ -85,7 +86,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         if (bad == bad0) {
             fprintf(stderr, "%s : %lu ok\n", *files, ok-ok0);
         } else {
-            fprintf(stderr, "%s : %lu ok ; FOUND %lu ERRORS\n",
+            fprintf(stderr, "%s : %lu ok ; FOUND %lu ERROR(S)\n",
                     *files, ok-ok0, bad-bad0);
         }
         relation_stream_closefile(rs);
@@ -96,7 +97,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
 }
 
 void usage_and_die(char *str) {
-    fprintf(stderr, "usage: %s -poly <polyfile> <relfile1> <relfile2> ...\n",
+    fprintf(stderr, "usage: %s [-f] -poly <polyfile> <relfile1> <relfile2> ...\n",
             str);
     exit(3);
 }
@@ -105,9 +106,18 @@ int main(int argc, char * argv[])
 {
     cado_poly cpoly;
     int had_error = 0;
+    int forced_read = 0;
+
+    if (argc >= 2 && strcmp (argv[1], "-f") == 0)
+      {
+        forced_read = 1;
+        fprintf (stderr, "Skipping corrupted lines\n");
+        argv ++;
+        argc --;
+      }
 
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
-        usage_and_die(argv[0]);
+        usage_and_die(argv[-forced_read]);
     }
     cado_poly_init(cpoly);
     if (!cado_poly_read(cpoly, argv[2])) 
@@ -117,7 +127,7 @@ int main(int argc, char * argv[])
     argv++,argc--;
     argv++,argc--;
 
-    had_error = complete_relation_files(argv, cpoly) < 0;
+    had_error = complete_relation_files (argv, cpoly, forced_read) < 0;
 
     cado_poly_clear(cpoly);
 

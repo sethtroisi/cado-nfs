@@ -202,7 +202,6 @@ my @default_param = (
 
     # polyselect using Kleinjung's algorithm
     degree         => 5,
-    polsel_lq      => 1,
     polsel_nq      => 1000,
     polsel_incr    => 60,
     polsel_admin   => 0,
@@ -245,7 +244,6 @@ my @default_param = (
     coverNmax    => 100,
     nslices_log  => 1,
     filterlastrels => 1,
-    dup_rm => $on_mingw, # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     linalg       => 'bwc',
@@ -1549,9 +1547,9 @@ sub distribute_task {
 #             the jobs when cleaning up.
 #
 # Some fields will be added during the execution of the script:
-#  - `rdep'    is the list of reverse dependecies, i.e. the tasks that depend
+#  - `rdep'    is the list of reverse dependencies, i.e. the tasks that depend
 #              on this one;
-#  - `rreq'    is the list of reverse order-only dependecies;
+#  - `rreq'    is the list of reverse order-only dependencies;
 #  - `visited' is used by graph traversal algorithms;
 #  - `done'    is the time at which the task has been completed (if any).
 my %tasks = (
@@ -1560,8 +1558,7 @@ my %tasks = (
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
                    param  => ['degree', 'polsel_incr',
-			      'polsel_admin', 'polsel_admax', 'polsel_lq',
-		              'polsel_nq'],
+			      'polsel_admin', 'polsel_admax', 'polsel_nq'],
                    files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
@@ -1998,7 +1995,6 @@ my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'polsel_nice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
-           "-lq $param{'polsel_lq'} ".
            "-nq $param{'polsel_nq'} ".
            "-incr $param{'polsel_incr'} ".
            "-admin $a ".
@@ -2168,8 +2164,10 @@ sub do_factbase {
     info "Generating factor base...\n";
     $tab_level++;
 
+    my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.makefb.log" });
@@ -2189,6 +2187,7 @@ sub do_freerels {
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
+              "-renumber $param{'prefix'}.renumber ".
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2252,21 +2251,6 @@ sub dup {
 
     # print number of primes in factor base
     if (scalar @files >= 2) {
-        my $f = $files[0];
-        $f = $files[1]
-            if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
-        $f = "$param{'wdir'}/".$f;
-        open FILE, "gzip -dc $f|"
-            or die "Cannot open `$f' for reading: $!.\n";
-        my $i=0;
-        while (<FILE>) {
-            s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
-                $i++;
-                last if $i==2;
-            }
-        }
-        close FILE;
         # print approximate number of large primes
         my $nlpa;
         my $nlpr;
@@ -2317,14 +2301,11 @@ sub dup {
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
-        my $rm_param = "";
-        if ($param{'dup_rm'} != 0) {
-          $rm_param = "-rm "
-        };
         cmd("$param{'bindir'}/filter/dup2 ".
-            "-K $K -out $param{'prefix'}.nodup/$i ".
+            "-K $K -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.filelist ".
-            "-basepath $param{'prefix'}.nodup/$i ". $rm_param,
+            "-renumber $param{'prefix'}.renumber ".
+            "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
             });
@@ -2347,6 +2328,8 @@ sub purge {
     $nslices = 2**$param{'nslices_log'};
     my $nbrels = 0;
     my $last = 0;
+    my $nprimes = 0;
+    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
@@ -2355,6 +2338,12 @@ sub purge {
             s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
                 $last = $1;
+            }
+            if ( $_ =~ /nprimes=(\d+)/ ) {
+                $nprimes = $1;
+            }
+            if ( $_ =~ /min_index=(\d+)/ ) {
+                $min_index = $1;
             }
         }
         close FILE;
@@ -2365,10 +2354,13 @@ sub purge {
     $tab_level--;
     info "Removing singletons...";
     $tab_level++;
+    my $npthr =  $param{'bwmt'};
+    if ($npthr =~ /^(\d+)x(\d+)$/) { $npthr = $1 * $2; }
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
-                  "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                  "-keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
-                  "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
+                  "-nprimes $nprimes -minindex $min_index ".
+                  "-npthr $npthr -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,
@@ -2385,7 +2377,7 @@ sub do_purge {
         info "Purge has already been done\n";
     }
     # Get the number of rows and columns from the .purged.gz file
-    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
+    my ($a,$nrows,$b,$ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
     my $excess = $nrows - $ncols;
     $tab_level++;
     info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
@@ -2395,9 +2387,12 @@ sub do_purge {
 # sieve
 my $sieve_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
+    my $powlim = (1 << $param{'I'}) - 1;
     my $cmd = "env nice -$param{'sievenice'} ".
         "$m->{'bindir'}/sieve/las ".
         "-I $param{'I'} ".
+        "-rpowlim $powlim ".
+        "-apowlim $powlim ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
@@ -2599,13 +2594,14 @@ sub do_sieve {
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
         my $ret = purge($param{'filterlastrels'});
-        if ($ret->{'status'}) {
+        if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
+        } elsif ($ret->{'status'} == 1) {
+            die "Error when calling purge ; STDERR:\n$ret->{'err'}";
         }
-
         return 1;
     };
 
@@ -2857,10 +2853,6 @@ sub do_linalg {
     } elsif ($param{'linalg'} eq "bwc") {
         info "Calling Block-Wiedemann...\n";
         $tab_level++;
-        my $mt = $param{'bwmt'};
-        if ($mt =~ /^(\d+)$/) {
-            $mt = "${mt}x1";
-        }
 
         my $bwc_script = "$param{'bindir'}/linalg/bwc/bwc.pl";
 
@@ -2886,7 +2878,7 @@ sub do_linalg {
         $cmd = "$bwc_script ".
                ":complete " .
                "seed=1 ". # For debugging purposes, we use a deterministic BW
-               "thr=$mt ";
+               "thr=$param{'bwmt'} ";
         if ( $param{'mpi'} > 1 ) {
             my $a = int ( sqrt($param{'mpi'}) );
             $a-- while ( $param{'mpi'} % $a != 0);
@@ -2994,10 +2986,13 @@ sub do_sqrt {
 
     {
         # First prepare all deps files
+        # with -prefix xxx.dep.gz, the dependency files will
+        # be compressed with gzip (idem for suffix .bz2 or .lzma)
+        # in that case also put the same suffix in the 2nd call to sqrt below
         info "Preparing $ndep dependency files\n";
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
             "-poly $param{'prefix'}.poly ".
-            "-prefix $param{'prefix'}.dep " .
+            "-prefix $param{'prefix'}.dep.gz " .
             "-ab " .
             "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
@@ -3016,7 +3011,7 @@ sub do_sqrt {
         $tab_level++;
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
             "-poly $param{'prefix'}.poly ".
-            "-prefix $param{'prefix'}.dep " .
+            "-prefix $param{'prefix'}.dep.gz " .
             "-dep $numdep " .
             "-rat -alg -gcd " .
             "-purged $param{'prefix'}.purged.gz ".

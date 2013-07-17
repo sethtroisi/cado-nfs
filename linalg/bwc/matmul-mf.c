@@ -34,11 +34,11 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, i
     mf->alloc = mf->size = sbuf->st_size / sizeof(uint32_t);
     mf->p = malloc(sbuf->st_size);
     ASSERT_ALWAYS(mf->p);
-    FILE * f = fopen(file, "r");
+    FILE * f = fopen(file, "rb");
     ASSERT_ALWAYS(f);
     int nread = fread(mf->p, sizeof(uint32_t), mf->size, f);
     if (nread < (int) mf->size) {
-        fprintf(stderr, "%s: short read (%d < %"PRIu64")\n", file, nread, mf->size);
+        fprintf(stderr, "%s: short read (%d < %" PRIu64 ")\n", file, nread, mf->size);
         exit(1);
     }
     fclose(f);

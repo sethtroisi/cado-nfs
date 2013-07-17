@@ -72,6 +72,96 @@ int is_supported_compression_format(const char * s)
     return 0;
 }
 
+/* Put the directory of cado in rep_cado */
+void set_rep_cado (const char *argv0, char *rep_cado) {
+  char *p, *q;
+  p = strdup(argv0);
+  q = dirname(p);
+  strcpy(rep_cado, q);
+  strcat(rep_cado, "/../");
+  free(p);
+}
+
+/* Search the executable in PATH and, if found, return in real_path the
+   complete path WITH the executable in the end */
+char *
+search_real_exec_in_path (const char *executable, char *real_path) {
+  char dummy[PATH_MAX];
+  char *p = getenv("PATH");
+  char *path = (p == NULL || strlen(p) == 0) ? strdup(".") : strdup(p);
+  char *pp = path;
+  unsigned int end = 0;
+  while (!end) {
+    char *ppe = strchr(pp, ':');
+    if (UNLIKELY(!ppe))
+      ppe = pp + strlen (pp);
+    if (LIKELY(ppe != pp)) {
+      memcpy (dummy, pp, ppe - pp);
+      dummy[ppe - pp] = '/';
+      dummy[ppe - pp + 1] = 0;
+    }
+    else
+      strcpy (dummy, "./");
+    strcat(dummy, executable);
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (LIKELY(*ppe))
+      pp = ppe + 1;
+    else
+      end = 1;
+    if (UNLIKELY(realpath(dummy, real_path) != NULL))
+      end = 2;
+  }
+  free (path);
+  if (end != 2) *real_path = 0;
+  return(real_path);
+}
+
+/* Search the path for antebuffer. Must be call one time before all I/O by
+   executable, but after the computation of rep_cado */
+void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char *antebuffer) {
+  *antebuffer = 0;
+  /* First, if we have path_antebuffer, we must have antebuffer or error */
+  if (path_antebuffer != NULL) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, path_antebuffer);
+    strcat(dummy, "/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) {
+      fprintf (stderr, "search_antebuffer: antebuffer path (%s) error : %s\n", dummy, strerror(errno));
+      exit (1);
+    }
+  }
+  /* Second, we search antebuffer in cado directory */
+  if (!*antebuffer) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, rep_cado);
+    strcat(dummy, "utils/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
+  }
+  /* 3th, we try the PATH */
+  if (!*antebuffer)
+    search_real_exec_in_path ("antebuffer", antebuffer);
+  /* 4th, OK, antebuffer is not here. cat is need to replace it */
+  if (!*antebuffer) {
+    search_real_exec_in_path ("cat", antebuffer);
+    if (!*antebuffer) {
+      fprintf (stderr, "search_antebuffer: antebuffer or cat paths not found: %s\n", strerror(errno));
+      exit (1);
+    }
+    /* cat needs no argument... except a space after its name! */
+    strcat (antebuffer, " ");
+  }
+  else /* real antebuffer is found : add its arguments */
+    strcat (antebuffer, " 24 ");
+}
+
 /* Return a unix commands list. Exemple :
    cat file_relation1
    gzip -dc file_relation2.gz file_relation3.gz
@@ -79,7 +169,7 @@ int is_supported_compression_format(const char * s)
    [empty string]
 */
 char **
-prempt_open_compressed_rs (char *rep_cado, char **ficname)
+preempt_open_compressed_rs (char *antebuffer, char **ficname)
 {
   const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
   char **cmd;
@@ -87,33 +177,20 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   size_t p_cmds = 0;
   int suffix_choice = 0;
   char lastcom[256];
-  char *antebuffer_realpath, *fic_realpath;
-
+  char *fic_realpath;
+  
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
-    fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
+    fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
     exit (1);
   }
-  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
-  antebuffer_realpath = (char *) malloc(PATH_MAX * sizeof(char));
-  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
-  if (fic_realpath == NULL || antebuffer_realpath == NULL || fic_realpath == NULL) {
+  if ((fic_realpath = (char *) malloc(PATH_MAX * sizeof(char))) == NULL) {
     fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
-    exit (1);
-  }
-  /* Use fic_realpath as temp storage for un-normalized path to antebuffer */
-  strcpy (fic_realpath, rep_cado);
-  strcat (fic_realpath, "utils/antebuffer");
-#ifdef EXECUTABLE_SUFFIX
-  strcat (fic_realpath, EXECUTABLE_SUFFIX);
-#endif
-  if (realpath(fic_realpath, antebuffer_realpath) == NULL) {
-    fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
     exit (1);
   }
   while (*ficname) {
     if (realpath(*ficname, fic_realpath) == NULL) {
-        fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
-        exit (1);
+      fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
+      exit (1);
     }
     if (!suffix_choice) {
       if (p_cmds + 1 >= s_cmds) {
@@ -124,20 +201,19 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
 	memset(&cmd[s_cmds], 0, sizeof(unsigned char *) * s_cmds);
 	s_cmds <<= 1;
       }
-      if (!(cmd[p_cmds] = malloc(PREMPT_S_CMD))) {
+      if (!(cmd[p_cmds] = malloc(PREEMPT_S_CMD))) {
 	fprintf (stderr, "fopen_compressed_rs: malloc erreur : %s\n", strerror(errno));
 	exit (1);
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
 	if (has_suffix (fic_realpath, cp_r->suffix)) break;
-      strcpy (cmd[p_cmds], antebuffer_realpath);
-      strcat (cmd[p_cmds], " 24 ");
+      strcpy (cmd[p_cmds], antebuffer);
       strcpy (lastcom, " | ");
       strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
       strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
       suffix_choice = 1;
-      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
-	fprintf(stderr, "prempt_open_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
+      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREEMPT_S_CMD) {
+	fprintf(stderr, "preempt_open_compressed_rs: PREEMPT_S_CMD (%d) too small. Please * 2\n", PREEMPT_S_CMD);
 	exit (1);
       }
       strcat (cmd[p_cmds], fic_realpath);
@@ -145,7 +221,7 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
     }
     else {
       if (has_suffix (fic_realpath, cp_r->suffix) &&
-	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREMPT_S_CMD))
+	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREEMPT_S_CMD))
 	{
 	  strcat (cmd[p_cmds], " ");
 	  strcat (cmd[p_cmds], fic_realpath);
@@ -160,7 +236,6 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   }
   if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
     strcat (cmd[p_cmds], lastcom);
-  free (antebuffer_realpath);  
   free (fic_realpath);  
   return cmd;
 }
@@ -189,7 +264,10 @@ fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, 
         }
 
         if (command) {
-            f = popen(command, mode);
+          /* apparently popen() under Linux does not accept the 'b' modifier */
+            char pmode[2] = "x";
+            pmode[0] = mode[0];
+            f = popen(command, pmode);
             if (p_pipeflag) *p_pipeflag = 1;
 #ifdef F_SETPIPE_SZxxx
                 /* increase the pipe capacity (2^16 by default), thanks to

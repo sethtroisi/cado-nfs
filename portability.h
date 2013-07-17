@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 /* This header file defines macros (and perhaps static functions) to improve 
-   portability of the CADO code. They aim to provide a wrappers for some C99 
+   portability of the CADO code. They aim to provide a wrapper for some C99
    and POSIX functionality for systems that lack those. */
 
 #ifndef CADO_PORTABILITY_H_
@@ -168,6 +168,48 @@ sscanf_subst_zu (const char * const str, const char * const format, ...)
 #define scanf scanf_subst_zu
 #define fscanf fscanf_subst_zu
 #define sscanf sscanf_subst_zu
+
+static inline int
+printf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+
+  va_start (ap, format);
+  r = vprintf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+fprintf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+
+  va_start (ap, format);
+  r = vfprintf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+#define printf  printf_subst_zu
+#define fprintf fprintf_subst_zu
+
+static inline size_t
+strnlen_mingw (const char *s, size_t maxlen)
+{
+  size_t ret = 0;
+  for (; ret < maxlen && *s; s++)
+    ret++;
+  return ret;
+}
+
+#define strnlen strnlen_mingw
 
 #endif /* ifdef HAVE_MINGW */
 

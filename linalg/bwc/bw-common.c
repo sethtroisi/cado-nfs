@@ -22,7 +22,7 @@ extern void usage();
 int bw_common_init_defaults(struct bw_params * bw)
 {
     /*** defaults ***/
-    memset(bw, 0, sizeof(bw));
+    memset(bw, 0, sizeof(*bw));
     bw->interval = 1000;
     bw->can_print = 1;
     bw->ys[0] = bw->ys[1] = -1;

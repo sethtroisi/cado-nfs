@@ -8,13 +8,19 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <limits.h>
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#else
+#define MAP_FAILED ((void *) -1)
+#endif
 #include <gmp.h>
 
 /* Data types */
 
 typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
 #define FBPRIME_FORMAT "%u"
-#define FBPRIME_MAX 4294967295U
+#define FBPRIME_MAX UINT_MAX
 #define FBPRIME_BITS 32
 typedef fbprime_t fbroot_t;
 #define FBROOT_FORMAT "%u"
@@ -55,6 +61,7 @@ void		fb_fprint_entry (FILE *, const factorbase_degn_t *);
 void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
+fbprime_t       fb_is_power (fbprime_t);
 factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
 					const fbprime_t, const double, 
 					const int, const int, FILE *);
@@ -63,6 +70,8 @@ fbprime_t	*fb_extract_bycost (const factorbase_degn_t *,
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
 size_t          fb_nroots_total (const factorbase_degn_t *fb);
+void            fb_dump_degn (const factorbase_degn_t *, const char *);
+factorbase_degn_t *	fb_mmap(const char *);
 
 /* Some inlined functions which need to be fast */
   
@@ -213,7 +222,7 @@ static inline ptrdiff_t fb_iterator_diff_bytes(fb_iterator_srcptr t, fb_iterator
     ptrdiff_t n = -q->i * sizeof(fbprime_t);
     q->i = 0;
     for( ; fb_iterator_lessthan_fb(q, t->fb) ; ) {
-        n += q->fb->nr_roots * sizeof(fbprime_t) + sizeof(factorbase_degn_t);
+        n += fb_entrysize(q->fb);
         q->fb = fb_next(q->fb);
     }
     n += t->i;

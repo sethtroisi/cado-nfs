@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include <string.h>
 #include <math.h>
 
@@ -31,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h"
 #include "sieve/fb.h"
+#include "typedefs.h"
 
 #include "hashpair.h"
 
@@ -45,6 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 // TODO: make this definition go into the actual code, which is not the
 // case currently.
 
+#if 0
 // When p1 == p2, sort r's in increasing order
 int
 compare_ul2(const void *v1, const void *v2)
@@ -66,7 +69,7 @@ int
 findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
 {
     unsigned long *tmp = (unsigned long *)malloc((2+(nprimes<<1)) * sizeof(unsigned long));
-    HR_T i;
+    p_r_values_t i;
     unsigned int j, k, ntmp = 0;
     int pdeg, nfree;
 
@@ -132,11 +135,12 @@ Date:   Tue Feb 12 12:41:46 2008 +0000
     git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/cado/trunk@801 de4796e2-0b1e-0
  */
 
-void
+unsigned long
 largeFreeRelations (cado_poly pol, char **fic, int verbose)
 {
     hashtable_t H;
-    int Hsizea, nprimes_alg = 0, nfree = 0;
+    int Hsizea, nprimes_alg = 0;
+    unsigned long nfree = 0;
     /*
     int need64 = (pol->rat->lpb > 32) || (pol->alg->lpb > 32);
     */
@@ -183,17 +187,17 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
     if (verbose)
       fprintf (stderr, "nprimes_alg = %d\n", nprimes_alg);
     nfree = findFreeRelations(&H, pol, nprimes_alg);
-    if (verbose)
-      fprintf (stderr, "Found %d usable free relations\n", nfree);
     hashFree(&H);
+    return nfree;
 }
 
-int
+unsigned long 
 countFreeRelations(int *deg, char *roots)
 {
     FILE *ifile = fopen(roots, "r");
     char str[1024], str0[128], str1[128], str2[128], *t;
-    int nfree = 0, nroots;
+    int nroots;
+    unsigned long nfree = 0;
 
     *deg = -1;
     // look for the degree
@@ -274,62 +278,115 @@ addFreeRelations(char *roots, int deg)
     }
 }
 
-static void MAYBE_UNUSED
+static unsigned long MAYBE_UNUSED
 smallFreeRelations (char *fbfilename)
 {
     int deg;
-    int nfree = countFreeRelations (&deg, fbfilename);
-    fprintf (stderr, "# Free relations: %d\n", nfree);
+    unsigned long nfree = countFreeRelations (&deg, fbfilename);
     
     fprintf (stderr, "Handling free relations...\n");
     addFreeRelations (fbfilename, deg);
+    return nfree;
 }
+#endif
 
 /* generate all free relations up to the large prime bound */
+/* generate the renumbering table */
 
-static void MAYBE_UNUSED
-allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax)
+
+static unsigned long MAYBE_UNUSED
+allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
+                  renumber_t renumber_table)
 {
-  unsigned long lpb, p, *roots;
-  int d = pol->alg->degree, i, n, proj;
+  unsigned long lpb[2], p, *roots[2], nfree = 0, minlim;
+  int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
+  index_t old_table_size = renumber_table->size, min_index = UMAX(index_t);
+
+  rat_side = renumber_table->rat;
+  alg_side = 1 - rat_side;
+  d[rat_side] = pol->rat->degree;
+  d[alg_side] = pol->alg->degree;
 
   /* we generate all free relations up to the *minimum* of the two large
-     prime bounds, since larger primes will never occur on at least one side */
-  lpb = (pol->rat->lpb < pol->alg->lpb) ? pol->rat->lpb : pol->alg->lpb;
-  ASSERT_ALWAYS(lpb < sizeof(unsigned long) * CHAR_BIT);
-  lpb = 1UL << lpb;
-  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+     prime bounds, since larger primes will never occur on both sides */
+  /* we generate the renumbering table up to the *maximun* of the two large
+     prime bounds */
+  lpb[rat_side] = pol->rat->lpb;
+  ASSERT_ALWAYS(lpb[rat_side] > 0);
+  lpb[alg_side] = pol->alg->lpb;
+  ASSERT_ALWAYS(lpb[alg_side] > 0);
+  min_side = (lpb[0] < lpb[1]) ? 0 : 1;
+  max_side = 1 - min_side;
+  for (i = 0; i < 2; i++)
+  {
+    ASSERT_ALWAYS(lpb[i] < sizeof(unsigned long) * CHAR_BIT);
+    lpb[i] = 1UL << lpb[i];
+    roots[i] = (unsigned long*) malloc (d[i] * sizeof (unsigned long));
+  }
+
   if (pmax == 0)
-    pmax = lpb;
-  for (p = 2; p <= pmax; p = getprime (p))
+    pmax = lpb[min_side];
+  ASSERT_ALWAYS (pmax <= lpb[min_side]);
+
+  fprintf (stderr, "Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
+  fprintf (stderr, "Generating renumber table for 2 <= p <= %lu\n",
+                   lpb[max_side]);
+
+  minlim = MIN (pol->pols[0]->lim, pol->pols[1]->lim);
+
+  for (p = 2; p <= lpb[max_side]; p = getprime (p))
+  {
+    /* first compute the roots */
+    if (p < lpb[rat_side])
+      k[rat_side] = 1;
+    else
+      k[rat_side] = 0;
+      
+    if (p < lpb[alg_side])
     {
-      if (p >= pmin)
-        {
-          /* first compute the number of roots */
-          n = poly_roots_ulong (NULL, pol->alg->f, d, p);
-          proj = mpz_divisible_ui_p (pol->alg->f[d], p) ? 1 : 0;
-          if (n + proj == d)
-            {
-              /* then only compute the roots if we have d roots in total */
-              poly_roots_ulong (roots, pol->alg->f, d, p);
-              printf ("%lu,0:%lx:%lx", p, p, roots[0]);
-              for (i = 1; i < d; i++)
-                printf (",%lx", roots[i]);
-              if (proj)
-                printf (",%lx", p);
-              printf ("\n");
-            }
-        }
+      k[alg_side] = poly_roots_ulong(roots[alg_side],pol->alg->f,d[alg_side],p);
+      // Check for a projective root
+      if (mpz_divisible_ui_p (pol->alg->f[d[alg_side]], p)) 
+        roots[alg_side][k[alg_side]++] = p;
     }
+    else
+      k[alg_side] = 0;
+
+    renumber_write_p (renumber_table, p, roots, k);
+
+    if (p >= pmin && p <= pmax && k[alg_side] == d[alg_side])
+    {
+      //print the free rels
+      index_t l;
+      printf ("%lx,0:%lx", p, (unsigned long) old_table_size);
+      for (l = old_table_size + 1; l < renumber_table->size; l++)
+        printf (",%lx", (unsigned long) l);
+      printf ("\n");
+      nfree++;
+    }
+
+    /* compute minindex */
+    if (p >= minlim && min_index == UMAX(index_t))
+      min_index = old_table_size;
+
+    old_table_size = renumber_table->size;
+  }
+  
+  fprintf (stderr, "Renumbering struct: min_index=%" PRid "\n", min_index);
   getprime (0);
-  free (roots);
+  free (roots[0]);
+  free (roots[1]);
+  return nfree;
 }
 
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly\n", argv0);
+  fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly "
+                   "-badideals badfile -renumber outfile\n", argv0);
+#if 0
   fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
+#endif
   exit (1);
 }
 
@@ -337,11 +394,19 @@ int
 main (int argc, char *argv[])
 {
     char *fbfilename MAYBE_UNUSED, *polyfilename = NULL, **fic MAYBE_UNUSED;
+    char *renumberfilename = NULL;
+    char *badidealsfilename = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
     int nfic MAYBE_UNUSED;
     int verbose = 0, k;
-    unsigned long pmin = 2, pmax = 0;
+    unsigned long pmin = 2, pmax = 0, nfree;
+    renumber_t renumber_table;
+    int add_full_col = 0;
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     fbfilename = NULL;
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -369,6 +434,18 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-badideals") == 0)
+          {
+            badidealsfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-renumber") == 0)
+          {
+            renumberfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
         else if (argc > 2 && strcmp (argv[1], "-pmin") == 0)
           {
             pmin = strtoul (argv[2], NULL, 10);
@@ -381,6 +458,12 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 1 && strcmp (argv[1], "-addfullcol") == 0)
+          {
+            add_full_col = 1;
+            argc --;
+            argv ++;
+          }
         else
           usage (argv0);
       }
@@ -388,7 +471,7 @@ main (int argc, char *argv[])
     fic = argv+1;
     nfic = argc-1;
 
-    if (polyfilename == NULL)
+    if (polyfilename == NULL || renumberfilename == NULL)
       usage (argv0);
 
     cado_poly_init(cpoly);
@@ -401,19 +484,25 @@ main (int argc, char *argv[])
     /* check that n divides Res(f,g) [might be useful to factor n...] */
     cado_poly_check (cpoly);
 
+    renumber_init (renumber_table, cpoly);
+    renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
+                         add_full_col);
+
 #if 0
     if (nfic == 0)
       {
         if (fbfilename == NULL)
           usage (argv0);
-	smallFreeRelations(fbfilename);
+	nfree = smallFreeRelations(fbfilename);
       }
     else
-      largeFreeRelations(cpoly, fic, verbose);
+      nfree = largeFreeRelations(cpoly, fic, verbose);
 #else
-    allFreeRelations (cpoly, pmin, pmax);
+    nfree = allFreeRelations (cpoly, pmin, pmax, renumber_table);
 #endif
+    fprintf (stderr, "# Free relations: %lu\n", nfree);
 
+    renumber_close_write (renumber_table);
     cado_poly_clear (cpoly);
 
     return 0;

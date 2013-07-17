@@ -38,7 +38,7 @@ Required software tools:
     including gmp.h, which is not installed by default).
     Note: make sure to configure GMP with --enable-shared so that a shared
     library is installed (libgmp.so under Linux) otherwise CADO-NFS might not
-    compile.
+    compile. GMP 5 (or newer) is required.
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
 *) GNU make and CMake for building (CMake is installed on the fly if missing
@@ -250,6 +250,7 @@ under Windows:
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
   under Windows. Those instructions should work for CADO-NFS too.
+  See dev_docs/howto-MinGW.txt.
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.
@@ -268,6 +269,9 @@ Known problems:
   GCC 4.2.0, 4.2.1 and 4.2.2 are also affected
 * under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
   work, please use bwmt=1x1 option in factor.sh or cadofactor.pl.
+* under AIX, if GMP is compiled in 64-bit mode, you should set the
+  environment variable OBJECT_MODE, for example:
+  export OBJECT_MODE=64
 
 Publications related to CADO-NFS:
 =================================
@@ -289,7 +293,7 @@ preprint, 2011.
 
 Non-Linear Polynomial Selection for the Number Field Sieve, Thomas Prest and
 Paul Zimmermann, Journal of Symbolic Computation, special issue in the honour
-of Joachim von zur Gathen, volume 47, number 4, pages 401-409, 2011. 
+of Joachim von zur Gathen, volume 47, number 4, pages 401-409, 2011.
 
 Améliorations de la multiplication et de la factorisation d'entier, Alexander
 Kruppa, PhD thesis, Université Henri Poincaré - Nancy I, 2010, available from

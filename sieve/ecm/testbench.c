@@ -18,9 +18,11 @@
 */
 
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <gmp.h>
 #include "facul.h"
 #include "pm1.h"
@@ -58,7 +60,8 @@ print_pointorder (const unsigned long p, const unsigned long s,
 
 static int
 tryfactor (mpz_t N, const facul_strategy_t *strategy, 
-           const int verbose, const int printfactors, const int printnonfactors)
+           const int verbose, const int printfactors, const int printnonfactors, 
+           const int printcofactors)
 {
   unsigned long f[16];
   int facul_code;
@@ -68,19 +71,29 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
 
   facul_code = facul (f, N, strategy);
   
+  if (verbose >= 2)
+    gmp_printf ("facul returned code %d\n", facul_code);
+
   if (printfactors && facul_code > 0)
     {
       int j;
-      for (j = 0; j < facul_code; j++)
-        printf ("%lu ", f[j]);
+      printf ("%lu", f[0]);
+      for (j = 1; j < facul_code; j++)
+        printf (" %lu", f[j]);
+      if (printcofactors) {
+        mpz_t c;
+        mpz_init_set (c, N);
+        for (j = 0; j < facul_code; j++)
+          mpz_divexact_ui (c, c, f[j]);
+        if (mpz_cmp_ui (c, 1) != 0)
+          gmp_printf (" %Zd", c);
+        mpz_clear (c);
+      }
       printf ("\n");
     }
   
-  if (printnonfactors && facul_code == 0)
+  if (printnonfactors && (facul_code == 0 || facul_code == FACUL_NOT_SMOOTH))
     {
-      int j;
-      for (j = 0; j < facul_code; j++)
-        mpz_tdiv_q_ui (N, N, f[j]);
       gmp_printf ("%Zd\n", N);
     }
   
@@ -108,6 +121,7 @@ void print_help (char *programname)
           "         numbers that are tried. Three: internal info from strategies\n");
   printf ("-vf      Print factors that are found\n");
   printf ("-vnf     Print input numbers where no factor was found\n");
+  printf ("-vcf     Print cofactor if any factors were found\n");
   printf ("-cof <n> Multiply each number to test by <num> before calling facul.\n"
 	  "         NOTE: facul does not report input numbers as factors,\n"
 	  "         with -p you MUST use -cof or no factors will be found\n");
@@ -121,7 +135,7 @@ int main (int argc, char **argv)
 {
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, total = 0;
-  unsigned long fbb = 0, lpb = ~(0UL);
+  unsigned long fbb = 0, lpb = ULONG_MAX;
   char *inp_fn = NULL;
   FILE *inp;
   mpz_t N, cof;
@@ -130,6 +144,7 @@ int main (int argc, char **argv)
   int only_primes = 0, verbose = 0, quiet = 0;
   int printfactors = 0;
   int printnonfactors = 0;
+  int printcofactors = 0;
   int do_pointorder = 0;
   unsigned long po_sigma = 0, po_parameterization = 0;
   int inp_raw = 0;
@@ -140,9 +155,7 @@ int main (int argc, char **argv)
 
   strategy = malloc (sizeof(facul_strategy_t));
   strategy->methods = malloc ((MAX_METHODS + 1) * sizeof (facul_method_t));
-  strategy->lpb = ~(0UL);
-  strategy->fbb2[0] = 0UL;
-  strategy->fbb2[1] = 0UL;
+  strategy->assume_prime_thresh = 0;
 
   /* Parse options */
   mpz_init (N);
@@ -241,8 +254,10 @@ int main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-fbb") == 0)
 	{
 	  fbb = strtoul (argv[2], NULL, 10);
-	  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), 
-	                         fbb, fbb);
+	  if (fbb > UINT32_MAX)
+	    strategy->assume_prime_thresh = UINT64_MAX;
+	  else
+	    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -288,6 +303,12 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+      else if (argc > 1 && strcmp (argv[1], "-vcf") == 0)
+	{
+	  printcofactors = 1;
+	  argc -= 1;
+	  argv += 1;
+	}
       else if (argc > 2 && strcmp (argv[1], "-inpstop") == 0)
 	{
 	  inpstop = strtoul (argv[2], NULL, 10);
@@ -325,7 +346,7 @@ int main (int argc, char **argv)
 	}
       else
         {
-	  printf ("Unrecoglized option: %s\n", argv[1]);
+	  printf ("Unrecognized option: %s\n", argv[1]);
 	  exit (EXIT_FAILURE);
         }
     }
@@ -341,12 +362,14 @@ int main (int argc, char **argv)
 
   if (strat)
     {
-      facul_clear_strategy (strategy);
-      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? 0 : 1UL << lpb);
+      free(strategy->methods);
+      free(strategy);
+      strategy = facul_make_strategy (15, fbb, lpb);
     }
   else
     {
       if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
+      strategy->lpb = lpb;
       strategy->methods[nr_methods].method = 0;
     }
 
@@ -387,7 +410,7 @@ int main (int argc, char **argv)
           else
 	    {
               mpz_mul_ui (N, cof, i);
-              if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+              if (tryfactor (N, strategy, verbose, printfactors, printnonfactors, printcofactors))
                 {
                   hits++;
                   if (mod > 0)
@@ -424,12 +447,17 @@ int main (int argc, char **argv)
 	  continue;
 	total++;
 
-        if (do_pointorder && mpz_fits_ulong_p (N))
-          print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+        if (do_pointorder)
+          {
+            if (mpz_fits_ulong_p (N))
+              print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+            else
+              gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", N);
+          }
         else
           {
             mpz_mul (N, N, cof);
-            if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+            if (tryfactor (N, strategy, verbose, printfactors, printnonfactors, printcofactors))
               hits++;
           }
       }

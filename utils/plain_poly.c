@@ -9,14 +9,17 @@
    where f is the algebraic polynomial. This gives the following bounds:
 
    deg(f)      plain_poly_coeff_t=int32_t        plain_poly_coeff_t=int64_t
-     2         p <= 32749          p <= 2147483647
-     3         p <= 26737          p <= 1753413037
-     4         p <= 23167          p <= 1518500213
-     5         p <= 20719          p <= 1358187913
-     6         p <= 18917          p <= 1239850223
+     2         p <= 32768          p <= 2147483648
+     3         p <= 26755          p <= 1753413057
+     4         p <= 23171          p <= 1518500250
+     5         p <= 20725          p <= 1358187914
+     6         p <= 18919          p <= 1239850263
+     7         p <= 17516          p <= 1147878294
+     8         p <= 16384          p <= 1073741824
 */
 
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -767,7 +770,7 @@ plain_poly_roots_int64 (int64_t *r, mpz_t *f, int d, const plain_poly_coeff_t p)
 
 int plain_poly_is_irreducible(plain_poly_t fp, const plain_poly_coeff_t p) {
   plain_poly_t g, gmx, h;
-  int d, i;
+  int d, i, ret = 1;
 
   plain_poly_make_monic (fp, p);
   d = fp->degree;
@@ -802,11 +805,14 @@ int plain_poly_is_irreducible(plain_poly_t fp, const plain_poly_coeff_t p) {
     plain_poly_gcd (h, gmx, p);
 
     if (h->degree > 0)
-      return 0;
+      {
+        ret = 0;
+        break;
+      }
   }
 
   plain_poly_clear (g);
   plain_poly_clear (gmx);
   plain_poly_clear (h);
-  return 1;
+  return ret;
 }

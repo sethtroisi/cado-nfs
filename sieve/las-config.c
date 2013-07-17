@@ -38,13 +38,14 @@ void las_display_config_flags(FILE * stream)
 #ifdef ALG_RAT
     fprintf(stream, " ALG_RAT");
 #endif
+#ifdef SUPPORT_LARGE_Q
+    fprintf(stream, " SUPPORT_LARGE_Q");
+#endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
-    fprintf(stream, " BUCKET_LIMIT_FACTOR=%.1f",
-            (double) BUCKET_LIMIT_FACTOR);
-    fprintf(stream, " BUCKET_LIMIT_ADD=%u", BUCKET_LIMIT_ADD);
-    fprintf(stream, " GUARD=%1.2f", GUARD);
+    fprintf(stream, " GUARD=%1.2f", (double) GUARD);
     fprintf(stream, " LOG_MAX=%.1f", LOG_MAX);
+    fprintf(stream, " NB_CURVES=%u", NB_CURVES);
     fprintf(stream, "\n");
 }				/* }}} */
 

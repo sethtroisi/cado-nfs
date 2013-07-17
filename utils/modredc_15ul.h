@@ -19,6 +19,7 @@
 #include <stdio.h>
 #endif
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -61,7 +62,7 @@ static inline void
 modredc15ul_add (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m);
 static inline void
-modredc15ul_get_uls (modintredc15ul_t r, const residueredc15ul_t s, 
+modredc15ul_get_int (modintredc15ul_t r, const residueredc15ul_t s, 
 		     const modulusredc15ul_t m MAYBE_UNUSED);
 
 MAYBE_UNUSED
@@ -136,6 +137,23 @@ modredc15ul_redc1 (residueredc15ul_t r, const residueredc15ul_t s,
 
 MAYBE_UNUSED
 static inline void
+modredc15ul_intinit (modintredc15ul_t r)
+{
+  r[0] = 0;
+  r[1] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intclear (modintredc15ul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredc15ul_intset (modintredc15ul_t r, const modintredc15ul_t s)
 {
   r[0] = s[0];
@@ -148,6 +166,44 @@ modredc15ul_intset_ul (modintredc15ul_t r, const unsigned long s)
 {
   r[0] = s;
   r[1] = 0UL;
+}
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intset_uls (modintredc15ul_t r, const unsigned long *s, 
+                        const size_t n)
+{
+  if (n == 0) {
+    r[0] = 0;
+    r[1] = 0;
+  } else if (n == 1) {
+    r[0] = s[0];
+    r[1] = 0;
+  } else if (n == 2) {
+    r[0] = s[0];
+    r[1] = s[1];
+  } else
+    abort();
+}
+
+MAYBE_UNUSED
+static inline unsigned long 
+modredc15ul_intget_ul (const modintredc15ul_t s)
+{
+  ASSERT(s[1] == 0);
+  return s[0];
+}
+
+MAYBE_UNUSED
+static inline size_t  
+modredc15ul_intget_uls (unsigned long *r, const modintredc15ul_t s)
+{
+  r[0] = s[0];
+  if (s[1] != 0) {
+    r[1] = s[1];
+    return 2;
+  }
+  return 1;
 }
 
 MAYBE_UNUSED
@@ -197,6 +253,21 @@ modredc15ul_intcmp_ul (const modintredc15ul_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modredc15ul_intcmp_uint64 (const modintredc15ul_t a, const uint64_t b)
+{
+  ASSERT(ULONG_MAX == UINT32_MAX || ULONG_MAX == UINT64_MAX);
+  if (ULONG_MAX == UINT32_MAX) {
+    uint64_t t = ((uint64_t) a[1] << 32) + a[0];
+    return (t < b) ? -1 : (t == b) ? 0 : 1;
+  } else {
+    if (a[1] > 0UL)
+      return 1;
+    return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+  }
+}
+
+MAYBE_UNUSED
+static inline int
 modredc15ul_intfits_ul (const modintredc15ul_t a)
 {
   return (a[1] == 0UL);
@@ -227,7 +298,7 @@ modredc15ul_intsub (modintredc15ul_t r, const modintredc15ul_t a,
 /* Returns the number of bits in a, that is, floor(log_2(a))+1. 
    For a == 0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modredc15ul_intbits (const modintredc15ul_t a)
 {
   if (a[1] > 0UL)
@@ -381,12 +452,10 @@ modredc15ul_intmod (modintredc15ul_t r, const modintredc15ul_t n,
 
 /* Functions for the modulus */
 
-/* Init the modulus from a multi-word integer. s must point to an array of
-   at least two unsigned longs, where s[0] is the low word of the modulus, 
-   and s[1] is the high word. */
+/* Init the modulus from a modintredc15ul_t. */
 MAYBE_UNUSED
 static inline void
-modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
+modredc15ul_initmod_int (modulusredc15ul_t m, const modintredc15ul_t s)
 {
   ASSERT (s[1] > 0UL);
   ASSERT (s[1] < (1UL << (LONG_BIT / 2)));
@@ -400,17 +469,17 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc15ul_t t;
-    modredc15ul_get_uls (t, m[0].one, m);
+    modredc15ul_get_int (t, m[0].one, m);
     ASSERT_EXPENSIVE (modredc15ul_intequal_ul (t, 1UL));
   }
 #endif
 }
 
 
-/* Returns the modulus to an array of unsigned longs. */
+/* Returns the modulus as an modintredc15ul_t. */
 MAYBE_UNUSED
 static inline void
-modredc15ul_getmod_uls (modintredc15ul_t r, const modulusredc15ul_t m)
+modredc15ul_getmod_int (modintredc15ul_t r, const modulusredc15ul_t m)
 {
   modredc15ul_intset (r, m[0].m);
 }
@@ -475,7 +544,7 @@ modredc15ul_set_ul (residueredc15ul_t r, const unsigned long s,
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc15ul_t t;
-    modredc15ul_get_uls (t, r, m);
+    modredc15ul_get_int (t, r, m);
     ASSERT_EXPENSIVE (t[0] == s && t[1] == 0UL);
   }
 #endif
@@ -496,7 +565,7 @@ modredc15ul_set_ul_reduced (residueredc15ul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s, 
+modredc15ul_set_int (residueredc15ul_t r, const modintredc15ul_t s, 
 		     const modulusredc15ul_t m)
 {
   if (!modredc15ul_intlt (s, m[0].m))
@@ -510,7 +579,7 @@ modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_set_uls_reduced (residueredc15ul_t r, const modintredc15ul_t s, 
+modredc15ul_set_int_reduced (residueredc15ul_t r, const modintredc15ul_t s, 
 			     const modulusredc15ul_t m)
 {
   ASSERT (modredc15ul_intlt (s, m[0].m));
@@ -567,11 +636,11 @@ modredc15ul_get_ul (const residueredc15ul_t s,
 }
 
 
-/* Returns the residue into an array of unsigned longs */
+/* Returns the residue as a modintredc15ul_t */
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_get_uls (modintredc15ul_t r, const residueredc15ul_t s, 
+modredc15ul_get_int (modintredc15ul_t r, const residueredc15ul_t s, 
 		     const modulusredc15ul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (modredc15ul_intlt (s, m[0].m));
@@ -632,7 +701,7 @@ modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a,
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc15ul_intlt (b, m[0].m));
 
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   {
     unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
@@ -754,7 +823,7 @@ static inline void
 modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a, 
                  const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc15ul_intlt (b, m[0].m));
@@ -917,7 +986,7 @@ static inline void
 modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a, 
                  const modulusredc15ul_t m)
 {
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
 #if defined(MODTRACE)
   printf ("((%lu * 2^%d + %lu)^2 / 2^%d) %% (%lu * 2^%d + %lu)", 

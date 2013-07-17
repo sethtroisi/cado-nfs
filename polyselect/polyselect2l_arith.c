@@ -59,7 +59,7 @@ roots_lift (uint64_t *r, mpz_t N, unsigned long d, mpz_t m0,
   }
   else {
 #if 0   
-    printf ("p: %lu, ppl %"PRId64": ", p, pp);
+    printf ("p: %lu, ppl %" PRId64 ": ", p, pp);
 #endif
     uint64_t tmp1;
     mpz_t ppz, *rz, tmpz;
@@ -70,7 +70,7 @@ roots_lift (uint64_t *r, mpz_t N, unsigned long d, mpz_t m0,
       mpz_init_set_ui (rz[j], 0UL);
       mpz_set_uint64 (rz[j], r[j]);
 #if 0   
-      printf (" %"PRIu64"", r[j]);
+      printf (" %" PRIu64 "", r[j]);
 #endif
     }
 

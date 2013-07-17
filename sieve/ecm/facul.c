@@ -3,9 +3,11 @@
    or -1 in case of error. */
 
 #include "cado.h"
+#include <stdint.h>	/* AIX wants it first (it's a bug) */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "utils.h"      /* Happens to define ULONG_BITS, which we use */
 #include "portability.h"
 #include "pm1.h"
@@ -48,11 +50,12 @@ facul_make_strategy (const int n, const unsigned long fbb,
   int i;
   
   strategy = malloc (sizeof (facul_strategy_t));
-  strategy->lpb = 1UL << lpb;
-  if (lpb == ULONG_BITS)
-      strategy->lpb = ~0UL;
-  /* Store fbb^2 in fbb2 */
-  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), fbb, fbb);
+  strategy->lpb = lpb;
+  /* Store fbb^2 in assume_prime_thresh */
+  if (fbb > UINT32_MAX)
+    strategy->assume_prime_thresh = UINT64_MAX;
+  else
+    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
 
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
@@ -79,11 +82,22 @@ facul_make_strategy (const int n, const unsigned long fbb,
       ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, 0);
     }
 
+  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  double B1 = 105.0;
   for (i = 4; i < n + 3; i++)
     {
+      double B2;
+      unsigned int k;
+
+      B1 += sqrt (B1);
+      B2 = 17.0 * B1;
+      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
+         B2/210-0.5 */
+      k = B2 / 210.0;
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, 315, 5355, MONTY12, i - 1, 1, 0);
+      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+                     MONTY12, i - 1, 1, 0);
     }
 
   methods[n + 3].method = 0;
@@ -159,8 +173,8 @@ void facul_print_stats (FILE *stream)
 int
 facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
 {
-  modintredc2ul2_t n;
-  int i, found = 0;
+  int found = 0;
+  size_t bits;
   
 #ifdef PARI
   gmp_fprintf (stderr, "%Zd", N);
@@ -173,39 +187,51 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   
   /* If the composite does not fit into our modular arithmetic, return
      no factor */
-  if (mpz_sizeinbase (N, 2) > MODREDC2UL2_MAXBITS)
+  bits = mpz_sizeinbase (N, 2);
+  if (bits > MODMPZ_MAXBITS)
     return 0;
   
-  {
-    size_t written;
-    mpz_export (n, &written, -1, sizeof(unsigned long), 0, 0, N);
-    for (i = written; i < MODREDC2UL2_SIZE; i++)
-      n[i] = 0UL;
-  }
-  
   /* Use the fastest modular arithmetic that's large enough for this input */
-  i = modredc2ul2_intbits (n);
-  if (i <= MODREDCUL_MAXBITS)
+  if (bits <= MODREDCUL_MAXBITS)
     {
       modulusredcul_t m;
-      modredcul_initmod_uls (m, n);
+      ASSERT(mpz_fits_ulong_p(N));
+      modredcul_initmod_ul (m, mpz_get_ui(N));
       found = facul_doit_ul (factors, m, strategy, 0);
       modredcul_clearmod (m);
     }
-  else if (i <= MODREDC15UL_MAXBITS)
+  else if (bits <= MODREDC15UL_MAXBITS)
     {
       modulusredc15ul_t m;
-      modredc15ul_initmod_uls (m, n);
+      unsigned long t[2];
+      modintredc15ul_t n;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, N);
+      ASSERT_ALWAYS(written <= 2);
+      modredc15ul_intset_uls (n, t, written);
+      modredc15ul_initmod_int (m, n);
       found = facul_doit_15ul (factors, m, strategy, 0);
       modredc15ul_clearmod (m);
     }
-  else 
+  else if (bits <= MODREDC2UL2_MAXBITS)
     {
       modulusredc2ul2_t m;
-      ASSERT (i <= MODREDC2UL2_MAXBITS);
-      modredc2ul2_initmod_uls (m, n);
+      unsigned long t[2];
+      modintredc2ul2_t n;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, N);
+      ASSERT_ALWAYS(written <= 2);
+      modredc2ul2_intset_uls (n, t, written);
+      modredc2ul2_initmod_int (m, n);
       found = facul_doit_2ul2 (factors, m, strategy, 0);
       modredc2ul2_clearmod (m);
+    } 
+  else 
+    {
+      modulusmpz_t m;
+      modmpz_initmod_int (m, N);
+      found = facul_doit_mpz (factors, m, strategy, 0);
+      modmpz_clearmod (m);
     }
   
   if (found > 1)

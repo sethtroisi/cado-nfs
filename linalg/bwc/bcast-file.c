@@ -29,7 +29,7 @@ int size;
 void share_file(const char * fname, int root, size_t total, MPI_Comm comm)
 {
     FILE * f;
-    f = fopen(fname, rank == root ? "r" : "w");
+    f = fopen(fname, rank == root ? "rb" : "wb");
     if (f == NULL)
         MPI_Abort(comm,1);
 

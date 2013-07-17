@@ -1,7 +1,8 @@
 /* replay --- replaying history of merges to build the small matrix
 
-Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Emmanuel Thome,
-                                       Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012, 2013
+          Francois Morain, Emmanuel Thome, Paul Zimmermann,
+          Cyril Bouvier, Pierrick Gaudry
 
 This file is part of CADO-NFS.
 
@@ -23,23 +24,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include <string.h>
 
 #include "portability.h"
 #include "utils.h"
 
 #include "merge_opts.h"
+#include "filter_matrix.h"
 #include "sparse.h"
 #include "gzip.h"
 
 #define DEBUG 0
 #define STAT_FFS
-
-#define TRACE_COL -1 // 231 // put to -1 if not...!
-
-#if DEBUG >= 1
-static unsigned long row_additions = 0;
-#endif
 
 // newrows[i] contains a new row formed of old rows that correspond to
 // true original relations (and not multirelations).
@@ -47,37 +44,11 @@ static unsigned long row_additions = 0;
 // After computing newrows, we deduce for all old rows the list of newrows
 // containing it.
 
-#if DEBUG >= 1
-static void
-printOldRows(int **oldrows, int nrows)
-{
-    int i;
-
-    // where oldrows intervene
-    for(i = 0; i < nrows; i++)
-	if(oldrows[i][0] != 0){
-	    fprintf(stderr, "old row_%d takes part to new row(s)", i);
-	    fprintRow(stderr, oldrows[i]);
-	    fprintf(stderr, "\n");
-	}
-}
-
-static void
-printBuf(FILE *file, int *buf, int ibuf)
-{
-    int i;
-
-    fprintf(file, "buf[%d] =", ibuf);
-    for(i = 0; i < ibuf; i++)
-	fprintf(file, " %d", buf[i]);
-}
-#endif
-
 static unsigned long
 flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             int small_ncols, int *code, int skip, int bin)
 {
-#ifdef FOR_FFS
+#ifdef FOR_DL
   ASSERT_ALWAYS (skip == 0);
 #endif
     const struct {
@@ -116,6 +87,12 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     ASSERT_ALWAYS(weights != NULL);
     memset(weights, 0, small_ncols * sizeof(uint32_t));
 
+    char wmode[3] = "w";
+#ifdef HAVE_MINGW
+    if (bin)
+      strcpy (wmode, "wb");
+#endif
+
     char * base = strdup(sparsename);
     if (zip) { base[strlen(base)-3]='\0'; }
     if (has_suffix(base, suf->ext)) { base[strlen(base)-4]='\0'; }
@@ -130,8 +107,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     {
         smatname = derived_filename(base, suf->smat, zip);
         srwname  = derived_filename(base, suf->srw, zip);
-        smatfile = fopen_maybe_compressed(smatname, "w");
-        srwfile  = fopen_maybe_compressed(srwname, "w");
+        smatfile = fopen_maybe_compressed(smatname, wmode);
+        srwfile  = fopen_maybe_compressed(srwname, wmode);
         if (!bin)
             fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
     }
@@ -146,8 +123,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     if (skip) {
         dmatname = derived_filename(base, suf->dmat, zip);
         drwname  = derived_filename(base, suf->drw, zip);
-        dmatfile = fopen_maybe_compressed(dmatname, "w");
-        drwfile  = fopen_maybe_compressed(drwname, "w");
+        dmatfile = fopen_maybe_compressed(dmatname, wmode);
+        drwfile  = fopen_maybe_compressed(drwname, wmode);
         if (!bin)
             fprintf(dmatfile, "%d %d\n", small_nrows, skip);
     }
@@ -168,7 +145,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         } else {
             uint32_t dw = 0;
             uint32_t sw = 0;
-	    for(int j = 1; j <= rowLength(sparsemat, i); j++){
+	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
 		if (code[rowCell(sparsemat, i, j)]-1 < skip) {
                     dw++;
                     DW++;
@@ -183,14 +160,14 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 if (skip) fwrite32_little(&dw, 1, dmatfile);
                 if (skip) fwrite32_little(&dw, 1, drwfile);
             } else {
-                fprintf(smatfile, "%"PRIu32"", sw);
-                fprintf(srwfile, "%"PRIu32"\n", sw);
-                if (skip) fprintf(dmatfile, "%"PRIu32"", dw);
-                if (skip) fprintf(drwfile, "%"PRIu32"\n", dw);
+                fprintf(smatfile, "%" PRIu32 "", sw);
+                fprintf(srwfile, "%" PRIu32 "\n", sw);
+                if (skip) fprintf(dmatfile, "%" PRIu32 "", dw);
+                if (skip) fprintf(drwfile, "%" PRIu32 "\n", dw);
             }
 
 
-#if 0 //#ifdef FOR_FFS //for FFS sort the index
+#if 0 //#ifdef FOR_DL //for DL sort the index
       for (int k = 1; k < rowLength(sparsemat, i); k++)
         {
           for (int l = k+1; l <= rowLength(sparsemat, i); l++)
@@ -207,7 +184,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         }
 #endif
 
-	    for(int j = 1; j <= rowLength(sparsemat, i); j++){
+	    for(unsigned int j = 1; j <= rowLength(sparsemat, i); j++){
 #if DEBUG >= 1
 		ASSERT(code[rowCell(sparsemat, i, j)] > 0);
 #endif
@@ -218,19 +195,19 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                     if (bin) {
                         fwrite32_little(&x, 1, dmatfile);
                     } else {
-                        fprintf(dmatfile, " %"PRIu32"", x);
+                        fprintf(dmatfile, " %" PRIu32 "", x);
                     }
                 } else {
                     x-=skip;
                     if (bin) {
                         fwrite32_little(&x, 1, smatfile);
-#ifdef FOR_FFS
+#ifdef FOR_DL
                         uint32_t e = (uint32_t) sparsemat[i][j].e;
                         fwrite32_little(&e, 1, smatfile);
 #endif
                     } else {
-                        fprintf(smatfile, " %"PRIu32"", x);
-#ifdef FOR_FFS
+                        fprintf(smatfile, " %" PRIu32 "", x);
+#ifdef FOR_DL
                         fprintf(smatfile, ":%d", sparsemat[i][j].e);
 #endif
                     }
@@ -262,13 +239,13 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     if (skip) {
         dcwname = derived_filename(base, suf->dcw, zip);
-        dcwfile = fopen_maybe_compressed(dcwname, "w");
+        dcwfile = fopen_maybe_compressed(dcwname, wmode);
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
             if (bin) {
                 fwrite32_little(&x, 1, dcwfile);
             } else {
-                fprintf(dcwfile, "%"PRIu32"\n", x);
+                fprintf(dcwfile, "%" PRIu32 "\n", x);
             }
         }
         fclose_maybe_compressed(dcwfile, dcwname);
@@ -277,13 +254,13 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     {
         scwname = derived_filename(base, suf->scw, zip);
-        scwfile = fopen_maybe_compressed(scwname, "w");
+        scwfile = fopen_maybe_compressed(scwname, wmode);
         for(int j = skip; j < small_ncols; j++){
             uint32_t x = weights[j];
             if (bin) {
                 fwrite32_little(&x, 1, scwfile);
             } else {
-                fprintf(scwfile, "%"PRIu32"\n", x);
+                fprintf(scwfile, "%" PRIu32 "\n", x);
             }
         }
         fclose_maybe_compressed(scwfile, scwname);
@@ -296,27 +273,6 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     return W;
 }
 
-// dump of newrows in indexname.
-static void
-makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
-              int small_nrows, int small_ncols)
-{
-    FILE *indexfile;
-    int i, j;
-
-    indexfile = fopen_maybe_compressed(indexname, "w");
-    fprintf(indexfile, "%d %d\n", small_nrows, small_ncols);
-    for(i = 0; i < nrows; i++)
-	if(newrows[i] != NULL){
-	    fprintf(indexfile, "%d", rowLength(newrows, i));
-	    for(j = 1; j <= rowLength(newrows, i); j++){
-		fprintf(indexfile, " ");
-		fprintf(indexfile, PURGE_INT_FORMAT, rowCell(newrows, i, j));
-	    }
-	    fprintf(indexfile, "\n");
-	}
-    fclose_maybe_compressed(indexfile, indexname);
-}
 
 /* we also compare x[1] and y[1] to make the code deterministic
    since in case x[0] = y[0] qsort() may give different results on
@@ -344,7 +300,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
 {
     int j, k, nb, *tmp;
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
     FILE *renumberfile = fopen (idealsfilename, "w+");
     if (renumberfile == NULL)
       {
@@ -374,18 +330,18 @@ renumber (int *small_ncols, int *colweight, int ncols,
     for(j = nb-1, k = 1; j >= 0; j -= 2)
       {
         colweight[tmp[j]] = k++; // always this +1 trick
-#ifdef FOR_FFS
+#ifdef FOR_DL
         fprintf (renumberfile, "%d %x\n", colweight[tmp[j]]-1, tmp[j]);
 #endif
       }
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
     fclose(renumberfile);
 #endif
     free(tmp);
 }
 
-// A line is "i i1 ... ik".
+// A line is "i i1 ... ik [#j]".
 // If i >= 0 then
 //     row[i] is to be added to rows i1...ik and destroyed at the end of
 //     the process.
@@ -393,8 +349,9 @@ renumber (int *small_ncols, int *colweight, int ncols,
 // If i < 0 then
 //     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
 //
+// If given, j is the index of the column used for pivoting (used in DL).
 static void
-doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
+doAllAdds(typerow_t **newrows, char *str, index_data_t index_data)
 {
   int32_t j;
   int32_t ind[MERGE_LEVEL_MAX], i0;
@@ -417,55 +374,24 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 #endif
 
   for (int k = 1; k < ni; k++)
-		addRows(newrows, ind[k], i0, j);
+      addRowsUpdateIndex(newrows, index_data, ind[k], i0, j);
 
   if(destroy)
     {
-	    //destroy initial row!
-#ifdef FOR_FFS
-      fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
-      for (int k = 1; k <= rowLength(newrows, i0); k++)
-          fprintf (outdelfile, " %x:%d", newrows[i0][k].id, newrows[i0][k].e);
-      fprintf (outdelfile, "\n");
-#endif
+      //destroy initial row!
       free(newrows[i0]);
       newrows[i0] = NULL;
-    }
- }
- #if 0
- {
-    char *t = str;
-    int i, ii, destroy = 1;
 
-    if(*t == '-'){
-	destroy = 0;
-	t++;
-    }
-    for(i = 0; (*t != ' ') && (*t != '\n'); t++)
-	i = 10 * i + (*t - '0');
-    if(!destroy)
-	i--; // what a trick, man!
-    if(*t != '\n'){
-	++t;
-	ii = 0;
-	while(1){
-	    if((*t == '\n') || (*t == ' ')){
-#if DEBUG >= 1
-		fprintf(stderr, "next ii is %d\n", ii);
-                row_additions ++;
-#endif
-		addRows(newrows, ii, i, -1);
-		ii = 0;
-	    }
-	    else
-		ii = 10 * ii + (*t - '0');
-	    if(*t == '\n')
-		break;
-	    t++;
-	}
+      if (index_data != NULL) // ie we want an index
+      {
+        index_data[i0].n = 0;
+        free(index_data[i0].rels);
+        index_data[i0].rels = NULL;
+      }
     }
 }
-#endif
+
+
 #define STRLENMAX 2048
 
 // sparsemat is small_nrows x small_ncols, after small_ncols is found using
@@ -494,22 +420,11 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
 
 static void
 build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
-                        const char* outdelfilename)
+                        index_data_t index_data)
 {
     uint64_t bwcost;
     unsigned long addread = 0;
     char str[STRLENMAX];
-
-    FILE *outdelfile = NULL;
-    if (outdelfilename != NULL)
-      {
-        outdelfile = fopen (outdelfilename, "w+");
-        if (outdelfile == NULL)
-          {
-            fprintf (stderr, "Error, cannot open file %s.\n", outdelfilename);
-            exit(1);
-          }
-      }
 
     fprintf(stderr, "Reading row additions\n");
     double tt = wct_seconds();
@@ -523,15 +438,15 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
 	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(newrows, str, outdelfile);
+	    doAllAdds(newrows, str, index_data);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
-		sscanf(str+8, "%"PRIu64"", &bwcost);
-		//	fprintf(stderr, "Read bwcost=%"PRIu64"\n", bwcost);
+		sscanf(str+8, "%" PRIu64 "", &bwcost);
+		//	fprintf(stderr, "Read bwcost=%" PRIu64 "\n", bwcost);
 		if((bwcostmin != 0) && (bwcost == bwcostmin)){
 		    // what a damn tricky feature!!!!!!!
 		    fprintf(stderr, "Activating tricky stopping feature");
-		    fprintf(stderr, " since I reached %"PRIu64"\n", bwcostmin);
+		    fprintf(stderr, " since I reached %" PRIu64 "\n", bwcostmin);
 		    break;
 		}
 	    }
@@ -539,543 +454,138 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     }
 }
 
+/* if for_msieve=1, generate the *.cyc file needed by msieve to construct
+   its matrix, which is of the following (binary) format:
+      small_nrows
+      n1 i1 i2 ... in1
+      n2 j1 j2 ... jn2
+      ...
+      nk ...
+   where each value is stored as a 32-bit integer (no linebreak),
+   small_nrows is the number of relation-sets of the matrix,
+   n1 is the number of relations in the first relation-set,
+   i1 is the index of the first relation in the first relation-set
+   (should correspond to line i1+2 in *.purged.gz), and so on */
+
 // Feed sparsemat with M_purged
 static void
-readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
+readPurged (typerow_t **sparsemat, purgedfile_stream ps, int verbose,
+            int for_msieve)
 {
-  fprintf(stderr, "Reading sparse matrix from purged file\n");
-  for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-      if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+  if (for_msieve == 0)
+    {
+      fprintf(stderr, "Reading sparse matrix from purged file\n");
+      for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+        if (verbose && purgedfile_stream_disp_progress_now_p(ps))
           fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
-                          ps->rrows,ps->dt);
-	    if(ps->nc == 0)
+                  ps->rrows,ps->dt);
+        if(ps->nc == 0)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
-#ifdef FOR_FFS
-      sparsemat[i] = (typerow_t *)malloc((ps->nc+2) * sizeof(typerow_t));
-      int j = 0;
-      int previous = -1;
-#else
       sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
-      int j = ps->nc;
-#endif
       ASSERT_ALWAYS(sparsemat[i] != NULL);
+      int j = 1;
       for(int k = 0; k < ps->nc; k++)
         {
-#ifdef FOR_FFS
-          if (ps->cols[k] == previous)
-              sparsemat[i][j].e++;
+#ifdef FOR_DL
+          if (j > 1 && (int) sparsemat[i][j-1].id == ps->cols[k])
+            sparsemat[i][j-1].e++;
           else
-            {
-              j++;
-              rowCell(sparsemat, i, j) = ps->cols[k];
-              sparsemat[i][j].e = 1;
-            }
-
-          previous = ps->cols[k];
-#else
-          rowCell(sparsemat, i, k+1) = ps->cols[k];
 #endif
+          {
+            setCell(sparsemat[i][j], ps->cols[k], 1);
+            j++;
+          }
         }
-#ifdef FOR_FFS
-      if (ps->b != 0)
-        {
-          j++;
-          rowCell(sparsemat, i, j) = ps->ncols - 1;
-          sparsemat[i][j].e = 1;
-        }
-#endif
-      rowLength(sparsemat, i) = j;
-  }
-}
-
-static void
-toIndex(typerow_t **newrows, const char *indexname, FILE *hisfile,
-	uint64_t bwcostmin, int nrows, int small_nrows, int small_ncols)
-{
-    char *rp, str[STRLENMAX];
-    int small_nrows2;
-
-    // rewind
-    rewind(hisfile);
-    rp = fgets(str, STRLENMAX, hisfile);
-    ASSERT_ALWAYS(rp);
-    // reallocate
-    for(int i = 0; i < nrows; i++){
-      /* we only need to free the "crunched" part */
-        if (i < small_nrows)
-          free(newrows[i]);
-	newrows[i] = (typerow_t *)malloc(2 * sizeof(typerow_t));
-	ASSERT_ALWAYS(newrows[i] != NULL);
-	rowLength(newrows, i) = 1;
-	rowCell(newrows, i, 1) = i;
+      rowLength(sparsemat, i) = j-1;
+      }
     }
-    // replay hisfile
-    build_newrows_from_file(newrows, hisfile, bwcostmin, NULL);
-    // re-determining small_nrows to check
-    small_nrows2 = 0;
-    for(int i = 0; i < nrows; i++)
-	if(newrows[i] != NULL)
-	    small_nrows2++;
-    ASSERT_ALWAYS(small_nrows2 == small_nrows);
-    // now, make index
-    double tt = wct_seconds();
-    fprintf(stderr, "Writing index file\n");
-    // WARNING: small_ncols is not used, but...
-    makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
-    fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
-}
-
-#if DEBUG >= 1
-/* weight of merge of row i and row k */
-static uint32_t
-weight_merge (int **newrows, int i, int k, int skip)
-{
-  uint32_t w, li, lk, ix, kx;
-
-  ASSERT(newrows[i] != NULL);
-  ASSERT(newrows[k] != NULL);
-  li = newrows[i][0];
-  lk = newrows[k][0];
-  for (w = 0, ix = 1, kx = 1; ix <= li && kx <= lk; )
+  else /* for_msieve */
     {
-      if (newrows[i][ix] < newrows[k][kx])
-        w += newrows[i][ix++] >= skip;
-      else if (newrows[i][ix] == newrows[k][kx])
-        ix++, kx++;
-      else
-        w += newrows[k][kx++] >= skip;
-    }
-  while (ix <= li)
-    w += newrows[i][ix++] >= skip;
-  while (kx <= lk)
-    w += newrows[k][kx++] >= skip;
-  return w;
-}
-#endif
+      /* to generate the .cyc file for msieve, we only need to start from the
+         identity matrix with newnrows relation-sets, where relation-set i
+         contains only relation i. Thus we only need to read the first line of
+         the purged file, to get the number of relations-sets. */
 
-void
-add_relation (int **cols, int *len_col, int j, int i)
+      long i;
+
+      for (i = 0; i < ps->nrows; i++)
+        {
+          sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
+          rowCell(sparsemat, i, 1) = i;
+          rowLength(sparsemat, i) = 1;
+        }
+    }
+}
+
+static void 
+writeIndex(const char *indexname, index_data_t index_data,
+        int small_nrows, int small_ncols)
 {
-  len_col[j] ++;
-  cols[j] = (int*) realloc (cols[j], len_col[j] * sizeof(int));
-  cols[j][len_col[j]-1] = i;
+    FILE *indexfile;
+    indexfile = fopen_maybe_compressed(indexname, "w");
+    fprintf(indexfile, "%d %d\n", small_nrows, small_ncols);
+
+    for (int i = 0; i < small_nrows; ++i) {
+        ASSERT (index_data[i].n > 0);
+        fprintf(indexfile, "%d", index_data[i].n);
+        for (unsigned int j = 0; j < index_data[i].n; ++j) {
+#ifdef FOR_DL
+            fprintf(indexfile, " " PURGE_INT_FORMAT ":%d",
+                    index_data[i].rels[j].ind_row,
+                    index_data[i].rels[j].e);
+#else
+            ASSERT (index_data[i].rels[j].e == 1);
+            fprintf(indexfile, " " PURGE_INT_FORMAT,
+                    index_data[i].rels[j].ind_row);
+#endif
+        }
+        fprintf(indexfile, "\n");
+    }
+    fclose_maybe_compressed(indexfile, indexname);
 }
 
 void
-sub_relation (int **cols, int *len_col, int j, int i)
+generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 {
-  int k;
+  FILE *outfile;
+  uint32_t t, u, i, k;
 
-  for (k = 0; k < len_col[j]; k++)
-    if (cols[j][k] == i)
-      break;
-  if (k >= len_col[j])
-    {
-      fprintf (stderr, "Error, row i=%d not found in column j=%d\n", i, j);
-      exit (1);
-    }
-  len_col[j] --;
-  cols[j][k] = cols[j][len_col[j]];
-  cols[j] = (int*) realloc (cols[j], len_col[j] * sizeof(int));
-}
+  outfile = fopen (outname, "w");
+  ASSERT_ALWAYS(outfile != NULL);
 
-#if DEBUG >= 1
-static void
-print_row (int **newrows, int i)
-{
-  int j;
+  /* first write the number of relations as a 32-bit integer */
+  t = nrows;
+  fwrite (&t, sizeof(uint32_t), 1, outfile);
 
-  printf ("%d:", newrows[i][0]);
-  for (j = 1; j <= newrows[i][0]; j++)
-    printf (" %d", newrows[i][j]);
-  printf ("\n");
-}
-
-static void
-print_col (int **cols, int *len_col, int j)
-{
-  int i;
-
-  for (i = 0; i < len_col[j]; i++)
-    printf ("%d ", cols[j][i]);
-  printf ("\n");
-}
-
-static void
-check_row (int **newrows, int i, int **cols, int *len_col)
-{
-  int j, k, l;
-
-  for (k = 1; k <= newrows[i][0]; k++)
-    {
-      /* check that newrows[i][k] is in the tranpose matrix */
-      j = newrows[i][k];
-      for (l = 0; l < len_col[j]; l++)
-        if (cols[j][l] == i)
-          break;
-      if (l >= len_col[j])
-        {
-          fprintf (stderr, "Error, row %d contains column %d but column %d does not contain row %d\n", i, j, j, i);
-          exit (1);
-        }
-    }
-}
-
-static void
-check_col (int **cols, int *len_col, int j, int **newrows)
-{
-  int i, k, l;
-
-  for (l = 0; l < len_col[j]; l++)
-    {
-      i = cols[j][l];
-      for (k = 1; k <= newrows[i][0]; k++)
-        if (newrows[i][k] == j)
-          break;
-      ASSERT_ALWAYS (k <= newrows[i][0]);
-    }
-}
-#endif
-
-static int
-weight_row (typerow_t **newrows, int i, int skip)
-{
-  int w = 0, k;
-
-  ASSERT(newrows[i] != NULL);
-  for (k = 1; k <= rowLength(newrows, i); k++)
-    w += rowCell(newrows, i, k) >= skip;
-  return w;
-}
-
-/* row cols[j][i] += cols[j][k] */
-static void
-do_merge (typerow_t **newrows, int **cols, int *len_col, int j, int i, int k,
-          int skip, FILE *hisfile)
-{
-  int ii, kk, li, lk, ni, nk, ltmp;
-  typerow_t *tmp;
-
-  ii = cols[j][i];
-  kk = cols[j][k];
-  fprintf (hisfile, "-%u %u\n", kk + 1, ii);
-  fflush (hisfile);
-  ASSERT(newrows[ii] != NULL);
-  ASSERT(newrows[kk] != NULL);
-  li = rowLength(newrows, ii);
-  lk = rowLength(newrows, kk);
-  ASSERT(weight_row (newrows, ii, skip) >= weight_row (newrows, kk, skip));
-  tmp = (typerow_t*) malloc ((1 + li + lk) * sizeof(typerow_t));
-  for (ni = 1, nk = 1, ltmp = 0; ni <= li && nk <= lk;)
-    {
-      if (rowCell(newrows, ii, ni) < rowCell(newrows, kk, nk))
-        {
-          /* newrows[ii][ni] is already in row ii */
-          tmp[++ltmp] = newrows[ii][ni++];
-        }
-      else if (rowCell(newrows, ii, ni) > rowCell(newrows, kk, nk))
-        {
-          /* newrows[kk][nk] is new in row ii */
-          if (rowCell(newrows, kk, nk) >=  skip)
-            add_relation (cols, len_col, rowCell(newrows, kk, nk), ii);
-          tmp[++ltmp] = newrows[kk][nk++];
-        }
-      else
-        {
-          /* newrows[ii][ni] disappears in row ii */
-          if (rowCell(newrows, ii, ni) >= skip)
-            sub_relation (cols, len_col, rowCell(newrows, ii, ni), ii);
-          ni++, nk++;
-        }
-    }
-  /* only one of the following loops is non-empty */
-  while (ni <= li)
-    tmp[++ltmp] = newrows[ii][ni++];
-  while (nk <= lk)
-    {
-      if (rowCell(newrows, kk, nk) >= skip)
-        add_relation (cols, len_col, rowCell(newrows, kk, nk), ii);
-      tmp[++ltmp] = newrows[kk][nk++];
-    }
-  free (newrows[ii]);
-  tmp = (typerow_t*) realloc (tmp, (1 + ltmp) * sizeof(typerow_t));
-#ifdef FOR_FFS
-  tmp[0].id = ltmp;
-#else
-  tmp[0] = ltmp;
-#endif
-  newrows[ii] = tmp;
-}
-
-static int
-try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
-           FILE *hisfile)
-{
-  int i, k, gain, gain_max, imax, kmax, *W, ii, kk, *J, s, t;
-  mpz_t *M, and;
-
-  if (len_col[j] < 2) /* a column with 0 or 1 ideal cannot be merged */
-    return 0;
-
-  /* compute weights of rows containing the ideal j */
-  W = (int*) malloc (len_col[j] * sizeof(int));
-  for (i = 0, s = 0; i < len_col[j]; i++)
-    {
-      W[i] = weight_row (newrows, cols[j][i], skip);
-      s += W[i];
-    }
-
-  /* compute all ideals appearing in the rows containing j */
-  if (j >= skip)
-    s -= len_col[j];
-  J = (int*) malloc (s * sizeof(int));
-  for (ii = 0, t = 0; ii < len_col[j]; ii++)
-    {
-      i = cols[j][ii];
-      for (k = 1; k <= rowLength(newrows, i); k++)
-        if ((rowCell(newrows, i, k) >= skip) && (rowCell(newrows, i, k) != j))
-          J[t++] = rowCell(newrows, i, k);
-    }
-  ASSERT(t == s);
-  qsort (J, t, sizeof(int), cmp);
-
-  /* extract ideals appearing at least twice */
-  for (i = 1, k = 0; i < t; i++)
-    if ((J[i-1] == J[i]) && (k == 0 || (J[k-1] != J[i])))
-      J[k++] = J[i];
-  ASSERT_ALWAYS(k < s);
-  J[k++] = INT_MAX;
-  t = k;
-
-  /* compute bit vectors for ideals appearing at least twice */
-  M = (mpz_t*) malloc (len_col[j] * sizeof(mpz_t));
-  mpz_init (and);
-  for (ii = 0; ii < len_col[j]; ii++)
-    {
-      mpz_init (M[ii]);
-      mpz_realloc2 (M[ii], t - 1);
-      i = cols[j][ii];
-      for (s = 0, k = 1; k <= rowLength(newrows, i); k++)
-        {
-          while (J[s] < rowCell(newrows, i, k))
-            s++;
-          /* now J[s] >= newrows[i][k] */
-          if (J[s] == rowCell(newrows, i, k))
-            mpz_setbit (M[ii], s++);
-        }
-    }
-  for (gain_max = 0, i = 0; i < len_col[j]; i++)
-    {
-      for (k = i + 1; k < len_col[j]; k++)
-        {
-          if (W[i] >= W[k])
-            ii = i, kk = k;
-          else
-            ii = k, kk = i;
-          /* we need wmin > gain_max since the maximum gain is wmin */
-          if (W[kk] <= gain_max)
-            continue;
-          mpz_and (and, M[ii], M[kk]);
-          /* the +2 accounts for the ideal j */
-          gain = 2 * mpz_popcount (and) + 2 - W[kk];
-#if DEBUG >= 1
-          {
-            int wik;
-            wik = weight_merge (newrows, cols[j][ii], cols[j][kk], skip);
-            ASSERT_ALWAYS (gain == W[ii] - wik);
-          }
-#endif
-          if (gain > gain_max)
-            {
-              gain_max = gain;
-              imax = ii;
-              kmax = kk;
-            }
-        }
-    }
-  mpz_clear (and);
-  for (i = 0; i < len_col[j]; i++)
-    mpz_clear (M[i]);
-  free (M);
-  free (J);
-  free (W);
-  if (gain_max > 0)
-    do_merge (newrows, cols, len_col, j, imax, kmax, skip, hisfile);
-  return gain_max;
-}
-
-static int
-cmp_ge (const void *p, const void *q)
-{
-  int x = *((int *)p);
-  int y = *((int *)q);
-  return (x >= y ? -1 : 1);
-}
-
-/* we append the new merges in file 'hisname', so that they are considered
-   when writing the index file afterwards */
-static void
-optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
-          const char *hisname)
-{
-  int **cols, *len_col, i, j, k, small_ncols, pass = 0, *perm_cols,
-    small_nrows;
-  uint64_t total_weight;
-  FILE *hisfile;
-
-  hisfile = fopen (hisname, "a");
-  ASSERT_ALWAYS(hisfile != NULL);
-
-  /* first permute columns to get heavier columns first */
-  perm_cols = (int*) malloc (2 * ncols * sizeof(int));
-  for (j = 0; j < ncols; j++)
-    {
-      perm_cols[2*j] = colweight[j];
-      perm_cols[2*j+1] = j;
-    }
-  qsort (perm_cols, ncols, 2*sizeof(int), cmp_ge);
-#if DEBUG >= 1
-  for (j = 1; j < ncols; j++)
-    ASSERT_ALWAYS(perm_cols[2*(j-1)] >= perm_cols[2*j]);
-#endif
-  printf ("Skip %d heaviest columns\n", skip);
-  for (j = 0; j < ncols && perm_cols[2*j] != 0; j++);
-  small_ncols = j;
-  printf ("New number of columns: %d\n", small_ncols);
-
-  /* compute the inverse permutation in colweight[] */
-  for (j = 0; j < ncols; j++)
-    colweight[perm_cols[2*j+1]] = j;
-
-  ncols = j;
-
-  /* renumber the direct matrix */
-  for (i = 0, small_nrows = 0; i < nrows; i++)
-    if (newrows[i] != NULL)
-      {
-        small_nrows ++;
-        for (k = 1; k <= rowLength(newrows, i); k++)
-          {
-            j = rowCell(newrows, i, k);
-            rowCell(newrows, i, k) = colweight[j];
-          }
-        qsort (newrows[i] + 1, rowLength(newrows, i), sizeof(typerow_t), cmp);
-#if DEBUG >= 1
-        for (k = 2; k <= newrows[i][0]; k++)
-          ASSERT_ALWAYS(newrows[i][k-1] <= newrows[i][k]);
-#endif
-      }
-  /* update colweight */
-  for (j = 0; j < ncols; j++)
-    colweight[j] = perm_cols[2*j];
-  free (perm_cols);
-
-  cols = (int**) malloc (ncols * sizeof(int*));
-  len_col = (int*) malloc (ncols * sizeof(int));
-  for (j = 0, total_weight = 0; j < ncols; j++)
-    {
-      if (j < skip)
-        cols[j] = NULL;
-      else
-        {
-          cols[j] = (int*) malloc (colweight[j] * sizeof(int));
-          total_weight += colweight[j];
-        }
-      len_col[j] = 0;
-    }
-
-  printf ("Optimize: small_nrows=%d small_ncols=%d weight=%"PRIu64" (av. %1.2f)\n",
-          small_nrows, small_ncols, total_weight,
-          (double) total_weight / (double) small_nrows);
-
-  /* compute transpose matrix */
+  /* then for each relation-set write a 32-bit integer giving the number k
+     of its element, followed by those k elements */
   for (i = 0; i < nrows; i++)
-    if (newrows[i] != NULL)
-      {
-        for (k = 1; k <= rowLength(newrows, i); k++)
-          {
-            j = rowCell(newrows, i, k);
-            /* we assume the row elements are sorted by increasing order */
-            if (k > 1 && rowCell(newrows, i ,k-1) > j)
-              printf ("i=%d k=%d newrows[i][k-1]=%d j=%d\n", i, k,
-                      rowCell(newrows, i, k-1), j);
-            ASSERT(k == 1 || rowCell(newrows, i, k-1) <= j);
-            if (j >= skip)
-              {
-                cols[j][len_col[j]] = i;
-                len_col[j]++;
-              }
-          }
-      }
-
-  printf ("Computed transpose matrix\n");
-  fflush (stdout);
-
-#if DEBUG >= 1
-  for (j = skip; j < ncols; j++)
-    ASSERT_ALWAYS(len_col[j] == colweight[j]);
-#endif
-
-  bit_vector active;
-  bit_vector_init_set (active, ncols, 1);
-  do
     {
-      int gain;
-
-      printf ("Pass %d: decrease total weight to ", ++pass);
-      fflush (stdout);
-      for (j = skip; j < ncols; j++)
-        if (len_col[j] <= pass + 1 && bit_vector_getbit (active, j))
-          {
-            gain = try_merge (newrows, cols, len_col, j, skip, hisfile);
-            if (gain == 0) /* we assume a column which does not give any
-                              gain will never give a gain in the future */
-              bit_vector_clearbit (active, j);
-            total_weight -= gain;
-          }
-      printf ("%"PRIu64" (%1.2f per row)\n", total_weight,
-              (double) total_weight / (double) small_nrows);
-      fflush (stdout);
-    }
-  while (pass < 20);
-  bit_vector_clear (active);
-
-#if DEBUG >= 1
-  for (j = 0; j < skip; j++)
-    ASSERT_ALWAYS(len_col[j] == 0);
-#endif
-
-  /* recompute colweight[] since it is wrong for heavy columns */
-  memset (colweight, 0, skip * sizeof(int));
-  for (i = 0; i < nrows; i++)
-    if (newrows[i] != NULL)
-      for (k = 1; k <= rowLength(newrows, i); k++)
+      t = rowLength(rows, i);
+      ASSERT_ALWAYS(t != 0);
+      fwrite (&t, sizeof(uint32_t), 1, outfile);
+      for (k = 1; k <= t; k++)
         {
-          j = rowCell(newrows, i, k);
-          if (j >= skip)
-            break;
-          colweight[j] ++;
+          u = rowCell(rows, i, k);
+          fwrite (&u, sizeof(uint32_t), 1, outfile);
         }
+    }
 
-  for (j = 0; j < ncols; j++)
-    free (cols[j]);
-  free (len_col);
-  free (cols);
-  fclose (hisfile);
+  fclose (outfile);
 }
 
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
               uint64_t bwcostmin, int nrows, int ncols, int skip, int bin,
-              int writeindex, const char *idealsfilename,
-              const char *outdelfilename)
+              const char *idealsfilename, int for_msieve)
 {
     FILE *hisfile;
     int *colweight;
     int small_nrows, small_ncols;
     char str[STRLENMAX], *rp MAYBE_UNUSED;
+    index_data_t index_data = NULL;
 
     hisfile = fopen (hisname, "r");
     ASSERT_ALWAYS(hisfile != NULL);
@@ -1083,8 +593,9 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     rp = fgets (str, STRLENMAX, hisfile);
 
     // 1st pass: read the relations in *.purged and put them in newrows[][]
-    readPurged(newrows, ps, 1);
+    readPurged(newrows, ps, 1, for_msieve);
 #if DEBUG >= 1
+    // [PG]: FIXME: seems to be broken for FFS ?
     for(int i = 0; i < nrows; i++){
 	printf("row[%d]=", i);
 	for(int k = 1; k <= newrows[i][0]; k++)
@@ -1093,8 +604,22 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     }
 #endif
 
+    if (indexname != NULL) {
+        // At the beginning, the index_data consists of relsets that
+        // are just single relations.
+        index_data = (relset_t *) malloc (nrows*sizeof(relset_t));
+        for (int i = 0; i < nrows; ++i) {
+            index_data[i].n = 1;
+            index_data[i].rels = (multirel_t *)malloc(sizeof(multirel_t));
+            index_data[i].rels[0].ind_row = i;
+            index_data[i].rels[0].e = 1;
+        }
+    }
+    else
+      index_data = NULL;
+
     // read merges in the *.merge.his file and replay them
-    build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, index_data);
 
     /* compute column weights */
     colweight = (int*) malloc (ncols * sizeof(int *));
@@ -1102,20 +627,24 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     memset (colweight, 0, ncols * sizeof(int *));
     for (int i = 0; i < nrows; i++)
       if (newrows[i] != NULL)
-        for(int k = 1; k <= rowLength(newrows, i); k++)
+        for(unsigned int k = 1; k <= rowLength(newrows, i); k++)
           colweight[rowCell(newrows, i, k)] += 1;
-
-    /* comment out the following line to disable cycle optimization */
-#ifndef FOR_FFS /* FIXME optimize create a bug for FFS*/
-    optimize (newrows, nrows, colweight, ncols, skip, hisname);
-#endif
 
     /* crunch empty rows */
     for (int i = small_nrows = 0; i < nrows; i++)
       if (newrows[i] != NULL)
         newrows[small_nrows++] = newrows[i];
+    if (indexname != NULL) {
+        int ii = 0;
+        for (int i = 0; i < nrows; i++) 
+            if (index_data[i].n > 0) 
+                index_data[ii++] = index_data[i];
+            else
+                free(index_data[i].rels);
+        ASSERT (ii == small_nrows);
+    }
 
-#if defined FOR_FFS && defined STAT_FFS
+#if defined FOR_DL && defined STAT_DL
     uint64_t count[11] = {0,0,0,0,0,0,0,0,0,0,0};
     uint64_t nonzero = 0;
     for (int i = 0; i < small_nrows ; i++)
@@ -1137,22 +666,64 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
                      100 * (double) count[0]/nonzero);
 #endif
 
-    /* renumber columns after sorting them by decreasing weight */
-    small_ncols = toFlush(sparsename, newrows, colweight, ncols,
-			  small_nrows, skip, bin, idealsfilename);
+    if (for_msieve)
+      {
+        /* generate the <dat_file_name>.cyc file in "indexname" */
+        if (skip != 0)
+          {
+            fprintf (stderr, "Error, skip should be 0 with --for_msieve\n");
+            exit (1);
+          }
+        if (bin != 0)
+          {
+            fprintf (stderr, "Error, --binary incompatible with --for_msieve\n");
+            exit (1);
+          }
+        generate_cyc (sparsename, newrows, small_nrows);
+      }
+    else
+      {
+        /* renumber columns after sorting them by decreasing weight */
+        small_ncols = toFlush(sparsename, newrows, colweight, ncols,
+                              small_nrows, skip, bin, idealsfilename);
+        // Create the index
+        if (indexname != NULL) 
+          writeIndex(indexname, index_data, small_nrows, small_ncols);
+      }
+
+    // Free.
     free (colweight);
-    if(writeindex)
-        toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
-                small_nrows, small_ncols);
-    for(int i = 0; i < nrows; i++)
-      /* If writeindex is false, we free only the "crunched" part */
-      if (writeindex || i < small_nrows)
-        if(newrows[i] != NULL)
-          free (newrows[i]);
-    free(newrows);
+    for(int i = 0; i < small_nrows; i++)
+        free (newrows[i]);
+    free (newrows);
+    if (index_data != NULL) {
+        for (int i = 0; i < small_nrows; ++i) 
+            free (index_data[i].rels);
+        free (index_data);
+    }
 
     fclose (hisfile);
 }
+
+static void
+usage (const char *argv0)
+{
+  fprintf (stderr, "Usage: %s [options]\n", argv0);
+  fprintf (stderr, "\nMandatory command line options: \n");
+  fprintf (stderr, "   -purged  xxx   - input (purged) file is xxx\n");
+  fprintf (stderr, "   -his  xxx      - history file (produced by merge)\n");
+  fprintf (stderr, "   -out  xxx      - basename for output matrices\n");
+  fprintf (stderr, "\nOther command line options: \n");
+  fprintf (stderr, "   -skip nnn      - dense matrice contains the nnn heaviest "
+                                       "columns (default %u)\n", SKIP_DEFAULT);
+  fprintf (stderr, "   -v or --verbose\n");
+  fprintf (stderr, "   --binary\n");
+  fprintf (stderr, "   --noindex\n");
+  fprintf (stderr, "   -index <file>  - if and only if there is no --noindex\n");
+  fprintf (stderr, "   -ideals\n");
+  exit (1);
+}
+
 
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
@@ -1163,16 +734,22 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
 int
 main(int argc, char *argv[])
 {
+  char * argv0 = argv[0];
     FILE *hisfile;
     uint64_t bwcostmin = 0;
     int nrows, ncols;
     typerow_t **newrows;
     int verbose = 0;
     int bin=0;
-    int skip=0;
+    int skip = SKIP_DEFAULT;
     int noindex = 0;
+    int for_msieve = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
@@ -1190,39 +767,58 @@ main(int argc, char *argv[])
     param_list_configure_switch(pl, "--verbose", &verbose);
     param_list_configure_switch(pl, "--binary", &bin);
     param_list_configure_switch(pl, "--noindex", &noindex);
+    param_list_configure_switch(pl, "--for_msieve", &for_msieve);
     param_list_configure_alias(pl, "--verbose", "-v");
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        abort();
+        usage(argv0);
     }
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * hisname = param_list_lookup_string(pl, "his");
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
-    const char * outdelfilename = param_list_lookup_string(pl, "outdel");
-    param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "skip", &skip);
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+
+    if (purgedname == NULL)
+    {
+      fprintf (stderr, "Error, missing mandatory -purged option.\n");
+      usage(argv0);
+    }
+
+    if (sparsename == NULL)
+    {
+      fprintf (stderr, "Error, missing mandatory -out option.\n");
+      usage(argv0);
+    }
+
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
         bin=1;
 
-#ifdef FOR_FFS
+    if (noindex && indexname != NULL) {
+        fprintf (stderr, "Error: --noindex was switched on, but a "
+                "name for the index file was given.\n");
+        exit (1);
+    }
+
+    if (noindex == 0 && indexname == NULL) {
+        fprintf (stderr, "Error: --noindex was not given, but no "
+                "index file was given.\n");
+        exit (1);
+    }
+
+#ifdef FOR_DL
     if (skip != 0)
       {
-        fprintf (stderr, "Error, for FFS -skip should be 0\n");
+        fprintf (stderr, "Error, for DL -skip should be 0\n");
         exit (1);
       }
     if (idealsfilename == NULL)
       {
-        fprintf (stderr, "Error, for FFS -ideals should be non null\n");
-        exit (1);
-      }
-    if (outdelfilename == NULL)
-      {
-        fprintf (stderr, "Error, for FFS -outdel should be non null\n");
+        fprintf (stderr, "Error, for DL -ideals should be non null\n");
         exit (1);
       }
 #endif
@@ -1242,11 +838,6 @@ main(int argc, char *argv[])
     ASSERT_ALWAYS(nrows == ps->nrows);
     ASSERT_ALWAYS(ncols == ps->ncols);
 
-#ifdef FOR_FFS
-    ncols++; //for FFS we add a column of 1
-    ps->ncols++;
-#endif
-
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
 
     newrows = (typerow_t **)malloc(nrows * sizeof(typerow_t *));
@@ -1259,8 +850,8 @@ main(int argc, char *argv[])
     // matrix
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
-                   bwcostmin, nrows, ncols, skip, bin, !noindex,
-                   idealsfilename, outdelfilename);
+                   bwcostmin, nrows, ncols, skip, bin, 
+                   idealsfilename, for_msieve);
 
 
     purgedfile_stream_closefile(ps);

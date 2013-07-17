@@ -105,6 +105,21 @@ mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
+void
+mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
+{
+  if (sizeof (long) == 8)
+    mpz_addmul_si (a, b, (long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_int64 (d, c);
+      mpz_addmul (a, b, d);
+      mpz_clear (d);
+    }
+}
+
 /* returns the smallest prime > q */
 uint64_t
 uint64_nextprime (uint64_t q)

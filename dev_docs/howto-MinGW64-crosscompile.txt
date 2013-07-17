@@ -2,14 +2,14 @@
 1. Download the latest mingw-w64-bin_x86_64-linux_*.tar.bz
 from http://sourceforge.net/projects/mingw-w64/files/  Toolchains targetting Win64 /  Automated Builds
 The rest of the document uses mingw-w64-bin_x86_64-linux_20121031.tar.bz
-For this howtow we assume that sources from tarballs/repositories are found under ~/sources/.
+For this howto we assume that sources from tarballs/repositories are found under ~/sources/.
 
 2. Create a directory mingw-w64/ somewhere. In it, run
 tar xvjf ~/Downloads/mingw-w64-bin_x86_64-linux_20121031.tar.bz
 Add mingw-w64/bin/ to the PATH:
 export PATH="/path/to/mingw-w64/bin/:$PATH"
 
-3. Download the pre-compiled pthread for MinGW library from
+3. Download the pre-compiled pthreads for MinGW library from
 http://sourceforge.net/projects/mingw-w64/files/  External binary packages (Win64 hosted) /  pthreads
 Unzip it, then find among the unzipped files another zip file mingw64/pthreads-w64.zip
 In the mingw-w64/ directory, unzip pthreads-w64.zip
@@ -27,7 +27,7 @@ make
 This should produce a 64-bit Windows ecm.exe file.
 
 
-6. To cross-compile CADO, create a build directory, e.g. cado-nfs--mingw64/.
+6. To cross-compile CADO, create a build directory, e.g. cado-nfs-mingw64/.
 In it, run
 cmake -DCMAKE_TOOLCHAIN_FILE=~/sources/cado-nfs/Toolchain-MinGW64.cmake ~/sources/cado-nfs/
 The ~/sources/cado-nfs/Toolchain-MinGW64.cmake file overrides CMake variables to point at the cross-compiling toolchain.

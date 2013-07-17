@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <inttypes.h>
 #include "utils.h"
 #include "portability.h"
@@ -28,7 +29,7 @@ cachesize_guess (int verbose)
       mask = n - 1;
       s0 = malloc (2 * n * sizeof (char));
       /* align s on a multiple of n */
-      s = s0 + (n - ((unsigned long) s0 & mask));
+      s = s0 + (n - ((uintptr_t) s0 & mask));
       for (j = 0; j < n; j++)
         s[j] = 0;
       /* We compute k(j) = 2*j + 3*j^2 mod n.

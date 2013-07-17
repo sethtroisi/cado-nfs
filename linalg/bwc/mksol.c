@@ -78,6 +78,12 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * is now.
      */
 
+    if (mpz_cmp_ui(p,2) != 0 && nsolvecs > 1) {
+        fprintf(stderr,
+                "Current mksol code is limited to nsolvecs==1 in the prime field case. Fixing it is not terribly hard, but not terribly easy either. It requires either implementing a n-at-a-time variant of the mpfq operations.\n");
+        abort();
+    }
+
     abase_vbase Ar;
     abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME_MPZ, p,
@@ -243,7 +249,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             char * tmp;
             rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
 
-            FILE * f = fopen(tmp, "r");
+            FILE * f = fopen(tmp, "rb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
             rc = fseek(f, A->vec_elt_stride(A, s * nsolvecs), SEEK_SET);
             if (rc < 0) {

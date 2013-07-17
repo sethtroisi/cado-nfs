@@ -29,9 +29,6 @@ struct cado_poly_s {
   mpz_t m;        /* common root of f and g mod n */
   double skew;    /* skewness */
 
-  char type[8]; /* type (gnfs or snfs) */
-  int qintsize;       /* sieve block range */
-
   cado_poly_side_ptr rat, alg;
   cado_poly_side pols[2];
   /* XXX wtf ?? */

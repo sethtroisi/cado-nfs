@@ -59,7 +59,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define _POSIX_C_SOURCE 200112L /* strtoumax */
 /* POSIX: popen/pclose with -std=c99, -pedantic or -ansi (requires
  * _POSIX_C_SOURCE==2 ?) fileno */
-#define _XOPEN_SOURCE   600     /* posix_memalign lrand48 */
+#define _XOPEN_SOURCE   700     /* posix_memalign lrand48 strndup */
 #define _BSD_SOURCE     /* M_LN2 gethostname strdup random */
 #define _ISOC99_SOURCE  /* Sometimes there's link trickery which causes fscanf to be linked in *only* when this is defined */
 #ifndef __cplusplus
@@ -73,6 +73,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS    /* PRIu32 in lingen_mat_types.hpp */
 #endif
+
+#if	defined(_AIX) && !defined(__cplusplus)
+/* AIX seems to have weird rules. For example I don't understand exactly
+ * how strndup is exposed. It seems that our choice of enabling feature
+ * test macros above has the unfortunate effect of switching from the
+ * default "expose-everything" mode for the libc headers to the more
+ * restrictice "expose-only-what-has-been asked" mode. Putting
+ * _ALL_SOURCE, which is obviously a catch-all, seems to maximize the
+ * number of exported prototypes (it's clearly by lack of a better
+ * solution). */
+/* (for C++, _ALL_SOURCE is forcibly enabled by default) */
+#define _ALL_SOURCE
+#endif  /* _AIX */
 
 #include "cado_config.h"
 

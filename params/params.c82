@@ -38,7 +38,6 @@ polsel_admax=125e3           # max value for lc(f)
 polsel_adrange=1e3           # individual tasks
 polsel_incr=60               # forced divisor of lc(f)
 polsel_P=10000               # choose lc(g) with two prime factors in [P,2P]
-polsel_lq=1                  # special-q in lc(g) has such many factors
 polsel_maxnorm=30.5          # maximal lognorm before rootsieve
 
 ###########################################################################
@@ -86,8 +85,6 @@ bwstrat=3
 
 bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
                         # <m>x<n> for bwc, or only one integer for bw.
-                        # Note that this will be substituted with 1x1
-                        # unless PTHREADS have been enabled.
 bwc_interval=100        # checkpointing interval for bwc.
 
 ###########################################################################

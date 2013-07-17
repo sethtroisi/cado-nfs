@@ -31,6 +31,8 @@ const unsigned int SPECIAL_Q[LEN_SPECIAL_Q] = {
   179, 181, 191, 193, 197, 199, 211, 223, 227, 229,
   233, 239, 241, 251, 0 };
 
+static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; 
+
 //#define LESS_P
 
 static inline uint64_t cputicks()
@@ -106,7 +108,7 @@ printPrimes ( uint32_t *primes,
 {
   unsigned long i;
   for (i = 0; i < size; i++) {
-    fprintf (stderr, "(%lu, %"PRIu32") ", i, primes[i]);
+    fprintf (stderr, "(%lu, %" PRIu32 ") ", i, primes[i]);
     if ((i+1) % 5 == 0)
       fprintf (stderr, "\n");
   }
@@ -212,7 +214,7 @@ proots_print ( proots_t R,
     }
     else {
       for (j = 0; j < R->nr[i]; j ++)
-        fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
+        fprintf (stderr, "%" PRIu64 " ", R->roots[i][j]);
       fprintf (stderr, "\n");
     }
   }
@@ -332,7 +334,7 @@ qroots_print (qroots_t R)
   for (i = 0; i < R->size; i++) {
     fprintf (stderr, "q: %u, r: ", R->q[i]);
     for (j = 0; j < R->nr[i]; j ++)
-      fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
+      fprintf (stderr, "%" PRIu64 " ", R->roots[i][j]);
     fprintf (stderr, "\n");
   }
 }
@@ -958,6 +960,9 @@ shash_find_collision (shash_t H)
     __builtin_prefetch(TH, 1, 3);		\
   } while (0)					\
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
   if (!size) {
     size = H->balloc << 1;
     /* round up to power of 2 */
@@ -969,6 +974,9 @@ shash_find_collision (shash_t H)
     mask = size - 1;
     size += 16; /* Guard to avoid to test the end of hash_table when ++TH */
   }
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
   T = (uint32_t*) malloc (size * sizeof(*T));
   for (k = 0; k < SHASH_NBUCKETS; k++) {
     Hj = H->base[k];

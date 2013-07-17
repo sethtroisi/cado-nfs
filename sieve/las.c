@@ -1,17 +1,17 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <math.h>   // for ceiling, floor in cfrac
 #include <ctype.h>
 #include <float.h>
 #include <pthread.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
-#include "basicnt.h"         /* ctzl bin_gcd */
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
@@ -72,7 +72,7 @@ static double MAYBE_UNUSED exp2 (double x)
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
-pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int create_descent_hints = 0;
 double tt_qstart;
@@ -91,22 +91,18 @@ uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         the rational side, and a bits on the algebraic side */
 uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
                         successes, i.e., of call that lead to a relation */
+double cof_calls[2][256] = {{0},{0}};
+double cof_fails[2][256] = {{0},{0}};
 /* }}} */
 
-/* {{{ Forward decl of some functions  */
-static void usage (const char *argv0, const char * missing);
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       sieve_info_srcptr si, int side);
-/* fbbits is a bit size for which we know that bitsize(n)<=fbbits
- * implies n prime */
 int factor_leftover_norm (mpz_t n,
-                          double fbbits,
-                          unsigned int lpb,
                           mpz_array_t* const factors,
 			  uint32_array_t* const multis,
-			  facul_strategy_t *strategy);
+                          sieve_info_ptr si, int side);
 /* }}} */
 
 /*****************************/
@@ -125,7 +121,7 @@ void siever_config_display(FILE * o, siever_config_srcptr sc)/*{{{*/
             sc->sides[RATIONAL_SIDE]->lpb,
 	    sc->sides[ALGEBRAIC_SIDE]->lpb);
     fprintf(o,
-	    "#                     rat->mfb=%d alg->mfb=%d rlambda=%1.1f alambda=%1.1f\n",
+	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
 	    sc->sides[RATIONAL_SIDE]->mfb,
             sc->sides[ALGEBRAIC_SIDE]->mfb,
             sc->sides[RATIONAL_SIDE]->lambda,
@@ -225,11 +221,20 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         if (pol->degree > 1) {
             fbprime_t *leading_div;
             tfb = seconds ();
+            /* Do we actually use leading_div anywhere? */
             leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
              */
             const char * fbfilename = param_list_lookup_string(pl, "fb");
+            /* If apowlim is not given, or if it is too large, set it to
+             * its maximum allowed value */
+            if (apow_lim >= si->bucket_thresh) {
+                apow_lim = si->bucket_thresh - 1;
+                printf ("# apow_lim reduced to %d\n", apow_lim);
+            }
+            if (apow_lim == 0) 
+                apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
@@ -244,7 +249,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (rpow_lim >= si->bucket_thresh)
               {
                 rpow_lim = si->bucket_thresh - 1;
-                printf ("# rpowthresh reduced to %d\n", rpow_lim);
+                printf ("# rpow_lim reduced to %d\n", rpow_lim);
               }
             sis->fb = fb_make_linear ((const mpz_t *) pol->f,
                                     (fbprime_t) lim,
@@ -268,17 +273,18 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
      * in the end (*fb_main gives away ownership of its contents).
      */
     /* Start by counting, unsurprisingly */
+    /* Compute the size in bytes of each of the nparts pieces */
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
     FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
     size_t headsize = fb_diff_bytes(fb0, *fb_main);
     int i = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        size_t sz = fb_entrysize (fb); 
-        fb_sizes[i] += sz;
-        i++;
-        i %= nparts;
+        fb_sizes[i] += fb_entrysize (fb);
+        if (++i == nparts)
+          i = 0;
     }
+    /* Allocate memory for each of the nparts pieces */
     factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
     for(i = 0 ; i < nparts ; i++) {
         // add one for end marker
@@ -288,6 +294,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         fbi[i] = fb_dst[i];
     }
     free(fb_sizes); fb_sizes = NULL;
+    /* Copy factorbase entries to each of the nparts pieces */
     i = 0;
     int k = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
@@ -295,9 +302,10 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         size_t sz = fb_entrysize (fb); 
         memcpy(fbi[i], fb, sz);
         fbi[i] = fb_next(fbi[i]);
-        i++;
-        i %= nparts;
+        if (++i == nparts)
+          i = 0;
     }
+    /* Add an end marker to each of the nparts pieces */
     for(i = 0 ; i < nparts ; i++) {
         memset(fbi[i], 0, sizeof(factorbase_degn_t));
         fbi[i]->p = FB_END;
@@ -468,13 +476,14 @@ void sieve_info_split_bucket_fb_for_threads(las_info_ptr las, sieve_info_ptr si,
     double min_bucket_fill_ratio = bucket_fill_ratio[n-1];
     double max_bucket_fill_ratio = bucket_fill_ratio[0];
     for(int i = 0 ; i < n ; i++) {
-        double r = bucket_fill_ratio[0];
+        double r = bucket_fill_ratio[i];
         if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
         if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
     }
     fprintf(las->output, " [hit jitter %.2f%%]\n",
             100 * (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
-    s->max_bucket_fill_ratio = max_bucket_fill_ratio;
+    /* enable some margin in the bucket size */
+    s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.05;
     free(nn);
 }
 /*}}}*/
@@ -516,7 +525,9 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     }
 #endif
 
-    si->nb_buckets = 1 + ((si->I / 2) * (si->J / 2) - 1) / BUCKET_REGION;
+    /* this is the maximal value of the number of buckets (might be less
+       for a given special-q if J is smaller) */
+    si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
@@ -543,13 +554,21 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
 
+        mpz_init (si->BB[s]);
+        mpz_init (si->BBB[s]);
+        mpz_init (si->BBBB[s]);
+        unsigned long lim = si->conf->sides[s]->lim;
+        mpz_ui_pow_ui (si->BB[s], lim, 2);
+        mpz_mul_ui (si->BBB[s], si->BB[s], lim);
+        mpz_mul_ui (si->BBBB[s], si->BBB[s], lim);
+
         /* The strategies also depend on the special-q used within the
          * descent, assuming lim / lpb depend on the sq bitsize */
         fprintf(las->output, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
         si->sides[s]->strategy = facul_make_strategy(
-                15, sc->sides[s]->lim, sc->sides[s]->lpb);
+                NB_CURVES, sc->sides[s]->lim, sc->sides[s]->lpb);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
@@ -599,23 +618,47 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
+/* return 0 if we should discard that special-q, in which case we intend
+ * to discard this special-q. For this reason, si->J is then set to an
+ * unrounded value, for diagnostic.
+ *
+ * The current check for discarding is whether we do fill one bucket or
+ * not. If we don't even achieve that, we should of course discard.
+ *
+ * Now for efficiency reasons, the ``minimum reasonable'' number of
+ * buckets should be more than that.
+ */
 int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
 {
-    /* compare skewed max-norms */
-    double maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
-    double maxab0 = MAX(fabs(si->a0), fabs(si->b0) * skewness);
-    if (maxab0 > maxab1) {
+    /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
+       and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
+       Assume |u'| <= |v'|.
+       We know from Gauss reduction that u' and v' form an angle of at
+       least pi/3, thus since their determinant is q*s, we have
+       |u'|^2 <= |u'| * |v'| <= q*s/sin(pi/3) = 2*q*s/sqrt(3).
+       Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B.
+
+       If we take J <= I/2*min(s*B/|a1|, B/|b1|), then for any j <= J:
+       |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
+       |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
+    */
+    double maxab1, maxab0;
+    maxab1 = si->b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
+    maxab0 = si->b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->a0 * si->a0;
+    if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
         int64_t oa[2] = { si->a0, si->a1 };
         int64_t ob[2] = { si->b0, si->b1 };
         si->a0 = oa[1]; si->a1 = oa[0];
         si->b0 = ob[1]; si->b1 = ob[0];
-        maxab1 = maxab0;
     }
+    maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
     double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
-    if (maxab1 >= B)
+    if (maxab1 >= B * skewness)
         si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
     else
         si->J = si->I >> 1;
@@ -627,19 +670,22 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
     uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
     i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
-    si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
 
-    return 0;
+    /* Bug 15617: if we round up, we are not true to our promises */
+    uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
+
+    /* XXX No rounding if we intend to abort */
+    if (nJ > 0) si->J = nJ;
+    return nJ > 0;
 }/*}}}*/
 
-static void sieve_info_update (sieve_info_ptr si)/*{{{*/
+static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 {
-  /* update number of buckets */
-  
-  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
-  
   /* essentially update the fij polynomials */
-  sieve_info_update_norm_data(si);
+  sieve_info_update_norm_data(si, nb_threads);
+
+  /* update number of buckets */
+  si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
@@ -655,6 +701,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
             free(si->sides[s]->fb_bucket_threads[i]);
         }
         free(si->sides[s]->fb_bucket_threads);
+
+        mpz_clear (si->BB[s]);
+        mpz_clear (si->BBB[s]);
+        mpz_clear (si->BBBB[s]);
     }
     sieve_info_clear_norm_data(si);
     mpz_clear(si->doing->p);
@@ -825,6 +875,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
 	param_list_read_file(pl, tmp);
+    } else {
+        fprintf(stderr, "Error: -poly is missing\n");
+        param_list_print_usage(pl, NULL, stderr);
+        exit(EXIT_FAILURE);
     }
 
     if (!cado_poly_set_plist(las->cpoly, pl)) {
@@ -874,11 +928,16 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         sc->sides[s]->mfb = las->cpoly->pols[s]->mfb;
         sc->sides[s]->lambda = las->cpoly->pols[s]->lambda;
     }
+    /* We used to print the default config unconditionally. It's in fact
+     * useless, as this bit of configuration will be printed anyway, and
+     * printing it twice causes unnecessary clutter.
     if (sc->bitsize) {
         siever_config_display(las->output, sc);
         fprintf(las->output, "#                     skewness=%1.1f\n",
                 las->cpoly->skew);
     }
+     */
+
     /* }}} */
 
     /* {{{ Init and parse info regarding work to be done by the siever */
@@ -1545,7 +1604,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         const unsigned int logI = si->conf->logI;
 	const uint32_t maskI = I-1;
 	const uint64_t even_mask = (1U << logI) | 1U;
-	const uint64_t IJ = I * si->J;
+	const uint64_t IJ = si->J << logI;
         // TODO: should be line sieved in the non-bucket phase?
         // Or should we have a bucket line siever?
         if (UNLIKELY(r == 0))
@@ -1563,10 +1622,20 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w)); 
             push_bucket_update(BA, x >> shiftbucket, update);
+#ifdef TRACE_K
+            if (trace_on_spot_x(x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+#endif
             continue;
         }
-        if (UNLIKELY(r == p))
+        if (UNLIKELY(r >= p))
         {
+          if (r > p) /* should only happen for lattice-sieved prime powers,
+                        which is not possible currently since maxbits < I */
+            continue;
+
+          /* now r == p */
             /* r == p means root at infinity, which hits for
                j == 0 (mod p). Since q > I > J, this implies j = 0
                or j > J. This means we sieve only (i,j) = (1,0) here.
@@ -1580,10 +1649,11 @@ but which of these two (if any) do we sieve? */
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w));
             push_bucket_update(BA, 0, update);
-            continue;
-        }
-        if (UNLIKELY(r > p))
-        {
+#ifdef TRACE_K
+            if (trace_on_spot_x(update.x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], 0);
+#endif
             continue;
         }
 
@@ -1603,7 +1673,6 @@ but which of these two (if any) do we sieve? */
             continue; /* Simply don't consider that (p,r) for now.
 FIXME: can we find the locations to sieve? */
         }
-
         unsigned int bound0 = plattice_bound0(&pli, si);
         unsigned int bound1 = plattice_bound1(&pli, si);
 
@@ -1613,12 +1682,15 @@ FIXME: can we find the locations to sieve? */
 	  if (x >= IJ) continue;
 	  unsigned int \
 	    bep = ((unsigned int) bucket_encode_prime (p)) << 16,
-            inc_a = (unsigned int) plattice_a(&pli, si),
+	    inc_a = (unsigned int) plattice_a(&pli, si),
 	    inc_c = (unsigned int) plattice_c(&pli, si);
+
 	  /* To put all in registers for x86_64 */
+	  /*
 #ifdef __x86_64
 	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
 #endif
+	  */
 	  // ASSERT_ALWAYS(inc_a == pli.a);
 	  // ASSERT_ALWAYS(inc_c == pli.c);
 	  do {
@@ -1630,12 +1702,12 @@ FIXME: can we find the locations to sieve? */
 	    /* i-coordinate = (x % I) - I/2
 	       (I/2) % 3 == (-I) % 3, hence
 	       3|i-coordinate iff (x%I+I) % 3 == 0 */
-	    if (MOD2_CLASSES_BS || (x & even_mask) 
+	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
 		&& (!is_divisible_3_u32 (i + I) ||
 		    !is_divisible_3_u32 ((uint32_t) (x >> logI)))
 #endif
-		       )
+		       ))
 	      {
 		unsigned int u;
 		bucket_update_t **ppu, *pu;
@@ -1643,8 +1715,11 @@ FIXME: can we find the locations to sieve? */
 		pu = *ppu;
 #ifdef TRACE_K
 		if (trace_on_spot_x(x)) {
+                  WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+                  WHERE_AM_I_UPDATE(w, x, x & maskbucket);
 		  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
 			   (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                  ASSERT(test_divisible(w));
 		}
 #endif
 #if LOG_BUCKET_REGION == 16
@@ -1715,49 +1790,78 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
 }/*}}}*/
 
 /* {{{ apply_buckets */
-NOPROFILE_STATIC void
+#ifndef TRACE_K
+/* backtrace display can't work for static symbols (see backtrace_symbols) */
+NOPROFILE_STATIC
+#endif
+void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
 {
-    int j = nb_of_updates(BA, i);
-    int next_logp_j = 0;
-    unsigned char logp = 0;
-    bucket_update_t *next_logp_change, *read_ptr;
+  unsigned int next_logp_j;
+  unsigned char logp;
+  bucket_update_t *next_logp_change, *next_align, **pnlc, *read_ptr;
 
-    /* Having the read_ptr here defeats the whole idea of having 
-       nice inline functions to handle all the BA stuff, but I yet 
-       need to figure out how to keep gcc from writing 
-       BA.bucket_read[i] back to memory and reading it from memory again
-       on every get_next_bucket_update()  */
-    read_ptr = BA.bucket_read[i];
-
-    /* Init so that first access fetches logp */
-    next_logp_j = 0;
-    next_logp_change = read_ptr;
-
-    WHERE_AM_I_UPDATE(w, p, 0);
-
-    for (; j > 0; --j) {
-       uint16_t x;
-
-       /* Do we need a new logp ? */
-       if (read_ptr >= next_logp_change)
-         {
-           ASSERT_ALWAYS (next_logp_j < BA.nr_logp);
-           ASSERT_ALWAYS (BA.logp_idx[next_logp_j * BA.n_bucket + i] 
-                           == next_logp_change);
-           logp = BA.logp_val[next_logp_j++];
-           /* Get pointer telling when to fetch new logp next time */
-           if (next_logp_j < BA.nr_logp)
-             next_logp_change = BA.logp_idx[next_logp_j * BA.n_bucket + i];
-           else
-             next_logp_change = BA.bucket_write[i]; /* effectively: never */
-         }
-       
-       x = (read_ptr++)->x;
-       WHERE_AM_I_UPDATE(w, x, x);
-       sieve_decrease (S + x, logp, w);
+  read_ptr = BA.bucket_read[i];
+  pnlc = BA.logp_idx + i + BA.n_bucket;
+  next_logp_j = 0;
+  WHERE_AM_I_UPDATE(w, p, 0);
+  while (read_ptr < BA.bucket_write[i]) {
+    logp = BA.logp_val[next_logp_j++];
+    if (LIKELY(next_logp_j < (unsigned int) BA.nr_logp)) {
+      next_logp_change = *pnlc;
+      pnlc += BA.n_bucket;
     }
+    else
+      next_logp_change = BA.bucket_write[i];
+    next_align = (bucket_update_t *) (((size_t) read_ptr + 0x3F) & ~((size_t) 0x3F));
+    if (UNLIKELY(next_align > next_logp_change)) next_align = next_logp_change;
+    while (read_ptr < next_align) {
+      uint16_t x;
+      x = (read_ptr++)->x;
+      WHERE_AM_I_UPDATE(w, x, x);
+      sieve_increase(S + x, logp, w);
+    }
+    while (read_ptr + 16 <= next_logp_change) {
+      uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
+      uint16_t x;
+#ifdef HAVE_SSE2
+      _mm_prefetch(((void *) read_ptr)+256, _MM_HINT_NTA);
+#endif
+      x0 = ((uint64_t *) read_ptr)[0];
+      x1 = ((uint64_t *) read_ptr)[1];
+      x2 = ((uint64_t *) read_ptr)[2];
+      x3 = ((uint64_t *) read_ptr)[3];
+      x4 = ((uint64_t *) read_ptr)[4];
+      x5 = ((uint64_t *) read_ptr)[5];
+      x6 = ((uint64_t *) read_ptr)[6];
+      x7 = ((uint64_t *) read_ptr)[7];
+      read_ptr += 16;
+      __asm__ __volatile__ (""); /* To be sure all x? are read together in one operation */
+      x = (uint16_t) (x0 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x0 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x1 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x1 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x2 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x2 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x3 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x3 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x4 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x4 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x5 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x5 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x6 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x6 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x7 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x7 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+    }
+    while (read_ptr < next_logp_change) {
+      uint16_t x;
+      x = (read_ptr++)->x;
+      WHERE_AM_I_UPDATE(w, x, x);
+      sieve_increase(S + x, logp, w);
+    }
+  }
 }
 /* }}} */
 
@@ -1972,10 +2076,11 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
 static int
-check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
-                     size_t mfb)
+check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
 {
   size_t s = mpz_sizeinbase (n, 2);
+  unsigned int lpb = si->conf->sides[side]->lpb;
+  unsigned int mfb = si->conf->sides[side]->mfb;
 
   if (s > mfb)
     return 0; /* n has more than mfb bits, which is the given limit */
@@ -1986,14 +2091,14 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
      * it's still fine of course, but we have no guarantee that our
      * cofactor is prime... */
   /* now n >= L=2^lpb */
-  if (mpz_cmp (n, BB) < 0)
+  if (mpz_cmp (n, si->BB[side]) < 0)
     return 0; /* case (b) */
   /* now n >= B^2 */
   if (2 * lpb < s)
     {
-      if (mpz_cmp (n, BBB) < 0)
+      if (mpz_cmp (n, si->BBB[side]) < 0)
         return 0; /* case (e) */
-      if (3 * lpb < s && mpz_cmp (n, BBBB) < 0)
+      if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
         return 0; /* case (h) */
     }
   if (mpz_probab_prime_p (n, 1))
@@ -2004,7 +2109,7 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
-    NOPROFILE_STATIC int
+NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_ptr las = th->las;
@@ -2014,7 +2119,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
     int cpt = 0;
     int surv = 0, copr = 0;
-    mpz_t norm[2], BB[2], BBB[2], BBBB[2];
+    mpz_t norm[2];
     factor_list_t factors[2];
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
@@ -2034,14 +2139,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
         factor_list_init(&factors[side]);
         mpz_init (norm[side]);
-        mpz_init (BB[side]);
-        mpz_init (BBB[side]);
-        mpz_init (BBBB[side]);
-
-        unsigned long lim = si->conf->sides[side]->lim;
-        mpz_ui_pow_ui (BB[side], lim, 2);
-        mpz_mul_ui (BBB[side], BB[side], lim);
-        mpz_mul_ui (BBBB[side], BBB[side], lim);
     }
 
     mpz_init (BLPrat);
@@ -2054,6 +2151,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
         fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
                 trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
+        gmp_fprintf(stderr, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -2072,8 +2170,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound : 0 ? alg->bound,
-                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound : 0 ? rat->bound);
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
         unsigned int X;
@@ -2091,7 +2189,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
 #ifndef UNSIEVE_NOT_COPRIME
-        if (bin_gcd_safe (i, j) != 1)
+        if (bin_gcd_int64_safe (i, j) != 1)
         {
 #ifdef TRACE_K
             if (trace_on_spot_Nx(N, x)) {
@@ -2162,8 +2260,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
              * log to base 2 of the sieve limits on each side, and compare the
              * bitsize of the cofactor with their double.
              */
-            double log2_fbs[2] = {log2(si->conf->sides[0]->lim), log2(si->conf->sides[1]->lim)};
-
             int64_t a;
             uint64_t b;
 
@@ -2183,7 +2279,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# about to print relation for (%"PRId64",%"PRIu64")\n",a,b);
+                fprintf(stderr, "# about to start cofactorization for (%" PRId64 ",%" PRIu64 ")  %d %u\n",a,b, x, SS[x]);
             }
 #endif
             /* since a,b both even were not sieved, either a or b should
@@ -2215,35 +2311,25 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             copr++;
 
-            /* For hunting missed relations */
-#if 0
-            if (a == -6537753 && b == 1264)
-                fprintf (stderr, "# Have relation %ld,%lu at bucket nr %d, "
-                        "x = %d, K = %lu\n", 
-                        a, b, N, x, (unsigned long) N * BUCKET_REGION + x);
-#endif
-
             int pass = 1;
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = cpoly->pols[side]->f;
+                mpz_t * f = si->sides[side]->fij;
                 int deg = cpoly->pols[side]->degree;
                 int lim = si->conf->sides[side]->lim;
-                int lpb = si->conf->sides[side]->lpb;
-                int mfb = si->conf->sides[side]->mfb;
+                int i;
+                unsigned int j;
 
                 // Trial divide rational norm
-                mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
-                if (si->conf->side == side) {
-#ifdef  WANT_ASSERT_EXPENSIVE
-                    ASSERT(mpz_divisible_p(norm[side], si->doing->p));
-#endif
-                    mpz_divexact (norm[side], norm[side], si->doing->p);
-                }
+                /* Compute the norms using the polynomials transformed to 
+                   i,j-coordinates. The transformed polynomial on the 
+                   special-q side is already divided by q */
+                NxToIJ (&i, &j, N, x, si);
+                mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
+                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
                 trial_div (&factors[side], norm[side], N, x,
@@ -2251,11 +2337,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                         &primes[side], si->sides[side]->trialdiv_data,
                         lim, a, b);
 
-                pass = check_leftover_norm (norm[side], lpb,
-                        BB[side], BBB[side], BBBB[side], mfb);
+                pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
+                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
                 }
 #endif
             }
@@ -2287,18 +2372,42 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 }
             }
 
-            /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
-             * be smooth. We factor it first. Otherwise we factor it
-             * last.
-             */
-            int first = mpz_cmp(norm[RATIONAL_SIDE], BLPrat) > 0 ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+            unsigned int nbits[2];
+            int first;
 
-            for(int z = 0 ; pass && z < 2 ; z++) {
+            for (int z = 0; z < 2; z++)
+              nbits[z] = mpz_sizeinbase (norm[z], 2);
+
+            if (cof_calls[0][nbits[0]] > 0 && cof_calls[1][nbits[1]] > 0)
+              {
+                if (cof_fails[0][nbits[0]] / cof_calls[0][nbits[0]] >
+                    cof_fails[1][nbits[1]] / cof_calls[1][nbits[1]])
+                  first = 0;
+                else
+                  first = 1;
+              }
+            else
+              /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
+               * be smooth. We factor it first. Otherwise we factor it last. */
+              first = mpz_cmp (norm[RATIONAL_SIDE], BLPrat) > 0
+                ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+
+            for (int z = 0 ; pass > 0 && z < 2 ; z++)
+              {
                 int side = first ^ z;
-                int lpb = si->conf->sides[side]->lpb;
-                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
-            }
-            if (!pass) continue;
+                cof_calls[side][nbits[side]] ++;
+                pass = factor_leftover_norm (norm[side], f[side], m[side],
+                                             si, side);
+                if (pass <= 0)
+                  cof_fails[side][nbits[side]] ++;
+#ifdef TRACE_K
+                if (trace_on_spot_ab(a, b) && pass == 0)
+                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%" PRId64 ",%" PRIu64 "), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
+#endif
+              }
+
+            if (pass <= 0) continue; /* a factor was > 2^lpb, or some
+                                        factorization was incomplete */
 
             /* yippee: we found a relation! */
 
@@ -2306,7 +2415,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
-            ASSERT (bin_gcd_safe (a, b) == 1);
+            ASSERT (bin_gcd_int64_safe (a, b) == 1);
 #endif
 
             relation_t rel[1];
@@ -2318,7 +2427,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
                     if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%"PRId64",%"PRIu64")\n",
+                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%" PRId64 ",%" PRIu64 ")\n",
                                 mpz_sizeinbase(f[side]->data[i], 2), a, b);
                     for (unsigned int j = 0; j < m[side]->data[i]; j++) {
                         relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
@@ -2331,7 +2440,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# Relation for (%"PRId64",%"PRIu64") printed\n", a, b);
+                fprintf(stderr, "# Relation for (%" PRId64 ",%" PRIu64 ") printed\n", a, b);
             }
 #endif
 
@@ -2503,9 +2612,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
     for(int side = 0 ; side < 2 ; side++) {
         clear_bucket_primes (&primes[side]);
-        mpz_clear (BBBB[side]);
-        mpz_clear (BBB[side]);
-        mpz_clear (BB[side]);
         mpz_clear(norm[side]);
         factor_list_clear(&factors[side]);
         clear_uint32_array (m[side]);
@@ -2521,8 +2627,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 /* {{{ factor_leftover_norm */
 
-/* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
-   should be enough. See also http://www.trnicely.net/misc/mpzspsp.html */
 #define NMILLER_RABIN 1 /* in the worst case, what can happen is that a
                            composite number is declared as prime, thus
                            a relation might be missed, but this will not
@@ -2534,60 +2638,55 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 /* This function was contributed by Jerome Milan (and bugs were introduced
    by Paul Zimmermann :-).
    Input: n - the number to be factored (leftover norm). Must be composite!
-          l - (large) prime bit size bound is L=2^l
+              Assumed to have no factor < B (factor base bound).
+          L - large prime bound is L=2^l
    Assumes n > 0.
    Return value:
-          0 if n has a prime factor larger than 2^l
-          1 if all prime factors of n are < 2^l
+          -1 if n has a prime factor larger than L
+          1 if all prime factors of n are < L
+          0 if n could not be completely factored
    Output:
           the prime factors of n are factors->data[0..factors->length-1],
           with corresponding multiplicities multis[0..factors->length-1].
 */
 int
-factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
-                      mpz_array_t* const factors, uint32_array_t* const multis,
-		      facul_strategy_t *strategy)
+factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
+                      uint32_array_t* const multis,
+                      sieve_info_ptr si, int side)
 {
+  unsigned int lpb = si->conf->sides[side]->lpb;
+  facul_strategy_t *strategy = si->sides[side]->strategy;
   uint32_t i, nr_factors;
   unsigned long ul_factors[16];
   int facul_code;
 
   /* For the moment this code can't cope with too large factors */
-  ASSERT_ALWAYS(lpb <= ULONG_BITS);
+  ASSERT(lpb <= ULONG_BITS);
 
   factors->length = 0;
   multis->length = 0;
 
-  /* factoring programs do not like 1 */
-  if (mpz_cmp_ui (n, 1) == 0)
-    return 1;
-
-  /* If n < L, we know that n is prime, since all primes < B have been
-   * removed, and L < B^2 in general, where B is the factor base bound,
-   * thus we only need a primality test when n > L.
-   * For the descent, we rather use the provided fbbits argument
-   * (otherwise that would be 2bitsize(B)), since there could be a strong
-   * unbalance between B and L
-   */
-  if (BITSIZE(n) <= 2*fbbits)
+  /* If n < B^2, then n is prime, since all primes < B have been removed */
+  if (mpz_cmp (n, si->BB[side]) < 0)
     {
-      append_mpz_to_array (factors, n);
-      append_uint32_to_array (multis, 1);
+      /* if n > L, return -1 */
+      if (mpz_sizeinbase (n, 2) > lpb)
+        return -1;
+
+      if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
+        {
+          append_mpz_to_array (factors, n);
+          append_uint32_to_array (multis, 1);
+        }
       return 1;
     }
-/* Input is required to be composite!
-  else if (IS_PROBAB_PRIME(n))
-    {
-      return 0;
-    }
-*/
 
   /* use the facul library */
-  // gmp_printf ("facul: %Zd\n", n);
+  //gmp_printf ("facul: %Zd\n", n);
   facul_code = facul (ul_factors, n, strategy);
 
   if (facul_code == FACUL_NOT_SMOOTH)
-    return 0;
+    return -1;
 
   ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
 
@@ -2603,7 +2702,7 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
 	  unsigned long r;
 	  mpz_t t;
 	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
-	    return 0;
+            return -1;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
 	  mpz_init (t);
@@ -2614,28 +2713,97 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
 						 factors correctly */
 	}
 
-      if (mpz_cmp_ui (n, 1UL) == 0)
-	return 1;
-      unsigned int s = BITSIZE(n);
-      if (s <= lpb)
+      if (mpz_cmp (n, si->BB[side]) < 0)
         {
-          append_mpz_to_array (factors, n);
-          append_uint32_to_array (multis, 1);
+          if (mpz_sizeinbase (n, 2) > lpb)
+            return -1;
+
+          if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
+            {
+              append_mpz_to_array (factors, n);
+              append_uint32_to_array (multis, 1);
+            }
           return 1;
         }
-      /* If we still have more than two primes (or something non-smooth),
-         bail out */
-      if (s > 2*lpb)
-        return 0;
-      /* We always abort below, so let's skip the prp test
-      if (IS_PROBAB_PRIME(n))
-        return 0; */
+
+      if (check_leftover_norm (n, si, side) == 0)
+        return -1;
     }
-  /* When sieving for 3 large primes, here are so many left over, non-smooth
-     numbers here that factoring them all takes a long time, for few
-     additional relations */
-  return 0;
-}/*}}}*/
+  return 0; /* unable to completely factor n */
+}
+/*}}}*/
+
+MAYBE_UNUSED static inline void subusb(unsigned char *S1, unsigned char *S2, ssize_t offset)
+{
+  int ex = (unsigned int) S1[offset] - (unsigned int) S2[offset];
+  if (UNLIKELY(ex < 0)) S1[offset] = 0; else S1[offset] = ex;	     
+}
+
+/* S1 = S1 - S2, with "-" in saturated arithmetical,
+ * and memset(S2, 0, EndS1-S1).
+ */
+void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
+#ifndef HAVE_SSE2
+  ssize_t mysize = EndS1 - S1;
+  unsigned char *cS2 = S2;
+  while (S1 < EndS1) {
+    subusb(S1,S2,0);
+    subusb(S1,S2,1);
+    subusb(S1,S2,2);
+    subusb(S1,S2,3);
+    subusb(S1,S2,4);
+    subusb(S1,S2,5);
+    subusb(S1,S2,6);
+    subusb(S1,S2,7);
+    S1 += 8; S2 += 8;
+  }
+  memset(cS2, 0, mysize);
+#else
+  __m128i *S1i = (__m128i *) S1, *EndS1i = (__m128i *) EndS1, *S2i = (__m128i *) S2,
+    z = _mm_setzero_si128();
+  while (S1i < EndS1i) {
+    __asm__
+      ("prefetchnta 0x100(%0)\n"
+       "prefetcht0 0x100(%1)\n"
+       "movdqa (%0),%%xmm0\n"
+       "movdqa 0x10(%0),%%xmm1\n"
+       "movdqa 0x20(%0),%%xmm2\n"
+       "movdqa 0x30(%0),%%xmm3\n"
+       "psubusb (%1),%%xmm0\n"
+       "psubusb 0x10(%1),%%xmm1\n"
+       "psubusb 0x20(%1),%%xmm2\n"
+       "psubusb 0x30(%1),%%xmm3\n"
+       "movdqa %2,(%1)\n"
+       "movdqa %2,0x10(%1)\n"
+       "movdqa %2,0x20(%1)\n"
+       "movdqa %2,0x30(%1)\n"
+       "movdqa %%xmm0,(%0)\n"
+       "movdqa %%xmm1,0x10(%0)\n"
+       "movdqa %%xmm2,0x20(%0)\n"
+       "movdqa %%xmm3,0x30(%0)\n"
+       "add $0x40,%0\n"
+       "add $0x40,%1\n"
+       : "+r"(S1i), "+r"(S2i) : "x"(z) : "%xmm0", "%xmm1", "%xmm2", "%xmm3");
+    /* I prefer use ASM than intrinsics to be sure each 4 instructions which
+     * use exactly a cache line are together. I'm 99% sure it's not useful...
+     * but it's more beautiful :-)
+     */
+    /*
+    __m128i x0, x1, x2, x3;
+    _mm_prefetch(S1i + 16, _MM_HINT_NTA); _mm_prefetch(S2i + 16, _MM_HINT_T0);
+    x0 = _mm_load_si128(S1i + 0);         x1 = _mm_load_si128(S1i + 1);
+    x2 = _mm_load_si128(S1i + 2);         x3 = _mm_load_si128(S1i + 3);
+    x0 = _mm_subs_epu8(S2i[0], x0);       x1 = _mm_subs_epu8(S2i[1], x1);
+    x2 = _mm_subs_epu8(S2i[2], x2);       x3 = _mm_subs_epu8(S2i[3], x3);
+    _mm_store_si128(S2i + 0, z);          _mm_store_si128(S1i + 1, z);
+    _mm_store_si128(S2i + 2, z);          _mm_store_si128(S1i + 3, z);
+    _mm_store_si128(S1i + 0, x0);         _mm_store_si128(S1i + 1, x1);
+    _mm_store_si128(S1i + 2, x2);         _mm_store_si128(S1i + 3, x3);
+    S1i += 4; S2i += 4;
+    */
+  }
+#endif 
+}
 
 /* Move above ? */
 /* {{{ process_bucket_region
@@ -2673,9 +2841,10 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc_aligned(BUCKET_REGION + MEMSET_MIN, 16);
-        ASSERT_ALWAYS (S != NULL);
+        S[side] = (unsigned char *) malloc_pagealigned(BUCKET_REGION + MEMSET_MIN);
     }
+    unsigned char *SS = malloc_pagealigned(BUCKET_REGION);
+    memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
     for (int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
@@ -2692,18 +2861,28 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init rational norms */
             rep->tn[side] -= seconds ();
             init_rat_norms_bucket_region(S[side], i, si);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
             rep->tn[side] += seconds ();
 
             /* Apply rational buckets */
             rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds();
 
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on rational side, N=%u rat_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         {
@@ -2719,17 +2898,27 @@ void * process_bucket_region(thread_data_ptr th)
             unsigned char * xS = S[side ^ 1];
             init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
 
             /* Apply algebraic buckets */
             rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds();
 
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on algebraic side, N=%u alg_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         /* Factor survivors */
@@ -2748,6 +2937,7 @@ void * process_bucket_region(thread_data_ptr th)
             memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
         }
       }
+    free_aligned(SS, BUCKET_REGION, pagesize());
 
     for(int side = 0 ; side < 2 ; side++) {
         thread_side_data_ptr ts = th->sides[side];
@@ -2804,22 +2994,14 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
         thread_data_ptr th = thrs[i];
         for(int side = 0 ; side < 2 ; side++) {
             thread_side_data_ptr ts = th->sides[side];
-
             int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
-
-            ts->BA = init_bucket_array(thrs[i]->si->nb_buckets, bucket_limit);
-
-            /*
-            double limit_factor =
-                log(log(si->cpoly->pols[side]->lim)) -
-                log(log(si->bucket_thresh));
-            int bucket_limit_base = limit_factor * BUCKET_REGION;
-            bucket_limit_base *= BUCKET_LIMIT_FACTOR;
-            bucket_limit_base /= las->nb_threads;
-
-
-            fprintf(las->output, "# (thread %d, %s) asymptotic bucket_limit = %d, choosing %d\n", th->id, sidenames[side], bucket_limit_base, bucket_limit);
-            */
+	    int nb_buckets = thrs[i]->si->nb_buckets;
+	    int uniform = (pagesize() / nb_buckets) & (~1U);
+	    if (uniform < 2)
+	      bucket_limit |= 2;
+	    else
+	      bucket_limit += uniform; 
+            ts->BA = init_bucket_array(nb_buckets, bucket_limit);
         }
     }
 }
@@ -2862,8 +3044,9 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         las_report_accumulate(rep, thrs[i]->rep);
     }
     if (las->verbose) {
-      /* fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0); */
-        fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
+        fprintf (las->output, "# ");
+      /* fprintf (las->output, "%lu survivors after rational sieve,", rep->survivors0); */
+        fprintf (las->output, "%lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
@@ -2890,54 +3073,45 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
 
 /*************************** main program ************************************/
 
-/* {{{ usage */
-static void
-usage (const char *argv0, const char * missing)
-{
-  fprintf (stderr, "Usage: %s [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
-           argv0);
-  fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
-  fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
-  fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
-  fprintf (stderr, "          -q0 nnn         left bound of special-q range\n");
-  fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
-  fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
-  fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
-  fprintf (stderr, "          -bkthresh nnn   bucket-sieve primes p >= nnn\n");
-  fprintf (stderr, "          -rlim     nnn   rational factor base bound nnn\n");
-  fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
-  fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
-  fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          ->mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          ->mfba     nnn   algebraic cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
-  fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
-  fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
-  fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
-  fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
-  fprintf (stderr, "          -mt nnn   use nnn threads\n");
-  fprintf (stderr, "          -ratq           use rational special-q\n");
-  fprintf (stderr, "          The following are for benchs:\n");
-  fprintf (stderr, "          -bench          activate bench mode\n");
-  fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
-  fprintf (stderr, "          -bench2         activate alternate bench mode\n");
-  fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
-  fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
-  fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
-  fprintf (stderr, "          -sievestats xxx write sieve statistics to file xxx\n");
-  if (missing) {
-      fprintf(stderr, "\nError: missing parameter %s\n", missing);
-  }
-  exit (EXIT_FAILURE);
-}
-/* }}} */
 
+static void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "poly", "polynomial file");
+  param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "q0",   "left bound of special-q range");
+  param_list_decl_usage(pl, "q1",   "right bound of special-q range");
+  param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
+  param_list_decl_usage(pl, "v",    "(switch) verbose mode");
+  param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
+  param_list_decl_usage(pl, "mt",   "number of threads to use");
+  param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
+
+  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "skew", "(alias S) skewness");
+  param_list_decl_usage(pl, "rlim", "rational factor base bound");
+  param_list_decl_usage(pl, "alim", "algebraic factor base bound");
+  param_list_decl_usage(pl, "lpbr", "set rational large prime bound to 2^lpbr");
+  param_list_decl_usage(pl, "lpba", "set algebraic large prime bound to 2^lpba");
+  param_list_decl_usage(pl, "mfbr", "set rational cofactor bound 2^mfbr");
+  param_list_decl_usage(pl, "mfba", "set algebraic cofactor bound 2^mfba");
+  param_list_decl_usage(pl, "rlambda", "rational lambda value");
+  param_list_decl_usage(pl, "alambda", "algebraic lambda value");
+  param_list_decl_usage(pl, "rpowlim", "limit on powers on rat side");
+  param_list_decl_usage(pl, "apowlim", "limit on powers on alg side");
+  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+
+  param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
+  param_list_decl_usage(pl, "mkhint", "(switch) ???");
+}
 
 int main (int argc0, char *argv0[])/*{{{*/
 {
     las_info las;
     double t0, tts;
     unsigned long sq = 0;
+    int allow_largesq = 0;
     double totJ = 0.0;
     /* following command-line values override those in the polynomial file */
     int argc = argc0;
@@ -2954,14 +3128,21 @@ int main (int argc0, char *argv0[])/*{{{*/
     const char *sievestatsfilename = NULL;
 #endif
 
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
     param_list pl;
     param_list_init(pl);
+
+    declare_usage(pl);
 
     /* Passing NULL is allowed here. Find value with
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
+    param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
 #if 0   /* incompatible with the todo list */
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
@@ -2981,7 +3162,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             continue;
         }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        usage(argv0[0],NULL);
+        param_list_print_usage(pl, argv0[0], stderr);
+        exit(EXIT_FAILURE);
     }
 
 
@@ -3187,18 +3369,56 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif
 
+        /* Check whether q is larger than the large prime bound.
+         * This can create some problems, for instance in characters.
+         * By default, this is not allowed, but the parameter
+         * -allow-largesq is a by-pass to this test.
+         */
+        if (!allow_largesq) {
+            if ((int)mpz_sizeinbase(si->doing->p, 2) >
+                    si->conf->sides[si->conf->side]->lpb) {
+                fprintf(stderr, "ERROR: The special q is larger than the "
+                        "large prime bound.\n");
+                fprintf(stderr, "       You can disable this check with "
+                        "the -allow-largesq argument,\n");
+                fprintf(stderr, "       It is for instance useful for the "
+                        "descent.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         double qt0 = seconds();
         tt_qstart = seconds();
 
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
 
-        sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads);
+        /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
+#ifndef SUPPORT_LARGE_Q
+        if (si->a0 <= -2147483648L || 2147483648L <= si->a0 ||
+            si->a1 <= -2147483648L || 2147483648L <= si->a1)
+          {
+            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q\n");
+            exit (1);
+          }
+#endif
 
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
-           see http://www.mersenneforum.org/showthread.php?p=130478 */
+         * see http://www.mersenneforum.org/showthread.php?p=130478 
+         *
+         * Just for correctness at the moment we're doing it in very
+         * extreme cases, see bug 15617
+         */
+        if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
+            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
+                    sidenames[si->conf->side],
+                    si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
+                    si->J);
+            continue;
+        }
 
-        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64";",
+
+        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
                 sidenames[si->conf->side],
                 si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
         if (si->doing->depth) {
@@ -3206,16 +3426,20 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         fprintf(las->output, "\n");
         sq ++;
-        if (las->verbose)
-            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si);
+        sieve_info_update (si, las->nb_threads);
         totJ += (double) si->J;
+        if (las->verbose)
+            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
-        trace_update_conditions(si);
+        /* Only when tracing. This function gets called once per
+         * special-q only. Here we compute the two norms corresponding to
+         * the traced (a,b) pair, and start by dividing out the special-q
+         * from the one where it should divide */
+        trace_per_sq_init(si);
 
         /* WARNING. We're filling the report info for thread 0 for
          * ttbuckets_fill, while in fact the cost is over all threads.
@@ -3237,7 +3461,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         thread_do(thrs, &fill_in_buckets_both, las->nb_threads);
 
         max_full = MAX(max_full, thread_buckets_max_full(thrs, las->nb_threads));
-        ASSERT_ALWAYS(max_full <= 1.0); /* see commented code below */
+        ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
+                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 #if 0   /* {{{ I no longer believe we can save something if this happens */
         /* See bug #14987 on the tracker */
         if (max_full >= 1.0) {
@@ -3300,6 +3525,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         thread_buckets_free(thrs, las->nb_threads);
 
+        trace_per_sq_clear(si);
 #if 0   /* incompatible with the todo list */
         /* {{{ bench stats */
         if (bench) {
@@ -3434,9 +3660,24 @@ int main (int argc0, char *argv0[])/*{{{*/
                 report->ttbuckets_apply,
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
                 report->ttf);
+
     fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
+#if 0
+    fprintf (stderr, "rat:");
+    for (int i = 0; i < 256; i++)
+      if (cof_calls[RATIONAL_SIDE][i] > 0)
+        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[RATIONAL_SIDE][i],
+                 cof_calls[RATIONAL_SIDE][i]);
+    fprintf (stderr, "\n");
+    fprintf (stderr, "alg:");
+    for (int i = 0; i < 256; i++)
+      if (cof_calls[ALGEBRAIC_SIDE][i] > 0)
+        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[ALGEBRAIC_SIDE][i],
+                 cof_calls[ALGEBRAIC_SIDE][i]);
+    fprintf (stderr, "\n");
+#endif
     /*}}}*/
 #if 0   /* incompatible with the todo list */
     /* {{{ stats */

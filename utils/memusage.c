@@ -16,7 +16,7 @@ Memusage (void)
 
   char str[1024];
   char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
+  snprintf(str, 1024, "/proc/%d/status", (int) pid);
 
   FILE *file;
   file = fopen(str, "r");
@@ -46,7 +46,7 @@ Memusage2 (void)
 
   char str[1024];
   char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
+  snprintf(str, 1024, "/proc/%d/status", (int) pid);
 
   FILE *file;
   file = fopen(str, "r");
@@ -80,7 +80,7 @@ PeakMemusage (void)
 
   char str[1024];
   char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
+  snprintf(str, 1024, "/proc/%d/status", (int) pid);
 
   FILE *file;
   file = fopen(str, "r");

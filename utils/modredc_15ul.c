@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include "modredc_15ul_default.h"
 #include "modredc_2ul_common.c"
@@ -45,11 +46,11 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   if (A[0] == 0UL && A[1] == 0UL)
     return 0;
 
-  modredc15ul_getmod_uls (b, m);
+  modredc15ul_getmod_int (b, m);
 
   /* Let A = x*2^{2w}, so we want the Montgomery representation of 1/x, 
      which is 2^{2w}/x. We start by getting a = x */ 
-  modredc15ul_get_uls (a, A, m);
+  modredc15ul_get_int (a, A, m);
   MODINV_PRINT_PARI_x;
 
   /* We simply set a = x/2^{2w} and t=0. The result before correction 
@@ -207,7 +208,7 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   if (!modredc15ul_is1 (tmp, m))
     {
       modintredc15ul_t tmpi;
-      modredc15ul_get_uls (tmpi, tmp, m);
+      modredc15ul_get_int (tmpi, tmp, m);
       fprintf (stderr, "Error, Mod(1/(%lu + 2^%d * %lu), %lu + 2^%d * %lu) == "
                "%lu + 2^%d * %lu\n",
                A[0], LONG_BIT, A[1], m[0].m[0], LONG_BIT, m[0].m[1],

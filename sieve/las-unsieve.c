@@ -6,7 +6,7 @@
 void sieve_info_init_unsieve_data(sieve_info_ptr si)
 {
   /* Store largest prime factor of k in si->us->lpf[k], 0 for k=0, 1 for k=1 */
-  si->us->lpf = (unsigned int *) malloc (si->I * sizeof (unsigned int));
+  si->us->lpf = (unsigned int *) malloc (sizeof (unsigned int) << si->conf->logI);
   FATAL_ERROR_CHECK(si->us->lpf == NULL, "malloc failed");
   ASSERT_ALWAYS (si->us->lpf != NULL);
   si->us->lpf[0] = 0U;

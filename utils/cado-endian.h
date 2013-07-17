@@ -25,10 +25,9 @@
 #ifndef CADO_ENDIAN_H_
 #define CADO_ENDIAN_H_
 
+#if defined (__GLIBC__)
 // GNU libc offers the helpful header <endian.h> which defines
 // __BYTE_ORDER
-
-#if defined (__GLIBC__)
 # include <endian.h>
 # if (__BYTE_ORDER == __LITTLE_ENDIAN)
 #  define CADO_LITTLE_ENDIAN
@@ -40,12 +39,19 @@
 #  error Unknown machine endianness detected.
 # endif
 # define CADO_BYTE_ORDER __BYTE_ORDER
+/* There is no serious reason to think that _BIG_ENDIAN or _LITTLE_ENDIAN
+ * being defined actually means that the machine is big (resp, little)
+ * endian. Systems may like to unconditionally define these as constants
+ * to correspond to some endianness, and define whichever user-exposed
+ * constant they like (e.g. BYTE_ORDER) to either. After all, this is
+ * more or less how it works for glibc above.
 #elif defined(_BIG_ENDIAN)
 # define CADO_BIG_ENDIAN
 # define CADO_BYTE_ORDER 4321
 #elif defined(_LITTLE_ENDIAN)
 # define CADO_LITTLE_ENDIAN
 # define CADO_BYTE_ORDER 1234
+ */
 #elif defined(__sparc) || defined(__sparc__) \
    || defined(_POWER) || defined(__powerpc__) \
    || defined(__ppc__) || defined(__hpux) \

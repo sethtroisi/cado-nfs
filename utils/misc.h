@@ -10,6 +10,11 @@
 #include "macros.h"
 #include "portability.h"
 
+/* we require GMP 5 at least */
+#if __GNU_MP_VERSION < 5
+#error "GNU MP 5 (at least) is required to compile CADO-NFS"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,7 +31,7 @@ extern "C" {
     if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
       fprintf (stderr, "%s: malloc error (%zu MB): %s\n",		\
 	       M, mysize>>20, strerror(errno));				\
-      exit (1);								\
+      abort();								\
     }									\
   } while (0)
   
@@ -58,6 +63,7 @@ extern char ** filelist_from_file(const char * basepath, const char * filename,
 extern void filelist_clear(char ** filelist);
 
 extern void * malloc_check(const size_t x);
+extern void * physical_malloc(const size_t x, const int affect);
 
 extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);

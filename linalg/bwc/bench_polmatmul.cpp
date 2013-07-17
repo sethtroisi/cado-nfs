@@ -507,7 +507,7 @@ void tune_strassen(fft_type const& base, size_t maxlen)
 }
 
     template<typename fft_type>
-void plot_compose(const char * name,
+void plot_compose(const char * name MAYBE_UNUSED,
         unsigned int n1, unsigned int n2, unsigned int n3, unsigned long wt)
 {
     my_strassen_selector& s(foo<fft_type>::s);

@@ -14,15 +14,17 @@
 #include <string.h>
 #include "portability.h"
 #include "macros.h"
+#include "filter_matrix.h"
 #include "sparse.h"
+#include "utils.h"
 
 #define DEBUG 0
 
 void
 fprintRow(FILE *file, typerow_t *row)
 {
-    int i;
-#ifdef FOR_FFS
+  index_t i;
+#ifdef FOR_DL
     fprintf(file, "[%d]", row[0].id);
     for(i = 1; i <= row[0].id; i++)
         fprintf(file, " %d(%d)", row[i].id, row[i].e);
@@ -47,10 +49,19 @@ copyRow(int32_t *row)
 // A row is row[0..max] where row[0] = max and the real components are
 // row[1..max].
 // If len != -1, then it is the real length of row[i1]+row[i2].
+//
+// If j is given, it is the index of the column that is used for
+// pivoting in the case of DL. Then, the operation is
+//   i1 = e2*i1 + e1*i2
+// where e1 and e2 are adjusted so that the j-th column is zero in i1.
+//
+// Also update the data for the index file, if needed (i.e. if the given
+// pointer is not NULL).
 void
-addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
+addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
+        MAYBE_UNUSED int32_t j)
 {
-    int32_t k1, k2, k, len;
+    uint32_t k1, k2, k, len;
     typerow_t *tmp;
 
     ASSERT(rows[i1] != NULL);
@@ -65,15 +76,17 @@ addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
     tmp = (typerow_t *)malloc(len * sizeof(typerow_t));
     k = k1 = k2 = 1;
 
-#ifdef FOR_FFS /* look for the exponents of j in i1 i2*/
-    int e1 = 0, e2 = 0;
+    int e1 = 1, e2 = 1;  // default value for non-DL
+
+#ifdef FOR_DL /* look for the exponents of j in i1 i2*/
+    e1 = 0, e2 = 0;
     int d;
-    int l;
+    unsigned int l;
     for (l = 1 ; l <= rowLength(rows, i1) ; l++)
-        if (rowCell(rows, i1, l) == j)
+        if ((int) rowCell(rows, i1, l) == j)
             e1 = rows[i1][l].e;
     for (l = 1 ; l <= rowLength(rows, i2) ; l++)
-        if (rowCell(rows, i2, l) == j)
+        if ((int) rowCell(rows, i2, l) == j)
             e2 = rows[i2][l].e;
 
     ASSERT (e1 != 0 && e2 != 0);
@@ -102,7 +115,7 @@ addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
         else if(rowCell(rows, i1, k1) > rowCell(rows, i2, k2))
             tmp[k++] = rows[i2][k2++];
         else{
-#ifdef FOR_FFS
+#ifdef FOR_DL
             if (rows[i1][k1].e + rows[i2][k2].e != 0)
             {
                 tmp[k].id = rows[i1][k1].id;
@@ -124,19 +137,10 @@ addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
     for( ; k2 <= rowLength(rows, i2); k2++)
 	tmp[k++] = rows[i2][k2];
     ASSERT(k <= len);
+
     // copy back
     free(rows[i1]);
-        /* FIXME: why not use realloc here instead? Since k <= len,
-           it suffices to shrink the tmp[] array to k entries.
-           Also, we might detect the special case k = len. */
-#if 0
-	int *tmp2 = (int32_t *)malloc(k * sizeof(int32_t));
-	memcpy(tmp2, tmp, k * sizeof(int32_t));
-	tmp2[0] = k-1;
-	rows[i1] = tmp2;
-	free(tmp);
-#else
-#ifdef FOR_FFS
+#ifdef FOR_DL
         tmp[0].id = k-1;
 #else
         tmp[0] = k-1;
@@ -145,12 +149,58 @@ addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
 	    rows[i1] = tmp;
 	else
 	    rows[i1] = realloc(tmp, k * sizeof(typerow_t));
-#ifdef FOR_FFS
+#ifdef FOR_DL
     /* restore old coeff for row i2 */
     for (l = 1 ; l <= rowLength(rows, i2) ; l++)
         rows[i2][l].e /= e1;
 #endif
+
+
+    // Now, deal with the index_data.
+    if (index_data != NULL) {
+        k = k1 = k2 = 0;   // in index_data_t, we count from 0...
+
+        relset_t r1 = index_data[i1];
+        relset_t r2 = index_data[i2];
+        relset_t tmp;
+        tmp.n = 0;
+        tmp.rels = (multirel_t *) malloc((r1.n+r2.n)*sizeof(multirel_t));
+        while ((k1 < r1.n) && (k2 < r2.n)) {
+            if (r1.rels[k1].ind_row < r2.rels[k2].ind_row) {
+                tmp.rels[k].ind_row = r1.rels[k1].ind_row;
+                tmp.rels[k++].e = e2*r1.rels[k1++].e;
+            } else if (r1.rels[k1].ind_row > r2.rels[k2].ind_row) { 
+                tmp.rels[k].ind_row = r2.rels[k2].ind_row;
+                tmp.rels[k++].e = e1*r2.rels[k2++].e;
+            } else {
+#ifdef FOR_DL
+                int32_t e = e2*r1.rels[k1].e + e1*r2.rels[k2].e;
+                if (e != 0) {
+                    tmp.rels[k].ind_row = r1.rels[k1].ind_row;
+                    tmp.rels[k++].e = e;
+                }
 #endif
+            k1++;
+            k2++;
+            }
+        }
+        // finish with k1 and k2
+        for( ; k1 < r1.n; k1++) {
+            tmp.rels[k].ind_row = r1.rels[k1].ind_row;
+            tmp.rels[k++].e = e2*r1.rels[k1].e;
+        }
+        for( ; k2 < r2.n; k2++) {
+            tmp.rels[k].ind_row = r2.rels[k2].ind_row;
+            tmp.rels[k++].e = e1*r2.rels[k2].e;
+        }
+        ASSERT (k <= r1.n + r2.n);
+        tmp.n = k;
+
+        // copy back to i1
+        free (index_data[i1].rels);
+        index_data[i1] = tmp;
+    }
+
 #if DEBUG >= 1
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
     fprintRow(stderr, rows[i1]); fprintf(stderr, "\n");

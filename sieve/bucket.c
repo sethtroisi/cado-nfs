@@ -23,8 +23,11 @@ init_bucket_array(const int n_bucket, const int bucket_size)
       malloc_check (n_bucket * sizeof(bucket_update_t *));
 
 #ifdef  ONE_BIG_MALLOC
-    BA.bucket_start[0] = (bucket_update_t *)
-      malloc_check (n_bucket * bucket_size * sizeof(bucket_update_t));
+    {
+      size_t alloc = (size_t)n_bucket * (size_t)bucket_size
+          * sizeof(bucket_update_t);
+      BA.bucket_start[0] = (bucket_update_t *) physical_malloc (alloc, 1);
+    }
 #endif
 
     for (i = 0; i < n_bucket; ++i) {

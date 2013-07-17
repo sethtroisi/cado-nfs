@@ -5,6 +5,7 @@
  * and prep into one would be difficult and/or artificial, because they
  * handle different data widths.
  */
+#include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <stdio.h>
 #include <string.h>
 #include "bwc_config.h"
@@ -91,17 +92,20 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_save_vector(mmt, "Hx", 1, 0, unpadded);
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            char * cmd;
-            int rc = asprintf(&cmd, "diff -q %s Hx.0", tmp);
+            char cmd[1024];
+            int rc = snprintf(cmd, 80, "diff -q %s Hx.0", tmp);
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
-                fprintf(stderr, "%s returned %d\n", cmd, rc >> 8);
+#ifdef WEXITSTATUS
+                fprintf(stderr, "%s returned %d\n", cmd, WEXITSTATUS(rc));
+#else
+                fprintf(stderr, "%s returned %d\n", cmd, rc);
+#endif
                 exit(1);
             } else {
                 printf("Check of %s against %s: ok\n", tmp, "Hx.0");
             }
-            free(cmd);
         }
         serialize(pi->m);
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
