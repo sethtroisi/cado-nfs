@@ -109,10 +109,6 @@
  */
 #define xxxUNSIEVE_NOT_COPRIME  /* see las-unsieve.c */
 
-
-/* default sieve region side is 2^DEFAULT_I */
-#define DEFAULT_I 12
-
 /* default bucket region: 2^16 = 64K == close to L1 size, but this is the
    (current) largest possible value, otherwise bucket.h must be changed,
    since it stores positions on 16 bits */
