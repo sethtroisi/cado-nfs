@@ -2042,7 +2042,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
         self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
-            self.registered_filenames, uploaddir, bg = True)
+            self.registered_filenames, uploaddir, bg=True, only_registered=True)
         
         # Init client lists
         self.clients = []
