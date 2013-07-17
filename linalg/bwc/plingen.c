@@ -1771,12 +1771,23 @@ int main(int argc, char *argv[])
          * same node together. So we pick them by bunches of size
          * thr[0]*thr[1].
          */
-        printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
+        if (rank == 0)
+            printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
         ASSERT_ALWAYS(size == mpi[0] * mpi[1] * thr[0] * thr[1]);
         /* Keep the semantics which exist for krylov and so on --
          * even though we are not really using threads here. */
         bm->mpi_dims[0] *= thr[0];
         bm->mpi_dims[1] *= thr[1];
+        if (bm->mpi_dims[0] != bm->mpi_dims[1]) {
+            if (rank == 0)
+                fprintf(stderr, "The current plingen code is limited to square splits ; here, we received a %d x %x split, which will not work\n",
+                    bm->mpi_dims[0], bm->mpi_dims[1]);
+            abort();
+        } else if ((m % bm->mpi_dims[0] != 0) || (n % bm->mpi_dims[0] != 0)) {
+            if (rank == 0)
+                fprintf(stderr, "The process grid dimensions must divide gcd(m,n)\n");
+            abort();
+        }
         int tl_grank = rank % (thr[0] * thr[1]); // thread-level global rank
         int tl_irank = tl_grank / thr[1];
         int tl_jrank = tl_grank % thr[1];
