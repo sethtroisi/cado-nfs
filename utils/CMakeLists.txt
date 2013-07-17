@@ -12,7 +12,7 @@ set (sources
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils ${CADO_SHARED} ${sources})
-target_link_libraries(utils pthread gmp m)
+target_link_libraries(utils pthread ${gmp_libname} m)
 install(TARGETS utils DESTINATION lib/${package_basename})
 
 add_executable(check_rels check_rels.c)
@@ -51,10 +51,10 @@ target_link_libraries(test_modredc_15ul utils)
 target_link_libraries(test_modredc_2ul2 utils)
 target_link_libraries(test-rootfinder utils)
 target_link_libraries(test_roots_mod utils)
+target_link_libraries(gmp_prob_prime ${gmp_libname})
+target_link_libraries(gmp_nextprime ${gmp_libname})
+target_link_libraries(random_integer ${gmp_libname})
 target_link_libraries(test_omega utils)
-target_link_libraries(gmp_prob_prime gmp)
-target_link_libraries(gmp_nextprime gmp)
-target_link_libraries(random_integer gmp)
 target_link_libraries(antebuffer pthread)
 
 include(CMakeLists-nodist.txt OPTIONAL)

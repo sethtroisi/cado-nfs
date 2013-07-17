@@ -28,6 +28,7 @@
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
+/* Active handler: simd_char2 */
 /* Options used:{
    w=64,
    k=1,
@@ -39,6 +40,7 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -46,6 +48,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -98,6 +101,15 @@ typedef abase_u64k1_elt_ur * abase_u64k1_vec_ur;
 typedef abase_u64k1_elt_ur * abase_u64k1_dst_vec_ur;
 typedef abase_u64k1_elt_ur * abase_u64k1_src_vec_ur;
 
+typedef struct {
+  abase_u64k1_vec c;
+  unsigned int alloc;
+  unsigned int size;
+} abase_u64k1_poly_struct;
+typedef abase_u64k1_poly_struct abase_u64k1_poly [1];
+typedef abase_u64k1_poly_struct * abase_u64k1_dst_poly;
+typedef abase_u64k1_poly_struct * abase_u64k1_src_poly;
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -136,6 +148,7 @@ void abase_u64k1_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_elt);
 /* Assignment of random values */
 static inline
 void abase_u64k1_random(abase_u64k1_dst_field, abase_u64k1_dst_elt, gmp_randstate_t);
+/* missing random2 */
 
 /* Arithmetic operations on elements */
 static inline
@@ -162,6 +175,8 @@ void abase_u64k1_add(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src
 #define abase_u64k1_elt_ur_clear(f, px)	/**/
 static inline
 void abase_u64k1_elt_ur_set(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur, abase_u64k1_src_elt_ur);
+static inline
+void abase_u64k1_elt_ur_set_elt(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur, abase_u64k1_src_elt);
 static inline
 void abase_u64k1_elt_ur_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur);
 /* missing elt_ur_set_ui */
@@ -217,6 +232,7 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1
 /* missing vec_conv */
 static inline
 void abase_u64k1_vec_random(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int, gmp_randstate_t);
+/* missing vec_random2 */
 static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
 static inline
@@ -231,6 +247,8 @@ int abase_u64k1_vec_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_vec *, unsi
 void abase_u64k1_vec_ur_init(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
 static inline
 void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, unsigned int);
+static inline
+void abase_u64k1_vec_ur_set_vec(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec, unsigned int);
 void abase_u64k1_vec_ur_reinit(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int, unsigned int);
 void abase_u64k1_vec_ur_clear(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
 static inline
@@ -243,11 +261,46 @@ static inline
 void abase_u64k1_vec_ur_add(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 static inline
 void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static inline
+void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static inline
+void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 /* missing vec_scal_mul_ur */
 /* missing vec_conv_ur */
 /* missing vec_reduce */
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, simd_flat */
 #define abase_u64k1_vec_elt_stride(K, n)	((n)*sizeof(abase_u64k1_elt))
+
+/* Polynomial functions */
+/* missing poly_init */
+/* missing poly_clear */
+/* missing poly_set */
+/* missing poly_setmonic */
+/* missing poly_setcoef */
+/* missing poly_setcoef_ui */
+/* missing poly_getcoef */
+/* missing poly_deg */
+/* missing poly_add */
+/* missing poly_sub */
+/* missing poly_add_ui */
+/* missing poly_sub_ui */
+/* missing poly_neg */
+/* missing poly_scal_mul */
+/* missing poly_mul */
+/* missing poly_divmod */
+/* missing poly_precomp_mod */
+/* missing poly_mod_pre */
+/* missing poly_gcd */
+/* missing poly_xgcd */
+/* missing poly_random */
+/* missing poly_random2 */
+/* missing poly_cmp */
+/* missing poly_asprint */
+/* missing poly_fprint */
+/* missing poly_print */
+/* missing poly_sscan */
+/* missing poly_fscan */
+/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_u64k::code_for_groupsize */
@@ -331,6 +384,13 @@ void abase_u64k1_elt_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     if (r != s) memcpy(r,s,sizeof(abase_u64k1_elt_ur));
 }
 
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */
+static inline
+void abase_u64k1_elt_ur_set_elt(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur r, abase_u64k1_src_elt s)
+{
+    memset(r, 0, sizeof(abase_u64k1_elt_ur)); memcpy(r,s,sizeof(abase_u64k1_elt));
+}
+
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, simd_flat */
 static inline
 void abase_u64k1_elt_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur r)
@@ -369,7 +429,7 @@ int abase_u64k1_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_el
 static inline
 void abase_u64k1_vec_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec r, abase_u64k1_src_vec s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_u64k1_elt));
+    if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
@@ -460,7 +520,7 @@ int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_ve
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, simd_flat */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec r, unsigned int n)
 {
@@ -478,11 +538,20 @@ void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64
     memset(r, 0, n*sizeof(abase_u64k1_elt_ur));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k1_vec_ur_set_vec(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; i+=1)
+        abase_u64k1_elt_ur_set_elt(K, w[i], u[i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur r, abase_u64k1_src_vec_ur s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_u64k1_elt_ur));
+    if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
@@ -515,6 +584,33 @@ void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     unsigned int i;
     for(i = 0; i < n; i+=1)
         abase_u64k1_elt_ur_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; ++i)
+        abase_u64k1_elt_ur_neg(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
+{
+    unsigned int nn = n >> 1;
+    abase_u64k1_elt_ur tmp[1];
+    abase_u64k1_elt_ur_init(K, tmp);
+    unsigned int i;
+    for(i = 0; i < nn; ++i) {
+        abase_u64k1_elt_ur_set(K, tmp[0], u[i]);
+        abase_u64k1_elt_ur_set(K, w[i], u[n-1-i]);
+        abase_u64k1_elt_ur_set(K, w[n-1-i], tmp[0]);
+    }
+    if (n & 1)
+        abase_u64k1_elt_ur_set(K, w[nn], u[nn]);
+    abase_u64k1_elt_ur_clear(K, tmp);
 }
 
 /* *simd_flat::code_for_set_ui_at */

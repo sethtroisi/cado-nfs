@@ -71,7 +71,7 @@ endforeach(v)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v p_1 p_3 p_4)
+foreach(v p_1 p_3 p_4 p_8)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
@@ -113,7 +113,7 @@ set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
-target_link_libraries(bwc_mpfq gmp utils)
+target_link_libraries(bwc_mpfq ${gmp_libname} utils)
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
     set_target_properties(bwc_mpfq PROPERTIES
         COMPILE_FLAGS "--mpi -DCOMPILE_MPFQ_PRIME_FIELDS")
@@ -189,6 +189,7 @@ if (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib(p_1 basicp)
     configure_matmul_lib(p_3 basicp)
     configure_matmul_lib(p_4 basicp)
+    configure_matmul_lib(p_8 basicp)
     endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 else (BUILD_DYNAMICALLY_LINKABLE_BWC)
     configure_matmul_lib("u64k1" "bucket")
@@ -258,18 +259,24 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 4)
+set(plingen_prime_nwords 8)
+
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
+                bw-common-mpi.c
                 plingen.c
-                polymat.c
+                plingen-tuning.cpp
+                lingen-matpoly.c
+                lingen-bigmatpoly.c
+                lingen-polymat.c
+                lingen-bigpolymat.c
                 mpfq/abase_p_${plingen_prime_nwords}.c
-                bigpolymat.c
         )
+set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
-target_link_libraries(plingen gmp utils)
+target_link_libraries(plingen ${gmp_libname} utils)
 set_target_properties(plingen PROPERTIES
     COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
     LINK_FLAGS "--mpi"

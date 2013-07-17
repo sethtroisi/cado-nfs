@@ -186,11 +186,11 @@ sub detect_mpi {
                     $maybe_openmpi=0;
                     last;
                 } elsif ($mpiexec =~ /hydra/) {
-                    print STDERR "Auto-detecting mpich2(hydra) based on alternatives\n";
-                    $maybe_mvapich2=0;
+                    # Newer mvapich2 uses hydra as well...
+                    print STDERR "Auto-detecting mpich or mvapich2 (hydra) based on alternatives\n";
+                    $maybe_mvapich2='hydra';
                     $maybe_mpich2='hydra';
                     $maybe_openmpi=0;
-                    last;
                 } elsif ($mpiexec =~ /mvapich2/) {
                     print STDERR "Auto-detecting mvapich2 based on alternatives\n";
                     $maybe_mpich2=0;
@@ -203,11 +203,15 @@ sub detect_mpi {
                     my $v = `$mpi/mpiname -n -v`;
                     chomp($v);
                     if ($v =~ /MVAPICH2\s+([\d\.]+)((?:\D\w*)?)/) {
-                        $mpi_ver="mvapich2-$1$2";
-                        $needs_mpd = ($1 < 1.6) || ($1 == 1.6 && $2 =~ /^rc\d/);
                         # Presently all versions of mvapich2 up
                         # until 1.6rc3 included need mpd daemons.
                         # Released version 1.6 uses hydra.
+                        $mpi_ver="mvapich2-$1$2";
+                        if (($1 < 1.6) || ($1 == 1.6 && $2 =~ /^rc\d/)) {
+                            $needs_mpd = 1;
+                        } else {
+                            $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
+                        }
                         last SEVERAL_CHECKS;
                     }
                 }
@@ -808,15 +812,13 @@ sub drive {
         chdir $wdir;
         die "Won't wipe cwd" if $pwd eq getcwd;
         print STDERR "Doing cleanup in $wdir\n";
+        opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
+        my @rmfiles= grep {/^[A-Z]/ && $_ ne 'H1' } readdir DIR;
+        close DIR;
         if ($show_only) {
-            print "find $wdir -name '[A-Z]*' | xargs -r rm";
-            print "(cd $wdir ; rm -f bw.cfg)";
+            print "rm -f $wdir/$_\n" for @rmfiles;
         } else {
-            opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
-            my @rmfiles= grep /^[A-Z]/, readdir DIR;
-            close DIR;
-            unlink "$wdir/$_" for (@rmfiles);
-            unlink "$wdir/bw.cfg";
+            unlink "$wdir/$_" for @rmfiles;
         }
         chdir $pwd;
         return;

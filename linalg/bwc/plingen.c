@@ -18,32 +18,17 @@
 #include "macros.h"
 #include "utils.h"
 #include "abase.h"
-#include "polymat.h"
-#include "bigpolymat.h"
+#include "memusage.h"
+#include "lingen-matpoly.h"
+
+#include "lingen-bigmatpoly.h"
+
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
+#include "bw-common-mpi.h"
 #include "filenames.h"
 #include "plingen.h"
-
-// #include "types.h"
-// #include "macros.h"
-// #include "auxfuncs.h"
-// #include "bw_scalar.h"
-// #include "timer.h"
-// #include "variables.h"
-// #include "structure.h"
-// #include "gmp-hacks.h"
-// #include "modulus_hacks.h"
-// #include "e_polynomial.h"
-// #include "twisting_polynomials.h"
-// #include "fft_on_matrices.hpp"
-// #include "field_def.h"
-// #include "field_prime.h"
-// #include "field_quad.h"
-// #include "field_usage.h"
-// /* #include "version.h" */
-// #include "master_common.h"
-// #include "ops_poly.hpp"
+#include "plingen-tuning.h"
 
 static unsigned int display_threshold = 100;
 
@@ -57,272 +42,11 @@ struct bmstatus_s {
 
     unsigned int lingen_threshold;
     unsigned int lingen_mpi_threshold;
-    int mpi_dims[2];
+    int mpi_dims[2]; /* mpi_dims[0] = mpi[0] * thr[0] */
     MPI_Comm world;     /* reordered, in fact */
 };
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
-
-#if 0/*{{{*/
-bw_nbpoly f_poly;
-int t_counter;
-int *global_delta;
-int global_sum_delta;
-int dontread_pi = 0;
-unsigned int *chance_list;
-static int recursion_level;	/* static, hence 0 on init */
-static int rec_threshold = 1;
-static int print_min = 10;
-static int preferred_quadratic_algorithm;	/* Defaults to 0 (old) */
-static int t_init;
-static int check_input = 1;
-
-const char f_base_filename[] = "F_INIT";
-
-#define SAVE_LEVEL_THRESHOLD	4
-
-void reclevel_prolog(void)
-{
-    int i;
-    printf("%2d [ t=%6d ] ", recursion_level, t_counter);
-    for (i = 0; i < recursion_level; i++)
-	printf("  ");
-}
-
-int sum_delta(dims * d, int * delta)
-{
-    int i, res = 0;
-    for (i = 0; i < d->b; i++)
-	res += delta[i];
-    return res;
-}
-
-int max_delta(dims * d, int *delta)
-{
-    int i, res = -1;
-    for (i = 0; i < d->b; i++)
-	if (delta[i] > res)
-	    res = delta[i];
-    return res;
-}
-
-
-/* {{{ low priority */
-#if 0
-static int save_pi(struct t_poly *pi, int t_start, int t_middle, int t_end)
-{
-    char filename[FILENAME_LENGTH];
-    FILE *f;
-    int res;
-
-    sprintf(filename, pi_meta_filename, t_start, t_end);
-    f = fopen(filename, "wb");
-    if (f == NULL)
-	return -1;
-    res = tp_write(f, pi);
-    if (fclose(f) < 0)
-	res = -1;
-
-    if (res == 0) {
-	printf("Saved file %s\n", filename);
-    } else {
-	fprintf(stderr, "Failure to save %s: %s\n",
-		filename, strerror(errno));
-	return -1;
-    }
-
-    if (t_middle == -1)
-	return res;
-
-#if 0
-    /* Unlinking not done, for safety */
-    sprintf(filename, pi_meta_filename, t_start, t_middle);
-
-    if (unlink(filename) < 0) {
-	fprintf(stderr, "Cannot unlink %s: %s\n", filename, strerror(errno));
-    } else {
-	printf("Unlinked %s\n", filename);
-    }
-
-    sprintf(filename, pi_meta_filename, t_middle, t_end);
-
-    if (unlink(filename) < 0) {
-	fprintf(stderr, "Cannot unlink %s: %s\n", filename, strerror(errno));
-    } else {
-	printf("Unlinked %s\n", filename);
-    }
-#endif
-    return res;
-}
-
-
-static int retrieve_pi_files(struct t_poly **p_pi, int t_start)
-{
-    DIR *pi_dir;
-    struct dirent *curr;
-    int n_pi_files;
-    struct couple {
-	int s;
-	int e;
-    } *pi_files;
-    const char *pattern;
-    int i;
-    struct t_poly *left = NULL, *right = NULL;
-    ft_order_t order;
-    int o_i;
-    struct dft_bb *dft_left, *dft_right, *dft_prod;
-    double tt;
-
-    *p_pi = NULL;
-
-    if (dontread_pi)
-	return t_start;
-
-    if ((pi_dir = opendir(".")) == NULL) {
-	perror(".");
-	return t_start;
-    }
-
-    printf("Scanning directory %s for pi files\n", ".");
-
-    pattern = strrchr(pi_meta_filename, '/');
-    if (pattern == NULL) {
-	pattern = pi_meta_filename;
-    } else {
-	pattern++;
-    }
-
-    for (n_pi_files = 0; (curr = readdir(pi_dir)) != NULL;) {
-	int s, e;
-	if (sscanf(curr->d_name, pattern, &s, &e) == 2) {
-	    printf("Found %s\n", curr->d_name);
-	    if (s > e) {
-		printf("but that's a stupid one\n");
-		continue;
-	    }
-	    n_pi_files++;
-	}
-    }
-
-    if (n_pi_files == 0) {
-	printf("Found no pi files\n");
-	return t_start;
-    }
-
-    pi_files = (struct couple *) malloc(n_pi_files * sizeof(struct couple));
-
-    rewinddir(pi_dir);
-
-    for (i = 0; i < n_pi_files && (curr = readdir(pi_dir)) != NULL;) {
-	if (sscanf(curr->d_name,
-		   pattern, &(pi_files[i].s), &(pi_files[i].e)) == 2) {
-	    if (pi_files[i].s > pi_files[i].e)
-		continue;
-	    i++;
-	}
-    }
-    n_pi_files = i;
-    closedir(pi_dir);
-
-    /* The rule is: only look at the best candidate. It's not worth
-     * bothering about more subtle cases */
-    for (;;) {
-	int t_max;
-	int best = -1;
-	FILE *f;
-	char filename[FILENAME_LENGTH];
-
-	printf("Scanning for data starting at t=%d\n", t_start);
-	t_max = -1;
-	for (i = 0; i < n_pi_files; i++) {
-	    if (pi_files[i].s == t_start && pi_files[i].e != -1) {
-		printf("candidate : ");
-		printf(pattern, pi_files[i].s, pi_files[i].e);
-		printf("\n");
-		if (pi_files[i].e > t_max) {
-		    t_max = pi_files[i].e;
-		    best = i;
-		}
-	    }
-	}
-	if (t_max == -1) {
-	    printf("Could not find such data\n");
-	    break;
-	}
-
-	sprintf(filename, pi_meta_filename, t_start, t_max);
-	printf("trying %s\n", filename);
-	f = fopen(filename, "rb");
-	if (f == NULL) {
-	    perror(filename);
-	    pi_files[best].e = -1;
-	    continue;
-	}
-	/* Which degree can we expect for t_start..t_max ?
-	 */
-
-	unsigned int pideg;
-	pideg = iceildiv(m_param * (t_max - t_start), bigdim);
-	pideg += 10;
-	if (t_max > bm->len) {
-	    pideg += t_max - bm->len;
-	}
-
-	right = tp_read(f, pideg);
-	fclose(f);
-
-	if (right == NULL) {
-	    printf("%s : bad or nonexistent data\n", filename);
-	    pi_files[best].e = -1;
-	    continue;
-	}
-
-	if (left == NULL) {
-	    left = right;
-	    right = NULL;
-	    t_start = t_max;
-	    continue;
-	}
-
-	printf("Beginning multiplication\n");
-	*p_pi = tp_comp_alloc(left, right);
-	core_if_null(*p_pi, "*p_pi");
-
-	order.set((*p_pi)->degree + 1);
-	o_i = order;
-
-	dft_left = fft_tp_dft(left, order, &tt);
-	printf("DFT(pi_left,%d) : %.2fs\n", o_i, tt);
-	core_if_null(dft_left, "dft_left");
-
-	dft_right = fft_tp_dft(right, order, &tt);
-	printf("DFT(pi_right,%d) : %.2fs\n", o_i, tt);
-	core_if_null(dft_right, "dft_right");
-
-	dft_prod = fft_bbb_conv(dft_left, dft_right, &tt);
-	printf("CONV(pi_left,pi_right,%d) : %.2fs\n", o_i, tt);
-	core_if_null(dft_prod, "dft_prod");
-
-	fft_tp_invdft(*p_pi, dft_prod, &tt);
-	printf("IDFT(pi,%d) : %.2fs\n", o_i, tt);
-
-	tp_free(left);
-	tp_free(right);
-	dft_bb_free(dft_left);
-	dft_bb_free(dft_right);
-	dft_bb_free(dft_prod);
-	left = *p_pi;
-	right = NULL;
-	t_start = t_max;
-    }
-    free(pi_files);
-
-    *p_pi = left;
-    return t_start;
-}
-#endif /* }}} */
-
-#endif/*}}}*/
 
 /* {{{ col sorting */
 /* We sort only with respect to the global delta[] parameter. As it turns
@@ -384,7 +108,10 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 }/*}}}*/
 
 /* Forward declaration, it's used by the recursive version */
-static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
+static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
+static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
+
+static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
 
 
 /* This destructively cancels the first len coefficients of E, and
@@ -396,7 +123,7 @@ static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta
  * that E*pi is divisible by X^len.
  */
 
-static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
+static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -414,14 +141,15 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
      * soon freed anyway. Set it to identity. */
     unsigned int pi_room_base = expected_pi_length(d, E->size);
 
-    polymat_init(pi, b, b, pi_room_base);
+    matpoly_init(ab, pi, b, b, pi_room_base);
+    pi->size = pi_room_base;
 
     /* Also keep track of the
      * number of coefficients for the columns of pi. Set pi to Id */
 
     unsigned int *pi_lengths = malloc(b * sizeof(unsigned int));
     for(unsigned int i = 0 ; i < b ; i++) {
-        abset_ui(ab, polymat_coeff(pi, i, i, 0), 1);
+        abset_ui(ab, matpoly_coeff(pi, i, i, 0), 1);
         pi_lengths[i] = 1;
     }
 
@@ -434,8 +162,9 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     int * is_pivot = malloc(b * sizeof(int));
     memset(is_pivot, 0, b * sizeof(int));
 
-    polymat e;
-    polymat_init(e, m, b, 1);
+    matpoly e;
+    matpoly_init(ab, e, m, b, 1);
+    e->size = 1;
 
     for (unsigned int t = 0; t < E->size ; t++, bm->t++) {
 
@@ -447,8 +176,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
 
         abelt_ur tmp_ur;
         abelt_ur_init(ab, &tmp_ur);
-        polymat_ur e_ur;
-        polymat_ur_init(e_ur, m, b, 1);
+
+        abvec_ur e_ur;
+        abvec_ur_init(ab, &e_ur, m*b);
+        abvec_ur_set_zero(ab, e_ur, m*b);
         for(unsigned int j = 0 ; j < b ; j++) {
             if (is_pivot[j]) continue;
             /* We should never have to recompute from pi using discarded
@@ -459,12 +190,9 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                 for(unsigned int i = 0 ; i < m ; i++) {
                     for(unsigned int k = 0 ; k < b ; k++) {
                         abmul_ur(ab, tmp_ur,
-                                polymat_coeff(E, i, k, t - s),
-                                polymat_coeff(pi, k, j, s));
-                        abelt_ur_add(ab,
-                                polymat_ur_coeff(e_ur, i, j, 0),
-                                polymat_ur_coeff(e_ur, i, j, 0),
-                                tmp_ur);
+                                matpoly_coeff(E, i, k, t - s),
+                                matpoly_coeff(pi, k, j, s));
+                        abelt_ur_add(ab, e_ur[i*b+j], e_ur[i*b+j], tmp_ur);
                     }
                 }
             }
@@ -474,11 +202,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (is_pivot[j]) continue;
             unsigned int nz = 0;
             for(unsigned int i = 0 ; i < m ; i++) {
-                abreduce(ab,
-                        polymat_coeff(e, i, j, 0),
-                        polymat_ur_coeff(e_ur, i, j, 0)
-                        );
-                nz += abcmp_ui(ab, polymat_coeff(e, i, j, 0), 0) == 0;
+                abreduce(ab, matpoly_coeff(e, i, j, 0), e_ur[i*b+j]);
+                nz += abcmp_ui(ab, matpoly_coeff(e, i, j, 0), 0) == 0;
             }
             if (nz == m) {
                 newluck++, bm->lucky[j]++;
@@ -487,7 +212,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             }
         }
         abelt_ur_clear(ab, &tmp_ur);
-        polymat_ur_clear(e_ur);
+        abvec_ur_clear(ab, &e_ur, m*b);
         if (newluck) {
             /* If newluck == n, then we probably have a generator. We add an
              * extra guarantee. newluck==n, for a total of k iterations in a
@@ -540,7 +265,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             unsigned int u = 0;
             /* {{{ Find the pivot */
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, polymat_coeff(e, u, j, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(e, u, j, 0), 0) != 0)
                     break;
             }
             if (u == m) continue;
@@ -551,7 +276,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
-            int rc = abinv(ab, inv, polymat_coeff(e, u, j, 0));
+            int rc = abinv(ab, inv, matpoly_coeff(e, u, j, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, inv);
@@ -561,12 +286,12 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
                 unsigned int k = ctable[kl][1];
-                if (abcmp_ui(ab, polymat_coeff(e, u, k, 0), 0) == 0)
+                if (abcmp_ui(ab, matpoly_coeff(e, u, k, 0), 0) == 0)
                     continue;
                 // add lambda = e[u,k]*-e[u,j]^-1 times col j to col k.
                 abelt lambda;
                 abinit(ab, &lambda);
-                abmul(ab, lambda, inv, polymat_coeff(e, u, k, 0));
+                abmul(ab, lambda, inv, matpoly_coeff(e, u, k, 0));
 
                 assert(delta[j] <= delta[k]);
                 /* {{{ Apply on both e and pi */
@@ -574,10 +299,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                 abinit(ab, &tmp);
                 for(unsigned int i = 0 ; i < m ; i++) {
                     /* TODO: Would be better if mpfq had an addmul */
-                    abmul(ab, tmp, lambda, polymat_coeff(e, i, j, 0));
+                    abmul(ab, tmp, lambda, matpoly_coeff(e, i, j, 0));
                     abadd(ab,
-                            polymat_coeff(e, i, k, 0),
-                            polymat_coeff(e, i, k, 0),
+                            matpoly_coeff(e, i, k, 0),
+                            matpoly_coeff(e, i, k, 0),
                             tmp);
                 }
                 if (bm->lucky[k] < 0) {
@@ -604,10 +329,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
                         /* TODO: Would be better if mpfq had an addmul */
                         abmul(ab, tmp, lambda,
-                                polymat_coeff(pi, i, j, s));
+                                matpoly_coeff(pi, i, j, s));
                         abadd(ab,
-                                polymat_coeff(pi, i, k, s),
-                                polymat_coeff(pi, i, k, s),
+                                matpoly_coeff(pi, i, k, s),
+                                matpoly_coeff(pi, i, k, s),
                                 tmp);
                     }
                 }
@@ -627,7 +352,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (!is_pivot[j]) continue;
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
-                    polymat_realloc(pi, pi->alloc + 1 + pi->alloc / (m+n));
+                    matpoly_realloc(ab, pi, pi->alloc + MAX(pi->alloc / (m+n), 1));
                     printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
                             bm->t,
                             100 * pi->alloc / pi_room_base);
@@ -645,45 +370,19 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                     continue;
                 }
             }
-            ASSERT_ALWAYS(pi_lengths[j] + 1 <= pi->alloc);
-            bwmat_move_coeffs(ab,
-                    polymat_part(pi, 0, j, 1), b,
-                    polymat_part(pi, 0, j, 0), b,
-                    b * pi_lengths[j]);
-            for(unsigned int i = 0 ; i < b ; i++) {
-                abset_ui(ab, polymat_coeff(pi, i, j, 0), 0);
-            }
+            matpoly_multiply_column_by_x(ab, pi, j, pi_lengths[j]);
             pi_lengths[j]++;
             delta[j]++;
         }
         /* }}} */
-
-        /*
-        printf("t=%u:", bm->t);
-        for(unsigned int j = 0; j < b; j++) {
-            printf(" %u", delta[j]);
-        }
-        printf("\n");
-        */
     }
-    /*
-        printf("t=%u: delta =", bm->t);
-        for(unsigned int j = 0; j < b; j++) {
-            printf(" %u", delta[j]);
-        }
-        printf("\n");
-        printf("t=%u: pi_length =", bm->t + len);
-        for(unsigned int j = 0; j < b; j++) {
-            printf(" %u", pi_lengths[j]);
-        }
-        printf("\n");
-        */
+    pi->size = 0;
     for(unsigned int j = 0; j < b; j++) {
         if (pi_lengths[j] > pi->size)
             pi->size = pi_lengths[j];
     }
     pi->size = MIN(pi->size, pi->alloc);
-    polymat_clear(e);
+    matpoly_clear(ab, e);
     free(is_pivot);
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
@@ -691,299 +390,188 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     return generator_found;
 }/*}}}*/
 
-static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
+double start_time = -1;
+void info_init_timer()
 {
-    dims * d = bm->d;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    unsigned int b = m + n;
-    abdst_field ab = d->ab;
-    int done;
-
-    /* XXX I think we have to start with something large enough to get
-     * all coefficients of E_right correct */
-    size_t half = E->size - (E->size / 2);
-    polymat E_left;
-    polymat_init(E_left, m, b, half);
-
-    bwmat_copy_coeffs(ab,
-            polymat_part(E_left,0,0,0),1,
-            polymat_part(E,0,0,0),1,
-            m*b*half);
-    E_left->size = half;
-
-    polymat pi_left;
-    polymat_init(pi_left, 0, 0, 0);
-
-    done = bw_lingen(bm, pi_left, E_left, delta);
-
-    polymat_clear(E_left);
-
-    if (done) {
-        polymat_swap(pi_left, pi);
-        polymat_clear(pi_left);
-        return 1;
-    }
-
-    /* Do a naive middle product for the moment, just to make sure I'm
-     * not speaking nonsense */
-    /* First get coefficient bounds in E */
-    /* E_i0 + (max degree in pi) = half */
-    unsigned int E_i0 = half - (pi_left->size - 1);
-    unsigned int E_i1 = E->size;
-
-    /* length of the middle product is the difference of lengths + 1 */
-    unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
-    if (E->size > display_threshold)
-        printf("t=%u, MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
-
-    polymat E_right;
-    polymat_init(E_right, m, b, mp_len);
-    E_right->size = mp_len;
-
-    bm->t_mp -= seconds();
-    polymat_mp_raw(ab,
-            E_right, 0,
-            E, E_i0, E_i1 - E_i0,
-            pi_left, 0, pi_left->size, 0, 0);
-    bm->t_mp += seconds();
-
-    polymat pi_right;
-    polymat_init(pi_right, 0, 0, 0);
-
-    done = bw_lingen(bm, pi_right, E_right, delta);
-
-    polymat_clear(E_right);
-
-    if (E->size > display_threshold)
-        printf("t=%u, MUL(%zu, %zu) --> %zu\n", bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right ->size - 1);
-    bm->t_mp -= seconds();
-    polymat_mul(ab, pi, pi_left, pi_right);
-    bm->t_mp += seconds();
-    
-    polymat_clear(pi_left);
-    polymat_clear(pi_right);
-
-    return done;
-}/*}}}*/
-
-void debug_matrix_print(polymat_srcptr M, const char * fmt, ...)
-{
-    return;
-    va_list ap;
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    va_start(ap, fmt);
-    /* We have three buffers: initial message, with matrix, and with rank
-     * info prepended.
-     */
-    char * buf[3];
-    int len[3];
-    int alloc[3];
-    int pos[3];
-
-    len[0] = vasprintf(&(buf[0]), fmt, ap);
-    ASSERT_ALWAYS(len[0] >= 0);
-
-    alloc[1] = len[0] + 16 * M->m * M->n + 4*M->m;
-    buf[1] = malloc(alloc[1]);
-    pos[1] = 0;
-
-    memcpy(buf[1], buf[0], len[0] + 1);
-    pos[1] = len[0];
-
-    /* For the moment we're assuming only one unsigned long */
-    for(unsigned int i = 0 ; i < M->m ; i++) {
-        int v;
-        for(unsigned int j = 0 ; j < M->n ; j++) {
-            ASSERT_ALWAYS(pos[1] < alloc[1] - 16);
-            v = snprintf(buf[1] + pos[1], alloc[1]-pos[1],  " %4lu", ((unsigned long*)(M->x))[i*M->n + j]);
-            ASSERT_ALWAYS(v >= 0);
-            pos[1] += v;
-        }
-        ASSERT_ALWAYS(pos[1] < alloc[1] - 10);
-        v = snprintf(buf[1] + pos[1], alloc[1]-pos[1], "\n");
-        ASSERT_ALWAYS(v >= 0);
-        pos[1] += v;
-    }
-    len[1] = pos[1];
-
-    /* Prepend rank info, now */
-    alloc[2] = len[1] + 4 * M->m + len[0];
-    buf[2] = malloc(alloc[2]);
-    pos[2] = 0;
-
-    for(pos[1] = 0 ; pos[1] < len[1] ; ) {
-        int v;
-        ASSERT_ALWAYS(pos[2] < alloc[2] - 4);
-        v = snprintf(buf[2] + pos[2], alloc[2] - pos[2], "%2d: ", rank);
-        ASSERT_ALWAYS(v >= 0);
-        pos[2] += v;
-        for( ; pos[1] < len[1] ; ) {
-            ASSERT_ALWAYS(pos[2] < alloc[2]);
-            if ((buf[2][pos[2]++] = buf[1][pos[1]++]) == '\n')
-                break;
-        }
-    }
-
-    fputs(buf[2], stdout);
-    free(buf[2]);
-    free(buf[1]);
-    free(buf[0]);
+    start_time = wct_seconds();
 }
 
-/* This version works over MPI */
-static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, unsigned int *delta) /*{{{*/
+static const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+        ds /= 1024.0;
+        px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
+}
+
+void print_info_mp(unsigned int t, matpoly_ptr A, matpoly_ptr B)
+{
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
+            A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+}
+
+void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)
+{
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
+            A->size, B->size, A->size + B->size - 1);
+}
+
+void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
+{
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return;
+    printf("[%.3f %s %s] t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
+            A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+}
+
+void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
+{
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return;
+    printf("[%.3f %s %s] t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
+            A->size, B->size, A->size + B->size - 1);
+}
+
+static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    unsigned int b = m + n;
-    unsigned int m0 = E->m0;
-    unsigned int b0 = E->n0;    /* E is m * b */
-    // unsigned int n0 = b0 - m0;
-
     abdst_field ab = d->ab;
     int done;
-
-        int irank;
-        int jrank;
-        MPI_Comm_rank(E->col, &irank);
-        MPI_Comm_rank(E->row, &jrank);
-
-    debug_matrix_print(bigpolymat_my_cell(E), 
-            "Entering bw_lingen_bigrecursive, size %zu/%zu\n"
-            "local matrix E at degree 0:\n", E->size, bigpolymat_my_cell(E)->size);
-
-    if (E->size < bm->lingen_mpi_threshold) {
-        /* Fall back to local code */
-        /* This entails gathering E locally, computing pi locally, and
-         * dispathing it back. */
-
-        int done;
-        polymat sE, spi;
-        polymat_init(sE, m, b, E->size);
-        polymat_init(spi, 0, 0, 0);
-        bigpolymat_gather_mat(ab, sE, E);
-        /* Only the master node does the local computation */
-        if (!irank && !jrank) {
-            debug_matrix_print(sE, "Global matrix [X^0]E at root (size %zu):\n", sE->size);
-            done = bw_lingen_recursive(bm, spi, sE, delta);
-            debug_matrix_print(spi, "Output: global matrix [X^0]pi at root (size %zu):\n", spi->size);
-        }
-        bigpolymat_scatter_mat(ab, pi, spi);
-        debug_matrix_print(bigpolymat_my_cell(pi), "Output: local matrix [X^0]pi (complete size %zu/%zu):\n", pi->size, bigpolymat_my_cell(pi)->size);
-        /* Don't forget to broadcast delta from root node to others ! */
-        MPI_Bcast(&done, 1, MPI_INT, 0, bm->world);
-        MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->world);
-        MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->world);
-        MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
-        polymat_clear(spi);
-        polymat_clear(sE);
-        return done;
-    }
-
 
     /* XXX I think we have to start with something large enough to get
      * all coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
-    bigpolymat E_left;
-    bigpolymat_init(E_left, E, m, b, half);
 
-    /* should be part of the interface, I guess. OTOH it remains simple
-     * enough */
-    bwmat_copy_coeffs(ab,
-            polymat_part(bigpolymat_my_cell(E_left),0,0,0),1,
-            polymat_part(bigpolymat_my_cell(E),0,0,0),1,
-            m0*b0*half);
+    /* declare an lazy-alloc all matrices */
+    matpoly E_left;
+    matpoly pi_left;
+    matpoly pi_right;
+    matpoly E_right;
+    matpoly_init(ab, E_left, 0, 0, 0);
+    matpoly_init(ab, pi_left, 0, 0, 0);
+    matpoly_init(ab, pi_right, 0, 0, 0);
+    matpoly_init(ab, E_right, 0, 0, 0);
 
-    bigpolymat_set_size(E_left, half);
-
-    bigpolymat pi_left;
-    bigpolymat_init(pi_left, pi, 0, 0, 0);      /* pre-init */
-
-    done = bw_lingen_bigrecursive(bm, pi_left, E_left, delta);
-
-    bigpolymat_clear(E_left);
+    matpoly_truncate(ab, E_left, E, half);
+    done = bw_lingen(bm, pi_left, E_left, delta);
+    ASSERT_ALWAYS(pi_left->size);
+    matpoly_clear(ab, E_left);
 
     if (done) {
-        bigpolymat_swap(pi_left, pi);
-        bigpolymat_clear(pi_left);
+        matpoly_swap(pi_left, pi);
+        matpoly_clear(ab, pi_left);
         return 1;
     }
 
-    /* Do a naive middle product for the moment, just to make sure I'm
-     * not speaking nonsense */
-    /* First get coefficient bounds in E */
-    /* E_i0 + (max degree in pi) = half */
-    unsigned int E_i0 = half - (pi_left->size - 1);
-    unsigned int E_i1 = E->size;
-
-    /* length of the middle product is the difference of lengths + 1 */
-    unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
-    if (!irank && !jrank && E->size > display_threshold)
-        printf("t=%u, MPI-MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
-
-    bigpolymat E_right;
-    bigpolymat_init(E_right, E, m, b, mp_len);
-    E_right->size = mp_len;
+    bm->t_mp -= seconds();
+    matpoly_rshift(ab, E, E, half - pi_left->size + 1);
+    if (E->size > display_threshold) print_info_mp(bm->t, E, pi_left);
+    matpoly_mp(ab, E_right, E, pi_left);
+    bm->t_mp += seconds();
+    done = bw_lingen(bm, pi_right, E_right, delta);
+    matpoly_clear(ab, E_right);
 
     bm->t_mp -= seconds();
-    bigpolymat_mp_raw(ab,
-            E_right, 0,
-            E, E_i0, E_i1 - E_i0,
-            pi_left, 0, pi_left->size, 0, 0);
+    if (E->size > display_threshold) print_info_mul(bm->t, pi_left, pi_right);
+    matpoly_mul(ab, pi, pi_left, pi_right);
     bm->t_mp += seconds();
-
-    bigpolymat pi_right;
-    bigpolymat_init(pi_right, pi, 0, 0, 0);     /* pre-init */
-
-    done = bw_lingen_bigrecursive(bm, pi_right, E_right, delta);
-
-    bigpolymat_clear(E_right);
-
-    if (!irank && !jrank && E->size > display_threshold)
-        printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n", bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right ->size - 1);
-    bm->t_mp -= seconds();
-    bigpolymat_mul(ab, pi, pi_left, pi_right);
-    bm->t_mp += seconds();
-    
-    bigpolymat_clear(pi_left);
-    bigpolymat_clear(pi_right);
+    matpoly_clear(ab, pi_left);
+    matpoly_clear(ab, pi_right);
 
     return done;
 }/*}}}*/
 
-
-static int/*{{{*/
-bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
+/* This version works over MPI */
+static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
-    dims *d = bm->d;
+    dims * d = bm->d;
     abdst_field ab = d->ab;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    unsigned int b = m + n;
+    int done;
 
-    if (E->size >= bm->lingen_mpi_threshold) {
-        /* We are going to delegate to the MPI code */
-        bigpolymat model;
-        bigpolymat xpi, xE;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
 
-        bigpolymat_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
-        /* We prefer to allocate soon. The interface doesn't really like
-         * lazy allocation at the moment */
-        bigpolymat_init(xE, model, m, b, E->size);
-        bigpolymat_init(xpi, model, 0, 0, 0);   /* pre-init for now */
-        bigpolymat_scatter_mat(ab, xE, E);
-        ASSERT_ALWAYS(xE->size);
-        int res = bw_lingen_bigrecursive(bm, xpi, xE, delta);
-        bigpolymat_gather_mat(ab, pi, xpi);
-        bigpolymat_clear(xE);
-        bigpolymat_clear(xpi);
-        bigpolymat_clear_model(model);
-        return res;
-    } else if (E->size < bm->lingen_threshold) {
+    /* XXX I think we have to start with something large enough to get
+     * all coefficients of E_right correct */
+    size_t half = E->size - (E->size / 2);
+
+    /* declare an lazy-alloc all matrices */
+    bigmatpoly E_left;
+    bigmatpoly E_right;
+    bigmatpoly pi_left;
+    bigmatpoly pi_right;
+    bigmatpoly_init(ab, E_left, E, 0, 0, 0);
+    bigmatpoly_init(ab, pi_left, pi, 0, 0, 0);
+    bigmatpoly_init(ab, pi_right, pi, 0, 0, 0);
+    bigmatpoly_init(ab, E_right, E, 0, 0, 0);
+
+    bigmatpoly_truncate_loc(ab, E_left, E, half);
+    done = bw_biglingen_collective(bm, pi_left, E_left, delta);
+    bigmatpoly_clear(ab, E_left);
+
+    if (done) {
+        bigmatpoly_swap(pi_left, pi);
+        bigmatpoly_clear(ab, pi_left);
+        return 1;
+    }
+
+    bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
+    bm->t_mp -= seconds();
+    if (E->size > display_threshold) print_info_mpi_mp(bm->t, E, pi_left);
+    bigmatpoly_mp(ab, E_right, E, pi_left);
+    bm->t_mp += seconds();
+    done = bw_biglingen_collective(bm, pi_right, E_right, delta);
+    bigmatpoly_clear(ab, E_right);
+
+    bm->t_mp -= seconds();
+    if (E->size > display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right);
+    bigmatpoly_mul(ab, pi, pi_left, pi_right);
+    bm->t_mp += seconds();
+    bigmatpoly_clear(ab, pi_left);
+    bigmatpoly_clear(ab, pi_right);
+
+    return done;
+}/*}}}*/
+
+static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
+{
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    ASSERT_ALWAYS(rank == 0);
+    ASSERT_ALWAYS(E->size < bm->lingen_mpi_threshold);
+
+    if (E->size < bm->lingen_threshold) {
         bm->t_basecase -= seconds();
         int res = bw_lingen_basecase(bm, pi, E, delta);
         bm->t_basecase += seconds();
@@ -993,281 +581,81 @@ bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
     }
 }/*}}}*/
 
-#if 0/*{{{*/
-int check_zero_and_advance(struct e_coeff *ec, unsigned int kill)
+static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
 {
-    unsigned int i;
-    for (i = 0; i < kill; i++) {
-	int res = 1;
-	int j;
-	for (j = 0; res && j < bigdim; j++) {
-	    if (!mcol_is_zero(mbmat_col(mbpoly_coeff(ec->p, 0), j))) {
-		die("argh, not zero !\n", 1);
-		return 1;
-	    }
-	}
-	if (!res) {
-	    return 0;
-	}
-	ec_advance(ec, 1);
-    }
-    return 1;
-}
+    dims *d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
 
-static double
-bw_recursive_algorithm(struct e_coeff *ec, int *delta, struct t_poly **p_pi)
+    if (E->size >= bm->lingen_mpi_threshold) 
+        return bw_lingen_bigrecursive(bm, pi, E, delta);
+
+    /* Fall back to local code */
+    /* This entails gathering E locally, computing pi locally, and
+     * dispathing it back. */
+
+    matpoly sE, spi;
+    matpoly_init(ab, sE, m, b, E->size);
+    matpoly_init(ab, spi, 0, 0, 0);
+    bigmatpoly_gather_mat(ab, sE, E);
+    /* Only the master node does the local computation */
+    int done = bw_biglingen_single(bm, spi, sE, delta);
+    bigmatpoly_scatter_mat(ab, pi, spi);
+    /* Don't forget to broadcast delta from root node to others ! */
+    matpoly_clear(ab, spi);
+    matpoly_clear(ab, sE);
+    return done;
+}/*}}}*/
+
+static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta)/*{{{*/
 {
-    struct t_poly *pi_left, *pi_right;
-    int deg, ldeg, rdeg;
-    struct dft_mb *dft_e_left, *dft_e_middle;
-    struct dft_bb *dft_pi_left, *dft_pi_right;
-    struct dft_bb *dft_pi;
-    ft_order_t sub_order;
-    int so_i;
-    int expected_pi_deg;
-    double t_dft_e_l, t_dft_pi_l, t_conv_e, t_idft_e,
-	t_dft_pi_r, t_conv_pi, t_idft_pi, t_ft, t_cv, t_sub;
-    int kill;
-    int t0 = t_counter;
-    double tt = 0;
+    /* This version of the code is called collectively from all nodes,
+     * but with the input E on rank 0. This normally happens _only_ at
+     * the start. */
+    dims *d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
+    int done;
+    int go_mpi = 0;
+    go_mpi = E->size >= bm->lingen_mpi_threshold;
 
-    tt -= seconds();
-
-    deg = ec->degree;
-
-    /* Repartition of the job:
-     *
-     *          left            right
-     * deg==0   1               0       (never recursive)
-     * deg==1   1               1
-     * deg==2   2               1
-     * deg==n   n/2 + 1         (n+1)/2
-     * 
-     * The figures are for the number of steps, each one corres-
-     * ponding to a m/(m+n) increase of the average degree of pi.
-     */
-
-    ldeg = (deg / 2) + 1;
-    rdeg = (deg + 1) / 2;
-
-    assert(ldeg && rdeg && ldeg + rdeg == deg + 1);
-
-    /* We aim at computing ec * pi / X^ldeg. The degree of this
-     * product will be
-     *
-     * ec->degree + pi->degree - ldeg
-     *
-     * (We are actually only interested in the low (ec->degree-ldeg)
-     * degree part of the product, but the whole thing is required)
-     *
-     * The expected value of pi->degree is 
-     *  ceil(ldeg*m/(m+n))
-     *
-     * The probability that pi exceeds this expected degree
-     * depends on the base field, but is actually low.
-     * However, by the end of the computations, this does
-     * happen because the degrees increase unevenly.
-     *
-     * The DFTs of e and pi can be computed using only the
-     * number of points given above, *even if their actual
-     * degree is higher*. The FFT routines need to have
-     * provision for this.
-     *
-     * The number of points will then be the smallest power
-     * of 2 above deg+ceil(ldeg*m/(m+n))-ldeg+1
-     */
-
-    expected_pi_deg = 10 + iceildiv(ldeg * m_param, bigdim);
-#ifdef	HAS_CONVOLUTION_SPECIAL
-    kill = ldeg;
-#else
-    kill = 0;
-#endif
-    sub_order.set(deg + expected_pi_deg - kill + 1);
-
-    so_i = sub_order;
-
-    dft_e_left = fft_ec_dft(ec, sub_order, &t_dft_e_l);
-    reclevel_prolog();
-    printf("DFT(e,%d) : %.2fs\n", so_i, t_dft_e_l);
-    core_if_null(dft_e_left, "dft_e_left");
-
-    ec->degree = ldeg - 1;
-    t_sub = bw_lingen(ec, delta, &pi_left);
-
-    if (t_counter < t0 + ldeg) {
-	printf("Exceptional situation, small generator ; escaping\n");
-	*p_pi = pi_left;
-	dft_mb_free(dft_e_left);
-	return tt + seconds();
-    }
-
-    printf("deg(pi_l)=%d, bound is %d\n", pi_left->degree, expected_pi_deg);
-    if (!sub_order.fits(deg + pi_left->degree - kill + 1)) {
-	printf("Warning : pi grows above its expected degree...\n");
-	printf("order %d , while :\n"
-	       "deg=%d\n"
-	       "deg(pi_left)=%d\n"
-	       "ldeg-1=%d\n"
-	       "hence, %d is too big\n",
-	       so_i,
-	       deg, pi_left->degree, ldeg - 1,
-	       deg + pi_left->degree - kill + 1);
-
-	int n_exceptional = 0;
-	for (int i = 0; i < bigdim; i++) {
-	    n_exceptional += chance_list[i] * m_param;
-	}
-	if (!n_exceptional) {
-	    die("This should only happen at the end of the computation\n", 1);
-	}
-	*p_pi = pi_left;
-	dft_mb_free(dft_e_left);
-	return tt + seconds();
-    }
-
-    dft_pi_left = fft_tp_dft(pi_left, sub_order, &t_dft_pi_l);
-    reclevel_prolog();
-    printf("DFT(pi_l,%d) : %.2fs\n", so_i, t_dft_pi_l);
-    core_if_null(dft_pi_left, "dft_pi_left");
-
-#ifdef  HAS_CONVOLUTION_SPECIAL
-    dft_e_middle = fft_mbb_conv_sp(dft_e_left, dft_pi_left, ldeg, &t_conv_e);
-#else
-    dft_e_middle = fft_mbb_conv(dft_e_left, dft_pi_left, &t_conv_e);
-#endif
-    reclevel_prolog();
-    printf("CONV(e*pi_l,%d) : %.2fs\n", so_i, t_conv_e);
-    core_if_null(dft_e_middle, "dft_e_middle");
-
-    /* This is a special convolution in the sense that we
-     * compute f(w)*g(w) / w^k for k=ldeg, since we are
-     * interested in fg div X^k (we know fg mod X^k==0)
-     */
-
-    ec_park(ec);
-    ec_untwist(ec);
-
-    fft_mb_invdft(ec->p, dft_e_middle, deg - kill, &t_idft_e);
-    ec->degree = deg - kill;
-
-    check_zero_and_advance(ec, ldeg - kill);
-    reclevel_prolog();
-    printf("IDFT(e,%d) : %.2fs\n", (int) (dft_e_middle->order), t_idft_e);
-
-    dft_mb_free(dft_e_middle);
-    dft_mb_free(dft_e_left);
-
-    assert(ec->degree == rdeg - 1);
-
-    t_sub += bw_lingen(ec, delta, &pi_right);
-    printf("deg(pi_r)=%d, bound is %d\n", pi_right->degree, expected_pi_deg);
-
-    *p_pi = tp_comp_alloc(pi_left, pi_right);
-    core_if_null(*p_pi, "*p_pi");
-
-    printf("deg(pi_prod)=%d (order %d)\n", (*p_pi)->degree, so_i);
-    assert(sub_order.fits((*p_pi)->degree + 1));
-
-    dft_pi_right = fft_tp_dft(pi_right, sub_order, &t_dft_pi_r);
-    reclevel_prolog();
-    printf("DFT(pi_r,%d) : %.2fs\n", so_i, t_dft_pi_r);
-    core_if_null(dft_pi_right, "dft_pi_right");
-
-    dft_pi = fft_bbb_conv(dft_pi_left, dft_pi_right, &t_conv_pi);
-    reclevel_prolog();
-    printf("CONV(pi_l*pi_r,%d) : %.2fs\n", so_i, t_conv_pi);
-    core_if_null(dft_pi, "dft_pi");
-
-
-    fft_tp_invdft(*p_pi, dft_pi, &t_idft_pi);
-    reclevel_prolog();
-    printf("IDFT(pi,%d) : %.2fs\n", (int) (dft_pi->order), t_idft_pi);
-
-    dft_bb_free(dft_pi);
-    dft_bb_free(dft_pi_right);
-    dft_bb_free(dft_pi_left);
-    tp_free(pi_left);
-    tp_free(pi_right);
-
-    reclevel_prolog();
-
-    t_ft = t_dft_e_l + t_dft_pi_l + t_idft_e + t_dft_pi_r + t_idft_pi;
-    t_cv = t_conv_e + t_conv_pi;
-
-    printf("proper : %.2fs (%.2fs FT + %.2fs CV), sub : %.2fs\n",
-	   t_ft + t_cv, t_ft, t_cv, t_sub);
-    printf("constants : c_ft=%.4e c_cv=%.4e		# %d,%d\n",
-	   t_ft / (double) (so_i << so_i),
-	   t_cv / (double) (1 << so_i), deg, so_i);
-    printf("Different values for M1:");
-    printf("   e_left: M1=%.3e\n",
-	   t_dft_e_l / (so_i << so_i) / (m_param * bigdim));
-    printf("  pi_left: M1=%.3e\n",
-	   t_dft_pi_l / (so_i << so_i) / (bigdim * bigdim));
-    printf("    e_inv: M1=%.3e\n",
-	   t_idft_e / (so_i << so_i) / (m_param * bigdim));
-    printf(" pi_right: M1=%.3e\n",
-	   t_dft_pi_r / (so_i << so_i) / (bigdim * bigdim));
-    printf("   pi_inv: M1=%.3e\n",
-	   t_idft_pi / (so_i << so_i) / (bigdim * bigdim));
-    printf("   e_conv: M1=%.3e\n",
-	   t_conv_e / (1 << so_i) / (m_param * bigdim * bigdim));
-    printf("  pi_conv: M1=%.3e\n",
-	   t_conv_pi / (1 << so_i) / (bigdim * bigdim * bigdim));
-    return tt + seconds();
-}
-
-static double bw_lingen(struct e_coeff *ec, int *delta, struct t_poly **p_pi)
-{
-    /* int check_chance; */
-    double inner;
-    int deg;
-    int t_before;
-    int did_rec = 0;
-
-    t_before = t_counter;
-    deg = ec->degree;
-    reclevel_prolog();
-    printf("Degree %d\n", deg);
-
-    recursion_level++;
-    /* check_chance=(t_counter > bm->len - 5); */
-    if (ec->degree < rec_threshold) {
-	/* check_chance=(t_counter > bm->len - 5 - ec->degree); */
-	inner = bw_traditional_algorithm(ec, delta, p_pi, 1);
+    if (!go_mpi) {
+        int rank;
+        MPI_Comm_rank(bm->world, &rank);
+        if (rank == 0)
+            done = bw_lingen(bm, pi, E, delta);
+        MPI_Bcast(&done, 1, MPI_INT, 0, bm->world);
+        MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->world);
+        MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->world);
+        MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
     } else {
-	did_rec = 1;
-	inner = bw_recursive_algorithm(ec, delta, p_pi);
+        /* We are going to do this collectively */
+        bigmatpoly model;
+        abdst_field ab = d->ab;
+        bigmatpoly xpi, xE;
+
+        bigmatpoly_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
+        /* We prefer to allocate soon. The interface doesn't really like
+         * lazy allocation at the moment */
+        bigmatpoly_init(ab, xE, model, m, b, E->size);
+        bigmatpoly_init(ab, xpi, model, 0, 0, 0);   /* pre-init for now */
+        bigmatpoly_scatter_mat(ab, xE, E);
+        ASSERT_ALWAYS(xE->size);
+        done = bw_biglingen_collective(bm, xpi, xE, delta);
+        bigmatpoly_gather_mat(ab, pi, xpi);
+        bigmatpoly_clear(ab, xE);
+        bigmatpoly_clear(ab, xpi);
+        bigmatpoly_clear_model(model);
     }
-    recursion_level--;
-
-    reclevel_prolog();
-    printf("Degree %d : took %.2fs\n", deg, inner);
-
-    if (recursion_level <= SAVE_LEVEL_THRESHOLD) {
-	if (!did_rec || recursion_level == SAVE_LEVEL_THRESHOLD) {
-	    save_pi(*p_pi, t_before, -1, t_counter);
-	} else {
-	    int t_middle;
-	    t_middle = t_before + (deg / 2) + 1;
-	    save_pi(*p_pi, t_before, t_middle, t_counter);
-	}
-    }
-
-    return inner;
-}
-
-void showuse(void)
-{
-    die("Usage : bw-master <bank#>\n", 1);
-}
-
-#endif/*}}}*/
+    return done;
+}/*}}}*/
 
 /**********************************************************************/
 
-unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
+unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
 {				
     dims *d = bm->d;
     abdst_field ab = d->ab;
@@ -1286,8 +674,9 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     /* We want to create a full rank m*m matrix M, by extracting columns
      * from the first coefficients of A */
 
-    polymat M;
-    polymat_init(M, m, m, 1);
+    matpoly M;
+    matpoly_init(ab, M, m, m, 1);
+    M->size = 1;
 
     /* For each integer i between 0 and m-1, we have a column, picked
      * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
@@ -1301,9 +690,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     for (unsigned int k = 0; r < m && k < A->size; k++) {
 	for (unsigned int j = 0; r < m && j < n; j++) {
 	    /* Extract a full column into M */
-	    bwmat_copy_coeffs(ab,
-			      polymat_part(M, 0, r, 0),
-			      m, polymat_part(A, 0, j, k), n, m);
+            matpoly_extract_column(ab, M, r, 0, A, j, k);
 
             /* Now reduce it modulo all other columns */
 	    for (unsigned int v = 0; v < r; v++) {
@@ -1317,18 +704,18 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
                 for(unsigned int i = 0 ; i < m ; i++) {
                     if (i == u) continue;
                     abmul(ab, tmp,
-                              polymat_coeff(M, i, v, 0),
-                              polymat_coeff(M, u, r, 0));
-                    abadd(ab, polymat_coeff(M, i, r, 0),
-                              polymat_coeff(M, i, r, 0),
+                              matpoly_coeff(M, i, v, 0),
+                              matpoly_coeff(M, u, r, 0));
+                    abadd(ab, matpoly_coeff(M, i, r, 0),
+                              matpoly_coeff(M, i, r, 0),
                               tmp);
                 }
                 abset_zero(ab,
-                        polymat_coeff(M, u, r, 0));
+                        matpoly_coeff(M, u, r, 0));
 	    }
             unsigned int u = 0;
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, polymat_coeff(M, u, r, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(M, u, r, 0), 0) != 0)
                     break;
             }
             if (u == m) {
@@ -1348,7 +735,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
 	    exponents[r] = k;
 
 	    /* Multiply the column so that the pivot becomes -1 */
-            int rc = abinv(ab, tmp, polymat_coeff(M, u, r, 0));
+            int rc = abinv(ab, tmp, matpoly_coeff(M, u, r, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, tmp);
@@ -1357,8 +744,8 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
             }
             abneg(ab, tmp, tmp);
             for(unsigned int i = 0 ; i < m ; i++) {
-                abmul(ab, polymat_coeff(M, i, r, 0),
-                          polymat_coeff(M, i, r, 0),
+                abmul(ab, matpoly_coeff(M, i, r, 0),
+                          matpoly_coeff(M, i, r, 0),
                           tmp);
             }
 
@@ -1390,7 +777,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     free(pivots);
     free(exponents);
     free(cnum);
-    polymat_clear(M);
+    matpoly_clear(ab, M);
     abclear(ab, &tmp);
 
     return fdesc;
@@ -1411,8 +798,7 @@ unsigned int get_max_delta_on_solutions(bmstatus_ptr bm, unsigned int * delta)/*
     return maxdelta;
 }/*}}}*/
 
-
-void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], unsigned int t0, polymat pi, unsigned int * delta)/*{{{*/
+void compute_final_F_red(bmstatus_ptr bm, matpoly f, unsigned int (*fdesc)[2], unsigned int t0, matpoly pi, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -1446,7 +832,8 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     ASSERT(f->n == 0);
     ASSERT(f->alloc == 0);
 
-    polymat_init(f, n, n, flen);
+    matpoly_init(ab, f, n, n, flen);
+    f->size = flen;
 
     printf("Computing value of f(X)=f0(X)pi(X) (degree %u)\n", maxdelta);
     printf("Final, t=%u: delta =", bm->t);
@@ -1475,8 +862,8 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abset(ab,
-                        polymat_coeff(f, i, j, k),
-                        polymat_coeff(pi, i, j1, k));
+                        matpoly_coeff(f, i, j, k),
+                        matpoly_coeff(pi, i, j1, k));
             }
         }
     }
@@ -1490,9 +877,9 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abadd(ab,
-                        polymat_coeff(f, c, j, k+t0-e),
-                        polymat_coeff(f, c, j, k+t0-e),
-                        polymat_coeff(pi, i+n, j1, k));
+                        matpoly_coeff(f, c, j, k+t0-e),
+                        matpoly_coeff(f, c, j, k+t0-e),
+                        matpoly_coeff(pi, i+n, j1, k));
             }
         }
     }
@@ -1500,8 +887,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     free(pi_colidx);
 }/*}}}*/
 
-
-void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta, int ascii)/*{{{*/
+void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int * delta, int ascii)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -1517,14 +903,40 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
             continue;
         sols[jj++]=j;
     }
+    /* Apparently it occurs that F can have a zero coefficient in
+     * delta[j], or at least some columns of F. This seems to have a
+     * slight potential of missing part of the solution space. Hence we
+     * check whether, for each column, the coefficients of degree
+     * delta[j] in F are zero or not. If they are all zero, we reduce
+     * delta[j] by one unit for the purpose of this function, as this
+     * will lead to the same sequence of vectors being computed in the
+     * end. Whether or not this is the _real_ delta[j], corresponding to
+     * the right-hand side having zero coefficients for degrees
+     * [delta[j]..t[, is out of our concern.
+     */
+    for(unsigned int jj = 0 ; jj < n ; jj++) {
+        unsigned int j = sols[jj];
+        unsigned int delta_orig = delta[j];
+        for(int z = 1; z && delta[j] ; delta[j]-=z) {
+            for(unsigned int i = 0 ; z && i < n ; i++) {
+                z = abis_zero(ab, matpoly_coeff(f_red, i, jj, delta[j]));
+            }
+        }
+        if (delta_orig > delta[j]) {
+            printf("Reduced solution column #%u from delta=%u to delta=%u\n",
+                    j, delta_orig, delta[j]);
+        }
+    }
+
+    /* Do as we do in lingen-binary.cpp: transpose the solutions */
     if (ascii) {
         for(unsigned int k = 0 ; k < flen ; k++) {
-            for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int jj = 0 ; jj < n ; jj++) {
-                    if (jj) fprintf(f, " ");
+            for(unsigned int jj = 0 ; jj < n ; jj++) {
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    if (i) fprintf(f, " ");
                     unsigned int j = sols[jj];
                     if (k <= delta[j]) {
-                        abfprint(ab, f, polymat_coeff(f_red, i, jj, delta[j]-k));
+                        abfprint(ab, f, matpoly_coeff(f_red, i, jj, delta[j]-k));
                     } else {
                         fprintf(f, "0");
                     }
@@ -1537,12 +949,12 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
         abelt tmp;
         abinit(ab, &tmp);
         for(unsigned int k = 0 ; k < flen ; k++) {
-            for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int jj = 0 ; jj < n ; jj++) {
-                    unsigned int j = sols[jj];
+            for(unsigned int jj = 0 ; jj < n ; jj++) {
+                unsigned int j = sols[jj];
+                for(unsigned int i = 0 ; i < n ; i++) {
                     abset_zero(ab, tmp);
                     if (k <= delta[j])
-                        abset(ab, tmp, polymat_coeff(f_red, i, jj, delta[j]-k));
+                        abset(ab, tmp, matpoly_coeff(f_red, i, jj, delta[j]-k));
                     fwrite(tmp, sizeof(abelt), 1, f);
                 }
             }
@@ -1552,8 +964,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
     fclose(f);
 }/*}}}*/
 
-
-void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fdesc)[2])/*{{{*/
+void compute_initial_E(bmstatus_ptr bm, matpoly E, matpoly A, unsigned int (*fdesc)[2])/*{{{*/
 {
     // F0 is exactly the n x n identity matrix, plus the
     // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
@@ -1570,14 +981,12 @@ void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fde
     abdst_field ab = d->ab;
     /* Now we're ready to compute E, which is nothing more than a rewrite
      * of A, of course. */
-    polymat_init(E, m, b, A->size - t0);
+    matpoly_init(ab, E, m, b, A->size - t0);
+    E->size = A->size - t0;
     for(unsigned int k = t0 ; k < A->size ; k++) {
         for(unsigned int j = 0 ; j < n ; j++) {
             /* Take column j of A, shifted by t0 positions */
-            bwmat_copy_coeffs(ab,
-                    polymat_part(E, 0, j, k-t0), b,
-                    polymat_part(A, 0, j, k), n,
-                    m);
+            matpoly_extract_column(ab, E, j, k-t0, A, j, k);
         }
         for(unsigned int j = n ; j < m + n ; j++) {
             /* Take column cnum[j-n] of coeff exponents[j-n] of A, to
@@ -1586,17 +995,12 @@ void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fde
              * shift by exponents[j-n] coefficients */
             unsigned int c = fdesc[j-n][1];
             unsigned int e = fdesc[j-n][0];
-            bwmat_copy_coeffs(ab,
-                    polymat_part(E, 0, j, k-t0), b,
-                    polymat_part(A, 0, c, k-t0+e), n,
-                    m);
+            matpoly_extract_column(ab, E, j, k-t0, A, c, k-t0+e);
         }
     }
-    E->size = A->size - t0;
 }/*}}}*/
 
-
-void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
+void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
 			  const char *input_file, int ascii_input)
 {
     dims * d = bm->d;
@@ -1607,7 +1011,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     unsigned int guess_len = 1000;
 
     ASSERT(!A->m && !A->n && !A->alloc);
-    polymat_init(A, m, n, guess_len);
+    matpoly_init(ab, A, m, n, guess_len);
 
     FILE *f = fopen(input_file, ascii_input ? "r" : "rb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
@@ -1616,8 +1020,10 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     int eof_met = 0;
     for( ; !eof_met ; k++) {
         if (k == A->alloc) {
-            polymat_realloc(A, A->alloc + A->alloc / 10);
+            matpoly_realloc(ab, A, A->alloc + A->alloc / 10);
         }
+        ASSERT_ALWAYS(k < A->alloc);
+        A->size = k + 1;
 
 	/* coefficient 0 will be read to position 0 (k-!!k=0), but all
 	 * other coefficients from position 1 onwards will be stored to
@@ -1627,7 +1033,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
 	int k1 = k - ! !k;
 	for (unsigned int i = 0; i < m && !eof_met ; i++) {
 	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
-                abdst_elt x = polymat_coeff(A, i, j, k1);
+                abdst_elt x = matpoly_coeff(A, i, j, k1);
 		int rc;
                 if (ascii_input) {
                     rc = abfscan(ab, f, x);
@@ -1635,7 +1041,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
                 } else {
                     rc = fread(x, sizeof(abelt), 1, f);
                     rc = rc == 1;
-                    abreduce(ab, x, x);
+                    abnormalize(ab, x);
                 }
 		if (!rc) {
                     if (i == 0 && j == 0) {
@@ -1683,22 +1089,15 @@ void bmstatus_clear(bmstatus_ptr bm)/*{{{*/
     memset(bm, 0, sizeof(bmstatus));
 }/*}}}*/
 
+
+
 int main(int argc, char *argv[])
 {
     bmstatus bm;
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
-    gmp_randstate_t rstate;
 
-    MPI_Init(&argc, &argv);
-    int rank;
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    gmp_randinit_default(rstate);
-    gmp_randseed_ui(rstate, 1);
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1709,7 +1108,14 @@ int main(int argc, char *argv[])
 
     param_list_configure_switch(pl, "--tune", &tune);
     param_list_configure_switch(pl, "--ascii", &ascii);
-    bw_common_init(bw, pl, &argc, &argv);
+    bw_common_init_mpi(bw, pl, &argc, &argv);
+
+    int rank;
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    info_init_timer();
 
     const char * afile = param_list_lookup_string(pl, "afile");
 
@@ -1745,12 +1151,19 @@ int main(int argc, char *argv[])
 	abfield_specify(ab, MPFQ_PRIME_MPZ, p);
 	mpz_clear(p);
     }
+    abmpi_ops_init(ab);
 
     bm->lingen_threshold = 10;
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
+#if defined(FAKEMPI_H_)
+    bm->lingen_mpi_threshold = UINT_MAX;
+#endif
 
+    /* }}} */
+
+    /* {{{ Parse MPI args. Make bm->world a better mpi communicator */
     bm->mpi_dims[0] = 1;
     bm->mpi_dims[1] = 1;
     param_list_parse_intxint(pl, "mpi", bm->mpi_dims);
@@ -1771,12 +1184,31 @@ int main(int argc, char *argv[])
          * same node together. So we pick them by bunches of size
          * thr[0]*thr[1].
          */
-        printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
+        if (rank == 0)
+            printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
         ASSERT_ALWAYS(size == mpi[0] * mpi[1] * thr[0] * thr[1]);
-        /* Keep the semantics which exist for krylov and so on --
-         * even though we are not really using threads here. */
+        /* The mpi and thr command line argument lead to the same number
+         * of working processes than with krylov. Except that here, we're
+         * not really doing threads, but running real mpi jobs with their
+         * own address space (hence mpirun will need a bigger -n
+         * argument).  In a sense, here we strive to follow the semantics
+         * used in bwc otherwise.  In fact, we should probably use the
+         * pi_wiring structures as well, so that we can say that we
+         * consistently use the same infrastructure.  For simplicity of
+         * the code, we don't.
+         */
         bm->mpi_dims[0] *= thr[0];
         bm->mpi_dims[1] *= thr[1];
+        if (bm->mpi_dims[0] != bm->mpi_dims[1]) {
+            if (rank == 0)
+                fprintf(stderr, "The current plingen code is limited to square splits ; here, we received a %d x %x split, which will not work\n",
+                    bm->mpi_dims[0], bm->mpi_dims[1]);
+            abort();
+        } else if ((m % bm->mpi_dims[0] != 0) || (n % bm->mpi_dims[0] != 0)) {
+            if (rank == 0)
+                fprintf(stderr, "The process grid dimensions must divide gcd(m,n)\n");
+            abort();
+        }
         int tl_grank = rank % (thr[0] * thr[1]); // thread-level global rank
         int tl_irank = tl_grank / thr[1];
         int tl_jrank = tl_grank % thr[1];
@@ -1788,92 +1220,16 @@ int main(int argc, char *argv[])
         int newrank = irank * mpi[1] * thr[1] + jrank;
         MPI_Comm_split(MPI_COMM_WORLD, 0, newrank, &(bm->world));
     }
+    /* }}} */
 
     if (param_list_warn_unused(pl))
 	usage();
-    /* }}} */
 
-    /* TODO: delegate them to other functions, elsewhere... */
-    int tune_bm_basecase = tune;
-    int tune_mp = tune;
-
-    if (tune_bm_basecase) {
-        unsigned int maxtune = 10000 / (m * n);
-        for(unsigned int k = 10 ; k < maxtune ; k += k/10) {
-            unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
-            polymat E, pi;
-            polymat_init(pi, 0, 0, 0);
-            polymat_init(E, m, m+n, maxtune);
-            E->size = k;
-            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v], rstate);
-            }
-            double tt = seconds();
-            for(unsigned int j = 0 ; j < m + n ; delta[j++]=1);
-            bm->t = 1;
-            bw_lingen_basecase(bm, pi, E, delta);
-            printf("%zu %.2e\n", E->size, (seconds()-tt) / (k * k));
-            polymat_clear(pi);
-            polymat_clear(E);
-            free(delta);
-        }
-    }
-
-    if (tune_mp) {
-        /* Now for benching mp and plain mul */
-        unsigned int maxtune = 10000 / (m*n);
-        /* Bench the products which would come together with a k-steps
-         * basecase algorithm. IOW a 2k, one-level recursive call incurs
-         * twice the k-steps basecase, plus once the timings counted here
-         * (presently, this has Karatsuba complexity)
-         */
-        for(unsigned int k = 10 ; k < maxtune ; k+= k/10) {
-            polymat E, piL, piR, pi, Er;
-            unsigned int sE = k*(m+2*n)/(m+n);
-            unsigned int spi = k*m/(m+n);
-            polymat_init(E, m, m+n, sE);
-            polymat_init(piL, m+n, m+n, spi);
-            polymat_init(piR, m+n, m+n, spi);
-            polymat_init(pi, m+n, m+n, spi*2);
-            polymat_init(Er, m, m+n, sE-spi+1);
-            E->size = sE;
-            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v], rstate);
-            }
-            piL->size = spi;
-            piR->size = spi;
-            for(unsigned int v = 0 ; v < piL->m * piL->n * piL->size ; v++) {
-                abrandom(ab, piL->x[v], rstate);
-                abrandom(ab, piR->x[v], rstate);
-            }
-            double ttmp = 0, ttmul = 0;
-            ttmp -= seconds();
-            polymat_mp(ab, Er, E, piL);
-            ttmp += seconds();
-            ttmul -= seconds();
-            polymat_mul(ab, pi, piL, piR);
-            ttmul += seconds();
-            double ttmpq = ttmp / (k*k);
-            double ttmulq = ttmul / (k*k);
-            double ttmpk = ttmp / pow(k, 1.58);
-            double ttmulk = ttmul / pow(k, 1.58);
-            printf("%u [%.2e+%.2e = %.2e] [%.2e+%.2e = %.2e]\n",
-                    k,
-                    ttmpq, ttmulq, ttmpq + ttmulq,
-                    ttmpk, ttmulk, ttmpk + ttmulk
-                    );
-            // (seconds()-tt) / (k*k)); // ((sE-spi) * spi) / (m*(m+n)*(m+n)));
-            // printf("%zu %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
-            polymat_clear(E);
-            polymat_clear(piL);
-            polymat_clear(piR);
-            polymat_clear(pi);
-            polymat_clear(Er);
-        }
-    }
-
-    if (tune)
+    if (tune) {
+        plingen_tuning(bm->d->ab, bm->d->m, bm->d->n, bm->world, pl);
+        MPI_Finalize();
         return 0;
+    }
 
     unsigned int (*fdesc)[2] = NULL;    /* gcc is stupid */
 
@@ -1882,12 +1238,12 @@ int main(int argc, char *argv[])
      * should rather do an mpi-level read. Either with only one
      * jobreading, and handing over data immediately to its peers, or
      * with several accesses to the file(s). */
-    polymat E;
-    polymat_init(E, 0, 0, 0);
+    matpoly E;
+    matpoly_init(ab, E, 0, 0, 0);
 
     if (rank == 0) { /* {{{ Read A, compute F0 and E, and keep only E */
-        polymat A;
-        polymat_init(A, 0, 0, 0);
+        matpoly A;
+        matpoly_init(ab, A, 0, 0, 0);
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
         read_data_for_series(bm, A, afile, ascii);
 
@@ -1905,7 +1261,7 @@ int main(int argc, char *argv[])
         compute_initial_E(bm, E, A, fdesc);
 
         printf("Throwing out a(X)\n");
-        polymat_clear(A);
+        matpoly_clear(ab, A);
     } /* }}} */
     MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
     /* This will quite probably be changed. We are playing nasty games
@@ -1923,11 +1279,10 @@ int main(int argc, char *argv[])
         delta[j] = t0;
     }
 
-    polymat pi;
-    polymat_init(pi, 0, 0, 0);
-    /* At this point, we're not propagating the mpi info here */
-    bw_lingen(bm, pi, E, delta);
-    polymat_clear(E);
+    matpoly pi;
+    matpoly_init(ab, pi, 0, 0, 0);
+    bw_biglingen_single(bm, pi, E, delta);
+    matpoly_clear(ab, E);
 
     unsigned int nlucky = 0;
     int luck_mini = expected_pi_length(d, 0);
@@ -1936,15 +1291,15 @@ int main(int argc, char *argv[])
     if (rank == 0) {
         /* TODO: consider luck only below probability 2^-64 */
         if (nlucky == n) {
-            polymat f_red;
-            polymat_init(f_red, 0, 0, 0);
+            matpoly f_red;
+            matpoly_init(ab, f_red, 0, 0, 0);
             compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
             char * f_filename;
             int rc = asprintf(&f_filename, "%s.gen", afile);
             ASSERT_ALWAYS(rc >= 0);
             write_f(bm, f_filename, f_red, delta, ascii);
             free(f_filename);
-            polymat_clear(f_red);
+            matpoly_clear(ab, f_red);
         } else {
             fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
         }
@@ -1952,38 +1307,15 @@ int main(int argc, char *argv[])
         printf("t_basecase = %.2f\n", bm->t_basecase);
         printf("t_mp = %.2f\n", bm->t_mp);
         free(delta);
-        polymat_clear(pi);
+        matpoly_clear(ab, pi);
         free(fdesc);
     }
 
-#if 0
-    struct e_coeff *ec;
-    struct t_poly *pi_left, *pi_right, *pi_prod;
-
-    printf("ec->degree=%d, new_t=%d, t_counter=%d\n",
-	   ec->degree, new_t, t_counter);
-
-    global_sum_delta = sum_delta(d, global_delta);
-
-    if (ec->degree >= 0) {
-	bw_lingen(ec, global_delta, &pi_right);
-    } else {
-	pi_right = pi_left;
-	pi_left = NULL;
-    }
-
-    compute_f_final(pi_prod);
-    bw_commit_f(f_poly, global_delta);
-    print_chance_list(bm->len, chance_list);
-    /* Now I can clean up everything if I want... if I want... */
-    ft_order_t::cleanup();
-#endif
-
+    abmpi_ops_clear(ab);
     abfield_clear(ab);
     bmstatus_clear(bm);
     bw_common_clear(bw);
     param_list_clear(pl);
-    gmp_randclear(rstate);
 
     MPI_Finalize();
     return 0;

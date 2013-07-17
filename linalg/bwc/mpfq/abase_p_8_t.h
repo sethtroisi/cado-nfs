@@ -1,9 +1,9 @@
-#ifndef ABASE_P_3_T_H_
-#define ABASE_P_3_T_H_
+#ifndef ABASE_P_8_T_H_
+#define ABASE_P_8_T_H_
 
 /* MPFQ generated file -- do not edit */
 
-#include "abase_p_3.h"
+#include "abase_p_8.h"
 /* Active handler: simd_gfp */
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
@@ -15,9 +15,9 @@
 /* Options used:{
    w=64,
    fieldtype=prime,
-   n=3,
-   nn=7,
-   vtag=p_3,
+   n=8,
+   nn=17,
+   vtag=p_8,
    vbase_stuff={
     vc:includes=[ <stdarg.h>, ],
     member_templates_restrict={
@@ -37,37 +37,37 @@
      ],
     choose_byfeatures=<code>,
     },
-   tag=p_3,
+   tag=p_8,
    type=plain,
    opthw=,
    virtual_base={
     filebase=abase_vbase,
     substitutions=[
-     [ (?^:abase_p_3_elt \*), void *, ],
-     [ (?^:abase_p_3_src_elt\b), const void *, ],
-     [ (?^:abase_p_3_elt\b), void *, ],
-     [ (?^:abase_p_3_dst_elt\b), void *, ],
-     [ (?^:abase_p_3_elt_ur \*), void *, ],
-     [ (?^:abase_p_3_src_elt_ur\b), const void *, ],
-     [ (?^:abase_p_3_elt_ur\b), void *, ],
-     [ (?^:abase_p_3_dst_elt_ur\b), void *, ],
-     [ (?^:abase_p_3_vec \*), void *, ],
-     [ (?^:abase_p_3_src_vec\b), const void *, ],
-     [ (?^:abase_p_3_vec\b), void *, ],
-     [ (?^:abase_p_3_dst_vec\b), void *, ],
-     [ (?^:abase_p_3_vec_ur \*), void *, ],
-     [ (?^:abase_p_3_src_vec_ur\b), const void *, ],
-     [ (?^:abase_p_3_vec_ur\b), void *, ],
-     [ (?^:abase_p_3_dst_vec_ur\b), void *, ],
-     [ (?^:abase_p_3_poly \*), void *, ],
-     [ (?^:abase_p_3_src_poly\b), const void *, ],
-     [ (?^:abase_p_3_poly\b), void *, ],
-     [ (?^:abase_p_3_dst_poly\b), void *, ],
+     [ (?^:abase_p_8_elt \*), void *, ],
+     [ (?^:abase_p_8_src_elt\b), const void *, ],
+     [ (?^:abase_p_8_elt\b), void *, ],
+     [ (?^:abase_p_8_dst_elt\b), void *, ],
+     [ (?^:abase_p_8_elt_ur \*), void *, ],
+     [ (?^:abase_p_8_src_elt_ur\b), const void *, ],
+     [ (?^:abase_p_8_elt_ur\b), void *, ],
+     [ (?^:abase_p_8_dst_elt_ur\b), void *, ],
+     [ (?^:abase_p_8_vec \*), void *, ],
+     [ (?^:abase_p_8_src_vec\b), const void *, ],
+     [ (?^:abase_p_8_vec\b), void *, ],
+     [ (?^:abase_p_8_dst_vec\b), void *, ],
+     [ (?^:abase_p_8_vec_ur \*), void *, ],
+     [ (?^:abase_p_8_src_vec_ur\b), const void *, ],
+     [ (?^:abase_p_8_vec_ur\b), void *, ],
+     [ (?^:abase_p_8_dst_vec_ur\b), void *, ],
+     [ (?^:abase_p_8_poly \*), void *, ],
+     [ (?^:abase_p_8_src_poly\b), const void *, ],
+     [ (?^:abase_p_8_poly\b), void *, ],
+     [ (?^:abase_p_8_dst_poly\b), void *, ],
      ],
     name=abase_vbase,
     global_prefix=abase_,
     },
-   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
    } */
 
 
@@ -98,10 +98,10 @@
 /* MPI interface */
 
 /* Object-oriented interface */
-void abase_p_3_p_3_dotprod(abase_p_3_dst_field, abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_src_vec, abase_p_3_src_vec, unsigned int);
-void abase_p_3_p_3_addmul_tiny(abase_p_3_dst_field, abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_src_vec, abase_p_3_dst_vec, unsigned int);
-void abase_p_3_p_3_transpose(abase_p_3_dst_field, abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_src_vec);
+void abase_p_8_p_8_dotprod(abase_p_8_dst_field, abase_p_8_dst_field, abase_p_8_dst_vec, abase_p_8_src_vec, abase_p_8_src_vec, unsigned int);
+void abase_p_8_p_8_addmul_tiny(abase_p_8_dst_field, abase_p_8_dst_field, abase_p_8_dst_vec, abase_p_8_src_vec, abase_p_8_dst_vec, unsigned int);
+void abase_p_8_p_8_transpose(abase_p_8_dst_field, abase_p_8_dst_field, abase_p_8_dst_vec, abase_p_8_src_vec);
 
-#endif  /* ABASE_P_3_T_H_ */
+#endif  /* ABASE_P_8_T_H_ */
 
 /* vim:set ft=cpp: */

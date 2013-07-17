@@ -40,6 +40,15 @@
 #elif defined(SELECT_ABASE_p_6)
 #define NOT_OVER_GF2
 #include "mpfq/abase_p_6.h"
+#elif defined(SELECT_ABASE_p_7)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_7.h"
+#elif defined(SELECT_ABASE_p_8)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_8.h"
+#elif defined(SELECT_ABASE_p_9)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_9.h"
 #else
 // #warning "Using default selection for abase"
 #error "argh. This code must be compiled with some SELECT_ABASE_ macro defined"
