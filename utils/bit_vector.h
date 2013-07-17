@@ -6,6 +6,9 @@
 
 #define BV_BITS 64      // since we're using uint64_t's
 #define LN2_BV_BITS 6   // 2^^LN2_BV_BITS = BV_BITS
+/* Changing bv_t to something else is possibly dangerous and should not
+ * be taken lightly. Some code down the line may make indirect
+ * assumptions on bv_t being uint64_t */
 typedef uint64_t bv_t;
 
 struct bit_vector_s {
@@ -38,6 +41,7 @@ extern int bit_vector_flipbit(bit_vector_ptr b, size_t pos);
 extern void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname);
 extern void bit_vector_read_from_file(bit_vector_ptr b, const char * fname);
 
+extern size_t bit_vector_popcount(bit_vector_ptr b);
 #ifdef __cplusplus
 }
 #endif
