@@ -105,8 +105,6 @@ static double required_excess = DEFAULT_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_NPT;
 
 static float w_ccc;
-static uint8_t binfilerel;	/* True (1) if a rel_used file must be read */
-static uint8_t boutfilerel;	/* True (1) if a rel_used file must be written */
 
 #ifdef STAT
 uint64_t __stat_weight;
@@ -117,25 +115,8 @@ uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN + 1];
 #endif
 
 
+int binary_bitmap_output;       /* XXX will be dropped */
 
-static const unsigned char nbbits[256] = {
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-    4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
-};
 
 
 /*****************************************************************************/
@@ -521,7 +502,7 @@ static void singletons_and_cliques_removal(index_t * nrels, index_t * nprimes)
     }
 }
 
-/* singleton removal when binary out file (boutfilerel) is requested */
+/* singleton removal when binary out file is requested (through -outrel) */
 static int no_singleton(buf_rel_t * br)
 {
     weight_t i;
@@ -590,8 +571,9 @@ void *thread_insert(buf_arg_t * arg)
 
 	if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num)) {
 	    arg->info.nprimes +=
-		insert_rel_in_table_no_e(my_rel, arg->min_index, boutfilerel,
-					 rel_compact, ideals_weight);
+		insert_rel_in_table_no_e(my_rel, arg->min_index, 
+                                    binary_bitmap_output,
+                                    rel_compact, ideals_weight);
 #ifdef STAT
 	    arg->info.W += (double) my_rel->nb_above_min_index;
 #endif
@@ -626,13 +608,13 @@ static void *thread_print(buf_arg_t * arg)
 	    NANOSLEEP();
 
 	aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
-	if (boutfilerel && aff) {
+	if (binary_bitmap_output && aff) {
 	    if (!(no_singleton(my_rel)))
 		bit_vector_clearbit(arg->rel_used, (size_t) my_rel->num);
 	} else if (aff) {
 	    arg->info.W += (double) my_rel->nb;
 	    fputs(my_rel->line, arg->fd[0]);
-	} else if (!boutfilerel && arg->fd[1] != NULL)
+	} else if (!binary_bitmap_output && arg->fd[1] != NULL)
 	    fputs(my_rel->line, arg->fd[1]);
 
 	test_and_print_progress_now();
@@ -643,38 +625,6 @@ static void *thread_print(buf_arg_t * arg)
 
 
 /***************** utils functions for purge binary **************************/
-
-void
-read_rel_used_from_infile(const char *infilerel, size_t rel_used_nb_bytes,
-			  index_t * nrels)
-{
-    FILE *in;
-    void *p, *pl, *pf;
-    index_t nr = 0;
-
-    fprintf(stderr, "Loading rel_used file %s, %zu bytes\n", infilerel,
-	    rel_used_nb_bytes);
-    if (!(in = fopen_maybe_compressed(infilerel, "r"))) {
-	fprintf(stderr, "Error, cannot open file %s for reading.\n",
-		infilerel);
-	exit(1);
-    }
-    for (p = (void *) rel_used->p, pf = p + rel_used_nb_bytes; (pf - p);) {
-	pl = p + fread(p, 1, pf - p, in);
-	while (p != pl)
-	    nr += nbbits[*((uint8_t *) p++)];
-
-	if ((p == pf) ^ !feof(in)) {
-	    fprintf(stderr,
-		    "Error, the length of file %s is incorrect compared "
-		    "with nrels (%" PRIu64 ").\n", infilerel, nrelmax);
-	    exit(1);
-	}
-    }
-    fclose_maybe_compressed(in, infilerel);
-    *nrels = nr;
-    fprintf(stderr, "Number of used relations is %" PRid "\n", *nrels);
-}
 
 
 
@@ -798,20 +748,21 @@ int main(int argc, char **argv)
     const char *basepath = param_list_lookup_string(pl, "basepath");
     const char *subdirlist = param_list_lookup_string(pl, "subdirlist");
     const char *purgedname = param_list_lookup_string(pl, "out");
-    const char *infilerel = param_list_lookup_string(pl, "inrel");
-    const char *outfilerel = param_list_lookup_string(pl, "outrel");
+    /* TODO: rename these parameters. The name should include "bitmap"
+     * somehow.  */
+    const char *rel_used_bitmap_file_in = param_list_lookup_string(pl, "inrel");
+    const char *rel_used_bitmap_file_out = param_list_lookup_string(pl, "outrel");
     const char *deletedname = param_list_lookup_string(pl, "outdel");
 
-    set_antebuffer_path(argv0, path_antebuffer);
+    binary_bitmap_output = rel_used_bitmap_file_out != NULL;
 
-    /* Check command-line parameters */
-    binfilerel = (infilerel != 0);
-    boutfilerel = (outfilerel != 0);
+    set_antebuffer_path(argv0, path_antebuffer);
 
     if (param_list_warn_unused(pl)) {
 	fprintf(stderr, "Unused options in command-line\n");
 	usage(argv0);
     }
+    /*{{{ build the list of input files from the given args*/
     if ((basepath || subdirlist) && !filelist) {
 	fprintf(stderr,
 		"-basepath / -subdirlist only valid with -filelist\n");
@@ -831,7 +782,10 @@ int main(int argc, char **argv)
 	fic =
 	    filelist_from_file_with_subdirlist(basepath, filelist,
 					       subdirlist);
-
+    /*}}}*/
+    /*{{{ the hash table needs several static parameters on the command
+     * line. This is cumbersome, but while it can probably be avoided, it
+     * also hard to do so efficiently */
     if (nrelmax == 0) {
 	fprintf(stderr, "Error, missing -nrels ... option (or nrels=0)\n");
 	usage(argv0);
@@ -855,6 +809,7 @@ int main(int argc, char **argv)
 	exit(1);
     }
     ASSERT_ALWAYS(min_index <= nprimemax);
+    /*}}}*/
 
     /* Printing relevant information */
     fprintf(stderr, "Weight function used during clique removal:\n"
@@ -868,7 +823,8 @@ int main(int argc, char **argv)
 	    "Number of prime ideals below the two large prime bounds: " "%"
 	    PRIu64 "\n", nprimemax);
 
-    /* Allocating memory */
+    /* Allocating memory. We are keeping track of the total malloc()'ed
+     * amount, only for informational purposes. */
 
     cur_alloc = nprimemax * sizeof(weight_t);
     ideals_weight = (weight_t *) malloc(cur_alloc);
@@ -885,9 +841,14 @@ int main(int argc, char **argv)
     fprintf(stderr, "Allocated rel_used of %zuMB (total %zuMB so far)\n",
 	    rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
 
-    if (binfilerel)
-	read_rel_used_from_infile(infilerel, rel_used_nb_bytes, &nrels);
-    else {
+    if (rel_used_bitmap_file_in) {
+        fprintf(stderr, "Loading rel_used file %s, %zu bytes\n", rel_used_bitmap_file_in,
+                rel_used_nb_bytes);
+        bit_vector_read_from_file(rel_used, rel_used_bitmap_file_in);
+        nrels = bit_vector_popcount(rel_used);
+        fprintf(stderr, "Number of used relations is %" PRid "\n", nrels);
+
+    } else {
 	bit_vector_set(rel_used, 1);
 	nrels = nrelmax;
     }
@@ -897,7 +858,7 @@ int main(int argc, char **argv)
 	rel_used->p[nrelmax >> LN2_BV_BITS] &=
 	    (((bv_t) 1) << (nrelmax & (BV_BITS - 1))) - 1;
 
-    if (!boutfilerel) {
+    if (!rel_used_bitmap_file_out) {
 	bit_vector_init(Tbv, nrelmax);
 	ASSERT_ALWAYS(Tbv->p != NULL);
 	tot_alloc_bytes += rel_used_nb_bytes;
@@ -921,9 +882,9 @@ int main(int argc, char **argv)
 		cur_alloc >> 20, tot_alloc_bytes >> 20);
     }
 
-  /**********************Start interessing stuff *****************************/
+    /****************** Begin interesting stuff *************************/
     info_mat_t info;
-    if (!boutfilerel)
+    if (!rel_used_bitmap_file_out)
 	fprintf(stderr, "Pass 1, reading and storing ideals with index h >= "
 		"%" PRIu64 "\n", min_index);
     else
@@ -959,7 +920,7 @@ int main(int argc, char **argv)
 	exit(1);
     }
 
-    if (!boutfilerel) {
+    if (!rel_used_bitmap_file_out) {
 	singletons_and_cliques_removal(&nrels, &nprimes);
 	if (nrels < nprimes) {
 	    fprintf(stderr, "number of relations < number of ideals\n");
@@ -983,7 +944,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
 		tmp >> 20, tot_alloc_bytes >> 20);
     } else {
-	if (!binfilerel)
+	if (!rel_used_bitmap_file_in)
 	    fprintf(stderr,
 		    "   nrels=%" PRid " nprimes=%" PRid " excess=%" PRId64
 		    "\n", nrels, nprimes, ((int64_t) nrels) - nprimes);
@@ -1028,7 +989,7 @@ int main(int argc, char **argv)
 			STEP_PURGE_PASS2);
 
 
-    if (!boutfilerel) {
+    if (!rel_used_bitmap_file_out) {
 	/* write final values to stdout */
 	fprintf(stdout, "Final values:\nnrels=%" PRid " nprimes=%" PRid " "
 		"excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
@@ -1048,18 +1009,18 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Deleted %" PRid " relations with singleton(s)\n"
 		"Number of primes deleted: %" PRid "\n"
 		"Writing rel_used file %s, %zu bytes\n",
-		relsup, prisup, outfilerel, rel_used_nb_bytes);
+		relsup, prisup, rel_used_bitmap_file_out, rel_used_nb_bytes);
 
-	if (!(out = fopen_maybe_compressed(outfilerel, "w"))) {
+	if (!(out = fopen_maybe_compressed(rel_used_bitmap_file_out, "w"))) {
 	    fprintf(stderr, "Error, cannot open file %s for writing.\n",
-		    outfilerel);
+		    rel_used_bitmap_file_out);
 	    exit(1);
 	}
 	p = (void *) rel_used->p;
 	for (pf = p + rel_used_nb_bytes; p != pf;
 	     p += fwrite(p, 1, pf - p, out));
 
-	fclose_maybe_compressed(out, outfilerel);
+	fclose_maybe_compressed(out, rel_used_bitmap_file_out);
     }
 
 
@@ -1072,7 +1033,7 @@ int main(int argc, char **argv)
     sum2_index = NULL;
 
     bit_vector_clear(rel_used);
-    if (!boutfilerel)
+    if (!rel_used_bitmap_file_out)
 	bit_vector_clear(Tbv);
 
     if (filelist)
