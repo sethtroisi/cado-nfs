@@ -149,37 +149,37 @@ class Program(object, metaclass=InspectType):
       "verbose" should map to an instance Toggle("-v"), and "threads" should
       map to an instance Parameter("-t")
 
-    >>> p = Ls({})
+    >>> p = Ls()
     >>> p.make_command_line()
     '/bin/ls'
-    >>> p = Ls({}, stdout='foo')
+    >>> p = Ls(stdout='foo')
     >>> p.make_command_line()
     '/bin/ls > foo'
-    >>> p = Ls({}, stderr='foo')
+    >>> p = Ls(stderr='foo')
     >>> p.make_command_line()
     '/bin/ls 2> foo'
-    >>> p = Ls({}, stdout='foo', stderr='bar')
+    >>> p = Ls(stdout='foo', stderr='bar')
     >>> p.make_command_line()
     '/bin/ls > foo 2> bar'
-    >>> p = Ls({}, stdout='foo', stderr='foo')
+    >>> p = Ls(stdout='foo', stderr='foo')
     >>> p.make_command_line()
     '/bin/ls > foo 2>&1'
-    >>> p = Ls({}, stdout='foo', append_stdout=True)
+    >>> p = Ls(stdout='foo', append_stdout=True)
     >>> p.make_command_line()
     '/bin/ls >> foo'
-    >>> p = Ls({}, stderr='foo', append_stderr=True)
+    >>> p = Ls(stderr='foo', append_stderr=True)
     >>> p.make_command_line()
     '/bin/ls 2>> foo'
-    >>> p = Ls({}, stdout='foo', append_stdout=True, stderr='bar', append_stderr=True)
+    >>> p = Ls(stdout='foo', append_stdout=True, stderr='bar', append_stderr=True)
     >>> p.make_command_line()
     '/bin/ls >> foo 2>> bar'
-    >>> p = Ls({}, stdout='foo', append_stdout=True, stderr='foo', append_stderr=True)
+    >>> p = Ls(stdout='foo', append_stdout=True, stderr='foo', append_stderr=True)
     >>> p.make_command_line()
     '/bin/ls >> foo 2>&1'
-    >>> p = Ls({}, 'foo', 'bar')
+    >>> p = Ls('foo', 'bar')
     >>> p.make_command_line()
     '/bin/ls foo bar'
-    >>> p = Ls({}, 'foo', 'bar', long = True)
+    >>> p = Ls('foo', 'bar', long = True)
     >>> p.make_command_line()
     '/bin/ls -l foo bar'
     '''
@@ -197,9 +197,10 @@ class Program(object, metaclass=InspectType):
     # attribute
     init_signature = None
 
-    def __init__(self, options, parameters, stdin = None,
+    def __init__(self, options, stdin = None,
                  stdout = None, append_stdout = False, stderr = None,
-                 append_stderr = False, background = False):
+                 append_stderr = False, background = False, execpath = None,
+                 execsubdir = None, execbin = None):
         ''' Takes a dict of of command line options. Defaults are filled in
         from the cadoaprams.Parameters instance parameters.
 
@@ -242,21 +243,7 @@ class Program(object, metaclass=InspectType):
         filtered = {key:options[key] for key in filtered \
                     if not options[key] is None}
 
-        # The effective parameters are the union of the parameters passed to
-        # the class constructor (in "options", then filtered), and parameters
-        # from the parameter file (in "parameters"), where the former take
-        # precedence.
-        self.parameters = parameters.copy()
-        self.parameters.update(filtered)
-
-        # Check that all parameters passed in are understood. Since parameters
-        # passed via the constructor are necessarily understood, this
-        # effectively tests that the values passed via "parameters" are
-        # understood.
-        known_keys = self.get_accepted_keys()
-        for key in parameters:
-            if not key in known_keys:
-                raise Exception("Unknown parameter %s" % key)
+        self.parameters = filtered
 
         self.stdin = stdin
         self.stdout = stdout
@@ -273,9 +260,9 @@ class Program(object, metaclass=InspectType):
 
         # Look for location of the binary executable at __init__, to avoid
         # calling os.path.isfile() multiple times
-        path = str(self.parameters.get("execpath", self.path))
-        subdir = str(self.parameters.get("execsubdir", self.subdir))
-        binary = str(self.parameters.get("execbin", self.binary))
+        path = str(execpath or self.path)
+        subdir = str(execsubdir or self.subdir)
+        binary = str(execbin or self.binary)
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
         if execsubfile != execfile and os.path.isfile(execsubfile):
@@ -457,10 +444,10 @@ class Program(object, metaclass=InspectType):
 
 class Polyselect2l(Program):
     """
-    >>> p = Polyselect2l({}, P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line()
     'polyselect2l -N 42 -degree 4 -v 5'
-    >>> p = Polyselect2l({}, P=5, N=42, degree=4, verbose=True)
+    >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line()
     'polyselect2l -N 42 -degree 4 -v 5'
     """
@@ -468,7 +455,7 @@ class Polyselect2l(Program):
     name = binary
     subdir = "polyselect"
 
-    def __init__(self, parameters,
+    def __init__(self,
                  P : PositionalParameter(), *,
                  N : Parameter(),
                  degree : Parameter(),
@@ -487,15 +474,15 @@ class Polyselect2l(Program):
                  out : Parameter() = None,
                  printdelay : Parameter("s") = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 
 class MakeFB(Program):
     """
-    >>> p = MakeFB({}, "foo.poly")
+    >>> p = MakeFB("foo.poly")
     >>> p.make_command_line()
     'makefb -poly foo.poly'
-    >>> p = MakeFB({}, poly="foo.poly", nopowers=True, maxbits=5, stdout="foo.roots")
+    >>> p = MakeFB(poly="foo.poly", nopowers=True, maxbits=5, stdout="foo.roots")
     >>> p.make_command_line()
     'makefb -poly foo.poly -nopowers -maxbits 5 > foo.roots'
     """
@@ -503,27 +490,27 @@ class MakeFB(Program):
     name = binary
     subdir = "sieve"
 
-    def __init__(self, parameters,
+    def __init__(self,
                  poly: Parameter(is_input_file = True),
                  nopowers: Toggle() = None,
                  maxbits: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 
 class FreeRel(Program):
     """
-    >>> p = FreeRel({}, "foo.poly", "foo.renumber")
+    >>> p = FreeRel("foo.poly", "foo.renumber")
     >>> p.make_command_line()
     'freerel -poly foo.poly -renumber foo.renumber'
-    >>> p = FreeRel({"verbose": True, "pmin": 123, "pmax": 234}, poly="foo.poly", renumber="foo.renumber", badideals="foo.bad")
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", badideals="foo.bad", verbose=True, pmin=123, pmax=234)
     >>> p.make_command_line()
     'freerel -poly foo.poly -renumber foo.renumber -badideals foo.bad -v -pmin 123 -pmax 234'
     """
     binary = "freerel"
     name = binary
     subdir = "sieve"
-    def __init__(self, parameters,
+    def __init__(self,
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_output_file = True),
                  badideals: Parameter(is_output_file = True) = None,
@@ -531,13 +518,13 @@ class FreeRel(Program):
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Las(Program):
     binary = "las"
     name = binary
     subdir = "sieve"
-    def __init__(self, parameters,
+    def __init__(self,
                  I: Parameter(),
                  poly: Parameter(is_input_file = True),
                  factorbase: Parameter("fb", is_input_file = True),
@@ -560,14 +547,14 @@ class Las(Program):
                  threads: Parameter("mt") = None,
                  ratq: Toggle() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 
 class Duplicates1(Program):
     binary = "dup1"
     name = binary
     subdir = "filter"
-    def __init__(self, parameters,
+    def __init__(self,
                  *args: PositionalParameter(is_input_file = True), 
                  out: Parameter() = None,
                  outfmt: Parameter() = None,
@@ -577,27 +564,27 @@ class Duplicates1(Program):
                  filelist: Parameter(is_input_file = True) = None,
                  basepath: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 
 class Duplicates2(Program):
     binary = "dup2"
     name = binary
     subdir = "filter"
-    def __init__(self, parameters,
+    def __init__(self,
                  *args: PositionalParameter(is_input_file = True),
                  rel_count: Parameter("K"),
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_input_file = True),
                  filelist: Parameter(is_input_file = True) = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Purge(Program):
     binary = "purge"
     name = binary
     subdir = "filter"
-    def __init__(self, parameters,
+    def __init__(self,
                  *args: PositionalParameter(is_input_file = True),
                  out: Parameter(is_output_file = True),
                  filelist: Parameter(is_input_file = True) = None,
@@ -616,13 +603,13 @@ class Purge(Program):
                  npass: Parameter() = None,
                  required_excess: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Merge(Program):
     binary = "merge"
     name = binary
     subdir = "filter"
-    def __init__(self, parameters,
+    def __init__(self,
                  mat: Parameter(is_input_file = True),
                  out: Parameter(is_output_file = True),
                  maxlevel: Parameter() = None,
@@ -636,14 +623,14 @@ class Merge(Program):
                  mkztype: Parameter() = None,
                  wmstmax: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 # Todo: define is_input_file/is_output_file for remaining programs
 class Replay(Program):
     binary = "replay"
     name = binary
     subdir = "filter"
-    def __init__(self, parameters,
+    def __init__(self,
                  binary: Toggle(prefix = "--") = None,
                  skip: Parameter() = None,
                  purged: Parameter() = None,
@@ -651,13 +638,13 @@ class Replay(Program):
                  index: Parameter() = None,
                  out: Parameter() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class BWC(Program):
     binary = "bwc.pl"
     name = "bwc"
     subdir = "linalg/bwc"
-    def __init__(self, parameters,
+    def __init__(self,
                  complete: Toggle(prefix=":") = None,
                  wipeout: Toggle(prefix=":") = None,
                  dryrun: Toggle("d") = None,
@@ -677,13 +664,13 @@ class BWC(Program):
                  shuffled_product: ParameterEq() = None,
                  bwc_bindir: ParameterEq() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Characters(Program):
     binary = "characters"
     name = binary
     subdir = "linalg"
-    def __init__(self, parameters, *,
+    def __init__(self, *,
                  poly: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
@@ -693,13 +680,13 @@ class Characters(Program):
                  nchar: Parameter() = None,
                  threads: Parameter("t") = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Sqrt(Program):
     binary = "sqrt"
     name = binary
     subdir = "sqrt"
-    def __init__(self, parameters, *,
+    def __init__(self, *,
                  poly: Parameter(),
                  prefix: Parameter(),
                  purged: Parameter(),
@@ -711,13 +698,13 @@ class Sqrt(Program):
                  alg: Toggle() = None,
                  gcd: Toggle() = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class WuClient(Program):
     binary = "wuclient2.py"
     name = "wuclient"
     subdir = "scripts/cadofactor"
-    def __init__(self, parameters,
+    def __init__(self,
                  server: Parameter(prefix='--'),
                  daemon: Toggle(prefix='--') = None,
                  dldir: Parameter(prefix='--') = None,
@@ -734,13 +721,13 @@ class WuClient(Program):
                  wu_filename: Parameter(prefix='--') = None,
                  arch: Parameter(prefix='--') = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class SSH(Program):
     binary = "ssh"
     name = binary
     path = "/usr/bin"
-    def __init__(self, parameters,
+    def __init__(self,
                  host: PositionalParameter(),
                  *args: PositionalParameter(),
                  compression: Toggle("C") = None,
@@ -751,40 +738,40 @@ class SSH(Program):
                  login_name: Parameter("l") = None,
                  port: Parameter("p") = None,
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class RSync(Program):
     binary = "rsync"
     name = binary
     path = "/usr/bin"
-    def __init__(self, parameters,
+    def __init__(self,
                  sourcefile: PositionalParameter(),
                  remotefile: PositionalParameter(),
                  **kwargs):
-        super().__init__(locals(), parameters=parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Ls(Program):
     binary = "ls"
     name = binary
     path = "/bin"
-    def __init__(self, parameters,
+    def __init__(self,
                  *args : PositionalParameter(),
                  long : Toggle('l') = None,
                  **kwargs):
-        super().__init__(locals(), parameters = parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 class Kill(Program):
     binary = "kill"
     name = binary
     path = "/bin"
-    def __init__(self, parameters,
+    def __init__(self,
                  *args: PositionalParameter(),
                  signal: Parameter("s"),
                  **kwargs):
-        super().__init__(locals(), parameters = parameters, **kwargs)
+        super().__init__(locals(), **kwargs)
 
 
 if __name__ == '__main__':
-    PROGRAM = Ls({}, 'foo', 'bar')
+    PROGRAM = Ls('foo', 'bar')
     CMDLINE = PROGRAM.make_command_line()
     print(CMDLINE)
