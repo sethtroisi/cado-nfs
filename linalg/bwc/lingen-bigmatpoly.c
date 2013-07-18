@@ -532,6 +532,8 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
         MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->col);
         MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->row);
         if (irank || jrank) {
+            /* make sure we have exactly the same amount of allocated
+             * memory everywhere */
             matpoly_init(ab, src, shell->m, shell->n, shell->alloc);
             src->size = shell->size;
         }
@@ -546,10 +548,12 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
     bigmatpoly_set_size(dst, src->size);
     /* See similar comment in gather_mat. We can't do scatter() here.
      * We're better off with a simple bcast.
+     * 
+     * Copy the full range of allocated bytes, not only up to size.
      */
     MPI_Bcast(
             matpoly_part(src, 0, 0, 0),
-            src->m * src->n * src->size,
+            src->m * src->n * src->alloc,
             abmpi_datatype(ab),
             0,
             dst->col);
