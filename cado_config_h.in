@@ -10,6 +10,8 @@
 
 #define GMP_INCDIR    "@GMP_INCDIR@"
 #define GMP_LIBDIR    "@GMP_LIBDIR@"
+#define MPIR_INCDIR    "@MPIR_INCDIR@"
+#define MPIR_LIBDIR    "@MPIR_LIBDIR@"
 
 #cmakedefine    HAVE_POSIX_MEMALIGN
 #cmakedefine    HAVE_GCC_STYLE_AMD64_INLINE_ASM

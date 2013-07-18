@@ -5,7 +5,7 @@ set -x
 
 top=`dirname $0`/../..
 export DEBUG=1
-# export MPI=1
+export MPI=1
 make -s -C $top -j 4
 make -s -C $top -j 4 plingen
 eval `make -s -C $top show`
@@ -22,14 +22,17 @@ mkdir $wdir
 m=8 n=4
 
 Mh=1; Mv=1;
-Th=1; Tv=1;
+Th=2; Tv=2;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
-prime=1766847064778384329583297500742918515827483896875618958121606201292619891
+mpi_njobs_lingen=$((Nh*Nv))
+mpi_njobs_other=$((Mh*Mv))
+
+prime=4148386731260605647525186547488842396461625774241327567978137
 bits_per_coeff=256
 
 if ! echo "$prime-2^$bits_per_coeff" | bc | grep -q '^-' ; then
@@ -139,18 +142,45 @@ while [ $j0 -lt $n ] ; do
 done
 
 afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
-$bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
 
-ln $wdir/$afile.gen $wdir/F0-$n
+mpirun -n $mpi_njobs_lingen $bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
+
+ln $wdir/$afile.gen $wdir/F
+
+# This does the splitting as documented in mksol.c, e.g. with F on disk
+# stored as the transpose of the reversal of the F in A*F=G+O(X^t).
+
+# Note that the transpose was absent in commits 4f7d835 and earlier.
+$bins/split wdir=$wdir m=$m n=$n splits=$all_splits     \
+    ifile=F ofile-fmt=F.%u-%u --binary-ratio $((bits_per_coeff/8))/1
 j0=0
 while [ $j0 -lt $n ] ; do
     let j1=$j0+1
-    $bins/bwc.pl mksol  $common interval=$interval ys=$j0..$j1
+    $bins/split wdir=$wdir m=$m n=$n splits=$all_splits     \
+        ifile=F.${j0}-${j1} ofile-fmt=F.sols%u-%u.${j0}-${j1} \
+        --binary-ratio $((bits_per_coeff/8))/1
     j0=$j1
 done
 
-$bins/bwc.pl gather  $common interval=$interval || :
+# Now take solution 0, for instance.
 
+j0=0
+while [ $j0 -lt $n ] ; do
+    let j1=$j0+1
+    ln -s F.sols0-1.${j0}-${j1} $wdir/F${j0}-${j1}
+    j0=$j1
+done
+
+j0=0
+while [ $j0 -lt $n ] ; do
+    let j1=$j0+1
+    $bins/bwc.pl mksol  $common interval=$interval ys=$j0..$j1 nsolvecs=1
+    j0=$j1
+done
+
+$bins/bwc.pl gather  $common interval=$interval nsolvecs=1 || :
+
+set +x
 
 # [ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
 # 
@@ -212,7 +242,12 @@ echo "];"
 ) > $mdir/placemats.m
 
 
-$cmd spvector64 < $wdir/Y.0 > $mdir/Y0.m
+if [ -f  $wdir/Y.0  ] ; then
+    $cmd spvector64 < $wdir/Y.0 > $mdir/Y0.m
+else
+    :
+    # otherwise we're probably in the case where n>1
+fi
 $cmd spvector64 < $wdir/V0-1.0 > $mdir/V0.m
 $cmd spvector64 < $wdir/V0-1.1 > $mdir/V1.m
 $cmd spvector64 < $wdir/V0-1.2 > $mdir/V2.m
@@ -229,5 +264,5 @@ $cmd spvector64 < $wdir/C.1 > $mdir/C1.m
 $cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
 $cmd x $wdir/X > $mdir/x.m
 $cmd spvector64 < $wdir/$afile > $mdir/A.m
-$cmd spvector64 < $wdir/F0-$n > $mdir/F0-$n.m
-$cmd spvector64 < $wdir/W > $mdir/W.m
+$cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
+$cmd spvector64 < $wdir/K.0 > $mdir/K0.m

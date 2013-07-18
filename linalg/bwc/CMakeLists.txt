@@ -113,7 +113,7 @@ set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
-target_link_libraries(bwc_mpfq gmp utils)
+target_link_libraries(bwc_mpfq ${gmp_libname} utils)
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
     set_target_properties(bwc_mpfq PROPERTIES
         COMPILE_FLAGS "--mpi -DCOMPILE_MPFQ_PRIME_FIELDS")
@@ -261,16 +261,22 @@ install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 set(plingen_prime_nwords 8)
 
+
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
+                bw-common-mpi.c
                 plingen.c
-                polymat.c
+                plingen-tuning.cpp
+                lingen-matpoly.c
+                lingen-bigmatpoly.c
+                lingen-polymat.c
+                lingen-bigpolymat.c
                 mpfq/abase_p_${plingen_prime_nwords}.c
-                bigpolymat.c
         )
+set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
-target_link_libraries(plingen gmp utils)
+target_link_libraries(plingen ${gmp_libname} utils)
 set_target_properties(plingen PROPERTIES
     COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
     LINK_FLAGS "--mpi"

@@ -1681,22 +1681,23 @@ FIXME: can we find the locations to sieve? */
 	  uint64_t x = (uint64_t) plattice_starting_vector(&pli, si, parity);
 	  if (x >= IJ) continue;
 	  unsigned int \
-	    bep = ((unsigned int) bucket_encode_prime (p)) << 16,
+	    bep = ((unsigned int) bucket_encode_prime (p)),
 	    inc_a = (unsigned int) plattice_a(&pli, si),
 	    inc_c = (unsigned int) plattice_c(&pli, si);
 
+	  /* fprintf (stderr, "bound0=%u bound1=%u inc_a=%u inc_c=%u maskI=%x\n", bound0, bound1, inc_a, inc_c, maskI); */
 	  /* To put all in registers for x86_64 */
 	  /*
 #ifdef __x86_64
 	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
 #endif
 	  */
+
 	  // ASSERT_ALWAYS(inc_a == pli.a);
 	  // ASSERT_ALWAYS(inc_c == pli.c);
 	  do {
-	    unsigned int i;
-	    i = x & maskI;
-	    /* i = x & maskI; */  // x mod I
+	    /*******************************************************************/
+	    unsigned int i = x & maskI; /* x mod I */
 	    /* if both i = x % I and j = x / I are even, then
 	       both a, b are even, thus we can't have a valid relation */
 	    /* i-coordinate = (x % I) - I/2
@@ -1704,38 +1705,138 @@ FIXME: can we find the locations to sieve? */
 	       3|i-coordinate iff (x%I+I) % 3 == 0 */
 	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-		&& (!is_divisible_3_u32 (i + I) ||
-		    !is_divisible_3_u32 ((uint32_t) (x >> logI)))
+		       && (!is_divisible_3_u32 (i + I) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> logI)))
 #endif
-		       ))
-	      {
-		unsigned int u;
-		bucket_update_t **ppu, *pu;
-		ppu = &(BA.bucket_write[x >> shiftbucket]);
-		pu = *ppu;
+		       )) {
+	      bucket_update_t **ppu, *pu;
+	      ppu = &(BA.bucket_write[x >> shiftbucket]);
+	      pu = *ppu;
 #ifdef TRACE_K
-		if (trace_on_spot_x(x)) {
-                  WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                  WHERE_AM_I_UPDATE(w, x, x & maskbucket);
-		  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-			   (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                  ASSERT(test_divisible(w));
-		}
+	      if (trace_on_spot_x(x)) {
+		WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+		WHERE_AM_I_UPDATE(w, x, x & maskbucket);
+		fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+			 (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+		ASSERT(test_divisible(w));
+	      }
 #endif
 #if LOG_BUCKET_REGION == 16
-		u = (unsigned int)(uint16_t)x;
+	      *(uint16_t *)pu = (uint16_t)x;
 #else
-		u = ((unsigned int) x & maskbucket);
+	      *(uint16_t *)pu = (uint16_t) ((unsigned int) x & maskbucket);
 #endif
-		u |= bep;
-		*(uint32_t *)pu++ = u;
-#ifdef __GNUC__		
-		__builtin_prefetch((void *)pu, 0, 3);
+	      ((uint16_t *)pu)[1] = (uint16_t) bep;
+	      *ppu = ++pu;
+#ifdef HAVE_SSE2		
+	      _mm_prefetch((char *)pu, _MM_HINT_T0);
 #endif
-		*ppu = pu;
-	      }
+	    }
 	    if (i >= bound1) x += inc_a;
 	    if (i < bound0)  x += inc_c;
+	    if (UNLIKELY (x >= IJ)) break;
+	    /*******************************************************************/
+	    i = x & maskI;
+	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + I) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> logI)))
+#endif
+		       )) {
+	      bucket_update_t **ppu, *pu;
+	      ppu = &(BA.bucket_write[x >> shiftbucket]);
+	      pu = *ppu;
+#ifdef TRACE_K
+	      if (trace_on_spot_x(x)) {
+		WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+		WHERE_AM_I_UPDATE(w, x, x & maskbucket);
+		fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+			 (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+		ASSERT(test_divisible(w));
+	      }
+#endif
+#if LOG_BUCKET_REGION == 16
+	      *(uint16_t *)pu = (uint16_t)x;
+#else
+	      *(uint16_t *)pu = (uint16_t) ((unsigned int) x & maskbucket);
+#endif
+	      ((uint16_t *)pu)[1] = (uint16_t) bep;
+	      *ppu = ++pu;
+#ifdef HAVE_SSE2		
+	      _mm_prefetch((char *)pu, _MM_HINT_T0);
+#endif
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	    if (UNLIKELY (x >= IJ)) break;
+	    /*******************************************************************/
+	    i = x & maskI;
+	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + I) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> logI)))
+#endif
+		       )) {
+	      bucket_update_t **ppu, *pu;
+	      ppu = &(BA.bucket_write[x >> shiftbucket]);
+	      pu = *ppu;
+#ifdef TRACE_K
+	      if (trace_on_spot_x(x)) {
+		WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+		WHERE_AM_I_UPDATE(w, x, x & maskbucket);
+		fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+			 (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+		ASSERT(test_divisible(w));
+	      }
+#endif
+#if LOG_BUCKET_REGION == 16
+	      *(uint16_t *)pu = (uint16_t)x;
+#else
+	      *(uint16_t *)pu = (uint16_t) ((unsigned int) x & maskbucket);
+#endif
+	      ((uint16_t *)pu)[1] = (uint16_t) bep;
+	      *ppu = ++pu;
+#ifdef HAVE_SSE2		
+	      _mm_prefetch((char *)pu, _MM_HINT_T0);
+#endif
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	    if (UNLIKELY (x >= IJ)) break;
+	    /*******************************************************************/
+	    i = x & maskI;
+	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + I) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> logI)))
+#endif
+		       )) {
+	      bucket_update_t **ppu, *pu;
+	      ppu = &(BA.bucket_write[x >> shiftbucket]);
+	      pu = *ppu;
+#ifdef TRACE_K
+	      if (trace_on_spot_x(x)) {
+		WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+		WHERE_AM_I_UPDATE(w, x, x & maskbucket);
+		fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+			 (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+		ASSERT(test_divisible(w));
+	      }
+#endif
+#if LOG_BUCKET_REGION == 16
+	      *(uint16_t *)pu = (uint16_t)x;
+#else
+	      *(uint16_t *)pu = (uint16_t) ((unsigned int) x & maskbucket);
+#endif
+	      ((uint16_t *)pu)[1] = (uint16_t) bep;
+	      *ppu = ++pu;
+#ifdef HAVE_SSE2		
+	      _mm_prefetch((char *)pu, _MM_HINT_T0);
+#endif
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	    /*******************************************************************/
 	  } while (x < IJ);
         }
     }
