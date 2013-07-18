@@ -225,7 +225,7 @@ class Program(object, metaclass=InspectType):
         # are evaluated once at class creation time), we'll set the defaultnames
         # on the same Option instances again each time a Program subclass gets
         # instantiated, but that does not hurt.
-        for (name, option) in self.init_signature.annotations.items():
+        for (name, option) in self.__init__.__annotations__.items():
             option.set_defaultname(name)
 
         # "options" contains all local symbols defined in the sub-class'
@@ -289,13 +289,20 @@ class Program(object, metaclass=InspectType):
             # raise Exception("Binary executable file %s not found" % execfile)
 
     @classmethod
+    def _get_option_annotations(cls):
+        """ Extract the elements of this class' __init__() annotations where
+        the annotation is an Option instance
+        """
+        return {key:val for (key,val) in cls.__init__.__annotations__.items()
+                if isinstance(val, Option)}
+
+    @classmethod
     def _filter_annotated_keys(cls, keys):
         """ From the list of keys given in "keys", return those that are
         parameters of the __init__() method of this class and annotated with an
         Option instance.
         """
-        return [key for key in keys if key in cls.init_signature.annotations
-                and isinstance(cls.init_signature.annotations[key], Option)]
+        return [key for key in keys if key in cls._get_option_annotations()]
 
     @classmethod
     def get_accepted_keys(cls):
@@ -309,6 +316,8 @@ class Program(object, metaclass=InspectType):
         included here; there is no way to specify a variable-length set of
         positional parameters in the parameter file.
         """
+        # The fact that we want to exclude varargs is why we need the inspect
+        # info here.
         parameters = cls._filter_annotated_keys(cls.init_signature.args +
                                                 cls.init_signature.kwonlyargs)
         return parameters + list(Program.paramnames)
@@ -340,7 +349,7 @@ class Program(object, metaclass=InspectType):
             parameters.append(self.init_signature.varargs)
         parameters = self._filter_annotated_keys(parameters)
         for param in parameters:
-            ann = self.init_signature.annotations[param]
+            ann = self.__init__.__annotations__[param]
             if param in self.parameters and \
                     (ann.is_output_file if is_output else ann.is_input_file):
                 if param == self.init_signature.varargs:
@@ -387,7 +396,7 @@ class Program(object, metaclass=InspectType):
         parameters = self._filter_annotated_keys(parameters)
         for key in parameters:
             if key in self.parameters:
-                ann = self.init_signature.annotations[key]
+                ann = self.__init__.__annotations__[key]
                 value = str(self.parameters[key])
                 # If this is an input or an output file name, we may have to
                 # translate it, e.g., for workunits
@@ -402,7 +411,7 @@ class Program(object, metaclass=InspectType):
         key = self.init_signature.varargs
         if not key is None:
             paramlist = self.parameters[key]
-            ann = self.init_signature.annotations.get(key, None)
+            ann = self.__init__.__annotations__.get(key, None)
             for value in paramlist:
                 command += ann.map(value)
         return command
