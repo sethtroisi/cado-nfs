@@ -30,7 +30,8 @@
 #include "plingen.h"
 #include "plingen-tuning.h"
 
-static unsigned int display_threshold = 100;
+static unsigned int display_threshold = 10;
+static int with_timings = 0;
 
 struct bmstatus_s {
     dims d[1];
@@ -411,56 +412,80 @@ static const char *size_disp(size_t s, char buf[16])
 
 void print_info_mp(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
-    char buf1[16];
-    char buf2[16];
-    size_disp(Memusage2(), buf1);
-    size_disp(PeakMemusage(), buf2);
-    printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu\n",
-            wct_seconds() - start_time, buf1, buf2,
-            t,
-            A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    if (with_timings) {
+        char buf1[16];
+        char buf2[16];
+        size_disp(Memusage2(), buf1);
+        size_disp(PeakMemusage(), buf2);
+        printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu\n",
+                wct_seconds() - start_time, buf1, buf2,
+                t,
+                A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    } else {
+        printf("t=%u, MP(%zu, %zu) --> %zu\n",
+                t,
+                A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    }
 }
 
 void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
-    char buf1[16];
-    char buf2[16];
-    size_disp(Memusage2(), buf1);
-    size_disp(PeakMemusage(), buf2);
-    printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu\n",
-            wct_seconds() - start_time, buf1, buf2,
-            t,
-            A->size, B->size, A->size + B->size - 1);
+    if (with_timings) {
+        char buf1[16];
+        char buf2[16];
+        size_disp(Memusage2(), buf1);
+        size_disp(PeakMemusage(), buf2);
+        printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu\n",
+                wct_seconds() - start_time, buf1, buf2,
+                t,
+                A->size, B->size, A->size + B->size - 1);
+    } else {
+        printf("t=%u, MUL(%zu, %zu) --> %zu\n",
+                t,
+                A->size, B->size, A->size + B->size - 1);
+    }
 }
 
 void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
-    char buf1[16];
-    char buf2[16];
-    size_disp(Memusage2(), buf1);
-    size_disp(PeakMemusage(), buf2);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("[%.3f %s %s] t=%u, MPI-MP(%zu, %zu) --> %zu\n",
-            wct_seconds() - start_time, buf1, buf2,
-            t,
-            A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    if (with_timings) {
+        char buf1[16];
+        char buf2[16];
+        size_disp(Memusage2(), buf1);
+        size_disp(PeakMemusage(), buf2);
+        printf("[%.3f %s %s] t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+                wct_seconds() - start_time, buf1, buf2,
+                t,
+                A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    } else {
+        printf("t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+                t,
+                A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
+    }
 }
 
 void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
-    char buf1[16];
-    char buf2[16];
-    size_disp(Memusage2(), buf1);
-    size_disp(PeakMemusage(), buf2);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("[%.3f %s %s] t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
-            wct_seconds() - start_time, buf1, buf2,
-            t,
-            A->size, B->size, A->size + B->size - 1);
+    if (with_timings) {
+        char buf1[16];
+        char buf2[16];
+        size_disp(Memusage2(), buf1);
+        size_disp(PeakMemusage(), buf2);
+        printf("[%.3f %s %s] t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+                wct_seconds() - start_time, buf1, buf2,
+                t,
+                A->size, B->size, A->size + B->size - 1);
+    } else {
+        printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+                t,
+                A->size, B->size, A->size + B->size - 1);
+    }
 }
 
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -588,24 +613,27 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
     unsigned int m = d->m;
     unsigned int n = d->n;
     unsigned int b = m + n;
+    int done;
 
-    if (E->size >= bm->lingen_mpi_threshold) 
-        return bw_lingen_bigrecursive(bm, pi, E, delta);
+    if (E->size >= bm->lingen_mpi_threshold)  {
+        done = bw_lingen_bigrecursive(bm, pi, E, delta);
+    } else {
+        /* Fall back to local code */
+        /* This entails gathering E locally, computing pi locally, and
+         * dispathing it back. */
 
-    /* Fall back to local code */
-    /* This entails gathering E locally, computing pi locally, and
-     * dispathing it back. */
+        matpoly sE, spi;
+        matpoly_init(ab, sE, m, b, E->size);
+        matpoly_init(ab, spi, 0, 0, 0);
+        bigmatpoly_gather_mat(ab, sE, E);
+        /* Only the master node does the local computation */
+        done = bw_biglingen_single(bm, spi, sE, delta);
+        bigmatpoly_scatter_mat(ab, pi, spi);
+        /* Don't forget to broadcast delta from root node to others ! */
+        matpoly_clear(ab, spi);
+        matpoly_clear(ab, sE);
+    }
 
-    matpoly sE, spi;
-    matpoly_init(ab, sE, m, b, E->size);
-    matpoly_init(ab, spi, 0, 0, 0);
-    bigmatpoly_gather_mat(ab, sE, E);
-    /* Only the master node does the local computation */
-    int done = bw_biglingen_single(bm, spi, sE, delta);
-    bigmatpoly_scatter_mat(ab, pi, spi);
-    /* Don't forget to broadcast delta from root node to others ! */
-    matpoly_clear(ab, spi);
-    matpoly_clear(ab, sE);
     return done;
 }/*}}}*/
 
@@ -1108,6 +1136,7 @@ int main(int argc, char *argv[])
 
     param_list_configure_switch(pl, "--tune", &tune);
     param_list_configure_switch(pl, "--ascii", &ascii);
+    param_list_configure_switch(pl, "--timings", &with_timings);
     bw_common_init_mpi(bw, pl, &argc, &argv);
 
     int rank;
