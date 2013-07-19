@@ -43,10 +43,12 @@ struct __renumber_t
   index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
   index_t first_not_cached;
   int add_full_col; //do we add a col of 1 to all relations
+  unsigned long lpbr;  // The rational side large prime bound
+  unsigned long lpba;  // The algebraic side large prime bound
 };
 typedef struct __renumber_t renumber_t[1];
 
-void renumber_init (renumber_t, cado_poly);
+void renumber_init (renumber_t, cado_poly, unsigned long *);
 int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
 void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *, const char *, int);
