@@ -259,7 +259,7 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 8)
+set(plingen_prime_nwords 4)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)

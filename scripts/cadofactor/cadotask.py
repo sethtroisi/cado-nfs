@@ -193,7 +193,8 @@ class WorkDir(object):
     
     def _make_path(self, extra):
         """ Make a path of the form: "workdir/jobname.taskname""extra" """
-        return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname, extra))
+        return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname,
+                                                 extra))
     
     def make_dirname(self, subdir = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
@@ -214,7 +215,8 @@ class WorkDir(object):
         """
         if use_subdir:
             if subdir:
-                return self._make_path("%s%s%s%s" % (os.sep, subdir, os.sep, name))
+                return self._make_path("%s%s%s%s" % (os.sep, subdir, os.sep,
+                                                     name))
             else:
                 return self._make_path("%s%s" % (os.sep, name))
         else:
@@ -233,7 +235,8 @@ class WorkDir(object):
         return
 
 
-class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
+class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
+           metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -383,6 +386,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         if isinstance(self, patterns.Observer):
             message = Task.ResultInfo(wuname, rc, stdout, stderr,
                                       command.get_output_files())
+            # pylint: disable=E1101
             self.updateObserver(message)
         return result
     
@@ -627,13 +631,13 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            N = self.progparams[0]["N"]
-            degree = self.progparams[0]["degree"]
-            P = self.progparams[0]["P"]
-            p = cadoprograms.Polyselect2l(self.progparams[0], P, N=N, 
-                                          degree=degree,
-                                          admin=adstart, admax=adend,
-                                          stdout=str(outputfile))
+            # Remove admin and admax from the parameter-file-supplied
+            # parameters as those would conflict with the computed values
+            self.progparams[0].pop("admin", None)
+            self.progparams[0].pop("admax", None)
+            p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
+                                          stdout=str(outputfile),
+                                          **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend))
         self.state["adnext"] = adend
 
@@ -692,8 +696,9 @@ class FactorBaseTask(Task):
             outputfilename = self.workdir.make_filename("roots")
 
             # Run command to generate factor base/free relations file
-            p = cadoprograms.MakeFB(self.progparams[0], poly=polyfilename,
-                                    stdout = str(outputfilename))
+            p = cadoprograms.MakeFB(poly=polyfilename,
+                                    stdout = str(outputfilename),
+                                    **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -769,9 +774,10 @@ class FreeRelTask(Task):
             renumberfilename = self.workdir.make_filename("renumber")
 
             # Run command to generate factor base/free relations file
-            p = cadoprograms.FreeRel(self.progparams[0], poly=polyfilename,
+            p = cadoprograms.FreeRel(poly=polyfilename,
                                      renumber=renumberfilename,
-                                     stdout=str(freerelfilename))
+                                     stdout=str(freerelfilename),
+                                     **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
@@ -866,10 +872,10 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
-            I=self.progparams[0]["I"]
-            p = cadoprograms.Las(self.progparams[0], I=I, q0=q0, q1=q1,
+            p = cadoprograms.Las(q0=q0, q1=q1,
                                  poly=polyfilename, factorbase=factorbase,
-                                 out=outputfilename)
+                                 out=outputfilename,
+                                 **self.progparams[0])
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
         self.logger.info("Reached target of %d relations, now have %d",
@@ -1027,14 +1033,15 @@ class Duplicates1Task(Task, FilesCreator):
                                         shouldexist=False)
                 outputdir = self.workdir.make_dirname()
                 if len(newfiles) <= 10:
-                    p = cadoprograms.Duplicates1(self.progparams[0], *newfiles,
-                                                 out=outputdir)
+                    p = cadoprograms.Duplicates1(*newfiles,
+                                                 out=outputdir,
+                                                 **self.progparams[0])
                 else:
                     filelistname = self.workdir.make_filename("filelist")
                     with open(str(filelistname), "w") as filelistfile:
                         filelistfile.write("\n".join(newfiles))
-                    p = cadoprograms.Duplicates1(self.progparams[0],
-                                                 filelist=filelistname)
+                    p = cadoprograms.Duplicates1(filelist=filelistname,
+                                                 **self.progparams[0])
                 (identifier, rc, stdout, stderr, output_files) = \
                         self.submit_command(p, "")
                 if rc:
@@ -1151,19 +1158,20 @@ class Duplicates2Task(Task, FilesCreator):
             del(self.slice_relcounts[str(i)])
             # self.workdir.make_directories(str(i)) OBSOLETE
             if len(files) <= 10:
-                p = cadoprograms.Duplicates2(self.progparams[0], *files,
+                p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
-                                             renumber=renumber_filename)
+                                             renumber=renumber_filename,
+                                             **self.progparams[0])
             else:
                 filelistname = self.workdir.make_filename("filelist")
                 with open(str(filelistname), "w") as filelistfile:
                     filelistfile.write("\n".join(files))
-                p = cadoprograms.Duplicates2(self.progparams[0],
-                                             poly=polyfilename,
+                p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
-                                             filelist=filelistname)
+                                             filelist=filelistname,
+                                             **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
@@ -1279,16 +1287,18 @@ class PurgeTask(Task):
         files = unique_filenames + [str(freerel_filename)]
         
         if len(files) <= 10:
-            p = cadoprograms.Purge(self.progparams[0], *files,
+            p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
-                                   minindex=minindex, nprimes=nprimes)
+                                   minindex=minindex, nprimes=nprimes,
+                                   **self.progparams[0])
         else:
             filelistname = self.workdir.make_filename("filelist")
             with open(str(filelistname), "w") as filelistfile:
                 filelistfile.write("\n".join(files))
-            p = cadoprograms.Purge(self.progparams[0], nrels=input_nrels,
+            p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
-                                   nprimes=nprimes, filelist=filelistname)
+                                   nprimes=nprimes, filelist=filelistname,
+                                   **self.progparams[0])
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
@@ -1485,10 +1495,11 @@ class MergeTask(Task):
             progname = cadoprograms.Merge.name
             stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
-            p = cadoprograms.Merge(self.progparams[0], mat=purged_filename,
+            p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
                                    stdout=str(stdoutfilename), append_stdout=True,
-                                   stderr=str(stderrfilename), append_stderr=True)
+                                   stderr=str(stderrfilename), append_stderr=True,
+                                   **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1498,13 +1509,14 @@ class MergeTask(Task):
             progname = cadoprograms.Replay.name
             stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
-            p = cadoprograms.Replay(self.progparams[1], binary=True,
+            p = cadoprograms.Replay(binary=True,
                                     purged=purged_filename,
                                     history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutfilename),
                                     append_stdout=True,
                                     stderr=str(stderrfilename),
-                                    append_stderr=True)
+                                    append_stderr=True,
+                                    **self.progparams[1])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
@@ -1564,12 +1576,13 @@ class LinAlgTask(Task):
             progname = cadoprograms.BWC.name
             stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
-            matrix=os.path.realpath(str(mergedfile))
-            wdir=os.path.realpath(str(workdir))
-            p = cadoprograms.BWC(self.progparams[0], complete=True,
+            matrix = os.path.realpath(str(mergedfile))
+            wdir = os.path.realpath(str(workdir))
+            p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left", 
                                  stdout=str(stdoutfilename), append_stdout=True, 
-                                 stderr=str(stderrfilename), append_stderr=True)
+                                 stderr=str(stderrfilename), append_stderr=True,
+                                 **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1623,12 +1636,12 @@ class CharactersTask(Task):
             progname = cadoprograms.Characters.name
             stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
             stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
-            p = cadoprograms.Characters(self.progparams[0], poly=polyfilename,
+            p = cadoprograms.Characters(poly=polyfilename,
                     purged=purgedfilename, index=indexfilename,
                     wfile=dependencyfilename, out=kernelfilename,
                     heavyblock=densefilename, stdout=str(stdoutfilename),
                     append_stdout=True, stderr=str(stderrfilename),
-                    append_stderr=True)
+                    append_stderr=True, **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
@@ -1675,10 +1688,10 @@ class SqrtTask(Task):
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
-            p = cadoprograms.Sqrt(self.progparams[0], ab = True,
+            p = cadoprograms.Sqrt(ab = True,
                     poly=polyfilename, purged=purgedfilename,
                     index=indexfilename, kernel=kernelfilename,
-                    prefix=prefix)
+                    prefix=prefix, **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
@@ -1686,10 +1699,11 @@ class SqrtTask(Task):
             while not self.is_done():
                 self.state.setdefault("next_dep", 0)
                 dep = self.state["next_dep"]
-                p = cadoprograms.Sqrt(self.progparams[0], ab=False, rat=True,
+                p = cadoprograms.Sqrt(ab=False, rat=True,
                         alg=True, gcd=True, dep=dep, poly=polyfilename,
                         purged=purgedfilename, index=indexfilename,
-                        kernel=kernelfilename, prefix=prefix)
+                        kernel=kernelfilename, prefix=prefix,
+                        **self.progparams[0])
                 (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "dep%d" % self.state["next_dep"])
                 if rc:
@@ -1901,8 +1915,9 @@ class StartClientsTask(Task):
                 del(self.hosts[clientid])
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
-        wuclient = cadoprograms.WuClient(self.progparams[0], server=self.server,
-                                         clientid=clientid, daemon=True)
+        wuclient = cadoprograms.WuClient(server=self.server,
+                                         clientid=clientid, daemon=True,
+                                         **self.progparams[0])
         if host == "localhost":
             process = cadocommand.Command(wuclient)
         else:
@@ -1954,7 +1969,7 @@ class StartClientsTask(Task):
     def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]
         host = self.hosts[clientid]
-        kill = cadoprograms.Kill({}, pid, signal=signal)
+        kill = cadoprograms.Kill(pid, signal=signal)
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.get_param_prefix())
         return process.wait()
 
