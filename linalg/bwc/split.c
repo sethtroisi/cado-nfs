@@ -66,8 +66,8 @@ int main(int argc, char * argv[])
     balancing_read_header(bal, balancing_filename);
     */
 
-    char * ifile;
-    char * ofile_fmt;
+    char * ifile = NULL;
+    char * ofile_fmt = NULL;
 
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "ifile")) != NULL)
