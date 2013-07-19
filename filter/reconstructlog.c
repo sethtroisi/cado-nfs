@@ -5,7 +5,6 @@
 
 #include "utils.h"
 #include "filter_utils.h"
-#include "filter_io.h"
 
 #ifdef FOR_FFS
 #include "fppol.h"
