@@ -378,7 +378,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d %lu %lu\n", &tab->nb_bits,
       &tmp_size, &tab->bad_ideals.n, &tab->add_full_col,
       &tab->lpbr, &tab->lpba);
-  ASSERT_ALWAYS (ret == 4);
+  ASSERT_ALWAYS (ret == 6);
 
   ASSERT_ALWAYS (tab->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (tab->nb_bits == 32 || tab->nb_bits == 64);
