@@ -2064,13 +2064,6 @@ sub do_polysel {
     cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
         { cmdlog => 1, kill => 1 });
     $tab_level--;
-
-    # Append sieving parameters to the poly file
-    open FILE, ">> $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for writing: $!.\n";
-    print FILE "$_: $param{$_}\n"
-        for qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    close FILE;
 }
 
 sub do_polysel_bench {
