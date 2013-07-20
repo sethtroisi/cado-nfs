@@ -296,9 +296,9 @@ smallFreeRelations (char *fbfilename)
 
 static unsigned long MAYBE_UNUSED
 allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
-                  renumber_t renumber_table)
+        unsigned long lpb[2], unsigned long minlim, renumber_t renumber_table)
 {
-  unsigned long lpb[2], p, *roots[2], nfree = 0, minlim;
+  unsigned long p, *roots[2], nfree = 0;
   int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
   index_t old_table_size = renumber_table->size, min_index = UMAX(index_t);
 
@@ -311,10 +311,6 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
      prime bounds, since larger primes will never occur on both sides */
   /* we generate the renumbering table up to the *maximun* of the two large
      prime bounds */
-  lpb[rat_side] = pol->rat->lpb;
-  ASSERT_ALWAYS(lpb[rat_side] > 0);
-  lpb[alg_side] = pol->alg->lpb;
-  ASSERT_ALWAYS(lpb[alg_side] > 0);
   min_side = (lpb[0] < lpb[1]) ? 0 : 1;
   max_side = 1 - min_side;
   for (i = 0; i < 2; i++)
@@ -331,8 +327,6 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   fprintf (stderr, "Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
   fprintf (stderr, "Generating renumber table for 2 <= p <= %lu\n",
                    lpb[max_side]);
-
-  minlim = MIN (pol->pols[0]->lim, pol->pols[1]->lim);
 
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {
@@ -383,7 +377,9 @@ static void
 usage (char *argv0)
 {
   fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly "
-                   "-badideals badfile -renumber outfile\n", argv0);
+          "-badideals badfile -renumber outfile -lpbr xxx -lpba xxx "
+          "-minlim xxx\n",
+          argv0);
 #if 0
   fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
 #endif
@@ -403,6 +399,8 @@ main (int argc, char *argv[])
     unsigned long pmin = 2, pmax = 0, nfree;
     renumber_t renumber_table;
     int add_full_col = 0;
+    unsigned long lpb[2] = {0, 0};
+    unsigned long minlim = 0;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -446,6 +444,24 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-lpba") == 0)
+          {
+            lpb[1] = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-lpbr") == 0)
+          {
+            lpb[0] = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-minlim") == 0)
+          {
+            minlim = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
         else if (argc > 2 && strcmp (argv[1], "-pmin") == 0)
           {
             pmin = strtoul (argv[2], NULL, 10);
@@ -484,7 +500,7 @@ main (int argc, char *argv[])
     /* check that n divides Res(f,g) [might be useful to factor n...] */
     cado_poly_check (cpoly);
 
-    renumber_init (renumber_table, cpoly);
+    renumber_init (renumber_table, cpoly, lpb);
     renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
                          add_full_col);
 
@@ -498,7 +514,7 @@ main (int argc, char *argv[])
     else
       nfree = largeFreeRelations(cpoly, fic, verbose);
 #else
-    nfree = allFreeRelations (cpoly, pmin, pmax, renumber_table);
+    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, minlim, renumber_table);
 #endif
     fprintf (stderr, "# Free relations: %lu\n", nfree);
 

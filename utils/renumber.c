@@ -249,9 +249,8 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
 
 
 void
-renumber_init (renumber_t renumber_info, cado_poly pol)
+renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
 {
-  int max_nb_bits = MAX(pol->pols[0]->lpb, pol->pols[1]->lpb);
 
   if (pol->pols[0]->degree != 1 && pol->pols[1]->degree != 1)
     renumber_info->rat = -1;
@@ -260,14 +259,25 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
   else
     renumber_info->rat = 1;
 
-  if (renumber_info->rat == -1)
-    max_nb_bits++;
+  if (lpb != NULL) {
+    if (renumber_info->rat <= 0) {
+      renumber_info->lpbr = lpb[0];
+      renumber_info->lpba = lpb[1];
+    } else {
+      renumber_info->lpbr = lpb[1];
+      renumber_info->lpba = lpb[0];
+    }
 
-  if (max_nb_bits <= 32)
-    renumber_info->nb_bits = 32;
-  else
-    renumber_info->nb_bits = 64;
-  ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+    int max_nb_bits = MAX(lpb[0], lpb[1]);
+    if (renumber_info->rat == -1)
+      max_nb_bits++;
+
+    if (max_nb_bits <= 32)
+      renumber_info->nb_bits = 32;
+    else
+      renumber_info->nb_bits = 64;
+    ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+  }
 
   renumber_info->add_full_col = 0;
   renumber_info->size = 0;
@@ -319,7 +329,7 @@ renumber_init_write (renumber_t tab, const char *tablefile, const char *badfile,
   tab->add_full_col = (add_full_col) ? 1 : 0;
   tab->size = (add_full_col) ? 1 : 0;
 
-  fprintf (tab->file, "###################################\n");
+  fprintf (tab->file, "##################################################\n");
 
   // Write first the bad ideals information at the beginning of file
   if (badfile != NULL)
@@ -335,8 +345,8 @@ renumber_close_write (renumber_t tab)
 {
   // Put the right value of size.
   rewind (tab->file);
-  fprintf (tab->file, "%u %" PRid " %d %d\n", tab->nb_bits, tab->size,
-                                     tab->bad_ideals.n, tab->add_full_col);
+  fprintf (tab->file, "%u %" PRid " %d %d %lu %lu\n", tab->nb_bits, tab->size,
+      tab->bad_ideals.n, tab->add_full_col, tab->lpbr, tab->lpba);
 
   fclose(tab->file);
 
@@ -365,8 +375,9 @@ renumber_read_table (renumber_t tab, const char * filename)
 
   // read size of renumbering table
   uint64_t tmp_size;
-  ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d\n", &tab->nb_bits,
-                        &tmp_size, &tab->bad_ideals.n, &tab->add_full_col);
+  ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d %lu %lu\n", &tab->nb_bits,
+      &tmp_size, &tab->bad_ideals.n, &tab->add_full_col,
+      &tab->lpbr, &tab->lpba);
   ASSERT_ALWAYS (ret == 4);
 
   ASSERT_ALWAYS (tab->nb_bits <= 8 * sizeof(p_r_values_t));
@@ -668,7 +679,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   else
   {
     *p = tab[j] - 1;
-    if (*p > (1UL << pol->rat->lpb) && i == j)
+    if (*p > (1UL << renumber_info->lpbr) && i == j)
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
@@ -691,14 +702,14 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
 
 //for DEBUG, should be remove later
 void renumber_debug_print_tab (FILE *output, const char *filename,
-        cado_poly pol)
+        cado_poly pol, unsigned long lpb[])
 {
   renumber_t tab;
   index_t i;
   p_r_values_t p, r;
   int side;
 
-  renumber_init (tab, pol);
+  renumber_init (tab, pol, lpb);
   renumber_read_table (tab, filename);
 
   for (i = 0; i < tab->size; i++)

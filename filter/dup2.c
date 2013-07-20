@@ -494,6 +494,9 @@ usage(const char *argv0)
     fprintf (stderr, "     -poly xxx     - polynomial file\n");
     fprintf (stderr, "     -renumber xxx - file with renumbering table\n");
     fprintf (stderr, "     -K <K>        - size of the hashtable\n");
+    fprintf (stderr, "     -lpbr xxx     - rational large prime bound\n");
+    fprintf (stderr, "     -lpba xxx     - algebraic large prime bound\n");
+    fprintf (stderr, "     -minlim xxx   - factor base bound\n");
     fprintf (stderr, "\nOther command line options:\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
     fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
@@ -512,6 +515,8 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     const char *renumberfilename = NULL;
     char **p;
+    unsigned long lpb[2] = {0, 0};
+    unsigned long minlim = 0;
 
     /* print command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -551,6 +556,13 @@ main (int argc, char *argv[])
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     param_list_parse_ulong(pl, "K", &K);
+    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
+    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
+    param_list_parse_ulong(pl, "minlim", &minlim);
+    if (lpb[0] == 0 || lpb[1] == 0 || minlim == 0) {
+        fprintf(stderr, "Parameters lpba, lpbr and minlim are mandatory.\n");
+        usage(argv0);
+    }
 
     if (param_list_warn_unused(pl) || polyfilename == NULL)
       usage(argv0);
@@ -562,12 +574,6 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
-    unsigned long minlim = MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim);
-    if (minlim == 0) {
-        fprintf(stderr, "Neither alim nor rlim specified in polynomial file %s\n",
-                polyfilename);
-        exit(EXIT_FAILURE);
-    }
     pmin = ulong_nextprime (minlim);
 #else
     if (!ffs_poly_read (cpoly, polyfilename))
@@ -578,7 +584,7 @@ main (int argc, char *argv[])
     //compute pmin
     {
       sq_t p;
-      sq_set_ti(p, MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim) + 1);
+      sq_set_ti(p, minlim + 1);
       do
       {
         sq_monic_set_next(p, p, 64);
@@ -610,7 +616,7 @@ main (int argc, char *argv[])
 
     set_antebuffer_path (argv0, path_antebuffer);
   
-    renumber_init (renumber_table, cpoly);
+    renumber_init (renumber_table, cpoly, NULL);
     renumber_read_table (renumber_table, renumberfilename);
     // Find the index that corresponds to the min value of alim and rlim (for
     // purge)

@@ -2847,8 +2847,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat->bound = (unsigned char) (r * rat->scale + GUARD);
   fprintf (output, " bound=%u\n", rat->bound);
-  double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
-  if (si->cpoly->rat->lambda > max_rlambda) {
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
+      si->conf->sides[RATIONAL_SIDE]->lpb;
+  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
   /* Obsolete: rat->Bound is replaced by a single threshold alg->bound */
@@ -2891,8 +2892,8 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      y >= GUARD + lambda * lpb * scale */
   alg->bound = (unsigned char) (r * alg->scale + GUARD);
   fprintf (output, " bound=%u\n", alg->bound);
-  double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
-  if (si->cpoly->alg->lambda > max_alambda) {
+  double max_alambda = (alg->logmax) / si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
   /* Obsolete: alg->Bound is replaced by a single threshold alg->bound */

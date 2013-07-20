@@ -1113,33 +1113,6 @@ sub last_line {
     return $last;
 }
 
-# This is _ugly_: the siever takes some parameters via the polynomial file.
-# The job of this function is to maintain the sieving parameters this
-# $name.poly file up to date.
-# TODO: Find a cleaner way to do this! (e.g. command-line parameters for las)
-sub append_poly_params {
-    my @list = qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    my $list = join "|", @list;
-
-    # Strip the parameters at the end of the poly file, in case they
-    # have changed
-    open IN, "< $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for reading: $!.\n";
-    open OUT, "> $param{'prefix'}.poly_tmp"
-        or die "Cannot open `$param{'prefix'}.poly_tmp' for writing: $!.\n";
-    while (<IN>) {
-        print OUT "$_" unless /^($list):\s*/;
-    }
-    close IN;
-
-    # Append the parameters to the poly file
-    print OUT "$_: $param{$_}\n" for @list;
-    close OUT;
-
-    cmd("env mv -f $param{'prefix'}.poly_tmp $param{'prefix'}.poly",
-        { kill => 1 });
-}
-
 sub local_time {
     my $job= shift;
     $cmdlog = "$param{'prefix'}.cmd";
@@ -1943,9 +1916,6 @@ sub do_init {
 
     # Dump parameters into $name.param
     write_param("$param{'prefix'}.param");
-
-    # Update parameters in the $name.poly file if needed
-    append_poly_params() if $tasks{'polysel'}->{'done'};
 }
 
 
@@ -2167,6 +2137,7 @@ sub do_factbase {
     my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-alim $param{'alim'} ".
               "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2184,8 +2155,16 @@ sub do_freerels {
     info "Computing free relations...\n";
     $tab_level++;
 
+    my $minlim = $param{'alim'};
+    if ($minlim > $param{'rlim'}) {
+        $minlim = $param{'rlim'};
+    }
+
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
+              "-minlim $minlim " .
               "-fb $param{'prefix'}.roots ".
               "-renumber $param{'prefix'}.renumber ".
               "> $param{'prefix'}.freerels ";
@@ -2297,12 +2276,17 @@ sub dup {
     close FILE;
 
     my $nrels = first_line("$param{'prefix'}.nrels");
-
+    my $minlim = $param{'alim'};
+    if ($minlim > $param{'rlim'}) {
+        $minlim = $param{'rlim'};
+    }
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
+            "-lpbr $param{'lpbr'} -lpba $param{'lpba'} ".
+            "-minlim $minlim ".
             "-filelist $param{'prefix'}.filelist ".
             "-renumber $param{'prefix'}.renumber ".
             "-basepath $param{'prefix'}.nodup/$i ",
@@ -2393,6 +2377,14 @@ my $sieve_cmd = sub {
         "-I $param{'I'} ".
         "-rpowlim $powlim ".
         "-apowlim $powlim ".
+        "-rlim $param{'rlim'} ".
+        "-alim $param{'alim'} ".
+        "-rlambda $param{'rlambda'} ".
+        "-alambda $param{'alambda'} ".
+        "-lpbr $param{'lpbr'} ".
+        "-lpba $param{'lpba'} ".
+        "-mfbr $param{'mfbr'} ".
+        "-mfba $param{'mfba'} ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
@@ -2926,6 +2918,8 @@ sub do_chars {
 
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
               "-purged $param{'prefix'}.purged.gz ".
               "-index $param{'prefix'}.index ".
               # Note: one can omit the -heavyblock option, but in that case

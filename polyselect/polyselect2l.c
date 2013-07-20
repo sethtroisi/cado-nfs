@@ -2331,7 +2331,7 @@ main (int argc, char *argv[])
   if (best_E == 0.0)
     printf ("No polynomial found, please increase the ad range or decrease P\n");
   else
-    print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
+    print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
 
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);

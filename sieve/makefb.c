@@ -167,17 +167,6 @@ void push_entry(entry_list *L, entry E) {
     L->list[L->len++] = E;
 }
 
-static int
-cmp_ulong (const void *A, const void *B)
-{
-  unsigned long a = *(unsigned long*) A;
-  unsigned long b = *(unsigned long*) B;
-
-  if (a < b)
-    return -1;
-  return 1;
-}
-
 int cmp_entry(const void *A, const void *B) {
     entry a, b;
     a = ((entry *)A)[0];
@@ -389,68 +378,27 @@ void makefb_with_powers(mpz_t *f, int d, unsigned long alim,
     }
 }
 
-
-void
-makefb (FILE *fp, cado_poly cpoly)
-{
-  unsigned long p;
-  int d = cpoly->alg->degree;
-  unsigned long *roots;
-  int nroots, i;
-
-  cado_poly_check (cpoly);
-
-  fprintf (fp, "# Roots for polynomial ");
-  fprint_polynomial (fp, cpoly->alg->f, d);
-
-  fprintf (fp, "# DEGREE: %d\n", d);
-
-  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
-
-  for (p = 2; p <= cpoly->alg->lim; p = getprime (p))
-    {
-      nroots = poly_roots_ulong (roots, cpoly->alg->f, d, p);
-      qsort (roots, nroots, sizeof(roots[0]), cmp_ulong);
-      // TODO: poly_roots_ulong returns 0 if f mod p is 0.
-      // This corresponds to complicated roots that should maybe go to
-      // the factor base (hum... maybe not!)
-      // TODO: this is now fixed in the -powers version!
-      if (nroots != 0)
-        {
-          fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
-          for (i = 1; i < nroots; i++)
-            fprintf (fp, ",%lld", (long long int) roots[i]);
-          fprintf (fp, "\n");
-        }
-    }
-
-  getprime (0); /* free the memory used by getprime() */
-  free (roots);
-}
-
 static void usage()
 {
     fprintf (stderr,
-            "Usage: makefb [-maxbits nnn] [-nopowers] -poly file\n"
+            "Usage: makefb [-maxbits nnn] -poly file -alim xxx\n"
             "    -poly file   : given polynomial\n"
-            "    -maxbits nnn : maximal number of bits of powers\n"
-            "    -nopowers    : switch to old fb format, without powers\n");
+            "    -alim xxx    : factor base bound\n"
+            "    -maxbits nnn : maximal number of bits of powers\n");
     exit (1);
 }
 
 int
 main (int argc, char *argv[])
 {
-  int no_powers = 0;
   param_list pl;
   cado_poly cpoly;
   FILE * f;
   int maxbits = 1;  // disable powers by default
+  unsigned long alim = 0;
 
   param_list_init(pl);
   cado_poly_init(cpoly);
-
-  param_list_configure_switch(pl, "-nopowers", &no_powers);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -469,24 +417,28 @@ main (int argc, char *argv[])
   }
 
   const char * filename;
-  if ((filename = param_list_lookup_string(pl, "poly")) != NULL) {
-      param_list_read_file(pl, filename);
+  if ((filename = param_list_lookup_string(pl, "poly")) == NULL) {
+      fprintf(stderr, "Error: parameter -poly is mandatory\n");
+      exit(EXIT_FAILURE);
+  }
+
+  param_list_parse_ulong(pl, "alim", &alim);
+  if (alim == 0) {
+      fprintf(stderr, "Error: parameter -alim is mandatory\n");
+      exit(EXIT_FAILURE);
   }
 
   param_list_parse_int(pl, "maxbits", &maxbits);
 
-  if (!cado_poly_set_plist (cpoly, pl))
+  if (!cado_poly_read(cpoly, filename))
     {
-      fprintf (stderr, "Error reading polynomial file\n");
+      fprintf (stderr, "Error reading polynomial file %s\n", filename);
       exit (EXIT_FAILURE);
     }
   param_list_clear(pl);
 
-  if (!no_powers)
-    makefb_with_powers (cpoly->alg->f, cpoly->alg->degree, 
-                        cpoly->alg->lim, maxbits);
-  else
-    makefb (stdout, cpoly);
+  makefb_with_powers (cpoly->alg->f, cpoly->alg->degree, 
+          alim, maxbits);
 
   cado_poly_clear (cpoly);
 

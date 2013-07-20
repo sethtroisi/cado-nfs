@@ -48,7 +48,12 @@ struct __renumber_t
 };
 typedef struct __renumber_t renumber_t[1];
 
+// The last parameter of renumber_init is the array of lpb. If the
+// renumber_t is going to be passed to renumber_read_table, this can be
+// set to NULL. Otherwise, it has to be given, in order to precompute
+// approriate data.
 void renumber_init (renumber_t, cado_poly, unsigned long *);
+
 int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
 void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *, const char *, int);
@@ -59,5 +64,5 @@ index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int)
 void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
 //for DEBUG, should be remove later
-void renumber_debug_print_tab (FILE *, const char *, cado_poly);
+void renumber_debug_print_tab (FILE *, const char *, cado_poly, unsigned long *);
 #endif
