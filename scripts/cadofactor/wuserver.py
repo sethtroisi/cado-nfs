@@ -13,8 +13,8 @@ import datetime
 import wudb
 import upload
 
-# Get the shell environment variable name in which we should store the path 
-# to the upload directory
+# Import upload to get the shell environment variable name in which we should
+# store the path to the upload directory
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
@@ -85,12 +85,11 @@ class HtmlGen(io.BytesIO):
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
-    # Overrides http.server.CGIHTTPRequestHandler.cgi_directories
-    clientid_pattern = re.compile("^[\w.-]*$")
+    clientid_pattern = re.compile("^clientid=([\w.-]*)$")
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.no_work_available = False
+        super().__init__(*args, **kwargs)
     
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
@@ -108,14 +107,13 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
-        self.log(logging.DEBUG, '"%s" %s %s', 
-                 self.requestline, code, size)
+        self.log(logging.DEBUG, '"%s" %s %s', self.requestline, code, size)
 
-    def log_error(self, format, *args):
+    def log_error(self, format, *args, **kwargs):
         # Log errors with WARNING level, except messages about no work being
         # available, as those are frequent and kinda spammy
         level = logging.DEBUG if self.no_work_available else logging.WARNING
-        self.log(level, format, *args)
+        self.log(level, format, *args, **kwargs)
 
     def send_body(self, body):
         self.wfile.write(body)
@@ -128,25 +126,33 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         in registered_filenames are delegated to super().translate_path()
         """
         # Path in url always starts with '/'
+        # print("translate_path(%s)" % path)
         relpath = self.path.lstrip('/')
         if relpath in self.registered_filenames:
-            self.log(logging.DEBUG, "Translated path %s to %s", relpath, 
+            self.log(logging.DEBUG, "Translated path %s to %s", self.path, 
                      self.registered_filenames[relpath])
             return self.registered_filenames[relpath]
-        self.log(logging.DEBUG, "Not translating path %s ", relpath)
-        return super().translate_path(path)
+        self.log(logging.DEBUG, "Not translating path %s ", self.path)
+        if self.only_registered:
+            return None
+        else:
+            return super().translate_path(path)
     
     def do_GET(self):
-        """Generates a work unit if request is cgi-bin/getwu, otherwise calls
-           parent class' do_GET()"""
+        """Generates a work unit if request is cgi-bin/getwu, generates a status
+        page is requested, otherwise calls parent class' do_GET()"""
         if self.is_cgi():
             if self.is_getwu():
                 self.send_WU()
             elif self.is_getstatus():
                 self.send_status()
             else:
-                self.send_error(404, "GET for CGI scripts allowed only " + 
+                self.send_error(404, "GET for CGI scripts allowed only "
                                 "for work unit or status page request")
+        elif self.only_registered and \
+                not self.path.lstrip('/') in self.registered_filenames:
+                self.send_error(404, "Access restricted to registered file "
+                                "names, %s is not registered" % self.path)
         else:
             super().do_GET()
         sys.stdout.flush()
@@ -170,36 +176,44 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def is_getwu(self):
         """Test whether request is for a new WU."""
+        if not self.command == 'GET':
+            return False
         splitpath = urllib.parse.urlsplit(self.path)
-        return self.command == 'GET' and splitpath.path in ['/getwu']
+        # print("is_getwu(): path = %s, splitpath.path = %s" %
+        #       (self.path, splitpath.path))
+        return splitpath.path in [directory + '/getwu'
+                                  for directory in self.cgi_directories]
 
     def is_getstatus(self):
         """Test whether request is for a a status page."""
+        if not self.command == 'GET':
+            return False
         splitpath = urllib.parse.urlsplit(self.path)
-        return self.command == 'GET' and splitpath.path in ['/status']
+        # print("is_getwu(): path = %s, splitpath.path = %s" %
+        #       (self.path, splitpath.path))
+        return splitpath.path in [directory + '/status'
+                                  for directory in self.cgi_directories]
 
     def guess_type(self, path):
         type = super().guess_type(path)
         # Use text/plain for files in upload, unless the type was properly 
         # identified
-        # FIXME: make path identification more robust
+        # FIXME: testing the CWD here is wrong. If we want to expose files in
+        # the upload directory, we either need to register all of them, or
+        # register the upload directory and add directory name translation.
         cwd = os.getcwd().rstrip(os.sep)
-        if type == "application/octet-stream" and path.startswith(cwd + os.sep + 'upload' + os.sep):
+        if type == "application/octet-stream" and \
+                 path.startswith(cwd + os.sep + 'upload' + os.sep):
             return "text/plain"
         return type
 
     def send_WU(self):
-        filename = self.cgi_info[1]
-        if not "?" in filename:
-            return self.send_error(400, "No query string given")
-        (filename, query) = self.cgi_info[1].split("?", 1)
-        if query.count("=") != 1 or "?" in query or "&" in query:
-            return self.send_error(400, "Bad query string in request")
-        (key, clientid) = query.split("=")
-        if key != "clientid":
-            return self.send_error(400, "No client id specified")
-        if not self.clientid_pattern.match(clientid):
-            return self.send_error(400, "Malformed client id specified")
+        splitpath = urllib.parse.urlsplit(self.path)
+        # print(str(splitpath))
+        clientid_match = self.clientid_pattern.match(splitpath.query)
+        if not clientid_match:
+            return self.send_error(400, "No or malformed client id specified")
+        clientid = clientid_match.group(1)
         
         if self.db_pool:
             wu_text = self.db_pool.assign(clientid)
@@ -226,24 +240,18 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_query()
     
     def send_query(self):
-        logging.debug("self.cgi_info = "  + str(self.cgi_info))
-        filename = self.cgi_info[1]
-        if "#" in filename:
-            # Get rid of fragment part
-            filename = filename.split("#", 1)[0]
+        splitpath = urllib.parse.urlsplit(self.path)
         conditions = {}
-        if "?" in filename:
+        logging.debug("send_query(): query: %s", splitpath.query)
+        if splitpath.query:
             # Parse query part into SELECT conditions
-            (filename, query) = filename.split("?", 1)
-            print("Query = " + query)
-            conditions = {}
             # Now look at individual key=value pairs
-            for q in query.split("&"):
-                q = urllib.parse.unquote_plus(q)
-                logging.debug("Processing token " + str(q))
+            for query in splitpath.query.split("&"):
+                query = urllib.parse.unquote_plus(query)
+                # logging.debug("Processing token " + str(query))
                 for (name, op) in wudb.MyCursor.name_to_operator.items():
-                    if op in q:
-                        (key, value) = q.split(op, 1)
+                    if op in query:
+                        (key, value) = query.split(op, 1)
                         if not name in conditions:
                             conditions[name] = {}
                         # If value is of the form "now(-123)", convert it to a 
@@ -255,6 +263,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                             value = str(datetime.datetime.now() + td)
                         conditions[name][key] = value
                         break
+        logging.debug("send_query(): conditions: %s", conditions)
         if self.db_pool:
             wus = self.db_pool.query(**conditions)
         else:
@@ -286,8 +295,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
 class ServerLauncher(object):
     def __init__(self, address, port, threaded, dbfilename,
-                registered_filenames, uploaddir, bg = False,
-                use_db_pool = True, scriptdir = None):
+                registered_filenames, uploaddir, *, bg = False,
+                use_db_pool = True, scriptdir = None, only_registered=False):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
@@ -319,7 +328,8 @@ class ServerLauncher(object):
             "db_pool": self.db_pool, 
             "uploaddir": uploaddir,
             "cgi_directories" : ['/cgi-bin'],
-            "upload_path": upload_url_path
+            "upload_path": upload_url_path,
+            "only_registered": only_registered
         }
         MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
         
@@ -390,6 +400,8 @@ if __name__ == '__main__':
     parser.add_argument("-dbfile", help="Database file name", required=True)
     parser.add_argument("-threaded", help="Use threaded server", 
                         action="store_true", default=False)
+    parser.add_argument("-onlyreg", help="Allow access only to registered files", 
+                        action="store_true", default=False)
     args = parser.parse_args()
 
     PORT = int(args.port)
@@ -401,7 +413,8 @@ if __name__ == '__main__':
     logger.setLevel(logging.NOTSET)
 
     httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, 
-                           registered_filenames, args.uploaddir)
+                           registered_filenames, args.uploaddir,
+                           only_registered=args.onlyreg)
     
     try:
         httpd.serve()

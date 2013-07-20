@@ -9,12 +9,14 @@
 #include <stddef.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #else
 #define MAP_FAILED ((void *) -1)
 #endif
 #include <gmp.h>
+#include "las-config.h"
 
 /* Data types */
 
@@ -27,6 +29,16 @@ typedef fbprime_t fbroot_t;
 typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit 
                                        large primes */
 #define LARGEPRIME_FORMAT "%lu"
+
+/* If SUPPORT_LARGE_Q is defined, 64-bit redc is used in the function that
+   converts roots to the p-lattice, and the redc code needs a 64-bit 
+   precomputed inverse. If SUPPORT_LARGE_Q is not defined, we store only a
+   32-bit inverse to conserve memory. */
+#if defined(SUPPORT_LARGE_Q)
+typedef uint64_t redc_invp_t;
+#else
+typedef uint32_t redc_invp_t;
+#endif
 
 /* The following format takes 16+4k bytes per prime with k roots. Since
  * the expected number of roots for primes with at least one root is
@@ -44,11 +56,8 @@ typedef struct {
                              guarantees proper alignment of roots[]. It's only a
                              precaution against -fpack-struct or other
                              ABI-breaking behaviours */
-  unsigned long invp;     /* -1/p (mod 2^wordsize) for REDC: although we need
-			     only a 32-bit inverse in say redc_32, we need a
-			     full-limb inverse on 64-bit machines for trial
-			     division */
-  /* Note that invp has a stronger alignment constraint than p, thus must
+  redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
+  /* Note that invp may have a stronger alignment constraint than p, thus must
    * not appear before the tiny fields plog and nr_roots which can easily
    * fit inbetween the two */
   fbroot_t roots[0];      /* the actual length of this array is determined

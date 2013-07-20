@@ -2,6 +2,8 @@
 #
 # This file is split into several sections [cluster_name].
 # The sections are independent.
+# The binaries for the master computer (the one running cadofactor) are
+# searched in the first section.
 #
 # Each section is read in order.
 # Leading white space is not significant.

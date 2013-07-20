@@ -200,7 +200,7 @@ EOF
     bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
   else
     $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
-    machines=$t/mach_desc nthchar=$cores bwmt=$bwmt wdir=$t \
+    machines=$t/mach_desc nthchar=$cores bwmt=$cores wdir=$t \
     sievenice=0 polsel_nice=0 logfile=$t/out "$@"
   fi
 fi

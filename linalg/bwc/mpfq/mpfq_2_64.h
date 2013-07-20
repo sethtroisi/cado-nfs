@@ -138,9 +138,8 @@ void mpfq_2_64_get_uipoly_wide(mpfq_2_64_dst_field, unsigned long *, mpfq_2_64_s
 /* Assignment of random values */
 static inline
 void mpfq_2_64_random(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, gmp_randstate_t);
-#define HAVE_mpfq_2_64_random2
 static inline
-void mpfq_2_64_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_elt);
+void mpfq_2_64_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, gmp_randstate_t);
 
 /* Arithmetic operations on elements */
 static inline
@@ -191,6 +190,8 @@ unsigned long mpfq_2_64_trace(mpfq_2_64_dst_field, mpfq_2_64_src_elt);
 #define mpfq_2_64_elt_ur_clear(f, px)	/**/
 static inline
 void mpfq_2_64_elt_ur_set(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur, mpfq_2_64_src_elt_ur);
+static inline
+void mpfq_2_64_elt_ur_set_elt(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur, mpfq_2_64_src_elt);
 static inline
 void mpfq_2_64_elt_ur_set_zero(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur);
 static inline
@@ -254,9 +255,8 @@ static inline
 void mpfq_2_64_vec_conv(mpfq_2_64_dst_field, mpfq_2_64_dst_vec, mpfq_2_64_src_vec, unsigned int, mpfq_2_64_src_vec, unsigned int);
 static inline
 void mpfq_2_64_vec_random(mpfq_2_64_dst_field, mpfq_2_64_dst_vec, unsigned int, gmp_randstate_t);
-#define HAVE_mpfq_2_64_vec_random2
 static inline
-void mpfq_2_64_vec_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_vec, unsigned int);
+void mpfq_2_64_vec_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_vec, unsigned int, gmp_randstate_t);
 static inline
 int mpfq_2_64_vec_cmp(mpfq_2_64_dst_field, mpfq_2_64_src_vec, mpfq_2_64_src_vec, unsigned int);
 static inline
@@ -271,6 +271,8 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field, FILE *, mpfq_2_64_vec *, unsigned i
 void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int);
 static inline
 void mpfq_2_64_vec_ur_set_zero(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, unsigned int);
+static inline
+void mpfq_2_64_vec_ur_set_vec(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec, unsigned int);
 void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int, unsigned int);
 void mpfq_2_64_vec_ur_clear(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int);
 static inline
@@ -283,6 +285,10 @@ static inline
 void mpfq_2_64_vec_ur_add(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec_ur, mpfq_2_64_src_vec_ur, unsigned int);
 static inline
 void mpfq_2_64_vec_ur_sub(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec_ur, mpfq_2_64_src_vec_ur, unsigned int);
+static inline
+void mpfq_2_64_vec_ur_neg(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec_ur, unsigned int);
+static inline
+void mpfq_2_64_vec_ur_rev(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec_ur, unsigned int);
 static inline
 void mpfq_2_64_vec_scal_mul_ur(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, mpfq_2_64_src_vec, mpfq_2_64_src_elt, unsigned int);
 static inline
@@ -333,9 +339,8 @@ static inline
 void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 static inline
 void mpfq_2_64_poly_random(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned int, gmp_randstate_t);
-#define HAVE_mpfq_2_64_poly_random2
 static inline
-void mpfq_2_64_poly_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned int);
+void mpfq_2_64_poly_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned int, gmp_randstate_t);
 static inline
 int mpfq_2_64_poly_cmp(mpfq_2_64_dst_field, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 static inline
@@ -464,9 +469,15 @@ void mpfq_2_64_random(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, g
 
 /* *Mpfq::gf2n::trivialities::code_for_random2 */
 static inline
-void mpfq_2_64_random2(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r)
+void mpfq_2_64_random2(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt r, gmp_randstate_t state)
 {
-    mpn_random2(r, 1);
+    int i;
+    mpz_t tmp;
+    mpz_init(tmp);
+    mpz_rrandomb(tmp, state, GMP_LIMB_BITS*1);
+    for(i=0;i<1;++i)
+     r[i]=tmp->_mp_d[i];
+    mpz_clear(tmp);
 }
 
 /* *Mpfq::gf2n::trivialities::code_for_add */
@@ -866,6 +877,13 @@ void mpfq_2_64_elt_ur_set(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_
     if (r != s) memcpy(r,s,sizeof(mpfq_2_64_elt_ur));
 }
 
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gf2n::trivialities */
+static inline
+void mpfq_2_64_elt_ur_set_elt(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur r, mpfq_2_64_src_elt s)
+{
+    memset(r, 0, sizeof(mpfq_2_64_elt_ur)); memcpy(r,s,sizeof(mpfq_2_64_elt));
+}
+
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, Mpfq::gf2n::trivialities */
 static inline
 void mpfq_2_64_elt_ur_set_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur r)
@@ -1084,7 +1102,7 @@ int mpfq_2_64_is_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_elt r)
 static inline
 void mpfq_2_64_vec_set(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec r, mpfq_2_64_src_vec s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(mpfq_2_64_elt));
+    if (r != s) memmove(r, s, n*sizeof(mpfq_2_64_elt));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
@@ -1191,11 +1209,11 @@ void mpfq_2_64_vec_random(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec 
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
-void mpfq_2_64_vec_random2(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec w, unsigned int n)
+void mpfq_2_64_vec_random2(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        mpfq_2_64_random2(K, w[i]);
+        mpfq_2_64_random2(K, w[i],state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */
@@ -1211,7 +1229,7 @@ int mpfq_2_64_vec_cmp(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec u, m
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 int mpfq_2_64_vec_is_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec r, unsigned int n)
 {
@@ -1229,11 +1247,20 @@ void mpfq_2_64_vec_ur_set_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst
     memset(r, 0, n*sizeof(mpfq_2_64_elt_ur));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void mpfq_2_64_vec_ur_set_vec(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur w, mpfq_2_64_src_vec u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; i+=1)
+        mpfq_2_64_elt_ur_set_elt(K, w[i], u[i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
 static inline
 void mpfq_2_64_vec_ur_set(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur r, mpfq_2_64_src_vec_ur s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(mpfq_2_64_elt_ur));
+    if (r != s) memmove(r, s, n*sizeof(mpfq_2_64_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
@@ -1266,6 +1293,33 @@ void mpfq_2_64_vec_ur_sub(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_
     unsigned int i;
     for(i = 0; i < n; i+=1)
         mpfq_2_64_elt_ur_sub(K, w[i], u[i], v[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void mpfq_2_64_vec_ur_neg(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur w, mpfq_2_64_src_vec_ur u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; ++i)
+        mpfq_2_64_elt_ur_neg(K, w[i], u[i]);
+}
+
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void mpfq_2_64_vec_ur_rev(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur w, mpfq_2_64_src_vec_ur u, unsigned int n)
+{
+    unsigned int nn = n >> 1;
+    mpfq_2_64_elt_ur tmp[1];
+    mpfq_2_64_elt_ur_init(K, tmp);
+    unsigned int i;
+    for(i = 0; i < nn; ++i) {
+        mpfq_2_64_elt_ur_set(K, tmp[0], u[i]);
+        mpfq_2_64_elt_ur_set(K, w[i], u[n-1-i]);
+        mpfq_2_64_elt_ur_set(K, w[n-1-i], tmp[0]);
+    }
+    if (n & 1)
+        mpfq_2_64_elt_ur_set(K, w[nn], u[nn]);
+    mpfq_2_64_elt_ur_clear(K, tmp);
 }
 
 /* *Mpfq::defaults::vec::mul::code_for_vec_scal_mul_ur, Mpfq::defaults::vec, Mpfq::defaults */
@@ -1658,9 +1712,9 @@ void mpfq_2_64_poly_gcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g
     if (db0==-1)
      mpfq_2_64_poly_set(k,g,a0);
     else {
-     mpfq_2_64_poly_init(k,a,++da0);
-     mpfq_2_64_poly_init(k,b,++db0);
-     mpfq_2_64_poly_init(k,q,(da0+1));
+     mpfq_2_64_poly_init(k,a,da0+1);
+     mpfq_2_64_poly_init(k,b,db0+1);
+     mpfq_2_64_poly_init(k,q,1);
      mpfq_2_64_poly_init(k,r,db0);
      mpfq_2_64_poly_set(k,a,a0);
      mpfq_2_64_poly_set(k,b,b0);
@@ -1679,56 +1733,64 @@ void mpfq_2_64_poly_gcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g
 
 /* *Mpfq::defaults::polygcd::code_for_poly_xgcd, Mpfq::defaults::poly */
 static inline
-void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g, mpfq_2_64_dst_poly u, mpfq_2_64_dst_poly v, mpfq_2_64_src_poly a0, mpfq_2_64_src_poly b0)
+void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g, mpfq_2_64_dst_poly u0, mpfq_2_64_dst_poly v0, mpfq_2_64_src_poly a0, mpfq_2_64_src_poly b0)
 {
-    mpfq_2_64_poly a,b,w,x,q,r;
+    mpfq_2_64_poly a,b,u,v,w,x,q,r;
     mpfq_2_64_elt c;
     mpfq_2_64_init(k,&c);
     int da0=mpfq_2_64_poly_deg(k,a0), db0=mpfq_2_64_poly_deg(k,b0), dega;
-    mpfq_2_64_poly_init(k,u,1);
-    mpfq_2_64_poly_init(k,v,1);
     if (db0==-1) {
-     mpfq_2_64_poly_getcoef(k,c,a0,da0);
-     mpfq_2_64_inv(k,c,c);
-     mpfq_2_64_poly_scal_mul(k,g,a0,c);
-     mpfq_2_64_poly_setcoef(k,u,c,0);
+     if (da0==-1) {
+      mpfq_2_64_poly_set(k,u0,a0);
+      mpfq_2_64_poly_set(k,v0,b0);
+      mpfq_2_64_poly_set(k,g,a0);
+     } else {
+      mpfq_2_64_poly_getcoef(k,c,a0,da0);
+      mpfq_2_64_inv(k,c,c);
+      mpfq_2_64_poly_scal_mul(k,g,a0,c);
+      mpfq_2_64_poly_set(k,v0,b0);
+      mpfq_2_64_poly_set(k,u0,b0);
+      mpfq_2_64_poly_setcoef(k,u0,c,0);
+     }
     }
     else {
-     mpfq_2_64_poly_setcoef_ui(k,u,1,0);
-     mpfq_2_64_poly_init(k,a,++da0);
-     mpfq_2_64_poly_init(k,b,++db0);
-     mpfq_2_64_poly_init(k,q,(da0+1));
+     mpfq_2_64_poly_init(k,a,da0+1);
+     mpfq_2_64_poly_init(k,b,db0+1);
+     mpfq_2_64_poly_init(k,q,1);
      mpfq_2_64_poly_init(k,r,db0);
      mpfq_2_64_poly_set(k,a,a0);
      mpfq_2_64_poly_set(k,b,b0);
+     mpfq_2_64_poly_init(k,u,1);
+     mpfq_2_64_poly_init(k,v,1);
      mpfq_2_64_poly_init(k,w,1);
      mpfq_2_64_poly_init(k,x,1);
+     mpfq_2_64_poly_setcoef_ui(k,u,1,0);
      mpfq_2_64_poly_setcoef_ui(k,x,1,0);
+     /* u*a_initial + v*b_initial = a */
+     /* w*a_initial + x*b_initial = b */
      while (mpfq_2_64_poly_deg(k,b)>=0) {
       mpfq_2_64_poly_divmod(k,q,r,a,b);
-      mpfq_2_64_poly_set(k,a,b);
+      mpfq_2_64_poly_set(k,a,b);  /* a,b <- b,a-qb=r */
       mpfq_2_64_poly_set(k,b,r);
       mpfq_2_64_poly_mul(k,r,q,w);
       mpfq_2_64_poly_sub(k,r,u,r);
-      mpfq_2_64_poly_set(k,u,w);
+      mpfq_2_64_poly_set(k,u,w);   /* u,w <- w,u-qw */
       mpfq_2_64_poly_set(k,w,r);
-      mpfq_2_64_poly_mul(k,r,q,x);
+      mpfq_2_64_poly_mul(k,r,q,x); /* v,x <- x,v-qx */
       mpfq_2_64_poly_sub(k,r,v,r);
       mpfq_2_64_poly_set(k,v,x);
       mpfq_2_64_poly_set(k,x,r);
      }
      dega=mpfq_2_64_poly_deg(k,a);
-     if (dega==-1) 
-      mpfq_2_64_poly_set(k,g,a);
-     else {
-      mpfq_2_64_poly_getcoef(k,c,a,dega);
-      mpfq_2_64_inv(k,c,c);
-      mpfq_2_64_poly_scal_mul(k,g,a,c);
-      mpfq_2_64_poly_scal_mul(k,u,u,c);
-      mpfq_2_64_poly_scal_mul(k,v,v,c);
-     }
+     mpfq_2_64_poly_getcoef(k,c,a,dega);
+     mpfq_2_64_inv(k,c,c);
+     mpfq_2_64_poly_scal_mul(k,g,a,c);
+     mpfq_2_64_poly_scal_mul(k,u0,u,c);
+     mpfq_2_64_poly_scal_mul(k,v0,v,c);
      mpfq_2_64_poly_clear(k,a);
      mpfq_2_64_poly_clear(k,b);
+     mpfq_2_64_poly_clear(k,u);
+     mpfq_2_64_poly_clear(k,v);
      mpfq_2_64_poly_clear(k,w);
      mpfq_2_64_poly_clear(k,x);
      mpfq_2_64_poly_clear(k,q);
@@ -1754,13 +1816,14 @@ void mpfq_2_64_poly_random(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_pol
 
 /* *Mpfq::defaults::poly::code_for_poly_random2 */
 static inline
-void mpfq_2_64_poly_random2(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly w, unsigned int n)
+void mpfq_2_64_poly_random2(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly w, unsigned int n, gmp_randstate_t state)
 {
+    n++;
     if (w->alloc < n) {
         mpfq_2_64_vec_reinit(k, &(w->c), w->alloc, n);
         w->alloc = n;
     }
-    mpfq_2_64_vec_random2(k, w->c, n);
+    mpfq_2_64_vec_random2(k, w->c, n,state);
     w->size=n;
     int wdeg = mpfq_2_64_poly_deg(k, w);
     w->size=wdeg+1;

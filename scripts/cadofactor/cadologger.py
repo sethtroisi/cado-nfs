@@ -147,11 +147,15 @@ root = logging.getLogger()
 root.setLevel(logging.NOTSET)
 del(root)
 
-if __name__ == '__main__':
-    logger = cadologger.Logger()
-    logger.addHandler(ScreenHandler(lvl = logging.INFO))
-    logger.addHandler(FileHandler(filename = "log", lvl = logging.DEBUG))
+def init_test_logger():
+    logger = logging.getLogger()
+    logger.addHandler(ScreenHandler(lvl = logging.NOTSET))
+    logger.addHandler(FileHandler(filename = "log", lvl = logging.NOTSET))
 
+if __name__ == '__main__':
+    init_test_logger()
+
+    logger = logging.getLogger()
     logger.info("An Info Center!")
     logger.warn("Beware")
     logger.error("All hope abandon", extra={"indent" : 4})
