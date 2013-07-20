@@ -2285,7 +2285,6 @@ sub dup {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
-            "-lpbr $param{'lpbr'} -lpba $param{'lpba'} ".
             "-minlim $minlim ".
             "-filelist $param{'prefix'}.filelist ".
             "-renumber $param{'prefix'}.renumber ".
