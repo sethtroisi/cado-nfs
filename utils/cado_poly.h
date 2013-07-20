@@ -16,10 +16,6 @@
 struct cado_poly_side_s {
   mpz_t *f;          /* rational coefficients */
   int degree;        /* degree of polynomial g */
-  // unsigned long lim; /* rational factor base bound */
-  // int lpb;           /* rational large prime bound is 2^lpbr */
-  // int mfb;           /* bound for rational residuals is 2^mfbr */
-  // double lambda;     /* lambda sieve parameter on the rational side */
 };
 typedef struct cado_poly_side_s cado_poly_side[1];
 typedef struct cado_poly_side_s * cado_poly_side_ptr;

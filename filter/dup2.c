@@ -494,8 +494,6 @@ usage(const char *argv0)
     fprintf (stderr, "     -poly xxx     - polynomial file\n");
     fprintf (stderr, "     -renumber xxx - file with renumbering table\n");
     fprintf (stderr, "     -K <K>        - size of the hashtable\n");
-    fprintf (stderr, "     -lpbr xxx     - rational large prime bound\n");
-    fprintf (stderr, "     -lpba xxx     - algebraic large prime bound\n");
     fprintf (stderr, "     -minlim xxx   - factor base bound\n");
     fprintf (stderr, "\nOther command line options:\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
@@ -515,7 +513,6 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     const char *renumberfilename = NULL;
     char **p;
-    unsigned long lpb[2] = {0, 0};
     unsigned long minlim = 0;
 
     /* print command line */
@@ -556,11 +553,9 @@ main (int argc, char *argv[])
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     param_list_parse_ulong(pl, "K", &K);
-    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
-    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
     param_list_parse_ulong(pl, "minlim", &minlim);
-    if (lpb[0] == 0 || lpb[1] == 0 || minlim == 0) {
-        fprintf(stderr, "Parameters lpba, lpbr and minlim are mandatory.\n");
+    if (minlim == 0) {
+        fprintf(stderr, "Parameter minlim is mandatory.\n");
         usage(argv0);
     }
 
