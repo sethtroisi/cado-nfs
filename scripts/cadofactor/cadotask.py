@@ -1970,7 +1970,11 @@ class StartClientsTask(Task):
         pid = self.pids[clientid]
         host = self.hosts[clientid]
         kill = cadoprograms.Kill(pid, signal=signal)
-        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.get_param_prefix())
+        if host == "localhost":
+            process = cadocommand.Command(kill)
+        else:
+            process = cadocommand.RemoteCommand(kill, host, self.parameters,
+                                                self.get_param_prefix())
         return process.wait()
 
 class Message(object):
