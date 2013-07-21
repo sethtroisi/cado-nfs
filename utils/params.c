@@ -546,9 +546,7 @@ int param_strcmp(const char * a, parameter_srcptr b)
 
 static int assoc(param_list pl, const char * key)
 {
-    // This check is not ready to be activated!
-    // if (pl->use_doc) {
-    if (0) {
+    if (pl->use_doc) {
         const char *k = (key[0] == '-') ? (1+key) : key;
         if (!is_documented_key(pl, k)) 
             fprintf(stderr, "# Warning: parameter %s is checked by this program but is undocumented.\n", k);

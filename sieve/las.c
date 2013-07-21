@@ -3100,8 +3100,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
-  param_list_decl_usage(pl, "mkhint", "(switch) ???");
+  param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
+  param_list_decl_usage(pl, "descent-hint", "hint file ?????");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
+  param_list_decl_usage(pl, "mkhint", "(switch) ?????");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
