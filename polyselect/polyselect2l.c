@@ -1996,7 +1996,8 @@ declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "degree", "(required, alias d) polynomial degree (max=6)");
   param_list_decl_usage(pl, "n", "(required, alias N) input number");
-  param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]");
+  param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]\n");
+
   param_list_decl_usage(pl, "admax", "max value for ad");
   param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
   param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
@@ -2010,7 +2011,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
-  snprintf(str, 200, "time intervals (seconds) for printing out statistics (default %d)\n", TARGET_TIME / 1000);
+  snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "save", "save state in given file");
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
@@ -2038,8 +2039,7 @@ main (int argc, char *argv[])
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin, admax;
-  unsigned long givenP = 0;
+  unsigned long P = 0, admin, admax;
   double admin_d, admax_d;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
@@ -2092,8 +2092,8 @@ main (int argc, char *argv[])
 
   if (mpz_cmp_ui (N, 0) <= 0) usage(argv0[0], "n", pl);
 
-  param_list_parse_ulong(pl, "P", &givenP);
-  if (givenP == 0) usage(argv0[0], "P", pl);
+  param_list_parse_ulong(pl, "P", &P);
+  if (P == 0) usage(argv0[0], "P", pl);
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
@@ -2173,12 +2173,11 @@ main (int argc, char *argv[])
 
   /* init primes */
   double Pd;
-  Pd = (double) givenP;
+  Pd = (double) P;
   if (Pd > (double) UINT_MAX) {
     fprintf (stderr, "Error, too large value of P\n");
     exit (1);
   }
-  P = (unsigned long) Pd;
   if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
     fprintf (stderr, "Error, too small value of P\n");
     exit (1);
