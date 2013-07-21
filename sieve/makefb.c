@@ -378,14 +378,12 @@ void makefb_with_powers(mpz_t *f, int d, unsigned long alim,
     }
 }
 
-static void usage()
+static void declare_usage(param_list pl)
 {
-    fprintf (stderr,
-            "Usage: makefb [-maxbits nnn] -poly file -alim xxx\n"
-            "    -poly file   : given polynomial\n"
-            "    -alim xxx    : factor base bound\n"
-            "    -maxbits nnn : maximal number of bits of powers\n");
-    exit (1);
+    param_list_decl_usage(pl, "poly", "polynomial file");
+    param_list_decl_usage(pl, "alim", "factor base bound");
+    param_list_decl_usage(pl, "maxbits", "(optional) maximal number of "
+            "bits of powers");
 }
 
 int
@@ -396,8 +394,10 @@ main (int argc, char *argv[])
   FILE * f;
   int maxbits = 1;  // disable powers by default
   unsigned long alim = 0;
+  char *argv0 = argv[0];
 
   param_list_init(pl);
+  declare_usage(pl);
   cado_poly_init(cpoly);
 
   argv++, argc--;
@@ -413,18 +413,21 @@ main (int argc, char *argv[])
       }
 
       fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-      usage();
+      param_list_print_usage(pl, argv0, stderr);
+      exit (EXIT_FAILURE);
   }
 
   const char * filename;
   if ((filename = param_list_lookup_string(pl, "poly")) == NULL) {
       fprintf(stderr, "Error: parameter -poly is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
   param_list_parse_ulong(pl, "alim", &alim);
   if (alim == 0) {
       fprintf(stderr, "Error: parameter -alim is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
