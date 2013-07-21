@@ -1972,7 +1972,7 @@ my $polysel_cmd = sub {
            "-degree $param{'degree'} ".
            "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
-           "$param{'polsel_P'} ".
+           "-P $param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.polsel_out.$a-$b ".
            "2>&1";

@@ -1991,41 +1991,43 @@ one_thread (void* args)
   return NULL;
 }
 
-
 static void
-usage (const char *argv, const char * missing)
+declare_usage(param_list pl)
 {
-  fprintf (stderr, "Usage: %s [options] P\n", argv);
-  fprintf (stderr, "Required:\n");
-  fprintf (stderr, " -degree nnn  --- polynomial degree (maximum 6)\n");
-  fprintf (stderr, " -N nnn       --- input number\n");
-  fprintf (stderr, " P            --- degree-1 coefficient of g(x) has\n");
-  fprintf (stderr, "                  two prime factors in [P,2P]\n");
-  fprintf (stderr, "Optional:\n");
-  fprintf (stderr, " -admax nnn   --- stop at ad=nnn\n");
-  fprintf (stderr, " -admin nnn   --- start from ad=nnn (default 0)\n");
-  fprintf (stderr, " -incr nnn    --- forced factor of ad (default 60)\n");
-  fprintf (stderr, " -maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
-  fprintf (stderr, " -maxtime xxx --- stop the search after xxx seconds\n");
-  fprintf (stderr, " -nq nnn      --- maximum number of special-q's considered\n");
-  fprintf (stderr, "                  for each ad (default %d)\n", INT_MAX);
-  fprintf (stderr, " -out xxx     --- for msieve-format output\n");
-  fprintf (stderr, " -q           --- quiet mode\n");
-  fprintf (stderr, " -r           --- size-optimize polynomial only (skip root-optimization)\n");
-  fprintf (stderr, " -resume xxx  --- resume state from file xxx\n");
-  fprintf (stderr, " -s xxx       --- time intervals (seconds) for printing\n");
-  fprintf (stderr, "                  out statistics (default %d)\n", TARGET_TIME / 1000);
-  fprintf (stderr, " -save xxx    --- save state in file xxx\n");
-  fprintf (stderr, " -t nnn       --- use n threads (default 1)\n");
-  fprintf (stderr, " -v           --- verbose mode\n");
+  param_list_decl_usage(pl, "degree", "(required, alias d) polynomial degree (max=6)");
+  param_list_decl_usage(pl, "n", "(required, alias N) input number");
+  param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]");
+  param_list_decl_usage(pl, "admax", "max value for ad");
+  param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
+  param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
+  param_list_decl_usage(pl, "maxnorm", "only optimize polynomials with norm <= maxnorm");
+  param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
-  if (missing) {
-      fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
-              missing);
-  }
-  exit (1);
+  char str[200];
+  snprintf(str, 200, "maximum number of special-q's considered\n"
+          "               for each ad (default %d)", INT_MAX);
+  param_list_decl_usage(pl, "nq", str);
+  param_list_decl_usage(pl, "out", "filename for msieve-format output");
+  param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
+  param_list_decl_usage(pl, "resume", "resume state from given file");
+  snprintf(str, 200, "time intervals (seconds) for printing out statistics (default %d)\n", TARGET_TIME / 1000);
+  param_list_decl_usage(pl, "s", str);
+  param_list_decl_usage(pl, "save", "save state in given file");
+  param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
+  param_list_decl_usage(pl, "v", "(switch) verbose mode");
+  param_list_decl_usage(pl, "q", "(switch) quiet mode");
 }
 
+static void
+usage (const char *argv, const char * missing, param_list pl)
+{
+  if (missing) {
+    fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
+        missing);
+  }
+  param_list_print_usage(pl, argv, stderr);
+  exit (EXIT_FAILURE);
+}
 
 int
 main (int argc, char *argv[])
@@ -2037,6 +2039,7 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin, admax;
+  unsigned long givenP = 0;
   double admin_d, admax_d;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
@@ -2054,25 +2057,30 @@ main (int argc, char *argv[])
   param_list pl;
   param_list_init (pl);
 
+  declare_usage(pl);
+
   param_list_configure_switch (pl, "-v", &verbose);
   param_list_configure_switch (pl, "-r", &raw);
   param_list_configure_switch (pl, "-q", &quiet);
   param_list_configure_alias(pl, "degree", "-d");
   param_list_configure_alias(pl, "incr", "-i");
-  param_list_configure_alias(pl, "N", "-n");
+  param_list_configure_alias(pl, "n", "-N");
+
+  if (argc == 1)
+    usage (argv0[0], NULL, pl);
 
   argv++, argc--;
-  for ( ; argc-1; ) {
+  for ( ; argc; ) {
     if (param_list_update_cmdline (pl, &argc, &argv)) continue;
     fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
-    usage (argv0[0],NULL);
+    usage (argv0[0], NULL, pl);
   }
 
   /* parse and check N in the first place */
-  int have_n = param_list_parse_mpz(pl, "N", N);
+  int have_n = param_list_parse_mpz(pl, "n", N);
 
   if (!have_n) {
-    fprintf(stderr, "Reading n from stdin\n");
+    fprintf(stderr, "# Reading n from stdin\n");
     param_list_read_stream(pl, stdin);
     have_n = param_list_parse_mpz(pl, "n", N);
   }
@@ -2082,7 +2090,10 @@ main (int argc, char *argv[])
       exit(1);
   }
 
-  if (mpz_cmp_ui (N, 0) <= 0) usage(argv0[0], "N");
+  if (mpz_cmp_ui (N, 0) <= 0) usage(argv0[0], "n", pl);
+
+  param_list_parse_ulong(pl, "P", &givenP);
+  if (givenP == 0) usage(argv0[0], "P", pl);
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
@@ -2105,13 +2116,13 @@ main (int argc, char *argv[])
   out = param_list_lookup_string (pl, "out");
 
   if (param_list_warn_unused(pl))
-    usage (argv0[0],NULL);
+    usage (argv0[0], NULL, pl);
 
   /* print command line */
   param_list_print_command_line (stdout, pl);
 
   /* check degree */
-  if (d <= 0) usage(argv0[0], "degree");
+  if (d <= 0) usage(argv0[0], "degree", pl);
 
   /* check lq and nq */
   if (nq < 0) {
@@ -2162,7 +2173,7 @@ main (int argc, char *argv[])
 
   /* init primes */
   double Pd;
-  Pd = strtod (argv[argc-1], NULL);
+  Pd = (double) givenP;
   if (Pd > (double) UINT_MAX) {
     fprintf (stderr, "Error, too large value of P\n");
     exit (1);
