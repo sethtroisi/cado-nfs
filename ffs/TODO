@@ -1,3 +1,8 @@
+- Avoid duplicated files
+  Some time ago, the ffs project was outside cado-nfs, and therefore some
+  files were duplicated. Now that they are in the same repo, it makes
+  sense that we use directly the files from cado-nfs.
+
 - Implement the char 3 arith with Pairing 2008
   Paper by Aoki et al. 
   Use 6 ops for add instead of 7, but changes the representation.
