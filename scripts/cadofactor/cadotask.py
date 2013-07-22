@@ -1039,7 +1039,7 @@ class Duplicates1Task(Task, FilesCreator):
                 else:
                     filelistname = self.workdir.make_filename("filelist")
                     with open(str(filelistname), "w") as filelistfile:
-                        filelistfile.write("\n".join(newfiles))
+                        filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  **self.progparams[0])
                 (identifier, rc, stdout, stderr, output_files) = \
@@ -1166,7 +1166,7 @@ class Duplicates2Task(Task, FilesCreator):
             else:
                 filelistname = self.workdir.make_filename("filelist")
                 with open(str(filelistname), "w") as filelistfile:
-                    filelistfile.write("\n".join(files))
+                    filelistfile.write("\n".join(files) + "\n")
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
