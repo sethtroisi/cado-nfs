@@ -114,11 +114,6 @@ uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN + 1];
 #endif
 #endif
 
-
-int binary_bitmap_output;       /* XXX will be dropped */
-
-
-
 /*****************************************************************************/
 
 
@@ -502,29 +497,6 @@ static void singletons_and_cliques_removal(index_t * nrels, index_t * nprimes)
     }
 }
 
-/* singleton removal when binary out file is requested (through -outrel) */
-static int no_singleton(buf_rel_t * br)
-{
-    weight_t i;
-    index_t h;
-
-    for (i = 0; i < br->nb; i++) {
-	if (ideals_weight[br->primes[i].h] == 1) {
-	    relsup++;
-
-	    for (i = 0; i < br->nb; i++) {
-		h = br->primes[i].h;
-		if (ideals_weight[h] != UMAX(weight_t)
-		    && !(--(ideals_weight[h])))
-		    prisup++;
-	    }
-	    return 0;
-	}
-    }
-    return 1;
-}
-
-
 /*****************************************************************************/
 /* I/O functions */
 
@@ -572,7 +544,6 @@ void *thread_insert(buf_arg_t * arg)
 	if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num)) {
 	    arg->info.nprimes +=
 		insert_rel_in_table_no_e(my_rel, arg->min_index, 
-                                    binary_bitmap_output,
                                     rel_compact, ideals_weight);
 #ifdef STAT
 	    arg->info.W += (double) my_rel->nb_above_min_index;
@@ -608,13 +579,10 @@ static void *thread_print(buf_arg_t * arg)
 	    NANOSLEEP();
 
 	aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
-	if (binary_bitmap_output && aff) {
-	    if (!(no_singleton(my_rel)))
-		bit_vector_clearbit(arg->rel_used, (size_t) my_rel->num);
-	} else if (aff) {
+	if (aff) {
 	    arg->info.W += (double) my_rel->nb;
 	    fputs(my_rel->line, arg->fd[0]);
-	} else if (!binary_bitmap_output && arg->fd[1] != NULL)
+	} else if (arg->fd[1] != NULL)
 	    fputs(my_rel->line, arg->fd[1]);
 
 	test_and_print_progress_now();
@@ -684,8 +652,6 @@ static void usage(const char *argv0)
 	    "    -keep    nnn - prune if excess > nnn (default 160)\n");
     fprintf(stderr,
 	    "    -npthr   nnn - threads number for suppress singletons\n");
-    fprintf(stderr, "    -inprel  file_rel_used - load active relations\n");
-    fprintf(stderr, "    -outrel  file_rel_used - write active relations\n");
     fprintf(stderr,
 	    "    -npass   nnn - number of step of clique removal (default %d)\n",
 	    DEFAULT_NPASS);
@@ -748,13 +714,7 @@ int main(int argc, char **argv)
     const char *basepath = param_list_lookup_string(pl, "basepath");
     const char *subdirlist = param_list_lookup_string(pl, "subdirlist");
     const char *purgedname = param_list_lookup_string(pl, "out");
-    /* TODO: rename these parameters. The name should include "bitmap"
-     * somehow.  */
-    const char *rel_used_bitmap_file_in = param_list_lookup_string(pl, "inrel");
-    const char *rel_used_bitmap_file_out = param_list_lookup_string(pl, "outrel");
     const char *deletedname = param_list_lookup_string(pl, "outdel");
-
-    binary_bitmap_output = rel_used_bitmap_file_out != NULL;
 
     set_antebuffer_path(argv0, path_antebuffer);
 
@@ -841,56 +801,41 @@ int main(int argc, char **argv)
     fprintf(stderr, "Allocated rel_used of %zuMB (total %zuMB so far)\n",
 	    rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
 
-    if (rel_used_bitmap_file_in) {
-        fprintf(stderr, "Loading rel_used file %s, %zu bytes\n", rel_used_bitmap_file_in,
-                rel_used_nb_bytes);
-        bit_vector_read_from_file(rel_used, rel_used_bitmap_file_in);
-        nrels = bit_vector_popcount(rel_used);
-        fprintf(stderr, "Number of used relations is %" PRid "\n", nrels);
+    bit_vector_set(rel_used, 1);
+    nrels = nrelmax;
 
-    } else {
-	bit_vector_set(rel_used, 1);
-	nrels = nrelmax;
-    }
     /* For the last byte of rel_used, put the bits to 0 if it does not
      * correspond to a rel num */
     if (nrelmax & (BV_BITS - 1))
 	rel_used->p[nrelmax >> LN2_BV_BITS] &=
 	    (((bv_t) 1) << (nrelmax & (BV_BITS - 1))) - 1;
 
-    if (!rel_used_bitmap_file_out) {
-	bit_vector_init(Tbv, nrelmax);
-	ASSERT_ALWAYS(Tbv->p != NULL);
-	tot_alloc_bytes += rel_used_nb_bytes;
-	fprintf(stderr, "Allocated Tbv of %zuMB (total %zuMB so far)\n",
-		rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
+    bit_vector_init(Tbv, nrelmax);
+    ASSERT_ALWAYS(Tbv->p != NULL);
+    tot_alloc_bytes += rel_used_nb_bytes;
+    fprintf(stderr, "Allocated Tbv of %zuMB (total %zuMB so far)\n",
+            rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
 
-	cur_alloc = nprimemax * sizeof(index_t);
-	sum2_index = (index_t *) malloc(cur_alloc);
-	ASSERT_ALWAYS(sum2_index != NULL);
-	tot_alloc_bytes += cur_alloc;
-	fprintf(stderr,
-		"Allocated sum2_index of %zuMb (total %zuMb so far)\n",
-		cur_alloc >> 20, tot_alloc_bytes >> 20);
+    cur_alloc = nprimemax * sizeof(index_t);
+    sum2_index = (index_t *) malloc(cur_alloc);
+    ASSERT_ALWAYS(sum2_index != NULL);
+    tot_alloc_bytes += cur_alloc;
+    fprintf(stderr,
+            "Allocated sum2_index of %zuMb (total %zuMb so far)\n",
+            cur_alloc >> 20, tot_alloc_bytes >> 20);
 
-	cur_alloc = nrelmax * sizeof(index_t *);
-	rel_compact = (index_t **) malloc(cur_alloc);
-	ASSERT_ALWAYS(rel_compact != NULL);
-	tot_alloc_bytes += cur_alloc;
-	fprintf(stderr,
-		"Allocated rel_compact of %zuMb (total %zuMb so far)\n",
-		cur_alloc >> 20, tot_alloc_bytes >> 20);
-    }
+    cur_alloc = nrelmax * sizeof(index_t *);
+    rel_compact = (index_t **) malloc(cur_alloc);
+    ASSERT_ALWAYS(rel_compact != NULL);
+    tot_alloc_bytes += cur_alloc;
+    fprintf(stderr,
+            "Allocated rel_compact of %zuMb (total %zuMb so far)\n",
+            cur_alloc >> 20, tot_alloc_bytes >> 20);
 
     /****************** Begin interesting stuff *************************/
     info_mat_t info;
-    if (!rel_used_bitmap_file_out)
-	fprintf(stderr, "Pass 1, reading and storing ideals with index h >= "
-		"%" PRIu64 "\n", min_index);
-    else
-	fprintf(stderr,
-		"Pass 1, reading ideals with index h >= %" PRIu64 "\n",
-		min_index);
+    fprintf(stderr, "Pass 1, reading and storing ideals with index h >= "
+            "%" PRIu64 "\n", min_index);
 
     /* first pass over relations in files */
     info = process_rels(fic, &thread_insert, NULL, min_index, NULL, rel_used,
@@ -920,40 +865,27 @@ int main(int argc, char **argv)
 	exit(1);
     }
 
-    if (!rel_used_bitmap_file_out) {
-	singletons_and_cliques_removal(&nrels, &nprimes);
-	if (nrels < nprimes) {
-	    fprintf(stderr, "number of relations < number of ideals\n");
-	    exit(2);
-	}
-	if (nrels == 0 || nprimes == 0) {
-	    fprintf(stderr, "number of relations or number of ideals is 0\n");
-	    exit(2);
-	}
-
-
-	/* free rel_compact[i] and rel_compact. We do not need it anymore */
-	my_malloc_free_all();
-	tot_alloc_bytes -= get_my_malloc_bytes();
-	fprintf(stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
-		get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
-
-	free(rel_compact);
-	size_t tmp = (nrelmax * sizeof(index_t *));
-	tot_alloc_bytes -= tmp;
-	fprintf(stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
-		tmp >> 20, tot_alloc_bytes >> 20);
-    } else {
-	if (!rel_used_bitmap_file_in)
-	    fprintf(stderr,
-		    "   nrels=%" PRid " nprimes=%" PRid " excess=%" PRId64
-		    "\n", nrels, nprimes, ((int64_t) nrels) - nprimes);
-	else
-	    fprintf(stderr,
-		    "   nrels=%" PRid " (out of %" PRIu64 ") nprimes=%" PRid
-		    " " "excess=%" PRId64 "\n", nrels, nrelmax, nprimes,
-		    ((int64_t) nrels) - nprimes);
+    singletons_and_cliques_removal(&nrels, &nprimes);
+    if (nrels < nprimes) {
+      fprintf(stderr, "number of relations < number of ideals\n");
+      exit(2);
     }
+    if (nrels == 0 || nprimes == 0) {
+      fprintf(stderr, "number of relations or number of ideals is 0\n");
+      exit(2);
+    }
+
+    /* free rel_compact[i] and rel_compact. We do not need it anymore */
+    my_malloc_free_all();
+    tot_alloc_bytes -= get_my_malloc_bytes();
+    fprintf(stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
+            get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
+
+    free(rel_compact);
+    size_t tmp = (nrelmax * sizeof(index_t *));
+    tot_alloc_bytes -= tmp;
+    fprintf(stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
+            tmp >> 20, tot_alloc_bytes >> 20);
 
     relsup = 0;
     prisup = 0;
@@ -989,40 +921,12 @@ int main(int argc, char **argv)
 			STEP_PURGE_PASS2);
 
 
-    if (!rel_used_bitmap_file_out) {
-	/* write final values to stdout */
-	fprintf(stdout, "Final values:\nnrels=%" PRid " nprimes=%" PRid " "
-		"excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
-		nrels, nprimes, ((int64_t) nrels) - nprimes, info.W,
-		info.W * (double) nrels);
-	fflush(stdout);
-    } else {
-	FILE *out;
-	void *p, *pf;
-
-	/* For the last byte of rel_used, put the bits to 0 if it does not
-	 * correspond to a rel num */
-	if (nrelmax & (BV_BITS - 1))
-	    rel_used->p[nrelmax >> LN2_BV_BITS] &=
-		(((bv_t) 1) << (nrelmax & (BV_BITS - 1))) - 1;
-
-	fprintf(stderr, "Deleted %" PRid " relations with singleton(s)\n"
-		"Number of primes deleted: %" PRid "\n"
-		"Writing rel_used file %s, %zu bytes\n",
-		relsup, prisup, rel_used_bitmap_file_out, rel_used_nb_bytes);
-
-	if (!(out = fopen_maybe_compressed(rel_used_bitmap_file_out, "w"))) {
-	    fprintf(stderr, "Error, cannot open file %s for writing.\n",
-		    rel_used_bitmap_file_out);
-	    exit(1);
-	}
-	p = (void *) rel_used->p;
-	for (pf = p + rel_used_nb_bytes; p != pf;
-	     p += fwrite(p, 1, pf - p, out));
-
-	fclose_maybe_compressed(out, rel_used_bitmap_file_out);
-    }
-
+    /* write final values to stdout */
+    fprintf(stdout, "Final values:\nnrels=%" PRid " nprimes=%" PRid " "
+            "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
+            nrels, nprimes, ((int64_t) nrels) - nprimes, info.W,
+            info.W * (double) nrels);
+    fflush(stdout);
 
     /* Free allocated stuff */
     if (ideals_weight != NULL)
@@ -1033,8 +937,7 @@ int main(int argc, char **argv)
     sum2_index = NULL;
 
     bit_vector_clear(rel_used);
-    if (!rel_used_bitmap_file_out)
-	bit_vector_clear(Tbv);
+    bit_vector_clear(Tbv);
 
     if (filelist)
 	filelist_clear(fic);
