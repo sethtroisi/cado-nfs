@@ -66,7 +66,7 @@ facul_make_strategy (const int n, const unsigned long fbb,
   pm1_make_plan (methods[0].plan, 315, 2205, 0);
 
   /* run one P+1 curve with B1=525 and B2=3255 */
-  methods[1].method = PP1_METHOD;
+  methods[1].method = PP1_27_METHOD;
   methods[1].plan = malloc (sizeof (pp1_plan_t));
   pp1_make_plan (methods[1].plan, 525, 3255, 0);
 
@@ -117,7 +117,9 @@ facul_clear_strategy (facul_strategy_t *strategy)
     {
       if (methods[i].method == PM1_METHOD)
         pm1_clear_plan (methods[i].plan);
-      else if (methods[i].method == PP1_METHOD)
+      else if (methods[i].method == PP1_27_METHOD)
+	pp1_clear_plan (methods[i].plan);
+      else if (methods[i].method == PP1_65_METHOD)
 	pp1_clear_plan (methods[i].plan);
       else if (methods[i].method == EC_METHOD)
 	ecm_clear_plan (methods[i].plan);
