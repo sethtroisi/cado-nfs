@@ -21,6 +21,11 @@ void bit_vector_init_set(bit_vector_ptr b, size_t n, int s)
 void bit_vector_set(bit_vector_ptr b, int s)
 {
     memset(b->p, -s, iceildiv(b->n, BV_BITS) * sizeof(bv_t));
+    /* For the last byte, put the bits to 0 if the bitmap count does not
+     * correspond to an integer number of words */
+    if (b->n & (BV_BITS - 1))
+        b->p[b->n >> LN2_BV_BITS] &=
+        (((bv_t) 1) << (b->n & (BV_BITS - 1))) - 1;
 }
 
 void bit_vector_clear(bit_vector_ptr b)

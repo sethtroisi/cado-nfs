@@ -804,12 +804,6 @@ int main(int argc, char **argv)
     bit_vector_set(rel_used, 1);
     nrels = nrelmax;
 
-    /* For the last byte of rel_used, put the bits to 0 if it does not
-     * correspond to a rel num */
-    if (nrelmax & (BV_BITS - 1))
-	rel_used->p[nrelmax >> LN2_BV_BITS] &=
-	    (((bv_t) 1) << (nrelmax & (BV_BITS - 1))) - 1;
-
     bit_vector_init(Tbv, nrelmax);
     ASSERT_ALWAYS(Tbv->p != NULL);
     tot_alloc_bytes += rel_used_nb_bytes;
