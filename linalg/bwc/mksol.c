@@ -57,16 +57,37 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
-    if (mpz_cmp_ui(p,2) != 0 && bw->n > 1) {
+    int nsolvecs = bw->nsolvecs;
+    /* In order to use only a subset of the number of solutions which can
+     * be extracted with bw, follow this procedure.
+     *
+     * Split F0-nn into F0-1,  F1-2,  etc. The split program can do this.
+     * This amounts to taking one column at a time, for whichever meaning
+     * of column one could choose. In the binary case, we have in mind
+     * splitting F0-512 into F0-64, F64-128, etc. This splitting still
+     * has the complete set of solutions, but spanned across files. The
+     * different files F we have just created are suitable for running on
+     * distinct clusters: F0-64 will go to cluster number 0 which is
+     * iterating with vector V0-64, etc.
+     *
+     * Now in order to work with nsolvecs < bw->n, an extraction must be
+     * done within the F0-64 (or F0-1) files. This consists in picking
+     * one set of rows, maybe one row only, for every bw->n rows.
+     * This could be done, at least in theory, by the split program, as
+     * it's really the same operation. However, it's not the case as it
+     * is now.
+     */
+
+    if (mpz_cmp_ui(p,2) != 0 && nsolvecs > 1) {
         fprintf(stderr,
-                "Current mksol code is limited to n==1 in the prime field case. Fixing it is not terribly hard, but not terribly easy either. It requires either implementing a n-at-a-time variant of the mpfq operations, or perhaps more realistically offer a way for mksol to focus only on one possible kernel element, which opens the possibility of reusing existing code. Neither has been coded yet.\n");
+                "Current mksol code is limited to nsolvecs==1 in the prime field case. Fixing it is not terribly hard, but not terribly easy either. It requires either implementing a n-at-a-time variant of the mpfq operations.\n");
         abort();
     }
 
     abase_vbase Ar;
     abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME_MPZ, p,
-            MPFQ_GROUPSIZE, bw->n,
+            MPFQ_GROUPSIZE, nsolvecs,
             MPFQ_DONE);
     mpz_clear(p);
 
@@ -138,22 +159,28 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * proper order (=reversed order, leading coeff first) by lingen,
      * iterate i is to be multiplied by the i-th coefficient of F.
      *
-     * The F-coefficients, from the overall description of the
-     * algorithm, are square matrices having bw->n rows and columns.
-     * Columns correspond to candidate solutions. Rows correspond to the
-     * fact that contributions from all vector iterates have to be added
-     * in order to form a candidate solution. However, for
-     * the purpose of splitting the work across sites, it's stored on
-     * disk in the transposed order, so that the already existing split
-     * program is able to do the split. This means that the data we read
-     * here consists of matrices having unconditionally bw->n rows, and
-     * ys[1]-ys[0] columns. Because our multiply-by-smallish-matrix code
-     * does not like this ordering, we have to transpose again in order
-     * to obtain a matrix with ys[1]-ys[0] rows, and bw->n columns. This
-     * matrix is called rhs in the text below.
+     * The F-coefficients, from the overall description of the algorithm,
+     * are square matrices having bw->n rows and columns.  Columns
+     * correspond to candidate solutions. In some cases we are interested
+     * in only a few solutions, maybe even one for the prime field case.
+     * Having bw->n rows correspond to the fact that contributions from
+     * all sequences have to be added in order to form a candidate
+     * solution.
+     *
+     * However, for the purpose of splitting the work across sites, F is
+     * stored on disk in the transposed order, so that the already
+     * existing split program is able to do the split. This means that
+     * the data we read here (which is presumed to come out of the split
+     * program) consists of matrices having unconditionally
+     * bw->n rows, and ys[1]-ys[0] columns.
+     *
+     * Because our multiply-by-smallish-matrix code does not like this
+     * ordering, we have to transpose again in order to obtain a matrix
+     * with ys[1]-ys[0] rows, and bw->n columns. This matrix is called
+     * rhs in the text below.
      */
 
-    ASSERT(A->vec_elt_stride(A,bw->n) == Ar->vec_elt_stride(Ar, A->groupsize(A)));
+    ASSERT(A->vec_elt_stride(A,nsolvecs) == Ar->vec_elt_stride(Ar, A->groupsize(A)));
 
     /* We'll load all the F coefficient matrices before the main loop.
      * It's dual to the treatment of the xy matrices in krylov. Same
@@ -224,14 +251,14 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
             FILE * f = fopen(tmp, "rb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
-            rc = fseek(f, A->vec_elt_stride(A, s * bw->n), SEEK_SET);
+            rc = fseek(f, A->vec_elt_stride(A, s * nsolvecs), SEEK_SET);
             if (rc < 0) {
                 bw->end = s;
             }
 
             for(int i = 0 ; i < bw->interval ; i++) {
-                rc = fread(ahead->v, A->vec_elt_stride(A,1), bw->n, f);
-                ASSERT_ALWAYS(rc == 0 || rc == bw->n);
+                rc = fread(ahead->v, A->vec_elt_stride(A,1), nsolvecs, f);
+                ASSERT_ALWAYS(rc == 0 || rc == nsolvecs);
                 if (rc == 0) {
                     printf("Exhausted F data after %d coefficients\n", s+i);
                     bw->end = s+i;

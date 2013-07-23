@@ -451,48 +451,6 @@ void mpfq_2_64_poly_setmonic(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_p
     mpfq_2_64_clear(K, &lc);
 }
 
-static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, int);
-static /* *Mpfq::defaults::poly::code_for_poly_divmod */
-void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, int n)
-{
-    // Compute the inverse of p(x) modulo x^n
-    // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
-    // Requires p(0) = 1
-    // Assume p != q (no alias)
-    assert (mpfq_2_64_cmp_ui(K, p->c[0], 1) == 0);
-    assert (p != q);
-    int m;
-    if (n <= 2) {
-        mpfq_2_64_poly_setcoef_ui(K, q, 1, 0);
-        q->size = 1;
-        m = 1;
-        if (n == 1)
-            return;
-    } else {
-        // n >= 3: recursive call at prec m = ceil(n/2)
-        m = 1 + ((n-1)/2);
-        mpfq_2_64_poly_preinv(K, q, p, m);
-    }
-    // enlarge q if necessary
-    if (q->alloc < n) {
-        mpfq_2_64_vec_reinit(K, &(q->c), q->alloc, n);
-        q->alloc = n;
-    }
-    // refine value
-    mpfq_2_64_vec tmp;
-    mpfq_2_64_vec_init(K, &tmp, m+n-1);
-    
-    mpfq_2_64_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
-    int nn = MIN(n, MIN(n, p->size) + m -1);
-    mpfq_2_64_vec_neg(K, tmp, tmp, nn);
-    mpfq_2_64_add_ui(K, tmp[0], tmp[0], 1);
-    mpfq_2_64_vec_conv(K, tmp, q->c, m, tmp, nn);
-    mpfq_2_64_vec_set(K, q->c + m, tmp + m, n-m);
-    q->size = n;
-    
-    mpfq_2_64_vec_clear(K, &tmp, m+n-1);
-}
-
 /* *Mpfq::defaults::poly::code_for_poly_divmod */
 void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_dst_poly r, mpfq_2_64_src_poly a, mpfq_2_64_src_poly b)
 {
@@ -524,6 +482,7 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     mpfq_2_64_elt ilb;
     mpfq_2_64_init(K, &ilb);
     if (mpfq_2_64_cmp_ui(K, (b->c)[degb], 1) == 0) {
+        mpfq_2_64_set_ui(K, ilb, 1);
         bmonic = 1;
     } else {
         mpfq_2_64_inv(K, ilb, (b->c)[degb]);
@@ -565,6 +524,48 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     mpfq_2_64_clear(K, &aux2);
     mpfq_2_64_poly_clear(K, rr);
     mpfq_2_64_poly_clear(K, qq);
+}
+
+static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, unsigned int);
+static /* *Mpfq::defaults::poly::code_for_poly_precomp_mod */
+void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, unsigned int n)
+{
+    // Compute the inverse of p(x) modulo x^n
+    // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
+    // Requires p(0) = 1
+    // Assume p != q (no alias)
+    assert (mpfq_2_64_cmp_ui(K, p->c[0], 1) == 0);
+    assert (p != q);
+    int m;
+    if (n <= 2) {
+        mpfq_2_64_poly_setcoef_ui(K, q, 1, 0);
+        q->size = 1;
+        m = 1;
+        if (n == 1)
+            return;
+    } else {
+        // n >= 3: recursive call at prec m = ceil(n/2)
+        m = 1 + ((n-1)/2);
+        mpfq_2_64_poly_preinv(K, q, p, m);
+    }
+    // enlarge q if necessary
+    if (q->alloc < n) {
+        mpfq_2_64_vec_reinit(K, &(q->c), q->alloc, n);
+        q->alloc = n;
+    }
+    // refine value
+    mpfq_2_64_vec tmp;
+    mpfq_2_64_vec_init(K, &tmp, m+n-1);
+    
+    mpfq_2_64_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
+    int nn = MIN(n, MIN(n, p->size) + m -1);
+    mpfq_2_64_vec_neg(K, tmp, tmp, nn);
+    mpfq_2_64_add_ui(K, tmp[0], tmp[0], 1);
+    mpfq_2_64_vec_conv(K, tmp, q->c, m, tmp, nn);
+    mpfq_2_64_vec_set(K, q->c + m, tmp + m, n-m);
+    q->size = n;
+    
+    mpfq_2_64_vec_clear(K, &tmp, m+n-1);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_precomp_mod */

@@ -93,7 +93,7 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
     if (!mpz_divisible_p(jj, si->doing->p)) ok = 0;
     mpz_divexact(ii, ii, si->doing->p);
     mpz_divexact(jj, jj, si->doing->p);
-    if (mpz_sgn(jj) < 0) {
+    if (mpz_sgn(jj) < 0 || (mpz_sgn(jj) == 0 && mpz_sgn(ii) < 0)) {
         mpz_neg(ii, ii);
         mpz_neg(jj, jj);
     }

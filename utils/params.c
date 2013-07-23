@@ -15,6 +15,10 @@
 void param_list_init(param_list pl)
 {
     memset(pl, 0, sizeof(param_list));
+    pl->ndocs_alloc = 16;
+    pl->ndocs = 0;
+    pl->docs = (param_list_doc *) malloc(pl->ndocs_alloc *
+            sizeof(param_list_doc));
     pl->alloc = 16;
     pl->p = (parameter *) malloc(pl->alloc * sizeof(parameter));
     pl->consolidated = 1;
@@ -25,10 +29,16 @@ void param_list_init(param_list pl)
     pl->switches = NULL;
     pl->nswitches = 0;
     pl->nswitches_alloc = 0;
+    ASSERT_ALWAYS(pl->docs != NULL && pl->p != NULL);
 }
 
 void param_list_clear(param_list pl)
 {
+    for(int i = 0 ; i < pl->ndocs ; i++) {
+        free(pl->docs[i]->key);
+        free(pl->docs[i]->doc);
+    }
+    free(pl->docs);
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (pl->p[i]->key) free(pl->p[i]->key);
         free(pl->p[i]->value);
@@ -43,6 +53,47 @@ void param_list_clear(param_list pl)
     }
     free(pl->switches);
     memset(pl, 0, sizeof(pl[0]));
+}
+
+void param_list_decl_usage(param_list pl, const char * key, const char * doc)
+{
+    if (pl->ndocs == pl->ndocs_alloc) {
+        pl->ndocs_alloc += 16;
+        pl->docs = (param_list_doc *) realloc(pl->docs,
+                pl->ndocs_alloc * sizeof(param_list_doc));
+        ASSERT_ALWAYS(pl->docs != NULL);
+    }
+    int i = pl->ndocs;
+    pl->ndocs++;
+    pl->docs[i]->key = strdup(key);
+    pl->docs[i]->doc = strdup(doc);
+    ASSERT_ALWAYS(pl->docs[i]->key != NULL && pl->docs[i]->doc != NULL);
+    pl->use_doc = 1;
+}
+
+static int is_documented_key(param_list pl, const char *key) {
+    for (int i = 0; i < pl->ndocs; ++i) {
+        if (strcmp(key, pl->docs[i]->key) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
+{
+    if (argv0 != NULL)
+        fprintf(f, "Usage: %s <parameters>\n", argv0);
+    fprintf(f, "The available parameters are the following:\n");
+    char whites[20];
+    for (int i = 0; i < 20; ++i)
+        whites[i] = ' ';
+    for (int i = 0; i < pl->ndocs; ++i) {
+        int l = strlen(pl->docs[i]->key);
+        l = MAX(1, 10-l);
+        whites[l] ='\0';
+        fprintf(f, "    -%s%s%s\n", pl->docs[i]->key, whites, pl->docs[i]->doc);
+        whites[l] =' ';
+    }
 }
 
 static void make_room(param_list pl, unsigned int more)
@@ -136,15 +187,14 @@ void param_list_consolidate(param_list pl)
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (pl->p[i]->key != NULL && i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
             /* The latest pair in the list is the one having highest
-             * priority. Do we don't do the copy at this moment.
+             * priority. So we don't do the copy at this moment.
              */
             free(pl->p[i]->key);
             free(pl->p[i]->value);
             // this value is useful for switches
             pl->p[i+1]->seen += pl->p[i]->seen;
         } else {
-            // I can't see why there could conceivably be a problem if i == j,
-            // but valgrind complains...
+            // in theory memcpy does not allow overlaps, even trivial ones.
             if (i != j) {
                 memcpy(pl->p[j], pl->p[i], sizeof(parameter));
             }
@@ -273,6 +323,10 @@ int param_list_read_file(param_list pl, const char * name)
 
 int param_list_configure_alias(param_list pl, const char * key, const char * alias)
 {
+    if (pl->use_doc)
+        if (!is_documented_key(pl, key+1)) // skip the '-' in key
+            fprintf(stderr, "# Warning: an alias %s is declared to the key %s that is undocumented\n", alias, key);
+
     size_t len = strlen(alias);
 
     ASSERT_ALWAYS(alias != NULL);
@@ -306,6 +360,10 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
 int param_list_configure_switch(param_list pl, const char * switchname, int * ptr)
 {
     ASSERT_ALWAYS(switchname != NULL);
+    if (pl->use_doc)
+        if (!is_documented_key(pl, 1+switchname))
+            fprintf(stderr, "# Warning: a switch %s is declared but is undocumented\n", switchname);
+
     if ((pl->nswitches + 1) >= pl->nswitches_alloc) {
         pl->nswitches_alloc += 2;
         pl->nswitches_alloc <<= 1;
@@ -866,5 +924,6 @@ void param_list_print_command_line(FILE * stream, param_list pl)
 {
     /* remember that the API for calling param_list functions mandates
      * that the binary name $0 is stripped from the provided lists */
-    print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
+    if (pl->cmdline_argv0 != NULL)
+        print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
 }

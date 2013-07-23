@@ -204,3 +204,15 @@ mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int64_t H[4])
     mpz_clear (g[k]);
   free (g);
 }
+
+/* put in c the content of f */
+void
+mp_poly_content (mpz_t c, mpz_t *f, const int d)
+{
+  int i;
+
+  mpz_set (c, f[0]);
+  for (i = 1; i <= d; i++)
+    mpz_gcd (c, c, f[i]);
+  mpz_abs (c, c);
+}

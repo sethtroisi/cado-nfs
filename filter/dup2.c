@@ -188,7 +188,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
         const char * name = *files;
         index_t nodu0 = nodu, dupl0 = dupl;
 
-        f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
+        f_in = fopen_maybe_compressed2 (name, "rb", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
 
         suffix_out = outfmt ? outfmt : suffix_in;
@@ -216,7 +216,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             fprintf (stderr, "Input file name: %s, temporary output file name:"
                      " %s, final output file name: %s\n",
                      name, oname_tmp, oname);
-        f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
+        f_out = fopen_maybe_compressed2 (oname_tmp, "wb", &p_out, NULL);
         if (f_out == NULL)
         {
           fprintf (stderr, "Could not open file %s for writing: %s\n",
@@ -376,7 +376,7 @@ thread_only_hash (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -385,7 +385,7 @@ thread_only_hash (buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     i = insert_relation_in_dup_hashtable (H, K, my_rel, &cost, &is_dup);
 #if DEBUG >= 1
@@ -416,7 +416,7 @@ thread_print(buf_arg_t *arg)
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
       if (!is_finish())
-        NANOSLEEP;
+        NANOSLEEP();
       else if (cpt_rel_a == cpy_cpt_rel_b)
           pthread_exit(NULL);
 
@@ -424,7 +424,7 @@ thread_print(buf_arg_t *arg)
     my_rel = &(arg->rels[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP;
+      NANOSLEEP();
 
     if (my_rel->nb != 0)
       print_relation (arg->fd[0], my_rel); //FIXME where do we print
@@ -433,6 +433,7 @@ thread_print(buf_arg_t *arg)
     cpy_cpt_rel_b++;
     cpt_rel_b = cpy_cpt_rel_b;
   }
+  return NULL;
 }
 
 
@@ -449,7 +450,7 @@ thread_root(fr_t *mfr)
     switch(mfr->ok) 
     {
       case 0:
-        NANOSLEEP;
+        NANOSLEEP();
         break;
       case 1 :
         for (j = mfr->num; j <= mfr->end; j++)
@@ -677,7 +678,7 @@ main (int argc, char *argv[])
   {
     unsigned int count = 0;
     char s[1024];
-    FILE *f_tmp = fopen_maybe_compressed (*p, "r");
+    FILE *f_tmp = fopen_maybe_compressed (*p, "rb");
     ASSERT_ALWAYS(f_tmp != NULL);
 
     /* Look for first non-comment line */
@@ -720,7 +721,7 @@ main (int argc, char *argv[])
                    nb_f_new, nb_f_renumbered);
 
 
-  //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
+  //call preempt_scan_rel 2 times with two diff filelist and two diff callback fct
 
   fprintf (stderr, "Reading files already renumbered:\n");
   process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,
@@ -729,7 +730,7 @@ main (int argc, char *argv[])
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;
   //buf_arg.needed = NEEDED_ABP;
-  //prempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
+  //preempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
   /* pass 1: we read new files, remove duplicates, and renumber them */
 #ifndef FOR_FFS
   rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 10,

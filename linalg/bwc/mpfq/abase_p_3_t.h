@@ -25,6 +25,7 @@
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -32,6 +33,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -86,6 +88,8 @@
 /* Input/output functions */
 
 /* Vector functions */
+
+/* Polynomial functions */
 
 /* Functions related to SIMD operation */
 

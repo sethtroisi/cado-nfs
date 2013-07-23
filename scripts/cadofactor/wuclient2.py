@@ -88,7 +88,8 @@ def create_daemon(workdir = None, umask = None):
     http://code.activestate.com/recipes/278731-creating-a-daemon-the-python-way/
 
     Changes: workdir is now a parameter, daemon changes CWD only if workdir 
-    parameter is specified.
+    parameter is specified. umask is also a parameter, and the process' umask
+    is set only if a value is specified.
     """
 
     __author__ = "Chad J. Schroeder"
@@ -302,7 +303,7 @@ class WuMIMEMultipart(MIMEMultipart):
         self.attach(result)
     
     def attach_file(self, name, filename, filepath):
-        ''' Attach the file as file
+        ''' Attach the file as a file
 
         Parameters as in attach_data(), but filepath is the path to the file 
         whose data should be sent
@@ -528,7 +529,7 @@ class WorkunitClient(object):
         if dlpath == None:
             filename = urlpath.split("/")[-1]
             dlpath = os.path.join(self.settings["DLDIR"], filename)
-        url = self.settings["SERVER"].rstrip("/") + "/" + urlpath
+        url = self.settings["SERVER"].rstrip("/") + "/" + urlpath.lstrip("/")
         if options:
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)

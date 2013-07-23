@@ -2354,11 +2354,13 @@ sub purge {
     $tab_level--;
     info "Removing singletons...";
     $tab_level++;
+    my $npthr =  $param{'bwmt'};
+    if ($npthr =~ /^(\d+)x(\d+)$/) { $npthr = $1 * $2; }
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
                   "-nprimes $nprimes -minindex $min_index ".
-                  "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
+                  "-npthr $npthr -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,

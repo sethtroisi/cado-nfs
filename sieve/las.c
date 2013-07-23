@@ -95,8 +95,6 @@ double cof_calls[2][256] = {{0},{0}};
 double cof_fails[2][256] = {{0},{0}};
 /* }}} */
 
-/* {{{ Forward decl of some functions  */
-static void usage (const char *argv0, const char * missing);
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
@@ -507,13 +505,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* overrides default only if parameter is given */
     param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
 
-    si->td_thresh = si->I;	/* default value */
+    si->td_thresh = 1024;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
-    if (si->td_thresh < si->I)
-      {
-        fprintf (stderr, "Using tdthresh < I not allowed due to bug #15897\n");
-        exit (1);
-      }
 
     /* Initialize the number of buckets */
 
@@ -534,7 +527,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
-    si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
+    si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
@@ -692,7 +685,7 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
   sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets */
-  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
+  si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
@@ -882,6 +875,10 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     const char *tmp;
     if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
 	param_list_read_file(pl, tmp);
+    } else {
+        fprintf(stderr, "Error: -poly is missing\n");
+        param_list_print_usage(pl, NULL, stderr);
+        exit(EXIT_FAILURE);
     }
 
     if (!cado_poly_set_plist(las->cpoly, pl)) {
@@ -1285,11 +1282,10 @@ typedef struct {
 //    overflow constants as UINT32_MAX.
 //
 
-#ifdef SUPPORT_I16
+// OBSOLETE: the large value is now UINT64MAX>>2. So, plattice_x_t must
+// be 64 bits. We could deal until logI <= 31 when logJ = logI -1.
+
 typedef uint64_t plattice_x_t;
-#else
-typedef uint32_t plattice_x_t;
-#endif
 
 // Return value:
 // * non-zero if everything worked ok
@@ -1385,30 +1381,16 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, siev
 #endif
 static inline plattice_x_t plattice_a(const plattice_info_t * pli, sieve_info_srcptr si)
 {
-    int32_t a0 = PLI_COEFF(pli, a0);
-    uint32_t a1 = PLI_COEFF(pli, a1);
-    if (a1 > (uint32_t) si->J || (a1 == (uint32_t) si->J && a0 > 0))
-#ifdef SUPPORT_I16
-        return UINT32_MAX;
-#else
-        return INT32_MAX/2;
-#endif
-    else
-        return (a1 << si->conf->logI) + a0;
+    int64_t a0 = PLI_COEFF(pli, a0);
+    uint64_t a1 = PLI_COEFF(pli, a1);
+    return (a1 << si->conf->logI) + a0;
 }
 
 static inline plattice_x_t plattice_c(const plattice_info_t * pli, sieve_info_srcptr si)
 {
-    int32_t b0 = PLI_COEFF(pli, b0);
-    uint32_t b1 = PLI_COEFF(pli, b1);
-    if (b1 > (uint32_t) si->J || (b1 == (uint32_t) si->J && b0 > 0))
-#ifdef SUPPORT_I16
-        return UINT32_MAX;
-#else
-        return INT32_MAX/2;
-#endif
-    else
-        return (b1 << si->conf->logI) + b0;
+    int64_t b0 = PLI_COEFF(pli, b0);
+    uint64_t b1 = PLI_COEFF(pli, b1);
+    return (b1 << si->conf->logI) + b0;
 }
 
 static inline uint32_t plattice_bound0(const plattice_info_t * pli, sieve_info_srcptr si MAYBE_UNUSED)
@@ -1424,7 +1406,7 @@ static inline uint32_t plattice_bound1(const plattice_info_t * pli, sieve_info_s
 
 /* This is for working with congruence classes only */
 NOPROFILE_INLINE
-plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, int par MAYBE_UNUSED)
+plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, unsigned int par )
 {
     /* With MOD2_CLASSES_BS set up, we have computed by the function
      * above an adapted basis for the band of total width I/2 (thus from
@@ -1499,15 +1481,6 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
     * Clearly, above, for the congruence class (0,1), we must start with
     * this vector, not with the sum.
     */
-#if !MOD2_CLASSES_BS
-    /* In case we don't consider congruence classes at all, then there is
-     * nothing very particular to be done */
-    plattice_x_t x = (1 << (si->conf->logI-1));
-    uint32_t i = x;
-    if (i >= plattice_bound1(pli, si)) x += plattice_a(pli, si);
-    if (i <  plattice_bound0(pli, si)) x += plattice_c(pli, si);
-    return x;
-#else
     int32_t a0 = pli->a0;
     int32_t a1 = pli->a1;
     int32_t b0 = pli->b0;
@@ -1522,15 +1495,7 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
         v[0] = a0-b0;
         v[1] = a1-b1;
     }
-
-    if (v[1] > (int32_t) si->J)
-#ifdef SUPPORT_I16
-        return UINT32_MAX;
-#else
-        return INT32_MAX/2;
-#endif
     return (v[1] << si->conf->logI) | (v[0] + (1 << (si->conf->logI-1)));
-#endif
 }
 
 /* }}} */
@@ -1567,183 +1532,208 @@ typedef const struct thread_data_s * thread_data_srcptr;
 /* }}} */
 
 /* {{{ fill_in_buckets */
+
+#ifdef SKIP_GCD3
+#define FILL_BUCKET_SKIP_GCD3()					\
+  && (!is_divisible_3_u32 (i + I) ||			\
+      !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
+#else
+#define FILL_BUCKET_SKIP_GCD3()
+#endif
+
+#ifdef TRACE_K								
+#define FILL_BUCKET_TRACE_K()							\
+  do {									\
+  if (trace_on_spot_x(x)) {						\
+    WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);				\
+    WHERE_AM_I_UPDATE(w, x, x & maskbucket);				\
+    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",		\
+	     (unsigned int) (x & maskbucket), logp, p, sidenames[side],	\
+	     (unsigned int) (x >> shiftbucket));			\
+    ASSERT(test_divisible(w));						\
+  } while(0)
+#else
+#define FILL_BUCKET_TRACE_K()
+#endif
+
+#if LOG_BUCKET_REGION == 16			
+#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) x; } while (0)
+#else									
+#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) (x & maskbucket); } while (0)
+#endif						
+
+#ifdef HAVE_SSE2							
+#define FILL_BUCKET_PREFETCH_PU() do { _mm_prefetch((char *)pu, _MM_HINT_T0); } while (0)
+#else
+#define FILL_BUCKET_PREFETCH_PU()
+#endif
+
+#define FILL_BUCKET_INC_X() do {						\
+    if (i >= bound1) x += inc_a;					\
+    if (i < bound0)  x += inc_c;					\
+  } while (0)
+
+#define FILL_BUCKET() do {							\
+    unsigned int i = x & maskI;						\
+    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
+	       FILL_BUCKET_SKIP_GCD3()						\
+	       )) {							\
+      bucket_update_t **ppu, *pu;					\
+      ppu = &(BA.bucket_write[x >> shiftbucket]);			\
+      pu = *ppu;							\
+      FILL_BUCKET_TRACE_K();							\
+      FILL_BUCKET_CX();								\
+      ((uint16_t *)pu)[1] = bep;					\
+      *ppu = ++pu;							\
+      FILL_BUCKET_PREFETCH_PU();						\
+    }									\
+    FILL_BUCKET_INC_X();							\
+  } while (0)
+
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
-    WHERE_AM_I_UPDATE(w, side, side);
-    sieve_info_srcptr si = th->si;
-    bucket_array_t BA = th->sides[side]->BA;  /* local copy */
-    // Loop over all primes in the factor base.
-    //
-    // Note that dispatch_fb already arranged so that all the primes
-    // which appear here are >= bucket_thresh and <= pmax (the latter
-    // being for the moment unconditionally set to FBPRIME_MAX by the
-    // caller of dispatch_fb).
-
-    fb_iterator t;
-    fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
-    for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
-        fbprime_t p = t->fb->p;
-        unsigned char logp = t->fb->plog;
-        ASSERT_ALWAYS (p & 1);
-        WHERE_AM_I_UPDATE(w, p, p);
-
-        /* Write new set of pointers if the logp value changed */
-        bucket_new_logp (&BA, logp);
-
-        /* If we sieve for special-q's smaller than the factor
-           base bound, the prime p might equal the special-q prime q. */
-        if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
-            continue;
-
-        fbprime_t r, R;
-
-        R = fb_iterator_get_r(t);
-        r = fb_root_in_qlattice(p, R, t->fb->invp, si);
-
+  WHERE_AM_I_UPDATE(w, side, side);
+  sieve_info_srcptr si = th->si;
+  bucket_array_t BA = th->sides[side]->BA;  /* local copy */
+  // Loop over all primes in the factor base.
+  //
+  // Note that dispatch_fb already arranged so that all the primes
+  // which appear here are >= bucket_thresh and <= pmax (the latter
+  // being for the moment unconditionally set to FBPRIME_MAX by the
+  // caller of dispatch_fb).
+  
+  fb_iterator t;
+  fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+    fbprime_t p = t->fb->p;
+    unsigned char logp = t->fb->plog;
+    ASSERT_ALWAYS (p & 1);
+    WHERE_AM_I_UPDATE(w, p, p);
+    
+    /* Write new set of pointers if the logp value changed */
+    bucket_new_logp (&BA, logp);
+    
+    /* If we sieve for special-q's smaller than the factor
+       base bound, the prime p might equal the special-q prime q. */
+    if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
+      continue;
+    
+    fbprime_t r, R;
+    
+    R = fb_iterator_get_r(t);
+    r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+    
 #define maskbucket (BUCKET_REGION - 1)
 #define shiftbucket LOG_BUCKET_REGION
-        const uint32_t I = si->I;
-        const unsigned int logI = si->conf->logI;
-	const uint32_t maskI = I-1;
-	const uint64_t even_mask = (1U << logI) | 1U;
-	const uint64_t IJ = I * si->J;
-        // TODO: should be line sieved in the non-bucket phase?
-        // Or should we have a bucket line siever?
-        if (UNLIKELY(r == 0))
-        {
-            /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
-               but since p > I, this implies i = 0 or i > I. We don't
-               sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
-               only need to sieve j = 1 */
-            /* x = j*I + (i + I/2) = I + I/2 */
-            bucket_update_t update;
-            uint32_t x = I + I / 2;
-            update.x = (uint16_t) (x & maskbucket);
-            update.p = bucket_encode_prime (p);
-            WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-            WHERE_AM_I_UPDATE(w, x, update.x);
-            ASSERT(test_divisible(w)); 
-            push_bucket_update(BA, x >> shiftbucket, update);
-#ifdef TRACE_K
-            if (trace_on_spot_x(x))
-              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                       (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-#endif
-            continue;
-        }
-        if (UNLIKELY(r >= p))
-        {
-          if (r > p) /* should only happen for lattice-sieved prime powers,
-                        which is not possible currently since maxbits < I */
-            continue;
-
-          /* now r == p */
-            /* r == p means root at infinity, which hits for
-               j == 0 (mod p). Since q > I > J, this implies j = 0
-               or j > J. This means we sieve only (i,j) = (1,0) here.
-               Since I < BUCKET_REGION, this always goes in bucket 0.
-FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
-but which of these two (if any) do we sieve? */
-            bucket_update_t update;
-            update.x = (uint16_t) I / 2 + 1;
-            update.p = bucket_encode_prime (p);
-            WHERE_AM_I_UPDATE(w, N, 0);
-            WHERE_AM_I_UPDATE(w, x, update.x);
-            ASSERT(test_divisible(w));
-            push_bucket_update(BA, 0, update);
-#ifdef TRACE_K
-            if (trace_on_spot_x(update.x))
-              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                       (unsigned int) update.x, logp, p, sidenames[side], 0);
-#endif
-            continue;
-        }
-
-        /* If working with congruence classes, once the loop on the
-         * parity goes at the level above, this initialization
-         * should in fact either be done for each congruence class,
-         * or saved for later use within the factor base structure.
-         */
-        plattice_info_t pli;
-        if (reduce_plattice(&pli, p, r, si) == 0)
-        {
-            pthread_mutex_lock(&io_mutex);
-            fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-                    "returned 0 for p = " FBPRIME_FORMAT ", r = "
-                    FBPRIME_FORMAT "\n", p, r);
-            pthread_mutex_unlock(&io_mutex);
-            continue; /* Simply don't consider that (p,r) for now.
-FIXME: can we find the locations to sieve? */
-        }
-        unsigned int bound0 = plattice_bound0(&pli, si);
-        unsigned int bound1 = plattice_bound1(&pli, si);
-
-        for(unsigned int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
-	  // The sieving point (0,0) is I/2 in x-coordinate
-	  uint64_t x = (uint64_t) plattice_starting_vector(&pli, si, parity);
-	  if (x >= IJ) continue;
-	  unsigned int \
-	    bep = ((unsigned int) bucket_encode_prime (p)) << 16,
-	    inc_a = (unsigned int) plattice_a(&pli, si),
-	    inc_c = (unsigned int) plattice_c(&pli, si);
-
-	  /* To put all in registers for x86_64 */
-	  /*
-#ifdef __x86_64
-	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
-#endif
-	  */
-	  // ASSERT_ALWAYS(inc_a == pli.a);
-	  // ASSERT_ALWAYS(inc_c == pli.c);
-	  do {
-	    unsigned int i;
-	    i = x & maskI;
-	    /* i = x & maskI; */  // x mod I
-	    /* if both i = x % I and j = x / I are even, then
-	       both a, b are even, thus we can't have a valid relation */
-	    /* i-coordinate = (x % I) - I/2
-	       (I/2) % 3 == (-I) % 3, hence
-	       3|i-coordinate iff (x%I+I) % 3 == 0 */
-	    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-		&& (!is_divisible_3_u32 (i + I) ||
-		    !is_divisible_3_u32 ((uint32_t) (x >> logI)))
+    const uint32_t I = si->I;
+    const unsigned int logI = si->conf->logI;
 #endif
-		       ))
-	      {
-		unsigned int u;
-		bucket_update_t **ppu, *pu;
-		ppu = &(BA.bucket_write[x >> shiftbucket]);
-		pu = *ppu;
+    const uint32_t maskI = si->I-1;
+    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+
+    // TODO: should be line sieved in the non-bucket phase?
+    // Or should we have a bucket line siever?
+    if (UNLIKELY(!r))
+      {
+	/* If r == 0 (mod p), this prime hits for i == 0 (mod p),
+	   but since p > I, this implies i = 0 or i > I. We don't
+	   sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
+	   only need to sieve j = 1 */
+	/* x = j*I + (i + I/2) = I + I/2 */
+	bucket_update_t update;
+	uint32_t x = si->I + (si->I >> 1);
+	update.x = (uint16_t) (x & maskbucket);
+	update.p = bucket_encode_prime (p);
+	WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+	WHERE_AM_I_UPDATE(w, x, update.x);
+	ASSERT(test_divisible(w)); 
+	push_bucket_update(BA, x >> shiftbucket, update);
 #ifdef TRACE_K
-		if (trace_on_spot_x(x)) {
-                  WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                  WHERE_AM_I_UPDATE(w, x, x & maskbucket);
-		  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-			   (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                  ASSERT(test_divisible(w));
-		}
+	if (trace_on_spot_x(x))
+	  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+		   (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
 #endif
-#if LOG_BUCKET_REGION == 16
-		u = (unsigned int)(uint16_t)x;
+	continue;
+      }
+    if (UNLIKELY(r >= p))
+      {
+	if (r > p) /* should only happen for lattice-sieved prime powers,
+		      which is not possible currently since maxbits < I */
+	  continue;
+	/* now r == p */
+	/* r == p means root at infinity, which hits for
+	   j == 0 (mod p). Since q > I > J, this implies j = 0
+	   or j > J. This means we sieve only (i,j) = (1,0) here.
+	   Since I < BUCKET_REGION, this always goes in bucket 0.
+	   FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
+	   but which of these two (if any) do we sieve? */
+	bucket_update_t update;
+	update.x = (uint16_t) ((si->I >> 1) + 1);
+	update.p = bucket_encode_prime (p);
+	WHERE_AM_I_UPDATE(w, N, 0);
+	WHERE_AM_I_UPDATE(w, x, update.x);
+	ASSERT(test_divisible(w));
+	push_bucket_update(BA, 0, update);
+#ifdef TRACE_K
+	if (trace_on_spot_x(update.x))
+	  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+		   (unsigned int) update.x, logp, p, sidenames[side], 0);
+#endif
+	continue;
+      }
+    
+    /* If working with congruence classes, once the loop on the
+     * parity goes at the level above, this initialization
+     * should in fact either be done for each congruence class,
+     * or saved for later use within the factor base structure.
+     */
+    plattice_info_t pli;
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si)))
+      {
+	pthread_mutex_lock(&io_mutex);
+	fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+		 "returned 0 for p = " FBPRIME_FORMAT ", r = "
+		 FBPRIME_FORMAT "\n", p, r);
+	pthread_mutex_unlock(&io_mutex);
+	continue; /* Simply don't consider that (p,r) for now.
+		     FIXME: can we find the locations to sieve? */
+      }
+
+    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+
+#if !MOD2_CLASSES_BS
+    const uint64_t				\
+      inc_a = plattice_a(&pli, si),
+      inc_c = plattice_c(&pli, si);
+    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint32_t i = x;
+    FILL_BUCKET_INC_X();
+    if (x >= IJ) continue;
 #else
-		u = ((unsigned int) x & maskbucket);
+    for(unsigned int parity = 1 ; parity < 4; parity++) {
+      // The sieving point (0,0) is I/2 in x-coordinate
+      uint64_t x = plattice_starting_vector(&pli, si, parity);
+      if (x >= IJ) continue;
+      const uint64_t				\
+	inc_a = plattice_a(&pli, si),
+	inc_c = plattice_c(&pli, si);
 #endif
-		u |= bep;
-		*(uint32_t *)pu++ = u;
-#ifdef __GNUC__		
-		__builtin_prefetch((void *)pu, 0, 3);
-#endif
-		*ppu = pu;
-	      }
-	    if (i >= bound1) x += inc_a;
-	    if (i < bound0)  x += inc_c;
-	  } while (x < IJ);
-        }
+      const uint16_t bep = (uint16_t) bucket_encode_prime (p);
+      do { 
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET();
+      } while (x < IJ);
+#if MOD2_CLASSES_BS
     }
-    /* Write back BA so the nr_logp etc get copied to caller */
-    th->sides[side]->BA = BA;
+#endif
+  }
+  /* Write back BA so the nr_logp etc get copied to caller */
+  th->sides[side]->BA = BA;
 }
 
 void * fill_in_buckets_both(thread_data_ptr th)
@@ -2188,7 +2178,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
-        X = x + (N << LOG_BUCKET_REGION);
+        X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
 #ifndef UNSIEVE_NOT_COPRIME
@@ -2282,7 +2272,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# about to print relation for (%" PRId64 ",%" PRIu64 ")\n",a,b);
+                fprintf(stderr, "# about to start cofactorization for (%" PRId64 ",%" PRIu64 ")  %d %u\n",a,b, x, SS[x]);
             }
 #endif
             /* since a,b both even were not sieved, either a or b should
@@ -2863,14 +2853,10 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds ();
-#if defined(TRACE_K) && defined(TRACE_Nx)
-            if (trace_on_spot_N(w->N))
-              fprintf (stderr, "before init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
-#endif
             init_rat_norms_bucket_region(S[side], i, si);
-#if defined(TRACE_K) && defined(TRACE_Nx)
+#if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "after init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             rep->tn[side] += seconds ();
 
@@ -2886,6 +2872,10 @@ void * process_bucket_region(thread_data_ptr th)
             /* Sieve small rational primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on rational side, N=%u rat_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         {
@@ -2901,6 +2891,10 @@ void * process_bucket_region(thread_data_ptr th)
             unsigned char * xS = S[side ^ 1];
             init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
 
             /* Apply algebraic buckets */
             rep->ttbuckets_apply -= seconds();
@@ -2914,6 +2908,10 @@ void * process_bucket_region(thread_data_ptr th)
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
+#if defined(TRACE_K) 
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "# Final value on algebraic side, N=%u alg_S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
         }
 
         /* Factor survivors */
@@ -3068,50 +3066,38 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
 
 /*************************** main program ************************************/
 
-/* {{{ usage */
-static void
-usage (const char *argv0, const char * missing)
-{
-  fprintf (stderr, "Usage: %s [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
-           argv0);
-  fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
-  fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
-  fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
-  fprintf (stderr, "          -q0 nnn         left bound of special-q range\n");
-  fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
-  fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
-  fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
-  fprintf (stderr, "          -bkthresh nnn   bucket-sieve primes p >= nnn\n");
-  fprintf (stderr, "          -rlim     nnn   rational factor base bound nnn\n");
-  fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
-  fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
-  fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
-  fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
-  fprintf (stderr, "          -rpowlim  nnn   limit on powers on rat side is nnn\n");
-  fprintf (stderr, "          -apowlim  nnn   limit on powers on alg side is nnn\n");
-  fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
-  fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
-  fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
-  fprintf (stderr, "          -mt nnn   use nnn threads\n");
-  fprintf (stderr, "          -ratq           use rational special-q\n");
-  fprintf (stderr, "          The following are for benchs:\n");
-  fprintf (stderr, "          -bench          activate bench mode\n");
-  fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
-  fprintf (stderr, "          -bench2         activate alternate bench mode\n");
-  fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
-  fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
-  fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
-  fprintf (stderr, "          -sievestats xxx write sieve statistics to file xxx\n");
-  if (missing) {
-      fprintf(stderr, "\nError: missing parameter %s\n", missing);
-  }
-  exit (EXIT_FAILURE);
-}
-/* }}} */
 
+static void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "poly", "polynomial file");
+  param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "q0",   "left bound of special-q range");
+  param_list_decl_usage(pl, "q1",   "right bound of special-q range");
+  param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
+  param_list_decl_usage(pl, "v",    "(switch) verbose mode");
+  param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
+  param_list_decl_usage(pl, "mt",   "number of threads to use");
+  param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
+
+  param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
+  param_list_decl_usage(pl, "skew", "(alias S) skewness");
+  param_list_decl_usage(pl, "rlim", "rational factor base bound");
+  param_list_decl_usage(pl, "alim", "algebraic factor base bound");
+  param_list_decl_usage(pl, "lpbr", "set rational large prime bound to 2^lpbr");
+  param_list_decl_usage(pl, "lpba", "set algebraic large prime bound to 2^lpba");
+  param_list_decl_usage(pl, "mfbr", "set rational cofactor bound 2^mfbr");
+  param_list_decl_usage(pl, "mfba", "set algebraic cofactor bound 2^mfba");
+  param_list_decl_usage(pl, "rlambda", "rational lambda value");
+  param_list_decl_usage(pl, "alambda", "algebraic lambda value");
+  param_list_decl_usage(pl, "rpowlim", "limit on powers on rat side");
+  param_list_decl_usage(pl, "apowlim", "limit on powers on alg side");
+  param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
+  param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+
+  param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
+  param_list_decl_usage(pl, "mkhint", "(switch) ???");
+}
 
 int main (int argc0, char *argv0[])/*{{{*/
 {
@@ -3142,6 +3128,8 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list pl;
     param_list_init(pl);
 
+    declare_usage(pl);
+
     /* Passing NULL is allowed here. Find value with
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
@@ -3167,7 +3155,8 @@ int main (int argc0, char *argv0[])/*{{{*/
             continue;
         }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        usage(argv0[0],NULL);
+        param_list_print_usage(pl, argv0[0], stderr);
+        exit(EXIT_FAILURE);
     }
 
 

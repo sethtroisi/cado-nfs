@@ -30,7 +30,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 #endif
 
 /* fb_root_in_qlattice returns (R*b1-a1)/(a0-R*b0) mod p */
-#if defined(DLP_DESCENT) || defined(SUPPORT_LARGE_Q)
+#if defined(SUPPORT_LARGE_Q)
 #ifndef  HAVE_redc_64
 #error  "Please implement redc_64"
 #else
@@ -44,13 +44,13 @@ extern "C" {
 #endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const uint64_t invp, sieve_info_srcptr si);
+        const redc_invp_t invp, sieve_info_srcptr si);
 #ifdef __cplusplus
 }
 #endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const uint64_t invp, sieve_info_srcptr si)
+        const redc_invp_t invp, sieve_info_srcptr si)
 {
     return fb_root_in_qlattice_63bits(p, R, invp, si);
 }
@@ -64,13 +64,13 @@ extern "C" {
 #endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, sieve_info_srcptr si);
+        const redc_invp_t invp, sieve_info_srcptr si);
 #ifdef __cplusplus
 }
 #endif
 static inline fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, sieve_info_srcptr si)
+        const redc_invp_t invp, sieve_info_srcptr si)
 {
     return fb_root_in_qlattice_31bits(p, R, invp, si);
 }

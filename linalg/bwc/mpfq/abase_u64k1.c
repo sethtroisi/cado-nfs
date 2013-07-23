@@ -19,6 +19,7 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
+/* Active handler: simd_char2 */
 /* Options used:{
    w=64,
    k=1,
@@ -30,6 +31,7 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      u64k2=[ u64k1, u64k2, ],
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      u64k1=[ u64k1, u64k2, ],
      },
     families=[
@@ -37,6 +39,7 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
      ],
     choose_byfeatures=<code>,
     },
@@ -96,6 +99,7 @@ void abase_u64k1_field_specify(abase_u64k1_dst_field K MAYBE_UNUSED, unsigned lo
 /* missing get_mpz */
 
 /* Assignment of random values */
+/* missing random2 */
 
 /* Arithmetic operations on elements */
 /* missing mul */
@@ -238,6 +242,7 @@ void abase_u64k1_vec_clear(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_vec
 /* missing vec_setcoef_ui */
 /* missing vec_scal_mul */
 /* missing vec_conv */
+/* missing vec_random2 */
 /* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k1_vec_asprint(abase_u64k1_dst_field K MAYBE_UNUSED, char * * pstr, abase_u64k1_src_vec w, unsigned int n)
 {
@@ -404,6 +409,37 @@ void abase_u64k1_vec_ur_clear(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_
 /* missing vec_scal_mul_ur */
 /* missing vec_conv_ur */
 /* missing vec_reduce */
+
+/* Polynomial functions */
+/* missing poly_init */
+/* missing poly_clear */
+/* missing poly_set */
+/* missing poly_setmonic */
+/* missing poly_setcoef */
+/* missing poly_setcoef_ui */
+/* missing poly_getcoef */
+/* missing poly_deg */
+/* missing poly_add */
+/* missing poly_sub */
+/* missing poly_add_ui */
+/* missing poly_sub_ui */
+/* missing poly_neg */
+/* missing poly_scal_mul */
+/* missing poly_mul */
+/* missing poly_divmod */
+/* missing poly_precomp_mod */
+/* missing poly_mod_pre */
+/* missing poly_gcd */
+/* missing poly_xgcd */
+/* missing poly_random */
+/* missing poly_random2 */
+/* missing poly_cmp */
+/* missing poly_asprint */
+/* missing poly_fprint */
+/* missing poly_print */
+/* missing poly_sscan */
+/* missing poly_fscan */
+/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_dotprod::code_for_dotprod */
@@ -597,6 +633,12 @@ static void abase_u64k1_wrapper_elt_ur_set(abase_vbase_ptr, abase_u64k1_dst_elt_
 static void abase_u64k1_wrapper_elt_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_elt_ur r MAYBE_UNUSED, abase_u64k1_src_elt_ur s MAYBE_UNUSED)
 {
     abase_u64k1_elt_ur_set(vbase->obj, r, s);
+}
+
+static void abase_u64k1_wrapper_elt_ur_set_elt(abase_vbase_ptr, abase_u64k1_dst_elt_ur, abase_u64k1_src_elt);
+static void abase_u64k1_wrapper_elt_ur_set_elt(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_elt_ur r MAYBE_UNUSED, abase_u64k1_src_elt s MAYBE_UNUSED)
+{
+    abase_u64k1_elt_ur_set_elt(vbase->obj, r, s);
 }
 
 static void abase_u64k1_wrapper_elt_ur_set_zero(abase_vbase_ptr, abase_u64k1_dst_elt_ur);
@@ -803,6 +845,12 @@ static void abase_u64k1_wrapper_vec_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUS
     abase_u64k1_vec_ur_set_zero(vbase->obj, r, n);
 }
 
+static void abase_u64k1_wrapper_vec_ur_set_vec(abase_vbase_ptr, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec, unsigned int);
+static void abase_u64k1_wrapper_vec_ur_set_vec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec_ur w MAYBE_UNUSED, abase_u64k1_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_u64k1_vec_ur_set_vec(vbase->obj, w, u, n);
+}
+
 static void abase_u64k1_wrapper_vec_ur_reinit(abase_vbase_ptr, abase_u64k1_vec_ur *, unsigned int, unsigned int);
 static void abase_u64k1_wrapper_vec_ur_reinit(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
 {
@@ -843,6 +891,18 @@ static void abase_u64k1_wrapper_vec_ur_sub(abase_vbase_ptr, abase_u64k1_dst_vec_
 static void abase_u64k1_wrapper_vec_ur_sub(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec_ur w MAYBE_UNUSED, abase_u64k1_src_vec_ur u MAYBE_UNUSED, abase_u64k1_src_vec_ur v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     abase_u64k1_vec_ur_sub(vbase->obj, w, u, v, n);
+}
+
+static void abase_u64k1_wrapper_vec_ur_neg(abase_vbase_ptr, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static void abase_u64k1_wrapper_vec_ur_neg(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec_ur w MAYBE_UNUSED, abase_u64k1_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_u64k1_vec_ur_neg(vbase->obj, w, u, n);
+}
+
+static void abase_u64k1_wrapper_vec_ur_rev(abase_vbase_ptr, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
+static void abase_u64k1_wrapper_vec_ur_rev(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec_ur w MAYBE_UNUSED, abase_u64k1_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_u64k1_vec_ur_rev(vbase->obj, w, u, n);
 }
 
 static ptrdiff_t abase_u64k1_wrapper_vec_elt_stride(abase_vbase_ptr, int);
@@ -975,6 +1035,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     /* missing get_mpn */
     /* missing get_mpz */
     vbase->random = (void (*) (abase_vbase_ptr, void *, gmp_randstate_t)) abase_u64k1_wrapper_random;
+    /* missing random2 */
     vbase->add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k1_wrapper_add;
     vbase->sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k1_wrapper_sub;
     vbase->neg = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k1_wrapper_neg;
@@ -991,6 +1052,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k1_wrapper_elt_ur_set;
+    vbase->elt_ur_set_elt = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k1_wrapper_elt_ur_set_elt;
     vbase->elt_ur_set_zero = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_elt_ur_set_zero;
     /* missing elt_ur_set_ui */
     vbase->elt_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k1_wrapper_elt_ur_add;
@@ -1023,6 +1085,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     /* missing vec_scal_mul */
     /* missing vec_conv */
     vbase->vec_random = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_u64k1_wrapper_vec_random;
+    /* missing vec_random2 */
     vbase->vec_cmp = (int (*) (abase_vbase_ptr, const void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_u64k1_wrapper_vec_is_zero;
     vbase->vec_asprint = (void (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_u64k1_wrapper_vec_asprint;
@@ -1033,6 +1096,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_u64k1_wrapper_vec_scan;
     vbase->vec_ur_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k1_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k1_wrapper_vec_ur_set_zero;
+    vbase->vec_ur_set_vec = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_set_vec;
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_u64k1_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k1_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_set;
@@ -1040,10 +1104,41 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_ur_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_getcoef;
     vbase->vec_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_add;
     vbase->vec_ur_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_sub;
+    vbase->vec_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_neg;
+    vbase->vec_ur_rev = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_ur_rev;
     /* missing vec_scal_mul_ur */
     /* missing vec_conv_ur */
     /* missing vec_reduce */
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_u64k1_wrapper_vec_elt_stride;
+    /* missing poly_init */
+    /* missing poly_clear */
+    /* missing poly_set */
+    /* missing poly_setmonic */
+    /* missing poly_setcoef */
+    /* missing poly_setcoef_ui */
+    /* missing poly_getcoef */
+    /* missing poly_deg */
+    /* missing poly_add */
+    /* missing poly_sub */
+    /* missing poly_add_ui */
+    /* missing poly_sub_ui */
+    /* missing poly_neg */
+    /* missing poly_scal_mul */
+    /* missing poly_mul */
+    /* missing poly_divmod */
+    /* missing poly_precomp_mod */
+    /* missing poly_mod_pre */
+    /* missing poly_gcd */
+    /* missing poly_xgcd */
+    /* missing poly_random */
+    /* missing poly_random2 */
+    /* missing poly_cmp */
+    /* missing poly_asprint */
+    /* missing poly_fprint */
+    /* missing poly_print */
+    /* missing poly_sscan */
+    /* missing poly_fscan */
+    /* missing poly_scan */
     vbase->groupsize = (int (*) (abase_vbase_ptr)) abase_u64k1_wrapper_groupsize;
     vbase->offset = (int (*) (abase_vbase_ptr, int)) abase_u64k1_wrapper_offset;
     vbase->stride = (int (*) (abase_vbase_ptr)) abase_u64k1_wrapper_stride;
