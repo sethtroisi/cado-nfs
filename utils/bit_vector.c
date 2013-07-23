@@ -103,6 +103,11 @@ size_t bit_vector_popcount(bit_vector_ptr b)
     return w;
 }
 
+size_t bit_vector_memory_footprint(bit_vector_srcptr b)
+{
+    return iceildiv(b->n, BV_BITS) * sizeof(bv_t);
+}
+
 void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
 {
     FILE * f = fopen_maybe_compressed(fname, "r");
