@@ -5,6 +5,7 @@ from fractions import gcd
 import abc
 import random
 import time
+from collections import OrderedDict
 import wudb
 import logging
 import socket
@@ -1039,8 +1040,9 @@ class Duplicates1Task(Task, FilesCreator):
                 else:
                     filelistname = self.workdir.make_filename("filelist")
                     with open(str(filelistname), "w") as filelistfile:
-                        filelistfile.write("\n".join(newfiles))
+                        filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
+                                                 out=outputdir,
                                                  **self.progparams[0])
                 (identifier, rc, stdout, stderr, output_files) = \
                         self.submit_command(p, "")
@@ -1166,7 +1168,7 @@ class Duplicates2Task(Task, FilesCreator):
             else:
                 filelistname = self.workdir.make_filename("filelist")
                 with open(str(filelistname), "w") as filelistfile:
-                    filelistfile.write("\n".join(files))
+                    filelistfile.write("\n".join(files) + "\n")
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
@@ -1848,10 +1850,32 @@ class StartClientsTask(Task):
         match = re.match(r"@(.*)", self.params["hostnames"])
         if match:
             with open(match.group(1)) as f:
-                self.hosts_to_launch = [line for line in f]
+                self.hosts_to_launch = [line.strip() for line in f]
         else:
-            self.hosts_to_launch = self.params["hostnames"].split(",")
-    
+            self.hosts_to_launch = [host.strip() for host in 
+                    self.params["hostnames"].split(",")]
+
+        if "nrclients" in self.params:
+            self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
+                    int(self.params["nrclients"]))
+
+    @staticmethod
+    def make_multiplicity(names, multi):
+        """ Produce a list in which each unique entry of the list "names" 
+        occurs "multi" times. The order of elements in names is preserved.
+        
+        >>> names = ['a', 'b', 'a', 'c', 'c', 'a', 'a']
+        >>> StartClientsTask.make_multiplicity(names, 1)
+        ['a', 'b', 'c']
+        >>> StartClientsTask.make_multiplicity(names, 2)
+        ['a', 'a', 'b', 'b', 'c', 'c']
+        """
+        result = []
+        # Use OrderedDict to get unique names, preserving order
+        for name in OrderedDict(zip(names, [None] * len(names))):
+            result.extend([name] * multi)
+        return result
+
     def is_alive(self, clientid):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep

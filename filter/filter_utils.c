@@ -48,7 +48,7 @@ inline void print_relation(FILE * file, buf_rel_t * rel)
 //TODO try with buf_rel_t instead of buf_rel_t *
 inline index_t
 insert_rel_in_table_no_e(buf_rel_t * my_br, index_t min_index,
-			 uint8_t no_storage, index_t ** rel_compact,
+			 index_t ** rel_compact,
 			 weight_t * ideals_weight)
 {
     index_t nprimes = 0;
@@ -57,7 +57,7 @@ insert_rel_in_table_no_e(buf_rel_t * my_br, index_t min_index,
     index_t h;
 
     itmp = 0;
-    my_tmp = no_storage ? NULL : my_malloc(my_br->nb_above_min_index);
+    my_tmp = my_malloc(my_br->nb_above_min_index);
 
     for (i = 0; i < my_br->nb; i++) {
 	h = my_br->primes[i].h;
@@ -67,14 +67,12 @@ insert_rel_in_table_no_e(buf_rel_t * my_br, index_t min_index,
 	} else if (ideals_weight[h] != UMAX(weight_t))
 	    ideals_weight[h]++;
 
-	if (!no_storage && h >= min_index)
+	if (h >= min_index)
 	    my_tmp[itmp++] = h;
     }
 
-    if (!no_storage) {
-	my_tmp[itmp] = UMAX(*my_tmp);	/* sentinel */
-	rel_compact[my_br->num] = my_tmp;
-    }
+    my_tmp[itmp] = UMAX(*my_tmp);	/* sentinel */
+    rel_compact[my_br->num] = my_tmp;
 
     return nprimes;
 }

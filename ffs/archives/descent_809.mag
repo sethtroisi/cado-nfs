@@ -1,0 +1,398 @@
+SIEVER:="/tmp/build-ffs/f2/sieve param.2.809 -sublat -I 15 -J 15";
+LOGFILE:="log.reconstruct2";
+LPB := 28;
+ell := 4148386731260605647525186547488842396461625774241327567978137;
+
+PP<t> := PolynomialRing(GF(2));
+MP<x> := PolynomialRing(PP);
+
+function pol2int(p)
+    return Seqint([ Integers()!x : x in  Eltseq(p) ], 2);
+end function;
+function pol2hex(p)
+    return IntegerToString(Seqint([ Integers()!x : x in  Eltseq(p) ], 2), 16);
+end function;
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 2);
+end function;
+
+F := x^6 + (t^2 + t + 1)*x^5 + (t^6 + t^5 + t^3 + t + 1)*x^3 + (t^8 + t^7 + t^5 + t^3 + t + 1)*x^2 + (t^9 + t^8 + t^5 + t^2 + t)*x + t^12 + t^11 + t^8 + t^7 + t^5 + t^4 + t + 1;
+G := x +  t^135 + t^20 + t^19 + t^18 + t^17 + t^14 + t^13 + t^12 + t^11 + t^10 + t^9 + t^7 + t^5 + t^3 + t;
+
+phi := Resultant(F, G) div (t+1);
+assert Degree(phi) eq 809 and IsIrreducible(phi);
+
+function QtoRho_rat(Q)
+    return Coefficient(G, 0) mod Q;
+end function;
+function QtoRho(Q, a, b)
+    if Degree(Q) eq 1 then
+        a := a mod Q;
+        b := b mod Q;
+        assert b eq 1;
+        return a;
+    end if;
+    Fq := ext<GF(2) | Q>;
+    rho := Fq!a / Fq!b;
+    rho := PP!Eltseq(rho);
+    assert Evaluate(F, rho) mod Q eq 0 or Evaluate(G, rho) mod Q eq 0;
+    return rho;
+end function;
+
+
+function parserel(str)
+    fields := Split(str, ":");
+    ab := Split(fields[1], ",");
+    side0 := Split(fields[2], ",");
+    side1 := Split(fields[3], ",");
+    return [ ab, side0, side1];
+end function;
+
+function GetRandomQ(d, side)
+    if side eq 0 then
+        FF := F;
+    else 
+        FF := G;
+    end if;
+    repeat
+        repeat
+            q := Random(PP, d);
+        until IsIrreducible(q);
+        Fq := ext<GF(2) | q>;
+        roo := Roots(PolynomialRing(Fq)![ Fq!x : x in Eltseq(FF) ]);
+    until #roo ge 1;
+    rho := PP!Eltseq(roo[1][1]);
+    return q, rho;
+end function;
+
+function TuneParams(d, side, Linit, gap)
+    Q, Rho := GetRandomQ(d, side);
+    L := Max(Linit, LPB);
+    while true do 
+        Thresh := 3*L;
+        printf "Trying with L = %o\n", L;
+        cmd := Sprintf("%o -longq %o -longrho %o -sqside %o -lpb0 %o -thresh0 %o -lpb1 %o -thresh1 %o",
+        SIEVER,
+        pol2hex(Q), pol2hex(Rho), side, L, Thresh, L, Thresh);
+
+        pipe := POpen(cmd, "r");
+        str := [];
+        line := Gets(pipe);
+        while not IsEof(line) do
+            if line[1] ne "#" then Append(~str, line); end if;
+            line := Gets(pipe);
+        end while;
+        printf "Got %o rels\n", #str;
+        if #str ge 5 then break; end if;
+        L +:= gap;
+    end while;
+    return L;
+end function;
+ 
+function GetParams(d, side)
+    if side eq 1 then
+        if d gt 90 then sh := 22;
+        elif d gt 85 then sh := 20;
+        elif d gt 80 then sh := 18;
+        elif d gt 70 then sh := 17;
+        elif d gt 60 then sh := 16;
+        elif d gt 50 then sh := 13;
+        elif d gt 40 then sh := 9;
+        elif d gt 35 then sh := 5;
+        elif d gt 30 then sh := 1;
+        else sh := d-LPB;
+        end if;
+        L := d - sh;
+        return L, 3*L;
+    end if;
+    if side eq 0 then
+        if d gt 90 then sh := 39;
+        elif d gt 80 then sh := 34;
+        elif d gt 70 then sh := 28;
+        elif d gt 65 then sh := 25;
+        elif d gt 60 then sh := 22;
+        elif d gt 50 then sh := 14;
+        elif d gt 40 then sh := 7;
+        elif d gt 35 then sh := 5;
+        elif d gt 32 then sh := 4;
+        else sh := d-LPB;
+        end if;
+        L := d - sh;
+        return L, 3*L;
+    end if;
+end function;
+
+function DescentOneStep(Q, Rho, side, Al)
+  L, Thresh := GetParams(Degree(Q), side);
+  printf "Descending Q of degree %o, side=%o, L=%o\n", Degree(Q), side, L;
+  printf "q = %o rho = %o side = %o\n", pol2hex(Q), pol2hex(Rho), side;
+
+  // Always randomize if we are close to the end
+  if L eq LPB then
+      Al := "Rnd";
+  end if;
+
+  while true do
+    cmd := Sprintf("%o -longq %o -longrho %o -sqside %o -lpb0 %o -thresh0 %o -lpb1 %o -thresh1 %o",
+     SIEVER,
+     pol2hex(Q), pol2hex(Rho), side, L, Thresh, L, Thresh);
+  
+    pipe := POpen(cmd, "r");
+    str := [];
+    line := Gets(pipe);
+    while not IsEof(line) do
+      if line[1] ne "#" then Append(~str, line); end if;
+      line := Gets(pipe);
+    end while;
+    if #str ne 0 then 
+      break;
+    end if;
+    L +:= 1; Thresh := 3*L;
+    printf "Fail: didn't found any relation. Try with L=%o\n", L;
+  end while;
+
+  printf "Got %o relations\n", #str;
+  if Al eq "Min" then 
+      best := 10000000000;
+      for rr in str do
+          rl := parserel(rr);
+          // take the smallest size1
+          max := 0;
+          for q in rl[3] do
+              qq := hex2pol(q);
+              if qq ne Q then
+                  max := Max(max, Degree(qq));
+              end if;
+          end for;
+          if max lt best then
+              best := max;
+              rel := rl;
+          end if;
+      end for;
+  elif Al eq "Rnd" then
+      rel := parserel(Random(str));
+  else
+      error "unknown Al";
+  end if;
+  return rel;
+end function;
+
+
+function FullDescent(Q, Rho, side)
+    List_Q := [ <Q, Rho, side> ];
+
+    Data := [];
+
+    while #List_Q ge 1 do
+        QQ := List_Q[#List_Q];
+        Prune(~List_Q);
+        rel := DescentOneStep(QQ[1], QQ[2], QQ[3], "Min");
+        Append(~Data, <QQ, rel>);
+        for q in rel[2] do  // side0
+            qq := hex2pol(q);
+            if qq ne QQ[1] and Degree(qq) gt LPB then
+                rr := QtoRho(qq, hex2pol(rel[1][1]), hex2pol(rel[1][2]));
+                Append(~List_Q, <qq, rr, 0>);
+            end if;
+        end for;
+        for q in rel[3] do  // side1
+            qq := hex2pol(q);
+            if qq ne QQ[1] and Degree(qq) gt LPB then
+                rr := QtoRho(qq, hex2pol(rel[1][1]), hex2pol(rel[1][2]));
+                Append(~List_Q, <qq, rr, 1>);
+            end if;
+        end for;
+        #List_Q, [ Degree(x[1]) : x in List_Q ];
+    end while;
+    return Data;
+end function;
+
+AddAttribute(Type(Integers()), "LOGDataIdeals");
+AddAttribute(Type(Integers()), "LOGDataLogs");
+GlobInt := Integers();
+GlobInt`LOGDataIdeals := [];
+GlobInt`LOGDataLogs := [];
+
+function GetLog(Q, Rho, side, a, b)
+    if Q eq t^2+t+1 and Rho eq t then
+        printf "Handling special ideal 7 2\n";
+        slope := ((Derivative(a) - t*Derivative(b)) * Modinv(b,Q)) mod Q;
+        Normfab := &+[ Coefficient(F, i)*a^i*b^(6-i) : i in [0..6] ];
+        val := Valuation(Normfab, t^2+t+1);
+        log1 := 2872283565204751852404693536293813712563303211463484902322311;
+        log2 := 1338341244126587493136928952378385645660125637016785450038350;
+        if slope eq 0 then
+            ll := GF(ell)!(log1 + (val-1)*log2);
+        elif slope eq 1 then
+            ll := GF(ell)!(log2 + (val-1)*log1);
+        else
+            ll := GF(ell)!(log1 + log2);
+        end if;
+        ll := ll / (GF(ell)!val);
+        return Integers()!ll;
+    end if;
+
+    GlobInt := Integers();
+    idx := Index(GlobInt`LOGDataIdeals, <Q, Rho, side>);
+    if idx gt 0 then
+        printf "Found %o %o %o in database\n", pol2hex(Q), pol2hex(Rho), side;
+        return GlobInt`LOGDataLogs[idx];
+    end if;
+    Qi := pol2int(Q);
+    Rhoi := pol2int(Rho);
+    if side eq 1 then
+        Rhoi := Qi+1;
+    end if;
+    Qstr := IntegerToString(Qi, 16);
+    Rhostr := IntegerToString(Rhoi, 16);
+    cmd := Sprintf("grep \"^%o %o \" %o", Qstr, Rhostr, LOGFILE);
+    print cmd;
+    pipe := POpen(cmd, "r");
+    str := [];
+    line := Gets(pipe);
+    if IsEof(line) then
+        printf "Not found: %o %o %o\n", pol2hex(Q), pol2hex(Rho), side;
+        return -1;
+    end if;
+    res := StringToInteger(Split(line, " ")[3], 10);
+    Append(~GlobInt`LOGDataIdeals, <Q, Rho, side>);
+    Append(~GlobInt`LOGDataLogs, res);
+    return res;
+end function;
+
+function CheckRel(rel)
+    a := hex2pol(rel[1][1]);
+    b := hex2pol(rel[1][2]);
+    LL := 0;
+    for q in rel[2] do  // side0
+        qq := hex2pol(q);
+        rr := QtoRho(qq, a, b);
+        LL +:= GetLog(qq, rr, 0, a, b);
+    end for;
+    for q in rel[3] do  // side1
+        qq := hex2pol(q);
+        rr := QtoRho(qq, a, b);
+        LL +:= GetLog(qq, rr, 1, a, b);
+    end for;
+    return (LL mod ell) eq 0;
+end function;
+
+function LearnLogFromRel(rel)
+    a := hex2pol(rel[1][1]);
+    b := hex2pol(rel[1][2]);
+    LL := 0;
+    unk := <0,0,0>;
+    for q in rel[2] do  // side0
+        qq := hex2pol(q);
+        rr := QtoRho(qq, a, b);
+        ll := GetLog(qq, rr, 0, a, b);
+        if ll ne -1 then
+            LL +:= ll;
+        elif unk ne <0,0,0> then
+            error "Two many unknown logs\n";
+        else
+            unk := <qq, rr, 0>;
+        end if;
+    end for;
+    for q in rel[3] do  // side1
+        qq := hex2pol(q);
+        rr := QtoRho(qq, a, b);
+        ll := GetLog(qq, rr, 1, a, b);
+        if ll ne -1 then
+            LL +:= ll;
+        elif unk ne <0,0,0> then
+            error "Two many unknown logs\n";
+        else
+            unk := <qq, rr, 1>;
+        end if;
+    end for;
+    if unk ne <0,0,0> then
+        printf "Get the log of %o %o %o\n", pol2hex(unk[1]), pol2hex(unk[2]), unk[3];
+        ll := (-LL) mod ell;
+        GlobInt := Integers();
+        Append(~GlobInt`LOGDataIdeals, unk);
+        Append(~GlobInt`LOGDataLogs, ll);
+        return ll;
+    else 
+        return -1;
+    end if;
+end function;
+
+/*
+Log(target) + Log(t^j) = Log(r) - Log(v)
+j = 2451070
+r = 1aaee4922b9c2e956d7a10d2a299c31591bbd7e595dca2b42703db8934ed11b0be1663f5fbe5e3700cbedbe727c3aacfc50d7b
+v = 1e6ae89d6f8f7607b85dfae2d3f6fa3b8194ad2a42d90a3178047f006af5319e281a1d566220c5dd628370ccfafb862b69bbc8
+factorization(r) = d 25 3d 11f1f153d 413dece12bd5 7929779a1231 21c126f1dcce137 2bc010eb6adb2c29 d39571aff2133d48d3 7a9319f196cb06e361bf
+factorization(v) = 2 2 2 1f 6d 89 5e0bb 33fafaa92bb 1d0ca24ee97f6b1 1701b7e208638bef 5f05595267f51f35 29209bf097b110f95 770ebfb6d84733a30c5dd
+
+Fulllist := "11f1f153d 413dece12bd5 7929779a1231 21c126f1dcce137 2bc010eb6adb2c29 d39571aff2133d48d3 7a9319f196cb06e361bf 33fafaa92bb 1d0ca24ee97f6b1 1701b7e208638bef 5f05595267f51f35 29209bf097b110f95 770ebfb6d84733a30c5dd";
+FL := Split(Fulllist, " ");
+
+DataSet := [];
+
+t_start := Cputime();
+for q in FL do
+  Qinit := hex2pol(q);
+  time Data := FullDescent(Qinit, QtoRho_rat(Qinit), 1);
+  Append(~DataSet, Data);
+end for;
+Cputime()-t_start;
+
+RelSet := [ [xx[2] : xx in dd ] : dd in DataSet ];
+rels := []; for rr in RelSet do for r in rr do Append(~rels, r); end for; end for;
+
+for i := 1 to #rels do
+   LearnLogFromRel(rels[#rels+1-i]);
+end for;
+
+DescentOneStep(Q, Rho, side, "Rnd");
+LearnLogFromRel($1);
+
+
+ListR := [ hex2pol("d"), hex2pol("25"), hex2pol("3d"), hex2pol("11f1f153d"), hex2pol("413dece12bd5"), hex2pol("7929779a1231"), hex2pol("21c126f1dcce137"), hex2pol("2bc010eb6adb2c29"), hex2pol("d39571aff2133d48d3"), hex2pol("7a9319f196cb06e361bf") ];
+ListV := [ hex2pol("2"), hex2pol("2"), hex2pol("2"), hex2pol("1f"), hex2pol("6d"), hex2pol("89"), hex2pol("5e0bb"), hex2pol("33fafaa92bb"), hex2pol("1d0ca24ee97f6b1"), hex2pol("1701b7e208638bef"), hex2pol("5f05595267f51f35"), hex2pol("29209bf097b110f95"), hex2pol("770ebfb6d84733a30c5dd") ];
+
+LogR := GF(ell)!0;
+for q in ListR do
+    r := QtoRho_rat(q);
+    LogR +:= GetLog(q, r, 1, 0, 0);
+end for;
+
+LogV := GF(ell)!0;
+for q in ListV do
+    r := QtoRho_rat(q);
+    LogV +:= GetLog(q, r, 1, 0, 0);
+end for;
+
+LogT := GF(ell)!23829981984220621048372586207845405497533384104896831686174;
+
+LogTarget := LogR-LogV-2451070*LogT;
+Log1024 := Integers()!(LogTarget/LogT);
+
+phi := hex2pol("3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE800000000000000000000000CC0CFAEB0E000000000000000000000000000000004DFFFFFFFFFFFFFC3C3FFC3C3C3FCE3C2133FFFFFFFFFFFFE9697FE96804C84C97E0B0000C00CF9B0F7675354E79F4CF7C97E29");
+
+target:=hex2pol("C05748BBFB5ACD7E5A77DC03D9EC7D8BB957C1B95D9B206090D83FD1B67433CE83EAD7376CCFD612C72901F4CE0A2E07E322D438EA4F34647555D62D04140E1084E999BB4CD5F947A76674009E2318549FD102C5F7596EDC332A0DDEE3A355186B9A046F0F96A279C1448A9151549DC663DA8A6E89CF8F511BAED6450DA2C1CB");
+N := 2^809-1;
+
+Modexp(target, (N div ell), phi) eq Modexp(t, (N div ell)*Log1024, phi);
+
+
+
+for rel in rels do
+   for q in rel[2] do  // side0
+       qq := hex2pol(q);
+       if Degree(qq) le LPB and Degree(qq) gt 20 then
+           rr := QtoRho(qq, hex2pol(rel[1][1]), hex2pol(rel[1][2]));
+           printf "alg %o %o\n", pol2hex(qq), pol2hex(rr);
+       end if;
+   end for;
+   for q in rel[3] do  // side1
+       qq := hex2pol(q);
+       if Degree(qq) le LPB and Degree(qq) gt 20 then
+           rr := QtoRho(qq, hex2pol(rel[1][1]), hex2pol(rel[1][2]));
+           printf "rat %o %o\n", pol2hex(qq), pol2hex(rr);
+       end if;
+   end for;
+end for;
+*/
