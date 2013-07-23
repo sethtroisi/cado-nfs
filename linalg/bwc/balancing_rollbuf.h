@@ -9,6 +9,24 @@
  */
 #include <pthread.h>
 
+/* Getting data from a rolling buffer can be done via two interfaces. One
+ * interface (rollbuf_get) provides a pointer, while the other
+ * (rollbuf_get2) does not, and asks the rollbuf interface to provide a
+ * pointer.
+ *
+ * The area pointed to by the pointer returned from rollbuf_get2 is free
+ * to be read from by the calling thread until the next call to
+ * rollbuf_get. This implies in particular that we assume that there is
+ * exactly one threading getting data, no more.
+ *
+ * Note though that this is not implemented by means of a zero-copy
+ * mechanism (doing so would make rollback_put break the active area of
+ * data being read, in case a realloc() occurs). The data is copied to a
+ * buffer exclusively dedicated to reading.
+ *
+ * (the reading buffer is allocated only if needed, and freed by
+ * rollbuf_clear eventually)
+ */
 struct rollbuf_s {
     char * p;
     size_t alloc;
@@ -16,7 +34,7 @@ struct rollbuf_s {
     size_t avail_to_write;
     const char * rhead;
     char * whead;
-    char * rbuf;
+    char * rbuf;        /* Only for rollbuf_get2 */
     pthread_mutex_t mx[1];
     pthread_cond_t bored[1];
     int empty_count;
