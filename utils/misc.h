@@ -11,7 +11,7 @@
 #include "portability.h"
 
 /* we require GMP 5 at least */
-#if __GNU_MP_VERSION < 5
+#if !GMP_VERSION_ATLEAST(5,0,0)
 #error "GNU MP 5 (at least) is required to compile CADO-NFS"
 #endif
 

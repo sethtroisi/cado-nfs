@@ -223,9 +223,9 @@ int main(int argc, char **argv)
 
     fprintf(stdin, "# Computed %" PRIu64 " free relations\n", nrel);
     fprintf(stderr, "# Computed %" PRIu64 " free relations\n", nrel);
+    renumber_close_write(tab, renumberfilename);
     param_list_clear(pl);
     cado_poly_clear(dummy_poly);
-    renumber_close_write(tab);
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
 

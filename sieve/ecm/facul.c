@@ -33,6 +33,23 @@ unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
+int
+nb_curves (const unsigned int lpb)
+{
+  /* the following table, computed with the proba_cofactor() function in the
+     facul.sage file, ensures a probability of at least about 90% to find a
+     factor below 2^lpb with n = T[lpb] */
+#define LPB_MAX 33
+  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 10-19 */
+                      0, 0, 1 /*22:0.9074*/, 2 /*23:0.9059*/, 3 /*24:0.8990*/,
+                      5 /*25:0.9194*/, 6 /*26:0.9065*/, 8 /*27:0.9053*/,
+                      10 /*28:0.9010*/, 13 /*29:0.9091*/, 16 /*30:0.9134*/,
+                      18 /*31:0.9039*/, 21 /*32:0.9076*/, 24/*33:0.8963*/};
+  return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
+#undef LPB_MAX
+}
+
 
 /* Make a simple minded strategy for factoring. We start with P-1 and
    P+1 (with x0=2/7), then an ECM curve with low bounds, then a bunch of
@@ -42,13 +59,14 @@ unsigned long stats_found_n[STATS_LEN] = {
 */
 
 facul_strategy_t *
-facul_make_strategy (const int n, const unsigned long fbb, 
+facul_make_strategy (const unsigned long fbb,
 		     const unsigned int lpb)
 {
   facul_strategy_t *strategy;
   facul_method_t *methods;
-  int i;
-  
+  int i, n;
+
+  n = nb_curves (lpb);
   strategy = malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;
   /* Store fbb^2 in assume_prime_thresh */
@@ -66,7 +84,7 @@ facul_make_strategy (const int n, const unsigned long fbb,
   pm1_make_plan (methods[0].plan, 315, 2205, 0);
 
   /* run one P+1 curve with B1=525 and B2=3255 */
-  methods[1].method = PP1_METHOD;
+  methods[1].method = PP1_27_METHOD;
   methods[1].plan = malloc (sizeof (pp1_plan_t));
   pp1_make_plan (methods[1].plan, 525, 3255, 0);
 
@@ -117,7 +135,9 @@ facul_clear_strategy (facul_strategy_t *strategy)
     {
       if (methods[i].method == PM1_METHOD)
         pm1_clear_plan (methods[i].plan);
-      else if (methods[i].method == PP1_METHOD)
+      else if (methods[i].method == PP1_27_METHOD)
+	pp1_clear_plan (methods[i].plan);
+      else if (methods[i].method == PP1_65_METHOD)
 	pp1_clear_plan (methods[i].plan);
       else if (methods[i].method == EC_METHOD)
 	ecm_clear_plan (methods[i].plan);
