@@ -25,7 +25,7 @@ fi
 
 ## Print header
 METHOD=`echo $method | tr '[:lower:]' '[:upper:]'`
-echo "METHOD=$METHOD B1=$B1 B2=$B2 sigma=$sigma"
+echo "METHOD=$METHOD B1=$B1 B2=$B2 param=$sigma"
 
 ## Bench
 echo "  Bench:"
