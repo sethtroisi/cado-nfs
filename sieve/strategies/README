@@ -20,7 +20,10 @@ Run the benchmark / statistic generator for your favorite method:
   Examples:
     ./run_stat.sh ecm 500 10000 17
     ./run_stat.sh pm1 200 4000 1
-    ./run_stat.sh pp1 200 4000 1
+    ./run_stat.sh pp1_27 200 4000 1
+    ./run_stat.sh pp1_65 200 4000 1
 
-  Note: for pm1 and pp1, the parameter sigma is ignored
+  Note: for pm1 and pp1, the parameter sigma is ignored.
+  Note 2: pp1_27 uses 2/7 as starting point, whereas pp1_65 uses 6/5.
+
 
