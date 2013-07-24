@@ -368,7 +368,6 @@ renumber_close_write (renumber_t tab, const char *tablefile)
     ASSERT (ret >= 0);
 
     retc = fgets (buffer, 128, tab->file);
-    fprintf (stderr, "%s\n", buffer);
   } while (retc != NULL);
 
   ASSERT_ALWAYS (feof(tab->file));
