@@ -3,6 +3,7 @@ import platform
 import abc
 import inspect
 import hashlib
+import logging
 import cadocommand
 import cadologger
 
@@ -143,11 +144,14 @@ class Sha1Cache(object):
     def get_sha1(self, filename):
         realpath = os.path.realpath(filename)
         if not realpath in self._sha1:
+            logger = logging.getLogger("Sha1Cache")
+            logger.debug("Computing SHA1 for file %s", realpath)
             with open(realpath, "rb") as inputfile:
                 sha1 = hashlib.sha1()
                 for data in self._read_file_in_blocks(inputfile):
                     sha1.update(data)
             self._sha1[realpath] = sha1.hexdigest()
+            logger.debug("SHA1 for file %s is ", realpath, self._sha1[realpath])
         return self._sha1[realpath]
 
 sha1cache = Sha1Cache()
