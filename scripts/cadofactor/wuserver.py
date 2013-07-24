@@ -139,7 +139,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             return super().translate_path(path)
     
     def do_GET(self):
-        """Generates a work unit if request is cgi-bin/getwu, generates a status
+        """Generates a workunit if request is cgi-bin/getwu, generates a status
         page is requested, otherwise calls parent class' do_GET()"""
         if self.is_cgi():
             if self.is_getwu():
@@ -148,7 +148,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 self.send_status()
             else:
                 self.send_error(404, "GET for CGI scripts allowed only "
-                                "for work unit or status page request")
+                                "for workunit or status page request")
         elif self.only_registered and \
                 not self.path.lstrip('/') in self.registered_filenames:
                 self.send_error(404, "Access restricted to registered file "
@@ -224,7 +224,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             self.no_work_available = True
             return self.send_error(404, "No work available")
         
-        self.log_message("Sending work unit " + Workunit(wu_text).get_id() + 
+        self.log_message("Sending workunit " + Workunit(wu_text).get_id() + 
                          " to client " + clientid)
         # wu_text = wu.get_wu()
         self.send_response(200)
