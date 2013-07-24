@@ -2187,7 +2187,7 @@ sub do_freerels {
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
-              "-renumber $param{'prefix'}.renumber ".
+              "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2304,7 +2304,7 @@ sub dup {
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.filelist ".
-            "-renumber $param{'prefix'}.renumber ".
+            "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
