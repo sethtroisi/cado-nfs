@@ -48,7 +48,7 @@ class Parameters(object):
         "bwc_mm_impl": None, # This parameter seems to be gone
         "bwc_mn": "tasks.linalg.mn",
         "bwc_shuffled_product": "tasks.linalg.shuffled_product",
-        "bwmt": "tasks.linalg.threads",
+        "bwmt": "tasks.linalg.bwc.threads",
         "bwstrat": "tasks.filter.forbw",
         "checkrange": None,
         "coverNmax": "tasks.merge.coverNmax",
