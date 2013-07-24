@@ -568,7 +568,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
         si->sides[s]->strategy = facul_make_strategy(
-                NB_CURVES, sc->sides[s]->lim, sc->sides[s]->lpb);
+                sc->sides[s]->lim, sc->sides[s]->lpb);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
