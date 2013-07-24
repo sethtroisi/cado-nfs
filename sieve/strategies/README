@@ -7,7 +7,7 @@ Prepare a database of small primes grouped by bitsize and class modulo 12:
 - run the script with a given location for the primeDB:
   ./prepare_primedb.sh /localdisk/primes
 
-Run the banchmark / statistic generator for your favorite method:
+Run the benchmark / statistic generator for your favorite method:
 =================================================================
 
 - Edit the run_stat.sh script and modify the following variables:
