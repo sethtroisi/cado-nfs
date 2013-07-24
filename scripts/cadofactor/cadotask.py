@@ -440,6 +440,25 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
             return None
         return self.workdir.path_in_workdir(self.state[key])
 
+    def make_std_paths(self, progname):
+        count = self.state.get("stdiocount", 0)
+        while True:
+            try:
+                count += 1
+                stdoutname = "%s.stdout.%d" % (progname, count)
+                stderrname = "%s.stderr.%d" % (progname, count)
+                self.check_files_exist((stdoutname, stderrname), "stdio",
+                                       shouldexist=False)
+            except IOError:
+                self.logger.warning("Stdout and stderr files with index %d "
+                                    "already exist", count)
+            else:
+                break
+        self.state["stdiocount"] = count
+        stdoutpath = self.workdir.make_filename(stdoutname)
+        stderrpath = self.workdir.make_filename(stderrname)
+        return (stdoutpath, stderrpath)
+
 
 class ClientServerTask(Task, patterns.Observer):
     @abc.abstractproperty
@@ -1033,9 +1052,13 @@ class Duplicates1Task(Task, FilesCreator):
                 self.check_files_exist(outfilenames.keys(), "output", 
                                         shouldexist=False)
                 outputdir = self.workdir.make_dirname()
+                (stdoutpath, stderrpath) = \
+                        self.make_std_paths(cadoprograms.Duplicates1.name)
                 if len(newfiles) <= 10:
                     p = cadoprograms.Duplicates1(*newfiles,
                                                  out=outputdir,
+                                                 stdout=str(stdoutpath),
+                                                 stderr=str(stderrpath),
                                                  **self.progparams[0])
                 else:
                     filelistname = self.workdir.make_filename("filelist")
@@ -1043,6 +1066,8 @@ class Duplicates1Task(Task, FilesCreator):
                         filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  out=outputdir,
+                                                 stdout=str(stdoutpath),
+                                                 stderr=str(stderrpath),
                                                  **self.progparams[0])
                 (identifier, rc, stdout, stderr, output_files) = \
                         self.submit_command(p, "")
@@ -1054,6 +1079,9 @@ class Duplicates1Task(Task, FilesCreator):
                     # exception
                 self.check_files_exist(outfilenames.keys(), "output", 
                                        shouldexist=True)
+                assert stderr is None
+                with open(str(stderrpath), "rb") as stderrfile:
+                    stderr = stderrfile.read()
                 current_counts = self.parse_slice_counts(stderr)
                 for idx in range(self.nr_slices):
                     self.slice_relcounts[str(idx)] += current_counts[idx]
@@ -1158,12 +1186,15 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            # self.workdir.make_directories(str(i)) OBSOLETE
+            name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
+            (stdoutpath, stderrpath) = self.make_std_paths(name)
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
+                                             stdout=str(stdoutpath),
+                                             stderr=str(stderrpath),
                                              **self.progparams[0])
             else:
                 filelistname = self.workdir.make_filename("filelist")
@@ -1173,11 +1204,16 @@ class Duplicates2Task(Task, FilesCreator):
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
                                              filelist=filelistname,
+                                             stdout=str(stdoutpath),
+                                             stderr=str(stderrpath),
                                              **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
+            assert stderr is None
+            with open(str(stderrpath), "rb") as stderrfile:
+                stderr = stderrfile.read()
             nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
             # Mark input file names and output file names
             for f in files:
@@ -1287,11 +1323,14 @@ class PurgeTask(Task):
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
                                    minindex=minindex, nprimes=nprimes,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath), 
                                    **self.progparams[0])
         else:
             filelistname = self.workdir.make_filename("filelist")
@@ -1300,8 +1339,16 @@ class PurgeTask(Task):
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
                                    nprimes=nprimes, filelist=filelistname,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath), 
                                    **self.progparams[0])
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+        assert stdout is None
+        assert stderr is None
+        with open(str(stderrpath), "rb") as stderrfile:
+            stderr = stderrfile.read()
+        with open(str(stdoutpath), "rb") as stdoutfile:
+            stdout = stdoutfile.read()
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
@@ -1494,30 +1541,25 @@ class MergeTask(Task):
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             historyfile = self.workdir.make_filename("history")
-            progname = cadoprograms.Merge.name
-            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
-            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
-                                   stdout=str(stdoutfilename), append_stdout=True,
-                                   stderr=str(stderrfilename), append_stderr=True,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath),
                                    **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            (identifier, rc, stdout, stderr, output_files) = \
+                    self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index")
             mergedfile = self.workdir.make_filename("small.bin")
-            progname = cadoprograms.Replay.name
-            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
-            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             p = cadoprograms.Replay(binary=True,
                                     purged=purged_filename,
                                     history=historyfile, index=indexfile,
-                                    out=mergedfile, stdout=str(stdoutfilename),
-                                    append_stdout=True,
-                                    stderr=str(stderrfilename),
-                                    append_stderr=True,
+                                    out=mergedfile, stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
                                     **self.progparams[1])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
@@ -1575,15 +1617,13 @@ class LinAlgTask(Task):
             workdir = self.workdir.make_dirname()
             self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
-            progname = cadoprograms.BWC.name
-            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
-            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = os.path.realpath(str(mergedfile))
             wdir = os.path.realpath(str(workdir))
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left", 
-                                 stdout=str(stdoutfilename), append_stdout=True, 
-                                 stderr=str(stderrfilename), append_stderr=True,
+                                 stdout=str(stdoutpath),
+                                 stderr=str(stderrpath),
                                  **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1635,15 +1675,14 @@ class CharactersTask(Task):
             densefilename = self.send_request(Request.GET_DENSE_FILENAME)
             dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
             
-            progname = cadoprograms.Characters.name
-            stdoutfilename = self.workdir.make_filename("%s.stdout" % progname)
-            stderrfilename = self.workdir.make_filename("%s.stderr" % progname)
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.Characters.name)
             p = cadoprograms.Characters(poly=polyfilename,
                     purged=purgedfilename, index=indexfilename,
                     wfile=dependencyfilename, out=kernelfilename,
-                    heavyblock=densefilename, stdout=str(stdoutfilename),
-                    append_stdout=True, stderr=str(stderrfilename),
-                    append_stderr=True, **self.progparams[0])
+                    heavyblock=densefilename, stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "")
             if rc:
