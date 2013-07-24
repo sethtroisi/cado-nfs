@@ -80,7 +80,7 @@ def do_upload(dbfilename, input = sys.stdin, output = sys.stdout):
 
         # Test if WUid and clientid was set:
         if not WUid.value:
-            message = 'No work unit was specified'
+            message = 'No workunit was specified'
         elif not clientid.value:
             message = 'No client id was specified'
 
@@ -121,11 +121,11 @@ def do_upload(dbfilename, input = sys.stdin, output = sys.stdout):
             file.close()
             
             # Example output:
-            # upload.py: The file "testrun.polyselect.0-5000" for work unit 
+            # upload.py: The file "testrun.polyselect.0-5000" for workunit 
             # testrun_polyselect_0-5000 was uploaded successfully by client 
             # localhost and stored as /localdisk/kruppaal/work/testrun.upload/
             # testrun.polyselect.0-5000.kcudj7, received 84720 bytes.
-            message = message + 'The file "' + basename + '" for work unit ' + WUid.value + \
+            message = message + 'The file "' + basename + '" for workunit ' + WUid.value + \
                 ' was uploaded successfully by client ' + clientid.value + \
                 ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.\n'
         wu = wudb.WuAccess(dbfilename)

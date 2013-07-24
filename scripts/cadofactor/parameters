@@ -1,19 +1,22 @@
 # Parameters form a tree structure. 
 # A parameter of the form
 # foo.bar.baz = 42
-# is said to have path foo.bar, key baz, and value 42.
+# is said to have path "foo.bar", key "baz", and value "42".
+
+# All quotes in the comments in this file are for emphasis and not part of
+# the parameters.
 
 # Objects of the Python scripts that take parameters from the parameter file 
 # have a path associated with them; for example, the Sieving task uses path
-# tasks.sieving, and the las siever run in the Sieving task uses
-# tasks.sieving.las. When looking for a parameter, we start at the object's 
+# "tasks.sieving", and the las siever run in the Sieving task uses
+# "tasks.sieving.las". When looking for a parameter, we start at the object's 
 # path, then work towards to root of the tree until the key is found.
 
-Some variable substitution occurs in the values specified in a parameter file:
-A string of the form "${FOO}" is substituted by the value of the shell
-environment variable $FOO.
-A string of the form "$(foo)" is substituted by the value of the parameter
-with key "foo", where the search starts at the path where "$(foo)" occurred.
+# Some variable substitution occurs in the values specified in a parameter file:
+# A string of the form "${FOO}" is substituted by the value of the shell
+# environment variable "$FOO".
+# A string of the form "$(foo)" is substituted by the value of the parameter
+# with key "foo", where the search starts at the path where "$(foo)" occurred.
 
 
 # name: The name of the factorization project. Will be used as part of file
@@ -32,13 +35,13 @@ N = 90377629292003121684002147101760858109247336549001090677693
 
 # Adjust sourcedir to point to the root of your CADO source directory. 
 # This parameter is not actually used by cadofactor directly, but it is 
-# referenced # as $(sourcedir) further down in the parameter file.
+# referenced as $(sourcedir) further down in the parameter file.
 
 sourcedir=${HOME}/git/cado-nfs
 
 
 # Adjust builddir to point to the root of your CADO build directory
-# Not used directly, either.
+# Not used directly, either, but referenced, too.
 
 builddir=${HOME}/build/cado-nfs/normal
 
@@ -50,7 +53,7 @@ builddir=${HOME}/build/cado-nfs/normal
 # All the output files of sieving, filtering, etc., are stored under the
 # working directory.
 # In principle it is possible to specify a different working directory for
-# each tasks, which may be benefitial to use disk space across several file
+# each task, which may be beneficial to use disk space across several file
 # systems, or to let filtering tasks read from one hard drive while writing
 # to another, improving throughput. TODO: test that this actually works
 
@@ -58,16 +61,19 @@ tasks.workdir = /tmp/work/
 
 
 # execpath: Specify the search path for binary programs that should be run.
-# Each binary program that is run can be specified with execpath,
-# execsubdir, and execbin parameters; the script looks for the binary
-# executable in execpath/execsubdir/execbin and execpath/execbin, in this
+# Each binary program that is run can be specified with "execpath",
+# "execsubdir", and "execbin" parameters; the script looks for the binary
+# executable as "execpath/execsubdir/execbin" and "execpath/execbin", in this
 # order. Defaults for these parameters are defined for each program in
 # cadoprograms.py.
-# The Program instances use path, e.g., "tasks.sieving.las", or
+# The Program instances use parameter path, e.g., "tasks.sieving.las", or
 # "tasks.filter.merge.merge", but of course can find their parameter from 
-# further up the parameter tree, such as "tasks".
+# further up the parameter tree, such as in "tasks".
 
 tasks.execpath=$(builddir)
+# Example: if you wanted to use a debugging-enabled binary for las which
+# is in "${HOME}/build/cado-nfs/debug", you could specify
+# tasks.sieving.las.execpath=${HOME}/build/cado-nfs/debug
 
 
 # verbose: Verbosity of program output. Many programs accept a -v (or
@@ -76,10 +82,13 @@ tasks.execpath=$(builddir)
 # sub-programs.
 
 tasks.verbose = 1
+# An example of overriding the tasks.verbose=1 for the polyselect task
+# tasks.polyselect.verbose = 0
+
 
 # rlim, lpbr, mfbr, rlambda, alim, lpba, mfba, alambda: The sieving
 # parameters. Also used by several other Tasks and Programs, so best
-# specified at path "tasks" where everything can find them.
+# specified at path "tasks" where everyone can find them.
 
 tasks.rlim=50000
 tasks.alim=100000
@@ -97,9 +106,6 @@ tasks.alambda=1.2
 
 tasks.threads=2
 
-
-# An example of overriding the tasks.verbose=1 for the polyselect task
-tasks.polyselect.verbose = 0
 
 # P, degree, admin, admax, adrange: Parameters for the polynomial search
 tasks.polyselect.P = 420
@@ -139,8 +145,8 @@ server.port = 8012
 
 
 # Clients which cadofactor should start are specified under "slaves".
-# It looks for any path under "slaves" with a "hostnames" key, then for each host
-# names specified (comma separated list, with multiplicity), one slave is
+# We look for any path under "slaves" with a "hostnames" key, then for each 
+# hostname specified (comma separated list, with multiplicity), one slave is
 # launched on that host.
 # If the hostname is of the form "@filename", then the host names are read
 # from the file "filename", one host name per line.
@@ -165,3 +171,14 @@ slaves.caramel.scriptpath = $(sourcedir)/scripts/cadofactor
 # download attempts from the server
 
 slaves.caramel.downloadretry = 10
+
+
+# basepath: defines the base directory under which wuclient creates its
+# download and working directories. It is permissible to let all clients use
+# the same download directory; files are protected by locking to prevent
+# download races. If the download directory is on a shared file system, then
+# this filesystem must support locking.
+# The working directories should probably be unique; the default choice for
+# the working directory includes the clientid which should ensure uniqueness.
+
+slaves.caramel.basepath = /tmp/wuclient
