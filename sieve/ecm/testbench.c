@@ -364,7 +364,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (15, fbb, lpb);
+      strategy = facul_make_strategy (fbb, lpb);
     }
   else
     {
