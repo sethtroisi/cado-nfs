@@ -93,7 +93,6 @@ char *argv0;			/* = argv[0]; */
 static index_t **rel_compact = NULL;	/* see above */
 weight_t *ideals_weight = NULL;
 
-static char **fic;
 static bit_vector rel_used, Tbv;
 static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
 static index_t relsup, prisup;
@@ -617,7 +616,7 @@ char **filelist_from_file_with_subdirlist(const char *basepath,
     char **sl = filelist_from_file(basepath, subdirlist, 1);
     for (char **p = sl; *p; p++, nsubdirs++);
 
-    fic = (char **) malloc((nsubdirs * nfiles + 1) * sizeof(char *));
+    char ** fic = (char **) malloc((nsubdirs * nfiles + 1) * sizeof(char *));
     ASSERT_ALWAYS(fic != NULL);
 
     char **full = fic;
@@ -668,18 +667,20 @@ int main(int argc, char **argv)
 {
     argv0 = argv[0];
     int k;
-    size_t rel_used_nb_bytes;
     param_list pl;
     uint64_t min_index = UMAX(uint64_t);
     index_t nrels, nprimes;
-    size_t tot_alloc_bytes = 0, cur_alloc;
+    size_t tot_alloc_bytes = 0;
     FILE *f_remaining = NULL, *f_deleted = NULL;
+    char ** input_files;
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;		/* Binary open for all files */
 #endif
 
     double wct0 = wct_seconds();
+
+    /* {{{ command-line */
     fprintf(stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
 	fprintf(stderr, " %s", argv[k]);
@@ -704,24 +705,41 @@ int main(int argc, char **argv)
     param_list_parse_uint64(pl, "nrels", &nrelmax);
     param_list_parse_uint64(pl, "nprimes", &nprimemax);
     param_list_parse_int64(pl, "keep", &keep);
+
+    /* Only look at relations of index above minindex */
     param_list_parse_uint64(pl, "minindex", &min_index);
+
+
     param_list_parse_uint(pl, "npthr", &npt);
     param_list_parse_uint(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
     const char *path_antebuffer =
 	param_list_lookup_string(pl, "path_antebuffer");
-    const char *filelist = param_list_lookup_string(pl, "filelist");
+
+    /* These three specify the set of input files, of the form <base
+     * path>/<one of the possible subdirs>/<one of the possible file
+     * names>
+     *
+     * possible subdirs are lister in the file passed as subdirlist.
+     * Ditto for possible file names.
+     *
+     * file names need not be basenames, i.e. they may contain directory
+     * components. subdirlist and basepath are optional.
+     */
     const char *basepath = param_list_lookup_string(pl, "basepath");
     const char *subdirlist = param_list_lookup_string(pl, "subdirlist");
+    const char *filelist = param_list_lookup_string(pl, "filelist");
     const char *purgedname = param_list_lookup_string(pl, "out");
     const char *deletedname = param_list_lookup_string(pl, "outdel");
-
-    set_antebuffer_path(argv0, path_antebuffer);
 
     if (param_list_warn_unused(pl)) {
 	fprintf(stderr, "Unused options in command-line\n");
 	usage(argv0);
     }
+    /* }}} */
+
+    set_antebuffer_path(argv0, path_antebuffer);
+
     /*{{{ build the list of input files from the given args*/
     if ((basepath || subdirlist) && !filelist) {
 	fprintf(stderr,
@@ -735,15 +753,16 @@ int main(int argc, char **argv)
     }
 
     if (!filelist)		// If no filelist was given, files are on the command-line
-	fic = argv;
-    else if (!subdirlist)	//If no subdirlist was given, fic is easy to construct
-	fic = filelist_from_file(basepath, filelist, 0);
+	input_files = argv;
+    else if (!subdirlist)	//If no subdirlist was given, input_files is easy to construct
+	input_files = filelist_from_file(basepath, filelist, 0);
     else			//with subdirlist is a little bit trickier
-	fic =
+	input_files =
 	    filelist_from_file_with_subdirlist(basepath, filelist,
 					       subdirlist);
     /*}}}*/
-    /*{{{ the hash table needs several static parameters on the command
+    /*{{{ argument checking, and some statistics for things related to
+     * the hash table. It needs several static parameters on the command
      * line. This is cumbersome, but while it can probably be avoided, it
      * also hard to do so efficiently */
     if (nrelmax == 0) {
@@ -769,7 +788,6 @@ int main(int argc, char **argv)
 	exit(1);
     }
     ASSERT_ALWAYS(min_index <= nprimemax);
-    /*}}}*/
 
     /* Printing relevant information */
     fprintf(stderr, "Weight function used during clique removal:\n"
@@ -782,55 +800,50 @@ int main(int argc, char **argv)
     fprintf(stderr,
 	    "Number of prime ideals below the two large prime bounds: " "%"
 	    PRIu64 "\n", nprimemax);
+    /*}}}*/
 
-    /* Allocating memory. We are keeping track of the total malloc()'ed
-     * amount, only for informational purposes. */
+    /* {{{ Allocating memory. We are keeping track of the total
+     * malloc()'ed amount only for informational purposes */
 
-    cur_alloc = nprimemax * sizeof(weight_t);
-    ideals_weight = (weight_t *) malloc(cur_alloc);
-    ASSERT_ALWAYS(ideals_weight != NULL);
-    tot_alloc_bytes += cur_alloc;
-    fprintf(stderr, "Allocated ideals_weight of %zuMb (total %zuMb so far)\n",
-	    cur_alloc >> 20, tot_alloc_bytes >> 20);
-    memset(ideals_weight, 0, cur_alloc);
+    /* {{{ Some macros for tracking memory-consuming variables */
+#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {			\
+    variable_ = (type_ *) malloc(amount_ * sizeof(type_));		\
+    ASSERT_ALWAYS(variable_ != NULL);					\
+    tot_alloc_bytes += amount_ * sizeof(type_);				\
+    fprintf(stderr,							\
+            "Allocated " #variable_ " of %zuMb (total %zuMb so far)\n",	\
+	    (amount_ * sizeof(type_)) >> 20, tot_alloc_bytes >> 20);	\
+} while (0)
 
-    rel_used_nb_bytes = (nrelmax + 7) >> 3;
-    bit_vector_init(rel_used, nrelmax);
-    ASSERT_ALWAYS(rel_used->p != NULL);
-    tot_alloc_bytes += rel_used_nb_bytes;
-    fprintf(stderr, "Allocated rel_used of %zuMB (total %zuMB so far)\n",
-	    rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
+#define ALLOC_VERBOSE_CALLOC(type_, variable_, amount_) do {		\
+    ALLOC_VERBOSE_MALLOC(type_, variable_, amount_);                    \
+    /* Do this now so that we crash early if kernel overcommitted memory\
+     */									\
+    memset(variable_, 0, amount_);					\
+} while (0)
+
+#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {			\
+    bit_vector_init(variable_, amount_);				\
+    ASSERT_ALWAYS(variable_->p != NULL);				\
+    size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
+    tot_alloc_bytes += cur_alloc;					\
+    fprintf(stderr,                                                     \
+            "Allocated rel_used of %zuMB (total %zuMB so far)\n",       \
+	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
+} while (0)
+    /* }}} */
+
+    ALLOC_VERBOSE_CALLOC(weight_t, ideals_weight, nprimemax);
+    ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrelmax);
 
     bit_vector_set(rel_used, 1);
     nrels = nrelmax;
 
-    /* For the last byte of rel_used, put the bits to 0 if it does not
-     * correspond to a rel num */
-    if (nrelmax & (BV_BITS - 1))
-	rel_used->p[nrelmax >> LN2_BV_BITS] &=
-	    (((bv_t) 1) << (nrelmax & (BV_BITS - 1))) - 1;
+    ALLOC_VERBOSE_BIT_VECTOR(Tbv, nrelmax);
+    ALLOC_VERBOSE_MALLOC(index_t, sum2_index, nprimemax);
+    ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
 
-    bit_vector_init(Tbv, nrelmax);
-    ASSERT_ALWAYS(Tbv->p != NULL);
-    tot_alloc_bytes += rel_used_nb_bytes;
-    fprintf(stderr, "Allocated Tbv of %zuMB (total %zuMB so far)\n",
-            rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
-
-    cur_alloc = nprimemax * sizeof(index_t);
-    sum2_index = (index_t *) malloc(cur_alloc);
-    ASSERT_ALWAYS(sum2_index != NULL);
-    tot_alloc_bytes += cur_alloc;
-    fprintf(stderr,
-            "Allocated sum2_index of %zuMb (total %zuMb so far)\n",
-            cur_alloc >> 20, tot_alloc_bytes >> 20);
-
-    cur_alloc = nrelmax * sizeof(index_t *);
-    rel_compact = (index_t **) malloc(cur_alloc);
-    ASSERT_ALWAYS(rel_compact != NULL);
-    tot_alloc_bytes += cur_alloc;
-    fprintf(stderr,
-            "Allocated rel_compact of %zuMb (total %zuMb so far)\n",
-            cur_alloc >> 20, tot_alloc_bytes >> 20);
+    /* }}} */
 
     /****************** Begin interesting stuff *************************/
     info_mat_t info;
@@ -838,7 +851,7 @@ int main(int argc, char **argv)
             "%" PRIu64 "\n", min_index);
 
     /* first pass over relations in files */
-    info = process_rels(fic, &thread_insert, NULL, min_index, NULL, rel_used,
+    info = process_rels(input_files, &thread_insert, NULL, min_index, NULL, rel_used,
 			STEP_PURGE_PASS1);
     nprimes = info.nprimes;
 
@@ -917,7 +930,7 @@ int main(int argc, char **argv)
 
     /* second pass over relations in files */
     FILE *outfd[2] = { f_remaining, f_deleted };
-    info = process_rels(fic, &thread_print, NULL, 0, outfd, rel_used,
+    info = process_rels(input_files, &thread_print, NULL, 0, outfd, rel_used,
 			STEP_PURGE_PASS2);
 
 
@@ -940,7 +953,7 @@ int main(int argc, char **argv)
     bit_vector_clear(Tbv);
 
     if (filelist)
-	filelist_clear(fic);
+	filelist_clear(input_files);
 
     fclose_maybe_compressed(f_remaining, purgedname);
     if (f_deleted != NULL)
