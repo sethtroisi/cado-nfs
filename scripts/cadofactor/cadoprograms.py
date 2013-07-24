@@ -29,7 +29,7 @@ class InspectType(type):
         cls.init_signature = inspect.getfullargspec(cls.__init__)
 
 
-class Option(metaclass=abc.ABCMeta):
+class Option(object, metaclass=abc.ABCMeta):
     ''' Base class for command line options that may or may not take parameters
     '''
     # TODO: decide whether we need '-' or '/' as command line option prefix
@@ -280,7 +280,7 @@ class Program(object, metaclass=InspectType):
         """ Extract the elements of this class' __init__() annotations where
         the annotation is an Option instance
         """
-        return {key:val for (key,val) in cls.__init__.__annotations__.items()
+        return {key:val for (key, val) in cls.__init__.__annotations__.items()
                 if isinstance(val, Option)}
 
     @classmethod
@@ -342,7 +342,7 @@ class Program(object, metaclass=InspectType):
                 if param == self.init_signature.varargs:
                     # vararg is a list; we need to convert each entry to string
                     # and append this list of strings to files
-                   files.extend(map(str, self.parameters[param]))
+                    files.extend(map(str, self.parameters[param]))
                 else:
                     files.append(str(self.parameters[param]))
         return files

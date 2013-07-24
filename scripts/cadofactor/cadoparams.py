@@ -293,7 +293,8 @@ class Parameters(object):
             # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
             (key, value) = (s.strip() for s in line2.split('=', 1))
             if old_format:
-                key = self.translate_old_key[key]
+                # If key is not found in translate_old_key, we use it unchanged
+                key = self.translate_old_key.get(key, key)
                 if key is None:
                     continue
             value = self.subst_env_var(key, value)

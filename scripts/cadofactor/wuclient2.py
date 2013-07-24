@@ -813,9 +813,9 @@ if __name__ == '__main__':
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
-        os.mkdir(SETTINGS["DLDIR"])
+        os.makedirs(SETTINGS["DLDIR"])
     if not os.path.isdir(SETTINGS["WORKDIR"]):
-        os.mkdir(SETTINGS["WORKDIR"])
+        os.makedirs(SETTINGS["WORKDIR"])
 
     # print (str(SETTINGS))
 
