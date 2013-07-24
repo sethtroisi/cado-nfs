@@ -55,8 +55,8 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
             return [f for (f, s) in self.output_files.items() if condition(s)]
     
     def forget_output_filenames(self, filenames):
-        for f in filenames:
-            del(self.output_files[f])
+        for filename in filenames:
+            del(self.output_files[filename])
     
     @abc.abstractclassmethod
     def make_tablename(self, name):
@@ -78,7 +78,7 @@ class Polynomial(object):
         """ Parse a polynomial file in the syntax as produced by polyselect2l 
         """
         self.poly = None
-        self.E = 0.
+        self.MurphyE = 0.
         poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
@@ -91,22 +91,22 @@ class Polynomial(object):
             # extract the value and store it
             match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
             if match:
-                self.E = float(match.group(1))
+                self.MurphyE = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
-            l = line.split('#', 1)[0].strip()
+            line2 = line.split('#', 1)[0].strip()
             # If nothing is left, process next line
-            if not l:
+            if not line2:
                 continue
             # All remaining lines must be of the form "x: y"
-            a = l.split(":")
-            if not len(a) == 2:
-                raise Exception("Invalid line %s" % l)
-            key = a[0].strip()
-            value = a[1].strip()
+            array = line2.split(":")
+            if not len(array) == 2:
+                raise Exception("Invalid line %s" % line)
+            key = array[0].strip()
+            value = array[1].strip()
             if not key in dict(self.keys):
                 raise Exception("Invalid key %s in line %s" %
-                                (key, l))
+                                (key, line))
             poly[key] = value
         for (key, isrequired) in self.keys:
             if isrequired and not key in poly:
@@ -127,17 +127,17 @@ class Polynomial(object):
     def is_valid(self):
         return not self.poly is None
     
-    def setE(self, E):
-        self.E = float(E)
+    def setE(self, MurphyE):
+        self.MurphyE = float(MurphyE)
     
     def create_file(self, filename, params):
         # Write polynomial to a file, and add lines with parameters such as 
         # "alim" if supplied in params 
-        with open(str(filename), "w") as f:
-            f.write(str(self))
+        with open(str(filename), "w") as poly_file:
+            poly_file.write(str(self))
             for key in self.paramnames:
                 if key in params:
-                    f.write(key + ": %s\n" % params[key])
+                    poly_file.write(key + ": %s\n" % params[key])
 
 
 class FilePath(object):
@@ -559,7 +559,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g", 
-                             self.state["bestfile"], self.bestpoly.E)
+                             self.state["bestfile"], self.bestpoly.MurphyE)
         else:
             self.logger.info("No polynomial was previously found")
         
@@ -576,7 +576,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                                "search range bound admax, or maxnorm")
             return
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
-                         "= %g", self.state["bestfile"] , self.bestpoly.E)
+                         "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
         return
     
@@ -608,22 +608,22 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', outputfile)
             return False
-        if not poly.E:
+        if not poly.MurphyE:
             self.logger.error("Polynomial in file %s has no Murphy E value" 
                               % outputfile)
             return False
-        if self.bestpoly is None or poly.E > self.bestpoly.E:
+        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
             self.bestpoly = poly
-            update = {"bestE": poly.E, "bestpoly": str(poly),
+            update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
                       "bestfile": outputfile}
             self.state.update(update)
             self.logger.info("New best polynomial from file %s:"
-                             " Murphy E = %g" % (outputfile, poly.E))
+                             " Murphy E = %g" % (outputfile, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
         else:
             self.logger.info("Best polynomial from file %s with E=%g is "
                              "no better than current best with E=%g",
-                             outputfile, poly.E, self.bestpoly.E)
+                             outputfile, poly.MurphyE, self.bestpoly.MurphyE)
         return True
     
     def write_poly_file(self):
@@ -2185,7 +2185,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                              parameters = parameters, 
                              path_prefix = parampath)
         
-        # Defines an order on tasks in which tasks that want to run should be run
+        # Defines an order on tasks in which tasks that want to run should be
+        # run
         self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
@@ -2213,7 +2214,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
-            Request.GET_DEPENDENCY_FILENAME: self.linalg.get_dependency_filename,
+            Request.GET_DEPENDENCY_FILENAME: \
+                self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
@@ -2239,7 +2241,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def run_next_task(self):
         for task in self.tasks:
             if task in self.tasks_that_want_to_run:
-                # self.logger.info("Next task that wants to run: %s", task.title)
+                # self.logger.info("Next task that wants to run: %s",
+                #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
                 task.run()
                 return True
