@@ -57,7 +57,7 @@ void renumber_init (renumber_t, cado_poly, unsigned long *);
 int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
 void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *, const char *, int);
-void renumber_close_write (renumber_t);
+void renumber_close_write (renumber_t, const char *);
 void renumber_read_table (renumber_t, const char *);
 void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);

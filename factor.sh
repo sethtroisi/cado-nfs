@@ -183,10 +183,10 @@ mkdir $t/tmp
 
 
 if $python; then
-  $cadofactor --old "$t/param" n=$n bindir="$bindir" \
-  sieve_max_threads=$cores poly_max_threads=$cores nthchar=$cores \
-  bwmt=$cores wdir="$t" slaves="$host" scriptpath="$scriptpath" \
-  serveraddress=localhost "$@"
+  $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
+  threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
+  slaves.scriptpath="$scriptpath" server.address=localhost \
+  slaves.basepath="$t/client/" "$@"
 else
   cat > $t/mach_desc <<EOF
 [local]

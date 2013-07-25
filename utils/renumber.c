@@ -322,14 +322,18 @@ void
 renumber_init_write (renumber_t tab, const char *tablefile, const char *badfile,
                      int add_full_col)
 {
-  fprintf (stderr, "Opening %s to write the renumbering table\n", tablefile);
-  tab->file = fopen(tablefile, "w");
+  // Open a file with no extension. Compression is done later if needed
+  char * tablefile_tmp = NULL;
+  int rc;
+  rc = asprintf(&tablefile_tmp, "%s-tmp", tablefile);
+  ASSERT_ALWAYS(rc >= 0);
+  fprintf (stderr, "Opening %s to write the temporary renumbering table\n",
+                   tablefile_tmp);
+  tab->file = fopen(tablefile_tmp, "w");
   ASSERT_ALWAYS(tab->file != NULL);
 
   tab->add_full_col = (add_full_col) ? 1 : 0;
   tab->size = (add_full_col) ? 1 : 0;
-
-  fprintf (tab->file, "##################################################\n");
 
   // Write first the bad ideals information at the beginning of file
   if (badfile != NULL)
@@ -338,18 +342,53 @@ renumber_init_write (renumber_t tab, const char *tablefile, const char *badfile,
     tab->bad_ideals.n = 0;
 
   print_info (stderr, tab);
+  free(tablefile_tmp);
 }
 
 void
-renumber_close_write (renumber_t tab)
+renumber_close_write (renumber_t tab, const char *tablefile)
 {
-  // Put the right value of size.
-  rewind (tab->file);
-  fprintf (tab->file, "%u %" PRid " %d %d %lu %lu\n", tab->nb_bits, tab->size,
-      tab->bad_ideals.n, tab->add_full_col, tab->lpbr, tab->lpba);
+  char * tablefile_tmp = NULL;
+  int rc;
+  rc = asprintf(&tablefile_tmp, "%s-tmp", tablefile);
+  ASSERT_ALWAYS(rc >= 0);
 
+
+  // Compression is now if needed
+  FILE *final = NULL;
+  fclose(tab->file);
+  fprintf (stderr, "Opening %s to read the temporary renumbering table\n",
+                   tablefile_tmp);
+  tab->file = fopen(tablefile_tmp, "r");
+  ASSERT_ALWAYS(tab->file != NULL);
+  fprintf (stderr, "Opening %s to write the final renumbering table\n",
+                   tablefile);
+  final = fopen_maybe_compressed (tablefile, "w");
+  ASSERT_ALWAYS (final != NULL);
+
+  // First we put some data about the renumbering table.
+  fprintf (final, "%u %" PRid " %d %d\n", tab->nb_bits, tab->size,
+                                     tab->bad_ideals.n, tab->add_full_col);
+
+  char buffer[128] = "" , *retc;
+  int ret;
+  do
+  {
+    ret = fputs (buffer, final);
+    ASSERT (ret >= 0);
+
+    retc = fgets (buffer, 128, tab->file);
+  } while (retc != NULL);
+
+  ASSERT_ALWAYS (feof(tab->file));
+
+  fclose_maybe_compressed (final, tablefile);
   fclose(tab->file);
 
+  //remove tmp file
+  ASSERT_ALWAYS (remove(tablefile_tmp) == 0);
+
+  free (tablefile_tmp);
   fprintf(stderr, "Renumbering struct: nprimes=%"PRid"\n", tab->size);
   renumber_free(tab);
 }
@@ -364,7 +403,6 @@ renumber_read_table (renumber_t tab, const char * filename)
   double t = wct_seconds ();
   uint8_t old_nb_bits = tab->nb_bits;
   char s[RENUMBER_MAXLINE];
-  char * rets;
   size_t bytes_read = 0;
   p_r_values_t v, prev_v = 0;
 
@@ -396,9 +434,6 @@ renumber_read_table (renumber_t tab, const char * filename)
 
   // Allocating memory
   renumber_alloc(tab);
-
-  rets = fgets(s, RENUMBER_MAXLINE, tab->file); //read the line of ####
-  ASSERT_ALWAYS (rets != NULL);
 
   // Begin to read the renumbering table
   i = 0;
@@ -464,7 +499,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   fclose_maybe_compressed (tab->file, filename);
 }
 
-int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p, 
+int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
   *first = 0;

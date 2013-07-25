@@ -2,6 +2,8 @@ import os
 import platform
 import abc
 import inspect
+import hashlib
+import logging
 import cadocommand
 import cadologger
 
@@ -29,7 +31,7 @@ class InspectType(type):
         cls.init_signature = inspect.getfullargspec(cls.__init__)
 
 
-class Option(metaclass=abc.ABCMeta):
+class Option(object, metaclass=abc.ABCMeta):
     ''' Base class for command line options that may or may not take parameters
     '''
     # TODO: decide whether we need '-' or '/' as command line option prefix
@@ -122,6 +124,37 @@ class Toggle(Option):
         else:
             raise ValueError("Toggle.map() requires a boolean type argument")
 
+class Sha1Cache(object):
+    """ A class that computes SHA1 sums for files and caches them, so that a
+    later request for the SHA1 sum for the same file is not computed again.
+    File identity is checked only via the file's realpath.
+    """
+    def __init__(self):
+        self._sha1 = {}
+
+    @staticmethod
+    def _read_file_in_blocks(file_object):
+        blocksize = 65536
+        while True:
+            data = file_object.read(blocksize)
+            if not data:
+                break
+            yield data
+
+    def get_sha1(self, filename):
+        realpath = os.path.realpath(filename)
+        if not realpath in self._sha1:
+            logger = logging.getLogger("Sha1Cache")
+            logger.debug("Computing SHA1 for file %s", realpath)
+            with open(realpath, "rb") as inputfile:
+                sha1 = hashlib.sha1()
+                for data in self._read_file_in_blocks(inputfile):
+                    sha1.update(data)
+            self._sha1[realpath] = sha1.hexdigest()
+            logger.debug("SHA1 for file %s is ", realpath, self._sha1[realpath])
+        return self._sha1[realpath]
+
+sha1cache = Sha1Cache()
 
 class Program(object, metaclass=InspectType):
     ''' Base class that represents programs of the CADO suite
@@ -280,7 +313,7 @@ class Program(object, metaclass=InspectType):
         """ Extract the elements of this class' __init__() annotations where
         the annotation is an Option instance
         """
-        return {key:val for (key,val) in cls.__init__.__annotations__.items()
+        return {key:val for (key, val) in cls.__init__.__annotations__.items()
                 if isinstance(val, Option)}
 
     @classmethod
@@ -342,7 +375,7 @@ class Program(object, metaclass=InspectType):
                 if param == self.init_signature.varargs:
                     # vararg is a list; we need to convert each entry to string
                     # and append this list of strings to files
-                   files.extend(map(str, self.parameters[param]))
+                    files.extend(map(str, self.parameters[param]))
                 else:
                     files.append(str(self.parameters[param]))
         return files
@@ -429,10 +462,13 @@ class Program(object, metaclass=InspectType):
         return cmdline
 
     def make_wu(self, wuname):
+        def append_file(wu, key, filename):
+            wu.append('%s %s' % (key, os.path.basename(filename)))
+            wu.append('CHECKSUM %s' % sha1cache.get_sha1(filename))
         workunit = ['WORKUNIT %s' % wuname]
         for filename in self.get_input_files():
-            workunit.append('FILE %s' % os.path.basename(filename))
-        workunit.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
+            append_file(workunit, 'FILE', filename)
+        append_file(workunit, 'EXECFILE', self.get_exec_file())
         cmdline = self.make_command_line(binpath = "${DLDIR}",
             inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
         workunit.append('COMMAND %s' % cmdline)

@@ -518,7 +518,7 @@ main (int argc, char *argv[])
 #endif
     fprintf (stderr, "# Free relations: %lu\n", nfree);
 
-    renumber_close_write (renumber_table);
+    renumber_close_write (renumber_table, renumberfilename);
     cado_poly_clear (cpoly);
 
     return 0;

@@ -2239,7 +2239,7 @@ main (int argc, char *argv[])
       tries ++;
       if (verbose >= 1)
       {
-        gmp_printf ("%d ad=%lu\n", tries, admin);
+        gmp_printf ("# %d ad=%lu\n", tries, admin);
       }
       T[i]->ad = admin;
 #ifndef MAX_THREADS

@@ -567,8 +567,10 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         fprintf(las->output, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
+        fprintf(las->output, "# Using %d+3 P-1/P+1/ECM curves\n",
+                nb_curves (sc->sides[s]->lpb));
         si->sides[s]->strategy = facul_make_strategy(
-                NB_CURVES, sc->sides[s]->lim, sc->sides[s]->lpb);
+                sc->sides[s]->lim, sc->sides[s]->lpb);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
@@ -1385,22 +1387,16 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, siev
 #endif
 static inline plattice_x_t plattice_a(const plattice_info_t * pli, sieve_info_srcptr si)
 {
-    int32_t a0 = PLI_COEFF(pli, a0);
-    uint32_t a1 = PLI_COEFF(pli, a1);
-    if (a1 > (uint32_t) si->J || (a1 == (uint32_t) si->J && a0 > 0))
-      return UINT64_MAX>>2;
-    else
-      return (a1 << si->conf->logI) + a0;
+    int64_t a0 = PLI_COEFF(pli, a0);
+    uint64_t a1 = PLI_COEFF(pli, a1);
+    return (a1 << si->conf->logI) + a0;
 }
 
 static inline plattice_x_t plattice_c(const plattice_info_t * pli, sieve_info_srcptr si)
 {
-    int32_t b0 = PLI_COEFF(pli, b0);
-    uint32_t b1 = PLI_COEFF(pli, b1);
-    if (b1 > (uint32_t) si->J || (b1 == (uint32_t) si->J && b0 > 0))
-      return UINT64_MAX>>2;
-    else
-      return (b1 << si->conf->logI) + b0;
+    int64_t b0 = PLI_COEFF(pli, b0);
+    uint64_t b1 = PLI_COEFF(pli, b1);
+    return (b1 << si->conf->logI) + b0;
 }
 
 static inline uint32_t plattice_bound0(const plattice_info_t * pli, sieve_info_srcptr si MAYBE_UNUSED)
@@ -1416,7 +1412,7 @@ static inline uint32_t plattice_bound1(const plattice_info_t * pli, sieve_info_s
 
 /* This is for working with congruence classes only */
 NOPROFILE_INLINE
-plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, int par MAYBE_UNUSED)
+plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, unsigned int par )
 {
     /* With MOD2_CLASSES_BS set up, we have computed by the function
      * above an adapted basis for the band of total width I/2 (thus from
@@ -1491,15 +1487,6 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
     * Clearly, above, for the congruence class (0,1), we must start with
     * this vector, not with the sum.
     */
-#if !MOD2_CLASSES_BS
-    /* In case we don't consider congruence classes at all, then there is
-     * nothing very particular to be done */
-    plattice_x_t x = (1 << (si->conf->logI-1));
-    uint32_t i = x;
-    if (i >= plattice_bound1(pli, si)) x += plattice_a(pli, si);
-    if (i <  plattice_bound0(pli, si)) x += plattice_c(pli, si);
-    return x;
-#else
     int32_t a0 = pli->a0;
     int32_t a1 = pli->a1;
     int32_t b0 = pli->b0;
@@ -1514,11 +1501,7 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
         v[0] = a0-b0;
         v[1] = a1-b1;
     }
-
-    if (v[1] > (int32_t) si->J)
-      return UINT64_MAX>>2;
     return (v[1] << si->conf->logI) | (v[0] + (1 << (si->conf->logI-1)));
-#endif
 }
 
 /* }}} */
@@ -1557,15 +1540,15 @@ typedef const struct thread_data_s * thread_data_srcptr;
 /* {{{ fill_in_buckets */
 
 #ifdef SKIP_GCD3
-#define PIB_SKIP_GCD3()					\
+#define FILL_BUCKET_SKIP_GCD3()					\
   && (!is_divisible_3_u32 (i + I) ||			\
       !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
 #else
-#define PIB_SKIP_GCD3()
+#define FILL_BUCKET_SKIP_GCD3()
 #endif
 
 #ifdef TRACE_K								
-#define PIB_TRACE_K()							\
+#define FILL_BUCKET_TRACE_K()							\
   do {									\
   if (trace_on_spot_x(x)) {						\
     WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);				\
@@ -1576,37 +1559,41 @@ typedef const struct thread_data_s * thread_data_srcptr;
     ASSERT(test_divisible(w));						\
   } while(0)
 #else
-#define PIB_TRACE_K()
+#define FILL_BUCKET_TRACE_K()
 #endif
 
 #if LOG_BUCKET_REGION == 16			
-#define PIB_CX() do { *(uint16_t *)pu = (uint16_t) x; } while (0)
+#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) x; } while (0)
 #else									
-#define PIB_CX() do { *(uint16_t *)pu = (uint16_t) (x & maskbucket); } while (0)
+#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) (x & maskbucket); } while (0)
 #endif						
 
 #ifdef HAVE_SSE2							
-#define PIB_PREFETCH_PU() do { _mm_prefetch((char *)pu, _MM_HINT_T0); } while (0)
+#define FILL_BUCKET_PREFETCH_PU() do { _mm_prefetch((char *)pu, _MM_HINT_T0); } while (0)
 #else
-#define PIB_PREFETCH_PU()
+#define FILL_BUCKET_PREFETCH_PU()
 #endif
 
-#define PIB() do {							\
+#define FILL_BUCKET_INC_X() do {						\
+    if (i >= bound1) x += inc_a;					\
+    if (i < bound0)  x += inc_c;					\
+  } while (0)
+
+#define FILL_BUCKET() do {							\
     unsigned int i = x & maskI;						\
     if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
-	       PIB_SKIP_GCD3()						\
+	       FILL_BUCKET_SKIP_GCD3()						\
 	       )) {							\
       bucket_update_t **ppu, *pu;					\
       ppu = &(BA.bucket_write[x >> shiftbucket]);			\
       pu = *ppu;							\
-      PIB_TRACE_K();							\
-      PIB_CX();								\
+      FILL_BUCKET_TRACE_K();							\
+      FILL_BUCKET_CX();								\
       ((uint16_t *)pu)[1] = bep;					\
       *ppu = ++pu;							\
-      PIB_PREFETCH_PU();						\
+      FILL_BUCKET_PREFETCH_PU();						\
     }									\
-    if (i >= bound1) x += inc_a;					\
-    if (i < bound0)  x += inc_c;					\
+    FILL_BUCKET_INC_X();							\
   } while (0)
 
 void
@@ -1645,14 +1632,17 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     
 #define maskbucket (BUCKET_REGION - 1)
 #define shiftbucket LOG_BUCKET_REGION
+#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-    const uint32_t maskI = I-1;
-    const uint64_t even_mask = (1ULL << logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << logI;
+#endif
+    const uint32_t maskI = si->I-1;
+    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+
     // TODO: should be line sieved in the non-bucket phase?
     // Or should we have a bucket line siever?
-    if (UNLIKELY(r == 0))
+    if (UNLIKELY(!r))
       {
 	/* If r == 0 (mod p), this prime hits for i == 0 (mod p),
 	   but since p > I, this implies i = 0 or i > I. We don't
@@ -1660,7 +1650,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	   only need to sieve j = 1 */
 	/* x = j*I + (i + I/2) = I + I/2 */
 	bucket_update_t update;
-	uint32_t x = I + I / 2;
+	uint32_t x = si->I + (si->I >> 1);
 	update.x = (uint16_t) (x & maskbucket);
 	update.p = bucket_encode_prime (p);
 	WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
@@ -1687,7 +1677,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	   FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
 	   but which of these two (if any) do we sieve? */
 	bucket_update_t update;
-	update.x = (uint16_t) I / 2 + 1;
+	update.x = (uint16_t) ((si->I >> 1) + 1);
 	update.p = bucket_encode_prime (p);
 	WHERE_AM_I_UPDATE(w, N, 0);
 	WHERE_AM_I_UPDATE(w, x, update.x);
@@ -1717,25 +1707,36 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	continue; /* Simply don't consider that (p,r) for now.
 		     FIXME: can we find the locations to sieve? */
       }
-    uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
-    for(unsigned int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+
+    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+
+#if !MOD2_CLASSES_BS
+    const uint64_t				\
+      inc_a = plattice_a(&pli, si),
+      inc_c = plattice_c(&pli, si);
+    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint32_t i = x;
+    FILL_BUCKET_INC_X();
+    if (x >= IJ) continue;
+#else
+    for(unsigned int parity = 1 ; parity < 4; parity++) {
       // The sieving point (0,0) is I/2 in x-coordinate
       uint64_t x = plattice_starting_vector(&pli, si, parity);
       if (x >= IJ) continue;
+      const uint64_t				\
+	inc_a = plattice_a(&pli, si),
+	inc_c = plattice_c(&pli, si);
+#endif
       const uint16_t bep = (uint16_t) bucket_encode_prime (p);
-      const uint64_t					\
-	inc_a = (unsigned int) plattice_a(&pli, si),
-	inc_c = (unsigned int) plattice_c(&pli, si);
-      do {
-	PIB();
-	if (x >= IJ) break;
-	PIB();
-	if (x >= IJ) break;
-	PIB();
-	if (x >= IJ) break;
-	PIB();
+      do { 
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET(); if (x >= IJ) break;
+	FILL_BUCKET();
       } while (x < IJ);
+#if MOD2_CLASSES_BS
     }
+#endif
   }
   /* Write back BA so the nr_logp etc get copied to caller */
   th->sides[side]->BA = BA;

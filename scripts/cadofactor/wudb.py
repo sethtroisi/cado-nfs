@@ -1212,7 +1212,7 @@ if __name__ == '__main__': # {
     parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
     parser.add_argument('-add', action="store_true", 
-                        help='Add new work units. Contents of WU(s) are ' 
+                        help='Add new workunits. Contents of WU(s) are ' 
                         'read from stdin, separated by blank line')
     parser.add_argument('-assign', nargs = 1, metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')

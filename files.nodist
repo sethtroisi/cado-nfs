@@ -25,6 +25,10 @@ filter/print_table.c
 filter/purge-mt.c
 scripts/nightly-test
 scripts/polsel_effort
+scripts/cadofactor/parameters
+scripts/cadofactor/parameters.oar
+scripts/cadofactor/parameters.rsa512.oar
+scripts/cadofactor/index.html
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c

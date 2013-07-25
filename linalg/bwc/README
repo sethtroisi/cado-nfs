@@ -1,7 +1,7 @@
 
 *** THIS DOCUMENTATION IS NOT REGULARILY CHECKED TO BE UP-TO-DATE. ***
 
-last update: 20110320
+last update: 20130724
 
 See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
 to the exact meaning of most files.
@@ -187,11 +187,17 @@ expected to be present in the same directory as the calling binary.
 Some more internal parameters.
 
 * start=<value>, end=<value> limits for doing partial krylov/mksol
-* ys=<number y0>..<number y1> specify which sub-sequence to work with. [y0,y1[
-  must be a sub-interval of [0,n[ . (y1-y0) must be equal to
-  nbys*(1+interleaving), where nbys is the XXX value in uXXX_krylov for
-  instance.
-* checkpoints=[0|1] whether LINGEN must save checkpoints. This flag is NOT
+* ys=<number y0>..<number y1> specify which sub-sequence to work with.
+  In normal usage y0 should be 0, and y1 should be the parameter "n".
+  When interleaving=1, this interval is divided into two sub-intervals
+  describing two subsequences whose computation is interleaved. The
+  quantity K=(y1-y0)/(1+interleaving) quantifies the operating width of the
+  innermost arithmetical operations ; when K=64, operations are based on
+  unsigned longs (on 64-bit machines). Usual values for K are 64 and 128.
+  Note that when ys is different from 0..n, then computation only involves
+  some of the needed subsequences, not all -- and all subsequences must be
+  computed.
+* checkpoints=[0|1] deprecated. Do not use. Note that this flag is NOT
   used for krylov/mksol, which always store checkpoints.
 * splits=<number1>,<number2>,... Only for the auxilary program ``split''.
   Splits Y0-<n> (or equivalently F) in files V<number1>-<number2>.*,

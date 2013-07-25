@@ -2159,7 +2159,7 @@ sub do_freerels {
               "-lpba $param{'lpba'} ".
               "-minlim $minlim " .
               "-fb $param{'prefix'}.roots ".
-              "-renumber $param{'prefix'}.renumber ".
+              "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2280,7 +2280,7 @@ sub dup {
             "-K $K -poly $param{'prefix'}.poly ".
             "-minlim $minlim ".
             "-filelist $param{'prefix'}.filelist ".
-            "-renumber $param{'prefix'}.renumber ".
+            "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
