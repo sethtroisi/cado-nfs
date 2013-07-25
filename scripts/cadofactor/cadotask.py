@@ -6,6 +6,7 @@ import abc
 import random
 import time
 from collections import OrderedDict
+from math import log
 import wudb
 import logging
 import socket
@@ -750,8 +751,7 @@ class FreeRelTask(Task):
             ("alim", "rlim")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
-        'nprimes': (r'Renumbering struct: nprimes=(\d+)', int),
-        'minindex': (r'Renumbering struct: min_index=(\d+)', int)
+        'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
     }
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -793,11 +793,9 @@ class FreeRelTask(Task):
             freerelfilename = self.workdir.make_filename("freerel")
             renumberfilename = self.workdir.make_filename("renumber")
 
-            minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
                                      renumber=renumberfilename,
-                                     minlim=minlim,
                                      stdout=str(freerelfilename),
                                      **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
@@ -843,8 +841,6 @@ class FreeRelTask(Task):
     def get_nprimes(self):
         return self.state["nprimes"]
 
-    def get_minindex(self):
-        return self.state["minindex"]
 
 class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
@@ -1190,13 +1186,11 @@ class Duplicates2Task(Task, FilesCreator):
             del(self.slice_relcounts[str(i)])
             name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
             (stdoutpath, stderrpath) = self.make_std_paths(name)
-            minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
-                                             minlim=minlim,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
@@ -1208,7 +1202,6 @@ class Duplicates2Task(Task, FilesCreator):
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
                                              filelist=filelistname,
-                                             minlim=minlim,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
@@ -1294,7 +1287,7 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames
+        return super().paramnames + ("alim", "rlim")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1308,7 +1301,8 @@ class PurgeTask(Task):
         
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-        minindex = self.send_request(Request.GET_RENUMBER_MININDEX)
+        minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
+        minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         if not nunique:
             raise Exception("No unique relation count received")
@@ -2085,7 +2079,6 @@ class Request(Message):
     GET_RENUMBER_FILENAME = object()
     GET_FREEREL_RELCOUNT = object()
     GET_RENUMBER_PRIMECOUNT = object()
-    GET_RENUMBER_MININDEX = object()
     GET_SIEVER_FILENAMES = object()
     GET_SIEVER_RELCOUNT = object()
     GET_DUP1_FILENAMES = object()
@@ -2208,7 +2201,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
             Request.GET_FREEREL_RELCOUNT: self.freerel.get_nrels,
             Request.GET_RENUMBER_PRIMECOUNT: self.freerel.get_nprimes,
-            Request.GET_RENUMBER_MININDEX: self.freerel.get_minindex,
             Request.GET_SIEVER_FILENAMES: self.sieving.get_output_filenames,
             Request.GET_SIEVER_RELCOUNT: self.sieving.get_nrels,
             Request.GET_DUP1_FILENAMES: self.dup1.get_output_filenames,
