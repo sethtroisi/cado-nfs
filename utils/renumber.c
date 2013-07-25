@@ -167,7 +167,7 @@ static void
 renumber_alloc (renumber_t tab)
 {
   // Allocate the renumbering table
-  tab->table = (index_t*) malloc (tab->size * sizeof(index_t));
+  tab->table = (p_r_values_t *) malloc (tab->size * sizeof(p_r_values_t));
   ASSERT_ALWAYS (tab->table != NULL);
   // Allocate the cached table
   tab->cached = (index_t*) malloc ((2<<MAX_LOG_CACHED) * sizeof(index_t));
