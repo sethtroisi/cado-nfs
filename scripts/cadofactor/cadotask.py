@@ -747,7 +747,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("lpba", "lpbr")
+            ("alim", "rlim")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int),
@@ -793,9 +793,11 @@ class FreeRelTask(Task):
             freerelfilename = self.workdir.make_filename("freerel")
             renumberfilename = self.workdir.make_filename("renumber")
 
+            minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
                                      renumber=renumberfilename,
+                                     minlim=minlim,
                                      stdout=str(freerelfilename),
                                      **self.progparams[0])
             (identifier, rc, stdout, stderr, output_files) = \
@@ -1151,7 +1153,7 @@ class Duplicates2Task(Task, FilesCreator):
         return (cadoprograms.Duplicates2,)
     @property
     def paramnames(self):
-        return super().paramnames + ("nslices_log",)
+        return super().paramnames + ("nslices_log", "alim", "rlim")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1188,11 +1190,13 @@ class Duplicates2Task(Task, FilesCreator):
             del(self.slice_relcounts[str(i)])
             name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
             (stdoutpath, stderrpath) = self.make_std_paths(name)
+            minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
+                                             minlim=minlim,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
@@ -1204,6 +1208,7 @@ class Duplicates2Task(Task, FilesCreator):
                                              rel_count=rel_count * 12 // 10,
                                              renumber=renumber_filename,
                                              filelist=filelistname,
+                                             minlim=minlim,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])

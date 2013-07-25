@@ -491,8 +491,8 @@ class Polyselect2l(Program):
     name = binary
     subdir = "polyselect"
 
-    def __init__(self,
-                 P : PositionalParameter(), *,
+    def __init__(self, *,
+                 P : Parameter(), 
                  N : Parameter(),
                  degree : Parameter(),
                  verbose : Toggle("v") = None,
@@ -526,8 +526,9 @@ class MakeFB(Program):
     name = binary
     subdir = "sieve"
 
-    def __init__(self,
+    def __init__(self, *,
                  poly: Parameter(is_input_file = True),
+                 alim: Parameter(),
                  nopowers: Toggle() = None,
                  maxbits: Parameter() = None,
                  **kwargs):
@@ -549,6 +550,9 @@ class FreeRel(Program):
     def __init__(self,
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_output_file = True),
+                 lpbr: Parameter(),
+                 lpba: Parameter(),
+                 minlim: Parameter(),
                  badideals: Parameter(is_output_file = True) = None,
                  verbose: Toggle("v") = None,
                  pmin: Parameter() = None,
@@ -610,6 +614,7 @@ class Duplicates2(Program):
     def __init__(self,
                  *args: PositionalParameter(is_input_file = True),
                  rel_count: Parameter("K"),
+                 minlim: Parameter(),
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_input_file = True),
                  filelist: Parameter(is_input_file = True) = None,
@@ -713,6 +718,8 @@ class Characters(Program):
                  heavyblock: Parameter(),
                  out: Parameter(),
                  wfile: PositionalParameter(),
+                 lpbr: Parameter(),
+                 lpba: Parameter(),
                  nchar: Parameter() = None,
                  threads: Parameter("t") = None,
                  **kwargs):
