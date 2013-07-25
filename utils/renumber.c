@@ -374,8 +374,9 @@ renumber_close_write (renumber_t tab, const char *tablefile)
   ASSERT_ALWAYS (final != NULL);
 
   // First we put some data about the renumbering table.
-  fprintf (final, "%u %" PRid " %d %d\n", tab->nb_bits, tab->size,
-                                     tab->bad_ideals.n, tab->add_full_col);
+  fprintf (final, "%u %" PRid " %d %d %lu %lu\n", tab->nb_bits, tab->size,
+                                     tab->bad_ideals.n, tab->add_full_col,
+                                     tab->lpbr, tab->lpba);
 
   char buffer[128] = "" , *retc;
   do
