@@ -2148,16 +2148,10 @@ sub do_freerels {
     info "Computing free relations...\n";
     $tab_level++;
 
-    my $minlim = $param{'alim'};
-    if ($minlim > $param{'rlim'}) {
-        $minlim = $param{'rlim'};
-    }
-
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-lpbr $param{'lpbr'} ".
               "-lpba $param{'lpba'} ".
-              "-minlim $minlim " .
               "-fb $param{'prefix'}.roots ".
               "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
@@ -2269,16 +2263,11 @@ sub dup {
     close FILE;
 
     my $nrels = first_line("$param{'prefix'}.nrels");
-    my $minlim = $param{'alim'};
-    if ($minlim > $param{'rlim'}) {
-        $minlim = $param{'rlim'};
-    }
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
-            "-minlim $minlim ".
             "-filelist $param{'prefix'}.filelist ".
             "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
@@ -2305,7 +2294,6 @@ sub purge {
     my $nbrels = 0;
     my $last = 0;
     my $nprimes = 0;
-    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
@@ -2318,13 +2306,13 @@ sub purge {
             if ( $_ =~ /nprimes=(\d+)/ ) {
                 $nprimes = $1;
             }
-            if ( $_ =~ /min_index=(\d+)/ ) {
-                $min_index = $1;
-            }
         }
         close FILE;
         $nbrels += $last;
     }
+    my $minlim = ($param{'alim'}<$param{'rlim'})?$param{'alim'}:$param{'rlim'};
+    my $min_index = ceil(2*$minlim / log($minlim));
+
     $tab_level++;
     info "Number of relations left after duplicates: $nbrels.\n";
     $tab_level--;
