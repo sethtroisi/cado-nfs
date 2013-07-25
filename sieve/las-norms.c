@@ -152,23 +152,21 @@ void init_rat_norms_bucket_region(unsigned char *S,
   /* #define CHECK_INIT_RAT 1 */ /* For internal debug: control all */
 
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  int halfI = (si->I)>>1,
-    int_i;
-  uint8_t oy, y;
-  double						\
+  const int halfI = (si->I)>>1;
+  const double halfI_double = (double) halfI,
+    halfI_double_minus_one = halfI_double - 1.0,
     u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
     u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
     invu1 = 1./u1,
-    u0j,
-    d0_init,
     scale = rat->scale * (1./0x100000),
-    add = 0x3FF00000 - GUARD / scale,
-    g, rac, d0, d1, i;
+    add = 0x3FF00000 - GUARD / scale;
+  double u0j, d0_init, g, rac, d0, d1, i, trunc_i;
   size_t ts;
-  unsigned int						\
-    j1 = LOG_BUCKET_REGION - si->conf->logI,
-    inc;
+  unsigned int j1, inc;
+  int int_i;
+  uint8_t oy, y;
 
+  j1 = LOG_BUCKET_REGION - si->conf->logI;
   j = j << j1;
   j1 = (1U << j1) + j;
   u0j = u0 * j;
@@ -215,13 +213,13 @@ void init_rat_norms_bucket_region(unsigned char *S,
        of the first iteration. In this special case, old_i = -halfI and
        int_i = trunc (i), where i=[inverse of the function g](trunc(y)) and
        y=g(old_i).
-       So, it's possible if y is very trunc trunc(y), old_i == int_i, so ts == 0.
+       So, it's possible if y is very near trunc(y), old_i == int_i, so ts == 0.
        We have to iterate at least one time to avoid this case => this is the
        use of inc here. */
     for (i = rac + rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
-      int_i = (int) trunc(i); 
-      if (UNLIKELY(int_i >= halfI)) {
+      trunc_i = trunc(i);
+      if (UNLIKELY(trunc_i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -230,6 +228,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
+      int_i = (int) trunc_i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "A1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -245,7 +244,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     }
   np1:
     g = u0j + u1 * int_i;
-    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+    if (UNLIKELY(trunc(rac) >= halfI_double_minus_one)) {
       for ( ; int_i < halfI; int_i++) {
 	y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
@@ -284,8 +283,8 @@ void init_rat_norms_bucket_region(unsigned char *S,
     i = rac - rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
-      int_i = (int) trunc(i);
-      if (UNLIKELY(int_i >= halfI)) {
+      trunc_i = trunc(i);
+      if (UNLIKELY(trunc_i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "A4.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -294,6 +293,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
+      int_i = (int) trunc_i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "A4 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -310,8 +310,8 @@ void init_rat_norms_bucket_region(unsigned char *S,
   cas3:
     for (i = rac - rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
-      int_i = (int) trunc(i); 
-      if (UNLIKELY(int_i >= halfI)) {
+      trunc_i = trunc(i);
+      if (UNLIKELY(trunc_i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "B1.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -320,6 +320,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
+      int_i = (int) trunc_i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -335,7 +336,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     }
   np2:
     g = -(u0j + u1 * int_i);
-    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+    if (UNLIKELY(trunc(rac) >= halfI_double_minus_one)) {
       for ( ; int_i < halfI; int_i++) {
 	y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
@@ -374,8 +375,8 @@ void init_rat_norms_bucket_region(unsigned char *S,
     i = rac + rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
-      int_i = (int) trunc(i);
-      if (UNLIKELY(int_i >= halfI)) {
+      trunc_i = trunc(i);
+      if (UNLIKELY(trunc_i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -384,6 +385,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
+      int_i = (int) trunc_i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
