@@ -28,6 +28,8 @@ int method_read_stream(cofac_method_ptr meth, FILE *file)
 
     if (strcmp(type, "ECM") == 0)
       meth->type = ECM;
+    else if (strcmp(type, "ECMM12") == 0)
+      meth->type = ECMM12;
     else if (strcmp(type, "PM1") == 0)
       meth->type = PM1;
     else if (strcmp(type, "PP1_27") == 0)
@@ -111,6 +113,8 @@ void method_print(cofac_method_srcptr meth, FILE *file)
   fprintf(file, "METHOD=");
   if (meth->type == ECM)
     fprintf(file, "ECM");
+  if (meth->type == ECMM12)
+    fprintf(file, "ECMM12");
   else if (meth->type == PM1)
     fprintf(file, "PM1");
   else if (meth->type == PP1_27)
