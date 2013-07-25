@@ -301,6 +301,8 @@ class ServerLauncher(object):
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
+        self.address = address
+        self.port = port
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -352,8 +354,8 @@ class ServerLauncher(object):
         self.httpd.server_name = self.name
     
     def serve(self):
-        logging.info("serving at http://%s:%d",
-                     *self.httpd.server_address)
+        logging.info("serving at http://%s:%d (%s)",
+                     self.address, self.port, self.httpd.server_address[0])
         
         if self.bg:
             from threading import Thread
