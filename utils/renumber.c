@@ -193,7 +193,14 @@ get_one_line (FILE *f, char *s)
   char *rets;
   size_t n;
   rets = fgets(s, RENUMBER_MAXLINE, f);
-  ASSERT_ALWAYS(rets != NULL);
+  if (rets == NULL) {
+    if (feof(f)) {
+      fprintf (stderr, "renumber.c: get_one_line() reached EOF\n");
+    } else {
+      perror("renumber.c: get_one_line()");
+    }
+    abort();
+  }
   n = strnlen(s, RENUMBER_MAXLINE);
   ASSERT_ALWAYS(n != RENUMBER_MAXLINE);
   return n;
