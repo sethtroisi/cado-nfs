@@ -45,11 +45,20 @@ fi
 ssh=false
 python=false
 cores=1
+slaves=1
 for ((i=1; i<=3; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
       echo "Error, number of cores '$cores' is not an integer" >&2
+      usage
+      exit 1
+    fi
+    shift 2
+  elif [ "$1" = "-s" ]; then
+    slaves=$2
+    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $slaves)" ]; then
+      echo "Error, number of slaves '$slaves' is not an integer" >&2
       usage
       exit 1
     fi
@@ -65,6 +74,10 @@ for ((i=1; i<=3; i=i+1)) ; do
   fi
 done
 
+if [ $slaves -ne 1 ] && ! $python
+then
+  echo "The -slaves parameter is used only for the Python script. Ignoring it."
+fi
 
 #########################################################################
 # Set paths properly.
@@ -185,6 +198,7 @@ mkdir $t/tmp
 if $python; then
   $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
   threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
+  slaves.nrclients=$slaves \
   slaves.scriptpath="$scriptpath" server.address=localhost \
   slaves.basepath="$t/client/" "$@"
 else
