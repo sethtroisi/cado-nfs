@@ -151,7 +151,7 @@ class Sha1Cache(object):
                 for data in self._read_file_in_blocks(inputfile):
                     sha1.update(data)
             self._sha1[realpath] = sha1.hexdigest()
-            logger.debug("SHA1 for file %s is ", realpath, self._sha1[realpath])
+            logger.debug("SHA1 for file %s is %s", realpath, self._sha1[realpath])
         return self._sha1[realpath]
 
 sha1cache = Sha1Cache()
