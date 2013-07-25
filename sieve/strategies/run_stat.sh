@@ -19,15 +19,13 @@ p1w=18446744073709551557
 p2w=85070591730234615865843651857942052727
 p3w=1569275433846670190958947355801916604025588861116008628213
 
-if [ "$method" = "ecmm12" ]; then
-   extra="-ep"
-else
-   extra=""
+if [ "$method" = "ecm" -o "$method" = "ecmm12" ]; then
+   method="ep -$method"
 fi
 
 ## Print header
 METHOD=`echo $method | tr '[:lower:]' '[:upper:]'`
-echo "METHOD=$METHOD B1=$B1 B2=$B2 sigma=$sigma $extra"
+echo "METHOD=$METHOD B1=$B1 B2=$B2 param=$sigma"
 
 ## Bench
 echo "  Bench:"
@@ -42,7 +40,8 @@ for i in 1 2 3; do
         echo "error..."
         exit 1
     fi
-    tm=`yes $p | head -1000 | $BENCHER -inp /dev/stdin -$method $B1 $B2 $sigma $extra | awk '/Total/ {print $7/1000.0}'`
+    # warning: the -ep option should come *before* the method
+    tm=`yes $p | head -1000 | $BENCHER -inp /dev/stdin -$method $B1 $B2 $sigma | awk '/Total/ {print $7/1000.0}'`
     echo "    $i words: $tm"
 done
 

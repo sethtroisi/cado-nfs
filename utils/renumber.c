@@ -378,11 +378,10 @@ renumber_close_write (renumber_t tab, const char *tablefile)
                                      tab->bad_ideals.n, tab->add_full_col);
 
   char buffer[128] = "" , *retc;
-  int ret;
   do
   {
-    ret = fputs (buffer, final);
-    ASSERT (ret >= 0);
+    int ret = fputs (buffer, final);
+    ASSERT_ALWAYS (ret >= 0);
 
     retc = fgets (buffer, 128, tab->file);
   } while (retc != NULL);
