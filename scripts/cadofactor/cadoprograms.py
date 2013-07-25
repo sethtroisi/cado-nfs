@@ -553,7 +553,6 @@ class FreeRel(Program):
                  lpbr: Parameter(),
                  lpba: Parameter(),
                  badideals: Parameter(is_output_file = True) = None,
-                 verbose: Toggle("v") = None,
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,
                  **kwargs):
