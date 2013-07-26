@@ -139,7 +139,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             return super().translate_path(path)
     
     def do_GET(self):
-        """Generates a work unit if request is cgi-bin/getwu, generates a status
+        """Generates a workunit if request is cgi-bin/getwu, generates a status
         page is requested, otherwise calls parent class' do_GET()"""
         if self.is_cgi():
             if self.is_getwu():
@@ -148,7 +148,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 self.send_status()
             else:
                 self.send_error(404, "GET for CGI scripts allowed only "
-                                "for work unit or status page request")
+                                "for workunit or status page request")
         elif self.only_registered and \
                 not self.path.lstrip('/') in self.registered_filenames:
                 self.send_error(404, "Access restricted to registered file "
@@ -224,7 +224,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             self.no_work_available = True
             return self.send_error(404, "No work available")
         
-        self.log_message("Sending work unit " + Workunit(wu_text).get_id() + 
+        self.log_message("Sending workunit " + Workunit(wu_text).get_id() + 
                          " to client " + clientid)
         # wu_text = wu.get_wu()
         self.send_response(200)
@@ -301,6 +301,8 @@ class ServerLauncher(object):
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
+        self.address = address
+        self.port = port
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -352,8 +354,8 @@ class ServerLauncher(object):
         self.httpd.server_name = self.name
     
     def serve(self):
-        logging.info("serving at http://%s:%d",
-                     *self.httpd.server_address)
+        logging.info("serving at http://%s:%d (%s)",
+                     self.address, self.port, self.httpd.server_address[0])
         
         if self.bg:
             from threading import Thread

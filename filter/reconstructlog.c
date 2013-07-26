@@ -495,7 +495,7 @@ main(int argc, char *argv[])
   purgedfile_stream_closefile (ps);
 
   /* Reading renumber file */
-  renumber_init (renumber_table, poly);
+  renumber_init (renumber_table, poly, NULL);
   renumber_read_table (renumber_table, renumberfilename);
 
   /* Opening logfile (produced by linalg). Reading ncols_matrix on first line */

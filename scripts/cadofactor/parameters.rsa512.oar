@@ -2,10 +2,15 @@ N = 1094173864157052742180970732204035761200373294544920599091384213147634998428
 name = rsa512
 workdir = work
 
-# Adjust execpath to point to the root of your CADO build directory
-tasks.execpath=${HOME}/build/cado-nfs
+# Adjust srcdir to point to the root of your CADO source directory
+srcdir=${HOME}/git/cado-nfs
+# Adjust bindir to point to the root of your CADO build directory
+bindir=${HOME}/build/cado-nfs
+
+tasks.execpath=$(bindir)
 tasks.verbose = 1
-tasks.threads = 1
+tasks.threads = 2
+tasks.maxwu = 10
 tasks.rlim=16000000
 tasks.alim=32000000
 tasks.lpbr=30
@@ -37,9 +42,10 @@ tasks.filter.ratio = 1.1
 tasks.linalg.mn = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
-tasks.linalg.threads = 4
+tasks.linalg.threads = 16
 
 slaves.catrel.hostnames = @${OAR_NODE_FILE}
-slaves.catrel.scriptpath = ${HOME}/git/cado-nfs/scripts/cadofactor
+slaves.catrel.nrclients = 8
+slaves.catrel.scriptpath = $(srcdir)/scripts/cadofactor
 slaves.catrel.downloadretry = 10
 slaves.catrel.ssh.execbin = oarsh

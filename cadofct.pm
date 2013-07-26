@@ -1113,33 +1113,6 @@ sub last_line {
     return $last;
 }
 
-# This is _ugly_: the siever takes some parameters via the polynomial file.
-# The job of this function is to maintain the sieving parameters this
-# $name.poly file up to date.
-# TODO: Find a cleaner way to do this! (e.g. command-line parameters for las)
-sub append_poly_params {
-    my @list = qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    my $list = join "|", @list;
-
-    # Strip the parameters at the end of the poly file, in case they
-    # have changed
-    open IN, "< $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for reading: $!.\n";
-    open OUT, "> $param{'prefix'}.poly_tmp"
-        or die "Cannot open `$param{'prefix'}.poly_tmp' for writing: $!.\n";
-    while (<IN>) {
-        print OUT "$_" unless /^($list):\s*/;
-    }
-    close IN;
-
-    # Append the parameters to the poly file
-    print OUT "$_: $param{$_}\n" for @list;
-    close OUT;
-
-    cmd("env mv -f $param{'prefix'}.poly_tmp $param{'prefix'}.poly",
-        { kill => 1 });
-}
-
 sub local_time {
     my $job= shift;
     $cmdlog = "$param{'prefix'}.cmd";
@@ -1943,9 +1916,6 @@ sub do_init {
 
     # Dump parameters into $name.param
     write_param("$param{'prefix'}.param");
-
-    # Update parameters in the $name.poly file if needed
-    append_poly_params() if $tasks{'polysel'}->{'done'};
 }
 
 
@@ -2002,7 +1972,7 @@ my $polysel_cmd = sub {
            "-degree $param{'degree'} ".
            "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
-           "$param{'polsel_P'} ".
+           "-P $param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.polsel_out.$a-$b ".
            "2>&1";
@@ -2094,13 +2064,6 @@ sub do_polysel {
     cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
         { cmdlog => 1, kill => 1 });
     $tab_level--;
-
-    # Append sieving parameters to the poly file
-    open FILE, ">> $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for writing: $!.\n";
-    print FILE "$_: $param{$_}\n"
-        for qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    close FILE;
 }
 
 sub do_polysel_bench {
@@ -2167,6 +2130,7 @@ sub do_factbase {
     my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-alim $param{'alim'} ".
               "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2186,6 +2150,8 @@ sub do_freerels {
 
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
               "-fb $param{'prefix'}.roots ".
               "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
@@ -2297,7 +2263,6 @@ sub dup {
     close FILE;
 
     my $nrels = first_line("$param{'prefix'}.nrels");
-
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
@@ -2329,7 +2294,6 @@ sub purge {
     my $nbrels = 0;
     my $last = 0;
     my $nprimes = 0;
-    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
@@ -2342,13 +2306,13 @@ sub purge {
             if ( $_ =~ /nprimes=(\d+)/ ) {
                 $nprimes = $1;
             }
-            if ( $_ =~ /min_index=(\d+)/ ) {
-                $min_index = $1;
-            }
         }
         close FILE;
         $nbrels += $last;
     }
+    my $minlim = ($param{'alim'}<$param{'rlim'})?$param{'alim'}:$param{'rlim'};
+    my $min_index = ceil(2*$minlim / log($minlim));
+
     $tab_level++;
     info "Number of relations left after duplicates: $nbrels.\n";
     $tab_level--;
@@ -2393,6 +2357,14 @@ my $sieve_cmd = sub {
         "-I $param{'I'} ".
         "-rpowlim $powlim ".
         "-apowlim $powlim ".
+        "-rlim $param{'rlim'} ".
+        "-alim $param{'alim'} ".
+        "-rlambda $param{'rlambda'} ".
+        "-alambda $param{'alambda'} ".
+        "-lpbr $param{'lpbr'} ".
+        "-lpba $param{'lpba'} ".
+        "-mfbr $param{'mfbr'} ".
+        "-mfba $param{'mfba'} ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
@@ -2926,6 +2898,8 @@ sub do_chars {
 
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
               "-purged $param{'prefix'}.purged.gz ".
               "-index $param{'prefix'}.index ".
               # Note: one can omit the -heavyblock option, but in that case

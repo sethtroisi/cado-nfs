@@ -19,9 +19,14 @@ p1w=18446744073709551557
 p2w=85070591730234615865843651857942052727
 p3w=1569275433846670190958947355801916604025588861116008628213
 
+extra=""
+if [ "$method" = "ecm" -o "$method" = "ecmm12" ]; then
+   extra="-ep"
+fi
+
 ## Print header
 METHOD=`echo $method | tr '[:lower:]' '[:upper:]'`
-echo "METHOD=$METHOD B1=$B1 B2=$B2 sigma=$sigma"
+echo "METHOD=$METHOD B1=$B1 B2=$B2 param=$sigma"
 
 ## Bench
 echo "  Bench:"
@@ -36,7 +41,8 @@ for i in 1 2 3; do
         echo "error..."
         exit 1
     fi
-    tm=`yes $p | head -1000 | $BENCHER -inp /dev/stdin -$method $B1 $B2 $sigma | awk '/Total/ {print $7/1000.0}'`
+    # warning: the -ep option should come *before* the method
+    tm=`yes $p | head -1000 | $BENCHER -inp /dev/stdin $extra -$method $B1 $B2 $sigma | awk '/Total/ {print $7/1000.0}'`
     echo "    $i words: $tm"
 done
 
@@ -53,7 +59,7 @@ echo "  Success Probability for p of given bit size for 1,5,7,11 mod 12"
 for i in `seq 15 50`; do
     echo -n "    $i:"
     for res in 1 5 7 11; do 
-        ratio=`head -2000 $PRIME_DB/p${i}.$res | $BENCHER -inp /dev/stdin -cof 1152921504606846883 -$method $B1 $B2 $sigma | awk '/Ratio/ {print $2}'`
+        ratio=`head -2000 $PRIME_DB/p${i}.$res | $BENCHER -inp /dev/stdin -cof 1152921504606846883 $extra -$method $B1 $B2 $sigma | awk '/Ratio/ {print $2}'`
         printf " %.2f" $ratio
     done
     echo

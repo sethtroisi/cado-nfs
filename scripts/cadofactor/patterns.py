@@ -1,5 +1,9 @@
 import abc
 
+""" This module defines some well-known design patterns, mostly taken from the
+Gang-of-Four book.
+"""
+
 class Observable(object):
     """ Implements the subject part of the Observer pattern.
     
@@ -26,8 +30,8 @@ class Observable(object):
             observer.updateObserver(message)
 
 class Observer(object):
-    """ Implements the client part of the Observer pattern. 
-    
+    """ Defines the interface of the client part of the Observer pattern. 
+
     This is an abstract base class; the subclass must implement 
     updateObserver. 
     """
