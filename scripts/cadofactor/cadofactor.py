@@ -27,8 +27,10 @@ if __name__ == '__main__':
     filelvlname = args.filelog
     
     parameters = cadoparams.Parameters()
-    parameters.readfile(open(paramfile), old_format = args.old)
-    parameters.readfile(args.options, old_format = args.old)
+    if args.old:
+        parameters.read_old_defaults()
+    parameters.readfile(paramfile, old_format = args.old)
+    parameters.readparams(args.options, old_format = args.old)
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())
