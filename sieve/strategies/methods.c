@@ -108,12 +108,12 @@ int methods_read(cofac_method_t **meths, const char *f)
   return nm;
 }
 
-void method_print(cofac_method_srcptr meth, FILE *file)
+void method_print_full(cofac_method_srcptr meth, FILE *file)
 {
   fprintf(file, "METHOD=");
   if (meth->type == ECM)
     fprintf(file, "ECM");
-  if (meth->type == ECMM12)
+  else if (meth->type == ECMM12)
     fprintf(file, "ECMM12");
   else if (meth->type == PM1)
     fprintf(file, "PM1");
@@ -134,6 +134,23 @@ void method_print(cofac_method_srcptr meth, FILE *file)
         meth->success[MOD12_5][i],
         meth->success[MOD12_7][i],
         meth->success[MOD12_11][i]);
+}
+
+void method_print(cofac_method_srcptr meth, FILE *file)
+{
+  if (meth->type == ECM)
+    fprintf(file, "ECM");
+  else if (meth->type == ECMM12)
+    fprintf(file, "ECMM12");
+  else if (meth->type == PM1)
+    fprintf(file, "PM1");
+  else if (meth->type == PP1_27)
+    fprintf(file, "PP1_27");
+  else if (meth->type == PP1_65)
+    fprintf(file, "PP1_65");
+  else
+    abort();
+  fprintf(file, " %d %d %d\n", meth->B1, meth->B2, meth->param);
 }
 
 #if 0

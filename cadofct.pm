@@ -2152,7 +2152,6 @@ sub do_freerels {
               "-poly $param{'prefix'}.poly ".
               "-lpbr $param{'lpbr'} ".
               "-lpba $param{'lpba'} ".
-              "-fb $param{'prefix'}.roots ".
               "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
 
