@@ -20,8 +20,7 @@
 
 
 # name: The name of the factorization project. Will be used as part of file
-# names, among other things, so probably should be alphanumeric (TODO: try
-# with weirdo German and French characters)
+# names, among other things, so probably should be alphanumeric.
 # Everything needs to know the name of the factorization, so this should be
 # specified at the root of the parameter tree.
 
@@ -55,7 +54,7 @@ builddir=${HOME}/build/cado-nfs/normal
 # In principle it is possible to specify a different working directory for
 # each task, which may be beneficial to use disk space across several file
 # systems, or to let filtering tasks read from one hard drive while writing
-# to another, improving throughput. TODO: test that this actually works
+# to another, improving throughput.
 
 tasks.workdir = /tmp/work/
 
@@ -114,7 +113,6 @@ tasks.polyselect.admin = 0
 tasks.polyselect.admax = 10000
 tasks.polyselect.adrange = 5000
 
-#tasks.sieve.rels_wanted = 50000
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000
 tasks.sieve.I = 11
@@ -135,7 +133,7 @@ tasks.linalg.nchar = 64
 # clients running on the same machine to connect. If not specified, the
 # computer's hostname will be used.
 
-server.address = localhost
+# server.address = localhost
 
 
 # port: The server of the client/server set-up will listen at this
@@ -151,26 +149,30 @@ server.port = 8012
 # If the hostname is of the form "@filename", then the host names are read
 # from the file "filename", one host name per line.
 
-slaves.caramel.hostnames = localhost
+slaves.hostnames = localhost
+# Example with multiple hostnames. This launches one client on localhost,
+# two on otherhost1, and one on otherhost2, assuming there is no nrclients 
+# parameter (see below) that would override the multiplicity
+# slaves.hostnames = localhost, otherhost1, otherhost1, otherhost2
 
 
 # Modifies the behaviour of the hostnames list: if nrclients in specified,
 # then multiplicity in the hostnames list is ignored, and "nrclients" client
 # scripts are launched on each unique host name.
 
-slaves.caramel.nrclients = 2
+slaves.nrclients = 2
 
 
 # scriptpath: The path to the wuclient2.py scripts, on the slave's file
 # system.
 
-slaves.caramel.scriptpath = $(sourcedir)/scripts/cadofactor
+slaves.scriptpath = $(sourcedir)/scripts/cadofactor
 
 
 # downloadretry: Number of seconds a client should wait between failed
 # download attempts from the server
 
-slaves.caramel.downloadretry = 10
+slaves.downloadretry = 10
 
 
 # basepath: defines the base directory under which wuclient creates its
@@ -181,4 +183,17 @@ slaves.caramel.downloadretry = 10
 # The working directories should probably be unique; the default choice for
 # the working directory includes the clientid which should ensure uniqueness.
 
-slaves.caramel.basepath = /tmp/wuclient
+slaves.basepath = /tmp/wuclient
+
+
+# If you want to launch clients on multiple groups of slave machines, with
+# different parameters per group, you can group them by different parameter
+# paths, like so:
+# slaves.downloadretry = 10
+# slaves.basepath = /tmp/wuclient
+# slaves.home.hostnames = localhost
+# slaves.home.nrclients = 1
+# slaves.home.scriptpath = $(sourcedir)/scripts/cadofactor
+# slaves.work.hostname = workstation1, workstation2
+# slaves.home.nrclients = 4
+# slaves.home.scriptpath = /path/to/scripts/cadofactor
