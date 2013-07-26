@@ -121,7 +121,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
   param_list_decl_usage(pl, "badideals",   "file describing bad ideals (for DL)");
-  param_list_decl_usage(pl, "add_full_col", "(switch) add a column of 1 in the matrix (for DL)");
+  param_list_decl_usage(pl, "addfullcol", "(switch) add a column of 1 in the matrix (for DL)");
 }
 
 static void
@@ -148,7 +148,7 @@ main (int argc, char *argv[])
     param_list pl;
     param_list_init(pl);
     declare_usage(pl);
-    param_list_configure_switch(pl, "-add_full_col", NULL);
+    param_list_configure_switch(pl, "-addfullcol", &add_full_col);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -189,10 +189,21 @@ main (int argc, char *argv[])
         exit (EXIT_FAILURE);
       }
 
-    param_list_parse_ulong(pl, "lpbr", &lpb[0]);
-    param_list_parse_ulong(pl, "lpba", &lpb[1]);
+    param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]);
+    param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]);
     param_list_parse_ulong(pl, "pmin", &pmin);
-    param_list_parse_ulong(pl, "pamx", &pmax);
+    param_list_parse_ulong(pl, "pmax", &pmax);
+
+    if (lpb[0] == 0 || lpb[1] == 0)
+    {
+      fprintf (stderr, "Error, missing -lpbr or -lpba command line argument\n");
+      usage (pl, argv0);
+    }
+
+    if (param_list_warn_unused(pl))
+    {
+      usage (pl, argv0);
+    }
     
     renumber_init (renumber_table, cpoly, lpb);
     renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
