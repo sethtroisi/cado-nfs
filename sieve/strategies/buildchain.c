@@ -6,7 +6,15 @@
 
 #include "methods.h"
 
-#define MAX(a,b) ((a)<(b))?(b):(a)
+#define MAX(a,b) ((a)<=(b))?(b):(a)
+
+float prior_checksum(histogram_t *P) {
+    float p = 0.0;
+    for (int i = 0; i < 4; ++i)
+        for (int b = 15; b <= METHOD_MAXBITS; ++b)
+            p += P[i][b];
+    return p;
+}
 
 // TODO: put an appropriate value, here.
 // ATM, we assume that probability of having a factor of b bits is 1/b,
@@ -35,11 +43,12 @@ typedef struct {
 void method_score(float *score, histogram_t *success, float *ms,
         histogram_t *prob)
 {
-    float p = 0;
+    float p = 1;
     for (int b = 15; b <= METHOD_MAXBITS; ++b) {  // for each bitsize
         for (int i = 0; i < 4; ++i)               // for each class
-            p += prob[i][b] * success[i][b];
+            p *= 1 - prob[i][b] * success[i][b];
     }
+    p = 1-p;
     assert (p >= 0 && p <= 1);
     p = -logf(1-p);
     for (int i = 0; i < 3; ++i)
@@ -171,7 +180,7 @@ void update_ppm1_history(ppm1_history_struct *hist, cofac_method_ptr meth)
 
 int
 get_best_method(cofac_method_t * list_meth, int nm, histogram_t *prior,
-        ppm1_history_struct *ppm1_history, int wordsize)
+        ppm1_history_struct *ppm1_history, int wordsize, float *sco)
 {
     int best_meth = -1;
     float best_score = 0;
@@ -185,29 +194,30 @@ get_best_method(cofac_method_t * list_meth, int nm, histogram_t *prior,
                 list_meth[i]->success, ppm1_history);
         method_score(sc, P, list_meth[i]->ms, prior);
         float score = sc[wordsize-1];
-        fprintf(stderr, "    Score of method %d: %f\n", i, score);
+    //    fprintf(stderr, "    Score of method %d: %f\n", i, score);
         if ((best_meth == -1) || (score > best_score)) {
             best_meth = i;
             best_score = score;
         }
     }
+    *sco = best_score;
     return best_meth;
 }
 
-// usage: ./buildchain <method_filename> <word_size>
-
-#define LEN 10
+// usage: ./buildchain <method_filename> <word_size> <chain_length>
 
 int main(int argc, char **argv)
 {
-    if (argc != 3) {
-        fprintf(stderr, "usage: ./buildchain <method_filename> <word_size>\n");
+    if (argc != 4) {
+        fprintf(stderr, "usage: ./buildchain <method_filename> " 
+                "<word_size> <chain_length>\n");
         return EXIT_FAILURE;
     }
     cofac_method_t *list_meth;
     int nm;
     int wordsize = atoi(argv[2]);
-    int chain[LEN];
+    int len = atoi(argv[3]);
+    int chain[len];
     nm = methods_read(&list_meth, argv[1]);
 
     // The current knowledge about probabilities of occurence of a prime.
@@ -221,10 +231,12 @@ int main(int argc, char **argv)
         ppm1_hist.pp1[i] = zero_hist;
     }
 
-    for (int i = 0; i < LEN; ++i) {
+    for (int i = 0; i < len; ++i) {
+        float sc;
         fprintf(stderr, "Choosing method for step %d...\n", i);
-        int m = get_best_method(list_meth, nm, P, &ppm1_hist, wordsize);
-        fprintf(stderr, "  The winner for step %d is: method number %d\n", i, m);
+        int m = get_best_method(list_meth, nm, P, &ppm1_hist, wordsize, &sc);
+        fprintf(stderr, "  The winner for step %d is: "
+                "method number %d with score %.3f\n", i, m, sc);
         chain[i] = m;
 
         // Update the prior
@@ -236,11 +248,14 @@ int main(int argc, char **argv)
 
         // Update the ppm1 history
         update_ppm1_history(&ppm1_hist, list_meth[m]);
+
+        fprintf(stderr, "  Current prior checksum = %.4f\n", prior_checksum(P));
     }
 
-    for (int i = 0; i < LEN; ++i)
-        printf("%d ", chain[i]);
-    printf("\n");
+    for (int i = 0; i < len; ++i) {
+        printf("%d: ", i);
+        method_print(list_meth[chain[i]], stdout);
+    }
 
     free(list_meth);
     return EXIT_SUCCESS;

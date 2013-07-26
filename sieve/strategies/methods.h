@@ -59,5 +59,6 @@ int method_read_stream(cofac_method_ptr meth, FILE *f);
 int methods_read(cofac_method_t **meths, const char *f);
 
 void method_print(cofac_method_srcptr meth, FILE *file);
+void method_print_full(cofac_method_srcptr meth, FILE *file);
 
 #endif   /* __METHODS_H__ */
