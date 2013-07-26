@@ -471,14 +471,14 @@ class ClientServerTask(Task, patterns.Observer):
                          path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", "10")
+        self.params.setdefault("maxwu", 10)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_available_wus() >= int(self.params["maxwu"]):
+        while self.get_number_available_wus() >= self.params["maxwu"]:
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -543,7 +543,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state["adnext"] = \
-            max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
+            max(self.state.get("adnext", 0), self.params.get("admin", 0))
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
@@ -641,12 +641,12 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return self.get_state_filename("polyfilename")
 
     def need_more_wus(self):
-        return self.state["adnext"] < int(self.params["admax"])
+        return self.state["adnext"] < self.params["admax"]
     
     def submit_one_wu(self):
         adstart = self.state["adnext"]
-        adend = adstart + int(self.params["adrange"])
-        adend = min(adend, int(self.params["admax"]))
+        adend = adstart + self.params["adrange"]
+        adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
@@ -863,17 +863,17 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        qmin = int(self.params.get("qmin", 0))
+        qmin = self.params.get("qmin", 0)
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            self.state["qnext"] = int(self.params.get("qmin", self.params["alim"]))
+            self.state["qnext"] = self.params.get("qmin", self.params["alim"])
         
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("maxwu", "10")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
-                                        int(self.params.get("rels_wanted", 0)))
+                                        self.params.get("rels_wanted", 0))
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
@@ -885,7 +885,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         
         while self.state["rels_found"] < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
-            q1 = q0 + int(self.params["qrange"])
+            q1 = q0 + self.params["qrange"]
             outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -969,7 +969,7 @@ class Duplicates1Task(Task, FilesCreator):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**int(self.params["nslices_log"])
+        self.nr_slices = 2**self.params["nslices_log"]
         self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
@@ -1154,7 +1154,7 @@ class Duplicates2Task(Task, FilesCreator):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**int(self.params["nslices_log"])
+        self.nr_slices = 2**self.params["nslices_log"]
         self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
@@ -1301,7 +1301,7 @@ class PurgeTask(Task):
         
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-        minlim = min(int(self.params["alim"]), int(self.params["rlim"]))
+        minlim = min(self.params["alim"], self.params["rlim"])
         minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         if not nunique:
@@ -1521,9 +1521,9 @@ class MergeTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        skip = int(self.progparams[0].get("skip", 32))
-        self.progparams[0].setdefault("skip", str(skip))
-        self.progparams[0].setdefault("keep", str(skip + 128))
+        skip = self.progparams[0].get("skip", 32)
+        self.progparams[0].setdefault("skip", skip)
+        self.progparams[0].setdefault("keep", skip + 128)
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1716,7 +1716,7 @@ class SqrtTask(Task):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
-        self.add_factor(int(self.params["N"]))
+        self.add_factor(self.params["N"])
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1895,7 +1895,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    int(self.params["nrclients"]))
+                    self.params["nrclients"])
 
     @staticmethod
     def make_multiplicity(names, multi):
@@ -2118,7 +2118,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         # Set up WU server
         serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
-        serverport = int(serverparams.get("port", 8001))
+        serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
         self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
