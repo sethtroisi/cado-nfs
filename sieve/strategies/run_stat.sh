@@ -42,6 +42,7 @@ for i in 1 2 3; do
         exit 1
     fi
     # warning: the -ep option should come *before* the method
+    echo "yes $p | head -100000 | $BENCHER -inp /dev/stdin $extra -$method $B1 $B2 $sigma"
     tm=`yes $p | head -1000 | $BENCHER -inp /dev/stdin $extra -$method $B1 $B2 $sigma | awk '/Total/ {print $7/1000.0}'`
     echo "    $i words: $tm"
 done
