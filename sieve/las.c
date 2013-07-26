@@ -1563,9 +1563,9 @@ typedef const struct thread_data_s * thread_data_srcptr;
 #endif
 
 #if LOG_BUCKET_REGION == 16			
-#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) x; } while (0)
+#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) x; } while (0)
 #else									
-#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) (x & maskbucket); } while (0)
+#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) (x & maskbucket); } while (0)
 #endif						
 
 #ifdef HAVE_SSE2							
@@ -1589,7 +1589,7 @@ typedef const struct thread_data_s * thread_data_srcptr;
       pu = *ppu;							\
       FILL_BUCKET_TRACE_K();							\
       FILL_BUCKET_CX();								\
-      ((uint16_t *)pu)[1] = bep;					\
+      ((bucket_update_t *)pu)->p = bep;					\
       *ppu = ++pu;							\
       FILL_BUCKET_PREFETCH_PU();						\
     }									\
@@ -1727,7 +1727,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	inc_a = plattice_a(&pli, si),
 	inc_c = plattice_c(&pli, si);
 #endif
-      const uint16_t bep = (uint16_t) bucket_encode_prime (p);
+      const prime_hint_t bep = (prime_hint_t) bucket_encode_prime (p);
       do { 
 	FILL_BUCKET(); if (x >= IJ) break;
 	FILL_BUCKET(); if (x >= IJ) break;
