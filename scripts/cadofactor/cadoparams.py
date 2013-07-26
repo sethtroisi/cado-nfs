@@ -111,7 +111,19 @@ class Parameters(object):
     key_types = {
         "admin": int,
         "admax": int,
-        "adrange": int
+        "adrange": int,
+        "qmin": int,
+        "qmax": int,
+        "qrange": int,
+        "maxwu": int,
+        "alim": int,
+        "rlim": int,
+        "rels_wanted": int,
+        "nslices_log": int,
+        "skip": int,
+        "N": int,
+        "nrclients": int,
+        "port": int
     }
 
     def __init__(self, *args, **kwargs):
@@ -256,7 +268,7 @@ class Parameters(object):
         m = 3
         results in foo.bar.k = 5 and k = 3
         """
-        while True:
+        while isinstance(value, str):
             match = re.search(r"^(.*)\$\((.*)\)(.*)$", value)
             if not match:
                 break
@@ -295,10 +307,14 @@ class Parameters(object):
         If the dataype is int, and the characters 'e' or '.' occur in the value,
         we convert to float first to convert scientific notation.
         """
-        value = orig_value
+        # If this value was converted before, don't try to convert again, as
+        # the code below assumes it is a str
+        if not isinstance(orig_value, str):
+            return orig_value
         param = ".".join(path + [key])
-        # print ("Trying to convert param=%s, value=%s" % (param, value))
+        # print ("Trying to convert param=%s, value=%s" % (param, orig_value))
         datatype = self.key_types.get(key, None)
+        value = orig_value
         if datatype is None:
             return value
         if datatype is int and ("e" in value or "." in value):
@@ -351,6 +367,8 @@ class Parameters(object):
                     continue
             value = self.subst_env_var(key, value)
             self._insertkey(key, value)
+        self._subst_references(self.data, [])
+        self._convert_types(self.data, [])
 
     def read_old_defaults(self):
         """ Read the DEFAULTS_OLD parameter table to set default values as they
@@ -365,8 +383,6 @@ class Parameters(object):
         logger.debug("Reading parameter file %s", filename)
         with open(filename, "r") as handle:
             self.readparams(handle, old_format)
-        self._subst_references(self.data, [])
-        self._convert_types(self.data, [])
 
     def __str_internal__(self):
         ''' Returns all entries of the dictionary dic as key=sep strings
