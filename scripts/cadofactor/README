@@ -18,14 +18,14 @@ start the cadofactor script, which also starts the server. It does not start any
 
 ./wuclient2.py --server=http://quiche.loria.fr:8001
 
-where the --server parameters should be given the URL of the server, as printed by the cadofactor script.
-You can start an arbitrary number of client scripts, and any machines that can connect to the server via HTTP.
+where the --server parameter should be given the URL of the server, as printed by the cadofactor script.
+You can start an arbitrary number of client scripts, on any machines that can connect to the server via HTTP.
 
 If you want to let the server automatically start clients, you need to supply a list of hostnames on which to start clients, e.g.,
 
-./cadofactor.py --old ../../params/params.c59 n=90377629292003121684002147101760858109247336549001090677693 wdir=/tmp/c59 bindir=$HOME/build/cado-nfs/normal slaves.hostnames=localhost slaves.nrclients=2
+./cadofactor.py --old ../../params/params.c59 n=90377629292003121684002147101760858109247336549001090677693 wdir=/tmp/c59 bindir=$HOME/build/cado-nfs/normal slaves.hostnames=localhost slaves.nrclients=2 slaves.scriptpath=$HOME/git/cado-nfs/scripts/cadofactor
 
-to let it start two clients on localhost.
+to let it start two clients on localhost. The scriptpath parameter must be the path to the directory on the client machine which contains wuclient2.py (and workunit.py).
 
 
 For more complex set-ups, it is preferable to write a parameter file in the new format. Some examples are in "parameters", "parameters.oar", and "parameters.rsa512.oar".
