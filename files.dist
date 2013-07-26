@@ -48,6 +48,8 @@ config/sync_fetch.cmake
 config/mingw.cmake
 config/test-rand.c
 config/test-rand.cmake
+config/odd_address_io_int.c
+config/odd_address_io_int.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
