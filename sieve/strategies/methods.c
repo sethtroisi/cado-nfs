@@ -26,8 +26,8 @@ int method_read_stream(cofac_method_ptr meth, FILE *file)
     n = sscanf(str, "METHOD=%s B1=%d B2=%d param=%d", type, &B1, &B2, &param);
     if (n != 4) complain("first line in wrong");
 
-    if (strcmp(type, "ECM") == 0)
-      meth->type = ECM;
+    if (strcmp(type, "ECM11") == 0)
+      meth->type = ECM11;
     else if (strcmp(type, "ECMM12") == 0)
       meth->type = ECMM12;
     else if (strcmp(type, "PM1") == 0)
@@ -111,8 +111,8 @@ int methods_read(cofac_method_t **meths, const char *f)
 void method_print_full(cofac_method_srcptr meth, FILE *file)
 {
   fprintf(file, "METHOD=");
-  if (meth->type == ECM)
-    fprintf(file, "ECM");
+  if (meth->type == ECM11)
+    fprintf(file, "ECM11");
   else if (meth->type == ECMM12)
     fprintf(file, "ECMM12");
   else if (meth->type == PM1)
@@ -138,8 +138,8 @@ void method_print_full(cofac_method_srcptr meth, FILE *file)
 
 void method_print(cofac_method_srcptr meth, FILE *file)
 {
-  if (meth->type == ECM)
-    fprintf(file, "ECM");
+  if (meth->type == ECM11)
+    fprintf(file, "ECM11");
   else if (meth->type == ECMM12)
     fprintf(file, "ECMM12");
   else if (meth->type == PM1)

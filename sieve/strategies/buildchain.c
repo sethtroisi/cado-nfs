@@ -8,6 +8,8 @@
 
 #define MAX(a,b) ((a)<=(b))?(b):(a)
 
+
+
 float prior_checksum(histogram_t *P) {
     float p = 0.0;
     for (int i = 0; i < 4; ++i)
@@ -26,6 +28,29 @@ void get_prior(histogram_t *P) {
             P[i][b] = 1/((float)(4*b));
 }
 
+// Return max bit-size b for which 95% of the primes of b bit have been
+// removed.
+int cleaned_primes(histogram_t *P) {
+    histogram_t prior[4];
+    get_prior(prior);
+    for (int b = 15; b <= METHOD_MAXBITS; ++b)
+        for (int i = 1; i < 4; ++i)
+            prior[0][b] += prior[i][b];
+
+    int res = -1;
+    float PP;
+    for (int b = 15; b <= METHOD_MAXBITS; ++b) {
+        PP = 0;
+        for (int i = 0; i < 4; ++i)
+            PP += P[i][b];
+        PP /= prior[0][b];
+        if (PP < 0.05)
+            res = b;
+    }
+    return res;
+}
+
+
 // History of which p-1 / p+1 where already run.
 // These are histogram of success proba according to class mod 12.
 // They are only pointers to the corresponding histograms of existing
@@ -33,6 +58,7 @@ void get_prior(histogram_t *P) {
 typedef struct {
     float * pm1[4];
     float * pp1[4];
+    float * ecm11[4];
 } ppm1_history_struct;
 
 // Evaluate the score of running a method, knowing the histogram of
@@ -98,14 +124,20 @@ void take_ppm1_history_into_account(histogram_t *P, int type,
         histogram_t *p, ppm1_history_struct *history)
 {
     // ECM does not redo p+1 or p-1. Just copy p to P.
-    if (type == ECM || type == ECMM12) {
+    if (type == ECMM12) {
         for (int i = 0; i < 4; ++i)
             for (int j = 15; j <= METHOD_MAXBITS; ++j)
                 P[i][j] = p[i][j];
         return;
     }
+    // ECM11 is just one curve.
+    if (type == ECM11) {
+        for (int i = 0; i < 4; ++i)
+            for (int j = 15; j <= METHOD_MAXBITS; ++j)
+                P[i][j] = p[i][j] - history->ecm11[i][j];
+    }
     // p-1 redo p-1. That's also easy: just a subtract.
-    if (type == PM1) {
+    else if (type == PM1) {
         for (int i = 0; i < 4; ++i)
             for (int j = 15; j <= METHOD_MAXBITS; ++j)
                 P[i][j] = p[i][j] - history->pm1[i][j];
@@ -155,8 +187,13 @@ float * max_prob(float *p1, float *p2) {
 // The ppm1 history must be updated accordingly.
 void update_ppm1_history(ppm1_history_struct *hist, cofac_method_ptr meth)
 {
-  if (meth->type == ECM || meth->type == ECMM12)
+  if (meth->type == ECMM12)
     return;
+  if (meth->type == ECM11) {
+    for (int i = 0; i < 4; ++i)
+      hist->ecm11[i] = max_prob(hist->ecm11[i], meth->success[i]);
+    return;
+  }
   if (meth->type == PM1) {
     for (int i = 0; i < 4; ++i)
       hist->pm1[i] = max_prob(hist->pm1[i], meth->success[i]);
@@ -226,9 +263,11 @@ int main(int argc, char **argv)
 
     // The history of p+1 and p-1. Initialize with 0.
     ppm1_history_struct ppm1_hist;
+    float zero_hist[METHOD_MAXBITS+1] = {0,}; // fill in with zeros.
     for (int i = 0; i < 4; ++i) {
         ppm1_hist.pm1[i] = zero_hist;
         ppm1_hist.pp1[i] = zero_hist;
+        ppm1_hist.ecm11[i] = zero_hist;
     }
 
     for (int i = 0; i < len; ++i) {
@@ -250,6 +289,8 @@ int main(int argc, char **argv)
         update_ppm1_history(&ppm1_hist, list_meth[m]);
 
         fprintf(stderr, "  Current prior checksum = %.4f\n", prior_checksum(P));
+        fprintf(stderr, "  Bit size that has been cleaned = %d\n",
+                cleaned_primes(P));
     }
 
     for (int i = 0; i < len; ++i) {
