@@ -591,6 +591,7 @@ scripts/cadofactor/workunit.py
 scripts/cadofactor/wuclient2.py
 scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
+scripts/cadofactor/README
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format

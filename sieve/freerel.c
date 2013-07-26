@@ -114,14 +114,14 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
 static void declare_usage(param_list pl)
 {
-    param_list_decl_usage(pl, "poly", "polynomial file");
-    param_list_decl_usage(pl, "renumber", "renumber file");
-    param_list_decl_usage(pl, "lpbr", "rational large prime bound");
-    param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
-    param_list_decl_usage(pl, "pmin", "???");
-    param_list_decl_usage(pl, "pmax", "???");
-    param_list_decl_usage(pl, "badideals",   "file describing bad ideals (for DL)");
-    param_list_decl_usage(pl, "add_full_col", "(switch) add a column of 1 in the matrix (for DL)");
+  param_list_decl_usage(pl, "poly", "polynomial file");
+  param_list_decl_usage(pl, "renumber", "renumber file");
+  param_list_decl_usage(pl, "lpbr", "rational large prime bound");
+  param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
+  param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
+  param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
+  param_list_decl_usage(pl, "badideals",   "file describing bad ideals (for DL)");
+  param_list_decl_usage(pl, "add_full_col", "(switch) add a column of 1 in the matrix (for DL)");
 }
 
 static void
