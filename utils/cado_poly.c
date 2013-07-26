@@ -62,6 +62,8 @@ cado_poly_set (cado_poly p, cado_poly q)
     mpz_set (p->m, q->m);
 }
 
+// This function is no longer exported
+static
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
@@ -85,15 +87,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
         snprintf(tag, sizeof(tag), "Y%d", i);
         have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->f[i]);
     }
-    param_list_parse_ulong(pl, "rlim", &(poly->rat->lim));
-    param_list_parse_int(pl, "lpbr", &(poly->rat->lpb));
-    param_list_parse_int(pl, "mfbr", &(poly->rat->mfb));
-    param_list_parse_double(pl, "rlambda", &(poly->rat->lambda));
-
-    param_list_parse_ulong(pl, "alim", &(poly->alg->lim));
-    param_list_parse_int(pl, "lpba", &(poly->alg->lpb));
-    param_list_parse_int(pl, "mfba", &(poly->alg->mfb));
-    param_list_parse_double(pl, "alambda", &(poly->alg->lambda));
 
     mpz_set_ui (poly->m, 0);
     param_list_parse_mpz(pl, "m", poly->m);

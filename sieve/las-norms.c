@@ -157,10 +157,11 @@ void init_rat_norms_bucket_region(unsigned char *S,
     halfI_double_minus_one = halfI_double - 1.0,
     u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
     u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
-    invu1 = 1./u1,
     scale = rat->scale * (1./0x100000),
     add = 0x3FF00000 - GUARD / scale;
-  double u0j, d0_init, g, rac, d0, d1, i, trunc_i;
+  ASSERT_ALWAYS(u1 != 0.);
+  const double invu1 = 1./u1;
+  double u0j, d0_init, g, rac, d0, d1, i;
   size_t ts;
   unsigned int j1, inc;
   int int_i;
@@ -218,8 +219,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
        use of inc here. */
     for (i = rac + rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
-      trunc_i = trunc(i);
-      if (UNLIKELY(trunc_i >= halfI_double)) {
+      if (UNLIKELY(i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -228,7 +228,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
-      int_i = (int) trunc_i; /* Overflow is not possible here */
+      int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "A1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -283,8 +283,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     i = rac - rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
-      trunc_i = trunc(i);
-      if (UNLIKELY(trunc_i >= halfI_double)) {
+      if (UNLIKELY(i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "A4.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -293,7 +292,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
-      int_i = (int) trunc_i; /* Overflow is not possible here */
+      int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "A4 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -310,8 +309,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
   cas3:
     for (i = rac - rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
-      trunc_i = trunc(i);
-      if (UNLIKELY(trunc_i >= halfI_double)) {
+      if (UNLIKELY(i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "B1.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -320,7 +318,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
-      int_i = (int) trunc_i; /* Overflow is not possible here */
+      int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -375,8 +373,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     i = rac + rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
-      trunc_i = trunc(i);
-      if (UNLIKELY(trunc_i >= halfI_double)) {
+      if (UNLIKELY(i >= halfI_double)) {
 	ts += halfI;
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
@@ -385,7 +382,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 	S += ts;
 	goto nextj;
       }
-      int_i = (int) trunc_i; /* Overflow is not possible here */
+      int_i = (int) i; /* Overflow is not possible here */
       ts += int_i;
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
@@ -2849,8 +2846,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat->bound = (unsigned char) (r * rat->scale + GUARD);
   fprintf (output, " bound=%u\n", rat->bound);
-  double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
-  if (si->cpoly->rat->lambda > max_rlambda) {
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
+      si->conf->sides[RATIONAL_SIDE]->lpb;
+  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
   /* Obsolete: rat->Bound is replaced by a single threshold alg->bound */
@@ -2893,8 +2891,8 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      y >= GUARD + lambda * lpb * scale */
   alg->bound = (unsigned char) (r * alg->scale + GUARD);
   fprintf (output, " bound=%u\n", alg->bound);
-  double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
-  if (si->cpoly->alg->lambda > max_alambda) {
+  double max_alambda = (alg->logmax) / si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
   /* Obsolete: alg->Bound is replaced by a single threshold alg->bound */

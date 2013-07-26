@@ -60,8 +60,7 @@ main (int argc0, char *argv0[])
 
   cado_poly_init (pol);
   ASSERT_ALWAYS((polyfilename = param_list_lookup_string(pl, "poly")) != NULL);
-  if (polyfilename) param_list_read_file(pl, polyfilename);
-  if (!cado_poly_set_plist (pol, pl)) {
+  if (!cado_poly_read (pol, polyfilename)) {
     fprintf (stderr, "Error reading polynomial file\n");
     usage(argv[0]);
     exit (EXIT_FAILURE);

@@ -30,4 +30,6 @@ Run the benchmark / statistic generator for your favorite method:
   * ecm corresponds to the BRENT12 curves in facul.c.
   * ecmm12 corresponds to the MONTY12 curves in facul.c.
 
-
+  If you have a file all.st containing all methods you want to test, you
+  can create a file of statistics with:
+    while read m b1 b2 p; do ./run_stat.sh $m $b1 $b2 $p; done < all.st

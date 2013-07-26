@@ -212,7 +212,8 @@ void eval_64chars_batch_thread(struct worker_threads_group * g, int tnum, void *
     return;
 }
 
-static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
+static alg_prime_t * create_characters(int nchars, int nratchars,
+        cado_poly pol, unsigned long *lpb)
 {
     unsigned long p;
     int ret;
@@ -244,7 +245,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
     /* Rational characters. Normally we have none. But the -nratchars
      * option inserts some */
     /* we want some prime beyond the (rational) large prime bound */
-    mpz_set_ui (pp, 1UL << pol->rat->lpb);
+    mpz_set_ui (pp, 1UL << lpb[RATIONAL_SIDE]);
     for(int i = 3 ; i < 3 + nratchars && i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
@@ -255,7 +256,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
         }
     }
     /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_set_ui (pp, 1UL << pol->alg->lpb);
+    mpz_set_ui (pp, 1UL << lpb[ALGEBRAIC_SIDE]);
     for(int i = 3 + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
@@ -572,6 +573,7 @@ int main(int argc, char **argv)
     const char *indexname = NULL;
     const char *outname = NULL;
     int nthreads = 1;
+    unsigned long lpb[2] = {0,0};
 
     /* print the command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -604,6 +606,8 @@ int main(int argc, char **argv)
     cado_poly_read(pol, tmp);
 
     ASSERT_ALWAYS(param_list_parse_int(pl, "nchar", &nchars));
+    ASSERT_ALWAYS(param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]));
+    ASSERT_ALWAYS(param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]));
 
     param_list_parse_int(pl, "nratchars", &nratchars);
     param_list_parse_int(pl, "t", &nthreads);
@@ -615,7 +619,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(indexname != NULL);
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
-    chars = create_characters (nchars, nratchars, pol);
+    chars = create_characters (nchars, nratchars, pol, lpb);
     int nchars2 = iceildiv(nchars, 64) * 64;
     double tt=wct_seconds();
     blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol, g);

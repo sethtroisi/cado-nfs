@@ -826,9 +826,16 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
          * remains reasonable to base our work on the larger factor base
          * (thus doing incomplete sieving).
          */
+        /* But now, the .poly file does not contain lim data anymore.
+         * This is up to the user to do this check, anyway, because
+         * it is not sure that makefb was run with the alim given in the
+         * poly file.
+         */
+        /*
         for(int s = 0 ; s < 2 ; s++) {
             ASSERT_ALWAYS(sc->sides[s]->lim <= las->cpoly->pols[s]->lim);
         }
+        */
     }
 
     fclose(f);
@@ -875,16 +882,14 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* {{{ Parse polynomial */
     cado_poly_init(las->cpoly);
     const char *tmp;
-    if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
-	param_list_read_file(pl, tmp);
-    } else {
+    if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (!cado_poly_set_plist(las->cpoly, pl)) {
-	fprintf(stderr, "Error reading polynomial file\n");
+    if (!cado_poly_read(las->cpoly, tmp)) {
+	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
 	exit(EXIT_FAILURE);
     }
 
@@ -923,22 +928,21 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     mpz_clear(q0);
     sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-    param_list_parse_int(pl, "I", &sc->logI);
-    for(int s = 0 ; s < 2 ; s++) {
-        sc->sides[s]->lim = las->cpoly->pols[s]->lim;
-        sc->sides[s]->lpb = las->cpoly->pols[s]->lpb;
-        sc->sides[s]->mfb = las->cpoly->pols[s]->mfb;
-        sc->sides[s]->lambda = las->cpoly->pols[s]->lambda;
+    int seen = 1;
+    seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
+    seen &= param_list_parse_ulong (pl, "rlim",    &(sc->sides[0]->lim));
+    seen &= param_list_parse_int   (pl, "lpbr",    &(sc->sides[0]->lpb));
+    seen &= param_list_parse_int   (pl, "mfbr",    &(sc->sides[0]->mfb));
+    seen &= param_list_parse_double(pl, "rlambda", &(sc->sides[0]->lambda));
+    seen &= param_list_parse_ulong (pl, "alim",    &(sc->sides[1]->lim));
+    seen &= param_list_parse_int   (pl, "lpba",    &(sc->sides[1]->lpb));
+    seen &= param_list_parse_int   (pl, "mfba",    &(sc->sides[1]->mfb));
+    seen &= param_list_parse_double(pl, "alambda", &(sc->sides[1]->lambda));
+    if (!seen) {
+        fprintf(stderr, "Error: options -I, -rlim, -lpbr, -mfbr, -rlambda,"
+                " -alim, -lpba, -mfba, -alambda are mandatory.\n");
+        exit(EXIT_FAILURE);
     }
-    /* We used to print the default config unconditionally. It's in fact
-     * useless, as this bit of configuration will be printed anyway, and
-     * printing it twice causes unnecessary clutter.
-    if (sc->bitsize) {
-        siever_config_display(las->output, sc);
-        fprintf(las->output, "#                     skewness=%1.1f\n",
-                las->cpoly->skew);
-    }
-     */
 
     /* }}} */
 
@@ -972,13 +976,13 @@ void las_info_clear(las_info_ptr las)/*{{{*/
         sieve_info_clear(las, si);
     }
     free(las->sievers);
-  if (las->outputname)
-      fclose_maybe_compressed(las->output, las->outputname);
-  mpz_clear(las->todo_q0);
-  mpz_clear(las->todo_q1);
-  if (las->todo_list_fd)
-      fclose(las->todo_list_fd);
-  cado_poly_clear(las->cpoly);
+    if (las->outputname)
+        fclose_maybe_compressed(las->output, las->outputname);
+    mpz_clear(las->todo_q0);
+    mpz_clear(las->todo_q1);
+    if (las->todo_list_fd)
+        fclose(las->todo_list_fd);
+    cado_poly_clear(las->cpoly);
 }/*}}}*/
 
 sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr sc, param_list pl)/*{{{*/
@@ -3097,8 +3101,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
-  param_list_decl_usage(pl, "mkhint", "(switch) ???");
+  param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
+  param_list_decl_usage(pl, "descent-hint", "hint file ?????");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
+  param_list_decl_usage(pl, "mkhint", "(switch) ?????");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/

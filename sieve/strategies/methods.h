@@ -11,6 +11,8 @@
 // with i-bits.
 
 typedef float histogram_t [METHOD_MAXBITS+1];
+static float zero_hist[METHOD_MAXBITS+1] = {0,}; // fill in with zeros.
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Defines for the congruences modulo 12
@@ -29,6 +31,7 @@ typedef float histogram_t [METHOD_MAXBITS+1];
 #define PP1_27 1
 #define PP1_65 2
 #define ECM 3
+#define ECMM12 4
 
 //////////////////////////////////////////////////////////////////////////////
 // Main struct for a method
