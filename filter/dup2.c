@@ -337,6 +337,9 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
+#ifdef HAVE_MINGW /* For MinGW, rename cannot overwrite an existing file */
+        remove (oname);
+#endif
         int ret = rename(oname_tmp, oname);
         if (ret)
         {
