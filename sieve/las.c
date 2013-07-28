@@ -2373,6 +2373,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 }
             }
 
+            relation_add_prime(rel, si->conf->side, mpz_get_ui(si->doing->p));
+
             relation_compress_rat_primes(rel);
             relation_compress_alg_primes(rel);
 
@@ -2389,37 +2391,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
             {
                 pthread_mutex_lock(&io_mutex);
-#if 0
-                fprint_relation(las->output, rel);
-#else
-                /* This code will be dropped soon. The thing is
-                 * that las is a moving target for the moment, and
-                 * going through the fprint_relation code above changes
-                 * the order of factors in printed relations. It's not so
-                 * handy.
-                 */
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
-                fprintf (las->output, "%" PRId64 ",%" PRIu64, a, b);
-                for(int z = 0 ; z < 2 ; z++) {
-                    int side = RATIONAL_SIDE ^ z;
-                    fprintf (las->output, ":");
-                    int comma = factor_list_fprint (las->output, factors[side]);
-                    for (unsigned int i = 0; i < f[side]->length; ++i) {
-                        for (unsigned int j = 0; j < m[side]->data[i]; j++) {
-                            if (comma++) fprintf (las->output, ",");
-                            gmp_fprintf (las->output, "%Zx", f[side]->data[i]);
-                        }
-                    }
-                    if (si->conf->side == side) {
-                        if (comma++) fprintf (las->output, ",");
-                        gmp_fprintf (las->output, "%Zx", si->doing->p);
-                    }
-                }
-                fprintf (las->output, "\n");
-                fflush (las->output);
-#endif
+                fprint_relation(las->output, rel);
                 pthread_mutex_unlock(&io_mutex);
             }
 
