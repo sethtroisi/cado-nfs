@@ -43,6 +43,10 @@ polyselect/linear_interpolation.sage
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 polyselect/ropt_main.c
+polyselect/rotate.c
+polyselect/rotate_all.c
+polyselect/sopt.c
+polyselect/twoquadratics.c
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
