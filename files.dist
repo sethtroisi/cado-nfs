@@ -30,6 +30,7 @@ config/inline-assembly.c
 config/math.cmake
 config/posix.cmake
 config/mpi.cmake
+config/mpir.cmake
 config/pthreads.cmake
 config/rusage_thread.c
 config/rusage_thread.cmake
