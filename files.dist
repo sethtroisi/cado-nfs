@@ -561,10 +561,6 @@ polyselect/ropt_str.c
 polyselect/ropt_str.h
 polyselect/ropt_tree.c
 polyselect/ropt_tree.h
-polyselect/rotate.c
-polyselect/rotate_all.c
-polyselect/sopt.c
-polyselect/twoquadratics.c
 scripts/call_cmake.sh
 scripts/cluster/README_LAS
 scripts/cluster/check_dup_purge.pl

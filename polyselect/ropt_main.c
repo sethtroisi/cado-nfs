@@ -141,7 +141,7 @@
 void
 usage (char **argv)
 {
-  fprintf (stderr, "Error: Unexpected argument: %s\n", argv[1]);
+  fprintf (stderr, "Error: Unhandled parameter: %s\n", argv[1]);
   fprintf (stderr, "\n");
   fprintf (stderr, "Usage: %s -f fname [options]\n", argv[0]);
   fprintf (stderr, "       %s -f fname --s2 [options]\n", argv[0]);
@@ -151,20 +151,20 @@ usage (char **argv)
   fprintf (stderr, "       %s --s2 [options]\n", argv[0]);
   fprintf (stderr, "\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, " -f fname      Read polynomials in CADO format in file 'fname'.\n");
-  fprintf (stderr, " -fm fname     Read polynomials in msieve format in file 'fname'. Use together\n");
-  fprintf (stderr, "               with options -n and -d.\n");
-  fprintf (stderr, " -n N          N is the integer to be factored (only in -fm mode).\n");
-  fprintf (stderr, " -d D          D is the degree of the polynomial (only in -fm mode).\n");
+  fprintf (stderr, " -f fname      read polynomials in CADO format.\n");
+  fprintf (stderr, " -fm fname     read polynomials in MSIEVE format (use together\n");
+  fprintf (stderr, "                with options -n and -d).\n");
+  fprintf (stderr, " -n N          (only in -fm mode) the integer to be factored.\n");
+  fprintf (stderr, " -d D          (only in -fm mode) the degree of the polynomial.\n");
   fprintf (stderr, " -amin L       L is the lower bound for quadratic rotation.\n");
   fprintf (stderr, " -amax R       R is the upper bound for quadratic rotation.\n");
   fprintf (stderr, " -bmax U       U and -U are the sieving length for linear rotation.\n");
   fprintf (stderr, " -cmax V       V and -V are the sieving length for constant rotation.\n");
-  fprintf (stderr, " -e N E_1 E_2 ... E_N   N is the number of small primes in finding sublattice.\n");
+  fprintf (stderr, " -e N E_1 E_2 ... E_N   N is the number of small primes in finding sublattices.\n");
   fprintf (stderr, "                        E_1 to E_N are the prime powers in finding sublattices.\n");
   fprintf (stderr, " -norm M       M is the (estimated) lognorm upper bound in ropt.\n");
-  fprintf (stderr, " -v            Number of occurrences defines verbose level {0, 1, 2, 3} (default 0).\n");
-  fprintf (stderr, " --s2          Sieve-only mode (e.g. Example 5). Use together with the following\n");
+  fprintf (stderr, " -v            number of occurrences defines verbose level {0, 1, 2, 3} (default 0).\n");
+  fprintf (stderr, " --s2          (switch) sieve-only mode (use together with the following\n");
   fprintf (stderr, "               four options: -a, -b, -c and -mod.\n");
   fprintf (stderr, " -a A          Fix the quadratic rotation of the sublattice by A.\n");
   fprintf (stderr, " -b B          Fix the linear rotation of the sublattice by B.\n");
