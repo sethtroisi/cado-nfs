@@ -93,6 +93,10 @@
 # Therefore if some flag is relevant to both, you have to set both.
 
 ############################################################
+# DISABLE_SHARED: Disable shared libraries
+# DISABLE_SHARED=1
+
+############################################################
 # PREFIX: Installation path
 #
 # Example values:
