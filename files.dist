@@ -341,6 +341,10 @@ linalg/bwc/mpfq/abase_p_4.c
 linalg/bwc/mpfq/abase_p_4.h
 linalg/bwc/mpfq/abase_p_4_t.c
 linalg/bwc/mpfq/abase_p_4_t.h
+linalg/bwc/mpfq/abase_p_8.c
+linalg/bwc/mpfq/abase_p_8.h
+linalg/bwc/mpfq/abase_p_8_t.c
+linalg/bwc/mpfq/abase_p_8_t.h
 linalg/bwc/mpfq/abase_u64k1.c
 linalg/bwc/mpfq/abase_u64k1.h
 linalg/bwc/mpfq/abase_u64k1_t.c
