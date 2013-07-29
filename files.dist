@@ -791,6 +791,7 @@ linalg/bwc/mpfq/abase_p_3_t.c
 linalg/bwc/mpfq/abase_p_3_t.h
 linalg/bwc/plingen.c
 linalg/bwc/plingen.h
+linalg/bwc/plingen-tuning.cpp
 linalg/bwc/lingen-matpoly.c
 linalg/bwc/lingen-matpoly.h
 linalg/bwc/lingen-polymat.c
