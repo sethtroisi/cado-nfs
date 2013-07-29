@@ -22,7 +22,6 @@ linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
 filter/print_table.c
-filter/purge-mt.c
 scripts/nightly-test
 scripts/polsel_effort
 scripts/cadofactor/parameters
