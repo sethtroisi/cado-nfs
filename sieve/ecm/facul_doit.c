@@ -214,8 +214,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
         break;
 #endif
       
-      if (i < STATS_LEN)
-	  stats_called[i]++;
+      stats_called[i]++;
       
       if (strategy->methods[i].method == PM1_METHOD)
 	bt = pm1 (f, m, (pm1_plan_t *) (strategy->methods[i].plan));
@@ -293,8 +292,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
       
       if (mod_intequal (f, n))
 	{
-	  if (i < STATS_LEN)
-	    stats_found_n[i]++;
+          stats_found_n[i]++;
+
 	  if (bt == 0)
 	    {
 	      /* Input number was found without any backtracking happening?
@@ -317,24 +316,40 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 large for our smoothness bounds */
       
       /* A quick test if the factor is <= fbb^2 and >2^lpb */
-      fprime = (mod_intcmp_uint64 (f, strategy->assume_prime_thresh) <= 0); 
+      double f_dbl = mod_intget_double (f);
+      fprime = f_dbl < strategy->assume_prime_thresh;
       if (fprime && mod_intbits (f) > strategy->lpb)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  break;
 	}
+
+      /* if L^2 < f < B^3, it cannot be smooth */
+      if (2 * strategy->lpb < mod_intbits (f) && f_dbl < strategy->BBB)
+        {
+          found = FACUL_NOT_SMOOTH;
+          break;
+        }
       
       /* Compute the cofactor */
       mod_intdivexact (n, n, f);
       
       /* See if cofactor is <= fbb^2 and > 2^lpb */
-      cfprime = (mod_intcmp_uint64 (n, strategy->assume_prime_thresh) <= 0);
+      double n_dbl = mod_intget_double (n);
+      cfprime = n_dbl < strategy->assume_prime_thresh;
       if (cfprime && mod_intbits (n) > strategy->lpb)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  break;
 	}
-      
+
+      if (2 * strategy->lpb < mod_intbits (n) &&
+          n_dbl < strategy->BBB)
+        {
+          found = FACUL_NOT_SMOOTH;
+          break;
+        }
+
       /* Determine for certain if the factor is prime */
       if (!fprime)
 	{

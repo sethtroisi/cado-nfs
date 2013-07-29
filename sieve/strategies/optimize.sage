@@ -162,7 +162,7 @@ def print_score():
    for t in [15..50]:
       s0 = sum([pr0[t,k] for k in [1,5,7,11]])
       if s0 > 0:
-         print "%1d:%.2f" % (t,sum([pr[t,k] for k in [1,5,7,11]])/s0),
+         print "%1d:%.3f" % (t,sum([pr[t,k] for k in [1,5,7,11]])/s0),
    print
 
 def find_best_chain(S, n, maxit, verbose=False):
@@ -171,6 +171,7 @@ def find_best_chain(S, n, maxit, verbose=False):
    pp1_27_last = -1
    pp1_65_last = -1
    print_score()
+   total_time = 0
    for it in range(maxit):
       best_i, best_w = find_best (S, n, verbose)
       if best_i == -1:
@@ -178,9 +179,45 @@ def find_best_chain(S, n, maxit, verbose=False):
          for i in S:
             print Method[i]
          break
-      print str(it) + ": best method:", Method[best_i], "score:", float(best_w),
+      print str(it) + ": best method " + str(best_i) + ": " + Method[best_i], "score:", float(best_w),
       update_pr(best_i)
       print_score()
+      total_time += T[best_i,n]
+      print "time so far:", total_time
+      if Method[best_i][:3] == 'pm1':
+         pm1_last = best_i
+         S = S - Set([best_i])
+      if Method[best_i][:6] == 'pp1_27':
+         pp1_27_last = best_i
+         S = S - Set([best_i])
+      if Method[best_i][:6] == 'pp1_65':
+         pp1_65_last = best_i
+         S = S - Set([best_i])
+      if Method[best_i][:3] == 'ecm' and Method[best_i][-3:] == ' 11':
+         # we cannot replay the sigma=11 curves
+         r = []
+         for i in S:
+            if Method[i][:3] == 'ecm' and Method[i][-3:] == ' 11':
+               r.append(i)
+         S = S - Set(r)
+
+def estimate_chain(C, S, n, verbose=False):
+   global Method, pm1_last, pp1_27_last, pp1_65_last
+   pm1_last = -1
+   pp1_27_last = -1
+   pp1_65_last = -1
+   print_score()
+   total_time = 0
+   for it in range(len(C)):
+      best_i = C[it]
+      if not (best_i in S):
+         print "given method is not in remaining set:", best_i
+         raise ValueError
+      print str(it) + ": use given method", Method[best_i],
+      update_pr(best_i)
+      print_score()
+      total_time += T[best_i,n]
+      print "time so far:", total_time
       if Method[best_i][:3] == 'pm1':
          pm1_last = best_i
          S = S - Set([best_i])
