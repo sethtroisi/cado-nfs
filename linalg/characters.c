@@ -562,6 +562,22 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
     return k2;
 }
 
+static void
+declare_usage (param_list pl)
+{
+  param_list_decl_usage (pl, "purged", "output-from-purge file");
+  param_list_decl_usage (pl, "index",  "index file");
+  param_list_decl_usage (pl, "out",    "output file");
+  param_list_decl_usage (pl, "heavyblock", "heavyblock output file");
+  param_list_decl_usage (pl, "poly",   "polynomial file");
+  param_list_decl_usage (pl, "nchar",  "number of (algebraic) characters");
+  param_list_decl_usage (pl, "lpbr",   "large prime bound on rational side");
+  param_list_decl_usage (pl, "lpba",   "large prime bound on algebraic side");
+  param_list_decl_usage (pl, "nratchars", "number of rational characters");
+  param_list_decl_usage (pl, "t",      "number of threads");
+  param_list_decl_usage (pl, "W",      "input kernel file");
+}
+
 int main(int argc, char **argv)
 {
     const char * heavyblockname = NULL;
@@ -574,6 +590,7 @@ int main(int argc, char **argv)
     const char *outname = NULL;
     int nthreads = 1;
     unsigned long lpb[2] = {0,0};
+    char *argv0 = argv[0];
 
     /* print the command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -583,15 +600,28 @@ int main(int argc, char **argv)
 
     param_list pl;
     param_list_init(pl);
+    declare_usage(pl);
+
     argc--,argv++;
     char ** bw_kernel_files = malloc(argc * sizeof(char*));
     int n_bw_kernel_files = 0;
+    FILE *f;
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-        /* might also be a BW kernel file */
-        bw_kernel_files[n_bw_kernel_files++] = *argv;
-        argv++,argc--;
+
+        /* Could also be a BWC kernel file */
+        if ((f = fopen (argv[0], "r")) != NULL)
+          {
+            bw_kernel_files[n_bw_kernel_files++] = *argv;
+            fclose (f);
+            argv++,argc--;
+            continue;
+          }
+
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        param_list_print_usage(pl, argv0, stderr);
+        exit (EXIT_FAILURE);
     }
     purgedname = param_list_lookup_string(pl, "purged");
     indexname = param_list_lookup_string(pl, "index");
@@ -602,21 +632,48 @@ int main(int argc, char **argv)
 
     const char * tmp;
 
-    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+    if ((tmp = param_list_lookup_string(pl, "poly")) == NULL)
+      {
+        fprintf (stderr, "Error: parameter -poly is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
     cado_poly_read(pol, tmp);
 
-    ASSERT_ALWAYS(param_list_parse_int(pl, "nchar", &nchars));
-    ASSERT_ALWAYS(param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]));
-    ASSERT_ALWAYS(param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]));
+    if (param_list_parse_int(pl, "nchar", &nchars) == 0)
+      {
+        fprintf (stderr, "Error: parameter -nchar is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+    if (param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]) == 0)
+      {
+        fprintf (stderr, "Error: parameter -lpbr is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+    if (param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]) == 0)
+      {
+        fprintf (stderr, "Error: parameter -lpba is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
 
     param_list_parse_int(pl, "nratchars", &nratchars);
     param_list_parse_int(pl, "t", &nthreads);
 
-    if (param_list_warn_unused(pl))
-        exit(1);
-
-    ASSERT_ALWAYS(purgedname != NULL);
-    ASSERT_ALWAYS(indexname != NULL);
+    if (purgedname == NULL)
+      {
+        fprintf (stderr, "Error: parameter -purged is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+     if (indexname == NULL)
+       {
+         fprintf (stderr, "Error: parameter -index is mandatory\n");
+         param_list_print_usage (pl, argv0, stderr);
+         exit (EXIT_FAILURE);
+       }
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
     chars = create_characters (nchars, nratchars, pol, lpb);
