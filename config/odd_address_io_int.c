@@ -1,5 +1,6 @@
-/* This source file is our test case for I/O odd adress for an int. If this can be
- * compiled, it means that ODD_ADDRESS_IO_INT will be usable in sieve/las.
+/* This source file is our test case for I/O odd adress for an int. If this
+   can be compiled and run, it means that ODD_ADDRESS_IO_INT will be usable
+   in sieve/las.
  */
 
 int main() {
