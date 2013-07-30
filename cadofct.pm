@@ -2909,7 +2909,7 @@ sub do_chars {
               "-nchar $param{'nchar'} ".
               "-t $param{'nthchar'} ".
               "-out $param{'prefix'}.ker " .
-              "$param{'prefix'}.bwc/W";
+              "-ker $param{'prefix'}.bwc/W";
 
     my $res = cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.characters.log" });

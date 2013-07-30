@@ -575,7 +575,7 @@ declare_usage (param_list pl)
   param_list_decl_usage (pl, "lpba",   "large prime bound on algebraic side");
   param_list_decl_usage (pl, "nratchars", "number of rational characters");
   param_list_decl_usage (pl, "t",      "number of threads");
-  param_list_decl_usage (pl, "W",      "input kernel file");
+  param_list_decl_usage (pl, "ker",      "input kernel file");
 }
 
 int main(int argc, char **argv)
@@ -603,21 +603,10 @@ int main(int argc, char **argv)
     declare_usage(pl);
 
     argc--,argv++;
-    char ** bw_kernel_files = malloc(argc * sizeof(char*));
-    int n_bw_kernel_files = 0;
-    FILE *f;
+    const char *bw_kernel_file = NULL;
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-
-        /* Could also be a BWC kernel file */
-        if ((f = fopen (argv[0], "r")) != NULL)
-          {
-            bw_kernel_files[n_bw_kernel_files++] = *argv;
-            fclose (f);
-            argv++,argc--;
-            continue;
-          }
 
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         param_list_print_usage(pl, argv0, stderr);
@@ -627,6 +616,7 @@ int main(int argc, char **argv)
     indexname = param_list_lookup_string(pl, "index");
     outname = param_list_lookup_string(pl, "out");
     heavyblockname = param_list_lookup_string(pl, "heavyblock");
+    bw_kernel_file = param_list_lookup_string(pl, "ker");
 
     cado_poly_init (pol);
 
@@ -707,38 +697,32 @@ int main(int argc, char **argv)
     /* First compute how many kernel vectors we have */
 
     unsigned int total_kernel_cols = 0;
-    unsigned int kncols[n_bw_kernel_files];
-    for(int i = 0 ; i < n_bw_kernel_files ; i++) {
-        struct stat sbuf[1];
-        int rc = stat(bw_kernel_files[i], sbuf);
-        if (rc < 0) { perror(bw_kernel_files[i]); exit(1); }
-        ASSERT_ALWAYS(sbuf->st_size % small_nrows == 0);
-        unsigned int ncols = 8 * (sbuf->st_size / small_nrows);
-        fprintf(stderr, "%s: %u vectors\n", bw_kernel_files[i], ncols);
-        ASSERT_ALWAYS(ncols % 64 == 0);
-        total_kernel_cols += kncols[i] = ncols;
-    }
+    unsigned int kncols;
+    struct stat sbuf[1];
+    int rc = stat(bw_kernel_file, sbuf);
+    if (rc < 0) { perror(bw_kernel_file); exit(1); }
+    ASSERT_ALWAYS(sbuf->st_size % small_nrows == 0);
+    unsigned int ncols = 8 * (sbuf->st_size / small_nrows);
+    fprintf(stderr, "%s: %u vectors\n", bw_kernel_file, ncols);
+    ASSERT_ALWAYS(ncols % 64 == 0);
+    total_kernel_cols += kncols = ncols;
 
     fprintf(stderr, "Total: %u kernel vectors\n", total_kernel_cols);
 
     /* kmat is the join of all kernel vectors */
     blockmatrix k = blockmatrix_alloc(small_nrows, total_kernel_cols);
-    for(int i = 0, j0 = 0 ; i < n_bw_kernel_files ; i++) {
-        blockmatrix_read_from_flat_file(k, 0, j0, bw_kernel_files[i], small_nrows, kncols[i]);
-        j0 += kncols[i];
-    }
+    int j0 = 0;
+    blockmatrix_read_from_flat_file(k, 0, j0, bw_kernel_file, small_nrows, kncols);
 
     fprintf(stderr, "done reading %u kernel vectors at %.1f\n",
             total_kernel_cols, wct_seconds() - tt);
 
-    {
-        blockmatrix k2 = blockmatrix_column_reduce(k, 4096);
-        blockmatrix_free(k);
-        k = k2;
-        total_kernel_cols = k->ncols;
-        fprintf(stderr, "Info: input kernel vectors reduced to dimension %u\n",
-                total_kernel_cols);
-    }
+    blockmatrix k2 = blockmatrix_column_reduce(k, 4096);
+    blockmatrix_free(k);
+    k = k2;
+    total_kernel_cols = k->ncols;
+    fprintf(stderr, "Info: input kernel vectors reduced to dimension %u\n",
+            total_kernel_cols);
 
     /* tmat is the product of the character matrices times the kernel vector */
     blockmatrix t = blockmatrix_alloc(total_kernel_cols, scmat->ncols + h->ncols);
@@ -796,7 +780,6 @@ int main(int argc, char **argv)
     }
     blockmatrix_free(nk);
 
-    free(bw_kernel_files);
     cado_poly_clear(pol);
     param_list_clear(pl);
 
