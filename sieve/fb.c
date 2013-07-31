@@ -365,10 +365,13 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 
 /* Generate a factor base with primes <= bound and prime powers <= powbound
    for a linear polynomial. If projective != 0, adds projective roots
-   (for primes that divide leading coefficient) */
+   (for primes that divide leading coefficient).
+   Returns 1 on success, 0 on error. */
 
-factorbase_degn_t *
-fb_make_linear (const mpz_t *poly, const fbprime_t bound,
+int
+fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
+                const mpz_t *poly, const fbprime_t bound, 
+                const fbprime_t smalllim, const int nr_pieces, 
 		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
@@ -389,9 +392,9 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   fb_cur->nr_roots = 1;
   fb_cur->size = fb_entrysize_uc (1);
-  if (!fb_split_init (&split, 0, 0, allocblocksize)) {
+  if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
     free (fb_cur);
-    return NULL;
+    return 0;
   }
 
   if (verbose)
@@ -491,9 +494,8 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
   if (error)
       fb_split_wipe (&split);
 
-  factorbase_degn_t *fb = NULL;
   if (!error) {
-      fb_split_getpieces (&split, &fb, NULL);
+      fb_split_getpieces (&split, fb_small, fb_pieces);
       fb_split_clear (&split);
   }
 
@@ -505,7 +507,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   rdtscll (tsc2);
 
-  return fb;
+  return error ? 0 : 1;
 }
 
 /* return the total size (in bytes) used by fb */
@@ -847,18 +849,6 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
     free (fb_cur);
 
     return error ? 0 : 1;
-}
-
-
-factorbase_degn_t *
-fb_read (const char * const filename, const double log_scale, 
-         const int verbose, const fbprime_t lim, const fbprime_t powlim)
-{
-    factorbase_degn_t *fb;
-    if (!fb_read_split (&fb, NULL, filename, log_scale, 0, 0, verbose, lim, 
-                        powlim))
-        return NULL;
-    return fb;
 }
 
 

@@ -236,7 +236,11 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (apow_lim == 0) 
                 apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
+            const int verbose = 0;
+            int ok = fb_read_split (&sis->fb, NULL, fbfilename, 
+                                    sis->scale * LOG_SCALE, 0, 0, verbose, 
+                                    lim,  apow_lim);
+            FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
             fprintf (las->output, 
@@ -251,11 +255,11 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 rpow_lim = si->bucket_thresh - 1;
                 printf ("# rpow_lim reduced to %d\n", rpow_lim);
               }
-            sis->fb = fb_make_linear ((const mpz_t *) pol->f,
-                                    (fbprime_t) lim,
-                                     rpow_lim, sis->scale * LOG_SCALE, 
+            int ok = fb_make_linear (&sis->fb, NULL, (const mpz_t *) pol->f,
+                                     (fbprime_t) lim, 0, 0,
+                                     rpow_lim, sis->scale * LOG_SCALE,
                                      las->verbose, 1, las->output);
-            ASSERT_ALWAYS(sis->fb != NULL);
+            FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             tfb = seconds () - tfb;
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
