@@ -372,7 +372,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
-  fb_buffer_t fb_buf;
+  fb_split_t split;
   fbprime_t p;
   factorbase_degn_t *fb_cur;
   size_t pow_len = 0;
@@ -389,7 +389,10 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   fb_cur->nr_roots = 1;
   fb_cur->size = fb_entrysize_uc (1);
-  fb_buffer_init (&fb_buf, allocblocksize);
+  if (!fb_split_init (&split, 0, 0, allocblocksize)) {
+    free (fb_cur);
+    return NULL;
+  }
 
   if (verbose)
     gmp_fprintf (output,
@@ -466,7 +469,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
 
-      if (!fb_buffer_add (&fb_buf, fb_cur))
+      if (!fb_split_add (&split, fb_cur))
 	{
 	  error = 1;
 	  break;
@@ -480,13 +483,19 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   if (!error) /* If nothing went wrong so far, put the end-of-fb mark */
     {
-      if (!fb_buffer_finish (&fb_buf)) 
+      if (!fb_split_finish (&split))
         {
           error = 1;
         }
     }
   if (error)
-      fb_buffer_clear (&fb_buf);
+      fb_split_wipe (&split);
+
+  factorbase_degn_t *fb = NULL;
+  if (!error) {
+      fb_split_getpieces (&split, &fb, NULL);
+      fb_split_clear (&split);
+  }
 
   free (fb_cur);
   free (powers);
@@ -496,7 +505,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   rdtscll (tsc2);
 
-  return fb_buf.fb;
+  return fb;
 }
 
 /* return the total size (in bytes) used by fb */
