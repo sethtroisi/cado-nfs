@@ -36,16 +36,11 @@ unsigned long stats_found_n[STATS_LEN] = {
 int
 nb_curves (const unsigned int lpb)
 {
-  /* the following table, computed with the proba_cofactor() function in the
-     facul.sage file, ensures a probability of at least about 90% to find a
-     factor below 2^lpb with n = T[lpb] */
 #define LPB_MAX 33
-  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
-                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 10-19 */
-                      0, 0, 1 /*22:0.9074*/, 2 /*23:0.9059*/, 3 /*24:0.8990*/,
-                      5 /*25:0.9194*/, 6 /*26:0.9065*/, 8 /*27:0.9053*/,
-                      10 /*28:0.9010*/, 13 /*29:0.9091*/, 16 /*30:0.9134*/,
-                      18 /*31:0.9039*/, 21 /*32:0.9076*/, 24/*33:0.8963*/};
+  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 0-9 */
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 10-19 */
+                      0, 0, 1, 2, 3, 5, 6, 8, 10, 13, /* 20-29 */
+                      16, 18, 21, 25};                /* 30-33 */
   return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
 #undef LPB_MAX
 }
