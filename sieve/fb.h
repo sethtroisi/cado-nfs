@@ -71,10 +71,10 @@ void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
 fbprime_t       fb_is_power (fbprime_t);
-int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t **, 
+int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
                                 const mpz_t *, fbprime_t, fbprime_t, int, 
                                 fbprime_t, double, int, int, FILE *);
-int             fb_read_split (factorbase_degn_t **, factorbase_degn_t **, 
+int             fb_read_split (factorbase_degn_t **, factorbase_degn_t ***, 
                                const char *, double, fbprime_t, int, int, 
                                fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 

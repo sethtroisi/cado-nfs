@@ -199,12 +199,12 @@ fb_split_finish (fb_split_t *split)
 
 static void
 fb_split_getpieces (fb_split_t *split, factorbase_degn_t **fb_small, 
-                    factorbase_degn_t **fb_pieces)
+                    factorbase_degn_t ***fb_pieces)
 {
   *fb_small = split->fb_bufs[0].fb;
   if (split->smalllim != 0)
     for (size_t i = 0; i < split->nr_pieces; i++)
-      fb_pieces[i] = split->fb_bufs[i + 1].fb;
+      (*fb_pieces)[i] = split->fb_bufs[i + 1].fb;
 }
 
 /* Free the memory allocated for the 'fb_buffer_t's, but not the factor bases
@@ -367,7 +367,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
    Returns 1 on success, 0 on error. */
 
 int
-fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
+fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                 const mpz_t *poly, const fbprime_t bound, 
                 const fbprime_t smalllim, const int nr_pieces, 
 		const fbprime_t powbound, const double log_scale,
@@ -489,6 +489,13 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
           error = 1;
         }
     }
+
+  if (!error && smalllim != 0) {
+      *fb_pieces = (factorbase_degn_t **) 
+          malloc(nr_pieces * sizeof(factorbase_degn_t *));
+      error = (*fb_pieces == NULL);
+  }
+
   if (error)
       fb_split_wipe (&split);
 
@@ -755,7 +762,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 */
 
 int 
-fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
+fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                const char * const filename, const double log_scale, 
                const fbprime_t smalllim, const int nr_pieces, 
                const int verbose, const fbprime_t lim, const fbprime_t powlim)
@@ -828,6 +835,12 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         if (!fb_split_finish (&split))
             error = 1;
     
+    if (!error && smalllim != 0) {
+        *fb_pieces = (factorbase_degn_t **) 
+            malloc(nr_pieces * sizeof(factorbase_degn_t *));
+        error = (*fb_pieces == NULL);
+    }
+
     if (error) {
         /* If there was any error, free all the allocated memory */
         fb_split_wipe (&split);
