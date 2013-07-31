@@ -15,6 +15,11 @@
 #include "utils.h"
 #include "ularith.h"
 
+typedef struct {
+  factorbase_degn_t *fb;
+  size_t size, alloc;
+} fb_buffer_t;
+
 /* strtoul(), but with const char ** for second argument.
    Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is
    of type const char *
@@ -54,39 +59,79 @@ fb_fprint (FILE *fd, const factorbase_degn_t *fb)
     }
 }
 
-/* Add fb_add to (void *)fb + fbsize. Return 1 on success, 0 if realloc failed
-   fb_add->size need not be set by caller, this function does it */
-
-static int 
-fb_add_to (factorbase_degn_t **fb, size_t *fbsize, size_t *fballoc,
-	   const size_t allocblocksize, factorbase_degn_t *fb_add)
+/* Initialise a factor base buffer to empty */
+static void
+fb_buffer_init(fb_buffer_t *fb_buf)
 {
-  const size_t fb_addsize = fb_entrysize (fb_add);
+    fb_buf->fb = NULL; /* Set to NULL so realloc() allocates */
+    fb_buf->size = 0;
+    fb_buf->alloc = 0;
+}
 
-  ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
-					   enough mem after the realloc */
-
+/* Extend a factorbase buffer, if necessary, to have room for at least
+   addsize additional bytes at the end */
+static int
+fb_buffer_extend(fb_buffer_t *fb_buf, const size_t allocblocksize, 
+		 const size_t addsize)
+{
   /* Do we need more memory for fb? */
-  if (*fballoc < *fbsize + fb_addsize)
+  if (fb_buf->alloc < fb_buf->size + addsize)
     {
       factorbase_degn_t *newfb;
-      size_t newalloc = *fballoc + allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (*fb, newalloc);
+      size_t newalloc = fb_buf->alloc + allocblocksize;
+      ASSERT(addsize <= allocblocksize); /* Otherwise we still might not have
+					    enough mem after the realloc */
+      newfb = (factorbase_degn_t *) realloc (fb_buf->fb, newalloc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr,
 		   "Could not reallocate factor base to %zu bytes\n",
-		   *fballoc);
+		   fb_buf->alloc);
 	  return 0;
 	}
-      *fballoc = newalloc;
-      *fb = newfb;
+      fb_buf->alloc = newalloc;
+      fb_buf->fb = newfb;
     }
-  memcpy (fb_skip(*fb, *fbsize), fb_add, fb_addsize);
-  fb_skip(*fb, *fbsize)->size = fb_addsize;
+  return 1;
+}
 
-  *fbsize += fb_addsize;
+/* Add the factor base enty "fb_add" to the factor base buffer "fb_buf". 
+   Return 1 on success, 0 if realloc failed.
+   fb_add->size need not be set by caller, this function does it */
 
+static int 
+fb_buffer_add (fb_buffer_t *fb_buf, const size_t allocblocksize, 
+	   const factorbase_degn_t *fb_add)
+{
+  const size_t fb_addsize = fb_entrysize (fb_add);
+
+  if (!fb_buffer_extend(fb_buf, allocblocksize, fb_addsize))
+    return 0;
+
+  /* Append the new entry at the end of the factor base */
+  factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
+  memcpy (fb_end_ptr, fb_add, fb_addsize);
+  fb_end_ptr->size = fb_addsize;
+
+  fb_buf->size += fb_addsize;
+
+  return 1;
+}
+
+static int
+fb_buffer_finish(fb_buffer_t *fb_buf, const size_t allocblocksize)
+{
+  const size_t fb_addsize = fb_entrysize_uc (0);
+
+  if (!fb_buffer_extend(fb_buf, allocblocksize, fb_addsize))
+    return 0;
+
+  /* Add the end-of-factor-base marker */
+  factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
+  fb_end_ptr->p = FB_END;
+  fb_end_ptr->invp = -(redc_invp_t)1;
+  fb_end_ptr->nr_roots = 0;
+  fb_buf->size += fb_addsize;
   return 1;
 }
 
@@ -236,9 +281,10 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
+  fb_buffer_t fb_buf;
   fbprime_t p;
-  factorbase_degn_t *fb = NULL, *fb_cur;
-  size_t fbsize = 0, fballoc = 0, pow_len = 0;
+  factorbase_degn_t *fb_cur;
+  size_t pow_len = 0;
   const size_t allocblocksize = 1 << 20;
   unsigned long logp;
   int had_proj_root = 0;
@@ -252,6 +298,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   fb_cur->nr_roots = 1;
   fb_cur->size = fb_entrysize_uc (1);
+  fb_buffer_init (&fb_buf);
 
   if (verbose)
     gmp_fprintf (output,
@@ -328,10 +375,10 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
 
-      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
+      if (!fb_buffer_add (&fb_buf, allocblocksize, fb_cur))
 	{
-	  free (fb);
-	  fb = NULL;
+	  free (fb_buf.fb);
+	  fb_buf.fb = NULL;
 	  break;
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
@@ -341,14 +388,12 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   getprime (0); /* free prime iterator */
 
-  if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
+  if (fb_buf.fb != NULL) /* If nothing went wrong so far, put the end-of-fb 
+			    mark */
     {
-      fb_cur->p = FB_END;
-      fb_cur->invp = -(redc_invp_t)1;
-      fb_cur->nr_roots = 0;
-      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
-	free (fb);
-	fb = NULL;
+      if (!fb_buffer_finish(&fb_buf, allocblocksize)) {
+	free (fb_buf.fb);
+	fb_buf.fb = NULL;
       }
     }
 
@@ -360,7 +405,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   rdtscll (tsc2);
 
-  return fb;
+  return fb_buf.fb;
 }
 
 /* return the total size (in bytes) used by fb */
@@ -609,16 +654,18 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
    opened, or memory allocation failed)
 */
 
-int  
+int 
 fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
                const char * const filename, const double log_scale, 
                const fbprime_t smalllim, const int nr_pieces, 
                const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
+    fb_buffer_t *fb_bufs; /* fb_bufs[0] is for primes <= smalllim, rest is for 
+			     larger primes. If smalllim == 0, then fb_bufs[0] 
+			     is used for all primes. */
     factorbase_degn_t *fb_cur;
+    size_t nr_buffers;
     FILE *fbfile;
-    size_t fbsize = 0, fballoc = 0;
-    size_t *piece_size = NULL, *piece_alloc = NULL;
     // too small linesize led to a problem with rsa768;
     // it would probably be a good idea to get rid of fgets
     const size_t linesize = 1000;
@@ -635,34 +682,24 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         return 0;
     }
 
-    fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) +
-            MAXDEGREE * sizeof(fbroot_t));
+    fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc(MAXDEGREE));
     if (fb_cur == NULL) {
         fprintf (stderr, "# Could not allocate memory for factor base\n");
         fclose (fbfile);
         return 0;
     }
 
-    *fb_small = NULL; /* To make realloc() allocate */
-    if (smalllim > 0) {
-        int i;
-        piece_size = malloc(nr_pieces * sizeof(size_t));
-        piece_alloc = malloc(nr_pieces * sizeof(size_t));
-        if (piece_size == NULL || piece_alloc == NULL) {
-            fprintf (stderr, "# %s(): could not allocate memory for "
-                     "piece_size or piece_alloc\n", __func__);
-            free (piece_size);
-            free (piece_alloc);
-            free (fb_cur);
-            fclose (fbfile);
-            return 0;
-        }
-        for (i = 0; i < nr_pieces; i++) {
-            fb_pieces[i] = NULL;
-            piece_size[i] = 0;
-            piece_alloc[i] = 0;
-        }
+    nr_buffers = (smalllim == 0) ? 1 : nr_pieces + 1;
+    fb_bufs = (fb_buffer_t *) malloc (nr_buffers * sizeof(fb_buffer_t));
+    if (fb_bufs == NULL) {
+        fprintf (stderr, "# %s(): could not allocate memory for fb_bufs\n", 
+		 __func__);
+	free (fb_cur);
+	fclose (fbfile);
+	return 0;
     }
+    for (size_t i = 0; i < nr_buffers; i++)
+      fb_buffer_init(&fb_bufs[i]);
 
     while (!feof(fbfile)) {
         if (fgets (line, linesize, fbfile) == NULL)
@@ -685,52 +722,34 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         }
 
         /* To which factor base do we add? */
-        if (smalllim == 0 || fb_cur->p <= smalllim) {
-            if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur)) {
-                error = 1;
-                break;
-            }
-        } else {
-            if (!fb_add_to (&fb_pieces[nextpiece], &piece_size[nextpiece], 
-                            &piece_alloc[nextpiece], allocblocksize, fb_cur)) {
-                error = 1;
-                break;
-            }
+	size_t add_to = 0;
+	if (smalllim != 0 && fb_cur->p > smalllim) {
+	    add_to = nextpiece + 1;
             if (++nextpiece == nr_pieces)
-              nextpiece = 0;
-        }
+                nextpiece = 0;
+	}
+	if (!fb_buffer_add (&fb_bufs[add_to], allocblocksize, fb_cur)) {
+	    error = 1;
+	    break;
+	}
 
         /* fb_fprint_entry (stdout, fb_cur); */
-        maxprime = fb_cur->p;
+	if (fb_cur->p > maxprime)
+	    maxprime = fb_cur->p;
         nr_primes++;
     }
 
-    if (!error) {
-        /* If nothing went wrong so far, put the end-of-fb markers */
-        fb_cur->p = FB_END;
-        fb_cur->invp = -(redc_invp_t)1;
-        fb_cur->nr_roots = 0;
-        
-        
-        if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur))
-            error = 1;
-        if (smalllim > 0) {
-            for (nextpiece = 0; !error && nextpiece < nr_pieces; nextpiece++) {
-                if (!fb_add_to (&fb_pieces[nextpiece], &fbsize, &fballoc, 
-                    allocblocksize, fb_cur))
-                    error = 1;
-            }
-        }
+    /* If nothing went wrong so far, put the end-of-fb markers */
+    for (size_t i = 0; !error && i < nr_buffers; i++) {
+        if (!fb_buffer_finish (&fb_bufs[i], allocblocksize))
+	    error = 1;
     }
     
     /* If there was any error, free all the allocated memory */
     if (error) {
-        free (*fb_small);
-        *fb_small = NULL;
-        for (nextpiece = 0; smalllim > 0 && nextpiece < nr_pieces; 
-             nextpiece++) {
-            free(fb_pieces[nextpiece]);
-            fb_pieces[nextpiece] = NULL;
+        for (size_t i = 0; i < nr_buffers; i++) {
+            free(fb_bufs[i].fb);
+            fb_bufs[i].fb = NULL; /* Thus caller's values will be set to NULL */
         }
     }
     if (!error && verbose)
@@ -739,14 +758,16 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 
-    if (smalllim > 0) {
-        free (piece_size);
-        free (piece_alloc);
+    *fb_small = fb_bufs[0].fb;
+    for (size_t i = 1; i < nr_buffers; i++) {
+      fb_pieces[i - 1] = fb_bufs[i].fb;
     }
 
+    free (fb_bufs);
     fclose (fbfile);
     free (fb_cur);
-    return 1;
+
+    return error ? 0 : 1;
 }
 
 
