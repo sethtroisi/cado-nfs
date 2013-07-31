@@ -136,9 +136,7 @@ fb_buffer_finish (fb_buffer_t *fb_buf)
     return 0;
 
   factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
-  fb_end_ptr->p = FB_END;
-  fb_end_ptr->invp = -(redc_invp_t)1;
-  fb_end_ptr->nr_roots = 0;
+  fb_write_end_marker (fb_end_ptr);
   fb_buf->size += fb_addsize;
   return 1;
 }

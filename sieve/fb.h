@@ -117,6 +117,16 @@ fb_entrysize_uc (const unsigned char n)
   return (sizeof (factorbase_degn_t) + n * sizeof (fbroot_t));
 }
 
+/* Write the end-of-factor-base marker at *fb */
+__attribute__ ((unused))
+static void
+fb_write_end_marker (factorbase_degn_t *fb)
+{
+  fb->p = FB_END;
+  fb->invp = -(redc_invp_t)1;
+  fb->nr_roots = 0;
+}
+
 /* Most often, we're in fact considering const iterators, but we refuse
  * to bother with having two interfaces */
 

@@ -291,9 +291,10 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     }
     /* Allocate memory for each of the nparts pieces */
     factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
+    FATAL_ERROR_CHECK(fbi == NULL, "malloc failed");
     for(i = 0 ; i < nparts ; i++) {
         // add one for end marker
-        fb_sizes[i] += sizeof(factorbase_degn_t);
+        fb_sizes[i] += fb_entrysize_uc(0);
         fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
         FATAL_ERROR_CHECK(fb_dst[i] == NULL, "malloc failed");
         fbi[i] = fb_dst[i];
@@ -312,15 +313,13 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     }
     /* Add an end marker to each of the nparts pieces */
     for(i = 0 ; i < nparts ; i++) {
-        memset(fbi[i], 0, sizeof(factorbase_degn_t));
-        fbi[i]->p = FB_END;
+        fb_write_end_marker(fbi[i]);
     }
     free(fbi); fbi = NULL;
     *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
     FATAL_ERROR_CHECK(*fb_main == NULL, "realloc failed");
     fb0 = fb_skip(*fb_main, headsize);
-    memset(fb0, 0, sizeof(factorbase_degn_t));
-    fb0->p = FB_END;
+    fb_write_end_marker(fb0);
 }
 /* }}} */
 
