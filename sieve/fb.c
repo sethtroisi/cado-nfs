@@ -17,7 +17,7 @@
 
 typedef struct {
   factorbase_degn_t *fb;
-  size_t size, alloc;
+  size_t size, alloc, blocksize;
 } fb_buffer_t;
 
 /* strtoul(), but with const char ** for second argument.
@@ -61,26 +61,26 @@ fb_fprint (FILE *fd, const factorbase_degn_t *fb)
 
 /* Initialise a factor base buffer to empty */
 static void
-fb_buffer_init(fb_buffer_t *fb_buf)
+fb_buffer_init(fb_buffer_t *fb_buf, const size_t blocksize)
 {
     fb_buf->fb = NULL; /* Set to NULL so realloc() allocates */
     fb_buf->size = 0;
     fb_buf->alloc = 0;
+    fb_buf->blocksize = blocksize;
 }
 
 /* Extend a factorbase buffer, if necessary, to have room for at least
    addsize additional bytes at the end */
 static int
-fb_buffer_extend(fb_buffer_t *fb_buf, const size_t allocblocksize, 
-		 const size_t addsize)
+fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
 {
   /* Do we need more memory for fb? */
   if (fb_buf->alloc < fb_buf->size + addsize)
     {
       factorbase_degn_t *newfb;
-      size_t newalloc = fb_buf->alloc + allocblocksize;
-      ASSERT(addsize <= allocblocksize); /* Otherwise we still might not have
-					    enough mem after the realloc */
+      size_t newalloc = fb_buf->alloc + fb_buf->blocksize;
+      ASSERT(addsize <= fb_buf->blocksize); /* Otherwise we still might not have
+					       enough mem after the realloc */
       newfb = (factorbase_degn_t *) realloc (fb_buf->fb, newalloc);
       if (newfb == NULL)
 	{
@@ -100,12 +100,11 @@ fb_buffer_extend(fb_buffer_t *fb_buf, const size_t allocblocksize,
    fb_add->size need not be set by caller, this function does it */
 
 static int 
-fb_buffer_add (fb_buffer_t *fb_buf, const size_t allocblocksize, 
-	   const factorbase_degn_t *fb_add)
+fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
 {
   const size_t fb_addsize = fb_entrysize (fb_add);
 
-  if (!fb_buffer_extend(fb_buf, allocblocksize, fb_addsize))
+  if (!fb_buffer_extend(fb_buf, fb_addsize))
     return 0;
 
   /* Append the new entry at the end of the factor base */
@@ -119,11 +118,11 @@ fb_buffer_add (fb_buffer_t *fb_buf, const size_t allocblocksize,
 }
 
 static int
-fb_buffer_finish(fb_buffer_t *fb_buf, const size_t allocblocksize)
+fb_buffer_finish(fb_buffer_t *fb_buf)
 {
   const size_t fb_addsize = fb_entrysize_uc (0);
 
-  if (!fb_buffer_extend(fb_buf, allocblocksize, fb_addsize))
+  if (!fb_buffer_extend(fb_buf, fb_addsize))
     return 0;
 
   /* Add the end-of-factor-base marker */
@@ -298,7 +297,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   fb_cur->nr_roots = 1;
   fb_cur->size = fb_entrysize_uc (1);
-  fb_buffer_init (&fb_buf);
+  fb_buffer_init (&fb_buf, allocblocksize);
 
   if (verbose)
     gmp_fprintf (output,
@@ -375,7 +374,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
 
-      if (!fb_buffer_add (&fb_buf, allocblocksize, fb_cur))
+      if (!fb_buffer_add (&fb_buf, fb_cur))
 	{
 	  free (fb_buf.fb);
 	  fb_buf.fb = NULL;
@@ -391,7 +390,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
   if (fb_buf.fb != NULL) /* If nothing went wrong so far, put the end-of-fb 
 			    mark */
     {
-      if (!fb_buffer_finish(&fb_buf, allocblocksize)) {
+      if (!fb_buffer_finish(&fb_buf)) {
 	free (fb_buf.fb);
 	fb_buf.fb = NULL;
       }
@@ -699,7 +698,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
 	return 0;
     }
     for (size_t i = 0; i < nr_buffers; i++)
-      fb_buffer_init(&fb_bufs[i]);
+      fb_buffer_init(&fb_bufs[i], allocblocksize);
 
     while (!feof(fbfile)) {
         if (fgets (line, linesize, fbfile) == NULL)
@@ -728,7 +727,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
             if (++nextpiece == nr_pieces)
                 nextpiece = 0;
 	}
-	if (!fb_buffer_add (&fb_bufs[add_to], allocblocksize, fb_cur)) {
+	if (!fb_buffer_add (&fb_bufs[add_to], fb_cur)) {
 	    error = 1;
 	    break;
 	}
@@ -741,7 +740,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
 
     /* If nothing went wrong so far, put the end-of-fb markers */
     for (size_t i = 0; !error && i < nr_buffers; i++) {
-        if (!fb_buffer_finish (&fb_bufs[i], allocblocksize))
+        if (!fb_buffer_finish (&fb_bufs[i]))
 	    error = 1;
     }
     
