@@ -509,7 +509,7 @@ renumber_read_table (renumber_t tab, const char * filename)
 int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
-  *first = 0;
+  *first = (rn->add_full_col) ? 1 : 0;
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
   {
