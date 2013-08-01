@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+/* Put in sfx the suffix in s (can be "" or NULL) */
+void get_suffix_from_filename (char *s, char const **sfx);
 
 /* Put the directory of cado in rep_cado */
 void set_rep_cado(const char *argv0, char *rep_cado);
