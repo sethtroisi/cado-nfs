@@ -2169,6 +2169,7 @@ sub do_freerels {
 
 my $dup_purge_done = 0;
 my $nslices;
+my $nb_dup = 0;
 
 # duplicates
 sub dup {
@@ -2177,7 +2178,7 @@ sub dup {
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
 
-    my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)\.gz$/;
+    my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+)\.gz$/;
 
     my @files = grep /$pat/, readdir DIR;
     closedir DIR;
@@ -2187,28 +2188,11 @@ sub dup {
         mkdir "$param{'prefix'}.nodup/$i"
             unless (-d "$param{'prefix'}.nodup/$i");
     }
-    opendir DIR, "$param{'prefix'}.nodup/0/"
-        or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
-    my @old_files = grep /$pat/, readdir DIR;
-    closedir DIR;
-    my %old_files;		
-    $old_files{$_} = 1 for (@old_files);
-    my @new_files;
-    for (@files) {
-        push @new_files, $_ unless (exists ($old_files{$_}));
-    }
 
     # Put basenames of relation files in list.
-    my $name="$param{'prefix'}.filelist";
+    my $name="$param{'prefix'}.dup1.filelist";
     open FILE, "> $name" or die "$name: $!";
     for (@files) {
-        m{([^/]+)$};
-        print FILE "$_\n";
-    }
-    close FILE;
-    $name="$param{'prefix'}.newfilelist";
-    open FILE, "> $name" or die "$name: $!";
-    for (@new_files) {
         m{([^/]+)$};
         print FILE "$_\n";
     }
@@ -2232,10 +2216,9 @@ sub dup {
     # Remove duplicates
     info "Removing duplicates...";
     $tab_level++;
-    if (exists($new_files[0])) {
         if ($nslices == 1) {
             info "copy new files in $param{'prefix'}.nodup/0/..." if ($verbose);
-            open FILE, "< $param{'prefix'}.newfilelist"
+            open FILE, "< $param{'prefix'}.dup1.filelist"
                 or die "Cannot open `$param{'prefix'}.newfilelist' for reading: $!.\n";
             while (<FILE>) {
                 s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
@@ -2249,12 +2232,12 @@ sub dup {
             cmd("$param{'bindir'}/filter/dup1 ".
                 "-n $param{'nslices_log'} ".
                 "-out $param{'prefix'}.nodup ".
-                "-filelist $param{'prefix'}.newfilelist ".
+                "-prefix $param{'name'}.rels.$nb_dup ".
+                "-filelist $param{'prefix'}.dup1.filelist ".
                 "-basepath $param{'wdir'} ",
                 { cmdlog => 1, kill => 1,
                   logfile=>"$param{'prefix'}.dup1.log" });
         }
-    }
 
     $name="$param{'prefix'}.subdirlist";
     open FILE, "> $name" or die "$name: $!";
@@ -2262,12 +2245,27 @@ sub dup {
     close FILE;
 
     my $nrels = first_line("$param{'prefix'}.nrels");
+
+    $pat=qr/rels/;
+    opendir DIR, "$param{'prefix'}.nodup/0/"
+        or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
+    @files = grep /$pat/, readdir DIR;
+    closedir DIR;
+    # Put basenames of relation files in list.
+    $name="$param{'prefix'}.dup2.filelist";
+    open FILE, "> $name" or die "$name: $!";
+    for (@files) {
+        m{([^/]+)$};
+        print FILE "$_\n";
+    }
+    close FILE;
+
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
-            "-filelist $param{'prefix'}.filelist ".
+            "-filelist $param{'prefix'}.dup2.filelist ".
             "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
@@ -2299,7 +2297,7 @@ sub purge {
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-            if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+            if ( $_ =~ /^At the end: (\d+) remaining relations/ ) {
                 $last = $1;
             }
             if ( $_ =~ /nprimes=(\d+)/ ) {
@@ -2325,7 +2323,7 @@ sub purge {
                   "-nprimes $nprimes -minindex $min_index ".
                   "-npthr $npthr -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
-                  "-filelist $param{'prefix'}.filelist ",
+                  "-filelist $param{'prefix'}.dup2.filelist ",
                   { cmdlog => 1,
                     logfile => "$param{'prefix'}.purge.log"
                  });
@@ -2568,6 +2566,7 @@ sub do_sieve {
         if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
+            $nb_dup++;
             $tab_level--;
             return 0;
         } elsif ($ret->{'status'} == 1) {
