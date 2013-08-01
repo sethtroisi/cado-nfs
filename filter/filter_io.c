@@ -9,6 +9,8 @@
 #include "utils.h"
 #include "filter_utils.h"
 
+#define DEBUG 0
+
 static relation_stream rs;
 static char *pmin, *pminlessone;
 
@@ -127,26 +129,32 @@ static inline void realloc_buffer_primes(buf_rel_t * buf)
 #define LOAD_ONE(P) { c = *P;  \
        P = ((size_t) (P - pminlessone) & (PREEMPT_BUF - 1)) + pmin;}
 
+#define ASSUME_2CHAR(c1,c2) do {   \
+    if (c != c1 && c != c2) {      \
+      fprintf (stderr, "Unexpected character '%c' in relation\n", c); \
+      abort (); } } while(0)
+#define ASSUME_3CHAR(c1,c2,c3) do {      \
+    if (c != c1 && c != c2 && c != c3) { \
+      fprintf (stderr, "Unexpected character '%c' in relation\n", c); \
+      abort (); } } while (0)
 
-static inline unsigned char read_one_prime(p_r_values_t * pr, char **p)
+
+static inline unsigned char
+read_one_prime (uint64_t * pr, char **p)
 {
-    unsigned char v, c;
+  unsigned char v, c;
+  LOAD_ONE(*p);
+  for (*pr = 0; (v = ugly[c]) < 16;)
+  {
+    *pr = (*pr << 4) + v;
     LOAD_ONE(*p);
-    for (*pr = 0; (v = ugly[c]) < 16;) {
-	*pr = (*pr << 4) + v;
-	LOAD_ONE(*p);
-    }
-    if (c != ',' && c != '\n')
-      {
-        fprintf (stderr, "Unexpected character '%c' in relation\n", c);
-        abort ();
-      }
+  }
 
-    return c;
+  return c;
 }
 
 static inline unsigned char
-read_a_or_b(uint64_t * n, char **p, unsigned char c, int ab_hexa)
+read_a_or_b (uint64_t * n, char **p, unsigned char c, int ab_hexa)
 {
     unsigned char v;
     if (ab_hexa) {
@@ -229,10 +237,10 @@ relation_get_fast_abp(preempt_t preempt_data, buf_rel_t * mybufrel)
 {
     char *p;
     unsigned int nb_primes_read;
-    int i;
-    p_r_values_t pr;
+    int i, prev;
+    uint64_t pr;
     unsigned char c;
-    int side = -1;
+    int side = 0, switch_side = 0;
 
     p = (char *) preempt_data->pcons;
 
@@ -244,30 +252,38 @@ relation_get_fast_abp(preempt_t preempt_data, buf_rel_t * mybufrel)
     c = read_b(&(mybufrel->b), &p, 1);
 #endif
 
-    nb_primes_read = 0;
-    for (c = 0;;) {
-	if (c == '\n')
-	    break;
-	if (c == ':')
-	    side++;
-
-	c = read_one_prime(&pr, &p);
-
-	for (i = nb_primes_read - 1; i >= 0; i--)
-	    if (mybufrel->primes[i].p == pr)
-		mybufrel->primes[i - 1].e++;
-
-	if (i == -1) {
-	    if (mybufrel->nb_alloc == nb_primes_read)
-		realloc_buffer_primes(mybufrel);
-
-	    mybufrel->primes[nb_primes_read++] = (prime_t) {
-	    .h = side,.p = pr,.e = 1};
-	}
+  nb_primes_read = 0;
+  for (c = 0;;)
+  {
+    if (c == '\n')
+      break;
+    if (c == ':')
+    {
+      side++;
+      switch_side = nb_primes_read;
     }
 
-    mybufrel->nb = nb_primes_read;
-    mybufrel->nb_above_min_index = nb_primes_read + 1;
+    c = read_one_prime(&pr, &p);
+    ASSUME_3CHAR('\n',',',':');
+
+    for (i = nb_primes_read - 1, prev = 0; i >= switch_side && !prev; i--)
+      if (mybufrel->primes[i].p == pr)
+      {
+        mybufrel->primes[i].e++;
+        prev = 1;
+      }
+
+	  if (!prev)
+    {
+      if (mybufrel->nb_alloc == nb_primes_read)
+        realloc_buffer_primes(mybufrel);
+
+      mybufrel->primes[nb_primes_read++] = (prime_t) { .h = side,.p = pr,.e = 1};
+    }
+  }
+
+  mybufrel->nb = nb_primes_read;
+  mybufrel->nb_above_min_index = nb_primes_read + 1;
 }
 
 static inline void
@@ -275,7 +291,7 @@ relation_get_fast_abh(preempt_t preempt_data, buf_rel_t * mybufrel)
 {
     char *p;
     unsigned int nb_primes_read;
-    index_t pr;
+    uint64_t pr;
     unsigned char c;
 
     p = (char *) preempt_data->pcons;
@@ -288,7 +304,8 @@ relation_get_fast_abh(preempt_t preempt_data, buf_rel_t * mybufrel)
 	if (c == '\n')
 	    break;
 
-	c = read_one_prime(&pr, &p);
+	c = read_one_prime (&pr, &p);
+  ASSUME_2CHAR('\n',',');
 
 	if (nb_primes_read > 0
 	    && mybufrel->primes[nb_primes_read - 1].h == pr)
@@ -322,29 +339,45 @@ relation_get_fast_ab(preempt_t preempt_data, buf_rel_t * mybufrel)
 }
 
 static inline void
-relation_get_fast_abline(preempt_t preempt_data, buf_rel_t * mybufrel)
+relation_get_fast_abline_abdecimal (preempt_t preempt_data, buf_rel_t * mybufrel)
 {
-    char *p, *begin;
-    unsigned char c;
-    unsigned int i = 0;
+  char *p, *begin;
+  unsigned char c;
+  unsigned int i = 0;
 
-    p = (char *) preempt_data->pcons;
-    begin = p;
+  p = (char *) preempt_data->pcons;
+  begin = p;
 
-#ifndef FOR_FFS
-    c = read_a(&(mybufrel->a), &p, 0);
-    c = read_b(&(mybufrel->b), &p, 0);
-#else
-    c = read_a(&(mybufrel->a), &p, 1);
-    c = read_b(&(mybufrel->b), &p, 1);
-#endif
+  c = read_a(&(mybufrel->a), &p, 0);
+  c = read_b(&(mybufrel->b), &p, 0);
 
-    do {
-	LOAD_ONE(begin);
-	mybufrel->line[i++] = c;
-    } while (c != '\n');
+  do
+  {
+    LOAD_ONE(begin);
+    mybufrel->line[i++] = c;
+  } while (c != '\n');
+  mybufrel->line[i] = '\0';
+}
 
-    mybufrel->line[i] = '\0';
+static inline void
+relation_get_fast_abline_abhexa (preempt_t preempt_data, buf_rel_t * mybufrel)
+{
+  char *p, *begin;
+  unsigned char c;
+  unsigned int i = 0;
+
+  p = (char *) preempt_data->pcons;
+  begin = p;
+
+  c = read_a(&(mybufrel->a), &p, 1);
+  c = read_b(&(mybufrel->b), &p, 1);
+
+  do
+  {
+    LOAD_ONE(begin);
+    mybufrel->line[i++] = c;
+  } while (c != '\n');
+  mybufrel->line[i] = '\0';
 }
 
 static inline void
@@ -375,7 +408,7 @@ relation_get_fast_hmin(preempt_t preempt_data, buf_rel_t * mybufrel,
 {
     char *p;
     unsigned int nb_primes_read;
-    index_t pr;
+    uint64_t pr;
     unsigned char c;
     weight_t nb_above_min_index = 1;	// count the -1 at the end of the relations
     // in rel_compact
@@ -389,7 +422,8 @@ relation_get_fast_hmin(preempt_t preempt_data, buf_rel_t * mybufrel,
 	if (c == '\n')
 	    break;
 
-	c = read_one_prime(&pr, &p);
+	c = read_one_prime (&pr, &p);
+  ASSUME_2CHAR('\n',',');
 
 	if (nb_primes_read > 0
 	    && mybufrel->primes[nb_primes_read - 1].h == pr)
@@ -438,11 +472,17 @@ process_rels(char **fic, void *(*callback_fct) (buf_arg_t *),
 
     ASSERT_ALWAYS(step <= MAX_STEP);
 
-    if (step == STEP_PURGE_PASS2) {
-	ASSERT_ALWAYS(buf_arg.fd != NULL);
-	ASSERT_ALWAYS(buf_arg.rel_used != NULL);
-	if (buf_arg.fd[1] != NULL)
-	    need_del_rels = 1;
+    if (step == STEP_PURGE_PASS2)
+    {
+      ASSERT_ALWAYS(buf_arg.fd != NULL);
+      ASSERT_ALWAYS(buf_arg.rel_used != NULL);
+      if (buf_arg.fd[1] != NULL)
+      need_del_rels = 1;
+    }
+    else if (step == STEP_DUP2_PASS2)
+    {
+      ASSERT_ALWAYS(buf_arg.fd != NULL);
+      ASSERT_ALWAYS(buf_arg.fd[0] != NULL);
     }
 
     buf_arg.rels = (buf_rel_t *) malloc(SIZE_BUF_REL * sizeof(buf_rel_t));
@@ -468,13 +508,16 @@ process_rels(char **fic, void *(*callback_fct) (buf_arg_t *),
 	buf_arg.rels[i].nb_alloc = NB_PRIMES_OPT;
     }
 
-    if (step == STEP_DUP1 || step == STEP_PURGE_PASS2) {
-	size_t tmp_alloc = RELATION_MAX_BYTES * sizeof(char);
-	for (i = SIZE_BUF_REL; i--;) {
-	    buf_arg.rels[i].line = (char *) malloc(tmp_alloc);
-	    ASSERT_ALWAYS(buf_arg.rels[i].line != NULL);
-	}
+  if (step == STEP_DUP1_DECIMAL || step == STEP_DUP1_HEXA
+                                || step == STEP_PURGE_PASS2)
+  {
+    size_t tmp_alloc = RELATION_MAX_BYTES * sizeof(char);
+    for (i = SIZE_BUF_REL; i--;)
+    {
+      buf_arg.rels[i].line = (char *) malloc(tmp_alloc);
+      ASSERT_ALWAYS(buf_arg.rels[i].line != NULL);
     }
+  }
 
     end_insertRelation = 0;
     cpt_rel_a = cpt_rel_b = 0;
@@ -599,8 +642,10 @@ process_rels(char **fic, void *(*callback_fct) (buf_arg_t *),
 
 	    buf_arg.rels[k].num = rs->nrels++;
 
-	    if (step == STEP_DUP1)
-		relation_get_fast_abline(preempt_data, &(buf_arg.rels[k]));
+	    if (step == STEP_DUP1_DECIMAL)
+		relation_get_fast_abline_abdecimal (preempt_data, &(buf_arg.rels[k]));
+	    else if (step == STEP_DUP1_HEXA)
+		relation_get_fast_abline_abhexa (preempt_data, &(buf_arg.rels[k]));
 	    else if (step == STEP_DUP2_PASS1)
 		relation_get_fast_ab(preempt_data, &(buf_arg.rels[k]));
 	    else if (step == STEP_DUP2_PASS2)
@@ -711,9 +756,10 @@ process_rels(char **fic, void *(*callback_fct) (buf_arg_t *),
 	if (buf_arg.rels[i].nb_alloc != NB_PRIMES_OPT)
 	    SFREE(buf_arg.rels[i].primes);
 
-    if (step == STEP_DUP1 || step == STEP_PURGE_PASS2)
-	for (i = SIZE_BUF_REL; i--;)
-	    free(buf_arg.rels[i].line);
+  if (step == STEP_DUP1_DECIMAL || step == STEP_DUP1_HEXA
+                                || step == STEP_PURGE_PASS2)
+    for (i = SIZE_BUF_REL; i--;)
+      free(buf_arg.rels[i].line);
 
     free(buf_arg.rels);
 

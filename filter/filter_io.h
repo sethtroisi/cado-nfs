@@ -52,15 +52,16 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 
 
 /* For which step do we read the rels */
-#define STEP_DUP1 0
-#define STEP_DUP2_PASS1 1
-#define STEP_DUP2_PASS2 2
-#define STEP_PURGE_PASS1 3
-#define STEP_PURGE_PASS2 4
-#define STEP_MERGE 5
-#define STEP_REPLAY 6
+#define STEP_DUP1_DECIMAL 0
+#define STEP_DUP1_HEXA 1
+#define STEP_DUP2_PASS1 2
+#define STEP_DUP2_PASS2 3
+#define STEP_PURGE_PASS1 4
+#define STEP_PURGE_PASS2 5
+#define STEP_MERGE 6
+#define STEP_REPLAY 7
 #define STEP_RECONSTRUCT STEP_MERGE
-#define MAX_STEP 6
+#define MAX_STEP 7
 
 typedef struct {
   int64_t a;
