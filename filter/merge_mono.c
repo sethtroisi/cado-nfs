@@ -698,7 +698,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     njrem = removeSingletons(rep, mat);
 
     nb_merges = (int*) malloc ((maxlevel + 1) * sizeof (int));
-    for (m = 1; m <= maxlevel; m++)
+    for (m = 0; m <= maxlevel; m++)
       nb_merges[m] = 0;
     printf ("Using mergeOneByOne\n");
     ncostmax = 20; // was 5
@@ -720,6 +720,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
           }
 	j = dj + 0;
         m = mat->wt[dj];
+        /* FIXME: do we assert m != 0 here ? */
 	if (m == 1) /* singleton ideal */
           removeColDefinitely(rep, mat, j);
 	else if (m > 0) /* m=0 can happen for already merged ideals */
