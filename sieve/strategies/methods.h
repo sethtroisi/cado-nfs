@@ -11,8 +11,6 @@
 // with i-bits.
 
 typedef float histogram_t [METHOD_MAXBITS+1];
-static float zero_hist[METHOD_MAXBITS+1] = {0,}; // fill in with zeros.
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Defines for the congruences modulo 12
@@ -30,7 +28,7 @@ static float zero_hist[METHOD_MAXBITS+1] = {0,}; // fill in with zeros.
 #define PM1 0
 #define PP1_27 1
 #define PP1_65 2
-#define ECM 3
+#define ECM11 3
 #define ECMM12 4
 
 //////////////////////////////////////////////////////////////////////////////
@@ -59,5 +57,6 @@ int method_read_stream(cofac_method_ptr meth, FILE *f);
 int methods_read(cofac_method_t **meths, const char *f);
 
 void method_print(cofac_method_srcptr meth, FILE *file);
+void method_print_full(cofac_method_srcptr meth, FILE *file);
 
 #endif   /* __METHODS_H__ */

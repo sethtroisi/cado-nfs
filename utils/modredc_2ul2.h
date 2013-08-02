@@ -200,6 +200,21 @@ modredc2ul2_intget_uls (unsigned long *r, const modintredc2ul2_t s)
 }
 
 MAYBE_UNUSED
+static inline double
+modredc2ul2_intget_double (const modintredc2ul2_t s)
+{
+  double d = (double) s[1];
+#if (LONG_BIT == 32)
+  d *= 4294967296.0;
+#elif (LONG_BIT == 64)
+  d *= 18446744073709551616.0;
+#else
+#error "unsupported value of LONG_BIT"
+#endif
+  return d + (double) s[0];
+}
+
+MAYBE_UNUSED
 static inline int
 modredc2ul2_intequal (const modintredc2ul2_t a, const modintredc2ul2_t b)
 {

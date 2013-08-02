@@ -15,6 +15,12 @@
 #include "utils.h"
 #include "ularith.h"
 
+typedef struct {
+  factorbase_degn_t *fb;
+  size_t size, alloc, blocksize;
+} fb_buffer_t;
+
+
 /* strtoul(), but with const char ** for second argument.
    Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is
    of type const char *
@@ -54,40 +60,168 @@ fb_fprint (FILE *fd, const factorbase_degn_t *fb)
     }
 }
 
-/* Add fb_add to (void *)fb + fbsize. Return 1 on success, 0 if realloc failed
-   fb_add->size need not be set by caller, this function does it */
-
-static int 
-fb_add_to (factorbase_degn_t **fb, size_t *fbsize, size_t *fballoc,
-	   const size_t allocblocksize, factorbase_degn_t *fb_add)
+/* Initialise a factor base buffer to empty */
+static void
+fb_buffer_init(fb_buffer_t *fb_buf, const size_t blocksize)
 {
-  const size_t fb_addsize = fb_entrysize (fb_add);
+    fb_buf->fb = NULL; /* Set to NULL so realloc() allocates */
+    fb_buf->size = 0;
+    fb_buf->alloc = 0;
+    fb_buf->blocksize = blocksize;
+}
 
-  ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
-					   enough mem after the realloc */
+/* Free all memory allocated for the factor base buffer */
+static void
+fb_buffer_clear (fb_buffer_t *fb_buf)
+{
+    free (fb_buf->fb);
+    fb_buf->fb = NULL;
+}
 
+/* Extend a factor base buffer, if necessary, to have room for at least
+   addsize additional bytes at the end */
+static int
+fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
+{
   /* Do we need more memory for fb? */
-  if (*fballoc < *fbsize + fb_addsize)
+  if (fb_buf->alloc < fb_buf->size + addsize)
     {
       factorbase_degn_t *newfb;
-      size_t newalloc = *fballoc + allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (*fb, newalloc);
+      size_t newalloc = fb_buf->alloc + fb_buf->blocksize;
+      ASSERT(addsize <= fb_buf->blocksize); /* Otherwise we still might not have
+					       enough mem after the realloc */
+      newfb = (factorbase_degn_t *) realloc (fb_buf->fb, newalloc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr,
 		   "Could not reallocate factor base to %zu bytes\n",
-		   *fballoc);
+		   fb_buf->alloc);
 	  return 0;
 	}
-      *fballoc = newalloc;
-      *fb = newfb;
+      fb_buf->alloc = newalloc;
+      fb_buf->fb = newfb;
     }
-  memcpy (fb_skip(*fb, *fbsize), fb_add, fb_addsize);
-  fb_skip(*fb, *fbsize)->size = fb_addsize;
+  return 1;
+}
 
-  *fbsize += fb_addsize;
+/* Add the factor base enty "fb_add" to the factor base buffer "fb_buf". 
+   Return 1 on success, 0 if realloc failed.
+   fb_add->size need not be set by caller, this function does it */
+
+static int 
+fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
+{
+  const size_t fb_addsize = fb_entrysize (fb_add);
+
+  if (!fb_buffer_extend(fb_buf, fb_addsize))
+    return 0;
+
+  /* Append the new entry at the end of the factor base */
+  factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
+  memcpy (fb_end_ptr, fb_add, fb_addsize);
+  fb_end_ptr->size = fb_addsize;
+
+  fb_buf->size += fb_addsize;
 
   return 1;
+}
+
+/* Add the end-of-factor-base marker to a factor base buffer */
+static int
+fb_buffer_finish (fb_buffer_t *fb_buf)
+{
+  const size_t fb_addsize = fb_entrysize_uc (0);
+
+  if (!fb_buffer_extend(fb_buf, fb_addsize))
+    return 0;
+
+  factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
+  fb_write_end_marker (fb_end_ptr);
+  fb_buf->size += fb_addsize;
+  return 1;
+}
+
+
+typedef struct {
+  fb_buffer_t *fb_bufs; /* fb_bufs[0] is for primes <= smalllim, rest is for 
+                           larger primes. If smalllim == 0, then fb_bufs[0] 
+                           is used for all primes. */
+  fbprime_t smalllim;
+  size_t nr_pieces, nr_buffers, nextbuf;
+} fb_split_t;
+
+static int
+fb_split_init (fb_split_t *split, const fbprime_t smalllim, 
+               const size_t nr_pieces, const size_t allocblocksize)
+{
+  split->smalllim = smalllim;
+  if (smalllim != 0) {
+    split->nextbuf = 0;
+    split->nr_pieces = nr_pieces;
+    split->nr_buffers = nr_pieces + 1;
+  } else {
+    split->nr_pieces = 0;
+    split->nr_buffers = 1;
+  }
+  split->fb_bufs = (fb_buffer_t *) malloc (split->nr_buffers * sizeof(fb_buffer_t));
+  if (split->fb_bufs == NULL) {
+    fprintf (stderr, "# %s(): could not allocate memory for fb_bufs\n", 
+             __func__);
+    return 0;
+  }
+  for (size_t i = 0; i < split->nr_buffers; i++)
+    fb_buffer_init(&split->fb_bufs[i], allocblocksize);
+  
+  return 1;
+}
+
+static int
+fb_split_add (fb_split_t *split, const factorbase_degn_t *fb_add)
+{
+  size_t add_to = 0; /* To which factor base do we add? */
+  if (split->smalllim != 0 && fb_add->p > split->smalllim) {
+      add_to = split->nextbuf + 1;
+      if (++split->nextbuf == split->nr_pieces)
+          split->nextbuf = 0;
+  }
+  return fb_buffer_add (&split->fb_bufs[add_to], fb_add);
+}
+
+static int
+fb_split_finish (fb_split_t *split)
+{
+  for (size_t i = 0; i < split->nr_buffers; i++) {
+    if (!fb_buffer_finish (&split->fb_bufs[i]))
+          return 0;
+  }
+  return 1;
+}
+
+static void
+fb_split_getpieces (fb_split_t *split, factorbase_degn_t **fb_small, 
+                    factorbase_degn_t ***fb_pieces)
+{
+  *fb_small = split->fb_bufs[0].fb;
+  if (split->smalllim != 0)
+    for (size_t i = 0; i < split->nr_pieces; i++)
+      (*fb_pieces)[i] = split->fb_bufs[i + 1].fb;
+}
+
+/* Free the memory allocated for the 'fb_buffer_t's, but not the factor bases
+  themselves */
+static void
+fb_split_clear (fb_split_t *split)
+{
+  free (split->fb_bufs);
+}
+
+/* Free all memory related to this fb_split_t, including factor bases */
+static void
+fb_split_wipe (fb_split_t *split)
+{
+  for (size_t i = 0; i < split->nr_buffers; i++)
+    fb_buffer_clear (&split->fb_bufs[i]);
+  free (split->fb_bufs);
 }
 
 /* Sort n primes in array *primes into ascending order */
@@ -229,19 +363,23 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 
 /* Generate a factor base with primes <= bound and prime powers <= powbound
    for a linear polynomial. If projective != 0, adds projective roots
-   (for primes that divide leading coefficient) */
+   (for primes that divide leading coefficient).
+   Returns 1 on success, 0 on error. */
 
-factorbase_degn_t *
-fb_make_linear (const mpz_t *poly, const fbprime_t bound,
+int
+fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
+                const mpz_t *poly, const fbprime_t bound, 
+                const fbprime_t smalllim, const int nr_pieces, 
 		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
+  fb_split_t split;
   fbprime_t p;
-  factorbase_degn_t *fb = NULL, *fb_cur;
-  size_t fbsize = 0, fballoc = 0, pow_len = 0;
+  factorbase_degn_t *fb_cur;
+  size_t pow_len = 0;
   const size_t allocblocksize = 1 << 20;
   unsigned long logp;
-  int had_proj_root = 0;
+  int had_proj_root = 0, error = 0;
   fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
 					    need to be included, and the
 					    minimum among them */
@@ -252,6 +390,10 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   fb_cur->nr_roots = 1;
   fb_cur->size = fb_entrysize_uc (1);
+  if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
+    free (fb_cur);
+    return 0;
+  }
 
   if (verbose)
     gmp_fprintf (output,
@@ -328,10 +470,9 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
 
-      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
+      if (!fb_split_add (&split, fb_cur))
 	{
-	  free (fb);
-	  fb = NULL;
+	  error = 1;
 	  break;
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
@@ -341,16 +482,27 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   getprime (0); /* free prime iterator */
 
-  if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
+  if (!error) /* If nothing went wrong so far, put the end-of-fb mark */
     {
-      fb_cur->p = FB_END;
-      fb_cur->invp = -(redc_invp_t)1;
-      fb_cur->nr_roots = 0;
-      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
-	free (fb);
-	fb = NULL;
-      }
+      if (!fb_split_finish (&split))
+        {
+          error = 1;
+        }
     }
+
+  if (!error && smalllim != 0) {
+      *fb_pieces = (factorbase_degn_t **) 
+          malloc(nr_pieces * sizeof(factorbase_degn_t *));
+      error = (*fb_pieces == NULL);
+  }
+
+  if (error)
+      fb_split_wipe (&split);
+
+  if (!error) {
+      fb_split_getpieces (&split, fb_small, fb_pieces);
+      fb_split_clear (&split);
+  }
 
   free (fb_cur);
   free (powers);
@@ -360,7 +512,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   rdtscll (tsc2);
 
-  return fb;
+  return error ? 0 : 1;
 }
 
 /* return the total size (in bytes) used by fb */
@@ -501,7 +653,7 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
     }
 }
 
-/* Parse a factorbase line. Return 1 if the line could be parsed and,
+/* Parse a factor base line. Return 1 if the line could be parsed and,
    if the FB entry is for a prime power, the power does not exceed powlim.
    Otherwise return 0. */
 static int
@@ -602,23 +754,22 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
    primes/powers > smalllim; factor base entries from the file are written to 
    these pieces in round-robin manner.
 
-   Pointers to the allocated memory of the factorbases are written to fb_small 
+   Pointers to the allocated memory of the factor bases are written to fb_small 
    and, if smalllim > 0, to fb_pieces[0, ..., nr_pieces-1].
 
    Returns 1 if everything worked, and 0 if not (i.e., if the file could not be 
    opened, or memory allocation failed)
 */
 
-int  
-fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
+int 
+fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                const char * const filename, const double log_scale, 
                const fbprime_t smalllim, const int nr_pieces, 
                const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
+    fb_split_t split;
     factorbase_degn_t *fb_cur;
     FILE *fbfile;
-    size_t fbsize = 0, fballoc = 0;
-    size_t *piece_size = NULL, *piece_alloc = NULL;
     // too small linesize led to a problem with rsa768;
     // it would probably be a good idea to get rid of fgets
     const size_t linesize = 1000;
@@ -627,7 +778,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
     const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
     fbprime_t maxprime = 0;
     unsigned long nr_primes = 0;
-    int nextpiece = 0, error = 0;
+    int error = 0;
 
     fbfile = fopen (filename, "r");
     if (fbfile == NULL) {
@@ -635,33 +786,17 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         return 0;
     }
 
-    fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) +
-            MAXDEGREE * sizeof(fbroot_t));
+    fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc(MAXDEGREE));
     if (fb_cur == NULL) {
         fprintf (stderr, "# Could not allocate memory for factor base\n");
         fclose (fbfile);
         return 0;
     }
 
-    *fb_small = NULL; /* To make realloc() allocate */
-    if (smalllim > 0) {
-        int i;
-        piece_size = malloc(nr_pieces * sizeof(size_t));
-        piece_alloc = malloc(nr_pieces * sizeof(size_t));
-        if (piece_size == NULL || piece_alloc == NULL) {
-            fprintf (stderr, "# %s(): could not allocate memory for "
-                     "piece_size or piece_alloc\n", __func__);
-            free (piece_size);
-            free (piece_alloc);
-            free (fb_cur);
-            fclose (fbfile);
-            return 0;
-        }
-        for (i = 0; i < nr_pieces; i++) {
-            fb_pieces[i] = NULL;
-            piece_size[i] = 0;
-            piece_alloc[i] = 0;
-        }
+    if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
+        free (fb_cur);
+        fclose (fbfile);
+        return 0;
     }
 
     while (!feof(fbfile)) {
@@ -684,81 +819,47 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
             fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
         }
 
-        /* To which factor base do we add? */
-        if (smalllim == 0 || fb_cur->p <= smalllim) {
-            if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur)) {
-                error = 1;
-                break;
-            }
-        } else {
-            if (!fb_add_to (&fb_pieces[nextpiece], &piece_size[nextpiece], 
-                            &piece_alloc[nextpiece], allocblocksize, fb_cur)) {
-                error = 1;
-                break;
-            }
-            if (++nextpiece == nr_pieces)
-              nextpiece = 0;
-        }
+        if (!fb_split_add (&split, fb_cur)) {
+	    error = 1;
+	    break;
+	}
 
         /* fb_fprint_entry (stdout, fb_cur); */
-        maxprime = fb_cur->p;
+	if (fb_cur->p > maxprime)
+	    maxprime = fb_cur->p;
         nr_primes++;
     }
 
-    if (!error) {
-        /* If nothing went wrong so far, put the end-of-fb markers */
-        fb_cur->p = FB_END;
-        fb_cur->invp = -(redc_invp_t)1;
-        fb_cur->nr_roots = 0;
-        
-        
-        if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur))
+    /* If nothing went wrong so far, put the end-of-fb markers */
+    if (!error)
+        if (!fb_split_finish (&split))
             error = 1;
-        if (smalllim > 0) {
-            for (nextpiece = 0; !error && nextpiece < nr_pieces; nextpiece++) {
-                if (!fb_add_to (&fb_pieces[nextpiece], &fbsize, &fballoc, 
-                    allocblocksize, fb_cur))
-                    error = 1;
-            }
-        }
-    }
     
-    /* If there was any error, free all the allocated memory */
-    if (error) {
-        free (*fb_small);
-        *fb_small = NULL;
-        for (nextpiece = 0; smalllim > 0 && nextpiece < nr_pieces; 
-             nextpiece++) {
-            free(fb_pieces[nextpiece]);
-            fb_pieces[nextpiece] = NULL;
-        }
+    if (!error && smalllim != 0) {
+        *fb_pieces = (factorbase_degn_t **) 
+            malloc(nr_pieces * sizeof(factorbase_degn_t *));
+        error = (*fb_pieces == NULL);
     }
-    if (!error && verbose)
-    {
+
+    if (error) {
+        /* If there was any error, free all the allocated memory */
+        fb_split_wipe (&split);
+    } else {
+        /* If no error, give caller the factor base pointers */
+        fb_split_getpieces (&split, fb_small, fb_pieces);
+        /* and free the memory of the iterator structures */
+        fb_split_clear (&split);
+    }
+
+    if (!error && verbose) {
         printf ("# Factor base sucessfully read, %lu primes, largest was "
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 
-    if (smalllim > 0) {
-        free (piece_size);
-        free (piece_alloc);
-    }
-
     fclose (fbfile);
     free (fb_cur);
-    return 1;
-}
 
-
-factorbase_degn_t *
-fb_read (const char * const filename, const double log_scale, 
-         const int verbose, const fbprime_t lim, const fbprime_t powlim)
-{
-    factorbase_degn_t *fb;
-    if (!fb_read_split (&fb, NULL, filename, log_scale, 0, 0, verbose, lim, 
-                        powlim))
-        return NULL;
-    return fb;
+    return error ? 0 : 1;
 }
 
 

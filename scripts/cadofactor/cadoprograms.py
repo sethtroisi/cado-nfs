@@ -714,7 +714,7 @@ class Characters(Program):
                  index: Parameter(),
                  heavyblock: Parameter(),
                  out: Parameter(),
-                 wfile: PositionalParameter(),
+                 wfile: Parameter("ker"),
                  lpbr: Parameter(),
                  lpba: Parameter(),
                  nchar: Parameter() = None,

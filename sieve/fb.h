@@ -71,10 +71,12 @@ void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
 fbprime_t       fb_is_power (fbprime_t);
-factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
-					const fbprime_t, const double, 
-					const int, const int, FILE *);
-factorbase_degn_t *	fb_read (const char *, const double, const int, const fbprime_t, fbprime_t);
+int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
+                                const mpz_t *, fbprime_t, fbprime_t, int, 
+                                fbprime_t, double, int, int, FILE *);
+int             fb_read_split (factorbase_degn_t **, factorbase_degn_t ***, 
+                               const char *, double, fbprime_t, int, int, 
+                               fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
@@ -113,6 +115,16 @@ static size_t
 fb_entrysize_uc (const unsigned char n)
 {
   return (sizeof (factorbase_degn_t) + n * sizeof (fbroot_t));
+}
+
+/* Write the end-of-factor-base marker at *fb */
+__attribute__ ((unused))
+static void
+fb_write_end_marker (factorbase_degn_t *fb)
+{
+  fb->p = FB_END;
+  fb->invp = -(redc_invp_t)1;
+  fb->nr_roots = 0;
 }
 
 /* Most often, we're in fact considering const iterators, but we refuse

@@ -119,6 +119,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/mingw.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/odd_address_io_int.cmake")
 
 string(COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "" DISABLE_SHARED)
 

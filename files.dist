@@ -30,6 +30,7 @@ config/inline-assembly.c
 config/math.cmake
 config/posix.cmake
 config/mpi.cmake
+config/mpir.cmake
 config/pthreads.cmake
 config/rusage_thread.c
 config/rusage_thread.cmake
@@ -48,6 +49,8 @@ config/sync_fetch.cmake
 config/mingw.cmake
 config/test-rand.c
 config/test-rand.cmake
+config/odd_address_io_int.c
+config/odd_address_io_int.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
@@ -338,6 +341,10 @@ linalg/bwc/mpfq/abase_p_4.c
 linalg/bwc/mpfq/abase_p_4.h
 linalg/bwc/mpfq/abase_p_4_t.c
 linalg/bwc/mpfq/abase_p_4_t.h
+linalg/bwc/mpfq/abase_p_8.c
+linalg/bwc/mpfq/abase_p_8.h
+linalg/bwc/mpfq/abase_p_8_t.c
+linalg/bwc/mpfq/abase_p_8_t.h
 linalg/bwc/mpfq/abase_u64k1.c
 linalg/bwc/mpfq/abase_u64k1.h
 linalg/bwc/mpfq/abase_u64k1_t.c
@@ -524,7 +531,6 @@ polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/murphyE.c
 polyselect/murphyE.h
-polyselect/polyselect2.c
 polyselect/polyselect2l.c
 polyselect/polyselect2l.h
 polyselect/polyselect2l_arith.c
@@ -555,10 +561,6 @@ polyselect/ropt_str.c
 polyselect/ropt_str.h
 polyselect/ropt_tree.c
 polyselect/ropt_tree.h
-polyselect/rotate.c
-polyselect/rotate_all.c
-polyselect/sopt.c
-polyselect/twoquadratics.c
 scripts/call_cmake.sh
 scripts/cluster/README_LAS
 scripts/cluster/check_dup_purge.pl
@@ -785,6 +787,7 @@ linalg/bwc/mpfq/abase_p_3_t.c
 linalg/bwc/mpfq/abase_p_3_t.h
 linalg/bwc/plingen.c
 linalg/bwc/plingen.h
+linalg/bwc/plingen-tuning.cpp
 linalg/bwc/lingen-matpoly.c
 linalg/bwc/lingen-matpoly.h
 linalg/bwc/lingen-polymat.c

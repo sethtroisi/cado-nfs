@@ -126,7 +126,9 @@ tasks.filter.ratio = 1.1
 tasks.linalg.mn = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
-
+# tasks.linalg.bwc.threads can be of the form 2x3 or in the form 6, in the
+# latter case the splitting is chosen automatically
+tasks.linalg.bwc.threads = 2x2
 
 # address: The server of the client/server set-up will listen at this
 # address. Note that listening on address "localhost" will allow only

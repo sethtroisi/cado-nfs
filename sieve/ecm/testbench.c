@@ -157,7 +157,7 @@ int main (int argc, char **argv)
 
   strategy = malloc (sizeof(facul_strategy_t));
   strategy->methods = malloc ((MAX_METHODS + 1) * sizeof (facul_method_t));
-  strategy->assume_prime_thresh = 0;
+  strategy->assume_prime_thresh = 0.0;
 
   /* Parse options */
   mpz_init (N);
@@ -272,10 +272,7 @@ int main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-fbb") == 0)
 	{
 	  fbb = strtoul (argv[2], NULL, 10);
-	  if (fbb > UINT32_MAX)
-	    strategy->assume_prime_thresh = UINT64_MAX;
-	  else
-	    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
+          strategy->assume_prime_thresh = (double) fbb * (double) fbb;
 	  argc -= 2;
 	  argv += 2;
 	}

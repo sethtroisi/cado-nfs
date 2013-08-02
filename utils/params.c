@@ -925,6 +925,9 @@ void print_command_line(FILE * stream, int argc, char * argv[])
         fprintf (stream, " %s", argv[i]);
     fprintf (stream, "\n");
 #ifdef  __GNUC__
+#if GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)
+#error "This version of GCC is known to miscompile CADO-NFS. See https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490"
+#endif
     fprintf(stream, "# Compiled with gcc " __VERSION__ "\n");
 #endif
     fprintf(stream, "# Compilation flags " CFLAGS "\n");

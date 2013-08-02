@@ -246,6 +246,14 @@ modredcul_intget_uls (unsigned long *r, const residueredcul_t s)
 
 
 MAYBE_UNUSED
+static inline double
+modredcul_intget_double (const residueredcul_t s)
+{
+  return (double) s[0];
+}
+
+
+MAYBE_UNUSED
 static inline int
 modredcul_intequal (const modintredcul_t a, const modintredcul_t b)
 {
