@@ -23,7 +23,7 @@ insert_rel_in_table_no_e(buf_rel_t * my_br, index_t min_index,
     index_t h;
 
     itmp = 0;
-    my_tmp = my_malloc(my_br->nb_above_min_index);
+    my_tmp = my_malloc(1 + my_br->nb_above_min_index);
 
     for (i = 0; i < my_br->nb; i++) {
 	h = my_br->primes[i].h;
@@ -59,7 +59,7 @@ insert_rel_in_table_with_e(buf_rel_t * my_br, index_t min_index,
     else {
 	//FIXME for now can't use my malloc, because it expected an index_t table
 	my_tmp =
-	    (ideal_merge_t *) malloc(my_br->nb_above_min_index *
+	    (ideal_merge_t *) malloc((1 + my_br->nb_above_min_index) *
 				     sizeof(ideal_merge_t));
 	ASSERT_ALWAYS(my_tmp != NULL);
     }
