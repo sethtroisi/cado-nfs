@@ -6,11 +6,11 @@
 #include <curl/easy.h>
 
 #include "balancing_data_source.h"
-#include "balancing_rollbuf.h"
+#include "ringbuf.h"
 
 struct curl_source_s {
     data_source b;
-    rollbuf r;
+    ringbuf r;
     CURL *curl_handle;
     const char * uri;
     pthread_t producer;

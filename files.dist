@@ -266,8 +266,6 @@ linalg/bwc/balancing_file_source.c
 linalg/bwc/balancing_file_source.h
 linalg/bwc/balancing_mpi_source.c
 linalg/bwc/balancing_mpi_source.h
-linalg/bwc/balancing_rollbuf.c
-linalg/bwc/balancing_rollbuf.h
 linalg/bwc/balancing_workhorse.c
 linalg/bwc/balancing_workhorse.h
 linalg/bwc/bcast-file.c
@@ -751,10 +749,11 @@ utils/plain_poly.c
 utils/plain_poly.h
 utils/poly.c
 utils/poly.h
-utils/preempt.h
 utils/purgedfile.c
 utils/purgedfile.h
 utils/random_integer.c
+utils/ringbuf.c
+utils/ringbuf.h
 utils/relation.c
 utils/relation.h
 utils/renumber.c

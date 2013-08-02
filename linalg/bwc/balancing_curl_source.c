@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "balancing_curl_source.h"
-#include "balancing_rollbuf.h"
+#include "ringbuf.h"
 #include "portability.h"
 
 static int curl_global_init_done;
@@ -14,11 +14,11 @@ static pthread_mutex_t curl_global_init_done_mx = PTHREAD_MUTEX_INITIALIZER;
 typedef size_t (*curl_writefunction_callback_t)(void *, size_t, size_t, void *);
 
 static size_t
-curl_source_callback(void *ptr, size_t size, size_t nmemb, rollbuf_ptr r)
+curl_source_callback(void *ptr, size_t size, size_t nmemb, ringbuf_ptr r)
 {
     size_t realsize = size * nmemb;
 
-    size_t rc = rollbuf_put(r, ptr, realsize);
+    size_t rc = ringbuf_put(r, ptr, realsize);
     assert(rc == 0 || rc == realsize);
     return rc;
 }
@@ -42,7 +42,7 @@ static void * curl_source_producer_thread(void * data)
         fprintf(stderr, "HTTP response: %ld\n", resp);
         exit(1);
     }
-    rollbuf_mark_done(cs->r);
+    ringbuf_mark_done(cs->r);
     return NULL;
 }
 
@@ -59,7 +59,7 @@ data_source_ptr curl_source_alloc(const char * uri, size_t esz __attribute__((un
 
     p->curl_handle = curl_easy_init();
 
-    rollbuf_init(p->r);
+    ringbuf_init(p->r, 0);
 
     curl_easy_setopt(p->curl_handle, CURLOPT_URL, p->uri);
     curl_easy_setopt(p->curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
@@ -78,7 +78,7 @@ void curl_source_free(data_source_ptr q)
     curl_source_ptr p = (curl_source_ptr) q;
 
     pthread_join(p->producer, NULL);
-    rollbuf_clear(p->r);
+    ringbuf_clear(p->r);
     curl_easy_cleanup(p->curl_handle);
 
     pthread_mutex_lock(&curl_global_init_done_mx);
@@ -94,10 +94,10 @@ size_t curl_source_get(curl_source_ptr f, void ** p, size_t avail)
      */
     assert((*p == NULL) == (avail == 0));
 
-    int rc = rollbuf_get2(f->r, p, avail * sizeof(uint32_t));
+    int rc = ringbuf_get2(f->r, p, avail * sizeof(uint32_t));
     if (rc == 0)
-        assert(rollbuf_is_done(f->r));
-    if (!rollbuf_is_done(f->r))
+        assert(ringbuf_is_done(f->r));
+    if (!ringbuf_is_done(f->r))
         assert(rc % sizeof(uint32_t) == 0);
     size_t n = rc / sizeof(uint32_t);
     f->b->pos += n;
