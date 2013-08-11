@@ -244,6 +244,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   if (verbose)
     {
       int changes = 0;
+      printf ("Exponent of 2 in stage 1 primes: %u\n", plan->exp2);
       printf ("Byte code for stage 1: ");
       for (p = 0; p < plan->bc_len; p++)
         {

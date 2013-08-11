@@ -1113,33 +1113,6 @@ sub last_line {
     return $last;
 }
 
-# This is _ugly_: the siever takes some parameters via the polynomial file.
-# The job of this function is to maintain the sieving parameters this
-# $name.poly file up to date.
-# TODO: Find a cleaner way to do this! (e.g. command-line parameters for las)
-sub append_poly_params {
-    my @list = qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    my $list = join "|", @list;
-
-    # Strip the parameters at the end of the poly file, in case they
-    # have changed
-    open IN, "< $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for reading: $!.\n";
-    open OUT, "> $param{'prefix'}.poly_tmp"
-        or die "Cannot open `$param{'prefix'}.poly_tmp' for writing: $!.\n";
-    while (<IN>) {
-        print OUT "$_" unless /^($list):\s*/;
-    }
-    close IN;
-
-    # Append the parameters to the poly file
-    print OUT "$_: $param{$_}\n" for @list;
-    close OUT;
-
-    cmd("env mv -f $param{'prefix'}.poly_tmp $param{'prefix'}.poly",
-        { kill => 1 });
-}
-
 sub local_time {
     my $job= shift;
     $cmdlog = "$param{'prefix'}.cmd";
@@ -1943,9 +1916,6 @@ sub do_init {
 
     # Dump parameters into $name.param
     write_param("$param{'prefix'}.param");
-
-    # Update parameters in the $name.poly file if needed
-    append_poly_params() if $tasks{'polysel'}->{'done'};
 }
 
 
@@ -2002,7 +1972,7 @@ my $polysel_cmd = sub {
            "-degree $param{'degree'} ".
            "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
-           "$param{'polsel_P'} ".
+           "-P $param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.polsel_out.$a-$b ".
            "2>&1";
@@ -2094,13 +2064,6 @@ sub do_polysel {
     cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
         { cmdlog => 1, kill => 1 });
     $tab_level--;
-
-    # Append sieving parameters to the poly file
-    open FILE, ">> $param{'prefix'}.poly"
-        or die "Cannot open `$param{'prefix'}.poly' for writing: $!.\n";
-    print FILE "$_: $param{$_}\n"
-        for qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
-    close FILE;
 }
 
 sub do_polysel_bench {
@@ -2167,6 +2130,7 @@ sub do_factbase {
     my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-alim $param{'alim'} ".
               "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
@@ -2186,7 +2150,8 @@ sub do_freerels {
 
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
-              "-fb $param{'prefix'}.roots ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
               "-renumber $param{'prefix'}.renumber.gz ".
               "> $param{'prefix'}.freerels ";
 
@@ -2204,6 +2169,7 @@ sub do_freerels {
 
 my $dup_purge_done = 0;
 my $nslices;
+my $nb_dup = 0;
 
 # duplicates
 sub dup {
@@ -2212,7 +2178,7 @@ sub dup {
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
 
-    my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)\.gz$/;
+    my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+)\.gz$/;
 
     my @files = grep /$pat/, readdir DIR;
     closedir DIR;
@@ -2222,28 +2188,11 @@ sub dup {
         mkdir "$param{'prefix'}.nodup/$i"
             unless (-d "$param{'prefix'}.nodup/$i");
     }
-    opendir DIR, "$param{'prefix'}.nodup/0/"
-        or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
-    my @old_files = grep /$pat/, readdir DIR;
-    closedir DIR;
-    my %old_files;		
-    $old_files{$_} = 1 for (@old_files);
-    my @new_files;
-    for (@files) {
-        push @new_files, $_ unless (exists ($old_files{$_}));
-    }
 
     # Put basenames of relation files in list.
-    my $name="$param{'prefix'}.filelist";
+    my $name="$param{'prefix'}.dup1.filelist";
     open FILE, "> $name" or die "$name: $!";
     for (@files) {
-        m{([^/]+)$};
-        print FILE "$_\n";
-    }
-    close FILE;
-    $name="$param{'prefix'}.newfilelist";
-    open FILE, "> $name" or die "$name: $!";
-    for (@new_files) {
         m{([^/]+)$};
         print FILE "$_\n";
     }
@@ -2267,10 +2216,9 @@ sub dup {
     # Remove duplicates
     info "Removing duplicates...";
     $tab_level++;
-    if (exists($new_files[0])) {
         if ($nslices == 1) {
             info "copy new files in $param{'prefix'}.nodup/0/..." if ($verbose);
-            open FILE, "< $param{'prefix'}.newfilelist"
+            open FILE, "< $param{'prefix'}.dup1.filelist"
                 or die "Cannot open `$param{'prefix'}.newfilelist' for reading: $!.\n";
             while (<FILE>) {
                 s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
@@ -2284,12 +2232,12 @@ sub dup {
             cmd("$param{'bindir'}/filter/dup1 ".
                 "-n $param{'nslices_log'} ".
                 "-out $param{'prefix'}.nodup ".
-                "-filelist $param{'prefix'}.newfilelist ".
+                "-prefix $param{'name'}.rels.$nb_dup ".
+                "-filelist $param{'prefix'}.dup1.filelist ".
                 "-basepath $param{'wdir'} ",
                 { cmdlog => 1, kill => 1,
                   logfile=>"$param{'prefix'}.dup1.log" });
         }
-    }
 
     $name="$param{'prefix'}.subdirlist";
     open FILE, "> $name" or die "$name: $!";
@@ -2298,12 +2246,26 @@ sub dup {
 
     my $nrels = first_line("$param{'prefix'}.nrels");
 
+    $pat=qr/rels/;
+    opendir DIR, "$param{'prefix'}.nodup/0/"
+        or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
+    @files = grep /$pat/, readdir DIR;
+    closedir DIR;
+    # Put basenames of relation files in list.
+    $name="$param{'prefix'}.dup2.filelist";
+    open FILE, "> $name" or die "$name: $!";
+    for (@files) {
+        m{([^/]+)$};
+        print FILE "$_\n";
+    }
+    close FILE;
+
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -poly $param{'prefix'}.poly ".
-            "-filelist $param{'prefix'}.filelist ".
+            "-filelist $param{'prefix'}.dup2.filelist ".
             "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
@@ -2329,26 +2291,25 @@ sub purge {
     my $nbrels = 0;
     my $last = 0;
     my $nprimes = 0;
-    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-            if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+            if ( $_ =~ /^At the end: (\d+) remaining relations/ ) {
                 $last = $1;
             }
             if ( $_ =~ /nprimes=(\d+)/ ) {
                 $nprimes = $1;
             }
-            if ( $_ =~ /min_index=(\d+)/ ) {
-                $min_index = $1;
-            }
         }
         close FILE;
         $nbrels += $last;
     }
+    my $minlim = ($param{'alim'}<$param{'rlim'})?$param{'alim'}:$param{'rlim'};
+    my $min_index = ceil(2*$minlim / log($minlim));
+
     $tab_level++;
     info "Number of relations left after duplicates: $nbrels.\n";
     $tab_level--;
@@ -2362,7 +2323,7 @@ sub purge {
                   "-nprimes $nprimes -minindex $min_index ".
                   "-npthr $npthr -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
-                  "-filelist $param{'prefix'}.filelist ",
+                  "-filelist $param{'prefix'}.dup2.filelist ",
                   { cmdlog => 1,
                     logfile => "$param{'prefix'}.purge.log"
                  });
@@ -2393,6 +2354,14 @@ my $sieve_cmd = sub {
         "-I $param{'I'} ".
         "-rpowlim $powlim ".
         "-apowlim $powlim ".
+        "-rlim $param{'rlim'} ".
+        "-alim $param{'alim'} ".
+        "-rlambda $param{'rlambda'} ".
+        "-alambda $param{'alambda'} ".
+        "-lpbr $param{'lpbr'} ".
+        "-lpba $param{'lpba'} ".
+        "-mfbr $param{'mfbr'} ".
+        "-mfba $param{'mfba'} ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
@@ -2597,6 +2566,7 @@ sub do_sieve {
         if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
+            $nb_dup++;
             $tab_level--;
             return 0;
         } elsif ($ret->{'status'} == 1) {
@@ -2926,6 +2896,8 @@ sub do_chars {
 
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
+              "-lpbr $param{'lpbr'} ".
+              "-lpba $param{'lpba'} ".
               "-purged $param{'prefix'}.purged.gz ".
               "-index $param{'prefix'}.index ".
               # Note: one can omit the -heavyblock option, but in that case
@@ -2936,7 +2908,7 @@ sub do_chars {
               "-nchar $param{'nchar'} ".
               "-t $param{'nthchar'} ".
               "-out $param{'prefix'}.ker " .
-              "$param{'prefix'}.bwc/W";
+              "-ker $param{'prefix'}.bwc/W";
 
     my $res = cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.characters.log" });

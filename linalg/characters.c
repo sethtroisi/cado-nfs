@@ -212,7 +212,8 @@ void eval_64chars_batch_thread(struct worker_threads_group * g, int tnum, void *
     return;
 }
 
-static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
+static alg_prime_t * create_characters(int nchars, int nratchars,
+        cado_poly pol, unsigned long *lpb)
 {
     unsigned long p;
     int ret;
@@ -244,7 +245,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
     /* Rational characters. Normally we have none. But the -nratchars
      * option inserts some */
     /* we want some prime beyond the (rational) large prime bound */
-    mpz_set_ui (pp, 1UL << pol->rat->lpb);
+    mpz_set_ui (pp, 1UL << lpb[RATIONAL_SIDE]);
     for(int i = 3 ; i < 3 + nratchars && i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
@@ -255,7 +256,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
         }
     }
     /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_set_ui (pp, 1UL << pol->alg->lpb);
+    mpz_set_ui (pp, 1UL << lpb[ALGEBRAIC_SIDE]);
     for(int i = 3 + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
@@ -561,6 +562,22 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
     return k2;
 }
 
+static void
+declare_usage (param_list pl)
+{
+  param_list_decl_usage (pl, "purged", "output-from-purge file");
+  param_list_decl_usage (pl, "index",  "index file");
+  param_list_decl_usage (pl, "out",    "output file");
+  param_list_decl_usage (pl, "heavyblock", "heavyblock output file");
+  param_list_decl_usage (pl, "poly",   "polynomial file");
+  param_list_decl_usage (pl, "nchar",  "number of (algebraic) characters");
+  param_list_decl_usage (pl, "lpbr",   "large prime bound on rational side");
+  param_list_decl_usage (pl, "lpba",   "large prime bound on algebraic side");
+  param_list_decl_usage (pl, "nratchars", "number of rational characters");
+  param_list_decl_usage (pl, "t",      "number of threads");
+  param_list_decl_usage (pl, "ker",      "input kernel file");
+}
+
 int main(int argc, char **argv)
 {
     const char * heavyblockname = NULL;
@@ -572,6 +589,8 @@ int main(int argc, char **argv)
     const char *indexname = NULL;
     const char *outname = NULL;
     int nthreads = 1;
+    unsigned long lpb[2] = {0,0};
+    char *argv0 = argv[0];
 
     /* print the command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -581,41 +600,73 @@ int main(int argc, char **argv)
 
     param_list pl;
     param_list_init(pl);
+    declare_usage(pl);
+
     argc--,argv++;
-    char ** bw_kernel_files = malloc(argc * sizeof(char*));
-    int n_bw_kernel_files = 0;
+    const char *bw_kernel_file = NULL;
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-        /* might also be a BW kernel file */
-        bw_kernel_files[n_bw_kernel_files++] = *argv;
-        argv++,argc--;
+
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        param_list_print_usage(pl, argv0, stderr);
+        exit (EXIT_FAILURE);
     }
     purgedname = param_list_lookup_string(pl, "purged");
     indexname = param_list_lookup_string(pl, "index");
     outname = param_list_lookup_string(pl, "out");
     heavyblockname = param_list_lookup_string(pl, "heavyblock");
+    bw_kernel_file = param_list_lookup_string(pl, "ker");
 
     cado_poly_init (pol);
 
     const char * tmp;
 
-    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+    if ((tmp = param_list_lookup_string(pl, "poly")) == NULL)
+      {
+        fprintf (stderr, "Error: parameter -poly is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
     cado_poly_read(pol, tmp);
 
-    ASSERT_ALWAYS(param_list_parse_int(pl, "nchar", &nchars));
+    if (param_list_parse_int(pl, "nchar", &nchars) == 0)
+      {
+        fprintf (stderr, "Error: parameter -nchar is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+    if (param_list_parse_ulong(pl, "lpbr", &lpb[RATIONAL_SIDE]) == 0)
+      {
+        fprintf (stderr, "Error: parameter -lpbr is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+    if (param_list_parse_ulong(pl, "lpba", &lpb[ALGEBRAIC_SIDE]) == 0)
+      {
+        fprintf (stderr, "Error: parameter -lpba is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
 
     param_list_parse_int(pl, "nratchars", &nratchars);
     param_list_parse_int(pl, "t", &nthreads);
 
-    if (param_list_warn_unused(pl))
-        exit(1);
-
-    ASSERT_ALWAYS(purgedname != NULL);
-    ASSERT_ALWAYS(indexname != NULL);
+    if (purgedname == NULL)
+      {
+        fprintf (stderr, "Error: parameter -purged is mandatory\n");
+        param_list_print_usage (pl, argv0, stderr);
+        exit (EXIT_FAILURE);
+      }
+     if (indexname == NULL)
+       {
+         fprintf (stderr, "Error: parameter -index is mandatory\n");
+         param_list_print_usage (pl, argv0, stderr);
+         exit (EXIT_FAILURE);
+       }
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
-    chars = create_characters (nchars, nratchars, pol);
+    chars = create_characters (nchars, nratchars, pol, lpb);
     int nchars2 = iceildiv(nchars, 64) * 64;
     double tt=wct_seconds();
     blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol, g);
@@ -646,38 +697,32 @@ int main(int argc, char **argv)
     /* First compute how many kernel vectors we have */
 
     unsigned int total_kernel_cols = 0;
-    unsigned int kncols[n_bw_kernel_files];
-    for(int i = 0 ; i < n_bw_kernel_files ; i++) {
-        struct stat sbuf[1];
-        int rc = stat(bw_kernel_files[i], sbuf);
-        if (rc < 0) { perror(bw_kernel_files[i]); exit(1); }
-        ASSERT_ALWAYS(sbuf->st_size % small_nrows == 0);
-        unsigned int ncols = 8 * (sbuf->st_size / small_nrows);
-        fprintf(stderr, "%s: %u vectors\n", bw_kernel_files[i], ncols);
-        ASSERT_ALWAYS(ncols % 64 == 0);
-        total_kernel_cols += kncols[i] = ncols;
-    }
+    unsigned int kncols;
+    struct stat sbuf[1];
+    int rc = stat(bw_kernel_file, sbuf);
+    if (rc < 0) { perror(bw_kernel_file); exit(1); }
+    ASSERT_ALWAYS(sbuf->st_size % small_nrows == 0);
+    unsigned int ncols = 8 * (sbuf->st_size / small_nrows);
+    fprintf(stderr, "%s: %u vectors\n", bw_kernel_file, ncols);
+    ASSERT_ALWAYS(ncols % 64 == 0);
+    total_kernel_cols += kncols = ncols;
 
     fprintf(stderr, "Total: %u kernel vectors\n", total_kernel_cols);
 
     /* kmat is the join of all kernel vectors */
     blockmatrix k = blockmatrix_alloc(small_nrows, total_kernel_cols);
-    for(int i = 0, j0 = 0 ; i < n_bw_kernel_files ; i++) {
-        blockmatrix_read_from_flat_file(k, 0, j0, bw_kernel_files[i], small_nrows, kncols[i]);
-        j0 += kncols[i];
-    }
+    int j0 = 0;
+    blockmatrix_read_from_flat_file(k, 0, j0, bw_kernel_file, small_nrows, kncols);
 
     fprintf(stderr, "done reading %u kernel vectors at %.1f\n",
             total_kernel_cols, wct_seconds() - tt);
 
-    {
-        blockmatrix k2 = blockmatrix_column_reduce(k, 4096);
-        blockmatrix_free(k);
-        k = k2;
-        total_kernel_cols = k->ncols;
-        fprintf(stderr, "Info: input kernel vectors reduced to dimension %u\n",
-                total_kernel_cols);
-    }
+    blockmatrix k2 = blockmatrix_column_reduce(k, 4096);
+    blockmatrix_free(k);
+    k = k2;
+    total_kernel_cols = k->ncols;
+    fprintf(stderr, "Info: input kernel vectors reduced to dimension %u\n",
+            total_kernel_cols);
 
     /* tmat is the product of the character matrices times the kernel vector */
     blockmatrix t = blockmatrix_alloc(total_kernel_cols, scmat->ncols + h->ncols);
@@ -735,7 +780,6 @@ int main(int argc, char **argv)
     }
     blockmatrix_free(nk);
 
-    free(bw_kernel_files);
     cado_poly_clear(pol);
     param_list_clear(pl);
 

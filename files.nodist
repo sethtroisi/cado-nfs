@@ -22,7 +22,6 @@ linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
 filter/print_table.c
-filter/purge-mt.c
 scripts/nightly-test
 scripts/polsel_effort
 scripts/cadofactor/parameters
@@ -43,6 +42,10 @@ polyselect/linear_interpolation.sage
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 polyselect/ropt_main.c
+polyselect/rotate.c
+polyselect/rotate_all.c
+polyselect/sopt.c
+polyselect/twoquadratics.c
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
@@ -63,6 +66,7 @@ sieve/ecm/testbench.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
 sieve/hist.rsa155.3lp.png
+sieve/strategies/optimize.sage
 sqrt/CMakeLists-nodist.txt
 sqrt/finish.mag
 sqrt/fmalgsqrt.c

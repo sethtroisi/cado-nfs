@@ -158,7 +158,8 @@ GF=`grep "^gf=" ${ORIGINAL_PARAMFILE} | cut -d = -f 2`
 
 CMDFILE="${DIR}/${NAME}.cmd"
 
-FILELIST="${DIR}/${NAME}.filelist"
+FILELIST_DUP1="${DIR}/${NAME}.filelist.dup1"
+FILELIST_DUP2="${DIR}/${NAME}.filelist.dup2"
 SUBDIRLIST="${DIR}/${NAME}.subdirlist"
 NODUPDIR="${DIR}/${NAME}.nodup"
 PARAMFILE="${ORIGINAL_PARAMFILE}"
@@ -235,9 +236,9 @@ if [ "${DO_INIT}" -eq "1" ] ; then
 
   echo "Start initialisation."
   
-  ls -1 "${RELDIR}/" > ${FILELIST} # all files in RELDIR goes to FILELIST
+  ls -1 "${RELDIR}/" > ${FILELIST_DUP1} # all files in RELDIR goes to FILELIST
   check_error "$?" "could not construct list of relation files from ${RELDIR}."
-  NB_RELFILE=`wc -l ${FILELIST} | cut -d " " -f 1`
+  NB_RELFILE=`wc -l ${FILELIST_DUP1} | cut -d " " -f 1`
   if [ ${NB_RELFILE} -eq 0 ] ; then
     echo "The directory ${RELDIR} contains no relations file."
     exit 1
@@ -277,17 +278,19 @@ fi
 
 ###### DUP1 ######
 if [ "${DO_DUP1}" -eq "1" ] ; then
-  argsd1="-n 1 -abhexa -filelist ${FILELIST} -basepath ${RELDIR} "
+  argsd1="-n 1 -abhexa -filelist ${FILELIST_DUP1} -basepath ${RELDIR}"
+  argsd2="-prefix ${NAME}.nodup.rels"
 
-  CMD="${BIN_DUP1} $argsd1 -out ${NODUPDIR}"
+  CMD="${BIN_DUP1} $argsd1 $argsd2 -out ${NODUPDIR}"
   run_cmd "${CMD}" "${LOGD1}" "${LOGD1}" "${VERBOSE}" "${DUP1DONE}"
 else
   echo "dup1 already done."
 fi
 ##################
   
-ESTIMATED_NB_REL="`tail -n 3 ${LOGD1} | head -n 1 | cut -d \" \" -f 3`"
-argsd2="-K ${ESTIMATED_NB_REL} -filelist ${FILELIST} -poly ${PARAMFILE} "
+ESTIMATED_NB_REL="`tail -n 3 ${LOGD1} | head -n 1 | cut -d \" \" -f 4`"
+ls -1 "${NODUPDIR}/0/" > ${FILELIST_DUP2}
+argsd2="-K ${ESTIMATED_NB_REL} -filelist ${FILELIST_DUP2} -poly ${PARAMFILE} "
 
 ###### DUP2_0 ######
 if [ "${DO_DUP20}" -eq "1" ] ; then
@@ -307,19 +310,21 @@ else
 fi
 ####################
 
-NB0=`tail -n 3 ${LOGD20} | head -n 1 | cut -d " " -f 6`
-NB1=`tail -n 3 ${LOGD21} | head -n 1 | cut -d " " -f 6`
+NB0=`grep "^At the end: [0-9]" ${LOGD20} | cut -d " " -f 4`
+NB1=`grep "^At the end: [0-9]" ${LOGD21} | cut -d " " -f 4`
 NBREL=`expr ${NB0} + ${NB1}`
 echo ${NBREL} > ${NRELSFILE}
 echo "${NBREL} unique relations remaining."
 
 NBPR=`grep nprimes ${LOGD20} | cut -d "=" -f 2`
-MIN=`grep min_index ${LOGD20} | cut -d "=" -f 2`
+#MIN=`grep min_index ${LOGD20} | cut -d "=" -f 2`
+MIN="0" # FIXME MIN=ceil(2*minlim/log(minlim)) (in the integers case, not true 
+#in the polynomials case (as in FFS))
 
 ###### PURGE ######
 if [ "${DO_PURGE}" -eq "1" ] ; then
   argp0="-out ${RELSFILE} -basepath ${NODUPDIR} -subdirlist ${SUBDIRLIST} "
-  argp1="-filelist ${FILELIST} -keep ${EXCESS} "
+  argp1="-filelist ${FILELIST_DUP2} -keep ${EXCESS} "
   argp2="-outdel ${DELRELSFILE} "
   argp3="-nrels ${NBREL} -nprimes ${NBPR} -minindex ${MIN} "
   if [ "x${REQ_EXCESS}" = "x-1" ] ; then

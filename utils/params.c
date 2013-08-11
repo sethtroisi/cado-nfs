@@ -323,9 +323,13 @@ int param_list_read_file(param_list pl, const char * name)
 
 int param_list_configure_alias(param_list pl, const char * key, const char * alias)
 {
-    if (pl->use_doc)
-        if (!is_documented_key(pl, key+1)) // skip the '-' in key
+    if (pl->use_doc) {
+        const char *k = key;
+        if (k[0] == '-')
+            k++;
+        if (!is_documented_key(pl, k))
             fprintf(stderr, "# Warning: an alias %s is declared to the key %s that is undocumented\n", alias, key);
+    }
 
     size_t len = strlen(alias);
 
@@ -546,6 +550,12 @@ int param_strcmp(const char * a, parameter_srcptr b)
 
 static int assoc(param_list pl, const char * key)
 {
+    if (pl->use_doc) {
+        const char *k = (key[0] == '-') ? (1+key) : key;
+        if (!is_documented_key(pl, k)) 
+            fprintf(stderr, "# Warning: parameter %s is checked by this program but is undocumented.\n", k);
+    }
+
     void * found;
 
     param_list_consolidate(pl);
@@ -915,6 +925,9 @@ void print_command_line(FILE * stream, int argc, char * argv[])
         fprintf (stream, " %s", argv[i]);
     fprintf (stream, "\n");
 #ifdef  __GNUC__
+#if GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)
+#error "This version of GCC is known to miscompile CADO-NFS. See https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490"
+#endif
     fprintf(stream, "# Compiled with gcc " __VERSION__ "\n");
 #endif
     fprintf(stream, "# Compilation flags " CFLAGS "\n");

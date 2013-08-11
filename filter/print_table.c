@@ -16,8 +16,8 @@
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-check] -poly xxx.poly -renumberfile outfile\n",
-                   argv0);
+  fprintf (stderr, "Usage: %s [-check] -poly xxx.poly -renumberfile outfile "
+                   "-lpb0 nnn -lpb1 nnn\n", argv0);
   exit (1);
 }
 
@@ -30,6 +30,7 @@ main (int argc, char *argv[])
     char *argv0 = argv[0];
     cado_poly cpoly;
     renumber_t tab;
+    unsigned long lpb[2] = {0, 0};
 
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
@@ -47,6 +48,18 @@ main (int argc, char *argv[])
         else if (argc > 2 && strcmp (argv[1], "-renumber") == 0)
           {
             renumberfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-lpb0") == 0)
+          {
+            lpb[0] = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-lpb1") == 0)
+          {
+            lpb[1] = atoi(argv[2]);
             argc -= 2;
             argv += 2;
           }
@@ -76,14 +89,14 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-    renumber_debug_print_tab(stdout, renumberfilename, cpoly);
+    renumber_debug_print_tab(stdout, renumberfilename, cpoly, lpb);
 
   /* Check for all index i if it can retrieved p and r from it and if it can
    * retrieved the same index from this p and r
    */
   if (check)
   {
-    renumber_init (tab, cpoly);
+    renumber_init (tab, cpoly, lpb);
     renumber_read_table (tab, renumberfilename);
 
     index_t i, j;

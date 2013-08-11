@@ -27,11 +27,11 @@ typedef struct {
 
 typedef struct {
   unsigned long lpb;        /* Large prime bound 2^lpb */
-  uint64_t assume_prime_thresh; /* The factor base bound squared. If the 
-                               square exceeds UINT64_MAX, store UINT64_MAX. 
+  double assume_prime_thresh; /* The factor base bound squared.
                                We assume that primes <= fbb have already been 
                                removed, thus any factor <= assume_prime_thresh 
                                is assumed prime without further test. */
+  double BBB;               /* The factor base bound cubed. */
   facul_method_t *methods;  /* List of methods to try */
 } facul_strategy_t;
 

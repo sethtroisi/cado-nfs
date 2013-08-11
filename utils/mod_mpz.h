@@ -109,6 +109,13 @@ modmpz_intget_uls (unsigned long *r, const modintmpz_t s)
   return count;
 }
 
+MAYBE_UNUSED
+static inline double
+modmpz_intget_double (const modintmpz_t s)
+{
+  ASSERT_MPZ(s);
+  return mpz_get_d (s);
+}
 
 MAYBE_UNUSED
 static inline int

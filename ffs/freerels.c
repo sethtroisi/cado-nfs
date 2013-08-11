@@ -154,9 +154,9 @@ int main(int argc, char **argv)
     cado_poly_init(dummy_poly);
 
     dummy_poly->pols[0]->degree = ffspol[0]->deg; 
-    dummy_poly->pols[0]->lpb = __FP_BITS + __FP_BITS * lpb[0]; 
     dummy_poly->pols[1]->degree = ffspol[1]->deg; 
-    dummy_poly->pols[1]->lpb = __FP_BITS + __FP_BITS * lpb[1]; 
+    unsigned long dummy_lpb[2] = { __FP_BITS + __FP_BITS * lpb[0],
+                                  __FP_BITS + __FP_BITS * lpb[1]};
 
     if (dummy_poly->pols[1]->degree == 1)
     {
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
       dummy_poly->alg  = dummy_poly->pols[1];
     }
 
-    renumber_init(tab, dummy_poly);
+    renumber_init(tab, dummy_poly, dummy_lpb);
     renumber_init_write (tab, renumberfilename, badidealsfilename, add_full_col);
 
     uint64_t nrel = 0;

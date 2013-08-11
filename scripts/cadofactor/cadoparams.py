@@ -28,6 +28,10 @@ the node of a program is equal to the name of the binary executable.
 import os
 import re
 import abc
+import logging
+import cadologger
+
+logger = logging.Logger("Parameters")
 
 class Parameters(object):
     """ Class that stores parameters for cadofactor in hierarchical dictionaries
@@ -39,7 +43,7 @@ class Parameters(object):
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
     
-    translate_old_key =  {
+    old_key_map =  {
         "alambda": "tasks.sieve.alambda",
         "alim": "alim",
         "bindir": "tasks.execpath",
@@ -102,6 +106,24 @@ class Parameters(object):
         "skip": "tasks.purge.skip",
         "wdir": "tasks.workdir",
         "expected_factorization": None
+    }
+    
+    key_types = {
+        "admin": int,
+        "admax": int,
+        "adrange": int,
+        "qmin": int,
+        "qmax": int,
+        "qrange": int,
+        "maxwu": int,
+        "alim": int,
+        "rlim": int,
+        "rels_wanted": int,
+        "nslices_log": int,
+        "skip": int,
+        "N": int,
+        "nrclients": int,
+        "port": int
     }
 
     def __init__(self, *args, **kwargs):
@@ -246,7 +268,7 @@ class Parameters(object):
         m = 3
         results in foo.bar.k = 5 and k = 3
         """
-        while True:
+        while isinstance(value, str):
             match = re.search(r"^(.*)\$\((.*)\)(.*)$", value)
             if not match:
                 break
@@ -267,22 +289,69 @@ class Parameters(object):
             else:
                 dic[key] = self._subst_reference(path, key, dic[key])
     
-    def readfile(self, infile, old_format = False):
+    def translate_old_key(self, key):
+        """ If key is in the translation table, translate it.
+        """
+        # If allow_new is True, we allow new-style parameters to occur, too,
+        # simply by not translating anything that does not occur in the
+        # translation table.
+        allow_new = True
+        if allow_new:
+            return self.old_key_map.get(key, key)
+        else:
+            return self.old_key_map[key]
+
+    def _convert_one_type(self, path, key, orig_value):
+        """ If a particular data type is registered in for this parameter,
+        convert its value to that type, otherwise return the value unchanged.
+        If the dataype is int, and the characters 'e' or '.' occur in the value,
+        we convert to float first to convert scientific notation.
+        """
+        # If this value was converted before, don't try to convert again, as
+        # the code below assumes it is a str
+        if not isinstance(orig_value, str):
+            return orig_value
+        param = ".".join(path + [key])
+        # print ("Trying to convert param=%s, value=%s" % (param, orig_value))
+        datatype = self.key_types.get(key, None)
+        value = orig_value
+        if datatype is None:
+            return value
+        if datatype is int and ("e" in value or "." in value):
+            value = float(value)
+            if float(int(value)) != value:
+                raise ValueError("Value %s for parameter %s cannot be "
+                                 "converted to int without loss"
+                                 % (orig_value, param))
+        try:
+            value = datatype(value)
+            # print ("Converted param=%s, value=%r to %r, type %s" %
+            #       (param, orig_value, value, datatype.__name__))
+        except ValueError as err:
+            ValueError("Cannot convert value %s for parameter %s to type %s"
+                       % (value, param, datatype.__name__))
+        return value
+
+    def _convert_types(self, dic, path):
+        for key in dic:
+            if isinstance(dic[key], dict):
+                self._convert_types(dic[key], path + [key])
+            else:
+                dic[key] = self._convert_one_type(path, key, dic[key])
+
+    def readparams(self, infile, old_format = False):
         """ 
         Read configuration file lines from infile, which must be an iterable.
         An open file handle, or an array of strings, work.
         
         >>> p = Parameters()
-        >>> p.readfile(DEFAULTS)
+        >>> p.readparams(DEFAULTS)
         >>> p.data["tasks"]["parallel"]
         '0'
         >>> p.myparams(["degree", "incr", "parallel"], "tasks.polyselect") == \
         {'parallel': '0', 'incr': '60', 'degree': '5'}
         True
         """
-        if old_format and not self._have_read_defaults:
-            self._have_read_defaults = True
-            self.readfile(DEFAULTS_OLD, True)
         for line in infile:
             line2 = line.split('#', 1)[0].strip()
             if not line2:
@@ -293,31 +362,37 @@ class Parameters(object):
             # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
             (key, value) = (s.strip() for s in line2.split('=', 1))
             if old_format:
-                # If key is not found in translate_old_key, we use it unchanged
-                key = self.translate_old_key.get(key, key)
+                key = self.translate_old_key(key)
                 if key is None:
                     continue
             value = self.subst_env_var(key, value)
             self._insertkey(key, value)
         self._subst_references(self.data, [])
-    
-    @staticmethod
-    def __str_internal__(dic, path):
+        self._convert_types(self.data, [])
+
+    def read_old_defaults(self):
+        """ Read the DEFAULTS_OLD parameter table to set default values as they
+        were set by the Perl script, as some of the old parameter files may
+        assume those defaults being effective.
+        """
+        logger.debug("Reading old default parameters table")
+        self.readparams(DEFAULTS_OLD, True)
+
+    def readfile(self, filename, old_format = False):
+        """ Read parameters from a file """
+        logger.debug("Reading parameter file %s", filename)
+        with open(filename, "r") as handle:
+            self.readparams(handle, old_format)
+
+    def __str_internal__(self):
         ''' Returns all entries of the dictionary dic as key=sep strings
         in an array
         '''
-        result = []
-        for key in dic:
-            if not isinstance(dic[key], dict):
-                result.append(path + key + " = " + dic[key])
-        for key in dic:
-            if isinstance(dic[key], dict):
-                result = result + Parameters.__str_internal__(dic[key], 
-                                                              path + key + '.')
-        return result
+        return ("%s = %s" % (".".join(path + [key]), value) for
+                (path, key, value) in self)
     
     def __str__(self):
-        r = Parameters.__str_internal__(self.data, "")
+        r = self.__str_internal__()
         return "\n".join(r)
 
 

@@ -56,14 +56,14 @@ int ffs_poly_set_plist(cado_poly poly, param_list pl)
   const char *s;
 
   param_list_parse_ulong(pl, "fbb0", &lim);
-  poly->pols[0]->lim = lim;
+  //poly->pols[0]->lim = lim;
   param_list_parse_ulong(pl, "fbb1", &lim);
-  poly->pols[1]->lim = lim;
+  //poly->pols[1]->lim = lim;
   
   param_list_parse_int(pl, "lpb0", &lpb);
-  poly->pols[0]->lpb = __FP_BITS + __FP_BITS * lpb;
+  //poly->pols[0]->lpb = __FP_BITS + __FP_BITS * lpb;
   param_list_parse_int(pl, "lpb1", &lpb);
-  poly->pols[1]->lpb = __FP_BITS + __FP_BITS * lpb;
+  //poly->pols[1]->lpb = __FP_BITS + __FP_BITS * lpb;
   
   s = param_list_lookup_string(pl, "pol0");
   for (deg = 0; *s != '\0'; s++)

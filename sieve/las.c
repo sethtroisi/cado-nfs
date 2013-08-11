@@ -236,7 +236,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (apow_lim == 0) 
                 apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
+            int ok = fb_read_split (&sis->fb, &sis->fb_bucket_threads, fbfilename,
+                                    sis->scale * LOG_SCALE, si->bucket_thresh,
+                                    las->nb_threads, las->verbose, lim, apow_lim);
+            FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
             fprintf (las->output, 
@@ -251,10 +254,12 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 rpow_lim = si->bucket_thresh - 1;
                 printf ("# rpow_lim reduced to %d\n", rpow_lim);
               }
-            sis->fb = fb_make_linear ((const mpz_t *) pol->f,
-                                    (fbprime_t) lim,
-                                     rpow_lim, sis->scale * LOG_SCALE, 
+            int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
+                                     (const mpz_t *) pol->f, (fbprime_t) lim,
+                                     si->bucket_thresh, las->nb_threads,
+                                     rpow_lim, sis->scale * LOG_SCALE,
                                      las->verbose, 1, las->output);
+            FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             tfb = seconds () - tfb;
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
@@ -262,62 +267,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     }
 }
 /*}}}*/
-
-/* {{{ dispatch_fb */
-static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
-{
-    /* Given fb0, which is a pointer in the fb array *fb_main, allocates
-     * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
-     * appropriate length to contain equivalent portions of the _tail_ of
-     * the fb array *fb_main, starting at pointer fb0. Reallocates *fb_main
-     * in the end (*fb_main gives away ownership of its contents).
-     */
-    /* Start by counting, unsurprisingly */
-    /* Compute the size in bytes of each of the nparts pieces */
-    size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
-    FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
-    memset(fb_sizes, 0, nparts * sizeof(size_t));
-    size_t headsize = fb_diff_bytes(fb0, *fb_main);
-    int i = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        fb_sizes[i] += fb_entrysize (fb);
-        if (++i == nparts)
-          i = 0;
-    }
-    /* Allocate memory for each of the nparts pieces */
-    factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
-    for(i = 0 ; i < nparts ; i++) {
-        // add one for end marker
-        fb_sizes[i] += sizeof(factorbase_degn_t);
-        fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
-        FATAL_ERROR_CHECK(fb_dst[i] == NULL, "malloc failed");
-        fbi[i] = fb_dst[i];
-    }
-    free(fb_sizes); fb_sizes = NULL;
-    /* Copy factorbase entries to each of the nparts pieces */
-    i = 0;
-    int k = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        k++;
-        size_t sz = fb_entrysize (fb); 
-        memcpy(fbi[i], fb, sz);
-        fbi[i] = fb_next(fbi[i]);
-        if (++i == nparts)
-          i = 0;
-    }
-    /* Add an end marker to each of the nparts pieces */
-    for(i = 0 ; i < nparts ; i++) {
-        memset(fbi[i], 0, sizeof(factorbase_degn_t));
-        fbi[i]->p = FB_END;
-    }
-    free(fbi); fbi = NULL;
-    *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
-    FATAL_ERROR_CHECK(*fb_main == NULL, "realloc failed");
-    fb0 = fb_skip(*fb_main, headsize);
-    memset(fb0, 0, sizeof(factorbase_degn_t));
-    fb0->p = FB_END;
-}
-/* }}} */
 
 /* {{{ reordering of the small factor base
  *
@@ -432,25 +381,17 @@ void reorder_fb(sieve_info_ptr si, int side)
 
 /* }}} */
 
-/* {{{ Split the factor base in pieces for the different threads.
+/* {{{ Print some statistics about the factor bases
  * This also fills the field si->sides[*]->max_bucket_fill_ratio, which
  * is used to verify that per-thread allocation for buckets is
  * sufficient.
  * */
-void sieve_info_split_bucket_fb_for_threads(las_info_ptr las, sieve_info_ptr si, int side, int n)
+void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int side)
 {
+    const int n = las->nb_threads;
     sieve_side_info_ptr s = si->sides[side];
-
-    /* aliases */
-    factorbase_degn_t ** fb_bucket = s->fb_bucket_threads;
-    factorbase_degn_t *fb = s->fb;
-
     double bucket_fill_ratio[n];
 
-    /* skip over small primes */
-    while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
-        fb = fb_next (fb); 
-    dispatch_fb(fb_bucket, &s->fb, fb, n, FBPRIME_MAX);
     fprintf (las->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
     /* Counting the bucket-sieved primes per thread.  */
@@ -459,7 +400,7 @@ void sieve_info_split_bucket_fb_for_threads(las_info_ptr las, sieve_info_ptr si,
     memset(nn, 0, n * sizeof(unsigned long));
     for (int i = 0; i < n; ++i) {
         bucket_fill_ratio[i] = 0;
-        fb = s->fb_bucket_threads[i];
+        factorbase_degn_t *fb = s->fb_bucket_threads[i];
         for (; fb->p != FB_END; fb = fb_next(fb)) {
             nn[i] += fb->nr_roots;
             bucket_fill_ratio[i] += fb->nr_roots / (double) fb->p;
@@ -548,9 +489,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
      */
 
     for(int s = 0 ; s < 2 ; s++) {
-        int n = las->nb_threads;
-        si->sides[s]->fb_bucket_threads = malloc(n * sizeof(factorbase_degn_t *));
-        sieve_info_split_bucket_fb_for_threads(las, si, s, n);
+        sieve_info_print_fb_statistics(las, si, s);
         /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
 
@@ -826,9 +765,16 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
          * remains reasonable to base our work on the larger factor base
          * (thus doing incomplete sieving).
          */
+        /* But now, the .poly file does not contain lim data anymore.
+         * This is up to the user to do this check, anyway, because
+         * it is not sure that makefb was run with the alim given in the
+         * poly file.
+         */
+        /*
         for(int s = 0 ; s < 2 ; s++) {
             ASSERT_ALWAYS(sc->sides[s]->lim <= las->cpoly->pols[s]->lim);
         }
+        */
     }
 
     fclose(f);
@@ -875,16 +821,14 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* {{{ Parse polynomial */
     cado_poly_init(las->cpoly);
     const char *tmp;
-    if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
-	param_list_read_file(pl, tmp);
-    } else {
+    if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (!cado_poly_set_plist(las->cpoly, pl)) {
-	fprintf(stderr, "Error reading polynomial file\n");
+    if (!cado_poly_read(las->cpoly, tmp)) {
+	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
 	exit(EXIT_FAILURE);
     }
 
@@ -923,22 +867,21 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     mpz_clear(q0);
     sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-    param_list_parse_int(pl, "I", &sc->logI);
-    for(int s = 0 ; s < 2 ; s++) {
-        sc->sides[s]->lim = las->cpoly->pols[s]->lim;
-        sc->sides[s]->lpb = las->cpoly->pols[s]->lpb;
-        sc->sides[s]->mfb = las->cpoly->pols[s]->mfb;
-        sc->sides[s]->lambda = las->cpoly->pols[s]->lambda;
+    int seen = 1;
+    seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
+    seen &= param_list_parse_ulong (pl, "rlim",    &(sc->sides[0]->lim));
+    seen &= param_list_parse_int   (pl, "lpbr",    &(sc->sides[0]->lpb));
+    seen &= param_list_parse_int   (pl, "mfbr",    &(sc->sides[0]->mfb));
+    seen &= param_list_parse_double(pl, "rlambda", &(sc->sides[0]->lambda));
+    seen &= param_list_parse_ulong (pl, "alim",    &(sc->sides[1]->lim));
+    seen &= param_list_parse_int   (pl, "lpba",    &(sc->sides[1]->lpb));
+    seen &= param_list_parse_int   (pl, "mfba",    &(sc->sides[1]->mfb));
+    seen &= param_list_parse_double(pl, "alambda", &(sc->sides[1]->lambda));
+    if (!seen) {
+        fprintf(stderr, "Error: options -I, -rlim, -lpbr, -mfbr, -rlambda,"
+                " -alim, -lpba, -mfba, -alambda are mandatory.\n");
+        exit(EXIT_FAILURE);
     }
-    /* We used to print the default config unconditionally. It's in fact
-     * useless, as this bit of configuration will be printed anyway, and
-     * printing it twice causes unnecessary clutter.
-    if (sc->bitsize) {
-        siever_config_display(las->output, sc);
-        fprintf(las->output, "#                     skewness=%1.1f\n",
-                las->cpoly->skew);
-    }
-     */
 
     /* }}} */
 
@@ -972,13 +915,13 @@ void las_info_clear(las_info_ptr las)/*{{{*/
         sieve_info_clear(las, si);
     }
     free(las->sievers);
-  if (las->outputname)
-      fclose_maybe_compressed(las->output, las->outputname);
-  mpz_clear(las->todo_q0);
-  mpz_clear(las->todo_q1);
-  if (las->todo_list_fd)
-      fclose(las->todo_list_fd);
-  cado_poly_clear(las->cpoly);
+    if (las->outputname)
+        fclose_maybe_compressed(las->output, las->outputname);
+    mpz_clear(las->todo_q0);
+    mpz_clear(las->todo_q1);
+    if (las->todo_list_fd)
+        fclose(las->todo_list_fd);
+    cado_poly_clear(las->cpoly);
 }/*}}}*/
 
 sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr sc, param_list pl)/*{{{*/
@@ -1559,9 +1502,9 @@ typedef const struct thread_data_s * thread_data_srcptr;
 #endif
 
 #if LOG_BUCKET_REGION == 16			
-#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) x; } while (0)
+#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) x; } while (0)
 #else									
-#define FILL_BUCKET_CX() do { *(uint16_t *)pu = (uint16_t) (x & maskbucket); } while (0)
+#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) (x & maskbucket); } while (0)
 #endif						
 
 #ifdef HAVE_SSE2							
@@ -1585,7 +1528,7 @@ typedef const struct thread_data_s * thread_data_srcptr;
       pu = *ppu;							\
       FILL_BUCKET_TRACE_K();							\
       FILL_BUCKET_CX();								\
-      ((uint16_t *)pu)[1] = bep;					\
+      ((bucket_update_t *)pu)->p = bep;					\
       *ppu = ++pu;							\
       FILL_BUCKET_PREFETCH_PU();						\
     }									\
@@ -1723,7 +1666,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	inc_a = plattice_a(&pli, si),
 	inc_c = plattice_c(&pli, si);
 #endif
-      const uint16_t bep = (uint16_t) bucket_encode_prime (p);
+      const prime_hint_t bep = (prime_hint_t) bucket_encode_prime (p);
       do { 
 	FILL_BUCKET(); if (x >= IJ) break;
 	FILL_BUCKET(); if (x >= IJ) break;
@@ -3097,8 +3040,10 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ???");
-  param_list_decl_usage(pl, "mkhint", "(switch) ???");
+  param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
+  param_list_decl_usage(pl, "descent-hint", "hint file ?????");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
+  param_list_decl_usage(pl, "mkhint", "(switch) ?????");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/

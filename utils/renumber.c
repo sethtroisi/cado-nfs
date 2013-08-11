@@ -167,7 +167,7 @@ static void
 renumber_alloc (renumber_t tab)
 {
   // Allocate the renumbering table
-  tab->table = (index_t*) malloc (tab->size * sizeof(index_t));
+  tab->table = (p_r_values_t *) malloc (tab->size * sizeof(p_r_values_t));
   ASSERT_ALWAYS (tab->table != NULL);
   // Allocate the cached table
   tab->cached = (index_t*) malloc ((2<<MAX_LOG_CACHED) * sizeof(index_t));
@@ -193,7 +193,14 @@ get_one_line (FILE *f, char *s)
   char *rets;
   size_t n;
   rets = fgets(s, RENUMBER_MAXLINE, f);
-  ASSERT_ALWAYS(rets != NULL);
+  if (rets == NULL) {
+    if (feof(f)) {
+      fprintf (stderr, "renumber.c: get_one_line() reached EOF\n");
+    } else {
+      perror("renumber.c: get_one_line()");
+    }
+    abort();
+  }
   n = strnlen(s, RENUMBER_MAXLINE);
   ASSERT_ALWAYS(n != RENUMBER_MAXLINE);
   return n;
@@ -249,9 +256,8 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
 
 
 void
-renumber_init (renumber_t renumber_info, cado_poly pol)
+renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
 {
-  int max_nb_bits = MAX(pol->pols[0]->lpb, pol->pols[1]->lpb);
 
   if (pol->pols[0]->degree != 1 && pol->pols[1]->degree != 1)
     renumber_info->rat = -1;
@@ -260,14 +266,25 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
   else
     renumber_info->rat = 1;
 
-  if (renumber_info->rat == -1)
-    max_nb_bits++;
+  if (lpb != NULL) {
+    if (renumber_info->rat <= 0) {
+      renumber_info->lpbr = lpb[0];
+      renumber_info->lpba = lpb[1];
+    } else {
+      renumber_info->lpbr = lpb[1];
+      renumber_info->lpba = lpb[0];
+    }
 
-  if (max_nb_bits <= 32)
-    renumber_info->nb_bits = 32;
-  else
-    renumber_info->nb_bits = 64;
-  ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+    int max_nb_bits = MAX(lpb[0], lpb[1]);
+    if (renumber_info->rat == -1)
+      max_nb_bits++;
+
+    if (max_nb_bits <= 32)
+      renumber_info->nb_bits = 32;
+    else
+      renumber_info->nb_bits = 64;
+    ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+  }
 
   renumber_info->add_full_col = 0;
   renumber_info->size = 0;
@@ -357,18 +374,17 @@ renumber_close_write (renumber_t tab, const char *tablefile)
   ASSERT_ALWAYS (final != NULL);
 
   // First we put some data about the renumbering table.
-  fprintf (final, "%u %" PRid " %d %d\n", tab->nb_bits, tab->size,
-                                     tab->bad_ideals.n, tab->add_full_col);
+  fprintf (final, "%u %" PRid " %d %d %lu %lu\n", tab->nb_bits, tab->size,
+                                     tab->bad_ideals.n, tab->add_full_col,
+                                     tab->lpbr, tab->lpba);
 
   char buffer[128] = "" , *retc;
-  int ret;
   do
   {
-    ret = fputs (buffer, final);
-    ASSERT (ret >= 0);
+    int ret = fputs (buffer, final);
+    ASSERT_ALWAYS (ret >= 0);
 
     retc = fgets (buffer, 128, tab->file);
-    fprintf (stderr, "%s\n", buffer);
   } while (retc != NULL);
 
   ASSERT_ALWAYS (feof(tab->file));
@@ -404,9 +420,10 @@ renumber_read_table (renumber_t tab, const char * filename)
 
   // read size of renumbering table
   uint64_t tmp_size;
-  ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d\n", &tab->nb_bits,
-                        &tmp_size, &tab->bad_ideals.n, &tab->add_full_col);
-  ASSERT_ALWAYS (ret == 4);
+  ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d %lu %lu\n", &tab->nb_bits,
+      &tmp_size, &tab->bad_ideals.n, &tab->add_full_col,
+      &tab->lpbr, &tab->lpba);
+  ASSERT_ALWAYS (ret == 6);
 
   ASSERT_ALWAYS (tab->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (tab->nb_bits == 32 || tab->nb_bits == 64);
@@ -492,7 +509,7 @@ renumber_read_table (renumber_t tab, const char * filename)
 int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p,
                      p_r_values_t r, int side)
 {
-  *first = 0;
+  *first = (rn->add_full_col) ? 1 : 0;
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
   {
@@ -704,7 +721,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   else
   {
     *p = tab[j] - 1;
-    if (*p > (1UL << pol->rat->lpb) && i == j)
+    if (*p > (1UL << renumber_info->lpbr) && i == j)
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
@@ -727,14 +744,14 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
 
 //for DEBUG, should be remove later
 void renumber_debug_print_tab (FILE *output, const char *filename,
-        cado_poly pol)
+        cado_poly pol, unsigned long lpb[])
 {
   renumber_t tab;
   index_t i;
   p_r_values_t p, r;
   int side;
 
-  renumber_init (tab, pol);
+  renumber_init (tab, pol, lpb);
   renumber_read_table (tab, filename);
 
   for (i = 0; i < tab->size; i++)

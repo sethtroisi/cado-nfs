@@ -81,3 +81,10 @@ CMAKE_GENERATOR="MSYS Makefiles"
 
 17. run
 make
+
+In case you get an error like:
+
+> No rule to make target 'gf2x.lo', needed by 'libgf2x.la'
+
+then add --srcdir=... as configure option to gf2x (or wipe out the content of
+the build/<machine>/gf2x directory, and run there configure again).

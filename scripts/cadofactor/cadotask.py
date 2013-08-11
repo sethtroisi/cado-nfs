@@ -6,6 +6,7 @@ import abc
 import random
 import time
 from collections import OrderedDict
+from math import log
 import wudb
 import logging
 import socket
@@ -55,8 +56,8 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
             return [f for (f, s) in self.output_files.items() if condition(s)]
     
     def forget_output_filenames(self, filenames):
-        for f in filenames:
-            del(self.output_files[f])
+        for filename in filenames:
+            del(self.output_files[filename])
     
     @abc.abstractclassmethod
     def make_tablename(self, name):
@@ -78,7 +79,7 @@ class Polynomial(object):
         """ Parse a polynomial file in the syntax as produced by polyselect2l 
         """
         self.poly = None
-        self.E = 0.
+        self.MurphyE = 0.
         poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
@@ -91,22 +92,22 @@ class Polynomial(object):
             # extract the value and store it
             match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
             if match:
-                self.E = float(match.group(1))
+                self.MurphyE = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
-            l = line.split('#', 1)[0].strip()
+            line2 = line.split('#', 1)[0].strip()
             # If nothing is left, process next line
-            if not l:
+            if not line2:
                 continue
             # All remaining lines must be of the form "x: y"
-            a = l.split(":")
-            if not len(a) == 2:
-                raise Exception("Invalid line %s" % l)
-            key = a[0].strip()
-            value = a[1].strip()
+            array = line2.split(":")
+            if not len(array) == 2:
+                raise Exception("Invalid line %s" % line)
+            key = array[0].strip()
+            value = array[1].strip()
             if not key in dict(self.keys):
                 raise Exception("Invalid key %s in line %s" %
-                                (key, l))
+                                (key, line))
             poly[key] = value
         for (key, isrequired) in self.keys:
             if isrequired and not key in poly:
@@ -127,17 +128,17 @@ class Polynomial(object):
     def is_valid(self):
         return not self.poly is None
     
-    def setE(self, E):
-        self.E = float(E)
+    def setE(self, MurphyE):
+        self.MurphyE = float(MurphyE)
     
     def create_file(self, filename, params):
         # Write polynomial to a file, and add lines with parameters such as 
         # "alim" if supplied in params 
-        with open(str(filename), "w") as f:
-            f.write(str(self))
+        with open(str(filename), "w") as poly_file:
+            poly_file.write(str(self))
             for key in self.paramnames:
                 if key in params:
-                    f.write(key + ": %s\n" % params[key])
+                    poly_file.write(key + ": %s\n" % params[key])
 
 
 class FilePath(object):
@@ -470,14 +471,14 @@ class ClientServerTask(Task, patterns.Observer):
                          path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", "10")
+        self.params.setdefault("maxwu", 10)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_available_wus() >= int(self.params["maxwu"]):
+        while self.get_number_available_wus() >= self.params["maxwu"]:
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -542,7 +543,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state["adnext"] = \
-            max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
+            max(self.state.get("adnext", 0), self.params.get("admin", 0))
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
@@ -559,7 +560,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g", 
-                             self.state["bestfile"], self.bestpoly.E)
+                             self.state["bestfile"], self.bestpoly.MurphyE)
         else:
             self.logger.info("No polynomial was previously found")
         
@@ -576,7 +577,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                                "search range bound admax, or maxnorm")
             return
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
-                         "= %g", self.state["bestfile"] , self.bestpoly.E)
+                         "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
         return
     
@@ -608,22 +609,22 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', outputfile)
             return False
-        if not poly.E:
+        if not poly.MurphyE:
             self.logger.error("Polynomial in file %s has no Murphy E value" 
                               % outputfile)
             return False
-        if self.bestpoly is None or poly.E > self.bestpoly.E:
+        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
             self.bestpoly = poly
-            update = {"bestE": poly.E, "bestpoly": str(poly),
+            update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
                       "bestfile": outputfile}
             self.state.update(update)
             self.logger.info("New best polynomial from file %s:"
-                             " Murphy E = %g" % (outputfile, poly.E))
+                             " Murphy E = %g" % (outputfile, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
         else:
             self.logger.info("Best polynomial from file %s with E=%g is "
                              "no better than current best with E=%g",
-                             outputfile, poly.E, self.bestpoly.E)
+                             outputfile, poly.MurphyE, self.bestpoly.MurphyE)
         return True
     
     def write_poly_file(self):
@@ -640,12 +641,12 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return self.get_state_filename("polyfilename")
 
     def need_more_wus(self):
-        return self.state["adnext"] < int(self.params["admax"])
+        return self.state["adnext"] < self.params["admax"]
     
     def submit_one_wu(self):
         adstart = self.state["adnext"]
-        adend = adstart + int(self.params["adrange"])
-        adend = min(adend, int(self.params["admax"]))
+        adend = adstart + self.params["adrange"]
+        adend = min(adend, self.params["admax"])
         outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
@@ -747,11 +748,10 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("lpba", "lpbr")
+            ("alim", "rlim")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
-        'nprimes': (r'Renumbering struct: nprimes=(\d+)', int),
-        'minindex': (r'Renumbering struct: min_index=(\d+)', int)
+        'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
     }
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -841,8 +841,6 @@ class FreeRelTask(Task):
     def get_nprimes(self):
         return self.state["nprimes"]
 
-    def get_minindex(self):
-        return self.state["minindex"]
 
 class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
@@ -865,17 +863,17 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        qmin = int(self.params.get("qmin", 0))
+        qmin = self.params.get("qmin", 0)
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            self.state["qnext"] = int(self.params.get("qmin", self.params["alim"]))
+            self.state["qnext"] = self.params.get("qmin", self.params["alim"])
         
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("maxwu", "10")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
-                                        int(self.params.get("rels_wanted", 0)))
+                                        self.params.get("rels_wanted", 0))
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
@@ -887,7 +885,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         
         while self.state["rels_found"] < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
-            q1 = q0 + int(self.params["qrange"])
+            q1 = q0 + self.params["qrange"]
             outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -971,7 +969,7 @@ class Duplicates1Task(Task, FilesCreator):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**int(self.params["nslices_log"])
+        self.nr_slices = 2**self.params["nslices_log"]
         self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
@@ -1151,12 +1149,12 @@ class Duplicates2Task(Task, FilesCreator):
         return (cadoprograms.Duplicates2,)
     @property
     def paramnames(self):
-        return super().paramnames + ("nslices_log",)
+        return super().paramnames + ("nslices_log", "alim", "rlim")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**int(self.params["nslices_log"])
+        self.nr_slices = 2**self.params["nslices_log"]
         self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
@@ -1289,7 +1287,7 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames
+        return super().paramnames + ("alim", "rlim")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1303,7 +1301,8 @@ class PurgeTask(Task):
         
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-        minindex = self.send_request(Request.GET_RENUMBER_MININDEX)
+        minlim = min(self.params["alim"], self.params["rlim"])
+        minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         if not nunique:
             raise Exception("No unique relation count received")
@@ -1522,9 +1521,9 @@ class MergeTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        skip = int(self.progparams[0].get("skip", 32))
-        self.progparams[0].setdefault("skip", str(skip))
-        self.progparams[0].setdefault("keep", str(skip + 128))
+        skip = self.progparams[0].get("skip", 32)
+        self.progparams[0].setdefault("skip", skip)
+        self.progparams[0].setdefault("keep", skip + 128)
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1717,7 +1716,7 @@ class SqrtTask(Task):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
-        self.add_factor(int(self.params["N"]))
+        self.add_factor(self.params["N"])
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1896,7 +1895,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    int(self.params["nrclients"]))
+                    self.params["nrclients"])
 
     @staticmethod
     def make_multiplicity(names, multi):
@@ -2080,7 +2079,6 @@ class Request(Message):
     GET_RENUMBER_FILENAME = object()
     GET_FREEREL_RELCOUNT = object()
     GET_RENUMBER_PRIMECOUNT = object()
-    GET_RENUMBER_MININDEX = object()
     GET_SIEVER_FILENAMES = object()
     GET_SIEVER_RELCOUNT = object()
     GET_DUP1_FILENAMES = object()
@@ -2120,7 +2118,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         # Set up WU server
         serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
-        serverport = int(serverparams.get("port", 8001))
+        serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
         self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
@@ -2185,7 +2183,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                              parameters = parameters, 
                              path_prefix = parampath)
         
-        # Defines an order on tasks in which tasks that want to run should be run
+        # Defines an order on tasks in which tasks that want to run should be
+        # run
         self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
@@ -2202,7 +2201,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
             Request.GET_FREEREL_RELCOUNT: self.freerel.get_nrels,
             Request.GET_RENUMBER_PRIMECOUNT: self.freerel.get_nprimes,
-            Request.GET_RENUMBER_MININDEX: self.freerel.get_minindex,
             Request.GET_SIEVER_FILENAMES: self.sieving.get_output_filenames,
             Request.GET_SIEVER_RELCOUNT: self.sieving.get_nrels,
             Request.GET_DUP1_FILENAMES: self.dup1.get_output_filenames,
@@ -2213,7 +2211,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
-            Request.GET_DEPENDENCY_FILENAME: self.linalg.get_dependency_filename,
+            Request.GET_DEPENDENCY_FILENAME: \
+                self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
@@ -2239,7 +2238,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def run_next_task(self):
         for task in self.tasks:
             if task in self.tasks_that_want_to_run:
-                # self.logger.info("Next task that wants to run: %s", task.title)
+                # self.logger.info("Next task that wants to run: %s",
+                #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
                 task.run()
                 return True

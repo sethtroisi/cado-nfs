@@ -35,7 +35,12 @@ tasks.linalg.mn = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
 
+# This reads hostnames from the file specified in the shell environment 
+# variable $OAR_NODE_FILE
 slaves.catrel.hostnames = @${OAR_NODE_FILE}
+# nrclients defines how many clients to start on each unique hostname
+# Note that the total number of threads in use will be nrclient * nrthreads
+slaves.catrel.nrclients = 8
 slaves.catrel.scriptpath = ${HOME}/git/cado-nfs/scripts/cadofactor
 slaves.catrel.downloadretry = 10
 slaves.catrel.ssh.execbin = oarsh

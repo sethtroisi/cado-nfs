@@ -69,15 +69,15 @@
  * that can contain, for instance, the low bits of p.
  */
 
-/* define PRIME_HINT to uint32_t to use 32-bit prime hints */
-#define PRIME_HINT uint16_t
+/* define prime_hint_t to uint32_t to use 32-bit prime hints */
+typedef uint16_t prime_hint_t;
 
 typedef struct {
 #ifdef CADO_LITTLE_ENDIAN
     uint16_t x;
-    PRIME_HINT p;
+    prime_hint_t p;
 #else
-    PRIME_HINT p;
+    prime_hint_t p;
     uint16_t x;
 #endif
 } bucket_update_t;
@@ -430,19 +430,19 @@ rewind_primes_by_1 (bucket_primes_t *BP)
 /* Remove some redundancy form the stored primes, e.g., remove the low
    bit which is always 1, or if BUCKET_ENCODE3 is set store floor(p/6)*2 and 
    the LSB telling whether it was 1 or 5 (mod 6). */
-static inline PRIME_HINT
+static inline prime_hint_t
 bucket_encode_prime (uint32_t p)
 {
 #ifdef BUCKET_ENCODE3
-  return (PRIME_HINT)(p/3U); /* This happens to work: if p=6k+1, we store
+  return (prime_hint_t)(p/3U); /* This happens to work: if p=6k+1, we store
                                 2k; if p=6k+5, we store 2k+1 */
 #else
-  return (PRIME_HINT)(p/2U);
+  return (prime_hint_t)(p/2U);
 #endif
 }
 
 static inline uint32_t
-bucket_decode_prime (PRIME_HINT h)
+bucket_decode_prime (prime_hint_t h)
 {
 #ifdef BUCKET_ENCODE3
   return 3U * (uint32_t) h + 1U + ((uint32_t) h & 1U);

@@ -72,6 +72,23 @@ int is_supported_compression_format(const char * s)
     return 0;
 }
 
+void get_suffix_from_filename (char *s, char const **sfx)
+{
+  const struct suffix_handler * r = supported_compression_formats;
+  for( ; r->suffix ; r++)
+  {
+    if (has_suffix(s, r->suffix))
+    {
+      *sfx = r->suffix;
+      return;
+    }
+  }
+
+  /* If we arrive here, it's because "" is not among the suffixes */
+  abort();
+  return;
+}
+
 /* Put the directory of cado in rep_cado */
 void set_rep_cado (const char *argv0, char *rep_cado) {
   char *p, *q;
