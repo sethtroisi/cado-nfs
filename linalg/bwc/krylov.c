@@ -12,7 +12,6 @@
 #include "misc.h"
 #include "bw-common-mpi.h"
 #include "async.h"
-// #include "rusage.h"
 #include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"

@@ -82,7 +82,6 @@ set(bwc_base_sources
     xvectors.c
     bw-common.c
     bw-common-mpi.c
-    rusage.c
     async.c
     rolling.c
     matmul.c

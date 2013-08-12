@@ -377,8 +377,6 @@ linalg/bwc/random_matrix.c
 linalg/bwc/raw_matrix_u32.h
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h
-linalg/bwc/rusage.c
-linalg/bwc/rusage.h
 linalg/bwc/secure.c
 linalg/bwc/short_matmul.c
 linalg/bwc/split.c

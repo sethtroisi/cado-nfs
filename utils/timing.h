@@ -15,6 +15,7 @@ extern double seconds_thread (void);
 extern void seconds_user_sys (double *);
 extern double wct_seconds (void);
 extern void print_timing_and_memory (double);
+extern void thread_seconds_user_sys(double *);
 
 #ifdef __cplusplus
 }
