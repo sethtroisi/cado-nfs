@@ -1028,7 +1028,7 @@ class Duplicates1Task(Task, FilesCreator):
                 # read the original siever output file, thus avoiding 
                 # having another copy of the data on disk. Since we don't
                 # process the file at all, we need to ask the Siever task
-                # for the relation count in this file
+                # for the relation count in the files
                 # TODO: pass a list or generator expression in the request
                 # here?
                 total = 0
@@ -1036,9 +1036,9 @@ class Duplicates1Task(Task, FilesCreator):
                     count = self.send_request(Request.GET_SIEVER_RELCOUNT, f)
                     total += count
                 self.slice_relcounts["0"] += total
-                update = dict(zip(newfiles, [self.nr_slices] * len(newfiles)))
+                update = dict.fromkeys(newfiles, self.nr_slices)
                 self.already_split_input.update(update)
-                update = dict(zip(newfiles, [0] * len(newfiles)))
+                update = dict.fromkeys(newfiles, 0)
                 self.add_output_files(update)
             else:
                 outfilenames = {}
@@ -1083,7 +1083,7 @@ class Duplicates1Task(Task, FilesCreator):
                 current_counts = self.parse_slice_counts(stderr)
                 for idx in range(self.nr_slices):
                     self.slice_relcounts[str(idx)] += current_counts[idx]
-                update = dict(zip(newfiles, [self.nr_slices] * len(newfiles)))
+                update = dict.fromkeys(newfiles, self.nr_slices)
                 self.already_split_input.update(update)
                 self.add_output_files(outfilenames)
         totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
@@ -1910,7 +1910,7 @@ class StartClientsTask(Task):
         """
         result = []
         # Use OrderedDict to get unique names, preserving order
-        for name in OrderedDict(zip(names, [None] * len(names))):
+        for name in OrderedDict.fromkeys(names, None):
             result.extend([name] * multi)
         return result
 
