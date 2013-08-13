@@ -325,3 +325,28 @@ int mkdir_with_parents(const char * dir, int fatal)
     free(tmp);
     return 0;
 }
+
+char * path_resolve(const char * progname, char * resolved)
+{
+  char * path = getenv("PATH");
+  if (!path) return 0;
+  char * next_path;
+  for( ; *path ; path = next_path) {
+      next_path = strchr(path, ':');
+      if (next_path) {
+          *next_path++ = '\0';
+      } else {
+          next_path = path + strlen(path);
+      }
+      char dummy2[PATH_MAX];
+#ifdef EXECUTABLE_SUFFIX
+      snprintf(dummy2, PATH_MAX, "%s/%s" EXECUTABLE_SUFFIX, path, progname);
+#else
+      snprintf(dummy2, PATH_MAX, "%s/%s", path, progname);
+#endif
+      if (realpath(dummy2, resolved))
+          return resolved;
+  }
+  return NULL;
+}
+

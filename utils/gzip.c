@@ -11,6 +11,7 @@
 #include "macros.h"
 #include "gzip.h"
 #include "misc.h"
+#include "cado_popen.h"
 
 struct suffix_handler {
     const char * suffix;
@@ -281,7 +282,7 @@ fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, 
           /* apparently popen() under Linux does not accept the 'b' modifier */
             char pmode[2] = "x";
             pmode[0] = mode[0];
-            f = popen(command, pmode);
+            f = cado_popen(command, pmode);
             if (p_pipeflag) *p_pipeflag = 1;
 #ifdef F_SETPIPE_SZxxx
                 /* increase the pipe capacity (2^16 by default), thanks to
@@ -309,7 +310,7 @@ fopen_maybe_compressed (const char * name, const char * mode)
 
 
 void
-fclose_maybe_compressed (FILE * f, const char * name)
+fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
 {
     const struct suffix_handler * r = supported_compression_formats;
 
@@ -319,8 +320,12 @@ fclose_maybe_compressed (FILE * f, const char * name)
          * may exist and not the other */
         ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
         if (r->pfmt_in || r->pfmt_out) {
-            pclose(f);
+            if (rr)
+                cado_pclose2(f, rr);
+            else
+                cado_pclose(f);
         } else {
+            if (rr) memset(rr, 0, sizeof(*rr));
             fclose(f);
         }
         return;
@@ -328,4 +333,10 @@ fclose_maybe_compressed (FILE * f, const char * name)
     /* If we arrive here, it's because "" is not among the suffixes */
     abort();
     return;
+}
+
+void
+fclose_maybe_compressed (FILE * f, const char * name)
+{
+    fclose_maybe_compressed2(f, name, NULL);
 }

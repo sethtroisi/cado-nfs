@@ -7,7 +7,7 @@ set (sources
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c
+        ringbuf.c cado_popen.c
 )
 
 # the utils library is used by some shared objects (prominently the

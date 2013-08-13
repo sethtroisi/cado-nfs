@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <libgen.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "preempt.h"
 
 #ifdef __cplusplus
@@ -55,6 +57,9 @@ extern FILE * fopen_maybe_compressed(const char * name, const char * mode);
  * fopen() was used. The file stream is then closed with pclose() or
  * fclose() accordingly.  */
 extern void fclose_maybe_compressed(FILE *, const char * name);
+
+/* Same, but recovers the time taken by the underlying process */
+extern void fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * r);
 
 #ifdef __cplusplus
 }
