@@ -396,34 +396,61 @@ class Parameters(object):
         return "\n".join(r)
 
 
-class UseParameters(object, metaclass=abc.ABCMeta):
+class UseParameters(metaclass=abc.ABCMeta):
+    """ Mix-in class for objects that take parameters from the parameter file
+    """
     @abc.abstractproperty
     def name(self):
+        """ The name of this object's node in the parameter tree """
         pass
     
-    def __init__(self, parameters, path_prefix):
-        self.parameters = parameters
-        self.path_prefix = path_prefix
-        self.parampath = path_prefix + [self.name]
-    
-    def myparams(self, keys, extrapath = None):
-        path = self.parampath
-        if not extrapath is None:
-            if isinstance(extrapath, str):
-                path += [extrapath]
+    class MyParameters():
+        """ Class that encapsules info on this node's parameters
+        
+        It stores a reference to the parameter dictionaries and info on this
+        node's path and node name in the parameter tree.
+        It can be initialised from a MyParameters or a Parameters instance;
+        in the latter case the path prefix defaults to empty. If path_prefix
+        is specified, it is always used as the path prefix.
+        """
+        def __init__(self, parent, name, path_prefix = None):
+            self.name = name
+            if isinstance(parent, UseParameters.MyParameters):
+                self.parameters = parent.parameters
+                self.path_prefix = parent.get_param_path()
             else:
-                path += extrapath
-        return self.parameters.myparams(keys, path)
+                # Assume parent is a Parameters instance
+                self.parameters = parent
+                self.path_prefix = []
+            if not path_prefix is None:
+                self.path_prefix = path_prefix
+        
+        def get_param_path(self):
+            return self.path_prefix + [self.name]
+        
+        def get_parameters(self):
+            return self.parameters
+        
+        def myparams(self, keys, extrapath = None):
+            path = self.get_param_path()
+            if not extrapath is None:
+                if isinstance(extrapath, str):
+                    path += [extrapath]
+                else:
+                    path += extrapath
+            return self.parameters.myparams(keys, path)
+        
+        def __str__(self):
+            return "MyParameters: name = %s, prefix = %s" % (
+                self.name, self.path_prefix)
+        
     
-    def get_param_prefix(self):
-        return self.path_prefix
-    
-    def get_param_path(self):
-        return self.parampath
-    
-    def get_parameters(self):
-        return self.parameters
-    
+    def __init__(self, *args, parameters, path_prefix = None,
+                 **kwargs):
+        self.parameters = UseParameters.MyParameters(parameters, self.name,
+                                                     path_prefix)
+        super().__init__(*args, **kwargs)
+
 
 DEFAULTS = (
     "logfile = cado.log",
