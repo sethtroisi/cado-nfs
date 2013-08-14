@@ -11,6 +11,25 @@
 #include <emmintrin.h>
 #endif
 
+/* Thresholds of the kilo-buckets & mega-buckets.
+ * When the number of buckets I*J/BUCKET_REGION = I*(I/2)/65536
+ * is less to THRESHOLD_K_BUCKETS, an one pass sort algorithm is
+ * used to computed the buckets : function fill_in_buckets.
+ * When the number is >= THRESHOLD_K_BUCKETS and < THRESHOLD_M_BUCKETS,
+ * a two passes sort algorithm is used : function fill_in_k_buckets.
+ * When the number is >= THRESHOLD_M_BUCKETS, a three pass sort
+ * algorithm is used : function fill_in_m_buckets.
+ * These threshold are very critical for the performance.
+ * The "good" values for THRESHOLD_K_BUCKETS are between 4 096 & 32 768;
+ * the "good" values for THRESHOLD_M_BUCKETS are between 32 768 &
+ * 1 048 576 (it's possible the 3 passes sort is always slower than
+ * the 2 passes).
+ * Mandatory: THRESHOLD_K_BUCKETS >= 16;
+ * THRESHOLD_M_BUCKETS >= (THRESHOLD_K_BUCKETS) * 4.
+*/
+#define THRESHOLD_K_BUCKETS 32768   /* 512 */
+#define THRESHOLD_M_BUCKETS 1048576 /* 131072 */
+
 /* Number of bits used to estimate the norms
  * This should be large enough: it must be such that all norms are
  * smaller than 2^NORM_BITS.
@@ -109,15 +128,15 @@
  */
 #define xxxUNSIEVE_NOT_COPRIME  /* see las-unsieve.c */
 
-/* default bucket region: 2^16 = 64K == close to L1 size, but this is the
-   (current) largest possible value, otherwise bucket.h must be changed,
-   since it stores positions on 16 bits */
+/* Optimal bucket region: 2^16 = 64K == close to L1 size.
+   MANDATORY. Don't change this value.
+*/
 #ifndef LOG_BUCKET_REGION
 #define LOG_BUCKET_REGION 16
 #endif
 
-#if LOG_BUCKET_REGION > 16
-#error "Too large LOG_BUCKET_REGION, please adapt bucket.h first"
+#if LOG_BUCKET_REGION != 16
+#error "LOG_BUCKET_REGION must (mandatory!) be equal to 16."
 #endif
 
 /* This flag is necessary to support I=16. Otherwise it's a useless

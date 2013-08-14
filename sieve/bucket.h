@@ -7,6 +7,7 @@
 
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
+#include <string.h>
 #include "cado-endian.h"
 
 // #define SAFE_BUCKETS
@@ -14,8 +15,6 @@
 #include <stdio.h>
 #include "portability.h"
 #endif
-
-#define ONE_BIG_MALLOC  1  // single big malloc for all the bucket_start[i]
 
 /* If BUCKET_ENCODE3 is defined, we encode primes p as
    (floor(p/6) * 2 + p%3-1) % 2^16,
@@ -72,16 +71,26 @@
 /* define prime_hint_t to uint32_t to use 32-bit prime hints */
 typedef uint16_t prime_hint_t;
 
+/* THE ORDER IS MANDATORY! */
 typedef struct {
 #ifdef CADO_LITTLE_ENDIAN
-    uint16_t x;
     prime_hint_t p;
+    uint16_t x;
 #else
-    prime_hint_t p;
     uint16_t x;
+    prime_hint_t p;
 #endif
 } bucket_update_t;
 
+/* Same than previous, but 1 byte more for indirection.
+   Careful: this byte is the first in little endian, and
+   the last byte in big endian.
+   k = kilo bucket */
+typedef uint8_t k_bucket_update_t[1 + sizeof(bucket_update_t)];
+
+/* Same than previous, but with 2 bytes (double 1 byte indirections).
+   m = mega bucket */
+typedef uint8_t m_bucket_update_t[2 + sizeof(bucket_update_t)];
 
 /* After a bucket is purged, it is usually not possible to reconstruct
  * the primes from their lower 16 bits any more, so purging does the 
@@ -100,43 +109,50 @@ typedef struct {
 static const bucket_update_t LAST_UPDATE = {0,0};
 
 /******** Bucket array typedef **************/
+typedef struct {
+  bucket_update_t ** bucket_write;    // Contains pointers to first empty
+                                      // location in each bucket
+  bucket_update_t ** bucket_start;    // Contains pointers to beginning of
+                                      // buckets
+  bucket_update_t ** bucket_read;     // Contains pointers to first unread
+                                      // location in each bucket
+  unsigned char    * logp_val;        // Each time logp changes, the
+                                      // new value is added here (including
+                                      // the initial logp value used) 
+  bucket_update_t ** logp_idx;        // For each logp value there are
+                                      // n_bucket pointers, each pointer
+                                      // tells where in the corresponding 
+                                      // bucket that logp values starts 
+                                      // being used
+  uint32_t           n_bucket;        // Number of buckets
+  uint64_t           bucket_size;     // The allocated size of one bucket.
+  size_t             size_b_align;    // (sizeof(void *) * n_bucket + 63) & ~63
+                                      // to align bucket_* on cache line
+  unsigned int       nr_logp;         // Number of different logp
+  unsigned int       size_arr_logp;   // size array logp_val & idx. 256 by default
+                                      // or less if the number of different logp
+                                      // is known
+} bucket_array_t;
 
-/*
- * A bucket is just an array of bucket_update_t.
- * We are going to manipulate several of them simultaneously when
- * sieving. In order to reduce the cache pressure, we are going to
- * introduce another structure that handles an array of bucket
- * efficiently.
- *
- * When doing a (long) sequence of pushes, only the bucket_write array is
- * used: pointer to it should be in a register, and the set of pointer
- * will probably fit in one page-size (please align!), so that the pressure
- * on the TLB is minimal. The other parts should not really be used
- * during this memory intensive part.
- * (except if one want to check for overflow, which can probably be
- * avoided by having large enough bucket_size).
- */
+/* Same than previous, for kilo & mega buckets in fill_in_k/m_buckets.
+   These buckets are used only for 2 and 3 sort passes buckets */ 
+typedef struct {
+  k_bucket_update_t ** bucket_write;
+  k_bucket_update_t ** bucket_start;
+  k_bucket_update_t ** logp_idx;
+  uint32_t             n_bucket;
+  uint64_t             bucket_size;
+  size_t               size_b_align;
+} k_bucket_array_t;
 
 typedef struct {
-    bucket_update_t ** bucket_start;    // Contains pointers to beginning of
-                                        // buckets.
-    bucket_update_t ** bucket_write;    // Contains pointers to first empty
-                                        // location in each bucket.
-    bucket_update_t ** bucket_read;     // Contains pointers to first unread
-                                        // location in each bucket.
-    unsigned char   * logp_val;         // Each time logp changes, the
-                                        // new value is added here (including
-                                        // the initial logp value used) 
-    bucket_update_t ** logp_idx;        // For each logp value there are
-                                        // n_bucket pointers, each pointer
-                                        // tells where in the corresponding 
-                                        // bucket that logp values starts 
-                                        // being used
-    int bucket_size;                    // The allocated size of one bucket.
-    int n_bucket;                       // Number of buckets.
-    int nr_logp;
-    unsigned char last_logp;
-} bucket_array_t;
+  m_bucket_update_t ** bucket_write;
+  m_bucket_update_t ** bucket_start;
+  m_bucket_update_t ** logp_idx;
+  uint32_t             n_bucket;
+  uint64_t             bucket_size;
+  size_t               size_b_align;
+} m_bucket_array_t;
 
 /* What does the logp entry do?
    In order to avoid having to store the logp value inside the 
@@ -177,30 +193,6 @@ typedef struct {
   int size;
 } bucket_primes_t;
 
-
-
-/*
- * Notes for future improvements:
- *
- * 1) Double buckets.
- * If we can not afford enough buckets (limited by TLB) and we don't want
- * to make the bucket_region larger than L1, we can have a double bucket
- * system: A first level of buckets, that correspond to very large
- * bucket_regions, and a second level of bucket regions fitting in L1.
- * We collect all updates in the buckets of the first level, then we
- * process one first level bucket at a time, copying its updates to the
- * corresponding second level buckets and processing each second level
- * bucket by applying its updates to the L1 bucket_regions.
- *
- * 2) Buffered buckets.
- * One can have a buffer that contains one cache-line for each bucket.
- * Once a cache-line is full of updates, it can be moved in a
- * write-combined (non-temporal) way to the memory location of the
- * bucket. Details are left to the reader ;-)
- *
- */
-
-
 /******** MAIN FUNCTIONS **************/
 
 #ifdef __cplusplus
@@ -208,13 +200,24 @@ extern "C" {
 #endif
 
 
-/* Returns an allocated array of <n_bucket> buckets each having size
- * <bucket_size>. Must be freed with clear_bucket_array().
- * It also put pointers in position ready for read/writes.
+/* Set an allocated array of <n_bucket> buckets each having size
+ * max_bucket_fill_ratio * BUCKET_REGION.
+ * Must be freed with clear_bucket_array().
+ * 3 functions with same arguments. The first uses only BA, the
+ * second uses BA & kBA, the 3th uses all.
  */
-extern bucket_array_t init_bucket_array(const int n_bucket, const int bucket_size);
+extern void init_bucket_array  (const uint32_t n_bucket, const uint64_t size_bucket,
+				const unsigned char diff_logp, bucket_array_t *BA,
+				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
+extern void init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket,
+				const unsigned char diff_logp, bucket_array_t *BA,
+				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
+extern void init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket,
+				const unsigned char diff_logp, bucket_array_t *BA,
+				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
 
-extern void clear_bucket_array(bucket_array_t BA);
+/* Only one (clever) function to clear the buckets. */
+extern void clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA);
 
 /* Main writing function: appends update to bucket number i.
  * If SAFE_BUCKETS is not #defined, then there is no checking that there is
@@ -256,12 +259,6 @@ rewind_bucket_by_1 (bucket_array_t BA, const int i);
 static inline bucket_update_t
 get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
 
-/* Call this to mark the current write position in the buckets the start
-   of this logp value. */
-static inline void
-bucket_new_logp(bucket_array_t *BA, const unsigned char logp);
-
-
 /* Functions for handling entries with x and complete prime p */
 
 extern bucket_primes_t init_bucket_primes (const int size);
@@ -302,43 +299,6 @@ push_bucket_update(bucket_array_t BA, const int i,
         BA.bucket_write[i]--;
     }
 #endif
-}
-
-static inline void
-bucket_new_logp (bucket_array_t *BA, const unsigned char logp)
-{
-  int i, j;
-
-  if (BA->last_logp == logp)
-    {
-      /* printf ("bucket_new_logp called unnecessarily\n"); */
-      return;
-    }
-
-  /* printf ("bucket_new_logp: need new logp, old logp = %u, "
-          "old nr_logp = %d, new logp = %u\n",
-          (unsigned) BA->last_logp, BA->nr_logp, (unsigned) logp); */
-  BA->last_logp = logp;
-  j = BA->nr_logp;
-  BA->nr_logp++;
-  BA->logp_val = (unsigned char *) realloc (BA->logp_val, 
-                 BA->nr_logp * sizeof (unsigned char));
-  if (BA->logp_val == NULL)
-    {
-      fprintf (stderr, "Error, cannot reallocate memory\n");
-      exit (EXIT_FAILURE);
-    }
-  BA->logp_idx = (bucket_update_t **) 
-                 realloc (BA->logp_idx, BA->nr_logp * BA->n_bucket * 
-                          sizeof (bucket_update_t *));
-  if (BA->logp_idx == NULL)
-    {
-      fprintf (stderr, "Error, cannot reallocate memory\n");
-      exit (EXIT_FAILURE);
-    }
-  BA->logp_val[j] = logp;
-  for (i = 0; i < BA->n_bucket; ++i)
-    BA->logp_idx[j * BA->n_bucket + i] = BA->bucket_write[i];
 }
 
 static inline void
