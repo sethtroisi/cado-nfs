@@ -95,6 +95,13 @@ double cof_calls[2][256] = {{0},{0}};
 double cof_fails[2][256] = {{0},{0}};
 /* }}} */
 
+/* For memcpy in fill_in_k_buckets & fill_in_m_buckets.
+   When you have to move data which the lenght is a
+   static const uint8_t N <= 16 bytes,
+   it's faster to move optimal_move[N] with a memcpy
+   (if you could do this, of course) :
+   it's done with only one or two instructions */
+static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
@@ -470,7 +477,12 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
        for a given special-q if J is smaller) */
     si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
-    fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
+    if (si->nb_buckets < THRESHOLD_K_BUCKETS)
+      fprintf(las->output, "# nb_buckets = %u, one pass for the buckets sort\n", si->nb_buckets);
+    else if (si->nb_buckets < THRESHOLD_M_BUCKETS)
+      fprintf(las->output, "# nb_buckets = %u, two passes for the buckets sort\n", si->nb_buckets);
+    else
+      fprintf(las->output, "# nb_buckets = %u, three passes for the buckets sort\n", si->nb_buckets);
 
     sieve_info_init_unsieve_data(si);
     mpz_init(si->doing->p);
@@ -1452,13 +1464,15 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
 /* {{{ thread-related defines */
 /* All of this exists _for each thread_ */
 struct thread_side_data_s {
-    bucket_array_t BA;
-    factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
-    // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-
-    /* For small sieve */
-    int * ssdpos;
-    int * rsdpos;
+  m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
+  k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
+  bucket_array_t BA;    /* Always used */
+  factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
+  // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+  
+  /* For small sieve */
+  int * ssdpos;
+  int * rsdpos;
 };
 typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
@@ -1476,10 +1490,21 @@ typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 /* }}} */
 
-/* {{{ fill_in_buckets */
+/**************************************************************************
+ * Global DEFINEs for fill_in_buckets, fill_in_k_buckets, fill_in_m_buckets 
+ **************************************************************************/
+#ifdef __x86_64
+#define ALIGNED_MEDIUM_MEMCPY(D,S,C) do {				\
+    size_t d = ((size_t) (D)), s = ((size_t) (S));			\
+    uint32_t c = (uint32_t) ((C) >> 3);					\
+    __asm__ __volatile__ ("cld\nrep movsq\n":"+D"(d),"+S"(s),"+c"(c));	\
+  } while (0)
+#else
+#define ALIGNED_MEDIUM_MEMCPY(D,S,C) memcpy(D,S,C)
+#endif
 
 #ifdef SKIP_GCD3
-#define FILL_BUCKET_SKIP_GCD3()					\
+#define FILL_BUCKET_SKIP_GCD3()				\
   && (!is_divisible_3_u32 (i + I) ||			\
       !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
 #else
@@ -1487,60 +1512,40 @@ typedef const struct thread_data_s * thread_data_srcptr;
 #endif
 
 #ifdef TRACE_K								
-#define FILL_BUCKET_TRACE_K()							\
-  do {									\
-  if (trace_on_spot_x(x)) {						\
-    WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);				\
-    WHERE_AM_I_UPDATE(w, x, x & maskbucket);				\
+#define FILL_BUCKET_TRACE_K(X) do {					\
+  if (trace_on_spot_x(X)) {						\
+    WHERE_AM_I_UPDATE(w, N, (X) >> 16);					\
+    WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
     fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",		\
-	     (unsigned int) (x & maskbucket), logp, p, sidenames[side],	\
-	     (unsigned int) (x >> shiftbucket));			\
+	     (unsigned int) (uint16_t) (X), logp, p, sidenames[side],	\
+	     (unsigned int) ((X) >> 16));				\
     ASSERT(test_divisible(w));						\
   } while(0)
 #else
-#define FILL_BUCKET_TRACE_K()
+#define FILL_BUCKET_TRACE_K(X)
 #endif
-
-#if LOG_BUCKET_REGION == 16			
-#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) x; } while (0)
-#else									
-#define FILL_BUCKET_CX() do { ((bucket_update_t *)pu)->x = (uint16_t) (x & maskbucket); } while (0)
-#endif						
 
 #ifdef HAVE_SSE2							
-#define FILL_BUCKET_PREFETCH_PU() do { _mm_prefetch((char *)pu, _MM_HINT_T0); } while (0)
+#define FILL_BUCKET_PREFETCH(PT) do {				\
+    _mm_prefetch((char *)(PT), _MM_HINT_T0);			\
+  } while (0)
 #else
-#define FILL_BUCKET_PREFETCH_PU()
+#define FILL_BUCKET_PREFETCH(PT)
 #endif
 
-#define FILL_BUCKET_INC_X() do {						\
+#define FILL_BUCKET_INC_X() do {					\
     if (i >= bound1) x += inc_a;					\
     if (i < bound0)  x += inc_c;					\
   } while (0)
+/************************************************************************/
 
-#define FILL_BUCKET() do {							\
-    unsigned int i = x & maskI;						\
-    if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
-	       FILL_BUCKET_SKIP_GCD3()						\
-	       )) {							\
-      bucket_update_t **ppu, *pu;					\
-      ppu = &(BA.bucket_write[x >> shiftbucket]);			\
-      pu = *ppu;							\
-      FILL_BUCKET_TRACE_K();							\
-      FILL_BUCKET_CX();								\
-      ((bucket_update_t *)pu)->p = bep;					\
-      *ppu = ++pu;							\
-      FILL_BUCKET_PREFETCH_PU();						\
-    }									\
-    FILL_BUCKET_INC_X();							\
-  } while (0)
-
+/* {{{ */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
-  bucket_array_t BA = th->sides[side]->BA;  /* local copy */
+  bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
   // Loop over all primes in the factor base.
   //
   // Note that dispatch_fb already arranged so that all the primes
@@ -1550,27 +1555,22 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   
   fb_iterator t;
   fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
     unsigned char logp = t->fb->plog;
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
-    
     /* Write new set of pointers if the logp value changed */
-    bucket_new_logp (&BA, logp);
-    
+    if (UNLIKELY(last_logp != logp)) {
+      ALIGNED_MEDIUM_MEMCPY((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
+      BA.logp_val[BA.nr_logp++] = last_logp = logp;
+    }
     /* If we sieve for special-q's smaller than the factor
        base bound, the prime p might equal the special-q prime q. */
-    if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
-      continue;
+    if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
+    fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-    fbprime_t r, R;
-    
-    R = fb_iterator_get_r(t);
-    r = fb_root_in_qlattice(p, R, t->fb->invp, si);
-    
-#define maskbucket (BUCKET_REGION - 1)
-#define shiftbucket LOG_BUCKET_REGION
 #ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
@@ -1579,80 +1579,55 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
     const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
 
-    // TODO: should be line sieved in the non-bucket phase?
-    // Or should we have a bucket line siever?
-    if (UNLIKELY(!r))
-      {
-	/* If r == 0 (mod p), this prime hits for i == 0 (mod p),
-	   but since p > I, this implies i = 0 or i > I. We don't
-	   sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
-	   only need to sieve j = 1 */
-	/* x = j*I + (i + I/2) = I + I/2 */
-	bucket_update_t update;
-	uint32_t x = si->I + (si->I >> 1);
-	update.x = (uint16_t) (x & maskbucket);
-	update.p = bucket_encode_prime (p);
-	WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-	WHERE_AM_I_UPDATE(w, x, update.x);
-	ASSERT(test_divisible(w)); 
-	push_bucket_update(BA, x >> shiftbucket, update);
-#ifdef TRACE_K
-	if (trace_on_spot_x(x))
-	  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-		   (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-#endif
+    /* Special cases */
+    if (UNLIKELY((!r) || (r >= p))) {
+      if (r > p) /* should only happen for lattice-sieved prime powers,
+		    which is not possible currently since maxbits < I */
 	continue;
-      }
-    if (UNLIKELY(r >= p))
-      {
-	if (r > p) /* should only happen for lattice-sieved prime powers,
-		      which is not possible currently since maxbits < I */
-	  continue;
-	/* now r == p */
-	/* r == p means root at infinity, which hits for
-	   j == 0 (mod p). Since q > I > J, this implies j = 0
-	   or j > J. This means we sieve only (i,j) = (1,0) here.
-	   Since I < BUCKET_REGION, this always goes in bucket 0.
-	   FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
-	   but which of these two (if any) do we sieve? */
-	bucket_update_t update;
-	update.x = (uint16_t) ((si->I >> 1) + 1);
-	update.p = bucket_encode_prime (p);
-	WHERE_AM_I_UPDATE(w, N, 0);
-	WHERE_AM_I_UPDATE(w, x, update.x);
-	ASSERT(test_divisible(w));
-	push_bucket_update(BA, 0, update);
-#ifdef TRACE_K
-	if (trace_on_spot_x(update.x))
-	  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-		   (unsigned int) update.x, logp, p, sidenames[side], 0);
-#endif
-	continue;
-      }
-    
-    /* If working with congruence classes, once the loop on the
-     * parity goes at the level above, this initialization
-     * should in fact either be done for each congruence class,
-     * or saved for later use within the factor base structure.
-     */
+      /* r == p or r == 0.
+	 1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
+	 this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
+	 gcd(a,b), for i = 0 we only need to sieve j = 1. 
+	 So, x = j*I + (i + I/2) = I + I/2.
+	 2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
+	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
+	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
+	 (if any) do we sieve? */
+      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      prime_hint_t prime = bucket_encode_prime (p);
+      /*****************************************************************/
+#define FILL_BUCKET_HEART() do {					\
+	bucket_update_t **pbut = BA.bucket_write + (x >> 16);		\
+	bucket_update_t *but = *pbut;					\
+	FILL_BUCKET_TRACE_K(x);						\
+	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
+	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
+	but->p = prime;							\
+	but->x = (uint16_t) x;						\
+	*pbut = ++but;							\
+	FILL_BUCKET_PREFETCH(but);					\
+      } while (0)
+      /*****************************************************************/
+      FILL_BUCKET_HEART();
+      continue;
+    }
+    /* If working with congruence classes, once the loop on the parity goes at the level
+       above, this initialization should in fact either be done for each congruence class,
+       or saved for later use within the factor base structure. */
     plattice_info_t pli;
-    if (UNLIKELY(!reduce_plattice(&pli, p, r, si)))
-      {
-	pthread_mutex_lock(&io_mutex);
-	fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-		 "returned 0 for p = " FBPRIME_FORMAT ", r = "
-		 FBPRIME_FORMAT "\n", p, r);
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+      pthread_mutex_lock(&io_mutex);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
+	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
 	pthread_mutex_unlock(&io_mutex);
 	continue; /* Simply don't consider that (p,r) for now.
 		     FIXME: can we find the locations to sieve? */
       }
+    /* OK, all special cases are done. */
 
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
-
 #if !MOD2_CLASSES_BS
-    const uint64_t				\
-      inc_a = plattice_a(&pli, si),
-      inc_c = plattice_c(&pli, si);
+    const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
     uint64_t x = 1ULL << (si->conf->logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
@@ -1662,12 +1637,21 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       // The sieving point (0,0) is I/2 in x-coordinate
       uint64_t x = plattice_starting_vector(&pli, si, parity);
       if (x >= IJ) continue;
-      const uint64_t				\
-	inc_a = plattice_a(&pli, si),
-	inc_c = plattice_c(&pli, si);
+      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
 #endif
-      const prime_hint_t bep = (prime_hint_t) bucket_encode_prime (p);
-      do { 
+      const prime_hint_t prime = (prime_hint_t) bucket_encode_prime (p);
+      
+      /* Now, do the real work: the filling of the buckets */
+      do {
+	/***************************************************************/
+#define FILL_BUCKET() do {						\
+	  unsigned int i = x & maskI;					\
+	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
+		     FILL_BUCKET_SKIP_GCD3()				\
+		     )) FILL_BUCKET_HEART();				\
+	  FILL_BUCKET_INC_X();						\
+	} while (0)
+	/***************************************************************/
 	FILL_BUCKET(); if (x >= IJ) break;
 	FILL_BUCKET(); if (x >= IJ) break;
 	FILL_BUCKET(); if (x >= IJ) break;
@@ -1677,7 +1661,506 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     }
 #endif
   }
-  /* Write back BA so the nr_logp etc get copied to caller */
+  th->sides[side]->BA = BA;
+}
+
+/* Same than fill_in_buckets, but with 2 passes (k_buckets & buckets). */
+void
+fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+{
+  WHERE_AM_I_UPDATE(w, side, side);
+  sieve_info_srcptr si = th->si;
+  bucket_array_t BA = th->sides[side]->BA;      /* local copy, gain a register + use stack */
+  k_bucket_array_t kBA = th->sides[side]->kBA;
+  // Loop over all primes in the factor base.
+  //
+  // Note that dispatch_fb already arranged so that all the primes
+  // which appear here are >= bucket_thresh and <= pmax (the latter
+  // being for the moment unconditionally set to FBPRIME_MAX by the
+  // caller of dispatch_fb).
+  
+  fb_iterator t;
+  fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  unsigned char last_logp = 0;
+  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+    fbprime_t p = t->fb->p;
+    unsigned char logp = t->fb->plog;
+    ASSERT_ALWAYS (p & 1);
+    WHERE_AM_I_UPDATE(w, p, p);
+    
+    /* Write new set of pointers if the logp value changed */
+    if (UNLIKELY(last_logp != logp)) {
+      ALIGNED_MEDIUM_MEMCPY((uint8_t *)kBA.logp_idx + kBA.size_b_align * BA.nr_logp, kBA.bucket_write, kBA.size_b_align);
+      BA.logp_val[BA.nr_logp++] = last_logp = logp;
+    }
+    
+    /* If we sieve for special-q's smaller than the factor
+       base bound, the prime p might equal the special-q prime q. */
+    if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
+    fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+    
+#ifdef SKIP_GCD3
+    const uint32_t I = si->I;
+    const unsigned int logI = si->conf->logI;
+#endif
+    const uint32_t maskI = si->I-1;
+    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+
+    /* Special cases */
+    if (UNLIKELY((!r) || (r >= p))) {
+      if (r > p) /* should only happen for lattice-sieved prime powers,
+		    which is not possible currently since maxbits < I */
+	continue;
+      /* r == p or r == 0.
+	 1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
+	 this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
+	 gcd(a,b), for i = 0 we only need to sieve j = 1. 
+	 So, x = j*I + (i + I/2) = I + I/2.
+	 2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
+	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
+	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
+	 (if any) do we sieve? */
+      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      prime_hint_t prime = bucket_encode_prime(p);
+      /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
+	 is need because the last byte of x (always 0 because x <<= 8) must
+	 be overwritten by the first byte of prime.
+	 2. memcpy is good because it's its job to know if it's possible to
+	 write more than 1 byte at an odd adress (ODD_ADDRESS_IO_INT).
+	 gcc does a optimal job with memcpy & a little + constant length.
+      */
+      /**************************************************************************/
+#ifdef CADO_LITTLE_ENDIAN
+#define FILL_K_BUCKET_HEART() do {					\
+	k_bucket_update_t **pkbut = kBA.bucket_write + (x >> 24);	\
+	k_bucket_update_t *kbut = *pkbut;				\
+	FILL_BUCKET_TRACE_K(x);						\
+	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
+	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
+	memcpy(kbut, &prime, sizeof(prime_hint_t));			\
+	uint32_t i = (uint32_t) x;					\
+	memcpy((uint8_t *) kbut + sizeof(prime_hint_t), &i, 4);		\
+	*pkbut = ++kbut;						\
+	FILL_BUCKET_PREFETCH(kbut);					\
+      } while (0)
+#else
+#define FILL_K_BUCKET_HEART() do {					\
+	k_bucket_update_t **pkbut = kBA.bucket_write + (x >> 24);	\
+	volatile k_bucket_update_t *kbut = *pkbut;			\
+	FILL_BUCKET_TRACE_K(x);						\
+	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
+	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
+	uint32_t i = (uint32_t) x << 8;					\
+	memcpy(kbut, &i, 4);						\
+	memcpy((uint8_t *) kbut + 3, &prime, sizeof(prime_hint_t));	\
+	*pkbut = ++kbut;						\
+	FILL_BUCKET_PREFETCH(kbut);					\
+      } while(0)
+#endif
+      /**************************************************************************/
+      FILL_K_BUCKET_HEART();
+      continue;
+    }
+    /* If working with congruence classes, once the loop on the parity goes at the level
+       above, this initialization should in fact either be done for each congruence class,
+       or saved for later use within the factor base structure. */
+    plattice_info_t pli;
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+      pthread_mutex_lock(&io_mutex);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
+	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
+	pthread_mutex_unlock(&io_mutex);
+	continue; /* Simply don't consider that (p,r) for now.
+		     FIXME: can we find the locations to sieve? */
+      }
+    /* OK, all special cases are done. */
+
+    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+#if !MOD2_CLASSES_BS
+    const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint32_t i = x;
+    FILL_BUCKET_INC_X();
+    if (x >= IJ) continue;
+#else
+    for(unsigned int parity = 1 ; parity < 4; parity++) {
+      // The sieving point (0,0) is I/2 in x-coordinate
+      uint64_t x = plattice_starting_vector(&pli, si, parity);
+      if (x >= IJ) continue;
+      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+#endif
+      const prime_hint_t prime = (prime_hint_t) bucket_encode_prime (p);
+      
+      /* Now, do the real work: the filling of the k-buckets */
+      do { 
+	/**********************************************************************/
+#define FILL_K_BUCKET() do {						\
+	  unsigned int i = x & maskI;					\
+	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
+		     FILL_BUCKET_SKIP_GCD3()				\
+		     )) FILL_K_BUCKET_HEART();				\
+	  FILL_BUCKET_INC_X();						\
+	} while (0)
+	/****************************************************************/
+	FILL_K_BUCKET(); if (x >= IJ) break;
+	FILL_K_BUCKET(); if (x >= IJ) break;
+	FILL_K_BUCKET(); if (x >= IJ) break;
+	FILL_K_BUCKET();
+      } while (x < IJ);
+#if MOD2_CLASSES_BS
+    }
+#endif
+  }
+  th->sides[side]->kBA = kBA;
+  
+  /* sort : 2nd pass; kBA -> BA */
+  bucket_update_t **pbw = BA.bucket_write;
+  ALIGNED_MEDIUM_MEMCPY(pbw, BA.bucket_start, BA.size_b_align);
+  for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
+    uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
+    /* First part: we rewrite 1->256 buckets, and in the same time,
+       we have to deal with the rewriting of logp_idx.
+       I use a block in these part to see the range of variables */
+    {
+      size_t lg = (size_t) BA.bucket_write + BA.size_b_align - (size_t) pbw;
+      if (LIKELY(lg > sizeof(bucket_update_t **) << 8)) lg = sizeof(bucket_update_t **) << 8;
+      bucket_update_t **pbl = BA.logp_idx + (kb << 8);
+      k_bucket_update_t **pkbl = kBA.logp_idx + kb;
+      uint8_t *kbl = (uint8_t *) *pkbl;
+      /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
+      for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
+	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
+	for (;
+	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
+	     kbs += sizeof(k_bucket_update_t)*12) {
+	  /*****************************************************************/
+#ifdef CADO_LITTLE_ENDIAN
+#define KBA_2_BA(A) do {						\
+	    bucket_update_t **pbut, *but;				\
+	    pbut = pbw + kbs[(A) + sizeof(bucket_update_t)];		\
+	    but = *pbut;						\
+	    memcpy(but, kbs + (A), optimal_move[sizeof(bucket_update_t)]); \
+	    *pbut = ++but;						\
+	  } while (0)
+#else
+#define KBA_2_BA(A) do {						\
+	    bucket_update_t **pbut, *but;				\
+	    pbut = pbw + kbs[A];					\
+	    but = *pbut;						\
+	    memcpy(but, kbs+(A)+1, optimal_move[sizeof(bucket_update_t)]); \
+	    *pbut = ++but;						\
+	  } while (0)
+#endif
+	  /*****************************************************************/
+	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
+	  KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	}
+	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+	/* OK, let's duplicate the current (at most) 256 pointers from
+	   BA.bucket_write in BA.logp_idx */
+	ALIGNED_MEDIUM_MEMCPY(pbl, pbw, lg);
+	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
+	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
+	kbl = (uint8_t *) *pkbl;
+      }
+    }
+    /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
+    const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
+    for (;
+	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
+	 kbs += sizeof(k_bucket_update_t)*12) {
+      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
+      KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
+      KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
+      KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
+      KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
+      KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+    }
+    for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+    pbw += 256;
+  }
+  th->sides[side]->BA = BA;
+}
+
+void
+fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+{
+  WHERE_AM_I_UPDATE(w, side, side);
+  sieve_info_srcptr si = th->si;
+  bucket_array_t BA = th->sides[side]->BA;  /* local copy; gain a register + use stack */
+  k_bucket_array_t kBA = th->sides[side]->kBA;
+  m_bucket_array_t mBA = th->sides[side]->mBA;
+  // Loop over all primes in the factor base.
+  //
+  // Note that dispatch_fb already arranged so that all the primes
+  // which appear here are >= bucket_thresh and <= pmax (the latter
+  // being for the moment unconditionally set to FBPRIME_MAX by the
+  // caller of dispatch_fb).
+  
+  fb_iterator t;
+  fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  unsigned char last_logp = 0;
+  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+    fbprime_t p = t->fb->p;
+    unsigned char logp = t->fb->plog;
+    ASSERT_ALWAYS (p & 1);
+    WHERE_AM_I_UPDATE(w, p, p);
+    
+    /* Write new set of pointers if the logp value changed */
+    if (UNLIKELY(last_logp != logp)) {
+      ALIGNED_MEDIUM_MEMCPY((uint8_t *)mBA.logp_idx + mBA.size_b_align * BA.nr_logp, mBA.bucket_write, mBA.size_b_align);
+      BA.logp_val[BA.nr_logp++] = last_logp = logp;
+    }
+    
+    /* If we sieve for special-q's smaller than the factor
+       base bound, the prime p might equal the special-q prime q. */
+    if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0)) continue;
+    fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+    
+#ifdef SKIP_GCD3
+    const uint32_t I = si->I;
+    const unsigned int logI = si->conf->logI;
+#endif
+    const uint32_t maskI = si->I-1;
+    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+
+    /* Special cases */
+    if (UNLIKELY((!r) || (r >= p))) {
+      if (r > p) /* should only happen for lattice-sieved prime powers,
+		    which is not possible currently since maxbits < I */
+	continue;
+      /* r == p or r == 0.
+	 1. If r == 0 (mod p), this prime hits for i == 0 (mod p), but since p > I,
+	 this implies i = 0 or i > I. We don't sieve i > I. Since gcd(i,j) |
+	 gcd(a,b), for i = 0 we only need to sieve j = 1. 
+	 So, x = j*I + (i + I/2) = I + I/2.
+	 2. r == p means root at infinity, which hits for j == 0 (mod p). Since q > I > J,
+	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
+	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
+	 (if any) do we sieve? */
+      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      prime_hint_t prime = bucket_encode_prime(p);
+      /* memcpy is good because it's its job to know if it's possible to
+	 write an int to all even addresses.
+	 gcc does a optimal job with memcpy & a little + constant length.
+      */
+      /**************************************************************************/
+#ifdef CADO_LITTLE_ENDIAN
+#define FILL_M_BUCKET_HEART() do {					\
+	m_bucket_update_t **pmbut = mBA.bucket_write + (x >> 32);	\
+	m_bucket_update_t *mbut = *pmbut;				\
+	FILL_BUCKET_TRACE_K(x);						\
+	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
+	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
+	memcpy(mbut, &prime, sizeof(prime_hint_t));			\
+	uint32_t i = (uint32_t) x;					\
+	memcpy((uint8_t *) mbut + sizeof(prime_hint_t), &i, 4);	\
+	*pmbut = ++mbut;						\
+	FILL_BUCKET_PREFETCH(mbut);					\
+      } while (0)
+#else
+#define FILL_M_BUCKET_HEART() do {					\
+	m_bucket_update_t **pmbut = mBA.bucket_write + (x >> 32);	\
+	m_bucket_update_t *mbut = *pmbut;				\
+	FILL_BUCKET_TRACE_K(x);						\
+	WHERE_AM_I_UPDATE(w, N, x >> 16);				\
+	WHERE_AM_I_UPDATE(w, x, (uint16_t) x);				\
+	uint32_t i = (uint32_t) x;					\
+	memcpy(mbut, &i, 4);						\
+	memcpy((uint8_t *) mbut + 4, &prime, sizeof(prime_hint_t));	\
+	*pmbut = ++mbut;						\
+	FILL_BUCKET_PREFETCH(mbut);					\
+      } while (0)
+#endif
+      /**************************************************************************/
+      FILL_M_BUCKET_HEART();
+      continue;
+    }
+    /* If working with congruence classes, once the loop on the parity goes at the level
+       above, this initialization should in fact either be done for each congruence class,
+       or saved for later use within the factor base structure. */
+    plattice_info_t pli;
+    if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
+      pthread_mutex_lock(&io_mutex);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
+	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
+	pthread_mutex_unlock(&io_mutex);
+	continue; /* Simply don't consider that (p,r) for now.
+		     FIXME: can we find the locations to sieve? */
+      }
+    /* OK, all special cases are done. */
+
+    const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
+#if !MOD2_CLASSES_BS
+    const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint32_t i = x;
+    FILL_BUCKET_INC_X();
+    if (x >= IJ) continue;
+#else
+    for(unsigned int parity = 1 ; parity < 4; parity++) {
+      // The sieving point (0,0) is I/2 in x-coordinate
+      uint64_t x = plattice_starting_vector(&pli, si, parity);
+      if (x >= IJ) continue;
+      const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
+#endif
+      const prime_hint_t prime = bucket_encode_prime (p);
+
+      /* Now, do the real work: the filling of the m-buckets */
+      do {
+	/***************************************************************/
+#define FILL_M_BUCKET() do {						\
+	  unsigned int i = x & maskI;					\
+	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
+		     FILL_BUCKET_SKIP_GCD3()				\
+		     )) FILL_M_BUCKET_HEART();				\
+	  FILL_BUCKET_INC_X();						\
+	} while (0)
+	/***************************************************************/
+	FILL_M_BUCKET(); if (x >= IJ) break;
+	FILL_M_BUCKET(); if (x >= IJ) break;
+	FILL_M_BUCKET(); if (x >= IJ) break;
+	FILL_M_BUCKET();
+      } while (x < IJ);
+#if MOD2_CLASSES_BS
+    }
+#endif
+  }
+  th->sides[side]->mBA = mBA;
+
+  /* sort : 2nd pass; mBA -> kBA */
+  k_bucket_update_t **pkbw = kBA.bucket_write;
+  ALIGNED_MEDIUM_MEMCPY (pkbw, kBA.bucket_start, kBA.size_b_align);
+  for (uint32_t mb = 0; mb < mBA.n_bucket; ++mb) {
+    uint8_t *mbs = (uint8_t *) (mBA.bucket_start[mb]);
+    /* First part: we rewrite 1->256 buckets, and in the same time,
+       we have to deal with the rewriting of logp_idx.
+       I use a block in these part to see the range of variables */
+    {
+      size_t lg = (size_t) kBA.bucket_write + kBA.size_b_align - (size_t) pkbw;
+      if (LIKELY(lg > sizeof(k_bucket_update_t **) << 8)) lg = sizeof(k_bucket_update_t **) << 8;
+      k_bucket_update_t **pkbl = kBA.logp_idx + (mb << 8);
+      m_bucket_update_t **pmbl = mBA.logp_idx + mb;
+      uint8_t *mbl = (uint8_t *) *pmbl;
+      /* There are BA.nr_logp duplicates of all mBA.bucket_write in mBA.logp_idx. */
+      for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
+	/* Ten mBA records in one time : it's the nearest of a cache line (60 bytes) */
+	for (;
+	     mbs +  sizeof(m_bucket_update_t)*10 <= mbl;
+	     mbs += sizeof(m_bucket_update_t)*10) {
+	  /*****************************************************************/
+#ifdef CADO_LITTLE_ENDIAN
+#define MBA_2_KBA(A) do {						\
+	    k_bucket_update_t **pkbut, *kbut;				\
+	    pkbut = pkbw + mbs[(A)+sizeof(k_bucket_update_t)];		\
+	    kbut = *pkbut;						\
+	    memcpy(kbut, mbs+(A), optimal_move[sizeof(k_bucket_update_t)]); \
+	    *pkbut = ++kbut;						\
+	  } while (0)
+#else
+#define MBA_2_KBA(A) do {						\
+	    k_bucket_update_t **pkbut, *kbut;				\
+	    pkbut = pkbw + mbs[A];					\
+	    kbut = *pkbut;						\
+	    memcpy(kbut, mbs+(A)+1, optimal_move[sizeof(k_bucket_update_t)]); \
+	    *pkbut = ++kbut;						\
+	  } while (0)
+#endif
+	  /*****************************************************************/
+	  MBA_2_KBA(0);	                          MBA_2_KBA(sizeof(m_bucket_update_t));
+	  MBA_2_KBA(sizeof(m_bucket_update_t)*2); MBA_2_KBA(sizeof(m_bucket_update_t)*3);
+	  MBA_2_KBA(sizeof(m_bucket_update_t)*4); MBA_2_KBA(sizeof(m_bucket_update_t)*5);
+	  MBA_2_KBA(sizeof(m_bucket_update_t)*6); MBA_2_KBA(sizeof(m_bucket_update_t)*7);
+	  MBA_2_KBA(sizeof(m_bucket_update_t)*8); MBA_2_KBA(sizeof(m_bucket_update_t)*9);
+	}
+	for (; mbs < mbl; mbs += sizeof(m_bucket_update_t)) MBA_2_KBA(0);
+	/* OK, let's duplicate the current (at most) 256 pointers in
+	   kBA.bucket_write in kBA.logp_idx */
+	ALIGNED_MEDIUM_MEMCPY(pkbl, pkbw, lg);
+	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
+	pmbl = (m_bucket_update_t **) ((size_t) pmbl + mBA.size_b_align);
+	mbl = (uint8_t *) *pmbl;
+      }
+    }
+    /* 2nd part: kBA.logp_idx is rewritten. We finish the rewrite of the current bucket */
+    const uint8_t *mbw = (uint8_t *) (mBA.bucket_write[mb]);
+    for (;
+	 mbs +  sizeof(m_bucket_update_t)*10 <= mbw;
+	 mbs += sizeof(m_bucket_update_t)*10) {
+      MBA_2_KBA(0);
+      MBA_2_KBA(sizeof(m_bucket_update_t));
+      MBA_2_KBA(sizeof(m_bucket_update_t)*2);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*3);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*4);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*5);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*6);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*7);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*8);
+      MBA_2_KBA(sizeof(m_bucket_update_t)*9);
+    }
+    for (; mbs < mbw; mbs += sizeof(m_bucket_update_t)) MBA_2_KBA(0);
+    pkbw += 256;
+  }
+  th->sides[side]->kBA = kBA;
+
+  /* sort : 3th pass; kBA -> BA */
+  bucket_update_t **pbw = BA.bucket_write;
+  ALIGNED_MEDIUM_MEMCPY (pbw, BA.bucket_start, BA.size_b_align);
+  for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
+    uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
+    /* First part: we rewrite 1->256 buckets, and in the same time,
+       we have to deal with the rewriting of logp_idx.
+       I use a block in these part to see the range of variables */
+    {
+      size_t lg = (size_t) BA.bucket_write + BA.size_b_align - (size_t) pbw;
+      if (LIKELY(lg > sizeof(bucket_update_t **) << 8)) lg = sizeof(bucket_update_t **) << 8;
+      bucket_update_t **pbl = BA.logp_idx + (kb << 8);
+      k_bucket_update_t **pkbl = kBA.logp_idx + kb;
+      uint8_t *kbl = (uint8_t *) *pkbl;
+      /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
+      for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
+	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
+	for (;
+	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
+	     kbs += sizeof(k_bucket_update_t)*12) {
+	  /* See the define of KBA_2_BA in fill_in_k_buckets */
+	  KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
+	  KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
+	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+	}
+	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+	/* OK, let's duplicate the current (at most) 256 pointers from
+	   BA.bucket_write in BA.logp_idx */
+	ALIGNED_MEDIUM_MEMCPY(pbl, pbw, lg);
+	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
+	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
+	kbl = (uint8_t *) *pkbl;
+      }
+    }
+    /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
+    const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
+    for (;
+	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
+	 kbs += sizeof(k_bucket_update_t)*12) {
+      KBA_2_BA(0);                            KBA_2_BA(sizeof(k_bucket_update_t));
+      KBA_2_BA(sizeof(k_bucket_update_t)*2);  KBA_2_BA(sizeof(k_bucket_update_t)*3);
+      KBA_2_BA(sizeof(k_bucket_update_t)*4);  KBA_2_BA(sizeof(k_bucket_update_t)*5);
+      KBA_2_BA(sizeof(k_bucket_update_t)*6);  KBA_2_BA(sizeof(k_bucket_update_t)*7);
+      KBA_2_BA(sizeof(k_bucket_update_t)*8);  KBA_2_BA(sizeof(k_bucket_update_t)*9);
+      KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
+    }
+    for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+    pbw += 256;
+  }
   th->sides[side]->BA = BA;
 }
 
@@ -1685,8 +2168,20 @@ void * fill_in_buckets_both(thread_data_ptr th)
 {
     where_am_I w;
     WHERE_AM_I_UPDATE(w, si, th->si);
-    fill_in_buckets(th, ALGEBRAIC_SIDE, w);
-    fill_in_buckets(th, RATIONAL_SIDE, w);
+
+    if (th->sides[ALGEBRAIC_SIDE]->BA.n_bucket < THRESHOLD_K_BUCKETS)
+      fill_in_buckets(th, ALGEBRAIC_SIDE, w);
+    else if (th->sides[ALGEBRAIC_SIDE]->BA.n_bucket < THRESHOLD_M_BUCKETS)
+      fill_in_k_buckets(th, ALGEBRAIC_SIDE, w);
+    else
+      fill_in_m_buckets(th, ALGEBRAIC_SIDE, w);
+
+    if (th->sides[RATIONAL_SIDE]->BA.n_bucket < THRESHOLD_K_BUCKETS)
+      fill_in_buckets(th, RATIONAL_SIDE, w);
+    else if (th->sides[RATIONAL_SIDE]->BA.n_bucket < THRESHOLD_M_BUCKETS)
+      fill_in_k_buckets(th, RATIONAL_SIDE, w);
+    else
+      fill_in_m_buckets(th, RATIONAL_SIDE, w);
     return NULL;
 }
 /* }}} */
@@ -1732,6 +2227,7 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
 /* backtrace display can't work for static symbols (see backtrace_symbols) */
 NOPROFILE_STATIC
 #endif
+
 void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
@@ -1741,14 +2237,14 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
   bucket_update_t *next_logp_change, *next_align, **pnlc, *read_ptr;
 
   read_ptr = BA.bucket_read[i];
-  pnlc = BA.logp_idx + i + BA.n_bucket;
+  pnlc = BA.logp_idx + i;
   next_logp_j = 0;
   WHERE_AM_I_UPDATE(w, p, 0);
   while (read_ptr < BA.bucket_write[i]) {
     logp = BA.logp_val[next_logp_j++];
     if (LIKELY(next_logp_j < (unsigned int) BA.nr_logp)) {
+      pnlc = (bucket_update_t **)((size_t) pnlc + BA.size_b_align);
       next_logp_change = *pnlc;
-      pnlc += BA.n_bucket;
     }
     else
       next_logp_change = BA.bucket_write[i];
@@ -1776,22 +2272,24 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
       x7 = ((uint64_t *) read_ptr)[7];
       read_ptr += 16;
       __asm__ __volatile__ (""); /* To be sure all x? are read together in one operation */
-      x = (uint16_t) (x0 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x0 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x1 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x1 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x2 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x2 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x3 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x3 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x4 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x4 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x5 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x5 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x6 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x6 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x7 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
-      x = (uint16_t) (x7 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+#ifdef CADO_LITTLE_ENDIAN
+#define INSERT_2_VALUES(X) do {						\
+	(X) >>= 16; x = (uint16_t) (X);					\
+	WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);	\
+	(X) >>= 32;							\
+	WHERE_AM_I_UPDATE(w, x, X); sieve_increase(S + (X), logp, w);	\
+      } while (0);
+#else
+#define INSERT_2_VALUES(X) do {						\
+	x = (uint16_t) (X);						\
+	WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);	\
+	(X) >>= 32; x = (uint16_t) (X);					\
+	WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);	\
+      } while (0);
+
+#endif
+      INSERT_2_VALUES(x0); INSERT_2_VALUES(x1); INSERT_2_VALUES(x2); INSERT_2_VALUES(x3);
+      INSERT_2_VALUES(x4); INSERT_2_VALUES(x5); INSERT_2_VALUES(x6); INSERT_2_VALUES(x7);
     }
     while (read_ptr < next_logp_change) {
       uint16_t x;
@@ -1801,7 +2299,6 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     }
   }
 }
-/* }}} */
 
 /* {{{ Trial division */
 typedef struct {
@@ -2700,35 +3197,36 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
   __m128i *S1i = (__m128i *) S1, *EndS1i = (__m128i *) EndS1, *S2i = (__m128i *) S2,
     z = _mm_setzero_si128();
   while (S1i < EndS1i) {
+    __m128i x0, x1, x2, x3;
     __asm__
-      ("prefetchnta 0x100(%0)\n"
-       "prefetcht0 0x100(%1)\n"
-       "movdqa (%0),%%xmm0\n"
-       "movdqa 0x10(%0),%%xmm1\n"
-       "movdqa 0x20(%0),%%xmm2\n"
-       "movdqa 0x30(%0),%%xmm3\n"
-       "psubusb (%1),%%xmm0\n"
-       "psubusb 0x10(%1),%%xmm1\n"
-       "psubusb 0x20(%1),%%xmm2\n"
-       "psubusb 0x30(%1),%%xmm3\n"
-       "movdqa %2,(%1)\n"
-       "movdqa %2,0x10(%1)\n"
-       "movdqa %2,0x20(%1)\n"
-       "movdqa %2,0x30(%1)\n"
-       "movdqa %%xmm0,(%0)\n"
-       "movdqa %%xmm1,0x10(%0)\n"
-       "movdqa %%xmm2,0x20(%0)\n"
-       "movdqa %%xmm3,0x30(%0)\n"
+      ("prefetcht0 0x1000(%0)\n"
+       "prefetcht0 0x1000(%1)\n"
+       "movdqa (%0),%2\n"
+       "movdqa 0x10(%0),%3\n"
+       "movdqa 0x20(%0),%4\n"
+       "movdqa 0x30(%0),%5\n"
+       "psubusb (%1),%2\n"
+       "psubusb 0x10(%1),%3\n"
+       "psubusb 0x20(%1),%4\n"
+       "psubusb 0x30(%1),%5\n"
+       "movdqa %6,(%1)\n"
+       "movdqa %6,0x10(%1)\n"
+       "movdqa %6,0x20(%1)\n"
+       "movdqa %6,0x30(%1)\n"
+       "movdqa %2,(%0)\n"
+       "movdqa %3,0x10(%0)\n"
+       "movdqa %4,0x20(%0)\n"
+       "movdqa %5,0x30(%0)\n"
        "add $0x40,%0\n"
        "add $0x40,%1\n"
-       : "+r"(S1i), "+r"(S2i) : "x"(z) : "%xmm0", "%xmm1", "%xmm2", "%xmm3");
+       : "+r"(S1i), "+r"(S2i), "=x"(x0), "=x"(x1), "=x"(x2), "=x"(x3) : "x"(z));
     /* I prefer use ASM than intrinsics to be sure each 4 instructions which
      * use exactly a cache line are together. I'm 99% sure it's not useful...
      * but it's more beautiful :-)
      */
     /*
     __m128i x0, x1, x2, x3;
-    _mm_prefetch(S1i + 16, _MM_HINT_NTA); _mm_prefetch(S2i + 16, _MM_HINT_T0);
+    _mm_prefetch(S1i + 16, _MM_HINT_T0); _mm_prefetch(S2i + 16, _MM_HINT_T0);
     x0 = _mm_load_si128(S1i + 0);         x1 = _mm_load_si128(S1i + 1);
     x2 = _mm_load_si128(S1i + 2);         x3 = _mm_load_si128(S1i + 3);
     x0 = _mm_subs_epu8(S2i[0], x0);       x1 = _mm_subs_epu8(S2i[1], x1);
@@ -2785,7 +3283,7 @@ void * process_bucket_region(thread_data_ptr th)
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
-    for (int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
+    for (unsigned int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
       {
         WHERE_AM_I_UPDATE(w, N, i);
 
@@ -2926,30 +3424,40 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
  *
  * Note also that we could consider having bucket_fill_ratio global.
  */
-static void thread_buckets_alloc(thread_data * thrs, int n)
+static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
 {
-    for (int i = 0; i < n ; ++i) {
-        thread_data_ptr th = thrs[i];
-        for(int side = 0 ; side < 2 ; side++) {
-            thread_side_data_ptr ts = th->sides[side];
-            int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
-	    int nb_buckets = thrs[i]->si->nb_buckets;
-	    int uniform = (pagesize() / nb_buckets) & (~1U);
-	    if (uniform < 2)
-	      bucket_limit |= 2;
-	    else
-	      bucket_limit += uniform; 
-            ts->BA = init_bucket_array(nb_buckets, bucket_limit);
-        }
+  ASSERT_ALWAYS(THRESHOLD_K_BUCKETS >= 16);
+  ASSERT_ALWAYS(THRESHOLD_M_BUCKETS >= (THRESHOLD_K_BUCKETS * 4));
+  for (unsigned int i = 0; i < n ; ++i) {
+    thread_data_ptr th = thrs[i];
+    for(unsigned int side = 0 ; side < 2 ; side++) {
+      thread_side_data_ptr ts = th->sides[side];
+      uint64_t bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
+      uint32_t nb_buckets = thrs[i]->si->nb_buckets;
+#if 0 /* Not useful; init_X_bucket_array has a special misalignment algorithm */
+      unsigned int uniform = (pagesize() / nb_buckets) & (~1U);
+      if (uniform < 2)
+	bucket_limit |= 2;
+      else
+	bucket_limit += uniform; 
+#endif 
+      if (nb_buckets < THRESHOLD_K_BUCKETS)
+	init_bucket_array   (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+      else if (nb_buckets < THRESHOLD_M_BUCKETS)
+	init_k_bucket_array (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+      else
+	init_m_bucket_array (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
     }
-}
-/*}}}*/
+  }
+}/*}}}*/
 
-static void thread_buckets_free(thread_data * thrs, int n)/*{{{*/
+static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
 {
-  for(int side = 0 ; side < 2 ; side++) {
-    for (int i = 0; i < n ; ++i) {
-      clear_bucket_array(thrs[i]->sides[side]->BA);
+  for(unsigned int side = 0 ; side < 2 ; ++side) {
+    for (unsigned int i = 0; i < n ; ++i) {
+      clear_bucket_array(&(thrs[i]->sides[side]->BA),
+			 &(thrs[i]->sides[side]->kBA),
+			 &(thrs[i]->sides[side]->mBA) );
     }
   }
 }/*}}}*/
@@ -3458,8 +3966,6 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_clear(si->sides[side]->ssd);
             small_sieve_clear(si->sides[side]->rsd);
         }
-
-
         qt0 = seconds() - qt0;
         las_report_accumulate_threads_and_display(las, si, report, thrs, qt0);
 
