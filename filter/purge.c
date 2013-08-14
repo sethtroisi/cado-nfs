@@ -930,7 +930,7 @@ int main(int argc, char **argv)
 
     /* second pass over relations in files */
     FILE *outfd[2] = { f_remaining, f_deleted };
-    info = process_rels(input_files, &thread_print, NULL, 0, outfd, rel_used,
+    info = process_rels(input_files, &thread_print, NULL, 0, (void **)outfd, rel_used,
 			STEP_PURGE_PASS2);
 
 

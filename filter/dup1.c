@@ -43,51 +43,75 @@
  * ourselves with smaller .ab files */
 static int only_ab = 0;
 
-static index_t nr_rels_tot[MAX_NSLICES], nr_rels_file[MAX_NSLICES];
-static int nslices_log = 1, nslices, do_slice[MAX_NSLICES];
+static index_t nr_rels_tot[MAX_NSLICES];
+static int nslices_log = 1, do_slice[MAX_NSLICES];
 
-static unsigned int log_max_nrels_per_files = DEFAULT_LOG_MAX_NRELS_PER_FILES;
 
-static unsigned int next_num_files = 0;
-static const char * prefix_files = NULL;
-static FILE * outfiles[MAX_NSLICES];
-static const char * outfmt;
-static const char * outdir;
-static char * filename[MAX_NSLICES];
+typedef struct {
+  const char *prefix, *suffix;
+  char *filename;
+  FILE *file;
+  const char *msg;
+  unsigned int next_idx;
+  size_t lines_per_file, lines_left;
+} split_output_iter_t;
 
-static void
-init_outfiles ()
+static split_output_iter_t *
+split_iter_init(const char *prefix, const char *suffix, 
+                const size_t lines_per_file, const char *msg)
 {
-  for(int i = 0 ; i < nslices ; i++)
-  {
-    int rc = asprintf(&filename[i],
-                      only_ab ? "%s/%d/%s.%04x.ab%s" : "%s/%d/%s.%04x%s",
-                      outdir, i, prefix_files, next_num_files, outfmt);
-
-    ASSERT_ALWAYS(rc >= 0);
-    outfiles[i] = fopen_maybe_compressed(filename[i], "w");
-    ASSERT_ALWAYS(outfiles[i] != NULL);
-    nr_rels_file[i] = 0;
-  }
+  split_output_iter_t *iter = malloc(sizeof(split_output_iter_t));
+  ASSERT_ALWAYS(iter != NULL);
+  iter->prefix = strdup(prefix);
+  iter->suffix = strdup(suffix);
+  iter->next_idx = 0;
+  iter->filename = NULL;
+  iter->file = NULL;
+  if (msg)
+    iter->msg = strdup(msg);
+  else
+    iter->msg = NULL;
+  ASSERT_ALWAYS(lines_per_file > 0);
+  iter->lines_per_file = lines_per_file;
+  iter->lines_left = 0; /* Force opening of file on next write */
+  return iter; 
 }
 
 static void
-close_outfiles ()
+split_iter_end(split_output_iter_t *iter)
 {
-  for(int i = 0 ; i < nslices ; i++)
-  {
-    fclose_maybe_compressed(outfiles[i], filename[i]);
-    free(filename[i]);
-    nr_rels_tot[i] += nr_rels_file[i];
-  }
+  if (iter->file != NULL)
+    fclose(iter->file);
+  free(iter->filename);
+  free((void *) iter->prefix);
+  free((void *) iter->suffix);
+  free((void *) iter->msg);
+  free(iter);
+}
+
+/* Closes the currently open file, if any, and opens the next one */
+void 
+split_iter_open_next_file(split_output_iter_t *iter)
+{
+  if (iter->file != NULL)
+    fclose_maybe_compressed(iter->file, iter->filename);
+  free (iter->filename);
+  int rc = asprintf(&(iter->filename), "%s%04x%s", 
+                    iter->prefix, iter->next_idx++, iter->suffix);
+  ASSERT_ALWAYS (rc >= 0);
+  if (iter->msg != NULL)
+    fprintf (stderr, "%s%s\n", iter->msg, iter->filename);
+  iter->file = fopen_maybe_compressed(iter->filename, "w");
+  iter->lines_left = iter->lines_per_file;
 }
 
 static void
-open_next_outfile ()
+split_iter_write_next(split_output_iter_t *iter, const char *line)
 {
-  close_outfiles ();
-  next_num_files++;
-  init_outfiles ();
+  if (iter->lines_left == 0)
+    split_iter_open_next_file(iter);
+  fputs (line, iter->file);
+  iter->lines_left--;
 }
 
 
@@ -139,12 +163,10 @@ thread_dup1(buf_arg_t *arg)
         *p = '\n';
       }
 
-      fputs (my_rel->line, arg->fd[slice]);
+      split_output_iter_t *iter = arg->fd[slice];
+      split_iter_write_next(iter, my_rel->line);
+      nr_rels_tot[slice]++;
     }
-
-    nr_rels_file[slice]++;
-    if (nr_rels_file[slice] >> log_max_nrels_per_files)
-      open_next_outfile();
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -204,17 +226,18 @@ main (int argc, char * argv[])
     fflush(stdout);
 
     param_list_parse_int(pl, "n", &nslices_log);
-    nslices = 1 << nslices_log;
-    outdir = param_list_lookup_string(pl, "out");
+    int nslices = 1 << nslices_log;
+    const char *outdir = param_list_lookup_string(pl, "out");
     int only_slice = -1;
     param_list_parse_int(pl, "only", &only_slice);
+    unsigned int log_max_nrels_per_files = DEFAULT_LOG_MAX_NRELS_PER_FILES;
     param_list_parse_uint(pl, "lognrelsoutfile", &log_max_nrels_per_files);
-    outfmt = param_list_lookup_string(pl, "outfmt");
+    const char *outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
     set_antebuffer_path (argv0, path_antebuffer);
-    prefix_files = param_list_lookup_string(pl, "prefix");
+    const char *prefix_files = param_list_lookup_string(pl, "prefix");
 
     if (param_list_warn_unused(pl)) {
         exit(1);
@@ -254,7 +277,24 @@ main (int argc, char * argv[])
       get_suffix_from_filename (files[0], &outfmt);
 
     memset (nr_rels_tot, 0, sizeof(index_t) * nslices);
-    init_outfiles();
+    split_output_iter_t **outiters;
+    outiters = malloc(sizeof(split_output_iter_t *) * nslices);
+    ASSERT_ALWAYS(outiters != NULL);
+    for(int i = 0 ; i < nslices ; i++)
+    {
+      char *prefix, *suffix, *msg;
+      int rc = asprintf(&prefix, "%s/%d/%s.",
+                        outdir, i, prefix_files);
+      ASSERT_ALWAYS(rc >= 0);
+      rc = asprintf(&suffix, only_ab ? ".ab%s" : "%s", outfmt);
+      ASSERT_ALWAYS(rc >= 0);
+      rc = asprintf (&msg, "# Opening output file for slice %d : ", i);
+      ASSERT_ALWAYS(rc >= 0);
+      outiters[i] = split_iter_init(prefix, suffix, 1UL<<log_max_nrels_per_files, msg);
+      free(prefix);
+      free(suffix);
+      free(msg);
+    }
 
     unsigned int step;
     if (ab_hexa)
@@ -262,9 +302,10 @@ main (int argc, char * argv[])
     else
       step = STEP_DUP1_DECIMAL;
     
-    process_rels (files, &thread_dup1, NULL, 0, outfiles, NULL, step);
+    process_rels (files, &thread_dup1, NULL, 0, (void **)outiters, NULL, step);
 
-    close_outfiles();
+    for(int i = 0 ; i < nslices ; i++)
+      split_iter_end(outiters[i]);
 
     for (int i = 0; i < nslices; i++)
         fprintf (stderr, "# slice %d received %" PRid " relations\n", i,

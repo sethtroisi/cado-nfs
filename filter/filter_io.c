@@ -444,7 +444,7 @@ relation_get_fast_hmin(preempt_t preempt_data, buf_rel_t * mybufrel,
 
 info_mat_t
 process_rels(char **fic, void *(*callback_fct) (buf_arg_t *),
-	     void *(*thread_root) (fr_t *), index_t min_index, FILE ** outfd,
+	     void *(*thread_root) (fr_t *), index_t min_index, void ** outfd,
 	     bit_vector_ptr rel_used, unsigned int step)
 {
     char *pcons, *pcons_old, *pcons_max, *p, **ff;

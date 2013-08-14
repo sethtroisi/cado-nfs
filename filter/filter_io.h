@@ -79,7 +79,7 @@ typedef struct {
   info_mat_t info;     // nb of rels & primes read; wiehgt of the matrix
   buf_rel_t *rels;     // buffer for rels for I/O
   index_t min_index;   // store only primes with index >= min_index
-  FILE **fd;           // output files
+  void **fd;            // handle(s) for output files (FILE *, iter structs, etc.)
   bit_vector_ptr rel_used; // If not all rels are processed
 } buf_arg_t;
 
@@ -118,7 +118,7 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
 void preempt_load (preempt_t);
 info_mat_t process_rels (char **, void* (*)(buf_arg_t *), void* (*)(fr_t *),
-                         index_t, FILE **, bit_vector_ptr, unsigned int);
+                         index_t, void **, bit_vector_ptr, unsigned int);
 void test_and_print_progress_now ();
 int is_finish ();
 void set_antebuffer_path (char *, const char *);
