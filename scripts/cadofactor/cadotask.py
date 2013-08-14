@@ -383,11 +383,9 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         wuname = self.make_wuname(identifier)
         process = cadocommand.Command(command)
         (rc, stdout, stderr) = process.wait()
-        result = [wuname, rc, stdout, stderr]
-        result.append(command.get_output_files())
+        result = [wuname, rc, stdout, stderr, command.get_output_files()]
         if isinstance(self, patterns.Observer):
-            message = Task.ResultInfo(wuname, rc, stdout, stderr,
-                                      command.get_output_files())
+            message = Task.ResultInfo(*result)
             # pylint: disable=E1101
             self.updateObserver(message)
         return result
@@ -993,12 +991,6 @@ class Duplicates1Task(Task, FilesCreator):
                 raise Exception("%s was previously split into %d parts, "
                                 "now %d parts requested",
                                 infile, parts, self.nr_slices)
-            for outfile in self.make_output_filenames(infile):
-                if not outfile in self.output_files:
-                    # TODO: How to recover from this error? Just re-split again?
-                    raise Exception("Output file %s missing in database for "
-                                    "supposedly split input file %s" %
-                                    (outfile, infile))
         
         # Check that previously split files do, in fact, exist.
         # FIXME: Do we want this? It may be slow when there are many files.
@@ -1041,19 +1033,15 @@ class Duplicates1Task(Task, FilesCreator):
                 update = dict.fromkeys(newfiles, 0)
                 self.add_output_files(update)
             else:
-                outfilenames = {}
-                for f in newfiles:
-                    outfilenames.update(self.make_output_filenames(f))
-                # TODO: how to recover from existing output files?
-                # Simply re-split? Check whether they all exist and assume 
-                # they are correct if they do?
-                self.check_files_exist(outfilenames.keys(), "output", 
-                                        shouldexist=False)
                 outputdir = self.workdir.make_dirname()
+                run_counter = self.state.get("run_counter", 0)
+                self.state["run_counter"] = run_counter + 1
+                prefix = "dup1.%s" % run_counter
                 (stdoutpath, stderrpath) = \
                         self.make_std_paths(cadoprograms.Duplicates1.name)
                 if len(newfiles) <= 10:
                     p = cadoprograms.Duplicates1(*newfiles,
+                                                 prefix=prefix,
                                                  out=outputdir,
                                                  stdout=str(stdoutpath),
                                                  stderr=str(stderrpath),
@@ -1075,11 +1063,13 @@ class Duplicates1Task(Task, FilesCreator):
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
                     # exception
+                assert stderr is None
+                with open(str(stderrpath), "r") as stderrfile:
+                    stderr = stderrfile.read()
+                outfilenames = self.parse_output_files(stderr)
+                self.logger.debug("Output file names: %s", outfilenames)
                 self.check_files_exist(outfilenames.keys(), "output", 
                                        shouldexist=True)
-                assert stderr is None
-                with open(str(stderrpath), "rb") as stderrfile:
-                    stderr = stderrfile.read()
                 current_counts = self.parse_slice_counts(stderr)
                 for idx in range(self.nr_slices):
                     self.slice_relcounts[str(idx)] += current_counts[idx]
@@ -1092,27 +1082,20 @@ class Duplicates1Task(Task, FilesCreator):
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return
     
-    def make_output_filenames(self, name):
-        """ Make a dictionary of the output file names corresponding to the
-        input file named "name" as keys, and the slice number as a string
-        as value. If nr_slices == 1, return the input file name, as in that
-        case we do not split at all - we just pass the original file to later
-        stages.
-        """
-        if self.nr_slices == 1:
-            return {name: 0}
-        else:
-            r = {}
-            basename = os.path.basename(name)
-            for i in range(0, self.nr_slices):
-                r[str(self.workdir.make_filename(basename, use_subdir=True, subdir=str(i)))] = i
-            return r
+    def parse_output_files(self, stderr):
+        files = {}
+        for line in stderr.splitlines():
+            match = re.match(r'# Opening output file for slice (\d+) : (.+)$', line)
+            if match:
+                (slicenr, filename) = match.groups()
+                files[filename] = int(slicenr)
+        return files
     
     def parse_slice_counts(self, stderr):
         """ Takes lines of text and looks for slice counts as printed by dup1
         """
         counts = [None] * self.nr_slices
-        for line in stderr.decode("ascii").splitlines():
+        for line in stderr.splitlines():
             match = re.match(r'# slice (\d+) received (\d+) relations', line)
             if match:
                 (slicenr, nrrels) = map(int, match.groups())
@@ -1228,7 +1211,7 @@ class Duplicates2Task(Task, FilesCreator):
     def parse_remaining(self, text):
         # "     112889 remaining relations"
         for line in text:
-            match = re.match(r'\s*(\d+) remaining relations', line)
+            match = re.match(r'At the end:\s*(\d+) remaining relations', line)
             if match:
                 remaining = int(match.group(1))
                 return remaining
@@ -2357,9 +2340,12 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             raise KeyError("Unknown Request key %s from sender %s" %
                            (key, sender))
         if value is None:
-            return self.request_map[key]()
+            result = self.request_map[key]()
         else:
-            return self.request_map[key](value)
+            result = self.request_map[key](value)
+        self.logger.message("Completed request from %s, key = %s, values = %s, result = %s",
+                            sender, Request.reverse_lookup(key), value, result)
+        return result
     
     def handle_message(self, message):
         if isinstance(message, Notification):
