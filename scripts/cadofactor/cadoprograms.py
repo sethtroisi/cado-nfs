@@ -593,12 +593,14 @@ class Duplicates1(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 *args: PositionalParameter(is_input_file = True), 
+                 *args: PositionalParameter(is_input_file = True),
+                 prefix : Parameter(),
                  out: Parameter() = None,
                  outfmt: Parameter() = None,
                  bzip: Toggle("bz") = None,
                  only: Parameter() = None,
                  nslices_log: Parameter("n") = None,
+                 lognrelsoutfile: Parameter() = None,
                  filelist: Parameter(is_input_file = True) = None,
                  basepath: Parameter() = None,
                  **kwargs):

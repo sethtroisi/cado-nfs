@@ -726,7 +726,7 @@ main (int argc, char *argv[])
     get_outfilename_from_infilename (*p, outfmt, outdir, &oname, &oname_tmp);
     outputfile = fopen_maybe_compressed(oname_tmp, "w");
     FILE *outfiles[2] = { outputfile, NULL};
-    info = process_rels (fic, &thread_dup2, &thread_root, 0, outfiles, NULL,
+    info = process_rels (fic, &thread_dup2, &thread_root, 0, (void **)outfiles, NULL,
                          STEP_DUP2_PASS2);
     ASSERT_ALWAYS (info.nrels == nrels);
 
