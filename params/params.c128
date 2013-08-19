@@ -20,7 +20,7 @@
 
 name=c128
 parallel=1           # do we use parallel computation?
-delay=60
+delay=300
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
@@ -29,8 +29,8 @@ machines=mach_desc      # file describing available computers for parallel
 # Polynomial selection
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
-polsel_delay=300             # time between two checks
+degree=5                 # degree of the algebraic polynomial
+polsel_delay=60          # time between two checks
 polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
