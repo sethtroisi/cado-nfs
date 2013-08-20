@@ -595,7 +595,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                 for line in polyfile:
                     # A "WARNING:" line can occur when a bad gcc version was
                     # used for compilation
-                    if re.match("WARNING", line):
+                    if re.match("# WARNING", line):
                         self.logger.warn("File %s contains: %s",
                                          outputfile, line.strip())
                     # If there is a "No polynomial found" message anywhere in
