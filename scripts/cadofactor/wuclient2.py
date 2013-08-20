@@ -132,7 +132,7 @@ def create_daemon(workdir = None, umask = None):
         # and inherits the parent's process group ID.  This step is required
         # to insure that the next call to os.setsid is successful.
         pid = os.fork()
-    except OSError, e:
+    except OSError as e:
         raise Exception, "%s [%d]" % (e.strerror, e.errno)
 
     if (pid == 0):	# The first child.
@@ -186,7 +186,7 @@ def create_daemon(workdir = None, umask = None):
             # no longer a session leader, preventing the daemon from ever
             # acquiring a controlling terminal.
             pid = os.fork()	# Fork a second child.
-        except OSError, e:
+        except OSError as e:
             raise Exception, "%s [%d]" % (e.strerror, e.errno)
 
         if (pid == 0):	# The second child.
