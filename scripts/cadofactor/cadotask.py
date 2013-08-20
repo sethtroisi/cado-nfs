@@ -1061,6 +1061,7 @@ class Duplicates1Task(Task, FilesCreator):
                     with open(str(filelistname), "w") as filelistfile:
                         filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
+                                                 prefix=prefix,
                                                  out=outputdir,
                                                  stdout=str(stdoutpath),
                                                  stderr=str(stderrpath),
