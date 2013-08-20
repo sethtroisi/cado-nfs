@@ -2339,9 +2339,13 @@ main (int argc, char *argv[])
     printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
 
   if (best_E == 0.0)
+    /* This line is required by the script: */
     printf ("No polynomial found, please increase the ad range or decrease P\n");
-  else
+  else {
+    /* This line is required by the script: */
+    printf ("# Best polynomial found:\n");
     print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
+  }
 
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);

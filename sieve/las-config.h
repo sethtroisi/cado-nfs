@@ -30,6 +30,13 @@
 #define THRESHOLD_K_BUCKETS 32768   /* 512 */
 #define THRESHOLD_M_BUCKETS 1048576 /* 131072 */
 
+#if THRESHOLD_K_BUCKETS < 16
+#error THRESHOLD_K_BUCKETS must be >= 16
+#endif
+#if THRESHOLD_M_BUCKETS < (THRESHOLD_K_BUCKETS * 4)
+#error THRESHOLD_M_BUCKETS must be >= (THRESHOLD_K_BUCKETS * 4)
+#endif
+
 /* Number of bits used to estimate the norms
  * This should be large enough: it must be such that all norms are
  * smaller than 2^NORM_BITS.

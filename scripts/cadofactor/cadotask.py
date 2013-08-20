@@ -83,11 +83,6 @@ class Polynomial(object):
         poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
-            # If there is a "No polynomial found" message anywhere in the
-            # file, we assume that there is no polynomial. This assumption
-            # will be false if, e.g., files get concatenated
-            if re.match(r"No polynomial found", line):
-                return
             # If this is a comment line telling the Murphy E value, 
             # extract the value and store it
             match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
@@ -287,14 +282,13 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
-        self.params = self.myparams(self.paramnames)
-        self.logger.debug("param_prefix = %s, get_param_path = %s", 
-                          self.get_param_prefix(), self.get_param_path())
+        self.params = self.parameters.myparams(self.paramnames)
+        self.logger.debug("self.parameters = %s", self.parameters)
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            progparams = self.myparams(prog.get_accepted_keys(), prog.name)
+            progparams = self.parameters.myparams(prog.get_accepted_keys(), prog.name)
             self.progparams.append(progparams)
         # FIXME: whether to init workdir or not should not be controlled via
         # presence of a "workdir" parameter, but by class definition
@@ -596,9 +590,24 @@ class PolyselTask(ClientServerTask, patterns.Observer):
     def parse_poly(self, outputfile):
         poly = None
         if outputfile:
-            with open(outputfile, "r") as f:
+            with open(outputfile, "r") as polyfile:
+                for line in polyfile:
+                    # A "WARNING:" line can occur when a bad gcc version was
+                    # used for compilation
+                    if re.match("# WARNING", line):
+                        self.logger.warn("File %s contains: %s",
+                                         outputfile, line.strip())
+                    # If there is a "No polynomial found" message anywhere in
+                    # the file, we assume that there is no polynomial. This
+                    # assumption will be false if, e.g., files get concatenated
+                    if re.match("No polynomial found", line):
+                        return False
+                    # If we get the "Best polynomial" marker, we stop reading
+                    # the file, and let Polynomial.__init__() parse the rest
+                    if re.match("# Best polynomial found:", line):
+                        break
                 try:
-                    poly = Polynomial(f)
+                    poly = Polynomial(polyfile)
                 except Exception as e:
                     self.logger.error("Invalid polyselect file %s: %s", 
                                       outputfile, e)
@@ -1051,6 +1060,7 @@ class Duplicates1Task(Task, FilesCreator):
                     with open(str(filelistname), "w") as filelistfile:
                         filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
+                                                 prefix=prefix,
                                                  out=outputdir,
                                                  stdout=str(stdoutpath),
                                                  stderr=str(stderrpath),
@@ -1966,8 +1976,7 @@ class StartClientsTask(Task):
         if host == "localhost":
             process = cadocommand.Command(wuclient)
         else:
-            process = cadocommand.RemoteCommand(wuclient, host, self.get_parameters(), 
-                                                self.get_param_prefix())
+            process = cadocommand.RemoteCommand(wuclient, host, self.parameters)
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
@@ -2018,8 +2027,7 @@ class StartClientsTask(Task):
         if host == "localhost":
             process = cadocommand.Command(kill)
         else:
-            process = cadocommand.RemoteCommand(kill, host, self.parameters,
-                                                self.get_param_prefix())
+            process = cadocommand.RemoteCommand(kill, host, self.parameters)
         return process.wait()
 
 class Message(object):
@@ -2089,7 +2097,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
         self.logger = logging.getLogger("Complete Factorization")
-        self.params = self.myparams(("name", "workdir"))
+        self.params = self.parameters.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
         self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
         self.chores = []
@@ -2099,7 +2107,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.wuar.create_tables()
         
         # Set up WU server
-        serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
+        serverparams = self.parameters.myparams(["address", "port"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
@@ -2109,61 +2117,61 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         
         # Init client lists
         self.clients = []
-        for (path, key) in self.get_parameters().find(['slaves'], 'hostnames'):
+        for (path, key) in self.parameters.get_parameters().find(['slaves'], 'hostnames'):
             self.clients.append(StartClientsTask(serveraddress, serverport, 
                                                  mediator = self,
                                                  db = db, 
-                                                 parameters = parameters, 
+                                                 parameters = self.parameters, 
                                                  path_prefix = path))
         
-        parampath = self.get_param_path()
+        parampath = self.parameters.get_param_path()
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
         self.polysel = PolyselTask(mediator = self,
                                    db = db, 
-                                   parameters = parameters, 
+                                   parameters = self.parameters, 
                                    path_prefix = parampath)
         self.fb = FactorBaseTask(mediator = self,
                                  db = db, 
-                                 parameters = parameters, 
+                                 parameters = self.parameters, 
                                  path_prefix = sievepath)
         self.freerel = FreeRelTask(mediator = self,
                                    db = db, 
-                                   parameters = parameters, 
+                                   parameters = self.parameters, 
                                    path_prefix = sievepath)
         self.sieving = SievingTask(mediator = self,
                                    db = db, 
-                                   parameters = parameters, 
+                                   parameters = self.parameters, 
                                    path_prefix = sievepath)
         self.dup1 = Duplicates1Task(mediator = self,
                                     db = db, 
-                                    parameters = parameters, 
+                                    parameters = self.parameters, 
                                     path_prefix = filterpath)
         self.dup2 = Duplicates2Task(mediator = self,
                                     db = db, 
-                                    parameters = parameters, 
+                                    parameters = self.parameters, 
                                     path_prefix = filterpath)
         self.purge = PurgeTask(mediator = self,
                                db = db, 
-                               parameters = parameters, 
+                               parameters = self.parameters, 
                                path_prefix = filterpath)
         self.merge = MergeTask(mediator = self,
                                db = db, 
-                               parameters = parameters, 
+                               parameters = self.parameters, 
                                path_prefix = filterpath)
         self.linalg = LinAlgTask(mediator = self,
                                  db = db, 
-                                 parameters = parameters, 
+                                 parameters = self.parameters, 
                                  path_prefix = linalgpath)
         self.characters = CharactersTask(mediator = self,
                                          db = db, 
-                                         parameters = parameters, 
+                                         parameters = self.parameters, 
                                          path_prefix = linalgpath)
         self.sqrt = SqrtTask(mediator = self,
                              db = db, 
-                             parameters = parameters, 
+                             parameters = self.parameters, 
                              path_prefix = parampath)
         
         # Defines an order on tasks in which tasks that want to run should be
