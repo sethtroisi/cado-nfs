@@ -110,6 +110,17 @@ static inline int clzl(unsigned long x)
 #endif
 #endif  /* HAVE_clzl */
 
+/* Best X86 medium memcpy with pointers & size length already cache
+   lines aligned on modern X86, so dst/src/lg & 0x3F = 0 */
+static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
+#ifdef __x86_64
+  size_t lg_8bytes = lg >> 3;
+  __asm__ __volatile__ ("cld\nrep movsq\n":"+D"(dst),"+S"(src),"+c"(lg_8bytes));
+#else
+  memcpy(dst,src,lg);
+#endif
+}
+
 #ifndef HAVE_ctzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
 #define ctzl(x)         __builtin_ctzl(x)

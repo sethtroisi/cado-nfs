@@ -881,14 +881,14 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
     int seen = 1;
     seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "rlim",    &(sc->sides[0]->lim));
-    seen &= param_list_parse_int   (pl, "lpbr",    &(sc->sides[0]->lpb));
-    seen &= param_list_parse_int   (pl, "mfbr",    &(sc->sides[0]->mfb));
-    seen &= param_list_parse_double(pl, "rlambda", &(sc->sides[0]->lambda));
-    seen &= param_list_parse_ulong (pl, "alim",    &(sc->sides[1]->lim));
-    seen &= param_list_parse_int   (pl, "lpba",    &(sc->sides[1]->lpb));
-    seen &= param_list_parse_int   (pl, "mfba",    &(sc->sides[1]->mfb));
-    seen &= param_list_parse_double(pl, "alambda", &(sc->sides[1]->lambda));
+    seen &= param_list_parse_ulong (pl, "rlim",    &(sc->sides[RATIONAL_SIDE]->lim));
+    seen &= param_list_parse_int   (pl, "lpbr",    &(sc->sides[RATIONAL_SIDE]->lpb));
+    seen &= param_list_parse_int   (pl, "mfbr",    &(sc->sides[RATIONAL_SIDE]->mfb));
+    seen &= param_list_parse_double(pl, "rlambda", &(sc->sides[RATIONAL_SIDE]->lambda));
+    seen &= param_list_parse_ulong (pl, "alim",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
+    seen &= param_list_parse_int   (pl, "lpba",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
+    seen &= param_list_parse_int   (pl, "mfba",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+    seen &= param_list_parse_double(pl, "alambda", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
     if (!seen) {
         fprintf(stderr, "Error: options -I, -rlim, -lpbr, -mfbr, -rlambda,"
                 " -alim, -lpba, -mfba, -alambda are mandatory.\n");
@@ -1493,16 +1493,6 @@ typedef const struct thread_data_s * thread_data_srcptr;
 /**************************************************************************
  * Global DEFINEs for fill_in_buckets, fill_in_k_buckets, fill_in_m_buckets 
  **************************************************************************/
-#ifdef __x86_64
-#define ALIGNED_MEDIUM_MEMCPY(D,S,C) do {				\
-    size_t d = ((size_t) (D)), s = ((size_t) (S));			\
-    uint32_t c = (uint32_t) ((C) >> 3);					\
-    __asm__ __volatile__ ("cld\nrep movsq\n":"+D"(d),"+S"(s),"+c"(c));	\
-  } while (0)
-#else
-#define ALIGNED_MEDIUM_MEMCPY(D,S,C) memcpy(D,S,C)
-#endif
-
 #ifdef SKIP_GCD3
 #define FILL_BUCKET_SKIP_GCD3()				\
   && (!is_divisible_3_u32 (i + I) ||			\
@@ -1563,7 +1553,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     WHERE_AM_I_UPDATE(w, p, p);
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
-      ALIGNED_MEDIUM_MEMCPY((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
+      aligned_medium_memcpy((uint8_t *)BA.logp_idx + BA.size_b_align * BA.nr_logp, BA.bucket_write, BA.size_b_align);
       BA.logp_val[BA.nr_logp++] = last_logp = logp;
     }
     /* If we sieve for special-q's smaller than the factor
@@ -1690,7 +1680,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
-      ALIGNED_MEDIUM_MEMCPY((uint8_t *)kBA.logp_idx + kBA.size_b_align * BA.nr_logp, kBA.bucket_write, kBA.size_b_align);
+      aligned_medium_memcpy((uint8_t *)kBA.logp_idx + kBA.size_b_align * BA.nr_logp, kBA.bucket_write, kBA.size_b_align);
       BA.logp_val[BA.nr_logp++] = last_logp = logp;
     }
     
@@ -1816,7 +1806,6 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   
   /* sort : 2nd pass; kBA -> BA */
   bucket_update_t **pbw = BA.bucket_write;
-  ALIGNED_MEDIUM_MEMCPY(pbw, BA.bucket_start, BA.size_b_align);
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
     /* First part: we rewrite 1->256 buckets, and in the same time,
@@ -1863,7 +1852,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
-	ALIGNED_MEDIUM_MEMCPY(pbl, pbw, lg);
+	aligned_medium_memcpy(pbl, pbw, lg);
 	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
 	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
 	kbl = (uint8_t *) *pkbl;
@@ -1913,7 +1902,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
-      ALIGNED_MEDIUM_MEMCPY((uint8_t *)mBA.logp_idx + mBA.size_b_align * BA.nr_logp, mBA.bucket_write, mBA.size_b_align);
+      aligned_medium_memcpy((uint8_t *)mBA.logp_idx + mBA.size_b_align * BA.nr_logp, mBA.bucket_write, mBA.size_b_align);
       BA.logp_val[BA.nr_logp++] = last_logp = logp;
     }
     
@@ -2036,7 +2025,6 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 
   /* sort : 2nd pass; mBA -> kBA */
   k_bucket_update_t **pkbw = kBA.bucket_write;
-  ALIGNED_MEDIUM_MEMCPY (pkbw, kBA.bucket_start, kBA.size_b_align);
   for (uint32_t mb = 0; mb < mBA.n_bucket; ++mb) {
     uint8_t *mbs = (uint8_t *) (mBA.bucket_start[mb]);
     /* First part: we rewrite 1->256 buckets, and in the same time,
@@ -2082,7 +2070,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	for (; mbs < mbl; mbs += sizeof(m_bucket_update_t)) MBA_2_KBA(0);
 	/* OK, let's duplicate the current (at most) 256 pointers in
 	   kBA.bucket_write in kBA.logp_idx */
-	ALIGNED_MEDIUM_MEMCPY(pkbl, pkbw, lg);
+	aligned_medium_memcpy(pkbl, pkbw, lg);
 	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
 	pmbl = (m_bucket_update_t **) ((size_t) pmbl + mBA.size_b_align);
 	mbl = (uint8_t *) *pmbl;
@@ -2111,7 +2099,6 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 
   /* sort : 3th pass; kBA -> BA */
   bucket_update_t **pbw = BA.bucket_write;
-  ALIGNED_MEDIUM_MEMCPY (pbw, BA.bucket_start, BA.size_b_align);
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
     /* First part: we rewrite 1->256 buckets, and in the same time,
@@ -2140,7 +2127,7 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
-	ALIGNED_MEDIUM_MEMCPY(pbl, pbw, lg);
+	aligned_medium_memcpy(pbl, pbw, lg);
 	pbl =    (bucket_update_t **) ((size_t)  pbl +  BA.size_b_align);
 	pkbl = (k_bucket_update_t **) ((size_t) pkbl + kBA.size_b_align);
 	kbl = (uint8_t *) *pkbl;
@@ -3426,39 +3413,40 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
  */
 static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
 {
-  ASSERT_ALWAYS(THRESHOLD_K_BUCKETS >= 16);
-  ASSERT_ALWAYS(THRESHOLD_M_BUCKETS >= (THRESHOLD_K_BUCKETS * 4));
   for (unsigned int i = 0; i < n ; ++i) {
     thread_data_ptr th = thrs[i];
     for(unsigned int side = 0 ; side < 2 ; side++) {
       thread_side_data_ptr ts = th->sides[side];
-      uint64_t bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
       uint32_t nb_buckets = thrs[i]->si->nb_buckets;
-#if 0 /* Not useful; init_X_bucket_array has a special misalignment algorithm */
-      unsigned int uniform = (pagesize() / nb_buckets) & (~1U);
-      if (uniform < 2)
-	bucket_limit |= 2;
-      else
-	bucket_limit += uniform; 
-#endif 
+      uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
+      /* The previous buckets are identical ? */
+      if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {
+	/* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
+	re_init_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+	/* Buckets are ready to be filled */
+	continue;
+      }
+      /* No. We free the buckets, if we have already malloc them. */
+      if (ts->BA.n_bucket) clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+      /* We (re)create the buckets */
       if (nb_buckets < THRESHOLD_K_BUCKETS)
-	init_bucket_array   (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+	init_bucket_array   (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
       else if (nb_buckets < THRESHOLD_M_BUCKETS)
-	init_k_bucket_array (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+	init_k_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
       else
-	init_m_bucket_array (nb_buckets, bucket_limit, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+	init_m_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
     }
   }
 }/*}}}*/
 
 static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
 {
-  for(unsigned int side = 0 ; side < 2 ; ++side) {
-    for (unsigned int i = 0; i < n ; ++i) {
-      clear_bucket_array(&(thrs[i]->sides[side]->BA),
-			 &(thrs[i]->sides[side]->kBA),
-			 &(thrs[i]->sides[side]->mBA) );
-    }
+  for (unsigned int i = 0; i < n ; ++i) {
+    thread_side_data_ptr ts;
+    ts = thrs[i]->sides[RATIONAL_SIDE];
+    clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+    ts = thrs[i]->sides[ALGEBRAIC_SIDE];
+    clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
   }
 }/*}}}*/
 
@@ -3466,9 +3454,9 @@ static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
 {
     double mf, mf0 = 0;
     for (int i = 0; i < n ; ++i) {
-        mf = buckets_max_full (thrs[i]->sides[0]->BA);
+        mf = buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA);
         if (mf > mf0) mf0 = mf;
-        mf = buckets_max_full (thrs[i]->sides[1]->BA);
+        mf = buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA);
         if (mf > mf0) mf0 = mf;
     }
     return mf0;
@@ -3914,12 +3902,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 #if 0   /* {{{ I no longer believe we can save something if this happens */
         /* See bug #14987 on the tracker */
         if (max_full >= 1.0) {
-            fprintf(stderr, "maxfull=%f\n", max_full);
             for (i = 0; i < las->nb_threads; ++i) {
                 fprintf(stderr, "intend to free [%d] max_full=%f %f\n",
                         i,
-                        buckets_max_full (thrs[i]->sides[0]->BA),
-                        buckets_max_full (thrs[i]->sides[1]->BA));
+                        buckets_max_full (thrs[i]->sides[RATIONAL_SIDE]->BA),
+                        buckets_max_full (thrs[i]->sides[ALGEBRAIC_SIDE]->BA));
             }
             thread_buckets_free(thrs); /* may crash. See below */
 
@@ -3969,7 +3956,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         qt0 = seconds() - qt0;
         las_report_accumulate_threads_and_display(las, si, report, thrs, qt0);
 
-        thread_buckets_free(thrs, las->nb_threads);
+        /* thread_buckets_free(thrs, las->nb_threads); */
 
         trace_per_sq_clear(si);
 #if 0   /* incompatible with the todo list */
@@ -4046,6 +4033,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* }}} */
 #endif
       } // end of loop over special q ideals.
+
+    thread_buckets_free(thrs, las->nb_threads);
 
     if (descent_lower) {
         fprintf(las->output, "# Now displaying again the results of all descents\n");

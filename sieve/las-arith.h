@@ -146,11 +146,6 @@ invmod (uint64_t *pa, uint64_t b)
 /* TODO: this is a close cousin of modredcul_inv, but the latter does
  * 64-bit redc */
 
-/* Define to 0 or 1. Table lookup seems to be slightly faster than
-   ctzl() on Opteron and slightly slower on Core2, but doesn't really
-   make much difference in either case. */
-#define LOOKUP_TRAILING_ZEROS 1
-
 // Compute 2^32/a mod b for b odd,
 // and 1/a mod b for b even, by binary xgcd.
 // a must be less than b.
@@ -158,95 +153,59 @@ invmod (uint64_t *pa, uint64_t b)
 // return 1 on succes, 0 on failure
 NOPROFILE_INLINE int
 invmod_redc_32(uint64_t *pa, uint64_t b) {
-#if LOOKUP_TRAILING_ZEROS
-  static const unsigned char trailing_zeros[256] =
-    {8,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     7,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
-     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0};
-#endif
-
   uint64_t a, u, v, fix, p = b;
-  int t, lsh;
+  unsigned int t, lsh;
   a = *pa;
-
-  if (UNLIKELY(*pa == 0))
-    return 0; /* or we get infinite loop */
-
-  if (UNLIKELY(b % 2UL == 0))
-    return invmod(pa, b);
-
+  if (UNLIKELY(!a)) return 0; /* or we get infinite loop */
+  if (UNLIKELY(!(b & 1))) return invmod(pa, b); 
   fix = (b+1)>>1;
-
   ASSERT (a < b);
-
   u = 1; v = 0; t = 0;
 
   // make a odd
-  lsh = ctzl(a);
-  a >>= lsh;
-  t += lsh;
-  /* v <<= lsh; ??? v is 0 here */
+  lsh = ctzl(a); a >>= lsh; t += lsh;
 
   // Here a and b are odd, and a < b
+  /* T1 & T2 in x86 asm has 8 instructions */
+#define T1 b -= a; v += u; lsh = ctzl(b); b >>= lsh; t += lsh; u <<= lsh; if (a >= b) break
+#define T2 a -= b; u += v; lsh = ctzl(a); a >>= lsh; t += lsh; v <<= lsh; if (b >= a) break
   do {
-    do {
-      b -= a; v += u;
-#if LOOKUP_TRAILING_ZEROS
-      do {
-	lsh = trailing_zeros [(unsigned char) b];
-	b >>= lsh;
-	t += lsh;
-	u <<= lsh;
-      } while (lsh == 8);
-#else
-      lsh = ctzl(b);
-      b >>= lsh;
-      t += lsh;
-      u <<= lsh;
-#endif
-    } while (a<b);
-    if (UNLIKELY(a == b))
-      break;
-    do {
-      a -= b; u += v;
-#if LOOKUP_TRAILING_ZEROS
-      do {
-	lsh = trailing_zeros [(unsigned char) a];
-	a >>= lsh;
-	t += lsh;
-	v <<= lsh;
-      } while (lsh == 8);
-#else
-      lsh = ctzl(a);
-      a >>= lsh;
-      t += lsh;
-      v <<= lsh;
-#endif
-    } while (b < a);
+    for (;;) { T1; T1; T1; T1; }
+    if (a == b) break;
+    for (;;) { T2; T2; T2; T2; }
   } while (a != b);
-  if (a != 1)
-    return 0;
-
+  if (a != 1) return 0;
+  
   // Here, the inverse of a is u/2^t mod b.
-  while (t>32) {
-    unsigned long sig = u & 1UL;
-    u >>= 1;
-    if (sig)
-      u += fix;
-    --t;
-  }
-  while (t < 32)
-    {
-      u <<= 1;
-      if (u >= p)
-        u -= p;
-      t ++;
+  /* T3 in x86 asm has 3 instructions; T4 has 5 */
+#ifdef __x86_64
+#define T3 do {								\
+    uint64_t addq;							\
+    __asm__ ( "shr $1,%1\n lea (%1,%2),%0\n cmovcq %0, %1\n" :		\
+	      "=r"(addq), "+r"(u) : "r"(fix));				\
+      } while (0)
+#else
+#define T3 do { unsigned char sig = (unsigned char) u; u >>= 1; if (sig & 1) u += fix; } while (0)
+#endif
+#define T4 do { u <<= 1; if (u >= p) u -= p; } while (0)
+  
+#if 0
+  for (; t > 32; --t) T3;
+  for (; t < 32; ++t) T4;
+#else
+  if (t > 32) {
+    for (t = t - 33; t > 7; t -= 8) { T3; T3; T3; T3; T3; T3; T3; T3; }
+    switch (t) {
+    case 7: T3; case 6: T3; case 5: T3; case 4: T3; case 3: T3; case 2: T3; case 1: T3; case 0: T3;
     }
+  }
+  else if (t < 32) {
+    for (t = 31 - t; t > 7; t -= 8) { T4; T4; T4; T4; T4; T4; T4; T4; }
+    switch (t) {
+    case 7: T4; case 6: T4; case 5: T4; case 4: T4; case 3: T4; case 2: T4; case 1: T4; case 0: T4;
+    }
+  }
+#endif
   *pa = u;
   return 1;
 }

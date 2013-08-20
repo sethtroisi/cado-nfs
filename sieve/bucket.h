@@ -199,6 +199,10 @@ typedef struct {
 extern "C" {
 #endif
 
+/* Copy bucket_start on bucket_write and bucket_read,
+   and reset nr_logp. */
+extern void re_init_bucket_array (bucket_array_t *BA, k_bucket_array_t *kBA,
+				  m_bucket_array_t *mBA);
 
 /* Set an allocated array of <n_bucket> buckets each having size
  * max_bucket_fill_ratio * BUCKET_REGION.
@@ -273,6 +277,7 @@ get_next_bucket_prime (bucket_primes_t *BP);
 
 extern void purge_bucket (bucket_primes_t *BP, bucket_array_t BA, const int i, const unsigned char *S);
 
+extern uint64_t bucket_misalignment(const uint64_t sz, const size_t sr);
 
 /* We also forward-define some auxiliary functions which are defined in
  * bucket.c (alongside with the non-inlined functions already listed).
