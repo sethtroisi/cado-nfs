@@ -1098,9 +1098,11 @@ class DbAccess(object):
 
 class DbWorker(DbAccess, threading.Thread):
     """Thread executing WuAccess requests from a given tasks queue"""
-    def __init__(self, taskqueue, *args, **kwargs):
+    def __init__(self, taskqueue, *args, daemon=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.taskqueue = taskqueue
+        if not daemon is None:
+            self.daemon = daemon
         self.start()
     
     def run(self):
@@ -1149,8 +1151,9 @@ class DbThreadPool(object):
     def __init__(self, dbfilename, num_threads = 1):
         self.taskqueue = Queue(num_threads)
         self.pool = []
-        for _ in range(num_threads): 
-            self.pool.append(DbWorker(self.taskqueue, db=dbfilename))
+        for _ in range(num_threads):
+            worker = DbWorker(self.taskqueue, daemon=True, db=dbfilename)
+            self.pool.append(worker)
 
     def terminate(self):
         for t in self.pool:
