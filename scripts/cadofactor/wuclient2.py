@@ -13,10 +13,11 @@ if sys.version_info[0] == 3:
     # pylint: disable=F0401
     import urllib.request as urllib_request
     import urllib.error as urllib_error
+    from http.client import BadStatusLine
 elif sys.version_info[0] == 2:
     import urllib2 as urllib_request
     import urllib2 as urllib_error
-from httplib import BadStatusLine
+    from httplib import BadStatusLine
 import subprocess
 import hashlib
 import logging
@@ -133,7 +134,7 @@ def create_daemon(workdir = None, umask = None):
         # to insure that the next call to os.setsid is successful.
         pid = os.fork()
     except OSError as e:
-        raise Exception, "%s [%d]" % (e.strerror, e.errno)
+        raise Exception("%s [%d]" % (e.strerror, e.errno))
 
     if (pid == 0):	# The first child.
         # Un-install the signal handler in the child process
@@ -187,7 +188,7 @@ def create_daemon(workdir = None, umask = None):
             # acquiring a controlling terminal.
             pid = os.fork()	# Fork a second child.
         except OSError as e:
-            raise Exception, "%s [%d]" % (e.strerror, e.errno)
+            raise Exception("%s [%d]" % (e.strerror, e.errno))
 
         if (pid == 0):	# The second child.
             # Since the current working directory may be a mounted filesystem,
@@ -492,7 +493,7 @@ class WorkunitClient(object):
                     as error:
                 conn = None
                 errorstr = str(error)
-            except (socket.error) as error:
+            except socket.error as error:
                 if error.errno == errno.ECONNRESET:
                     conn = None
                     errorstr = str(error)
