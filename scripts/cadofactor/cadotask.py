@@ -83,11 +83,6 @@ class Polynomial(object):
         poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
-            # If there is a "No polynomial found" message anywhere in the
-            # file, we assume that there is no polynomial. This assumption
-            # will be false if, e.g., files get concatenated
-            if re.match(r"No polynomial found", line):
-                return
             # If this is a comment line telling the Murphy E value, 
             # extract the value and store it
             match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
@@ -596,9 +591,24 @@ class PolyselTask(ClientServerTask, patterns.Observer):
     def parse_poly(self, outputfile):
         poly = None
         if outputfile:
-            with open(outputfile, "r") as f:
+            with open(outputfile, "r") as polyfile:
+                for line in polyfile:
+                    # A "WARNING:" line can occur when a bad gcc version was
+                    # used for compilation
+                    if re.match("WARNING", line):
+                        self.logger.warn("File %s contains: %s",
+                                         outputfile, line.strip())
+                    # If there is a "No polynomial found" message anywhere in
+                    # the file, we assume that there is no polynomial. This
+                    # assumption will be false if, e.g., files get concatenated
+                    if re.match("No polynomial found", line):
+                        return False
+                    # If we get the "Best polynomial" marker, we stop reading
+                    # the file, and let Polynomial.__init__() parse the rest
+                    if re.match("# Best polynomial found:", line):
+                        break
                 try:
-                    poly = Polynomial(f)
+                    poly = Polynomial(polyfile)
                 except Exception as e:
                     self.logger.error("Invalid polyselect file %s: %s", 
                                       outputfile, e)
