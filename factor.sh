@@ -196,7 +196,11 @@ mkdir $t/tmp
 
 
 if $python; then
-  $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
+    # $PYTHON is there to expand a shell variable having that name, if
+    # provided, in the case there is no python3 script in the path, or if
+    # one which is named otherwise, or placed in a non-prority location
+    # is the path, is preferred. If $PYTHON is empty, this is a no-op
+  $PYTHON $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
   threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
   slaves.nrclients=$slaves \
   slaves.scriptpath="$scriptpath" server.address=localhost \

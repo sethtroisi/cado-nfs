@@ -251,39 +251,58 @@ bucket_sortbucket (bucket_primes_t *BP)
  * reconstruction is done here and the full p is stored in the output.
  */
 
+#ifdef BUCKET_CAREFUL_DECODE
+#ifdef BUCKET_ENCODE3
+#define PURGE_BUCKET_HEART(A) do {					\
+    prime_hint_t up = (u + (A))->p;					\
+    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
+    uint32_t decoded = phigh + bucket_decode_prime(up); last_p = up;	\
+    if (UNLIKELY(decoded * 0xCCCCCCCDU <= 0x33333333U)) { /* Divisible by 5? */ \
+      decoded += BUCKET_P_WRAP; phigh += BUCKET_P_WRAP; }		\
+    uint16_t ux = (u + (A))->x;						\
+    if (UNLIKELY(S[ux] != 255)) {					\
+      bucket_prime_t bp;						\
+      bp.x = ux; bp.p = decoded; push_bucket_prime (BP, bp); }		\
+  } while (0)
+#else
+#define PURGE_BUCKET_HEART(A) do {					\
+    prime_hint_t up = (u + (A))->p;					\
+    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
+    uint32_t decoded = phigh + bucket_decode_prime(up); last_p = up;	\
+    if (UNLIKELY(decoded * 0xAAAAAAABU <= 0x55555555U)) { /* Divisible by 3? */ \
+      decoded += BUCKET_P_WRAP; phigh += BUCKET_P_WRAP; }		\
+    uint16_t ux = (u + (A))->x;						\
+    if (UNLIKELY(S[ux] != 255)) {					\
+      bucket_prime_t bp;						\
+      bp.x = ux; bp.p = decoded; push_bucket_prime (BP, bp); }		\
+  } while (0)
+#endif
+#else
+#define PURGE_BUCKET_HEART(A) do {					\
+    prime_hint_t up = (u + (A))->p;					\
+    if (UNLIKELY(up < last_p)) phigh += BUCKET_P_WRAP;			\
+    last_p = up;							\
+    uint16_t ux = (u + (A))->x;						\
+    if (UNLIKELY(S[ux] != 255)) {					\
+      bucket_prime_t bp;						\
+      bp.x = ux; bp.p = phigh + bucket_decode_prime(up);		\
+      push_bucket_prime (BP, bp); }					\
+  } while (0)
+#endif
+
 void
-purge_bucket (bucket_primes_t *BP, bucket_array_t BA, 
+purge_bucket (bucket_primes_t *BP, const bucket_array_t BA, 
               const int i, const unsigned char *S)
 {
-  bucket_update_t *u;
-  uint16_t last_p = 0;
+  bucket_update_t *u = BA.bucket_start[i], *end_u = BA.bucket_write[i];
+  prime_hint_t last_p = 0;
   uint32_t phigh = 0;
-  bucket_prime_t bp;
 
-  for (u = BA.bucket_start[i] ; u < BA.bucket_write[i]; u++)
-    {
-      uint32_t decoded;
-      if (u->p < last_p)
-	phigh += BUCKET_P_WRAP;
-      last_p = u->p;
-      decoded = phigh + bucket_decode_prime(u->p);
-#ifdef BUCKET_CAREFUL_DECODE
-      if (
-#ifndef BUCKET_ENCODE3
-          decoded * 0xAAAAAAABU <= 0x55555555U /* Divisible by 3? */
-#else
-          decoded * 0xCCCCCCCDU <= 0x33333333U /* Divisible by 5? */
-#endif
-        ) {
-        decoded += BUCKET_P_WRAP;
-        phigh += BUCKET_P_WRAP;
-      }
-#endif
-      if (S[u->x] != 255)
-        {
-	  bp.p = decoded;
-          bp.x = u->x;
-          push_bucket_prime (BP, bp);
-	}
-    }
+  for (; u + 16 <= end_u; u += 16) {
+    PURGE_BUCKET_HEART( 0); PURGE_BUCKET_HEART( 1); PURGE_BUCKET_HEART( 2); PURGE_BUCKET_HEART( 3);
+    PURGE_BUCKET_HEART( 4); PURGE_BUCKET_HEART( 5); PURGE_BUCKET_HEART( 6); PURGE_BUCKET_HEART( 7);
+    PURGE_BUCKET_HEART( 8); PURGE_BUCKET_HEART( 9); PURGE_BUCKET_HEART(10); PURGE_BUCKET_HEART(11);
+    PURGE_BUCKET_HEART(12); PURGE_BUCKET_HEART(13); PURGE_BUCKET_HEART(14); PURGE_BUCKET_HEART(15);
+  }
+  for (; u < end_u; ++u) PURGE_BUCKET_HEART(0);
 }

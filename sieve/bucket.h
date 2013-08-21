@@ -98,8 +98,8 @@ typedef uint8_t m_bucket_update_t[2 + sizeof(bucket_update_t)];
  */
 
 typedef struct {
-    uint32_t p;
     uint16_t x;
+    uint32_t p;
 } bucket_prime_t;
 
 
@@ -414,7 +414,7 @@ bucket_decode_prime (prime_hint_t h)
   /* if p was 6k+1, we stored h=2k, thus we want 3h+1;
      if p was 6k+5, we stored h=2k+1, thus we want 3h+2 */
 #else
-  return 2U * (uint32_t) h + 1U;
+  return (((uint32_t) h) << 1) + 1U;
 #endif
 }
 #endif	/* BUCKET_H_ */
