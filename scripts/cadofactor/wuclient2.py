@@ -643,14 +643,14 @@ class WorkunitClient(object):
             mimedata.attach_key("failedcommand", processor.failedcommand)
         for filename in self.workunit.get("RESULT", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
+            logging.info("Attaching file %s to upload", filepath)
             mimedata.attach_file("results", filename, filepath)
         for name in processor.stdio:
             for (counter, data) in enumerate(processor.stdio[name]):
                 if data:
-                    logging.debug ("Adding %s for command %s to upload", 
-                                   name, counter)
+                    logging.info ("Attaching %s for command %s to upload", 
+                                  name, counter)
                     mimedata.attach_data("results", name + str(counter), data)
-        
         return mimedata
 
     def upload_result(self, processor):
