@@ -35,7 +35,7 @@ def diag(level, text, var = None):
         if var is None:
             print (text, file=sys.stderr)
         else:
-            print (text + str(var), file=sys.stderr)
+            print ("%s%s" % (text, var), file=sys.stderr)
 
 def join3(l, pre = None, post = None, sep = ", "):
     """ 
@@ -109,7 +109,8 @@ class MyCursor(sqlite3.Cursor):
     
     def __init__(self, conn):
         # Enable foreign key support
-        super(MyCursor, self).__init__(conn)
+        self._conn = conn
+        super().__init__(conn)
         self._exec("PRAGMA foreign_keys = ON;")
 
     @staticmethod
@@ -148,9 +149,11 @@ class MyCursor(sqlite3.Cursor):
             # called from outside this class
             classname = self.__class__.__name__
             parent = sys._getframe(1).f_code.co_name
-            diag (1, classname + "." + parent + "(): command = " + command)
+            diag (1, "%s.%s(): conn = %s, command = %s"
+                  % (classname, parent, id(self._conn), command))
             if not values is None:
-                diag (1, classname + "." + parent + "(): values = ", values)
+                diag (1, "%s.%s(): conn = %s, values = %s"
+                      % (classname, parent, id(self._conn), values))
         i = 0
         while True:
             try:
@@ -165,14 +168,14 @@ class MyCursor(sqlite3.Cursor):
 
     def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
-        command = "CREATE TABLE IF NOT EXISTS " + table + \
-            "( " + ", ".join(" ".join(k) for k in layout) + " );"
+        command = "CREATE TABLE IF NOT EXISTS %s( %s );" % \
+                  (table, ", ".join(" ".join(k) for k in layout))
         self._exec (command)
     
     def create_index(self, name, table, columns):
         """ Creates an index with fields as described in the columns list """
-        command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
-            table + "( " + ", ".join(columns) + " );"
+        command = "CREATE INDEX IF NOT EXISTS %s ON %s( %s );" \
+                  % (name, table, ", ".join(columns))
         self._exec (command)
     
     def insert(self, table, d):
@@ -187,10 +190,11 @@ class MyCursor(sqlite3.Cursor):
         # if "id" is the primary key. But I guess not listing field:NULL items 
         # explicitly in an INSERT is a good thing in general
         fields = self._without_None(d)
+        fields_str = ", ".join(fields.keys())
 
         sqlformat = ", ".join(("?",) * len(fields)) # sqlformat = "?, ?, ?, " ... "?"
-        command = "INSERT INTO " + table + \
-            " (" + ", ".join(fields.keys()) + ") VALUES (" + sqlformat + ");"
+        command = "INSERT INTO %s( %s ) VALUES ( %s );" \
+                  % (table, fields_str, sqlformat)
         values = list(fields.values())
         self._exec(command, values)
         rowid = self.lastrowid
@@ -202,38 +206,39 @@ class MyCursor(sqlite3.Cursor):
             fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
-        setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
+        setstr = join3(d.keys(), post = " = ?", sep = ", ")
         (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
-        command = "UPDATE " + table + setstr + wherestr
+        command = "UPDATE %s SET %s %s" % (table, setstr, wherestr)
         values = list(d.values()) + wherevalues
         self._exec(command, values)
     
-    def where(self, joinsource, col_alias = None, limit = None, order = None, 
-              **conditions):
-        """ Get a up to "limit" table rows (limit == 0: no limit) where 
-            the key:value pairs of the dictionary "conditions" are set to the 
-            same value in the database table """
-
+    def where_query(self, joinsource, col_alias = None, limit = None, order = None, 
+                    **conditions):
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self._where_str("WHERE", **conditions)
-
         if order is None:
             ORDER = ""
         else:
             if not order[1] in ("ASC", "DESC"):
                 raise Exception
-            ORDER = " ORDER BY " + str(order[0]) + " " + order[1]
-
+            ORDER = " ORDER BY %s %s" % (order[0], order[1])
         if limit is None:
             LIMIT = ""
         else:
-            LIMIT = " LIMIT " + str(int(limit))
-
+            LIMIT = " LIMIT %s" % int(limit)
         AS = self.as_string(col_alias);
+        command = "SELECT * %s FROM %s %s %s %s" \
+                  % (AS, joinsource, WHERE, ORDER, LIMIT)
+        return (command, values)
 
-        command = "SELECT *" + AS + " FROM " + joinsource + WHERE + \
-            ORDER + LIMIT + ";"
-        self._exec(command, values)
+    def where(self, joinsource, col_alias = None, limit = None, order = None, 
+              values = [], **conditions):
+        """ Get a up to "limit" table rows (limit == 0: no limit) where 
+            the key:value pairs of the dictionary "conditions" are set to the 
+            same value in the database table """
+        (command, newvalues) = self.where_query(joinsource, col_alias, limit,
+                                             order, **conditions)
+        self._exec(command + ";", values + newvalues)
         
     def count(self, joinsource, **conditions):
         """ Count rows where the key:value pairs of the dictionary "conditions" are 
@@ -242,7 +247,7 @@ class MyCursor(sqlite3.Cursor):
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self._where_str("WHERE", **conditions)
 
-        command = "SELECT COUNT(*)" + " FROM " + joinsource + WHERE + ";"
+        command = "SELECT COUNT(*) FROM %s %s;" % (joinsource, WHERE)
         self._exec(command, values)
         r = self.fetchone()
         return int(r[0])
@@ -250,13 +255,13 @@ class MyCursor(sqlite3.Cursor):
     def delete(self, table, **conditions):
         """ Delete the rows specified by conditions """
         (WHERE, values) = self._where_str("WHERE", **conditions)
-        command = "DELETE FROM " + table + WHERE + ";"
+        command = "DELETE FROM %s %s;" % (table, WHERE)
         self._exec(command, values)
 
     def where_as_dict(self, joinsource, col_alias = None, limit = None, 
-                      order = None, **conditions):
+                      order = None, values = [], **conditions):
         self.where(joinsource, col_alias=col_alias, limit=limit, 
-                      order=order, **conditions)
+                      order=order, values=values, **conditions)
         # cursor.description is a list of lists, where the first element of 
         # each inner list is the column name
         result = []
@@ -300,8 +305,8 @@ class DbTable(object):
             # If this table references another table, we use the primary
             # key of the referenced table as the foreign key name
             r = self.references # referenced table
-            fk = (r.getpk(), "INTEGER", "REFERENCES " + 
-                  r.getname() + " (" + r.getpk() + ") ")
+            fk = (r.getpk(), "INTEGER", "REFERENCES %s ( %s ) " \
+                  % (r.getname(), r.getpk()))
             fields.append(fk)
         cursor.create_table(self.tablename, fields)
         if self.references:
@@ -739,27 +744,27 @@ class WuAccess(object): # {
     def to_str(wus):
         r = []
         for wu in wus:
-            s = "Workunit " + str(wu["wuid"]) + ":\n"
+            s = "Workunit %s:\n" % wu["wuid"]
             for (k,v) in wu.items():
                 if k != "wuid" and k != "files":
-                    s = s + "  " + k + ": " + repr(v) + "\n"
+                    s += "  %s: %r\n" % (k, v)
             if "files" in wu:
-                s = s + "  Associated files:\n"
+                s += "  Associated files:\n"
                 if wu["files"] is None:
-                    s = s + "    None\n"
+                    s += "    None\n"
                 else:
                     for f in wu["files"]:
-                        s = s + "    " + str(f) + "\n"
+                        s += "    %s\n" % f
             r.append(s)
         return '\n'.join(r)
 
     @staticmethod
     def _checkstatus(wu, status):
-        diag (2, "WuAccess._checkstatus(" + str(wu) + ", " + str(status) + ")")
+        diag (2, "WuAccess._checkstatus(%s, %s)" % (wu, status))
         if wu["status"] != status:
-            msg = "Workunit " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
-                + ", expected " + str(status)
-            diag (0, "WuAccess._checkstatus(): " + msg)
+            msg = "Workunit %s has status %s, expected %s" \
+                  % (wu["wuid"], wu["status"], status)
+            diag (0, "WuAccess._checkstatus(): %s" % msg)
             raise StatusUpdateError(msg)
 
     def check(self, data):
@@ -1056,7 +1061,7 @@ class DbListener(patterns.Observable):
 
 class IdMap(object):
     """ Identity map. Ensures that DB-backed dictionaries on the same DB and
-    of the same table name are instanciated only once. """
+    of the same table name are instantiated only once. """
     def __init__(self):
         self.db_dicts = {}
     
@@ -1270,7 +1275,7 @@ if __name__ == '__main__': # {
                 wus.append(s)
                 s = ""
             else:
-                s = s + line
+                s += line
         if s != "":
             wus.append(s)
         db_pool.create(wus, priority=prio)
