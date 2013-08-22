@@ -73,6 +73,14 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
         op = ""
     return sep.join([pre + op.join(k) + post for k in d.items()])
 
+def conn_commit(conn):
+    diag(1, "Commit on connection %s" % id(conn))
+    conn.commit()
+
+def conn_close(conn):
+    diag(1, "Closing connection %s" % id(conn))
+    conn.close()
+
 # Dummy class for defining "constants"
 class WuStatus:
     AVAILABLE = 0
@@ -512,7 +520,7 @@ class DictDbAccess(collections.MutableMapping):
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
         if self._ownconn:
-            self._conn.close()
+            conn_close(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
         # MutableMapping does not have __del__, but in a complex class 
         # hierarchy, it may not be next in the MRO
@@ -568,7 +576,7 @@ class DictDbAccess(collections.MutableMapping):
         """ Set a dict entry to a value and update the DB """
         cursor = self._conn.cursor(MyCursor)
         self.__setitem_nocommit(cursor, key, value)
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def __delitem__(self, key):
@@ -576,7 +584,7 @@ class DictDbAccess(collections.MutableMapping):
         del(self._data[key])
         cursor = self._conn.cursor(MyCursor)
         self._table.delete(cursor, eq={"key": key})
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def setdefault(self, key, default = None):
@@ -589,7 +597,7 @@ class DictDbAccess(collections.MutableMapping):
             for (key, value) in default.items():
                 if not key in self:
                     self.__setitem_nocommit(cursor, key, value)
-            self._conn.commit()
+            conn_commit(self._conn)
             cursor.close()
             return None
         elif not key in self:
@@ -600,7 +608,7 @@ class DictDbAccess(collections.MutableMapping):
         cursor = self._conn.cursor(MyCursor)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def clear(self, *args):
@@ -613,7 +621,7 @@ class DictDbAccess(collections.MutableMapping):
             for key in args:
                 del(self._data[key])
                 self._table.delete(cursor, eq={"key": key})
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
 
 
@@ -738,7 +746,7 @@ class WuAccess(object): # {
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
-        self.conn.close()
+        conn_close(self.conn)
     
     @staticmethod
     def to_str(wus):
@@ -821,7 +829,7 @@ class WuAccess(object): # {
         cursor = self.conn.cursor(MyCursor)
         cursor._exec("PRAGMA journal_mode=WAL;")
         self.mapper.create(cursor)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def create1(self, cursor, wutext, priority = None):
@@ -845,7 +853,7 @@ class WuAccess(object): # {
         else:
             for wu in wus:
                 self.create1(cursor, wu, priority)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def assign(self, clientid):
@@ -866,7 +874,7 @@ class WuAccess(object): # {
                  "timeassigned": str(datetime.now())}
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
-            self.conn.commit()
+            conn_commit(self.conn)
             cursor.close()
             return r[0]["wu"]
         else:
@@ -902,7 +910,7 @@ class WuAccess(object): # {
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self.add_files(cursor, files, rowid = data[pk])
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def verification(self, wuid, ok):
@@ -922,7 +930,7 @@ class WuAccess(object): # {
             d["status"] = WuStatus.VERIFIED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def cancel(self, wuid):
@@ -938,7 +946,7 @@ class WuAccess(object): # {
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
         self.mapper.table.update(cursor, d, **conditions)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def query(self, limit = None, **conditions):
