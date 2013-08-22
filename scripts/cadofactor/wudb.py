@@ -699,17 +699,19 @@ class Mapper(object):
         return cursor.count(joinsource, **cond)
     
     def where(self, cursor, limit = None, order = None, **cond):
+        # We want:
+        # SELECT * FROM (SELECT * from workunits WHERE status = 2 LIMIT 1) LEFT JOIN files USING ( wurowid );
         pk = self.getpk()
-        joinsource = self.table.tablename
+        (command, values) = cursor.where_query(self.table.tablename,
+                                               limit=limit, **cond)
+        joinsource = "( %s )" % command
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
-            joinsource = joinsource + " LEFT JOIN " + \
-                self.subtables[s].getname() + \
-                " USING ( " + pk + " )"
+            joinsource = "%s LEFT JOIN %s USING ( %s )" \
+                         % (joinsource, self.subtables[s].getname(), pk)
         # FIXME: don't get result rows as dict! Leave as tuple and
         # take them apart positionally
-        rows = cursor.where_as_dict(joinsource, limit=limit, order=order, 
-                                    **cond)
+        rows = cursor.where_as_dict(joinsource, order=order, values=values)
         wus = []
         for r in rows:
             # Collapse rows with identical primary key
@@ -1237,6 +1239,9 @@ if __name__ == '__main__': # {
     parser.add_argument('-prio', metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' 
                         'receive priority N')
+    parser.add_argument('-limit', metavar = 'N', 
+                        help = 'Limit number of records in queries',
+                        default = None)
     parser.add_argument('-result', nargs = 4, 
                         metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
@@ -1267,6 +1272,7 @@ if __name__ == '__main__': # {
     prio = 0
     if args["prio"]:
         prio = int(args["prio"][0])
+    limit = args["limit"]
     
     if use_pool:
         db_pool = DbThreadPool(dbname)
@@ -1294,10 +1300,10 @@ if __name__ == '__main__': # {
             continue
         print(msg)
         if not args["dump"]:
-            count = db_pool.count(**condition)
+            count = db_pool.count(limit=limit, **condition)
             print (count)
         elif args["dump"]:
-            wus = db_pool.query(**condition)
+            wus = db_pool.query(limit=limit, **condition)
             if wus is None:
                 print("None")
                 continue
