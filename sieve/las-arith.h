@@ -155,6 +155,7 @@ NOPROFILE_INLINE int
 invmod_redc_32(uint64_t *pa, uint64_t b) {
   uint64_t a, u, v, fix, p = b;
   unsigned int t, lsh;
+
   a = *pa;
   if (UNLIKELY(!a)) return 0; /* or we get infinite loop */
   if (UNLIKELY(!(b & 1))) return invmod(pa, b); 
@@ -166,7 +167,7 @@ invmod_redc_32(uint64_t *pa, uint64_t b) {
   lsh = ctzl(a); a >>= lsh; t += lsh;
 
   // Here a and b are odd, and a < b
-  /* T1 & T2 in x86 asm has 8 instructions */
+  /* T1 & T2 in x86 asm has 8 instructions. I cannot do better in manual asm */
 #define T1 b -= a; v += u; lsh = ctzl(b); b >>= lsh; t += lsh; u <<= lsh; if (a >= b) break
 #define T2 a -= b; u += v; lsh = ctzl(a); a >>= lsh; t += lsh; v <<= lsh; if (b >= a) break
   do {
@@ -177,18 +178,24 @@ invmod_redc_32(uint64_t *pa, uint64_t b) {
   if (a != 1) return 0;
   
   // Here, the inverse of a is u/2^t mod b.
-  /* T3 in x86 asm has 3 instructions; T4 has 5 */
+  /* T3 in x86 asm has 3 instructions; T4 has 4 */
 #ifdef __x86_64
+  uint64_t negp = (uint64_t) -p;
 #define T3 do {								\
     uint64_t addq;							\
     __asm__ ( "shr $1,%1\n lea (%1,%2),%0\n cmovcq %0, %1\n" :		\
 	      "=r"(addq), "+r"(u) : "r"(fix));				\
-      } while (0)
+  } while (0)
+#define T4 do {								\
+    uint64_t nu;							\
+    __asm__ ( "add %1,%1\n lea (%1,%2),%0\n cmp %1,%3 \n cmovbe %0,%1\n" : \
+	      "=r"(nu), "+r"(u) : "r"(negp), "r"(p));			\
+  } while (0)
 #else
 #define T3 do { unsigned char sig = (unsigned char) u; u >>= 1; if (sig & 1) u += fix; } while (0)
-#endif
 #define T4 do { u <<= 1; if (u >= p) u -= p; } while (0)
-  
+#endif
+
 #if 0
   for (; t > 32; --t) T3;
   for (; t < 32; ++t) T4;
