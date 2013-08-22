@@ -1257,22 +1257,56 @@ typedef uint64_t plattice_x_t;
 NOPROFILE_INLINE int
 reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
-    int32_t I = si->I;
-    int32_t a0=-(int32_t)p, a1=0, b0=r, b1=1;
-    int32_t hI = I;
+  int32_t a0 = - (int32_t) p, a1 = 0, b0 = r, b1 = 1, hI = si->I;
 #if MOD2_CLASSES_BS
-    hI/=2;
+    hI >>= 1;
 #endif
     /* subtractive variant of Euclid's algorithm */
     for(;;) {
         /* a0 < 0 <= b0 < -a0 */
         if (b0 < hI) break;
         /* a0 < 0 < b0 < -a0 */
-        for( ; a0 += b0, a1 += b1, a0 + b0 <= 0 ; );
+        /* for( ; a0 += b0, a1 += b1, a0 + b0 <= 0 ; ); */
+	for (;;) {
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
+	}
         /* -b0 < a0 <= 0 < b0 */
         if (-a0 < hI) break;
         /* -b0 < a0 < 0 < b0 */
-        for( ; b0 += a0, b1 += a1, b0 + a0 >= 0 ; );
+        /* for( ; b0 += a0, b1 += a1, b0 + a0 >= 0 ; ); */
+	for (;;) {
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
+	}
         /* a0 < 0 <= b0 < -a0 */
     }
     if (b0 > -a0) {
@@ -1292,12 +1326,14 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, siev
         a0 += k * b0;
         a1 += k * b1;
     }
+    /* Too expensive checks */
+    /*
     ASSERT (a1 > 0);
     ASSERT (b1 > 0);
     ASSERT ((a0 <= 0) && (a0 > -hI));
     ASSERT ((b0 >= 0) && (b0 <  hI));
     ASSERT (b0 - a0 >= hI);
-
+    */
     pli->a0 = a0;
     pli->a1 = a1;
     pli->b0 = b0;
@@ -1326,7 +1362,7 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, siev
      * relevant information...
      */
     pli->bound0 = -a0;
-    pli->bound1 = I - b0;
+    pli->bound1 = si->I - b0;
 #endif
     return 1;
 }

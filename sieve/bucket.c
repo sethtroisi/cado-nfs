@@ -299,6 +299,9 @@ purge_bucket (bucket_primes_t *BP, const bucket_array_t BA,
   uint32_t phigh = 0;
 
   for (; u + 16 <= end_u; u += 16) {
+#ifdef HAVE_SSE2
+    _mm_prefetch((uint8_t *) u + 0x100, _MM_HINT_T0);
+#endif
     PURGE_BUCKET_HEART( 0); PURGE_BUCKET_HEART( 1); PURGE_BUCKET_HEART( 2); PURGE_BUCKET_HEART( 3);
     PURGE_BUCKET_HEART( 4); PURGE_BUCKET_HEART( 5); PURGE_BUCKET_HEART( 6); PURGE_BUCKET_HEART( 7);
     PURGE_BUCKET_HEART( 8); PURGE_BUCKET_HEART( 9); PURGE_BUCKET_HEART(10); PURGE_BUCKET_HEART(11);

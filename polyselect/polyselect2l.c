@@ -2303,12 +2303,12 @@ main (int argc, char *argv[])
           double mean = aver_opt_lognorm / collisions_good;
           double rawmean = aver_raw_lognorm / collisions;
 
-          printf ("# Stat: raw lognorm (min/av/max/std): %1.2f/%1.2f/%1.2f/%1.2f\n",
-                  min_raw_lognorm, rawmean, max_raw_lognorm,
+          printf ("# Stat: raw lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
+                  collisions, min_raw_lognorm, rawmean, max_raw_lognorm,
                   sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
-            printf ("# Stat: optimized lognorm (min/av/max/std): %1.2f/%1.2f/%1.2f/%1.2f\n",
-                    min_opt_lognorm, mean, max_opt_lognorm,
+            printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
+                    collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
                     sqrt (var_opt_lognorm / collisions_good - mean * mean));
           printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
                   total_adminus2 / (double) collisions);

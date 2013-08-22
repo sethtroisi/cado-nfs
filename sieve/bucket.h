@@ -8,6 +8,7 @@
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
 #include <string.h>
+#include <emmintrin.h>
 #include "cado-endian.h"
 
 // #define SAFE_BUCKETS

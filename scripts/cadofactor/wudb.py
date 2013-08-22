@@ -35,7 +35,7 @@ def diag(level, text, var = None):
         if var is None:
             print (text, file=sys.stderr)
         else:
-            print (text + str(var), file=sys.stderr)
+            print ("%s%s" % (text, var), file=sys.stderr)
 
 def join3(l, pre = None, post = None, sep = ", "):
     """ 
@@ -73,6 +73,14 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
         op = ""
     return sep.join([pre + op.join(k) + post for k in d.items()])
 
+def conn_commit(conn):
+    diag(1, "Commit on connection %s" % id(conn))
+    conn.commit()
+
+def conn_close(conn):
+    diag(1, "Closing connection %s" % id(conn))
+    conn.close()
+
 # Dummy class for defining "constants"
 class WuStatus:
     AVAILABLE = 0
@@ -109,7 +117,8 @@ class MyCursor(sqlite3.Cursor):
     
     def __init__(self, conn):
         # Enable foreign key support
-        super(MyCursor, self).__init__(conn)
+        self._conn = conn
+        super().__init__(conn)
         self._exec("PRAGMA foreign_keys = ON;")
 
     @staticmethod
@@ -148,9 +157,11 @@ class MyCursor(sqlite3.Cursor):
             # called from outside this class
             classname = self.__class__.__name__
             parent = sys._getframe(1).f_code.co_name
-            diag (1, classname + "." + parent + "(): command = " + command)
+            diag (1, "%s.%s(): conn = %s, command = %s"
+                  % (classname, parent, id(self._conn), command))
             if not values is None:
-                diag (1, classname + "." + parent + "(): values = ", values)
+                diag (1, "%s.%s(): conn = %s, values = %s"
+                      % (classname, parent, id(self._conn), values))
         i = 0
         while True:
             try:
@@ -165,14 +176,14 @@ class MyCursor(sqlite3.Cursor):
 
     def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
-        command = "CREATE TABLE IF NOT EXISTS " + table + \
-            "( " + ", ".join(" ".join(k) for k in layout) + " );"
+        command = "CREATE TABLE IF NOT EXISTS %s( %s );" % \
+                  (table, ", ".join(" ".join(k) for k in layout))
         self._exec (command)
     
     def create_index(self, name, table, columns):
         """ Creates an index with fields as described in the columns list """
-        command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
-            table + "( " + ", ".join(columns) + " );"
+        command = "CREATE INDEX IF NOT EXISTS %s ON %s( %s );" \
+                  % (name, table, ", ".join(columns))
         self._exec (command)
     
     def insert(self, table, d):
@@ -187,10 +198,11 @@ class MyCursor(sqlite3.Cursor):
         # if "id" is the primary key. But I guess not listing field:NULL items 
         # explicitly in an INSERT is a good thing in general
         fields = self._without_None(d)
+        fields_str = ", ".join(fields.keys())
 
         sqlformat = ", ".join(("?",) * len(fields)) # sqlformat = "?, ?, ?, " ... "?"
-        command = "INSERT INTO " + table + \
-            " (" + ", ".join(fields.keys()) + ") VALUES (" + sqlformat + ");"
+        command = "INSERT INTO %s( %s ) VALUES ( %s );" \
+                  % (table, fields_str, sqlformat)
         values = list(fields.values())
         self._exec(command, values)
         rowid = self.lastrowid
@@ -202,38 +214,39 @@ class MyCursor(sqlite3.Cursor):
             fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
-        setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
+        setstr = join3(d.keys(), post = " = ?", sep = ", ")
         (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
-        command = "UPDATE " + table + setstr + wherestr
+        command = "UPDATE %s SET %s %s" % (table, setstr, wherestr)
         values = list(d.values()) + wherevalues
         self._exec(command, values)
     
-    def where(self, joinsource, col_alias = None, limit = None, order = None, 
-              **conditions):
-        """ Get a up to "limit" table rows (limit == 0: no limit) where 
-            the key:value pairs of the dictionary "conditions" are set to the 
-            same value in the database table """
-
+    def where_query(self, joinsource, col_alias = None, limit = None, order = None, 
+                    **conditions):
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self._where_str("WHERE", **conditions)
-
         if order is None:
             ORDER = ""
         else:
             if not order[1] in ("ASC", "DESC"):
                 raise Exception
-            ORDER = " ORDER BY " + str(order[0]) + " " + order[1]
-
+            ORDER = " ORDER BY %s %s" % (order[0], order[1])
         if limit is None:
             LIMIT = ""
         else:
-            LIMIT = " LIMIT " + str(int(limit))
-
+            LIMIT = " LIMIT %s" % int(limit)
         AS = self.as_string(col_alias);
+        command = "SELECT * %s FROM %s %s %s %s" \
+                  % (AS, joinsource, WHERE, ORDER, LIMIT)
+        return (command, values)
 
-        command = "SELECT *" + AS + " FROM " + joinsource + WHERE + \
-            ORDER + LIMIT + ";"
-        self._exec(command, values)
+    def where(self, joinsource, col_alias = None, limit = None, order = None, 
+              values = [], **conditions):
+        """ Get a up to "limit" table rows (limit == 0: no limit) where 
+            the key:value pairs of the dictionary "conditions" are set to the 
+            same value in the database table """
+        (command, newvalues) = self.where_query(joinsource, col_alias, limit,
+                                             order, **conditions)
+        self._exec(command + ";", values + newvalues)
         
     def count(self, joinsource, **conditions):
         """ Count rows where the key:value pairs of the dictionary "conditions" are 
@@ -242,7 +255,7 @@ class MyCursor(sqlite3.Cursor):
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self._where_str("WHERE", **conditions)
 
-        command = "SELECT COUNT(*)" + " FROM " + joinsource + WHERE + ";"
+        command = "SELECT COUNT(*) FROM %s %s;" % (joinsource, WHERE)
         self._exec(command, values)
         r = self.fetchone()
         return int(r[0])
@@ -250,13 +263,13 @@ class MyCursor(sqlite3.Cursor):
     def delete(self, table, **conditions):
         """ Delete the rows specified by conditions """
         (WHERE, values) = self._where_str("WHERE", **conditions)
-        command = "DELETE FROM " + table + WHERE + ";"
+        command = "DELETE FROM %s %s;" % (table, WHERE)
         self._exec(command, values)
 
     def where_as_dict(self, joinsource, col_alias = None, limit = None, 
-                      order = None, **conditions):
+                      order = None, values = [], **conditions):
         self.where(joinsource, col_alias=col_alias, limit=limit, 
-                      order=order, **conditions)
+                      order=order, values=values, **conditions)
         # cursor.description is a list of lists, where the first element of 
         # each inner list is the column name
         result = []
@@ -300,8 +313,8 @@ class DbTable(object):
             # If this table references another table, we use the primary
             # key of the referenced table as the foreign key name
             r = self.references # referenced table
-            fk = (r.getpk(), "INTEGER", "REFERENCES " + 
-                  r.getname() + " (" + r.getpk() + ") ")
+            fk = (r.getpk(), "INTEGER", "REFERENCES %s ( %s ) " \
+                  % (r.getname(), r.getpk()))
             fields.append(fk)
         cursor.create_table(self.tablename, fields)
         if self.references:
@@ -507,7 +520,7 @@ class DictDbAccess(collections.MutableMapping):
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
         if self._ownconn:
-            self._conn.close()
+            conn_close(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
         # MutableMapping does not have __del__, but in a complex class 
         # hierarchy, it may not be next in the MRO
@@ -563,7 +576,7 @@ class DictDbAccess(collections.MutableMapping):
         """ Set a dict entry to a value and update the DB """
         cursor = self._conn.cursor(MyCursor)
         self.__setitem_nocommit(cursor, key, value)
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def __delitem__(self, key):
@@ -571,7 +584,7 @@ class DictDbAccess(collections.MutableMapping):
         del(self._data[key])
         cursor = self._conn.cursor(MyCursor)
         self._table.delete(cursor, eq={"key": key})
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def setdefault(self, key, default = None):
@@ -584,7 +597,7 @@ class DictDbAccess(collections.MutableMapping):
             for (key, value) in default.items():
                 if not key in self:
                     self.__setitem_nocommit(cursor, key, value)
-            self._conn.commit()
+            conn_commit(self._conn)
             cursor.close()
             return None
         elif not key in self:
@@ -595,7 +608,7 @@ class DictDbAccess(collections.MutableMapping):
         cursor = self._conn.cursor(MyCursor)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
     
     def clear(self, *args):
@@ -608,7 +621,7 @@ class DictDbAccess(collections.MutableMapping):
             for key in args:
                 del(self._data[key])
                 self._table.delete(cursor, eq={"key": key})
-        self._conn.commit()
+        conn_commit(self._conn)
         cursor.close()
 
 
@@ -686,17 +699,19 @@ class Mapper(object):
         return cursor.count(joinsource, **cond)
     
     def where(self, cursor, limit = None, order = None, **cond):
+        # We want:
+        # SELECT * FROM (SELECT * from workunits WHERE status = 2 LIMIT 1) LEFT JOIN files USING ( wurowid );
         pk = self.getpk()
-        joinsource = self.table.tablename
+        (command, values) = cursor.where_query(self.table.tablename,
+                                               limit=limit, **cond)
+        joinsource = "( %s )" % command
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
-            joinsource = joinsource + " LEFT JOIN " + \
-                self.subtables[s].getname() + \
-                " USING ( " + pk + " )"
+            joinsource = "%s LEFT JOIN %s USING ( %s )" \
+                         % (joinsource, self.subtables[s].getname(), pk)
         # FIXME: don't get result rows as dict! Leave as tuple and
         # take them apart positionally
-        rows = cursor.where_as_dict(joinsource, limit=limit, order=order, 
-                                    **cond)
+        rows = cursor.where_as_dict(joinsource, order=order, values=values)
         wus = []
         for r in rows:
             # Collapse rows with identical primary key
@@ -733,33 +748,33 @@ class WuAccess(object): # {
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
-        self.conn.close()
+        conn_close(self.conn)
     
     @staticmethod
     def to_str(wus):
         r = []
         for wu in wus:
-            s = "Workunit " + str(wu["wuid"]) + ":\n"
+            s = "Workunit %s:\n" % wu["wuid"]
             for (k,v) in wu.items():
                 if k != "wuid" and k != "files":
-                    s = s + "  " + k + ": " + repr(v) + "\n"
+                    s += "  %s: %r\n" % (k, v)
             if "files" in wu:
-                s = s + "  Associated files:\n"
+                s += "  Associated files:\n"
                 if wu["files"] is None:
-                    s = s + "    None\n"
+                    s += "    None\n"
                 else:
                     for f in wu["files"]:
-                        s = s + "    " + str(f) + "\n"
+                        s += "    %s\n" % f
             r.append(s)
         return '\n'.join(r)
 
     @staticmethod
     def _checkstatus(wu, status):
-        diag (2, "WuAccess._checkstatus(" + str(wu) + ", " + str(status) + ")")
+        diag (2, "WuAccess._checkstatus(%s, %s)" % (wu, status))
         if wu["status"] != status:
-            msg = "Workunit " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
-                + ", expected " + str(status)
-            diag (0, "WuAccess._checkstatus(): " + msg)
+            msg = "Workunit %s has status %s, expected %s" \
+                  % (wu["wuid"], wu["status"], status)
+            diag (0, "WuAccess._checkstatus(): %s" % msg)
             raise StatusUpdateError(msg)
 
     def check(self, data):
@@ -816,7 +831,7 @@ class WuAccess(object): # {
         cursor = self.conn.cursor(MyCursor)
         cursor._exec("PRAGMA journal_mode=WAL;")
         self.mapper.create(cursor)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def create1(self, cursor, wutext, priority = None):
@@ -840,7 +855,7 @@ class WuAccess(object): # {
         else:
             for wu in wus:
                 self.create1(cursor, wu, priority)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def assign(self, clientid):
@@ -861,7 +876,7 @@ class WuAccess(object): # {
                  "timeassigned": str(datetime.now())}
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
-            self.conn.commit()
+            conn_commit(self.conn)
             cursor.close()
             return r[0]["wu"]
         else:
@@ -897,7 +912,7 @@ class WuAccess(object): # {
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self.add_files(cursor, files, rowid = data[pk])
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def verification(self, wuid, ok):
@@ -917,7 +932,7 @@ class WuAccess(object): # {
             d["status"] = WuStatus.VERIFIED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def cancel(self, wuid):
@@ -933,7 +948,7 @@ class WuAccess(object): # {
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
         self.mapper.table.update(cursor, d, **conditions)
-        self.conn.commit()
+        conn_commit(self.conn)
         cursor.close()
 
     def query(self, limit = None, **conditions):
@@ -1056,7 +1071,7 @@ class DbListener(patterns.Observable):
 
 class IdMap(object):
     """ Identity map. Ensures that DB-backed dictionaries on the same DB and
-    of the same table name are instanciated only once. """
+    of the same table name are instantiated only once. """
     def __init__(self):
         self.db_dicts = {}
     
@@ -1224,6 +1239,9 @@ if __name__ == '__main__': # {
     parser.add_argument('-prio', metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' 
                         'receive priority N')
+    parser.add_argument('-limit', metavar = 'N', 
+                        help = 'Limit number of records in queries',
+                        default = None)
     parser.add_argument('-result', nargs = 4, 
                         metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
@@ -1254,6 +1272,7 @@ if __name__ == '__main__': # {
     prio = 0
     if args["prio"]:
         prio = int(args["prio"][0])
+    limit = args["limit"]
     
     if use_pool:
         db_pool = DbThreadPool(dbname)
@@ -1270,7 +1289,7 @@ if __name__ == '__main__': # {
                 wus.append(s)
                 s = ""
             else:
-                s = s + line
+                s += line
         if s != "":
             wus.append(s)
         db_pool.create(wus, priority=prio)
@@ -1281,10 +1300,10 @@ if __name__ == '__main__': # {
             continue
         print(msg)
         if not args["dump"]:
-            count = db_pool.count(**condition)
+            count = db_pool.count(limit=limit, **condition)
             print (count)
         elif args["dump"]:
-            wus = db_pool.query(**condition)
+            wus = db_pool.query(limit=limit, **condition)
             if wus is None:
                 print("None")
                 continue
