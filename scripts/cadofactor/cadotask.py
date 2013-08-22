@@ -6,11 +6,12 @@ import abc
 import random
 import time
 from collections import OrderedDict
-from math import log
-import wudb
+from itertools import zip_longest
+from math import log, sqrt
 import logging
 import socket
 import patterns
+import wudb
 import cadoprograms
 import cadoparams
 import cadocommand
@@ -452,6 +453,9 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         stderrpath = self.workdir.make_filename(stderrname)
         return (stdoutpath, stderrpath)
 
+    def print_stats(self):
+        pass
+
 
 class ClientServerTask(Task, patterns.Observer):
     @abc.abstractproperty
@@ -547,6 +551,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - nothing to do")
+            self.print_stats()
             return
         
         if not self.bestpoly is None:
@@ -571,6 +576,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
+        self.print_stats()
         return
     
     def is_done(self):
@@ -585,54 +591,174 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         output_files = message.get_output_files()
         assert len(output_files) == 1
         ok = self.parse_poly(output_files[0])
+        self.parse_stats(output_files[0])
         self.verification(message, ok)
     
-    def parse_poly(self, outputfile):
+    def parse_poly(self, filename):
         poly = None
-        if outputfile:
-            with open(outputfile, "r") as polyfile:
-                for line in polyfile:
-                    # A "WARNING:" line can occur when a bad gcc version was
-                    # used for compilation
-                    if re.match("# WARNING", line):
-                        self.logger.warn("File %s contains: %s",
-                                         outputfile, line.strip())
-                    # If there is a "No polynomial found" message anywhere in
-                    # the file, we assume that there is no polynomial. This
-                    # assumption will be false if, e.g., files get concatenated
-                    if re.match("No polynomial found", line):
-                        return False
-                    # If we get the "Best polynomial" marker, we stop reading
-                    # the file, and let Polynomial.__init__() parse the rest
-                    if re.match("# Best polynomial found:", line):
-                        break
-                try:
-                    poly = Polynomial(polyfile)
-                except Exception as e:
-                    self.logger.error("Invalid polyselect file %s: %s", 
-                                      outputfile, e)
-                    return False
+        with open(filename, "r") as polyfile:
+            for line in polyfile:
+                # A "# WARNING:" line can occur when a bad gcc version was
+                # used for compilation
+                if re.match("# WARNING", line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                # If there is a "No polynomial found" message in the file,
+                # we just skip it. If there is no polynomial in this file,
+                # we'll reach EOF next and get the poly==None case below.
+                # If the file happens to be the concatenation of several
+                # polyselect output files, we should keep looking.
+                if re.match("No polynomial found", line):
+                    continue
+                # If we get the "Best polynomial" marker, we stop reading
+                # the file, and let Polynomial.__init__() parse the rest
+                if re.match("# Best polynomial found:", line):
+                    break
+            try:
+                poly = Polynomial(polyfile)
+            except Exception as e:
+                self.logger.error("Invalid polyselect file %s: %s", 
+                                  filename, e)
+                return False
         
         if not poly or not poly.is_valid():
-            self.logger.info('No polynomial found in %s', outputfile)
+            self.logger.info('No polynomial found in %s', filename)
             return False
         if not poly.MurphyE:
-            self.logger.error("Polynomial in file %s has no Murphy E value" 
-                              % outputfile)
-            return False
+            self.logger.warn("Polynomial in file %s has no Murphy E value",
+                             filename)
         if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
             self.bestpoly = poly
             update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
-                      "bestfile": outputfile}
+                      "bestfile": filename}
             self.state.update(update)
             self.logger.info("New best polynomial from file %s:"
-                             " Murphy E = %g" % (outputfile, poly.MurphyE))
+                             " Murphy E = %g" % (filename, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
         else:
             self.logger.info("Best polynomial from file %s with E=%g is "
                              "no better than current best with E=%g",
-                             outputfile, poly.MurphyE, self.bestpoly.MurphyE)
+                             filename, poly.MurphyE, self.bestpoly.MurphyE)
         return True
+    
+    # Helper functions for processing statistics:
+    def add_list(*lists):
+        """ Add one or more lists elementwise.
+        
+        Short lists are handled as if padded with zeroes. """
+        return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
+    
+    def update_lognorms(old_lognorm, new_lognorm):
+        def combine_stats(*stats):
+          """ Computes the combined mean and std.dev. for the stats
+          
+          stats is a list of 3-tuples, each containing number of sample points,
+          mean, and std.dev.
+          Returns a 3-tuple with the combined number of sample points, mean, 
+          and std. dev.
+          """
+          
+          def weigh(samples, weights):
+            return [sample*weight for (sample, weight) in zip(samples, weights)]
+          
+          # Samples is a list containing the first item (number of samples) of each
+          # item of stats, means is list means, stdvars is list of std. var.s
+          (samples, means, stdvars) = zip(*stats)
+            
+          total_samples = sum(samples)
+          total_mean = sum(weigh(means, samples)) / total_samples
+          # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
+          t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stdvars)]
+          # Compute combined variance
+          total_var = sum(weigh(t, samples))/total_samples - total_mean**2
+          return [total_samples, total_mean, sqrt(total_var)]
+        
+        lognorm = [0, 0, 0, 0, 0]
+        # print("update_lognorms: old_lognorm: %s" % old_lognorm)
+        # print("update_lognorms: new_lognorm: %s" % new_lognorm)
+        # New minimum. Don't use default value of 0 for minimum
+        if old_lognorm[1] > 0:
+            lognorm[1] = min(old_lognorm[1], new_lognorm[1])
+        else:
+            lognorm[1] = new_lognorm[1]
+        # New maximum
+        lognorm[3] = max(old_lognorm[3], new_lognorm[3])
+        # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
+        lognorm[0::2] = combine_stats(old_lognorm[0::2], new_lognorm[0::2])
+        return lognorm
+    
+    def smallest_10(*lists):
+        concat = []
+        for l in lists:
+            concat += l
+        concat.sort()
+        return concat[0:10]
+    
+    stat_conversions = (
+        ("potential collisions: %f", "stats_collisions", (float,), "0", add_list),
+        ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f", "stats_rawlognorm", (int, float, float, float, float), "0 0 0 0 0", update_lognorms),
+        ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f", "stats_optlognorm", (int, float, float, float, float), "0 0 0 0 0", update_lognorms),
+        ("tried ad-value(s): %d, found polynomial(s): %d, below maxnorm: %d", "stats_tries", (int, )*3, "0 0 0", add_list),
+        ("10 best logmu: %g %g %g %g %g %g %g %g %g %g", "stats_logmu", (float, )*10, "", smallest_10),
+        ("total time: %f", "stats_total_time", (float,), "0", add_list),
+        ("rootsieve time: %f", "rootsieve_time", (float,), "0", add_list)
+    )
+    
+    @staticmethod
+    def typecast(values, types):
+        """ Cast the values in values to the types specified in types """
+        return [t(v) for (v, t) in zip(values, types)]
+    
+    def read_stats(self, key, defaults, types):
+        return self.typecast(self.state.get(key, defaults).split(), types)
+    
+    def parse_stats(self, filename):
+        # Pattern for floating-point number
+        re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
+        cap_fp = "(%s)" % re_fp
+        
+        # Stat: potential collisions=124.92 (2.25e+00/s)
+        # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
+        # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
+        # Stat: av. g0/adm2 ratio: 8.594e+04
+        # Stat: tried 83 ad-value(s), found 132 polynomial(s), 125 below maxnorm
+        # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
+        # Stat: total phase took 55.47s
+        # Stat: rootsieve took 54.54s
+        
+        # Note for "best logmu" pattern: a regex like (%s )* does not work;
+        # the number of the capture group is determined by the paratheses in
+        # the regex string, so trying to repeat a group like this will always
+        # capture to the *same* group, overwriting previous matches, so that
+        # in the end, only the last match is in the capture group.
+        patterns = (
+            re.compile(r"# Stat: potential collisions=%s" % cap_fp),
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4)),
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4)),
+            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm"),
+            re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s" % ((cap_fp, )*10)),
+            re.compile(r"# Stat: total phase took %ss" % cap_fp),
+            re.compile(r"# Stat: rootsieve took %ss" % cap_fp),
+        )
+        stats = [None] * len(patterns)
+        with open(filename, "r") as polyfile:
+            for line in polyfile:
+                for (idx, pattern) in enumerate(patterns):
+                    match = pattern.match(line)
+                    if match:
+                        assert stats[idx] is None
+                        # print (pattern.pattern, match.groups())
+                        stats[idx] = match.groups()
+        
+        # Now merge the stats with what we had
+        for (stat, conversion) in zip(stats, self.stat_conversions):
+            if stat:
+                (name, key, types, defaults, combine) = conversion
+                old_val = self.read_stats(key, defaults, types)
+                new_val = self.typecast(stat, types)
+                final_val = combine(old_val, new_val)
+                # print(final_val)
+                self.state[key] = " ".join(map(str, final_val))
     
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
@@ -669,6 +795,17 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.submit_command(p, "%d-%d" % (adstart, adend))
         self.state["adnext"] = adend
 
+    def print_stats(self):
+        self.logger.info("Aggregate statistics:")
+        for conversion in self.stat_conversions:
+            (msgformat, key, types, defaults, combine) = conversion
+            if key in self.state:
+                stats = self.read_stats(key, defaults, types)
+                # print(msgformat, stats)
+                # Avoid exceptions when there are too few values for the
+                # format string
+                if len(stats) == len(types):
+                    self.logger.info(msgformat, *stats)
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
