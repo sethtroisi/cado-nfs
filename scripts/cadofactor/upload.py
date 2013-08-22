@@ -39,7 +39,9 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
     diag(2, "Environment:", os.environ)
 
     try: # Windows needs stdio set for binary mode.
+        # pylint: disable=F0401
         import msvcrt
+        # pylint: disable=E1101
         msvcrt.setmode (0, os.O_BINARY) # stdin  = 0
         msvcrt.setmode (1, os.O_BINARY) # stdout = 1
     except ImportError:
@@ -112,7 +114,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
                 dir=os.environ[UPLOADDIRKEY])
             filestuple = (fileitem.filename, filename)
             if False:
-                filestuple = (fileitem.filename, os.basename(filename))
+                filestuple = (fileitem.filename, os.path.basename(filename))
             filetuples.append(filestuple)
             
             # fd is a file descriptor, make a file object from it
