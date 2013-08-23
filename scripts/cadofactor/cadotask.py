@@ -1880,9 +1880,10 @@ class SqrtTask(Task):
                     raise Exception("Program failed")
                 if not stdout.decode("ascii").strip() == "Failed":
                     factorlist = list(map(int, stdout.decode("ascii").split()))
-                    # FIXME: Can sqrt print more/less than 2 factors?
-                    assert len(factorlist) == 2
-                    self.add_factor(factorlist[0])
+                    # Skip last factor which cannot produce a new split on top
+                    # of what the smaller factors did
+                    for factor in factorlist[:-1]:
+                        self.add_factor(factor)
                 self.state["next_dep"] += 1
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
