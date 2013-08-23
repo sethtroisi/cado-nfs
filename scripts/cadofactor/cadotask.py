@@ -1954,11 +1954,6 @@ class SqrtTask(Task):
         >>> SqrtTask.miller_rabin_pass(781, 5)
         True
         """
-        if number <= 3:
-            return number >= 2
-        if number % 2 == 0:
-            return False
-        # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
         po2 = 0
         exponent = number - 1
         while exponent % 2 == 0:
@@ -1976,7 +1971,13 @@ class SqrtTask(Task):
     
     @staticmethod
     def miller_rabin_tests(number, passes):
+        if number <= 3:
+            return number >= 2
+        if number % 2 == 0:
+            return False
         for i in range(0, passes):
+            # random.randrange(n) produces random integer in [0, n-1].
+            # We want [2, n-2]
             base = random.randrange(number - 3) + 2
             if not SqrtTask.miller_rabin_pass(number, base):
                 return False
