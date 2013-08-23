@@ -2245,7 +2245,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.wuar.create_tables()
         
         # Set up WU server
-        serverparams = self.parameters.myparams(["address", "port"], path_prefix + ["server"])
+        serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
