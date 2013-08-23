@@ -685,8 +685,8 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 }
 		/* gcc work is great on this next loop! */
 		/***********************************************/
-#define T WHERE_AM_I_UPDATE(w, x, j * I + i);			\
-	      sieve_increase (S_ptr + i, logp, w); i += twop
+#define T do {WHERE_AM_I_UPDATE(w, x, j * I + i);			\
+	      sieve_increase (S_ptr + i, logp, w); i += twop;} while(0)
 		/***********************************************/
 		while (i + (twop << 3) <= I) {
 		  T; T; T; T; T; T; T; T;
