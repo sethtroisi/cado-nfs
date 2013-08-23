@@ -1878,12 +1878,13 @@ class SqrtTask(Task):
                     self.submit_command(p, "dep%d" % self.state["next_dep"])
                 if rc:
                     raise Exception("Program failed")
-                if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int, stdout.decode("ascii").split()))
-                    # Skip last factor which cannot produce a new split on top
-                    # of what the smaller factors did
-                    for factor in factorlist[:-1]:
-                        self.add_factor(factor)
+                lines = stdout.decode("ascii").splitlines()
+                # Skip last factor which cannot produce a new split on top
+                # of what the smaller factors did
+                for line in lines[:-1]:
+                    if line == "Failed":
+                        break
+                    self.add_factor(int(line))
                 self.state["next_dep"] += 1
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
