@@ -1878,11 +1878,13 @@ class SqrtTask(Task):
                     self.submit_command(p, "dep%d" % self.state["next_dep"])
                 if rc:
                     raise Exception("Program failed")
-                if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int, stdout.decode("ascii").split()))
-                    # FIXME: Can sqrt print more/less than 2 factors?
-                    assert len(factorlist) == 2
-                    self.add_factor(factorlist[0])
+                lines = stdout.decode("ascii").splitlines()
+                # Skip last factor which cannot produce a new split on top
+                # of what the smaller factors did
+                for line in lines[:-1]:
+                    if line == "Failed":
+                        break
+                    self.add_factor(int(line))
                 self.state["next_dep"] += 1
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
@@ -1953,11 +1955,6 @@ class SqrtTask(Task):
         >>> SqrtTask.miller_rabin_pass(781, 5)
         True
         """
-        if number <= 3:
-            return number >= 2
-        if number % 2 == 0:
-            return False
-        # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
         po2 = 0
         exponent = number - 1
         while exponent % 2 == 0:
@@ -1975,7 +1972,13 @@ class SqrtTask(Task):
     
     @staticmethod
     def miller_rabin_tests(number, passes):
+        if number <= 3:
+            return number >= 2
+        if number % 2 == 0:
+            return False
         for i in range(0, passes):
+            # random.randrange(n) produces random integer in [0, n-1].
+            # We want [2, n-2]
             base = random.randrange(number - 3) + 2
             if not SqrtTask.miller_rabin_pass(number, base):
                 return False
@@ -2244,7 +2247,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.wuar.create_tables()
         
         # Set up WU server
-        serverparams = self.parameters.myparams(["address", "port"], path_prefix + ["server"])
+        serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"

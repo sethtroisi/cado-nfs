@@ -26,7 +26,6 @@ if sys.version_info.major == 3:
 else:
     from Queue import Queue
 import patterns
-import signalhandler
 
 debug = 1
 

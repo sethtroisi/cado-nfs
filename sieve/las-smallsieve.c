@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <pthread.h>
+#include <emmintrin.h>
 #include "las-config.h"
 #include "las-smallsieve.h"
 #include "las-types.h"
@@ -7,6 +8,19 @@
 #include "las-qlattice.h"
 #include "misc.h"
 #include "portability.h"
+
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
 
 /* It's defined as a global variable in las.c */
 extern pthread_mutex_t io_mutex;
@@ -425,6 +439,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                                int side,
 			       where_am_I_ptr w MAYBE_UNUSED)
 {
+  /*
+  static uint64_t cpt0 = 0, cpt1 = 0;
+  cpt0 -= cputicks();
+  */
+
     const uint32_t I = si->I;
     const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
     unsigned long j;
@@ -625,20 +644,21 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     // sieve with everyone, since pattern-sieving may miss some of the
     // small primes.
 
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
+    /* ALM: size_t for i and twop to speed up in x86 with LEA asm instructions */
+    for(size_t i = 0 ; i < (size_t) ssd->nb_ssp ; i++) {
         int fence;
         unsigned int event;
         event = next_marker->event;
         fence = next_marker->index;
         next_marker++;
-        for( ; i < fence ; i++) {
+        for( ; i < (size_t) fence ; i++) {
             ssp_t * ssp = &(ssd->ssp[i]);
             const fbprime_t p = ssp->p;
             const fbprime_t r = ssp->r;
             WHERE_AM_I_UPDATE(w, p, p);
             const unsigned char logp = ssd->logp[i];
             unsigned char *S_ptr = S;
-            fbprime_t twop;
+            /* fbprime_t twop; */ size_t twop;
             unsigned int linestart = 0;
             /* Always S_ptr = S + linestart. S_ptr is used for the actual array
                updates, linestart keeps track of position relative to start of
@@ -657,19 +677,24 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             for (j = 0; j < nj; j++) {
                 WHERE_AM_I_UPDATE(w, j, j);
                 twop = p;
-                unsigned int i = i0;
-                if ((((nj & N) ^ j) & 1) == 0) { /* (nj*N+j)%2 */
+                size_t i = i0;
+                if (!(((nj & N) ^ j) & 1)) { /* (nj*N+j)%2 */
                     /* for j even, we sieve only odd i. */
                     twop += p;
-                    i += (i0 & 1) ? 0 : p;
+		    if (!(i0 & 1)) i += p;
                 }
-                for ( ; i < I; i += twop) {
-                    WHERE_AM_I_UPDATE(w, x, j * I + i);
-                    sieve_increase (S_ptr + i, logp, w);
-                }
+		/* gcc work is great on this next loop! */
+		/***********************************************/
+#define T do {WHERE_AM_I_UPDATE(w, x, j * I + i);			\
+	      sieve_increase (S_ptr + i, logp, w); i += twop;} while(0)
+		/***********************************************/
+		while (i + (twop << 3) <= I) {
+		  T; T; T; T; T; T; T; T;
+		}
+                while (i < I) T;
+#undef T
                 i0 += r;
-                if (i0 >= p)
-                    i0 -= p;
+                if (i0 >= p) i0 -= p;
                 S_ptr += I;
                 linestart += I;
             }
