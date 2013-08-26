@@ -340,7 +340,7 @@ class FileLockedException(IOError):
     pass
 
 def open_exclusive(filename):
-    """ Open a file and get an exlcusige lock on it """
+    """ Open a file and get an exclusive lock on it """
     fileobj = open(filename)
     try:
         fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
