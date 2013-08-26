@@ -42,6 +42,12 @@ function find_timeout() {
     local TIMEOUT_DURATION="$1"
     test -z "$TIMEOUT_DURATION" && return 0
     TIMEOUT_BIN="`which timeout 2>/dev/null`"
+    if [ -z "$TIMEOUT_BIN" ]
+    then
+        # Maybe it's not a GNU system, but with GNU coreutils installed
+        # with "g" prefix to all binaries
+        TIMEOUT_BIN="`which gtimeout 2>/dev/null`"
+    fi
     if [ -n "$TIMEOUT_BIN" ]
     then
         TIMEOUT[0]="$TIMEOUT_BIN"
