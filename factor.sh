@@ -45,7 +45,8 @@ function find_timeout() {
     if [ -n "$TIMEOUT_BIN" ]
     then
         TIMEOUT[0]="$TIMEOUT_BIN"
-        TIMEOUT[1]="$TIMEOUT_DURATION"
+        TIMEOUT[1]="--signal=SIGINT"
+        TIMEOUT[2]="$TIMEOUT_DURATION"
         return 0
     fi
     return 1
