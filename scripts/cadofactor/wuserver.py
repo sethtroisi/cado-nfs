@@ -16,7 +16,44 @@ import upload
 # Import upload to get the shell environment variable name in which we should
 # store the path to the upload directory
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+def _select_retry(func, *args):
+    """restart a select call interrupted by EINTR"""
+    import select
+    while True:
+        try:
+            return select.select(*args)
+        except OSError as e:
+            if e.errno != errno.EINTR:
+                raise
+
+class FixedHTTPServer(http.server.HTTPServer):
+    """ A wrapper class that fixes the serve_forever() method in
+    http.server.HTTPServer
+    """
+    def serve_forever(self, poll_interval=0.5):
+        """Handle one request at a time until shutdown.
+
+        Polls for shutdown every poll_interval seconds. Ignores
+        self.timeout. If you need to do periodic tasks, do them in
+        another thread.
+        
+        Copy of the Python library serve_forever() method, but with the
+        select() call replaced by the _select_retry() wrapper that re-tries
+        select in case of EINTR.
+        See http://bugs.python.org/issue7978
+        """
+        self.__is_shut_down.clear()
+        try:
+            while not self.__shutdown_request:
+                r, w, e = _select_retry([self], [], [], poll_interval)
+                if self in r:
+                    self._handle_request_noblock()
+        finally:
+            self.__shutdown_request = False
+            self.__is_shut_down.set()
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
 
