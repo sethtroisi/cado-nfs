@@ -12,19 +12,11 @@ from workunit import Workunit
 import datetime
 import wudb
 import upload
+import select
+import errno
 
 # Import upload to get the shell environment variable name in which we should
 # store the path to the upload directory
-
-def _select_retry(func, *args):
-    """restart a select call interrupted by EINTR"""
-    import select
-    while True:
-        try:
-            return select.select(*args)
-        except OSError as e:
-            if e.errno != errno.EINTR:
-                raise
 
 class FixedHTTPServer(http.server.HTTPServer):
     """ Work-around class for http.server.HTTPServer that handles EINTR """
@@ -39,6 +31,9 @@ class FixedHTTPServer(http.server.HTTPServer):
                 return super().serve_forever(*args, **kwargs)
             except OSError as e:
                 if e.errno != errno.EINTR:
+                    raise
+            except select.error as e:
+                if e.args[0] != errno.EINTR:
                     raise
 
 
