@@ -27,30 +27,19 @@ def _select_retry(func, *args):
                 raise
 
 class FixedHTTPServer(http.server.HTTPServer):
-    """ A wrapper class that fixes the serve_forever() method in
-    http.server.HTTPServer
-    """
-    def serve_forever(self, poll_interval=0.5):
-        """Handle one request at a time until shutdown.
+    """ Work-around class for http.server.HTTPServer that handles EINTR """
+    def serve_forever(self, *args, **kwargs):
+        """ Wrapper around http.server.HTTPServer.serve_forever() that
+        restarts in case of EINTR.
 
-        Polls for shutdown every poll_interval seconds. Ignores
-        self.timeout. If you need to do periodic tasks, do them in
-        another thread.
-        
-        Copy of the Python library serve_forever() method, but with the
-        select() call replaced by the _select_retry() wrapper that re-tries
-        select in case of EINTR.
         See http://bugs.python.org/issue7978
         """
-        self.__is_shut_down.clear()
-        try:
-            while not self.__shutdown_request:
-                r, w, e = _select_retry([self], [], [], poll_interval)
-                if self in r:
-                    self._handle_request_noblock()
-        finally:
-            self.__shutdown_request = False
-            self.__is_shut_down.set()
+        while True:
+            try:
+                return super().serve_forever(*args, **kwargs)
+            except OSError as e:
+                if e.errno != errno.EINTR:
+                    raise
 
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
@@ -353,7 +342,7 @@ class ServerLauncher(object):
             ServerClass = ThreadedHTTPServer
         else:
             logging.info("Not using threaded server")
-            ServerClass = http.server.HTTPServer
+            ServerClass = FixedHTTPServer
         if use_db_pool:
             self.db_pool = wudb.DbThreadPool(dbfilename, 1)
         else:
