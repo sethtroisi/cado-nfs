@@ -197,5 +197,5 @@ slaves.basepath = /tmp/wuclient
 # slaves.home.nrclients = 1
 # slaves.home.scriptpath = $(sourcedir)/scripts/cadofactor
 # slaves.work.hostname = workstation1, workstation2
-# slaves.home.nrclients = 4
-# slaves.home.scriptpath = /path/to/scripts/cadofactor
+# slaves.work.nrclients = 4
+# slaves.work.scriptpath = /path/to/scripts/cadofactor
