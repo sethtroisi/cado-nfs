@@ -2353,11 +2353,14 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def run(self):
         self.server.serve()
         
-        for clients in self.clients:
-            clients.launch_clients()
+        try:
+            for clients in self.clients:
+                clients.launch_clients()
         
-        while self.run_next_task():
-            self.do_chores()
+            while self.run_next_task():
+                self.do_chores()
+        except KeyboardInterrupt:
+            self.logger.fatal("Received KeyboardInterrupt. Terminating")
         
         self.do_chores()
         

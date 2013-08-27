@@ -1,6 +1,6 @@
 import logging
 
-from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+from logging import DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
 MESSAGE = DEBUG - 1
 COMMAND = DEBUG + 1
 logging.addLevelName(MESSAGE, "Message")
@@ -39,6 +39,7 @@ class ScreenFormatter(logging.Formatter):
         INFO : ANSI.BRIGHTGREEN,
         WARNING : ANSI.BRIGHTYELLOW,
         ERROR : ANSI.BRIGHTRED,
+        FATAL : ANSI.BRIGHTRED,
         COMMAND : ANSI.BRIGHTBLUE
     }
     

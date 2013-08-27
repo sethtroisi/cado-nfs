@@ -12,11 +12,32 @@ from workunit import Workunit
 import datetime
 import wudb
 import upload
+import select
+import errno
 
 # Import upload to get the shell environment variable name in which we should
 # store the path to the upload directory
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class FixedHTTPServer(http.server.HTTPServer):
+    """ Work-around class for http.server.HTTPServer that handles EINTR """
+    def serve_forever(self, *args, **kwargs):
+        """ Wrapper around http.server.HTTPServer.serve_forever() that
+        restarts in case of EINTR.
+
+        See http://bugs.python.org/issue7978
+        """
+        while True:
+            try:
+                return super().serve_forever(*args, **kwargs)
+            except OSError as e:
+                if e.errno != errno.EINTR:
+                    raise
+            except select.error as e:
+                if e.args[0] != errno.EINTR:
+                    raise
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
 
@@ -316,7 +337,7 @@ class ServerLauncher(object):
             ServerClass = ThreadedHTTPServer
         else:
             logging.info("Not using threaded server")
-            ServerClass = http.server.HTTPServer
+            ServerClass = FixedHTTPServer
         if use_db_pool:
             self.db_pool = wudb.DbThreadPool(dbfilename, 1)
         else:

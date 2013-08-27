@@ -520,11 +520,6 @@ class DictDbAccess(collections.MutableMapping):
         """ Close the DB connection and delete the dictionary """
         if self._ownconn:
             conn_close(self._conn)
-        # http://docs.python.org/2/reference/datamodel.html#object.__del__
-        # MutableMapping does not have __del__, but in a complex class 
-        # hierarchy, it may not be next in the MRO
-        if hasattr(super(), "__del__"):
-            super().__del__()
     
     def __convert_value(self, row):
         valuestr = row["value"]
