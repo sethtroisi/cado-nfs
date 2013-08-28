@@ -2169,7 +2169,6 @@ sub do_freerels {
 
 my $dup_purge_done = 0;
 my $nslices;
-my $nb_dup = 0;
 
 # duplicates
 sub dup {
@@ -2232,7 +2231,7 @@ sub dup {
             cmd("$param{'bindir'}/filter/dup1 ".
                 "-n $param{'nslices_log'} ".
                 "-out $param{'prefix'}.nodup ".
-                "-prefix $param{'name'}.rels.$nb_dup ".
+                "-prefix $param{'name'}.rels ".
                 "-filelist $param{'prefix'}.dup1.filelist ".
                 "-basepath $param{'wdir'} ",
                 { cmdlog => 1, kill => 1,
@@ -2566,7 +2565,6 @@ sub do_sieve {
         if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
-            $nb_dup++;
             $tab_level--;
             return 0;
         } elsif ($ret->{'status'} == 1) {
