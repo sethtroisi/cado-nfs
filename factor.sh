@@ -28,6 +28,10 @@ options:
     -py           - use Python cadofactor script as worker
     -timeout <integer>
                   - abort computation after this many seconds
+
+    If the shell environment variable CADO_DEBUG is set to any non-empty
+    string, the working directory is not deleted even if the factorization
+    succeeds.
 EOF
 }
 
