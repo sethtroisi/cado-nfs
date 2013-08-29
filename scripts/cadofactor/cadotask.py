@@ -840,7 +840,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - nothing to do")
-            return
+            return not self.bestpoly is None
         
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
@@ -860,11 +860,11 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if self.bestpoly is None:
             self.logger.error ("No polynomial found. Consider increasing the "
                                "search range bound admax, or maxnorm")
-            return
+            return False
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
-        return
+        return True
     
     def is_done(self):
         return not self.bestpoly is None and not self.need_more_wus() and \
@@ -1041,6 +1041,7 @@ class FactorBaseTask(Task):
 
         self.check_files_exist([self.get_filename()], "output", 
                                shouldexist=True)
+        return True
     
     def get_filename(self):
         return self.get_state_filename("outputfile")
@@ -1125,6 +1126,7 @@ class FreeRelTask(Task):
         self.check_files_exist([self.get_freerel_filename(),
                                 self.get_renumber_filename()], "output", 
                                shouldexist=True)
+        return True
 
     def parse_file(self, stderr):
         found = {}
@@ -1242,7 +1244,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         self.logger.info("Reached target of %d relations, now have %d",
                          self.state["rels_wanted"], self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
-        return
+        return True
     
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -1432,7 +1434,7 @@ class Duplicates1Task(Task, FilesCreator):
                   for i in range(0, self.nr_slices)]
         self.logger.info("Relations per slice: %s", ", ".join(totals))
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
-        return
+        return True
     
     def parse_output_files(self, stderr):
         files = {}
@@ -1559,6 +1561,7 @@ class Duplicates2Task(Task, FilesCreator):
         self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
+        return True
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1646,7 +1649,7 @@ class PurgeTask(Task):
         if "purgedfile" in self.state and input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
-            return
+            return True
         
         self.state.pop("purgedfile", None)
         self.state.pop("input_nrels", None)
@@ -1696,6 +1699,7 @@ class PurgeTask(Task):
             self.logger.info("Not enough relations")
             self.request_more_relations(nunique)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
+        return True
     
     def request_more_relations(self, nunique):
         r"""
@@ -1911,6 +1915,7 @@ class MergeTask(Task):
                 self.state["densefile"] = densefilename.get_relative()
             
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        return True
     
     def get_index_filename(self):
         return self.get_state_filename("indexfile")
@@ -1967,6 +1972,7 @@ class LinAlgTask(Task):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.state["dependency"] =  dependencyfilename.get_relative()
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+        return True
 
     def get_dependency_filename(self):
         return self.get_state_filename("dependency")
@@ -2025,7 +2031,7 @@ class CharactersTask(Task):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename.get_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
-        return
+        return True
     
     def get_kernel_filename(self):
         return self.get_state_filename("kernel")
@@ -2094,6 +2100,7 @@ class SqrtTask(Task):
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
+        return True
     
     def is_done(self):
         for (factor, isprime) in self.factors.items():
@@ -2584,8 +2591,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 # self.logger.info("Next task that wants to run: %s",
                 #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
-                task.run()
-                return True
+                return task.run()
         return False
     
     def do_chores(self):
