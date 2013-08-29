@@ -198,7 +198,7 @@ elif ! [ -d "$bindir" ] ; then
     echo "Binary dir $bindir not found." >&2 ; exit 1
 elif ! [ -x "$cadofactor" ] ; then
     echo "Script $cadofactor not found." >&2 ; exit 1
-elif ! [ -x "$cputime" ] ; then
+elif ! $python && ! [ -x "$cputime" ] ; then
     echo "Script $cputime not found." >&2 ; exit 1
 else
     # Ok, everything looks good.
@@ -275,9 +275,12 @@ rc=$?
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
-    # Print timings
-    cd $t
-    $cputime
+    if ! $python
+    then
+        # Print timings
+        cd $t
+        $cputime
+    fi
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi
