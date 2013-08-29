@@ -2410,7 +2410,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.parameters.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
-        self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        self.registered_filenames = self.make_db_dict('server_registered_filenames')
         self.chores = []
         
         # Init WU DB
