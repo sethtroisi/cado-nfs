@@ -333,6 +333,26 @@ class Statistics():
         """
         return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
     
+    def weigh(samples, weights):
+      return [sample*weight for (sample, weight) in zip(samples, weights)]
+    
+    def combine_mean(means, samples):
+        """ From two lists, one containing values and the other containing
+        the respective sample sizes (i.e., weights of the values), compute
+        the combined mean (i.e. the weighted mean of the values).
+        The two lists must have equal length.
+        """
+        total_samples = sum(samples)
+        weighted_sum = sum(Statistics.weigh(means, samples))
+        return [weighted_sum / total_samples, total_samples]
+    
+    def zip_combine_mean(*lists):
+        """ From a list of 2-tuples, each tuple containing a value and a
+        weight, compute the weighted average of the values.
+        """
+        (means, samples) = zip(*lists)
+        return Statistics.combine_mean(means, samples)
+    
     def combine_stats(*stats):
         """ Computes the combined mean and std.dev. for the stats
         
@@ -344,22 +364,15 @@ class Statistics():
         
         # FIXME: buggy!
         
-        def weigh(samples, weights):
-          return [sample*weight for (sample, weight) in zip(samples, weights)]
-        
-        def combine_mean(means, samples):
-            return sum(weigh(means, samples)) / sum(samples)
-        
         # Samples is a list containing the first item (number of samples) of each
         # item of stats, means is list means, stdvars is list of std. var.s
         (samples, means, stddevs) = zip(*stats)
         
-        total_samples = sum(samples)
-        total_mean = combine_mean(means, samples)
+        (total_mean, total_samples) = Statistics.combine_mean(means, samples)
         # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
         t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stddevs)]
         # Compute combined variance
-        total_var = combine_mean(t, samples) - total_mean**2
+        total_var = Statistics.combine_mean(t, samples)[0] - total_mean**2
         return [total_samples, total_mean, sqrt(total_var)]
     
     def test_combine_stats():
@@ -1156,7 +1169,35 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             ("qmin", "qrange", "rels_wanted", "alim")
     @property
     def stat_conversions(self):
-        return []
+        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
+        # Total wct time 7.0s [precise timings available only for mono-thread]
+        # Total 26198 reports [0.000267s/r, 155.9r/sq]
+        return (
+            (
+                "Average J: %f for %d special-q",
+                "stats_avg_J",
+                (float, int),
+                "0 0",
+                Statistics.zip_combine_mean,
+                re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+            ),
+            (
+                "Max bucket fill: %f",
+                "stats_max_bucket_fill",
+                (float, ),
+                "0",
+                max,
+                re.compile(r"#.*max bucket fill %s" % cap_fp)
+            ),
+            (
+                "Total wall clock time: %f",
+                "stats_total_wall_clock_time",
+                (float, ),
+                "0",
+                Statistics.add_list,
+                re.compile(r"# Total wct time %ss" % cap_fp)
+            )
+        )
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
@@ -1209,6 +1250,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         output_files = message.get_output_files()
         assert len(output_files) == 1
         ok = self.parse_output_file(output_files[0])
+        self.parse_stats(output_files[0])
         self.verification(message, ok)
     
     def parse_output_file(self, filename):
@@ -1226,21 +1268,6 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
                     return True
         self.logger.error("Number of relations message not found in file %s", filename)
         return False
-    
-    def parse_stats(self, filename):
-        """ Parse statistics from the siever output files
-        
-        They are of the form:
-        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
-        # Total wct time 7.0s [precise timings available only for mono-thread]
-        # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        """
-        
-        size = os.path.getsize(filename)
-        with open(filename, "r") as f:
-            f.seek(max(size - self.file_end_offset, 0))
-            for line in f:
-                pass
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
