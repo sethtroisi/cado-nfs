@@ -426,6 +426,8 @@ class HasStatistics(object, metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions)
+    def get_statistics_as_strings(self):
+        return self.statistics.as_strings()
 
 
 class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
@@ -657,7 +659,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
     def print_stats(self):
         if not isinstance(self, HasStatistics):
             return
-        stat_msgs =  self.statistics.as_strings()
+        stat_msgs =  self.get_statistics_as_strings()
         if stat_msgs:
             self.logger.info("Aggregate statistics:")
             for msg in stat_msgs:
@@ -1268,6 +1270,11 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
                     return True
         self.logger.error("Number of relations message not found in file %s", filename)
         return False
+    
+    def get_statistics_as_strings(self):
+        strings = ["Total number of relations: %d" % self.get_nrels()]
+        strings += super().get_statistics_as_strings()
+        return strings
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
