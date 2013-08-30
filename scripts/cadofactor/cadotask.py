@@ -1884,8 +1884,7 @@ class MergeTask(Task):
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params.get("gzip", True) else ""
-            # FIXME: merge currently does not read history in gzip format
-            historyfile = self.workdir.make_filename("history") # + use_gz)
+            historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
