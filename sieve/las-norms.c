@@ -38,7 +38,7 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+x" (i));             /* Really need + here! i is not modified in C code! */
+	    : "+&x" (i));             /* Really need + here! i is not modified in C code! */
   return (uint8_t) ((i-add)*scale);
 #else
   /* Same function, but in x86 gcc needs to transfer the input i from a
@@ -64,13 +64,13 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
-	    : "+x" (i));
+	    : "+&x" (i));
   i = (i - add) * scale;
   __asm__ ( 
 	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
-	    : "+x" (i));
+	    : "+&x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
@@ -93,7 +93,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));
+	   : "+&x"(i):"x"(un));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
@@ -101,7 +101,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
-	   : "+x"(i));
+	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
 
@@ -112,7 +112,7 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));
+	   : "+&x"(i):"x"(un));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -126,7 +126,7 @@ static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));	   
+	   : "+&x"(i):"x"(un));	   
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal1] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -1120,7 +1120,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
            "jl 0b\n"                                            \
            : "=&r"(cP)                                          \
            : "r"(xS), "r"(P), "r"(Idiv2), "x"(tt)               \
-           : "%rax", "%rbx", "%rcx", "%xmm0", "%xmm1");
+           : "%rax", "%rbx", "%rcx", "%xmm0", "%xmm1", "cc");
 
    But the result is x1.5 slower than this version, because it needs
    6 instructions to look at only one rational (ALG_1BYTE).
@@ -1312,7 +1312,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
     "x"(scale), "r"(&un), "x"(u0), "x"(u1), "x"(u2),			\
     "x"(u3), "x"(u4), "x"(u5), "x"(u6), "x"(u7),			\
     "x"(u8), "x"(u9)							\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2")
+    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
 
 #define ALG_ILP3D							\
   ALG_ILP0								\
@@ -1320,7 +1320,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   "6:"									\
   :: "r"(xS), "r"(S), "r"(Idiv2), "x"(tt), "x"(add),			\
     "x"(scale), "r"(&un), "r"(u), "r"((uint64_t) (d<<4))			\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2")
+    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
   /****************** End of local define ******************************/
 
   memset (S, 255, (Idiv2<<1) * ej);

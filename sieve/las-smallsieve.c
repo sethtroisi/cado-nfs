@@ -18,7 +18,7 @@ static inline uint64_t cputicks()
                 "orq %%rdx, %%rax\n\t"
                 : "=a"(r)
                 :
-                : "rdx");
+                : "%rdx", "cc");
         return r;
 }
 
@@ -669,11 +669,12 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	 with sieve_increase(pi,logp,w), or *pi += logp in fact.
       */
 #if defined( HAVE_SSE2 ) && !defined( TRACK_CODE_PATH ) /* x86 optimized code */
+#define T
 #define U1								\
         "addb %4,(%1)\n"                /* sieve_increase(pi,logp,w) */	\
 	"addb %4,(%1,%3,1)\n"   /* sieve_increase(p_or_2p+pi,logp,w) */ \
 	"addb %4,(%1,%3,2)\n" /* sieve_increase(p_or_2p*2+pi,logp,w) */ \
-	"lea (%1,%2),%1\n"                      /* pi += p_or_2p * 3 */
+	"lea (%1,%2,1),%1\n"                    /* pi += p_or_2p * 3 */
 #define U2								\
         "cmp %5, %1\n"		          /* if (pi >= S_ptr) break; */	\
 	"jae 2f\n"							\
@@ -685,7 +686,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	__asm__ __volatile__ (						\
         "lea (%3,%3,2), %2\n"         /* three_p_or_2p = p_or_2p * 3 */ \
 	"lea (%1,%2,4), %0\n"            /* pi_end = pi + p_or_2p*12 */ \
-	"cmp %5, %0\n"	            /* if (pi_end > S_ptr) jump loop */	\
+	"cmp %5, %0\n"	              /* if (pi_end > S_ptr) no loop */	\
 	"jbe 0f\n"							\
 	"1:\n"								\
         U2 U2 U2 U2 U2 U2 U2 U2 U2 U2 U2				\
@@ -701,14 +702,16 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	"jbe 0b\n"							\
 	"jmp 1b\n"							\
 	".balign 8\n 2:\n"						\
-	: "=r"(pi_end), "+r"(pi), "=r"(three_p_or_2p)			\
-	: "r"(p_or_2p), "r"(logp), "r"(S_ptr));				\
+	: "=&r"(pi_end), "+&r"(pi), "=&r"(three_p_or_2p)		\
+	: "r"(p_or_2p), "q"(logp), "r"(S_ptr) : "cc");			\
       } while (0)
 #else
 #define T do {							\
 	WHERE_AM_I_UPDATE(w, x, j * I + pi + I - S_ptr);	\
 	sieve_increase (pi, logp, w); pi += p_or_2p;		\
       } while(0)
+#define U1
+#define U2
 #define U do {								\
 	while (UNLIKELY(pi + p_or_2p * 12 <= S_ptr))			\
 	  { T; T; T; T; T; T; T; T; T; T; T; T; }			\
@@ -756,9 +759,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	ssdpos[k] = i0;
       }
 #undef T
-#undef V
-#undef U
 #undef U1
+#undef U2
+#undef U
         /* cpt1 += cputicks(); */
         unsigned int event = (next_marker++)->event;
         if (event == SSP_END) {
