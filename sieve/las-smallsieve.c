@@ -917,7 +917,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ASSERT(i0 < p);
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < I; i += p) {
-                        WHERE_AM_I_UPDATE(w, x, j << si->conf->logI + i);
+     		        WHERE_AM_I_UPDATE(w, x, (j << si->conf->logI) + i);
                         sieve_increase (S_ptr + i, logp, w);
                     }
                     // odd lines only.

@@ -1723,15 +1723,15 @@ typedef const struct thread_data_s * thread_data_srcptr;
 
 #ifdef TRACE_K								
 #define FILL_BUCKET_TRACE_K(X) do {					\
-  if (trace_on_spot_x(X)) {						\
-    WHERE_AM_I_UPDATE(w, N, (X) >> 16);					\
-    WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
-    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",		\
-	     (unsigned int) (uint16_t) (X), logp, p, sidenames[side],	\
-	     (unsigned int) ((X) >> 16));				\
-    ASSERT(test_divisible(w));						\
-  }
-} while(0)
+    if (trace_on_spot_x(X)) {						\
+      WHERE_AM_I_UPDATE(w, N, (X) >> 16);				\
+      WHERE_AM_I_UPDATE(w, x, (uint16_t) (X));				\
+      fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",	\
+	       (unsigned int) (uint16_t) (X), logp, p, sidenames[side],	\
+	       (unsigned int) ((X) >> 16));				\
+      ASSERT(test_divisible(w));					\
+    }									\
+  } while(0)
 #else
 #define FILL_BUCKET_TRACE_K(X)
 #endif
