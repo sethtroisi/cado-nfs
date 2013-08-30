@@ -44,7 +44,7 @@ static inline uint64_t cputicks()
                 "orq %%rdx, %%rax\n\t"
                 : "=a"(r)
                 :
-                : "rdx");
+                : "%rdx", "cc");
         return r;
 }
 
@@ -932,7 +932,7 @@ MAYBE_UNUSED static inline uint8_t shash_find_collision_heart (uint64_t *Hj, uin
     "mov %%al, %0\n"
     : "=g"(ret)
     : "r"(Hj), "g"(Hjm), "r"(T), "r"(mask<<2), "i"(LN2SHASH_NBUCKETS-2)
-    : "%rax", "%rbx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15");
+    : "%rax", "%rbx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15", "cc");
   return(ret);
 }
 

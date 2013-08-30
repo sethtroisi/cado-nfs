@@ -44,6 +44,7 @@ config/ssse3.c
 config/ssse3.cmake
 config/sse41.c
 config/sse41.cmake
+config/strlcpy.cmake
 config/sync_fetch.c
 config/sync_fetch.cmake
 config/mingw.cmake

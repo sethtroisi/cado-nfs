@@ -587,7 +587,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     char str[STRLENMAX], *rp MAYBE_UNUSED;
     index_data_t index_data = NULL;
 
-    hisfile = fopen (hisname, "r");
+    hisfile = fopen_maybe_compressed (hisname, "r");
     ASSERT_ALWAYS(hisfile != NULL);
     /* read first line */
     rp = fgets (str, STRLENMAX, hisfile);
@@ -702,7 +702,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
         free (index_data);
     }
 
-    fclose (hisfile);
+    fclose_maybe_compressed (hisfile, hisname);
 }
 
 static void
@@ -827,11 +827,11 @@ main(int argc, char *argv[])
     purgedfile_stream_init(ps);
     purgedfile_stream_openfile(ps, purgedname);
 
-    hisfile = fopen (hisname, "r");
+    hisfile = fopen_maybe_compressed (hisname, "r");
     ASSERT_ALWAYS(hisfile != NULL);
     rp = fgets(str, STRLENMAX, hisfile);
     ASSERT_ALWAYS(rp);
-    fclose (hisfile);
+    fclose_maybe_compressed (hisfile, hisname);
 
     // read parameters that should be the same as in purgedfile!
     sscanf(str, "%d %d", &nrows, &ncols);

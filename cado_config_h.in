@@ -46,6 +46,8 @@
 #cmakedefine    HAVE_REALPATH
 #cmakedefine    HAVE_SYS_MMAN_H
 #cmakedefine    HAVE_MMAP
+#cmakedefine    HAVE_STRLCPY
+#cmakedefine    HAVE_STRLCAT
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF

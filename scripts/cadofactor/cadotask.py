@@ -333,6 +333,26 @@ class Statistics():
         """
         return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
     
+    def weigh(samples, weights):
+      return [sample*weight for (sample, weight) in zip(samples, weights)]
+    
+    def combine_mean(means, samples):
+        """ From two lists, one containing values and the other containing
+        the respective sample sizes (i.e., weights of the values), compute
+        the combined mean (i.e. the weighted mean of the values).
+        The two lists must have equal length.
+        """
+        total_samples = sum(samples)
+        weighted_sum = sum(Statistics.weigh(means, samples))
+        return [weighted_sum / total_samples, total_samples]
+    
+    def zip_combine_mean(*lists):
+        """ From a list of 2-tuples, each tuple containing a value and a
+        weight, compute the weighted average of the values.
+        """
+        (means, samples) = zip(*lists)
+        return Statistics.combine_mean(means, samples)
+    
     def combine_stats(*stats):
         """ Computes the combined mean and std.dev. for the stats
         
@@ -344,22 +364,15 @@ class Statistics():
         
         # FIXME: buggy!
         
-        def weigh(samples, weights):
-          return [sample*weight for (sample, weight) in zip(samples, weights)]
-        
-        def combine_mean(means, samples):
-            return sum(weigh(means, samples)) / sum(samples)
-        
         # Samples is a list containing the first item (number of samples) of each
         # item of stats, means is list means, stdvars is list of std. var.s
         (samples, means, stddevs) = zip(*stats)
         
-        total_samples = sum(samples)
-        total_mean = combine_mean(means, samples)
+        (total_mean, total_samples) = Statistics.combine_mean(means, samples)
         # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
         t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stddevs)]
         # Compute combined variance
-        total_var = combine_mean(t, samples) - total_mean**2
+        total_var = Statistics.combine_mean(t, samples)[0] - total_mean**2
         return [total_samples, total_mean, sqrt(total_var)]
     
     def test_combine_stats():
@@ -413,6 +426,8 @@ class HasStatistics(object, metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions)
+    def get_statistics_as_strings(self):
+        return self.statistics.as_strings()
 
 
 class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
@@ -644,7 +659,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
     def print_stats(self):
         if not isinstance(self, HasStatistics):
             return
-        stat_msgs =  self.statistics.as_strings()
+        stat_msgs =  self.get_statistics_as_strings()
         if stat_msgs:
             self.logger.info("Aggregate statistics:")
             for msg in stat_msgs:
@@ -825,7 +840,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - nothing to do")
-            return
+            return not self.bestpoly is None
         
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
@@ -845,11 +860,11 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if self.bestpoly is None:
             self.logger.error ("No polynomial found. Consider increasing the "
                                "search range bound admax, or maxnorm")
-            return
+            return False
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
-        return
+        return True
     
     def is_done(self):
         return not self.bestpoly is None and not self.need_more_wus() and \
@@ -974,7 +989,7 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", )
+            ("alim", "gzip")
 
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -1011,7 +1026,9 @@ class FactorBaseTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
-            outputfilename = self.workdir.make_filename("roots")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.MakeFB(poly=polyfilename,
@@ -1026,6 +1043,7 @@ class FactorBaseTask(Task):
 
         self.check_files_exist([self.get_filename()], "output", 
                                shouldexist=True)
+        return True
     
     def get_filename(self):
         return self.get_state_filename("outputfile")
@@ -1045,7 +1063,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", "rlim")
+            ("alim", "rlim", "gzip")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -1087,8 +1105,10 @@ class FreeRelTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
-            freerelfilename = self.workdir.make_filename("freerel")
-            renumberfilename = self.workdir.make_filename("renumber")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            freerelfilename = self.workdir.make_filename("freerel" + use_gz)
+            renumberfilename = self.workdir.make_filename("renumber" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
@@ -1110,6 +1130,7 @@ class FreeRelTask(Task):
         self.check_files_exist([self.get_freerel_filename(),
                                 self.get_renumber_filename()], "output", 
                                shouldexist=True)
+        return True
 
     def parse_file(self, stderr):
         found = {}
@@ -1156,7 +1177,35 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             ("qmin", "qrange", "rels_wanted", "alim")
     @property
     def stat_conversions(self):
-        return []
+        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
+        # Total wct time 7.0s [precise timings available only for mono-thread]
+        # Total 26198 reports [0.000267s/r, 155.9r/sq]
+        return (
+            (
+                "Average J: %f for %d special-q",
+                "stats_avg_J",
+                (float, int),
+                "0 0",
+                Statistics.zip_combine_mean,
+                re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+            ),
+            (
+                "Max bucket fill: %f",
+                "stats_max_bucket_fill",
+                (float, ),
+                "0",
+                max,
+                re.compile(r"#.*max bucket fill %s" % cap_fp)
+            ),
+            (
+                "Total wall clock time: %f",
+                "stats_total_wall_clock_time",
+                (float, ),
+                "0",
+                Statistics.add_list,
+                re.compile(r"# Total wct time %ss" % cap_fp)
+            )
+        )
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
@@ -1199,7 +1248,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         self.logger.info("Reached target of %d relations, now have %d",
                          self.state["rels_wanted"], self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
-        return
+        return True
     
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -1209,6 +1258,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         output_files = message.get_output_files()
         assert len(output_files) == 1
         ok = self.parse_output_file(output_files[0])
+        self.parse_stats(output_files[0])
         self.verification(message, ok)
     
     def parse_output_file(self, filename):
@@ -1227,20 +1277,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         self.logger.error("Number of relations message not found in file %s", filename)
         return False
     
-    def parse_stats(self, filename):
-        """ Parse statistics from the siever output files
-        
-        They are of the form:
-        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
-        # Total wct time 7.0s [precise timings available only for mono-thread]
-        # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        """
-        
-        size = os.path.getsize(filename)
-        with open(filename, "r") as f:
-            f.seek(max(size - self.file_end_offset, 0))
-            for line in f:
-                pass
+    def get_statistics_as_strings(self):
+        strings = ["Total number of relations: %d" % self.get_nrels()]
+        strings += super().get_statistics_as_strings()
+        return strings
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
@@ -1398,7 +1438,7 @@ class Duplicates1Task(Task, FilesCreator):
                   for i in range(0, self.nr_slices)]
         self.logger.info("Relations per slice: %s", ", ".join(totals))
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
-        return
+        return True
     
     def parse_output_files(self, stderr):
         files = {}
@@ -1525,6 +1565,7 @@ class Duplicates2Task(Task, FilesCreator):
         self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
+        return True
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1612,7 +1653,7 @@ class PurgeTask(Task):
         if "purgedfile" in self.state and input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
-            return
+            return True
         
         self.state.pop("purgedfile", None)
         self.state.pop("input_nrels", None)
@@ -1662,6 +1703,7 @@ class PurgeTask(Task):
             self.logger.info("Not enough relations")
             self.request_more_relations(nunique)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
+        return True
     
     def request_more_relations(self, nunique):
         r"""
@@ -1817,7 +1859,7 @@ class MergeTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1840,7 +1882,9 @@ class MergeTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            historyfile = self.workdir.make_filename("history")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
@@ -1852,7 +1896,7 @@ class MergeTask(Task):
             if rc:
                 raise Exception("Program failed")
             
-            indexfile = self.workdir.make_filename("index")
+            indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("small.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             p = cadoprograms.Replay(binary=True,
@@ -1877,6 +1921,7 @@ class MergeTask(Task):
                 self.state["densefile"] = densefilename.get_relative()
             
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        return True
     
     def get_index_filename(self):
         return self.get_state_filename("indexfile")
@@ -1933,6 +1978,7 @@ class LinAlgTask(Task):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.state["dependency"] =  dependencyfilename.get_relative()
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+        return True
 
     def get_dependency_filename(self):
         return self.get_state_filename("dependency")
@@ -1991,7 +2037,7 @@ class CharactersTask(Task):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename.get_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
-        return
+        return True
     
     def get_kernel_filename(self):
         return self.get_state_filename("kernel")
@@ -2060,6 +2106,7 @@ class SqrtTask(Task):
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
+        return True
     
     def is_done(self):
         for (factor, isprime) in self.factors.items():
@@ -2410,7 +2457,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.parameters.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
-        self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        self.registered_filenames = self.make_db_dict('server_registered_filenames')
         self.chores = []
         
         # Init WU DB
@@ -2550,8 +2597,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 # self.logger.info("Next task that wants to run: %s",
                 #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
-                task.run()
-                return True
+                return task.run()
         return False
     
     def do_chores(self):

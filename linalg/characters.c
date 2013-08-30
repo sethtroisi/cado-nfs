@@ -333,7 +333,7 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
  * number of cols is still (number of characters) */
 static blockmatrix small_character_matrix(blockmatrix bcmat, const char * indexname)
 {
-    FILE * ix = fopen(indexname, "r");
+    FILE * ix = fopen_maybe_compressed(indexname, "r");
     int small_nrows, small_ncols;
     int ret;
 
@@ -361,7 +361,7 @@ static blockmatrix small_character_matrix(blockmatrix bcmat, const char * indexn
             }
         }
     }
-    fclose(ix);
+    fclose_maybe_compressed(ix, indexname);
     return res;
 }
 
