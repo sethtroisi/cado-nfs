@@ -910,7 +910,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', filename)
-            return False
+            # No polynomial found an a given polyselec run is not an error
+            return True
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
