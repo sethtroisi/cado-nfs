@@ -1236,7 +1236,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         while self.state["rels_found"] < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
-            outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = \
+                self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
