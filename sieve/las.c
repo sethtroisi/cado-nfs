@@ -3726,6 +3726,31 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     las_report_clear(rep);
 }/*}}}*/
 
+
+static FILE *stats_output = NULL;
+/* Print statistics both to the passed-in file handle, and to stats_output 
+   if non-NULL. This is to allow scripts to get stats from stderr rather
+   than having to decompress the whole relation file. */
+static int
+print_stats (FILE *file, char* fmt, ...)
+{
+    int retval;
+    char *msg;
+    va_list ap;
+
+    va_start(ap, fmt);
+    retval = vasprintf(&msg, fmt, ap);
+    if (retval != -1) {
+        fprintf (file, "%s", msg);
+        if (stats_output != NULL)
+            fprintf (stats_output, "%s", msg);
+        free (msg);
+    }
+    va_end(ap);
+
+    return retval;
+}
+
 /*************************** main program ************************************/
 
 
@@ -3757,6 +3782,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
+  param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "descent-hint", "hint file ?????");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
@@ -3800,6 +3826,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
+    param_list_configure_switch(pl, "-stats-stderr", NULL);
 #if 0   /* incompatible with the todo list */
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
@@ -3823,6 +3850,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+
+    if (param_list_parse_switch(pl, "-stats-stderr"))
+        stats_output = stderr;
 
     memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
@@ -4264,7 +4294,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
     t0 = seconds () - t0;
-    fprintf (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
+    print_stats (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
             totJ / (double) sq, sq, max_full);
     tts = t0;
     tts -= report->tn[0];
@@ -4304,9 +4334,9 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
     /*{{{ Display tally */
     if (las->nb_threads > 1) 
-        fprintf (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
+        print_stats (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
-        fprintf (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+        print_stats (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
@@ -4317,9 +4347,10 @@ int main (int argc0, char *argv0[])/*{{{*/
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
                 report->ttf);
 
-    fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
+    print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
+    
 #if 0
     fprintf (stderr, "rat:");
     for (int i = 0; i < 256; i++)
