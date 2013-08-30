@@ -94,12 +94,8 @@ void set_rep_cado (const char *argv0, char *rep_cado, size_t size) {
   char *p, *q;
   p = strdup(argv0);
   q = dirname(p);
-  if (strlcat(rep_cado, q, size) >= size) {
-      croak__("Destination string too short", "aborted");
-  }
-  if (strlcat(rep_cado, "/../", size) >= size) {
-      croak__("Destination string too short", "aborted");
-  }
+  strlcat_check(rep_cado, q, size);
+  strlcat_check(rep_cado, "/../", size);
   free(p);
 }
 
@@ -122,10 +118,10 @@ search_real_exec_in_path (const char *executable, char *real_path) {
       dummy[ppe - pp + 1] = 0;
     }
     else
-      strcpy (dummy, "./");
-    strcat(dummy, executable);
+      strlcpy_check(dummy, "./", sizeof(dummy));
+    strlcat_check(dummy, executable, sizeof(dummy));
 #ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
+    strlcat_check (dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
 #endif
     if (LIKELY(*ppe))
       pp = ppe + 1;
@@ -146,10 +142,10 @@ void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char 
   /* First, if we have path_antebuffer, we must have antebuffer or error */
   if (path_antebuffer != NULL) {
     char dummy[PATH_MAX];
-    strcpy(dummy, path_antebuffer);
-    strcat(dummy, "/antebuffer");
+    strlcpy_check(dummy, path_antebuffer, sizeof(dummy));
+    strlcat_check(dummy, "/antebuffer", sizeof(dummy));
 #ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
+    strlcat_check (dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
 #endif
     if (realpath(dummy, antebuffer) == NULL) {
       fprintf (stderr, "search_antebuffer: antebuffer path (%s) error : %s\n", dummy, strerror(errno));
@@ -159,10 +155,10 @@ void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char 
   /* Second, we search antebuffer in cado directory */
   if (!*antebuffer) {
     char dummy[PATH_MAX];
-    strcpy(dummy, rep_cado);
-    strcat(dummy, "utils/antebuffer");
+    strlcpy_check(dummy, rep_cado, sizeof(dummy));
+    strlcat_check(dummy, "utils/antebuffer", sizeof(dummy));
 #ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
+    strlcat_check(dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
 #endif
     if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
   }
@@ -228,19 +224,16 @@ preempt_open_compressed_rs (char *antebuffer, char **ficname)
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
 	if (has_suffix (fic_realpath, cp_r->suffix)) break;
-      strcpy (cmd[p_cmds], antebuffer);
-      strcpy (lastcom, " | ");
-      strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
-      strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
+      strlcpy_check (cmd[p_cmds], antebuffer, PREEMPT_S_CMD);
+      strlcpy_check (lastcom, " | ", sizeof(lastcom));
+      strlcat_check (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s", sizeof(lastcom));
+      ASSERT_ALWAYS(strlen(lastcom) >= 2);
+      lastcom[strlen(lastcom)-2] = 0;
+      strlcat_check (lastcom, "-", sizeof(lastcom)); /* "%s" remplaces by "-" */
       suffix_choice = 1;
-      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREEMPT_S_CMD) {
-	fprintf(stderr, "preempt_open_compressed_rs: PREEMPT_S_CMD (%d) too small. Please * 2\n", PREEMPT_S_CMD);
-	exit (1);
-      }
-      strcat (cmd[p_cmds], fic_realpath);
+      strlcat_check (cmd[p_cmds], fic_realpath, PREEMPT_S_CMD);
       ficname++;
-    }
-    else {
+    } else {
       if (has_suffix (fic_realpath, cp_r->suffix) &&
 	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREEMPT_S_CMD))
 	{
