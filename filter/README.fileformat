@@ -1,3 +1,40 @@
+Binaries for NFS, NFS-DL, FFS
+=============================
+
+NFS   : dup1   -> dup2           -> purge -> merge    -> replay
+NFS-DL: dup1   -> dup2           -> purge -> merge-dl -> replay-dl
+FFS   : dup1 * -> dup2-ffs-f? ** -> purge -> merge-dl -> replay-dl
+
+*with -abhexa command line option
+**? is the caracteristic (currently only 2 or 3)
+
+Relations format
+================
+
+purge, merge, merge-dl, replay-dl read relations in the following format:
+  a,b:i1,...,ik
+  where a and b are in hexa
+        i1,...,ik are indexes in the renumbering table
+  all appearances of the same index must be continuous
+
+dup1 (without -abhexa) reads relations in the following format (output of las)
+  a,b:p1,...,pl:p'1,...,p'r
+  where a and b are in basis 10
+        p1,...,pl,p'1,...,p'r are in hexa
+
+dup1 (with -abhexa) reads relations in the following format (output of sieve4ffs)
+  a,b:p1,...,pl:p'1,...,p'r
+  where a and b are in hexa
+        p1,...,pl,p'1,...,p'r are in hexa
+
+dup2 reads relations in two different format (deducted by reading the first line
+of the file): either the same as purge, merge, merge-dl, ...; either the same
+as dup1 without abhexa
+
+dup-ffs-f* reads relations in two different format (deducted by reading the
+first line of the file): either the same as purge, merge, merge-dl, ...; either
+the same as dup1 with abhexa
+
 File XXX.renumber
 ==============
 
