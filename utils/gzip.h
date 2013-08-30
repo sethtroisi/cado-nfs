@@ -13,7 +13,7 @@ extern "C" {
 void get_suffix_from_filename (char *s, char const **sfx);
 
 /* Put the directory of cado in rep_cado */
-void set_rep_cado(const char *argv0, char *rep_cado);
+void set_rep_cado(const char *argv0, char *rep_cado, size_t);
 
 /* Search the executable in PATH and, if found, return in real_path the
    complete path WITH the executable in the end */

@@ -90,12 +90,16 @@ void get_suffix_from_filename (char *s, char const **sfx)
 }
 
 /* Put the directory of cado in rep_cado */
-void set_rep_cado (const char *argv0, char *rep_cado) {
+void set_rep_cado (const char *argv0, char *rep_cado, size_t size) {
   char *p, *q;
   p = strdup(argv0);
   q = dirname(p);
-  strcpy(rep_cado, q);
-  strcat(rep_cado, "/../");
+  if (strlcat(rep_cado, q, size) >= size) {
+      croak__("Destination string too short", "aborted");
+  }
+  if (strlcat(rep_cado, "/../", size) >= size) {
+      croak__("Destination string too short", "aborted");
+  }
   free(p);
 }
 
