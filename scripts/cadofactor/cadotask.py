@@ -989,7 +989,7 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", )
+            ("alim", "gzip")
 
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -1026,7 +1026,9 @@ class FactorBaseTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
-            outputfilename = self.workdir.make_filename("roots")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.MakeFB(poly=polyfilename,
@@ -1061,7 +1063,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", "rlim")
+            ("alim", "rlim", "gzip")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -1103,8 +1105,10 @@ class FreeRelTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
-            freerelfilename = self.workdir.make_filename("freerel")
-            renumberfilename = self.workdir.make_filename("renumber")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            freerelfilename = self.workdir.make_filename("freerel" + use_gz)
+            renumberfilename = self.workdir.make_filename("renumber" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
@@ -1855,7 +1859,7 @@ class MergeTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1878,7 +1882,10 @@ class MergeTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            historyfile = self.workdir.make_filename("history")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            # FIXME: merge currently does not read history in gzip format
+            historyfile = self.workdir.make_filename("history") # + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
@@ -1890,7 +1897,7 @@ class MergeTask(Task):
             if rc:
                 raise Exception("Program failed")
             
-            indexfile = self.workdir.make_filename("index")
+            indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("small.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             p = cadoprograms.Replay(binary=True,
