@@ -25,6 +25,9 @@ import wuserver
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
+# Pattern for floating-point number
+re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
+cap_fp = "(%s)" % re_fp
 
 class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
@@ -233,6 +236,200 @@ class WorkDir(object):
         return
 
 
+class Statistics():
+    """ Class that holds statistics on program execution, and can merge two
+    such statistics.
+    """
+    def __init__(self, conversions):
+        self.conversions = conversions
+        self.stats = {}
+    
+    @staticmethod
+    def typecast(values, types):
+        """ Cast the values in values to the types specified in types """
+        return [t(v) for (v, t) in zip(values, types)]
+    
+    @staticmethod
+    def _to_str(stat):
+        """ Convert one statistic to a string """
+        return " ".join(map(str, stat))
+    
+    @staticmethod
+    def _from_str(string, types):
+        """ Convert a string (probably from a state dict) to a statistic """
+        return Statistics.typecast(string.split(), types)
+    
+    def from_dict(self, stats):
+        """ Initialise values in self from the strings in the "stats"
+        dictionary
+        """
+        for conversion in self.conversions:
+            (msgfmt, key, types, defaults, combine, regex) = conversion
+            if key in stats:
+                assert not key in self.stats
+                self.stats[key] = self._from_str(stats.get(key, defaults), types)
+                assert not self.stats[key] is None
+    
+    def parse_line(self, line):
+        """ Parse one line of program output and look for statistics.
+        
+        If they are found, they are added to self.stats.
+        """
+        for conversion in self.conversions:
+            (msgfmt, key, types, defaults, combine, regex) = conversion
+            match = regex.match(line)
+            if match:
+                assert not key in self.stats
+                # print (pattern.pattern, match.groups())
+                self.stats[key] = self.typecast(match.groups(), types)
+                assert not self.stats[key] is None
+    
+    def merge_one_stat(self, key, new_val, combine):
+        if key in self.stats:
+            self.stats[key] = combine(self.stats[key], new_val)
+        else:
+            self.stats[key] = new_val
+        assert not self.stats[key] is None
+        # print(self.stats)
+    
+    def merge_stats(self, new_stats):
+        """ Merge the stats currently in self with the Statistics in
+        "new_stats"
+        """
+        
+        assert self.conversions == new_stats.conversions
+        for conversion in self.conversions:
+            (msgfmt, key, types, defaults, combine, regex) = conversion
+            if key in new_stats.stats:
+                self.merge_one_stat(key, new_stats.stats[key], combine)
+    
+    def as_dict(self):
+        return {key:self._to_str(self.stats[key]) for key in self.stats}
+    
+    def as_strings(self):
+        result = []
+        for conversion in self.conversions:
+            (msgfmt, key, types, defaults, combine, regex) = conversion
+            if key in self.stats:
+                if len(self.stats[key]) == len(types):
+                    result.append(msgfmt % tuple(self.stats[key]))
+        return result
+    
+    # Helper functions for processing statistics.
+    # We can't make them @staticmethod or references are not callable
+    def add_list(*lists):
+        """ Add zero or more lists elementwise.
+        
+        Short lists are handled as if padded with zeroes.
+        
+        >>> Statistics.add_list([])
+        []
+        >>> Statistics.add_list([1])
+        [1]
+        >>> Statistics.add_list([1,2], [3,7])
+        [4, 9]
+        >>> Statistics.add_list([1,2], [3,7], [5], [3,1,4,1,5])
+        [12, 10, 4, 1, 5]
+        """
+        return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
+    
+    def weigh(samples, weights):
+      return [sample*weight for (sample, weight) in zip(samples, weights)]
+    
+    def combine_mean(means, samples):
+        """ From two lists, one containing values and the other containing
+        the respective sample sizes (i.e., weights of the values), compute
+        the combined mean (i.e. the weighted mean of the values).
+        The two lists must have equal length.
+        """
+        total_samples = sum(samples)
+        weighted_sum = sum(Statistics.weigh(means, samples))
+        return [weighted_sum / total_samples, total_samples]
+    
+    def zip_combine_mean(*lists):
+        """ From a list of 2-tuples, each tuple containing a value and a
+        weight, compute the weighted average of the values.
+        """
+        (means, samples) = zip(*lists)
+        return Statistics.combine_mean(means, samples)
+    
+    def combine_stats(*stats):
+        """ Computes the combined mean and std.dev. for the stats
+        
+        stats is a list of 3-tuples, each containing number of sample points,
+        mean, and std.dev.
+        Returns a 3-tuple with the combined number of sample points, mean, 
+        and std. dev.
+        """
+        
+        # FIXME: buggy!
+        
+        # Samples is a list containing the first item (number of samples) of each
+        # item of stats, means is list means, stdvars is list of std. var.s
+        (samples, means, stddevs) = zip(*stats)
+        
+        (total_mean, total_samples) = Statistics.combine_mean(means, samples)
+        # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
+        t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stddevs)]
+        # Compute combined variance
+        total_var = Statistics.combine_mean(t, samples)[0] - total_mean**2
+        return [total_samples, total_mean, sqrt(total_var)]
+    
+    def test_combine_stats():
+        """ Test function for combine_stats()
+        
+        >>> Statistics.test_combine_stats()
+        """
+        
+        from random import randrange
+        
+        def mean(x): return float(sum(x))/float(len(x))
+        def var(x): E=mean(x); return mean([(a-E)**2 for a in x])
+        
+        # Generate between 1 and 5 random integers in [1,100]
+        lengths = [randrange(100) + 1 for i in range(randrange(5) + 1)]
+        lengths=[1,10]
+        # Generate lists of random integers in [1,100]
+        lists = [[randrange(100) for i in range(l)] for l in lengths]
+        stats = [(length, mean(l), var(l)) for (length, l) in zip(lengths, lists)]
+        
+        combined_list = []
+        for l in lists:
+            combined_list += l
+        
+        combined1 = Statistics.combine_stats(*stats)
+        combined2 = [len(combined_list), mean(combined_list), var(combined_list)]
+        if abs(combined1[2] - combined2[2]) > 0.2 * combined2[2]:
+            print("lists = %r" % lists)
+            print("combined_lists = %r" % combined_list)
+            print("stats = %r" % stats)
+            print("combined1 = %r" % combined1)
+            print("combined2 = %r" % combined2)
+            print(combined1[2], combined2[2])
+            print(abs(combined1[2] / combined2[2] - 1))
+        return combined1[0] == combined2[0] and \
+                abs(combined1[1] / combined2[1] - 1) < 1e-10 and \
+                abs(combined1[2] - combined2[2]) <= 1e-10 * combined2[2]
+    
+    def smallest_10(*lists):
+        concat = []
+        for l in lists:
+            concat += l
+        concat.sort()
+        return concat[0:10]
+
+
+class HasStatistics(object, metaclass=abc.ABCMeta):
+    @abc.abstractproperty
+    def stat_conversions(self):
+        pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.statistics = Statistics(self.stat_conversions)
+    def get_statistics_as_strings(self):
+        return self.statistics.as_strings()
+
+
 class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
            metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
@@ -296,6 +493,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
                                self.name)
+        self.init_stats()
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
@@ -452,9 +650,34 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         stdoutpath = self.workdir.make_filename(stdoutname)
         stderrpath = self.workdir.make_filename(stderrname)
         return (stdoutpath, stderrpath)
-
+    
+    def init_stats(self):
+        if not isinstance(self, HasStatistics):
+            return
+        self.statistics.from_dict(self.state)
+    
     def print_stats(self):
-        pass
+        if not isinstance(self, HasStatistics):
+            return
+        stat_msgs =  self.get_statistics_as_strings()
+        if stat_msgs:
+            self.logger.info("Aggregate statistics:")
+            for msg in stat_msgs:
+                self.logger.info(msg)
+    
+    def parse_stats(self, filename):
+        if not isinstance(self, HasStatistics):
+            return
+        new_stats = Statistics(self.stat_conversions)
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                new_stats.parse_line(line)
+        self.logger.debug("Newly arrived stats: %s", new_stats.as_dict())
+        self.statistics.merge_stats(new_stats)
+        update = self.statistics.as_dict()
+        self.logger.debug("Combined stats: %s", update)
+        self.state.update(update)
+
 
 
 class ClientServerTask(Task, patterns.Observer):
@@ -518,7 +741,7 @@ class ClientServerTask(Task, patterns.Observer):
             time.sleep(1)
 
 
-class PolyselTask(ClientServerTask, patterns.Observer):
+class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -534,6 +757,72 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return super().paramnames + \
             ("adrange", "admin", "admax") + \
             Polynomial.paramnames
+    @property
+    # Stat: potential collisions=124.92 (2.25e+00/s)
+    # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
+    # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
+    # Stat: av. g0/adm2 ratio: 8.594e+04
+    # Stat: tried 83 ad-value(s), found 132 polynomial(s), 125 below maxnorm
+    # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
+    # Stat: total phase took 55.47s
+    # Stat: rootsieve took 54.54s
+    def stat_conversions(self):
+        return (
+            ("potential collisions: %f",
+             "stats_collisions",
+             (float,),
+             "0",
+             Statistics.add_list,
+             re.compile(r"# Stat: potential collisions=%s" % cap_fp)
+            ),
+            ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
+             "stats_rawlognorm",
+             (int, float, float, float, float),
+             "0 0 0 0 0",
+             PolyselTask.update_lognorms,
+             re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            ),
+            ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
+             "stats_optlognorm",
+             (int, float, float, float, float),
+             "0 0 0 0 0",
+             PolyselTask.update_lognorms,
+             re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            ),
+            ("tried ad-value(s): %d, found polynomial(s): %d, below maxnorm: %d",
+             "stats_tries",
+             (int, )*3,
+             "0 0 0",
+             Statistics.add_list,
+             re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+            ),
+            # Note for "best logmu" pattern: a regex like (%s )* does not work;
+            # the number of the capture group is determined by the paratheses in
+            # the regex string, so trying to repeat a group like this will always
+            # capture to the *same* group, overwriting previous matches, so that
+            # in the end, only the last match is in the capture group.
+            ("10 best logmu: %g %g %g %g %g %g %g %g %g %g",
+             "stats_logmu",
+             (float, )*10,
+             "",
+             Statistics.smallest_10,
+             re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s" % ((cap_fp, )*10))
+            ),
+            ("total time: %f",
+             "stats_total_time",
+             (float,),
+             "0",
+             Statistics.add_list,
+             re.compile(r"# Stat: total phase took %ss" % cap_fp)
+            ),
+            ("rootsieve time: %f",
+             "rootsieve_time",
+             (float,),
+             "0",
+             Statistics.add_list,
+             re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
+            )
+        )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -551,8 +840,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - nothing to do")
-            self.print_stats()
-            return
+            return not self.bestpoly is None
         
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
@@ -572,12 +860,11 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         if self.bestpoly is None:
             self.logger.error ("No polynomial found. Consider increasing the "
                                "search range bound admax, or maxnorm")
-            return
+            return False
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
         self.write_poly_file()
-        self.print_stats()
-        return
+        return True
     
     def is_done(self):
         return not self.bestpoly is None and not self.need_more_wus() and \
@@ -623,7 +910,8 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', filename)
-            return False
+            # No polynomial found an a given polyselec run is not an error
+            return True
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
@@ -641,124 +929,17 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                              filename, poly.MurphyE, self.bestpoly.MurphyE)
         return True
     
-    # Helper functions for processing statistics:
-    def add_list(*lists):
-        """ Add one or more lists elementwise.
-        
-        Short lists are handled as if padded with zeroes. """
-        return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
-    
     def update_lognorms(old_lognorm, new_lognorm):
-        def combine_stats(*stats):
-          """ Computes the combined mean and std.dev. for the stats
-          
-          stats is a list of 3-tuples, each containing number of sample points,
-          mean, and std.dev.
-          Returns a 3-tuple with the combined number of sample points, mean, 
-          and std. dev.
-          """
-          
-          def weigh(samples, weights):
-            return [sample*weight for (sample, weight) in zip(samples, weights)]
-          
-          # Samples is a list containing the first item (number of samples) of each
-          # item of stats, means is list means, stdvars is list of std. var.s
-          (samples, means, stdvars) = zip(*stats)
-            
-          total_samples = sum(samples)
-          total_mean = sum(weigh(means, samples)) / total_samples
-          # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
-          t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stdvars)]
-          # Compute combined variance
-          total_var = sum(weigh(t, samples))/total_samples - total_mean**2
-          return [total_samples, total_mean, sqrt(total_var)]
-        
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
         # print("update_lognorms: new_lognorm: %s" % new_lognorm)
         # New minimum. Don't use default value of 0 for minimum
-        if old_lognorm[1] > 0:
-            lognorm[1] = min(old_lognorm[1], new_lognorm[1])
-        else:
-            lognorm[1] = new_lognorm[1]
+        lognorm[1] = min(old_lognorm[1] or new_lognorm[1], new_lognorm[1])
         # New maximum
         lognorm[3] = max(old_lognorm[3], new_lognorm[3])
         # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
-        lognorm[0::2] = combine_stats(old_lognorm[0::2], new_lognorm[0::2])
+        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2], new_lognorm[0::2])
         return lognorm
-    
-    def smallest_10(*lists):
-        concat = []
-        for l in lists:
-            concat += l
-        concat.sort()
-        return concat[0:10]
-    
-    stat_conversions = (
-        ("potential collisions: %f", "stats_collisions", (float,), "0", add_list),
-        ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f", "stats_rawlognorm", (int, float, float, float, float), "0 0 0 0 0", update_lognorms),
-        ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f", "stats_optlognorm", (int, float, float, float, float), "0 0 0 0 0", update_lognorms),
-        ("tried ad-value(s): %d, found polynomial(s): %d, below maxnorm: %d", "stats_tries", (int, )*3, "0 0 0", add_list),
-        ("10 best logmu: %g %g %g %g %g %g %g %g %g %g", "stats_logmu", (float, )*10, "", smallest_10),
-        ("total time: %f", "stats_total_time", (float,), "0", add_list),
-        ("rootsieve time: %f", "rootsieve_time", (float,), "0", add_list)
-    )
-    
-    @staticmethod
-    def typecast(values, types):
-        """ Cast the values in values to the types specified in types """
-        return [t(v) for (v, t) in zip(values, types)]
-    
-    def read_stats(self, key, defaults, types):
-        return self.typecast(self.state.get(key, defaults).split(), types)
-    
-    def parse_stats(self, filename):
-        # Pattern for floating-point number
-        re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
-        cap_fp = "(%s)" % re_fp
-        
-        # Stat: potential collisions=124.92 (2.25e+00/s)
-        # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
-        # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
-        # Stat: av. g0/adm2 ratio: 8.594e+04
-        # Stat: tried 83 ad-value(s), found 132 polynomial(s), 125 below maxnorm
-        # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
-        # Stat: total phase took 55.47s
-        # Stat: rootsieve took 54.54s
-        
-        # Note for "best logmu" pattern: a regex like (%s )* does not work;
-        # the number of the capture group is determined by the paratheses in
-        # the regex string, so trying to repeat a group like this will always
-        # capture to the *same* group, overwriting previous matches, so that
-        # in the end, only the last match is in the capture group.
-        patterns = (
-            re.compile(r"# Stat: potential collisions=%s" % cap_fp),
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4)),
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4)),
-            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm"),
-            re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s" % ((cap_fp, )*10)),
-            re.compile(r"# Stat: total phase took %ss" % cap_fp),
-            re.compile(r"# Stat: rootsieve took %ss" % cap_fp),
-        )
-        stats = [None] * len(patterns)
-        with open(filename, "r") as polyfile:
-            for line in polyfile:
-                for (idx, pattern) in enumerate(patterns):
-                    match = pattern.match(line)
-                    if match:
-                        assert stats[idx] is None
-                        # print (pattern.pattern, match.groups())
-                        stats[idx] = match.groups()
-        
-        # Now merge the stats with what we had
-        for (stat, conversion) in zip(stats, self.stat_conversions):
-            if stat:
-                (name, key, types, defaults, combine) = conversion
-                old_val = self.read_stats(key, defaults, types)
-                new_val = self.typecast(stat, types)
-                final_val = combine(old_val, new_val)
-                # print(final_val)
-                self.state[key] = " ".join(map(str, final_val))
     
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
@@ -795,18 +976,6 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.submit_command(p, "%d-%d" % (adstart, adend))
         self.state["adnext"] = adend
 
-    def print_stats(self):
-        self.logger.info("Aggregate statistics:")
-        for conversion in self.stat_conversions:
-            (msgformat, key, types, defaults, combine) = conversion
-            if key in self.state:
-                stats = self.read_stats(key, defaults, types)
-                # print(msgformat, stats)
-                # Avoid exceptions when there are too few values for the
-                # format string
-                if len(stats) == len(types):
-                    self.logger.info(msgformat, *stats)
-
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
     @property
@@ -821,7 +990,7 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", )
+            ("alim", "gzip")
 
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -858,7 +1027,9 @@ class FactorBaseTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
-            outputfilename = self.workdir.make_filename("roots")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.MakeFB(poly=polyfilename,
@@ -873,6 +1044,7 @@ class FactorBaseTask(Task):
 
         self.check_files_exist([self.get_filename()], "output", 
                                shouldexist=True)
+        return True
     
     def get_filename(self):
         return self.get_state_filename("outputfile")
@@ -892,7 +1064,7 @@ class FreeRelTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", "rlim")
+            ("alim", "rlim", "gzip")
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -934,8 +1106,10 @@ class FreeRelTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
             freerelfilename = self.workdir.make_filename("freerel")
-            renumberfilename = self.workdir.make_filename("renumber")
+            renumberfilename = self.workdir.make_filename("renumber" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
@@ -957,6 +1131,7 @@ class FreeRelTask(Task):
         self.check_files_exist([self.get_freerel_filename(),
                                 self.get_renumber_filename()], "output", 
                                shouldexist=True)
+        return True
 
     def parse_file(self, stderr):
         found = {}
@@ -986,7 +1161,7 @@ class FreeRelTask(Task):
         return self.state["nprimes"]
 
 
-class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
+class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
@@ -1001,6 +1176,37 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     def paramnames(self):
         return super().paramnames + \
             ("qmin", "qrange", "rels_wanted", "alim")
+    @property
+    def stat_conversions(self):
+        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
+        # Total wct time 7.0s [precise timings available only for mono-thread]
+        # Total 26198 reports [0.000267s/r, 155.9r/sq]
+        return (
+            (
+                "Average J: %f for %d special-q",
+                "stats_avg_J",
+                (float, int),
+                "0 0",
+                Statistics.zip_combine_mean,
+                re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+            ),
+            (
+                "Max bucket fill: %f",
+                "stats_max_bucket_fill",
+                (float, ),
+                "0",
+                max,
+                re.compile(r"#.*max bucket fill %s" % cap_fp)
+            ),
+            (
+                "Total wall clock time: %f",
+                "stats_total_wall_clock_time",
+                (float, ),
+                "0",
+                Statistics.add_list,
+                re.compile(r"# Total wct time %ss" % cap_fp)
+            )
+        )
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
@@ -1030,20 +1236,23 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         while self.state["rels_found"] < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
-            outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = \
+                self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
             p = cadoprograms.Las(q0=q0, q1=q1,
                                  poly=polyfilename, factorbase=factorbase,
-                                 out=outputfilename,
+                                 out=outputfilename, stats_stderr = True,
                                  **self.progparams[0])
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
         self.logger.info("Reached target of %d relations, now have %d",
                          self.state["rels_wanted"], self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
-        return
+        return True
     
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -1052,12 +1261,16 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
-        ok = self.parse_output_file(output_files[0])
+        stderr = message.get_stderr(0)
+        assert not stderr is None
+        ok = self.parse_output_files(output_files[0], stderr)
+        if ok:
+            self.parse_stats(stderr)
         self.verification(message, ok)
     
-    def parse_output_file(self, filename):
-        size = os.path.getsize(filename)
-        with open(filename, "r") as f:
+    def parse_output_files(self, filename, stderr):
+        size = os.path.getsize(stderr)
+        with open(stderr, "r") as f:
             f.seek(max(size - self.file_end_offset, 0))
             for line in f:
                 match = re.match(r"# Total (\d+) reports ", line)
@@ -1070,6 +1283,11 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
                     return True
         self.logger.error("Number of relations message not found in file %s", filename)
         return False
+    
+    def get_statistics_as_strings(self):
+        strings = ["Total number of relations: %d" % self.get_nrels()]
+        strings += super().get_statistics_as_strings()
+        return strings
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
@@ -1227,7 +1445,7 @@ class Duplicates1Task(Task, FilesCreator):
                   for i in range(0, self.nr_slices)]
         self.logger.info("Relations per slice: %s", ", ".join(totals))
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
-        return
+        return True
     
     def parse_output_files(self, stderr):
         files = {}
@@ -1354,6 +1572,7 @@ class Duplicates2Task(Task, FilesCreator):
         self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
+        return True
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1441,7 +1660,7 @@ class PurgeTask(Task):
         if "purgedfile" in self.state and input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
-            return
+            return True
         
         self.state.pop("purgedfile", None)
         self.state.pop("input_nrels", None)
@@ -1491,6 +1710,7 @@ class PurgeTask(Task):
             self.logger.info("Not enough relations")
             self.request_more_relations(nunique)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
+        return True
     
     def request_more_relations(self, nunique):
         r"""
@@ -1646,7 +1866,7 @@ class MergeTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1669,7 +1889,9 @@ class MergeTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            historyfile = self.workdir.make_filename("history")
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
                                    out=historyfile,
@@ -1681,7 +1903,7 @@ class MergeTask(Task):
             if rc:
                 raise Exception("Program failed")
             
-            indexfile = self.workdir.make_filename("index")
+            indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("small.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             p = cadoprograms.Replay(binary=True,
@@ -1706,6 +1928,7 @@ class MergeTask(Task):
                 self.state["densefile"] = densefilename.get_relative()
             
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        return True
     
     def get_index_filename(self):
         return self.get_state_filename("indexfile")
@@ -1762,6 +1985,7 @@ class LinAlgTask(Task):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.state["dependency"] =  dependencyfilename.get_relative()
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+        return True
 
     def get_dependency_filename(self):
         return self.get_state_filename("dependency")
@@ -1820,7 +2044,7 @@ class CharactersTask(Task):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename.get_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
-        return
+        return True
     
     def get_kernel_filename(self):
         return self.get_state_filename("kernel")
@@ -1889,6 +2113,7 @@ class SqrtTask(Task):
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
+        return True
     
     def is_done(self):
         for (factor, isprime) in self.factors.items():
@@ -2239,7 +2464,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.parameters.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
-        self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        self.registered_filenames = self.make_db_dict('server_registered_filenames')
         self.chores = []
         
         # Init WU DB
@@ -2353,13 +2578,20 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def run(self):
         self.server.serve()
         
-        for clients in self.clients:
-            clients.launch_clients()
-        
-        while self.run_next_task():
+        try:
+            for clients in self.clients:
+                clients.launch_clients()
+            
+            while self.run_next_task():
+                self.do_chores()
+            
             self.do_chores()
-        
-        self.do_chores()
+            
+            for task in self.tasks:
+                task.print_stats()
+            
+        except KeyboardInterrupt:
+            self.logger.fatal("Received KeyboardInterrupt. Terminating")
         
         for c in self.clients:
             c.kill_all_clients()
@@ -2372,8 +2604,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 # self.logger.info("Next task that wants to run: %s",
                 #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
-                task.run()
-                return True
+                return task.run()
         return False
     
     def do_chores(self):

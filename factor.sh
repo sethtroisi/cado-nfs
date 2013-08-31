@@ -20,12 +20,46 @@ Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
                     optimized only for 85 digits and above].
 options:
     -t <integer>  - numbers of cores to be used.
+    -s <integer>  - numbers of slave scripts to be used (only with -py).
     -ssh          - use ssh (see README) for distributing the polynomial
                     selection and sieve steps on localhost. For broader
                     use on several machines, use the advanced script
                     cadofactor.pl
     -py           - use Python cadofactor script as worker
+    -timeout <integer>
+                  - abort computation after this many seconds
+
+    If the shell environment variable CADO_DEBUG is set to any non-empty
+    string, the working directory is not deleted even if the factorization
+    succeeds.
 EOF
+}
+
+# If a duration is specified, find the "timeout" binary and store its
+# path and the duration in the TIMEOUT array. If no duration is specified,
+# or if the timeout binary is not found, leave TIMEOUT unset.
+# Returns 1 (false) if a timeout was requested and the binary was not found.
+# Otherwise returns 0 (true).
+# We use an array for TIMEOUT so that we can expand it to exactly 2 words on
+# the resulting command line.
+function find_timeout() {
+    local TIMEOUT_DURATION="$1"
+    test -z "$TIMEOUT_DURATION" && return 0
+    TIMEOUT_BIN="`which timeout 2>/dev/null`"
+    if [ -z "$TIMEOUT_BIN" ]
+    then
+        # Maybe it's not a GNU system, but with GNU coreutils installed
+        # with "g" prefix to all binaries
+        TIMEOUT_BIN="`which gtimeout 2>/dev/null`"
+    fi
+    if [ -n "$TIMEOUT_BIN" ]
+    then
+        TIMEOUT[0]="$TIMEOUT_BIN"
+        TIMEOUT[1]="--signal=SIGINT"
+        TIMEOUT[2]="$TIMEOUT_DURATION"
+        return 0
+    fi
+    return 1
 }
 
 # Set "t" to a temp directory, if not already set.
@@ -61,6 +95,18 @@ for ((i=1; i<=3; i=i+1)) ; do
       echo "Error, number of slaves '$slaves' is not an integer" >&2
       usage
       exit 1
+    fi
+    shift 2
+  elif [ "$1" = "-timeout" ]; then
+    timeout="$2"
+    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $timeout)" ]; then
+      echo "Error, number of seconds '$timeout' is not an integer" >&2
+      usage
+      exit 1
+    fi
+    if ! find_timeout $2
+    then
+      echo "timeout binary not found. Timeout disabled"
     fi
     shift 2
   elif [ "$1" = "-ssh" ]; then
@@ -152,7 +198,7 @@ elif ! [ -d "$bindir" ] ; then
     echo "Binary dir $bindir not found." >&2 ; exit 1
 elif ! [ -x "$cadofactor" ] ; then
     echo "Script $cadofactor not found." >&2 ; exit 1
-elif ! [ -x "$cputime" ] ; then
+elif ! $python && ! [ -x "$cputime" ] ; then
     echo "Script $cputime not found." >&2 ; exit 1
 else
     # Ok, everything looks good.
@@ -200,7 +246,7 @@ if $python; then
     # provided, in the case there is no python3 script in the path, or if
     # one which is named otherwise, or placed in a non-prority location
     # is the path, is preferred. If $PYTHON is empty, this is a no-op
-  $PYTHON $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
+  "${TIMEOUT[@]}" $PYTHON $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
   threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
   slaves.nrclients=$slaves \
   slaves.scriptpath="$scriptpath" server.address=localhost \
@@ -213,11 +259,11 @@ bindir=$bindir
 $host cores=$cores
 EOF
   if ! $ssh; then
-    $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
+    "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
     sieve_max_threads=$cores nthchar=$cores\
     bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
   else
-    $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
+    "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
     machines=$t/mach_desc nthchar=$cores bwmt=$cores wdir=$t \
     sievenice=0 polsel_nice=0 logfile=$t/out "$@"
   fi
@@ -229,9 +275,12 @@ rc=$?
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
-    # Print timings
-    cd $t
-    $cputime
+    if ! $python
+    then
+        # Print timings
+        cd $t
+        $cputime
+    fi
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi

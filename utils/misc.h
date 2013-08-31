@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <errno.h>
+#include <string.h>
 #include <gmp.h>
 #include "macros.h"
 #include "portability.h"
@@ -34,7 +35,7 @@ extern "C" {
       abort();								\
     }									\
   } while (0)
-  
+
 
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
@@ -55,6 +56,15 @@ char * strdup(const char *s);
 char * strndup(const char * a, size_t n);
 #endif
 
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused_result__));
+#endif
+void strlcpy_check(char *dst, const char *src, size_t size);
+#ifndef HAVE_STRLCAT
+size_t strlcat(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused_result__));
+#endif
+void strlcat_check(char *dst, const char *src, size_t size);
+
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
 
@@ -69,8 +79,8 @@ extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
 extern void free_aligned(void * ptr, size_t size, size_t alignment);
 
-extern void * malloc_pagealigned(size_t sz); 
-extern void free_pagealigned(void * ptr, size_t sz); 
+extern void * malloc_pagealigned(size_t sz);
+extern void free_pagealigned(void * ptr, size_t sz);
 
 extern int mkdir_with_parents(const char * dir, int fatal);
 
@@ -97,7 +107,7 @@ static inline int clzl(unsigned long x)
         int res;
 #if (GMP_LIMB_BITS == 64)
         if (x >> 32) { a += 32; x >>= 32; }
-#endif  
+#endif
         if (x >> 16) { a += 16; x >>= 16; }
         if (x >>  8) { a +=  8; x >>=  8; }
         if (x >>  4) { a +=  4; x >>=  4; }

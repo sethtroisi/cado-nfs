@@ -340,8 +340,8 @@ class FileLockedException(IOError):
     pass
 
 def open_exclusive(filename):
-    """ Open a file and get an exlcusige lock on it """
-    fileobj = open(filename)
+    """ Open a file and get an exclusive lock on it """
+    fileobj = open(filename, "r+")
     try:
         fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError as err:

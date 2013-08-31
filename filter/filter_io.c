@@ -24,7 +24,7 @@ inline int is_finish()
 
 void set_antebuffer_path(char *argv0, const char *path_antebuffer)
 {
-    set_rep_cado(argv0, rep_cado);
+    set_rep_cado(argv0, rep_cado, sizeof(rep_cado));
     search_antebuffer(rep_cado, path_antebuffer, antebuffer);
 }
 

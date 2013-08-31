@@ -1016,7 +1016,7 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
 
 void create_dependencies(const char * prefix, const char * indexname, const char * purgedname, const char * kername)
 {
-    FILE * ix = fopen(indexname, "r");
+    FILE * ix = fopen_maybe_compressed(indexname, "r");
     int small_nrows, small_ncols;
     int ret;
 
@@ -1068,7 +1068,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
             abs[col] ^= v;
         }
     }
-    fclose(ix);
+    fclose_maybe_compressed(ix, indexname);
     fclose(ker);
 
     unsigned int nonzero_deps = 0;

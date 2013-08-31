@@ -38,7 +38,7 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+x" (i));             /* Really need + here! i is not modified in C code! */
+	    : "+&x" (i));             /* Really need + here! i is not modified in C code! */
   return (uint8_t) ((i-add)*scale);
 #else
   /* Same function, but in x86 gcc needs to transfer the input i from a
@@ -64,13 +64,13 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
-	    : "+x" (i));
+	    : "+&x" (i));
   i = (i - add) * scale;
   __asm__ ( 
 	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
-	    : "+x" (i));
+	    : "+&x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
@@ -93,7 +93,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));
+	   : "+&x"(i):"x"(un));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
@@ -101,7 +101,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
-	   : "+x"(i));
+	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
 
@@ -112,7 +112,7 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));
+	   : "+&x"(i):"x"(un));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -126,7 +126,7 @@ static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "addpd     %1,       %0       \n"
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+x"(i):"x"(un));	   
+	   : "+&x"(i):"x"(un));	   
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal1] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -454,177 +454,188 @@ static inline void fpoly_scale(double * u, const double * t, unsigned int d, dou
 /* CAREFUL! __m128 a=x|y => x is the strongest quadword, higher in memory.
    INITALGN: uN= (j^N)*(alg->fijd[N]) | (j^N)*(alg->fijd[N])  
    INITALG0 to 2 are simple. 3,5,7,9 & 4,6,8 have similar algorithms. */
-#define INITALG0 							\
-  uu0=_mm_set1_epi64((__m64)(0x0101010101010101*			\
-			     inttruncfastlog2(fabs(alg->fijd[0]),*(double *)&add,*(double *)&scale)))
+#define INITALG0 do {							\
+    uu0=_mm_set1_epi64((__m64)(0x0101010101010101*			\
+			       inttruncfastlog2(fabs(alg->fijd[0]),\
+						*(double *)&add,*(double *)&scale))); \
+  } while (0)
 
-#define INITALG1(A)				\
-  u1=_mm_load1_pd(alg->fijd+1);			\
-  u0=_mm_set1_pd((double)(A)*alg->fijd[0])
+#define INITALG1(A) do {			\
+    u1=_mm_load1_pd(alg->fijd+1);		\
+    u0=_mm_set1_pd((double)(A)*alg->fijd[0]);	\
+  } while (0)
 
-#define INITALG2(A)				\
-  h=_mm_set1_pd((double)(A));			\
-  u2=_mm_load1_pd(alg->fijd+2);			\
-  u1=_mm_load1_pd(alg->fijd+1);			\
-  u0=_mm_load1_pd(alg->fijd);			\
-  u1=_mm_mul_pd(u1,h);				\
-  u0=_mm_mul_pd(u0,h);				\
-  u0=_mm_mul_pd(u0,h)
+#define INITALG2(A) do {			\
+    h=_mm_set1_pd((double)(A));			\
+    u2=_mm_load1_pd(alg->fijd+2);		\
+    u1=_mm_load1_pd(alg->fijd+1);		\
+    u0=_mm_load1_pd(alg->fijd);			\
+    u1=_mm_mul_pd(u1,h);			\
+    u0=_mm_mul_pd(u0,h);			\
+    u0=_mm_mul_pd(u0,h);			\
+  } while (0)
 
-#define INITALG3(A)						\
-  h=_mm_set_sd((double)(A));     /* h=0|j */			\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  g=_mm_mul_pd(g,g);             /* g=j2|j2 */			\
-  u2=_mm_load_pd(alg->fijd+2);   /* u2=d3|d2 */			\
-  u0=_mm_load_pd(alg->fijd);     /* u0=d1|d0 */			\
-  u2=_mm_mul_sd(u2,h);           /* u2=d3|d2*j */		\
-  u0=_mm_mul_sd(u0,h);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u0=_mm_unpacklo_pd(u2,u2)
+#define INITALG3(A) do {					\
+    h=_mm_set_sd((double)(A));     /* h=0|j */			\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    g=_mm_mul_pd(g,g);             /* g=j2|j2 */		\
+    u2=_mm_load_pd(alg->fijd+2);   /* u2=d3|d2 */		\
+    u0=_mm_load_pd(alg->fijd);     /* u0=d1|d0 */		\
+    u2=_mm_mul_sd(u2,h);           /* u2=d3|d2*j */		\
+    u0=_mm_mul_sd(u0,h);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u0=_mm_unpacklo_pd(u2,u2);					\
+  } while (0)
 
-#define INITALG4(A)						\
-  h=_mm_set1_pd((double)(A));					\
-  h=_mm_mul_sd(h,h);             /* h=j|j2 */			\
-  _MM_SHUFFLE_EPI32(g, h, 0x44); /* g=j2|j2 */			\
-  u4=_mm_load1_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u2=_mm_mul_pd(u2,h);						\
-  u0=_mm_mul_pd(u0,h);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2)
+#define INITALG4(A) do {					\
+    h=_mm_set1_pd((double)(A));					\
+    h=_mm_mul_sd(h,h);             /* h=j|j2 */			\
+    _MM_SHUFFLE_EPI32(g, h, 0x44); /* g=j2|j2 */		\
+    u4=_mm_load1_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u2=_mm_mul_pd(u2,h);					\
+    u0=_mm_mul_pd(u0,h);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+  } while (0)
 
-#define INITALG5(A)						\
-  h=_mm_set_sd((double)(A));					\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  g=_mm_mul_pd(g,g);						\
-  u4=_mm_load_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u4=_mm_mul_sd(u4,h);						\
-  u2=_mm_mul_sd(u2,h);						\
-  u0=_mm_mul_sd(u0,h);						\
-  u2=_mm_mul_pd(u2,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2);					\
-  _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-  u4=_mm_unpacklo_pd(u4,u4)
+#define INITALG5(A) do {					\
+    h=_mm_set_sd((double)(A));					\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    g=_mm_mul_pd(g,g);						\
+    u4=_mm_load_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u4=_mm_mul_sd(u4,h);					\
+    u2=_mm_mul_sd(u2,h);					\
+    u0=_mm_mul_sd(u0,h);					\
+    u2=_mm_mul_pd(u2,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
+    u4=_mm_unpacklo_pd(u4,u4);					\
+  } while (0)
 
-#define INITALG6(A)						\
-  h=_mm_set1_pd((double)(A));					\
-  h=_mm_mul_sd(h,h);						\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  u6=_mm_load1_pd(alg->fijd+6);					\
-  u4=_mm_load_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u4=_mm_mul_pd(u4,h);						\
-  u2=_mm_mul_pd(u2,h);						\
-  u0=_mm_mul_pd(u0,h);						\
-  u2=_mm_mul_pd(u2,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2);					\
-  _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-  u4=_mm_unpacklo_pd(u4,u4)
+#define INITALG6(A) do {					\
+    h=_mm_set1_pd((double)(A));					\
+    h=_mm_mul_sd(h,h);						\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    u6=_mm_load1_pd(alg->fijd+6);				\
+    u4=_mm_load_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u4=_mm_mul_pd(u4,h);					\
+    u2=_mm_mul_pd(u2,h);					\
+    u0=_mm_mul_pd(u0,h);					\
+    u2=_mm_mul_pd(u2,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
+    u4=_mm_unpacklo_pd(u4,u4);					\
+  } while (0)
 
-#define INITALG7(A)						\
-  h=_mm_set_sd((double)(A));					\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  g=_mm_mul_pd(g,g);						\
-  u6=_mm_load_pd(alg->fijd+6);					\
-  u4=_mm_load_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u6=_mm_mul_sd(u6,h);						\
-  u4=_mm_mul_sd(u4,h);						\
-  u2=_mm_mul_sd(u2,h);						\
-  u0=_mm_mul_sd(u0,h);						\
-  u4=_mm_mul_pd(u4,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  g=_mm_mul_pd(g,g);						\
-  u2=_mm_mul_pd(u2,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2);					\
-  _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-  u4=_mm_unpacklo_pd(u4,u4);					\
-  _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-  u6=_mm_unpacklo_pd(u6,u6)
+#define INITALG7(A) do {					\
+    h=_mm_set_sd((double)(A));					\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    g=_mm_mul_pd(g,g);						\
+    u6=_mm_load_pd(alg->fijd+6);				\
+    u4=_mm_load_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u6=_mm_mul_sd(u6,h);					\
+    u4=_mm_mul_sd(u4,h);					\
+    u2=_mm_mul_sd(u2,h);					\
+    u0=_mm_mul_sd(u0,h);					\
+    u4=_mm_mul_pd(u4,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    g=_mm_mul_pd(g,g);						\
+    u2=_mm_mul_pd(u2,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
+    u4=_mm_unpacklo_pd(u4,u4);					\
+    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
+    u6=_mm_unpacklo_pd(u6,u6);					\
+  } while (0)
 
-#define INITALG8(A)						\
-  h=_mm_set1_pd((double)(A));					\
-  h=_mm_mul_sd(h,h);						\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  u8=_mm_load1_pd(alg->fijd+8);					\
-  u6=_mm_load_pd(alg->fijd+6);					\
-  u4=_mm_load_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u6=_mm_mul_pd(u6,h);						\
-  u4=_mm_mul_pd(u4,h);						\
-  u2=_mm_mul_pd(u2,h);						\
-  u0=_mm_mul_pd(u0,h);						\
-  u4=_mm_mul_pd(u4,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  g=_mm_mul_pd(g,g);						\
-  u2=_mm_mul_pd(u2,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2);					\
-  _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-  u4=_mm_unpacklo_pd(u4,u4);					\
-  _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-  u6=_mm_unpacklo_pd(u6,u6)
+#define INITALG8(A) do {					\
+    h=_mm_set1_pd((double)(A));					\
+    h=_mm_mul_sd(h,h);						\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    u8=_mm_load1_pd(alg->fijd+8);				\
+    u6=_mm_load_pd(alg->fijd+6);				\
+    u4=_mm_load_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u6=_mm_mul_pd(u6,h);					\
+    u4=_mm_mul_pd(u4,h);					\
+    u2=_mm_mul_pd(u2,h);					\
+    u0=_mm_mul_pd(u0,h);					\
+    u4=_mm_mul_pd(u4,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    g=_mm_mul_pd(g,g);						\
+    u2=_mm_mul_pd(u2,g);					\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
+    u4=_mm_unpacklo_pd(u4,u4);					\
+    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
+    u6=_mm_unpacklo_pd(u6,u6);					\
+  } while (0)
 
-#define INITALG9(A)						\
-  h=_mm_set_sd((double)(A));					\
-  _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-  g=_mm_mul_pd(g,g);						\
-  u8=_mm_load_pd(alg->fijd+8);					\
-  u6=_mm_load_pd(alg->fijd+6);					\
-  u4=_mm_load_pd(alg->fijd+4);					\
-  u2=_mm_load_pd(alg->fijd+2);					\
-  u0=_mm_load_pd(alg->fijd);					\
-  u8=_mm_mul_sd(u8,h);						\
-  u6=_mm_mul_sd(u6,h);						\
-  u4=_mm_mul_sd(u4,h);						\
-  u2=_mm_mul_sd(u2,h);						\
-  u0=_mm_mul_sd(u0,h);						\
-  u6=_mm_mul_pd(u6,g);						\
-  u2=_mm_mul_pd(u2,g);						\
-  g=_mm_mul_pd(g,g);						\
-  u4=_mm_mul_pd(u4,g);						\
-  u2=_mm_mul_pd(u2,g);						\
-  g=_mm_mul_pd(g,g);						\
-  u0=_mm_mul_pd(u0,g);						\
-  _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-  u0=_mm_unpacklo_pd(u0,u0);					\
-  _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-  u2=_mm_unpacklo_pd(u2,u2);					\
-  _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-  u4=_mm_unpacklo_pd(u4,u4);					\
-  _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-  u6=_mm_unpacklo_pd(u6,u6);					\
-  _MM_SHUFFLE_EPI32(u9, u8, 0xEE);				\
-  u8=_mm_unpacklo_pd(u8,u8)
+#define INITALG9(A) do {					\
+    h =_mm_set_sd((double)(A));					\
+    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
+    g=_mm_mul_pd(g,g);						\
+    u8=_mm_load_pd(alg->fijd+8);				\
+    u6=_mm_load_pd(alg->fijd+6);				\
+    u4=_mm_load_pd(alg->fijd+4);				\
+    u2=_mm_load_pd(alg->fijd+2);				\
+    u0=_mm_load_pd(alg->fijd);					\
+    u8=_mm_mul_sd(u8,h);					\
+    u6=_mm_mul_sd(u6,h);					\
+    u4=_mm_mul_sd(u4,h);					\
+    u2=_mm_mul_sd(u2,h);					\
+    u0=_mm_mul_sd(u0,h);					\
+    u6=_mm_mul_pd(u6,g);					\
+    u2=_mm_mul_pd(u2,g);					\
+    g=_mm_mul_pd(g,g);						\
+    u4=_mm_mul_pd(u4,g);					\
+    u2=_mm_mul_pd(u2,g);					\
+    g=_mm_mul_pd(g,g);						\
+    u0=_mm_mul_pd(u0,g);					\
+    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
+    u0=_mm_unpacklo_pd(u0,u0);					\
+    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
+    u2=_mm_unpacklo_pd(u2,u2);					\
+    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
+    u4=_mm_unpacklo_pd(u4,u4);					\
+    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
+    u6=_mm_unpacklo_pd(u6,u6);					\
+    _MM_SHUFFLE_EPI32(u9, u8, 0xEE);				\
+    u8=_mm_unpacklo_pd(u8,u8);					\
+  } while (0)
 
 #define INITALGD(A) do {					\
     double du[d+1];						\
@@ -650,13 +661,16 @@ static inline void fpoly_scale(double * u, const double * t, unsigned int d, dou
 
 #define G9 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
 
-#define GD g=u[d-1];for (unsigned int k=d;--k!=UINT_MAX;g=_mm_add_pd(_mm_mul_pd(g,h),u[k]))
+#define GD do {								\
+	g=u[d-1];							\
+	for (unsigned int k = d; --k != UINT_MAX; g = _mm_add_pd(_mm_mul_pd(g,h),u[k])); \
+      } while (0)
 
 #define ALG_INIT_SCALE_ADD_UN_A const __m128d				\
-  un MAYBE_UNUSED = _mm_set1_pd(1.),					\
-    a MAYBE_UNUSED = _mm_set1_pd(16.),					\
-    add = _mm_set1_pd(0x3FF00000 - GUARD / (alg->scale * (1./0x100000))), \
-    scale = _mm_set1_pd(alg->scale * (1./0x100000));
+      un MAYBE_UNUSED = _mm_set1_pd(1.),				\
+	a MAYBE_UNUSED = _mm_set1_pd(16.),				\
+	add = _mm_set1_pd(0x3FF00000 - GUARD / (alg->scale * (1./0x100000))), \
+	scale = _mm_set1_pd(alg->scale * (1./0x100000))
 
 #define ALG_INIT_SCALE_ADD_UN_A_TT					\
   ALG_INIT_SCALE_ADD_UN_A;						\
@@ -882,19 +896,20 @@ void init_alg_norms_bucket_region(unsigned char *S,
     d = si->cpoly->alg->degree,
     p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
 
-#define FILL_OTHER_LINES						\
-  if (LIKELY(p > 1)) {							\
-    unsigned char *mS = S + Idiv2;					\
-    S -= Idiv2;								\
-    for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
-      memcpy (mS, S, (Idiv2<<1));					\
-    S = mS + Idiv2;							\
-    j += p;								\
-  }									\
-  else do {								\
-      S += (Idiv2<<1);							\
-      j++;								\
-    } while(0)
+#define FILL_OTHER_LINES do {						\
+    if (LIKELY(p > 1)) {						\
+      unsigned char *mS = S + Idiv2;					\
+      S -= Idiv2;							\
+      for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
+	memcpy (mS, S, (Idiv2<<1));					\
+      S = mS + Idiv2;							\
+      j += p;								\
+    }									\
+    else do {								\
+	S += (Idiv2<<1);						\
+	j++;								\
+      } while(0);							\
+  } while (0)
   
   j *= ej;
   ej += j;
@@ -1120,7 +1135,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
            "jl 0b\n"                                            \
            : "=&r"(cP)                                          \
            : "r"(xS), "r"(P), "r"(Idiv2), "x"(tt)               \
-           : "%rax", "%rbx", "%rcx", "%xmm0", "%xmm1");
+           : "%rax", "%rbx", "%rcx", "%xmm0", "%xmm1", "cc");
 
    But the result is x1.5 slower than this version, because it needs
    6 instructions to look at only one rational (ALG_1BYTE).
@@ -1312,15 +1327,15 @@ void init_alg_norms_bucket_region (unsigned char *S,
     "x"(scale), "r"(&un), "x"(u0), "x"(u1), "x"(u2),			\
     "x"(u3), "x"(u4), "x"(u5), "x"(u6), "x"(u7),			\
     "x"(u8), "x"(u9)							\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2")
+    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
 
 #define ALG_ILP3D							\
   ALG_ILP0								\
   									\
   "6:"									\
   :: "r"(xS), "r"(S), "r"(Idiv2), "x"(tt), "x"(add),			\
-    "x"(scale), "r"(&un), "r"(u), "r"((uint64_t) (d<<4))			\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2")
+    "x"(scale), "r"(&un), "r"(u), "r"((uint64_t) (d<<4))		\
+    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
   /****************** End of local define ******************************/
 
   memset (S, 255, (Idiv2<<1) * ej);
@@ -1717,106 +1732,115 @@ void init_alg_norms_bucket_region (unsigned char *S,
 
 #define INITALG0 uu0=0x0101010101010101*inttruncfastlog2(fabs(alg->fijd[0]),add,scale)
 
-#define INITALG1(A)				\
-  u1 = alg->fijd[1]    ;			\
-  u0 = alg->fijd[0] * ((double) (A))
-
-#define INITALG2(A)				\
-  u2 = alg->fijd[2]    ; h  = ((double) (A));	\
-  u1 = alg->fijd[1] * h; h *= h;		\
-  u0 = alg->fijd[0] * h
-
-#define INITALG3(A)				 \
-  u3 = alg->fijd[3]    ; h  = ((double) (A));	 \
-  u2 = alg->fijd[2] * h; g  = h * h;		 \
-  u1 = alg->fijd[1] * g; g *= h;		 \
-  u0 = alg->fijd[0] * g
-
-#define INITALG4(A)				 \
-  u4 = alg->fijd[4]    ; h  = ((double) (A));	 \
-  u3 = alg->fijd[3] * h; g  = h * h;		 \
-  u2 = alg->fijd[2] * g; g *= h;		 \
-  u1 = alg->fijd[1] * g; g *= h;		 \
-  u0 = alg->fijd[0] * g
-
-#define INITALG5(A)				 \
-  u5 = alg->fijd[5]    ; h  = ((double) (A));	 \
-  u4 = alg->fijd[4] * h; g  = h * h;		 \
-  u3 = alg->fijd[3] * g; g *= h;		 \
-  u2 = alg->fijd[2] * g; g *= h;		 \
-  u1 = alg->fijd[1] * g; g *= h;		 \
-  u0 = alg->fijd[0] * g
-
-#define INITALG6(A)					\
-  u6 = alg->fijd[6]    ; h  = ((double) (A));		\
-  u5 = alg->fijd[5] * h; g  = h * h;			\
-  u4 = alg->fijd[4] * g; g *= h;			\
-  u3 = alg->fijd[3] * g; g *= h;			\
-  u2 = alg->fijd[2] * g; g *= h;			\
-  u1 = alg->fijd[1] * g; g *= h;			\
-  u0 = alg->fijd[0] * g
-
-#define INITALG7(A)					\
-  u7 = alg->fijd[7]    ; h  = ((double) (A));		\
-  u6 = alg->fijd[6] * h; g  = h * h;			\
-  u5 = alg->fijd[5] * g; g *= h;			\
-  u4 = alg->fijd[4] * g; g *= h;			\
-  u3 = alg->fijd[3] * g; g *= h;			\
-  u2 = alg->fijd[2] * g; g *= h;			\
-  u1 = alg->fijd[1] * g; g *= h;			\
-  u0 = alg->fijd[0] * g
-
-#define INITALG8(A)					\
-  u8 = alg->fijd[8]    ; h  = ((double) (A));		\
-  u7 = alg->fijd[7] * h; g  = h * h;			\
-  u6 = alg->fijd[6] * g; g *= h;			\
-  u5 = alg->fijd[5] * g; g *= h;			\
-  u4 = alg->fijd[4] * g; g *= h;			\
-  u3 = alg->fijd[3] * g; g *= h;			\
-  u2 = alg->fijd[2] * g; g *= h;			\
-  u1 = alg->fijd[1] * g; g *= h;			\
-  u0 = alg->fijd[0] * g
-
-#define INITALG9(A)					\
-  u9 = alg->fijd[9]    ; h  = ((double) (A));		\
-  u8 = alg->fijd[8] * h; g  = h * h;			\
-  u7 = alg->fijd[7] * g; g *= h;			\
-  u6 = alg->fijd[6] * g; g *= h;			\
-  u5 = alg->fijd[5] * g; g *= h;			\
-  u4 = alg->fijd[4] * g; g *= h;			\
-  u3 = alg->fijd[3] * g; g *= h;			\
-  u2 = alg->fijd[2] * g; g *= h;			\
-  u1 = alg->fijd[1] * g; g *= h;			\
-  u0 = alg->fijd[0] * g
-
+#define INITALG1(A) do {			\
+    u1 = alg->fijd[1]    ;			\
+    u0 = alg->fijd[0] * ((double) (A));		\
+  } while(0)
+ 
+#define INITALG2(A) do {			\
+    u2 = alg->fijd[2]    ; h  = ((double) (A));	\
+    u1 = alg->fijd[1] * h; h *= h;		\
+    u0 = alg->fijd[0] * h;			\
+  } while(0)
+ 
+#define INITALG3(A) do {			 \
+    u3 = alg->fijd[3]    ; h  = ((double) (A));	 \
+    u2 = alg->fijd[2] * h; g  = h * h;		 \
+    u1 = alg->fijd[1] * g; g *= h;		 \
+    u0 = alg->fijd[0] * g;			 \
+  } while(0)
+ 
+#define INITALG4(A) do {			 \
+    u4 = alg->fijd[4]    ; h  = ((double) (A));	 \
+    u3 = alg->fijd[3] * h; g  = h * h;		 \
+    u2 = alg->fijd[2] * g; g *= h;		 \
+    u1 = alg->fijd[1] * g; g *= h;		 \
+    u0 = alg->fijd[0] * g;			 \
+  } while(0)
+ 
+#define INITALG5(A) do {			 \
+    u5 = alg->fijd[5]    ; h  = ((double) (A));	 \
+    u4 = alg->fijd[4] * h; g  = h * h;		 \
+    u3 = alg->fijd[3] * g; g *= h;		 \
+    u2 = alg->fijd[2] * g; g *= h;		 \
+    u1 = alg->fijd[1] * g; g *= h;		 \
+    u0 = alg->fijd[0] * g;			 \
+  } while(0)
+ 
+#define INITALG6(A) do {				\
+    u6 = alg->fijd[6]    ; h  = ((double) (A));		\
+    u5 = alg->fijd[5] * h; g  = h * h;			\
+    u4 = alg->fijd[4] * g; g *= h;			\
+    u3 = alg->fijd[3] * g; g *= h;			\
+    u2 = alg->fijd[2] * g; g *= h;			\
+    u1 = alg->fijd[1] * g; g *= h;			\
+    u0 = alg->fijd[0] * g;				\
+  } while(0)
+ 
+#define INITALG7(A) do {				\
+    u7 = alg->fijd[7]    ; h  = ((double) (A));		\
+    u6 = alg->fijd[6] * h; g  = h * h;			\
+    u5 = alg->fijd[5] * g; g *= h;			\
+    u4 = alg->fijd[4] * g; g *= h;			\
+    u3 = alg->fijd[3] * g; g *= h;			\
+    u2 = alg->fijd[2] * g; g *= h;			\
+    u1 = alg->fijd[1] * g; g *= h;			\
+    u0 = alg->fijd[0] * g;				\
+  } while(0)
+ 
+#define INITALG8(A) do {				\
+    u8 = alg->fijd[8]    ; h  = ((double) (A));		\
+    u7 = alg->fijd[7] * h; g  = h * h;			\
+    u6 = alg->fijd[6] * g; g *= h;			\
+    u5 = alg->fijd[5] * g; g *= h;			\
+    u4 = alg->fijd[4] * g; g *= h;			\
+    u3 = alg->fijd[3] * g; g *= h;			\
+    u2 = alg->fijd[2] * g; g *= h;			\
+    u1 = alg->fijd[1] * g; g *= h;			\
+    u0 = alg->fijd[0] * g;				\
+  } while(0)
+ 
+#define INITALG9(A) do {				\
+    u9 = alg->fijd[9]    ; h  = ((double) (A));		\
+    u8 = alg->fijd[8] * h; g  = h * h;			\
+    u7 = alg->fijd[7] * g; g *= h;			\
+    u6 = alg->fijd[6] * g; g *= h;			\
+    u5 = alg->fijd[5] * g; g *= h;			\
+    u4 = alg->fijd[4] * g; g *= h;			\
+    u3 = alg->fijd[3] * g; g *= h;			\
+    u2 = alg->fijd[2] * g; g *= h;			\
+    u1 = alg->fijd[1] * g; g *= h;			\
+    u0 = alg->fijd[0] * g;				\
+  } while(0)
+ 
 #define INITALGD(A)				\
   fpoly_scale(u, alg->fijd, d, (double) (A))
-
+ 
 #define ABSG1 g=fabs(u0+h*u1)
-
+ 
 #define ABSG2 g=fabs(u0+h*(u1+h*u2))
-
+ 
 #define ABSG3 g=fabs(u0+h*(u1+h*(u2+h*u3)))
-
+ 
 #define ABSG4 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*u4))))
-
+ 
 #define ABSG5 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*u5)))))
-
+ 
 #define ABSG6 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*u6))))))
-
+ 
 #define ABSG7 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*u7)))))))
-
+ 
 #define ABSG8 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*u8))))))))
-
+ 
 #define ABSG9 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*(u8+h*u9)))))))))
-
+ 
 #define ABSGD g=u[d]; for(unsigned int k=d;--k!=UINT_MAX;g=g*h+u[k]); g=fabs(g)
-
+ 
 #define ALG_INIT_SCALE_ADD_UN const double		\
-  scale = alg->scale * (1./0x100000),			\
+    scale = alg->scale * (1./0x100000),			\
     add = 0x3FF00000 - GUARD / scale,			\
     un MAYBE_UNUSED = 1.
-
+ 
 /* Careful! non SSE t and SSE tt are not the same formula, but the
    same use. */
 #define ALG_INIT_SCALE_ADD_UN_T						\
@@ -2029,20 +2053,21 @@ void init_alg_norms_bucket_region(unsigned char *S,
     d = si->cpoly->alg->degree,
     p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
 
-#define FILL_OTHER_LINES						\
-  if (LIKELY(p > 1)) {							\
-    unsigned char *mS = S + Idiv2;					\
-    S -= Idiv2;								\
-    for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
-      memcpy (mS, S, (Idiv2<<1));					\
-    S = mS + Idiv2;							\
-    j += p;								\
-  }									\
-  else do {								\
-      S += (Idiv2<<1);							\
-      j++;								\
-    } while(0)
-  
+#define FILL_OTHER_LINES do {						\
+    if (LIKELY(p > 1)) {						\
+      unsigned char *mS = S + Idiv2;					\
+      S -= Idiv2;							\
+      for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
+	memcpy (mS, S, (Idiv2<<1));					\
+      S = mS + Idiv2;							\
+      j += p;								\
+    }									\
+    else do {								\
+	S += (Idiv2<<1);						\
+	j++;								\
+      } while(0);							\
+  } while(0)
+
   j *= ej;
   ej += j;
   S += Idiv2;
@@ -2411,36 +2436,46 @@ void init_alg_norms_bucket_region(unsigned char *S,
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
     d = si->cpoly->alg->degree;
   
-#define ALG1(A)					\
-  ABSG1; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG2(A)					\
-  ABSG2; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG3(A)					\
-  ABSG3; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG4(A)					\
-  ABSG4; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG5(A)					\
-  ABSG5; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG6(A)					\
-  ABSG6; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG7(A)					\
-  ABSG7; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG8(A)					\
-  ABSG8; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALG9(A)					\
-  ABSG9; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
-#define ALGD(A)					\
-  ABSGD; g += un;				\
-  (&S[ih])[A]=inttruncfastlog2(g,add,scale)
+#define ALG1(A)	do {				\
+    ABSG1; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG2(A)	do {				\
+    ABSG2; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG3(A)	do {				\
+    ABSG3; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG4(A)	do {				\
+    ABSG4; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG5(A)	do {				\
+    ABSG5; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG6(A)	do {				\
+    ABSG6; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG7(A)	do {				\
+    ABSG7; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG8(A)	do {				\
+    ABSG8; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALG9(A)	do {				\
+    ABSG9; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
+#define ALGD(A)	do {				\
+    ABSGD; g += un;				\
+    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
+  } while (0)
 
   j *= ej;
   ej += j;

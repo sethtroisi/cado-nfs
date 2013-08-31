@@ -133,7 +133,8 @@ tasks.linalg.bwc.threads = 2x2
 # address: The server of the client/server set-up will listen at this
 # address. Note that listening on address "localhost" will allow only
 # clients running on the same machine to connect. If not specified, the
-# computer's hostname will be used.
+# computer's hostname will be used, which usually resolves to a network-
+# visible address so clients on other machines can connect.
 
 # server.address = localhost
 
@@ -149,7 +150,15 @@ server.port = 8012
 # hostname specified (comma separated list, with multiplicity), one slave is
 # launched on that host.
 # If the hostname is of the form "@filename", then the host names are read
-# from the file "filename", one host name per line.
+# from the file "filename", one host name per line, with the same
+# multiplicity rule.
+# Note: if the hostname for a client is "localhost", then the client is
+# started directly as sub-processes of the cadofactor script; if it is not
+# "localhost", then clients are started through SSH. This affects the
+# client's current working directory: if the client is started as a
+# sub-process, its CWD is the same as that of the cadofactor script; if it
+# is started through SSH, its CWD is the CWD after an SSH login (usually the
+# user's home directory).
 
 slaves.hostnames = localhost
 # Example with multiple hostnames. This launches one client on localhost,
@@ -158,7 +167,7 @@ slaves.hostnames = localhost
 # slaves.hostnames = localhost, otherhost1, otherhost1, otherhost2
 
 
-# Modifies the behaviour of the hostnames list: if nrclients in specified,
+# Modifies the behaviour of the hostnames list: if nrclients is specified,
 # then multiplicity in the hostnames list is ignored, and "nrclients" client
 # scripts are launched on each unique host name.
 
@@ -178,24 +187,32 @@ slaves.downloadretry = 10
 
 
 # basepath: defines the base directory under which wuclient creates its
-# download and working directories. It is permissible to let all clients use
-# the same download directory; files are protected by locking to prevent
-# download races. If the download directory is on a shared file system, then
-# this filesystem must support locking.
+# download and working directories. It is permissible to let all clients of
+# the same factorization to use the same download directory; files are
+# protected by locking to prevent download races. If the download directory
+# is on a shared file system, then this filesystem must support locking.
 # The working directories should probably be unique; the default choice for
 # the working directory includes the clientid which should ensure uniqueness.
 
-slaves.basepath = /tmp/wuclient
+slaves.basepath = /tmp/work/wuclient
 
 
 # If you want to launch clients on multiple groups of slave machines, with
 # different parameters per group, you can group them by different parameter
 # paths, like so:
+
 # slaves.downloadretry = 10
 # slaves.basepath = /tmp/wuclient
 # slaves.home.hostnames = localhost
 # slaves.home.nrclients = 1
 # slaves.home.scriptpath = $(sourcedir)/scripts/cadofactor
-# slaves.work.hostname = workstation1, workstation2
-# slaves.home.nrclients = 4
-# slaves.home.scriptpath = /path/to/scripts/cadofactor
+# slaves.work.desktop.hostname = workstation1, workstation2
+# slaves.work.desktop.scriptpath = /path/to/scripts/cadofactor
+# slaves.work.cluster.hostname = clusternode1, clusternode2, clusternode3
+# slaves.work.desktop.scriptpath = /other/path/to/scripts/cadofactor
+## Use 4 slaves on all "work" slaves, both "desktop" and "cluster"
+# slaves.work.nrclients = 4
+
+# Here, "home", "work", "workstation", and "cluster" are arbitrary 
+# alphanumeric strings; their sole purpose is to create different nodes in 
+# the parameter tree. 

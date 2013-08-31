@@ -273,7 +273,8 @@ main (int argc, char * argv[])
 
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
 
-    if (!outfmt) // In that case, the suffix_in of first input file is used
+    // If not output suffix is specified, use suffix of first input file
+    if (!outfmt && files[0] != NULL)
       get_suffix_from_filename (files[0], &outfmt);
 
     memset (nr_rels_tot, 0, sizeof(index_t) * nslices);
