@@ -584,6 +584,7 @@ class Las(Program):
                  out: Parameter(is_output_file = True) = None,
                  threads: Parameter("mt") = None,
                  ratq: Toggle() = None,
+                 stats_stderr: Toggle("stats-stderr") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

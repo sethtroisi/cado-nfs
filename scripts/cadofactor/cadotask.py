@@ -910,7 +910,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', filename)
-            return False
+            # No polynomial found an a given polyselec run is not an error
+            return True
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
@@ -1107,7 +1108,7 @@ class FreeRelTask(Task):
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params.get("gzip", True) else ""
-            freerelfilename = self.workdir.make_filename("freerel" + use_gz)
+            freerelfilename = self.workdir.make_filename("freerel")
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
 
             # Run command to generate factor base/free relations file
@@ -1235,13 +1236,16 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         while self.state["rels_found"] < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
-            outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            outputfilename = \
+                self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output", shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
             p = cadoprograms.Las(q0=q0, q1=q1,
                                  poly=polyfilename, factorbase=factorbase,
-                                 out=outputfilename,
+                                 out=outputfilename, stats_stderr = True,
                                  **self.progparams[0])
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
@@ -1257,13 +1261,16 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
-        ok = self.parse_output_file(output_files[0])
-        self.parse_stats(output_files[0])
+        stderr = message.get_stderr(0)
+        assert not stderr is None
+        ok = self.parse_output_files(output_files[0], stderr)
+        if ok:
+            self.parse_stats(stderr)
         self.verification(message, ok)
     
-    def parse_output_file(self, filename):
-        size = os.path.getsize(filename)
-        with open(filename, "r") as f:
+    def parse_output_files(self, filename, stderr):
+        size = os.path.getsize(stderr)
+        with open(stderr, "r") as f:
             f.seek(max(size - self.file_end_offset, 0))
             for line in f:
                 match = re.match(r"# Total (\d+) reports ", line)

@@ -1017,7 +1017,7 @@ class ResultInfo(WuResultMessage):
         name filename. Used internally.
         """
         for f in self.record["files"]:
-            if f["filename"] == "filename":
+            if f["filename"] == filename:
                 return f["path"]
         return None
     

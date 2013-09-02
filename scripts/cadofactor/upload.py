@@ -109,9 +109,13 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             # strip leading path from file name to avoid directory traversal
             # attacks
             basename = os.path.basename(fileitem.filename)
+            # Split extension from file name. We need to preserve the 
+            # file extension so that, e.g., gzipped files can be identified
+            # as such
+            (basename, suffix) = os.path.splitext(basename)
             # Make a file name which does not exist yet and create the file
             (filedesc, filename) = mkstemp(prefix=basename + '.',
-                dir=os.environ[UPLOADDIRKEY])
+                suffix=suffix, dir=os.environ[UPLOADDIRKEY])
             filestuple = (fileitem.filename, filename)
             if False:
                 filestuple = (fileitem.filename, os.path.basename(filename))
