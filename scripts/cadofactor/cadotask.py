@@ -462,6 +462,9 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
         return ("name", "workdir")
+    @property
+    def param_nodename(self):
+        return self.name
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -479,7 +482,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         # DB-backed dictionary with the state of this task
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
-        # Set default parametes for this task, if any are given
+        # Set default parameters for this task, if any are given
         self.params = self.parameters.myparams(self.paramnames)
         self.logger.debug("self.parameters = %s", self.parameters)
         self.logger.debug("params = %s", self.params)
@@ -2256,6 +2259,9 @@ class StartClientsTask(Task):
     def paramnames(self):
         return super().paramnames + \
             ('hostnames', 'scriptpath', "nrclients")
+    @property
+    def param_nodename(self):
+        return None
     
     def __init__(self, address, port, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2488,6 +2494,9 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     @property
     def name(self):
         return "tasks"
+    @property
+    def param_nodename(self):
+        return self.name
     
     CAN_CANCEL_WUS = 0
     
