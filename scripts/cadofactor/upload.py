@@ -7,6 +7,7 @@ DEBUG = 1
 import cgi, os
 import sys
 from tempfile import mkstemp
+from shutil import copyfileobj
 import wudb
 
 def diag(level, text, var = None):
@@ -14,19 +15,19 @@ def diag(level, text, var = None):
         if var == None:
             print (text, file=sys.stderr)
         else:
-            print (text + str(var), file=sys.stderr)
+            print ("%s%s" % (text, var), file=sys.stderr)
         sys.stderr.flush()
 
 def analyze(level, name, obj):
     """ Dump tons of internal data about an object """
     if DEBUG > level:
-        diag (level, "*** Content dump of %s" % name)
-        diag (level, "type(%s): %s" % (name, type(obj)))
-        diag (level, "dir(%s): %s" % (name, dir(obj)))
-        diag (level, "%s.__str__() = %s" % (name, obj))
+        diag (level, "*** Content dump of ", name)
+        diag (level, "type(%s): " % name, type(obj))
+        diag (level, "dir(%s): " % name, dir(obj))
+        diag (level, "%s.__str__() = " % name, obj)
         diag (level, "%s.__repr__() = %r" % (name, obj))
         for name2 in dir(obj):
-            diag (level, "%s.%s = %s" % (name, name2, getattr(obj, name)))
+            diag (level, "%s.%s = " % (name, name2), getattr(obj, name2))
 
 # Global variable in this module so that other Python modules can import
 # it and store the path to the upload directory in the shell environment
@@ -47,9 +48,9 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
     except ImportError:
         pass
 
-    diag(1, "Reading POST data\n", "")
-
+    diag(1, "Reading POST data")
     form = cgi.FieldStorage(fp = inputfp)
+    diag(1, "Finished reading POST data")
     analyze(2, "form", form)
 
     charset = "utf-8"
@@ -99,7 +100,6 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         else:
             fileitems = []
             diag(1, 'No "results" form found')
-
         analyze (2, "fileitems", fileitems)
 
         message = ""
@@ -116,15 +116,20 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             # Make a file name which does not exist yet and create the file
             (filedesc, filename) = mkstemp(prefix=basename + '.',
                 suffix=suffix, dir=os.environ[UPLOADDIRKEY])
+            diag(1, "output filename = ", filename)
             filestuple = (fileitem.filename, filename)
             if False:
                 filestuple = (fileitem.filename, os.path.basename(filename))
             filetuples.append(filestuple)
             
             # fd is a file descriptor, make a file object from it
+            diag(1, "Getting file object for temp file")
             file = os.fdopen(filedesc, "wb")
-            file.write(fileitem.file.read())
+            diag(1, "Writing data to temp file")
+            copyfileobj(fileitem.file, file)
             nr_bytes = file.tell()
+            diag(1, "Wrote %d bytes" % nr_bytes)
+            diag(1, "Closing file")
             file.close()
             
             # Example output:
@@ -135,7 +140,9 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             message = message + 'The file "%s" for workunit %s was uploaded ' \
             'successfully by client %s and stored as %s, received %d bytes.\n' \
             % (basename, wuid.value, clientid.value, filename, nr_bytes)
+        diag(1, "Getting WuAccess object")
         wuar = wudb.WuAccess(dbfilename)
+        diag(1, "Got WuAccess object. Calling .result()")
         try:
             wuar.result(wuid.value, clientid.value, filetuples, errorcode,
                         failedcommand)
@@ -143,6 +150,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             message = 'Workunit ' + wuid.value + 'was not currently assigned'
         else:
             message = message + 'Workunit ' + wuid.value + ' completed.\n'
+        diag(1, "Finished .result()")
 
     diag (0, sys.argv[0] + ': ', message.rstrip("\n"))
     if output == sys.stdout:
@@ -161,5 +169,7 @@ if __name__ == '__main__':
         print ('Script error: Environment variable %s not set'
                % DBFILENAMEKEY)
         sys.exit(1)
+
     DBFILENAME = os.environ[DBFILENAMEKEY]
+    diag(1, "About to call do_upload()")
     do_upload(DBFILENAME)
