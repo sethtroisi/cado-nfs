@@ -186,6 +186,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         else:
             self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
+        sys.stderr.flush()
 
     def is_upload(self):
         """Test whether request is a file upload."""
