@@ -481,9 +481,6 @@ class DictDbAccess(collections.MutableMapping):
         sqlite3.connect()), or an open DB connection. The latter is allowed 
         primarily for making the doctest work, so we can reuse the same 
         memory-backed DB connection, but it may be useful in other contexts.
-        Note that writes to the dict cause a commit() on the DB connection, 
-        so sharing a DB connection may be ill-advised if you want control 
-        over when commits happen.
         '''
         
         if isinstance(db, str):
@@ -517,7 +514,7 @@ class DictDbAccess(collections.MutableMapping):
         return self._data.__str__()
     
     def __del__(self):
-        """ Close the DB connection and delete the dictionary """
+        """ Close the DB connection and delete the in-memory dictionary """
         if self._ownconn:
             conn_close(self._conn)
     
@@ -553,7 +550,7 @@ class DictDbAccess(collections.MutableMapping):
     
     def __setitem_nocommit(self, cursor, key, value):
         """ Set dictioary key to value and update/insert into table,
-        but don't commit
+        but don't commit. Cursor must be given
         """
         update = {"value": str(value), "type": self.__get_type_idx(value)}
         if key in self._data:
@@ -566,22 +563,27 @@ class DictDbAccess(collections.MutableMapping):
         # Update the in-memory dict
         self._data[key] = value
     
-    def __setitem__(self, key, value):
+    def _setitem(self, key, value, commit=True):
         """ Set a dict entry to a value and update the DB """
         cursor = self._conn.cursor(MyCursor)
         self.__setitem_nocommit(cursor, key, value)
-        conn_commit(self._conn)
+        if commit:
+            conn_commit(self._conn)
         cursor.close()
     
+    def __setitem__(self, key, value):
+        """ Access by indexing, e.g., d["foo"]. Always commits """
+        self._setitem(key, value, commit=True)
+    
     def __delitem__(self, key):
-        """ Delete a key from the dictionary """
+        """ Delete a key from the dictionary. Always commits """
         del(self._data[key])
         cursor = self._conn.cursor(MyCursor)
         self._table.delete(cursor, eq={"key": key})
         conn_commit(self._conn)
         cursor.close()
     
-    def setdefault(self, key, default = None):
+    def setdefault(self, key, default = None, commit=True):
         ''' Setdefault function that allows a mapping as input
         
         Values from default dict are merged into self, *not* overwriting
@@ -591,22 +593,24 @@ class DictDbAccess(collections.MutableMapping):
             for (key, value) in default.items():
                 if not key in self:
                     self.__setitem_nocommit(cursor, key, value)
-            conn_commit(self._conn)
+            if commit:
+                conn_commit(self._conn)
             cursor.close()
             return None
         elif not key in self:
-            self.__setitem__(key, default)
+            self._setitem(key, default, commit)
         return self._data[key]
     
-    def update(self, other):
+    def update(self, other, commit=True):
         cursor = self._conn.cursor(MyCursor)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
-        conn_commit(self._conn)
+        if commit:
+            conn_commit(self._conn)
         cursor.close()
     
-    def clear(self, *args):
-        """ Overriden clear that allows removing several keys atomically """
+    def clear(self, *args, commit=True):
+        """ Overridden clear that allows removing several keys atomically """
         cursor = self._conn.cursor(MyCursor)
         if not args:
             self._data.clear()
@@ -615,7 +619,8 @@ class DictDbAccess(collections.MutableMapping):
             for key in args:
                 del(self._data[key])
                 self._table.delete(cursor, eq={"key": key})
-        conn_commit(self._conn)
+        if commit:
+            conn_commit(self._conn)
         cursor.close()
 
 
