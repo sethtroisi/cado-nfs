@@ -742,12 +742,18 @@ class WuAccess(object): # {
         of as if the WuAccess instance were itself a persistent 
         storage device """
     
-    def __init__(self, dbfilename):
-        self.conn = sqlite3.connect(dbfilename)
+    def __init__(self, db):
+        if isinstance(db, str):
+            self.conn = sqlite3.connect(db)
+            self._ownconn = True
+        else:
+            self.conn = db
+            self._ownconn = False
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
-        conn_close(self.conn)
+        if self._ownconn:
+            conn_close(self.conn)
     
     @staticmethod
     def to_str(wus):
@@ -776,7 +782,8 @@ class WuAccess(object): # {
             diag (0, "WuAccess._checkstatus(): %s" % msg)
             raise StatusUpdateError(msg)
 
-    def check(self, data):
+    @staticmethod
+    def check(data):
         status = data["status"]
         WuStatus.check(status)
         wu = Workunit(data["wu"])
@@ -806,7 +813,7 @@ class WuAccess(object): # {
     # assigning it to a client, receiving a result for the WU, marking it as
     # verified, or marking it as cancelled
 
-    def add_files(self, cursor, files, wuid=None, rowid=None):
+    def _add_files(self, cursor, files, wuid=None, rowid=None):
         # Exactly one must be given
         assert not wuid is None or not rowid is None
         assert wuid is None or rowid is None
@@ -833,7 +840,7 @@ class WuAccess(object): # {
         conn_commit(self.conn)
         cursor.close()
 
-    def create1(self, cursor, wutext, priority=None):
+    def _create1(self, cursor, wutext, priority=None):
         d = {
             "wuid": Workunit(wutext).get_id(),
             "wu": wutext,
@@ -845,19 +852,20 @@ class WuAccess(object): # {
         # Insert directly into wu table
         self.mapper.table.insert(cursor, d)
 
-    def create(self, wus, priority=None):
+    def create(self, wus, priority=None, commit=True):
         """ Create new workunits from wus which contains the texts of the 
             workunit files """
         cursor = self.conn.cursor(MyCursor)
         if isinstance(wus, str):
-            self.create1(cursor, wus, priority)
+            self._create1(cursor, wus, priority)
         else:
             for wu in wus:
-                self.create1(cursor, wu, priority)
-        conn_commit(self.conn)
+                self._create1(cursor, wu, priority)
+        if commit:
+            conn_commit(self.conn)
         cursor.close()
 
-    def assign(self, clientid):
+    def assign(self, clientid, commit=True):
         """ Finds an available workunit and assigns it to clientid.
             Returns the text of the workunit, or None if no available 
             workunit exists """
@@ -875,7 +883,8 @@ class WuAccess(object): # {
                  "timeassigned": str(datetime.now())}
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
-            conn_commit(self.conn)
+            if commit:
+                conn_commit(self.conn)
             cursor.close()
             return r[0]["wu"]
         else:
@@ -891,7 +900,7 @@ class WuAccess(object): # {
             return None
 
     def result(self, wuid, clientid, files, errorcode=None,
-               failedcommand=None):
+               failedcommand=None, commit=True):
         cursor = self.conn.cursor(MyCursor)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
@@ -910,11 +919,12 @@ class WuAccess(object): # {
             d["status"] = WuStatus.RECEIVED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
-        self.add_files(cursor, files, rowid = data[pk])
-        conn_commit(self.conn)
+        self._add_files(cursor, files, rowid = data[pk])
+        if commit:
+            conn_commit(self.conn)
         cursor.close()
 
-    def verification(self, wuid, ok):
+    def verification(self, wuid, ok, commit=True):
         cursor = self.conn.cursor(MyCursor)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
@@ -925,25 +935,23 @@ class WuAccess(object): # {
         if debug > 0:
             self.check(data)
         d = {"timeverified": str(datetime.now())}
-        if ok:
-            d["status"] = WuStatus.VERIFIED_OK
-        else:
-            d["status"] = WuStatus.VERIFIED_ERROR
+        d["status"] = WuStatus.VERIFIED_OK if ok else WuStatus.VERIFIED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
-        conn_commit(self.conn)
+        if commit:
+            conn_commit(self.conn)
         cursor.close()
 
-    def cancel(self, wuid):
-        self.cancel_by_condition(eq={"wuid":wuid})
+    def cancel(self, wuid, commit=True):
+        self.cancel_by_condition(eq={"wuid":wuid}, commit=commit)
     
-    def cancel_all_available(self):
-        self.cancel_by_condition(eq={"status": 0})
+    def cancel_all_available(self, commit=True):
+        self.cancel_by_condition(eq={"status": 0}, commit=commit)
     
-    def cancel_all_assigned(self):
-        self.cancel_by_condition(eq={"status": 1})
+    def cancel_all_assigned(self, commit=True):
+        self.cancel_by_condition(eq={"status": 1}, commit=commit)
     
-    def cancel_by_condition(self, **conditions):
+    def cancel_by_condition(self, commit=True, **conditions):
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
         self.mapper.table.update(cursor, d, **conditions)
@@ -1096,6 +1104,9 @@ class DbAccess(object):
     def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.__db = db
+    
+    def get_db_connection(self):
+        return sqlite3.connect(self.__db)
     
     def get_db_filename(self):
         return self.__db
