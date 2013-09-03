@@ -325,6 +325,7 @@ class ServerLauncher(object):
         self.logger.setLevel(logging.NOTSET)
         self.address = address
         self.port = port
+        upload_scriptname = "upload.py"
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -358,11 +359,11 @@ class ServerLauncher(object):
         MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
         
         # Find the upload.py script
-        upload_path = self.findscript("upload.py", scriptdir)
+        upload_path = self.findscript(upload_scriptname, scriptdir)
         # Always register the upload script
         if upload_path is None:
-            raise IOError("upload.py script not found")
-        self.logger.debug("Found upload.py at %s" % upload_path)
+            raise IOError("%s script not found" % upload_scriptname)
+        self.logger.debug("Found %s at %s" % (upload_scriptname, upload_path))
         registered_filenames[upload_url_path.lstrip('/')] = upload_path
 
         # Set shell environment variables which the upload.py script needs if
