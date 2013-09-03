@@ -29,23 +29,23 @@ import patterns
 
 debug = 1
 
-def diag(level, text, var = None):
+def diag(level, text, var=None):
     if debug > level:
         if var is None:
             print (text, file=sys.stderr)
         else:
             print ("%s%s" % (text, var), file=sys.stderr)
 
-def join3(l, pre = None, post = None, sep = ", "):
+def join3(l, pre=None, post=None, sep=", "):
     """ 
     If any parameter is None, it is interpreted as the empty string 
-    >>> join3 ( ('a'), pre = "+", post = "-", sep = ", ")
+    >>> join3 ( ('a'), pre="+", post="-", sep=", ")
     '+a-'
-    >>> join3 ( ('a', 'b'), pre = "+", post = "-", sep = ", ")
+    >>> join3 ( ('a', 'b'), pre="+", post="-", sep=", ")
     '+a-, +b-'
     >>> join3 ( ('a', 'b'))
     'a, b'
-    >>> join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ")
+    >>> join3 ( ('a', 'b', 'c'), pre="+", post="-", sep=", ")
     '+a-, +b-, +c-'
     """
     if pre is None:
@@ -58,8 +58,8 @@ def join3(l, pre = None, post = None, sep = ", "):
 
 def dict_join3(d, sep=None, op=None, pre=None, post=None):
     """ 
-    If any parameter is None, it is interpreted as the empty string 
-    >>> dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+")
+    If any parameter is None, it is interpreted as the empty string
+    >>> dict_join3 ( {"a": "1", "b": "2"}, sep=",", op="=", pre="-", post="+")
     '-a=1+,-b=2+'
     """
     if pre is None:
@@ -144,11 +144,11 @@ class MyCursor(sqlite3.Cursor):
                 where = " " + name + " "
             else:
                 where = where + " AND "
-            where = where + join3(args[opname].keys(), post = " " + cls.name_to_operator[opname] + " ?", sep = " AND ")
+            where = where + join3(args[opname].keys(), post=" " + cls.name_to_operator[opname] + " ?", sep=" AND ")
             values = values + list(args[opname].values())
         return (where, values)
 
-    def _exec(self, command, values = None):
+    def _exec(self, command, values=None):
         """ Wrapper around self.execute() that prints arguments 
             for debugging and retries in case of "database locked" exception """
         if debug > 1:
@@ -219,7 +219,7 @@ class MyCursor(sqlite3.Cursor):
         values = list(d.values()) + wherevalues
         self._exec(command, values)
     
-    def where_query(self, joinsource, col_alias = None, limit = None, order = None, 
+    def where_query(self, joinsource, col_alias=None, limit=None, order=None,
                     **conditions):
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self._where_str("WHERE", **conditions)
@@ -238,8 +238,8 @@ class MyCursor(sqlite3.Cursor):
                   % (AS, joinsource, WHERE, ORDER, LIMIT)
         return (command, values)
 
-    def where(self, joinsource, col_alias = None, limit = None, order = None, 
-              values = [], **conditions):
+    def where(self, joinsource, col_alias=None, limit=None, order=None,
+              values=[], **conditions):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
             the key:value pairs of the dictionary "conditions" are set to the 
             same value in the database table """
@@ -265,8 +265,8 @@ class MyCursor(sqlite3.Cursor):
         command = "DELETE FROM %s %s;" % (table, WHERE)
         self._exec(command, values)
 
-    def where_as_dict(self, joinsource, col_alias = None, limit = None, 
-                      order = None, values = [], **conditions):
+    def where_as_dict(self, joinsource, col_alias=None, limit=None,
+                      order=None, values=[], **conditions):
         self.where(joinsource, col_alias=col_alias, limit=limit, 
                       order=order, values=values, **conditions)
         # cursor.description is a list of lists, where the first element of 
@@ -352,7 +352,7 @@ class DbTable(object):
         """ Delete an existing row in this table """
         cursor.delete(self.tablename, **conditions)
 
-    def where(self, cursor, limit = None, order = None, **conditions):
+    def where(self, cursor, limit=None, order=None, **conditions):
         assert order is None or order[0] in self._get_colnames()
         return cursor.where_as_dict(self.tablename, limit=limit, 
                                     order=order, **conditions)
@@ -806,7 +806,7 @@ class WuAccess(object): # {
     # assigning it to a client, receiving a result for the WU, marking it as
     # verified, or marking it as cancelled
 
-    def add_files(self, cursor, files, wuid = None, rowid = None):
+    def add_files(self, cursor, files, wuid=None, rowid=None):
         # Exactly one must be given
         assert not wuid is None or not rowid is None
         assert wuid is None or rowid is None
@@ -833,7 +833,7 @@ class WuAccess(object): # {
         conn_commit(self.conn)
         cursor.close()
 
-    def create1(self, cursor, wutext, priority = None):
+    def create1(self, cursor, wutext, priority=None):
         d = {
             "wuid": Workunit(wutext).get_id(),
             "wu": wutext,
@@ -845,7 +845,7 @@ class WuAccess(object): # {
         # Insert directly into wu table
         self.mapper.table.insert(cursor, d)
 
-    def create(self, wus, priority = None):
+    def create(self, wus, priority=None):
         """ Create new workunits from wus which contains the texts of the 
             workunit files """
         cursor = self.conn.cursor(MyCursor)
@@ -890,8 +890,8 @@ class WuAccess(object): # {
         else:
             return None
 
-    def result(self, wuid, clientid, files, errorcode = None, 
-               failedcommand = None):
+    def result(self, wuid, clientid, files, errorcode=None,
+               failedcommand=None):
         cursor = self.conn.cursor(MyCursor)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
@@ -950,7 +950,7 @@ class WuAccess(object): # {
         conn_commit(self.conn)
         cursor.close()
 
-    def query(self, limit = None, **conditions):
+    def query(self, limit=None, **conditions):
         cursor = self.conn.cursor(MyCursor)
         r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
@@ -1162,7 +1162,7 @@ class DbRequest(object):
 
 class DbThreadPool(object):
     """Pool of threads consuming tasks from a queue"""
-    def __init__(self, dbfilename, num_threads = 1):
+    def __init__(self, dbfilename, num_threads=1):
         self.taskqueue = Queue(num_threads)
         self.pool = []
         for _ in range(num_threads):
