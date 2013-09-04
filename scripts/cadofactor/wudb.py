@@ -456,7 +456,7 @@ class DictDbAccess(collections.MutableMapping):
     >>> d = DictDbAccess(conn, 'test')
     >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
     True
-    >>> d.clear('a', 'd')
+    >>> d.clear(['a', 'd'])
     >>> d == {'b': 3.0, 'c': '4'}
     True
     >>> del(d)
@@ -609,10 +609,10 @@ class DictDbAccess(collections.MutableMapping):
             conn_commit(self._conn)
         cursor.close()
     
-    def clear(self, *args, commit=True):
+    def clear(self, args = None, commit=True):
         """ Overridden clear that allows removing several keys atomically """
         cursor = self._conn.cursor(MyCursor)
-        if not args:
+        if args is None:
             self._data.clear()
             self._table.delete(cursor)
         else:
