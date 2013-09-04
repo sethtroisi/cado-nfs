@@ -16,6 +16,7 @@ class Observable(object):
         super().__init__(*args, **kwargs)
     
     def subscribeObserver(self, observer):
+        assert isinstance(observer, Observer)
         if not observer in self.__observers:
             self.__observers.append(observer)
     
