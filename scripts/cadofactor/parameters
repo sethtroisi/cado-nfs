@@ -112,6 +112,7 @@ tasks.polyselect.degree = 4
 tasks.polyselect.admin = 0
 tasks.polyselect.admax = 10000
 tasks.polyselect.adrange = 5000
+tasks.polyselect.maxnorm = 21.5
 
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000
@@ -194,7 +195,7 @@ slaves.downloadretry = 10
 # The working directories should probably be unique; the default choice for
 # the working directory includes the clientid which should ensure uniqueness.
 
-slaves.basepath = /tmp/work/wuclient
+slaves.basepath = /tmp/work/testrun.wuclient
 
 
 # If you want to launch clients on multiple groups of slave machines, with

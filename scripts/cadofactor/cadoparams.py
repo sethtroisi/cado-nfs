@@ -21,7 +21,7 @@ For example, with
 threads = 2
 tasks.sieving.las.threads = 1
 the theads=1 parameter would apply only to the las program, but not to any 
-other programs run during the sieving tasks, if there are any. The name of 
+other programs run during the sieving tasks, if there were any. The name of 
 the node of a program is equal to the name of the binary executable.
 """
 
@@ -38,7 +38,7 @@ class Parameters(object):
     """
     # TODO: Add a self.used dictionary with the same structure and keys as
     # self.data, but booleans as the values which indicate whether a parameter
-    # has ever been access with myparams(). Add a function that tests that
+    # has ever been accessed with myparams(). Add a function that tests that
     # all parameters have been accessed, so that a warning can be printed
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
@@ -401,7 +401,7 @@ class UseParameters(metaclass=abc.ABCMeta):
     """ Mix-in class for objects that take parameters from the parameter file
     """
     @abc.abstractproperty
-    def name(self):
+    def param_nodename(self):
         """ The name of this object's node in the parameter tree """
         pass
     
@@ -427,7 +427,10 @@ class UseParameters(metaclass=abc.ABCMeta):
                 self.path_prefix = path_prefix
         
         def get_param_path(self):
-            return self.path_prefix + [self.name]
+            if self.name is None:
+                return self.path_prefix[:]
+            else:
+                return self.path_prefix + [self.name]
         
         def get_parameters(self):
             return self.parameters
@@ -448,8 +451,8 @@ class UseParameters(metaclass=abc.ABCMeta):
     
     def __init__(self, *args, parameters, path_prefix = None,
                  **kwargs):
-        self.parameters = UseParameters.MyParameters(parameters, self.name,
-                                                     path_prefix)
+        self.parameters = UseParameters.MyParameters(
+            parameters, self.param_nodename, path_prefix)
         super().__init__(*args, **kwargs)
 
 
@@ -609,3 +612,31 @@ DEFAULTS_OLD = (
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
+
+    bug1 = """
+        Problem: parameters for slaves are searched under slaves.slaves.
+        This is because we search for "hostnames" keys under "slaves", which
+        produces the path "slaves", assuming there is a "slaves.hostnames".
+        
+        Then StartClientsTask() is instantiated, with path_prefix="slaves".
+        We do need to pass this path_prefix, as it might be, say,
+        "slaves.catrel", and we need to know that we find out parameters
+        under that node.
+        
+        The UseParameters class is instantiated with path_prefix="slaves",
+        which instantiates the MyParameters class with name=self.name and
+        path_prefix="slaves", where self.name is the property defined by the
+        class that inherits UseParameters. If that name is "slaves" again,
+        then "slaves" is appended to path_prefix, even if path_prefix is,
+        in fact, the full path and nothing should be appended.
+        
+        Fix: use "param_nodename" instead of "name" as the property defining
+        the name of the node in the parameter tree, so that this node name
+        can have a different value from the name used for, e.g., making
+        database table names. Tasks can default self.param_nodename to
+        self.name.
+        Allow None for name in MyParameters; if name is None, then name is
+        NOT appended to path_prefix in MyParameters.get_param_path(). This
+        allows specifying the complete path in path_prefix, without anything
+        getting appended.
+    """

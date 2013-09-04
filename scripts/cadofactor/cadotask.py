@@ -462,6 +462,9 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
         return ("name", "workdir")
+    @property
+    def param_nodename(self):
+        return self.name
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -479,7 +482,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         # DB-backed dictionary with the state of this task
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
-        # Set default parametes for this task, if any are given
+        # Set default parameters for this task, if any are given
         self.params = self.parameters.myparams(self.paramnames)
         self.logger.debug("self.parameters = %s", self.parameters)
         self.logger.debug("params = %s", self.params)
@@ -757,7 +760,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         return super().paramnames + \
             ("adrange", "admin", "admax") + \
             Polynomial.paramnames
-    @property
     # Stat: potential collisions=124.92 (2.25e+00/s)
     # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
     # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
@@ -766,6 +768,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
     # Stat: total phase took 55.47s
     # Stat: rootsieve took 54.54s
+    @property
     def stat_conversions(self):
         return (
             ("potential collisions: %f",
@@ -1312,7 +1315,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
                              "already have %d. No need to sieve more",
                              self.state["rels_wanted"], self.state["rels_found"])
 
-class Duplicates1Task(Task, FilesCreator):
+class Duplicates1Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
     @property
     def name(self):
@@ -1327,6 +1330,20 @@ class Duplicates1Task(Task, FilesCreator):
     def paramnames(self):
         return super().paramnames + \
             ("nslices_log",)
+    @property
+    def stat_conversions(self):
+        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
+        # Without leading "# " !
+        return (
+            (
+                "CPU time for dup1: %fs",
+                "stats_dup1_time",
+                (float, ),
+                "0",
+                Statistics.add_list,
+                re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+            ),
+        )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1436,6 +1453,7 @@ class Duplicates1Task(Task, FilesCreator):
                 self.check_files_exist(outfilenames.keys(), "output", 
                                        shouldexist=True)
                 current_counts = self.parse_slice_counts(stderr)
+                self.parse_stats(str(stderrpath))
                 for idx in range(self.nr_slices):
                     self.slice_relcounts[str(idx)] += current_counts[idx]
                 update = dict.fromkeys(newfiles, self.nr_slices)
@@ -1484,7 +1502,7 @@ class Duplicates1Task(Task, FilesCreator):
         self.send_notification(Notification.WANT_MORE_RELATIONS, target)
         self.send_notification(Notification.WANT_TO_RUN, None)
 
-class Duplicates2Task(Task, FilesCreator):
+class Duplicates2Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
     @property
     def name(self):
@@ -1498,6 +1516,20 @@ class Duplicates2Task(Task, FilesCreator):
     @property
     def paramnames(self):
         return super().paramnames + ("nslices_log", "alim", "rlim")
+    @property
+    def stat_conversions(self):
+        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
+        # Without leading "# " !
+        return (
+            (
+                "CPU time for dup2: %fs",
+                "stats_dup2_time",
+                (float, ),
+                "0",
+                Statistics.add_list,
+                re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+            ),
+        )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1566,6 +1598,9 @@ class Duplicates2Task(Task, FilesCreator):
                 self.already_done_input[f] = True
             outfilenames = {f:i for f in files}
             self.add_output_files(outfilenames)
+            # Disabled for now, there are multiple lines of the same format
+            # which we can't parse atm.
+            # self.parse_stats(str(stderrpath))
             self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
         self.update_ratio(input_nrel, self.get_nrels())
@@ -2224,6 +2259,9 @@ class StartClientsTask(Task):
     def paramnames(self):
         return super().paramnames + \
             ('hostnames', 'scriptpath', "nrclients")
+    @property
+    def param_nodename(self):
+        return None
     
     def __init__(self, address, port, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2456,6 +2494,9 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     @property
     def name(self):
         return "tasks"
+    @property
+    def param_nodename(self):
+        return self.name
     
     CAN_CANCEL_WUS = 0
     
