@@ -1062,6 +1062,7 @@ class DbListener(patterns.Observable):
     The query is triggered by receiving a SIGUSR1 (the instance subscribes to
     the signal handler relay), or by calling send_result().
     """
+    # FIXME: SIGUSR1 handler is not implemented
     def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = WuAccess(db)
@@ -1077,14 +1078,19 @@ class DbListener(patterns.Observable):
 
 
 class IdMap(object):
-    """ Identity map. Ensures that DB-backed dictionaries on the same DB and
-    of the same table name are instantiated only once. """
+    """ Identity map. Ensures that DB-backed dictionaries of the same table
+    name are instantiated only once.
+    
+    Problem: we should also require that the DB is identical, but file names
+    are not a unique specifier to a file, and we allow connection objects
+    instead of DB file name. Not clear how to test for identity, lacking
+    support for this from the sqlite3 module API.
+    """
     def __init__(self):
         self.db_dicts = {}
     
     def make_db_dict(self, db, name):
-        assert isinstance(db, str)
-        key = (db, name)
+        key = name
         if not key in self.db_dicts:
             self.db_dicts[key] = DictDbAccess(db, name)
         return self.db_dicts[key]
@@ -1111,14 +1117,23 @@ class DbAccess(object):
     def get_db_filename(self):
         return self.__db
     
-    def make_db_dict(self, name):
-        return idmap.make_db_dict(self.__db, name)
+    def make_db_dict(self, name, connection=None):
+        if connection is None:
+            return idmap.make_db_dict(self.__db, name)
+        else:
+            return idmap.make_db_dict(connection, name)
     
-    def make_wu_access(self):
-        return WuAccess(self.__db)
+    def make_wu_access(self, connection=None):
+        if connection is None:
+            return WuAccess(self.__db)
+        else:
+            return WuAccess(connection)
     
-    def make_db_listener(self):
-        return DbListener(db = self.__db)
+    def make_db_listener(self, connection=None):
+        if connection is None:
+            return DbListener(db=self.__db)
+        else:
+            return DbListener(db=connection)
 
 
 class DbWorker(DbAccess, threading.Thread):
