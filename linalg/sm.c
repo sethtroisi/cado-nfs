@@ -14,10 +14,11 @@ Input:
   
 Output
 
-* A matrix of (small_nrows) rows and (nmaps)=deg(f) cols (mpz_t).
-  For each relation (rel) the (nmaps) Shirokauer maps are computed as the second least-significant digit
-  of the ell-adic representation of the polynomial equal to (rel^eps - 1) / ell.
-  Note: In the very unlikely case where the second lsd is zero, the program stops!
+* A matrix of (small_nrows) rows and (nmaps)=deg(f) cols (mpz_t).  For each
+  relation (rel) the (nmaps) Shirokauer maps are computed as the second
+  least-significant digit of the ell-adic representation of the polynomial equal
+  to (rel^eps - 1) / ell.  Note: In the very unlikely case where the second lsd
+  is zero, the program stops!
 */
 
 #include "cado.h"
@@ -69,9 +70,9 @@ poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
   // Horner
   for (k -= 2; k >= 0; k--)
   {
-    poly_sqr_mod_f_mod_mpz(R, R, f, p, NULL);  // R <- R^2
+    poly_sqr_mod_f_mod_mpz(R, R, f, p, invp);  // R <- R^2
     if (mpz_tstbit(a, k))
-      poly_mul_mod_f_mod_mpz(R, R, P, f, p, NULL);  // R <- R*P
+      poly_mul_mod_f_mod_mpz(R, R, P, f, p, invp);  // R <- R*P
   }
 
   poly_copy(Q, R);
