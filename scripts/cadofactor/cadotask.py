@@ -627,12 +627,12 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         wuname = self.make_wuname(identifier)
         process = cadocommand.Command(command)
         (rc, stdout, stderr) = process.wait()
-        result = [wuname, rc, stdout, stderr, command.get_output_files()]
+        message = Task.ResultInfo(wuname, rc, stdout, stderr,
+                                  command.get_output_files())
         if isinstance(self, patterns.Observer):
-            message = Task.ResultInfo(*result)
             # pylint: disable=E1101
             self.updateObserver(message)
-        return result
+        return message
     
     def filter_notification(self, message):
         wuid = message.get_wu_id()
@@ -1106,9 +1106,8 @@ class FactorBaseTask(Task):
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     stdout = str(outputfilename),
                                     **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = \
-                self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             self.state["outputfile"] = outputfilename.get_relative()
@@ -1189,10 +1188,10 @@ class FreeRelTask(Task):
                                      renumber=renumberfilename,
                                      stdout=str(freerelfilename),
                                      **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
+            stderr = message.get_stderr(0)
             found = self.parse_file(stderr.decode("ascii").splitlines())
             self.state.update(found)
             self.logger.info("Found %d free relations" % self.state["nfree"])
@@ -1516,15 +1515,14 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stdout=str(stdoutpath),
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
-                (identifier, rc, stdout, stderr, output_files) = \
-                        self.submit_command(p, "")
-                if rc:
+                message = self.submit_command(p, "")
+                if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
                     # exception
-                assert stderr is None
+                assert message.get_stderr(0) is None
                 with open(str(stderrpath), "r") as stderrfile:
                     stderr = stderrfile.read()
                 outfilenames = self.parse_output_files(stderr)
@@ -1667,11 +1665,10 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            assert stderr is None
+            assert message.get_stderr(0) is None
             with open(str(stderrpath), "r") as stderrfile:
                 nr_rels = self.parse_remaining(stderrfile)
             # Mark input file names and output file names
@@ -1811,9 +1808,9 @@ class PurgeTask(Task):
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
-        (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-        assert stdout is None
-        assert stderr is None
+        message = self.submit_command(p, "")
+        assert message.get_stdout(0) is None
+        assert message.get_stderr(0) is None
         with open(str(stderrpath), "rb") as stderrfile:
             stderr = stderrfile.read()
         with open(str(stdoutpath), "rb") as stdoutfile:
@@ -2022,9 +2019,8 @@ class MergeTask(Task):
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
@@ -2036,9 +2032,8 @@ class MergeTask(Task):
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.progparams[1])
-            (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             if not os.path.isfile(str(indexfile)):
@@ -2101,8 +2096,8 @@ class LinAlgTask(Task):
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir = True)
             if not os.path.isfile(str(dependencyfilename)):
@@ -2160,9 +2155,8 @@ class CharactersTask(Task):
                     heavyblock=densefilename, stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not os.path.isfile(str(kernelfilename)):
                 raise Exception("Output file %s does not exist" % kernelfilename)
@@ -2210,8 +2204,8 @@ class SqrtTask(Task):
                     poly=polyfilename, purged=purgedfilename,
                     index=indexfilename, kernel=kernelfilename,
                     prefix=prefix, **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-            if rc:
+            message = self.submit_command(p, "")
+            if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             while not self.is_done():
@@ -2222,10 +2216,10 @@ class SqrtTask(Task):
                         purged=purgedfilename, index=indexfilename,
                         kernel=kernelfilename, prefix=prefix,
                         **self.progparams[0])
-                (identifier, rc, stdout, stderr, output_files) = \
-                    self.submit_command(p, "dep%d" % self.state["next_dep"])
-                if rc:
+                message = self.submit_command(p, "dep%d" % self.state["next_dep"])
+                if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
+                stdout = message.get_stdout(0)
                 lines = stdout.decode("ascii").splitlines()
                 # Skip last factor which cannot produce a new split on top
                 # of what the smaller factors did
