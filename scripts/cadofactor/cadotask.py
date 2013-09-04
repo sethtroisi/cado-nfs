@@ -41,10 +41,10 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
     
     def add_output_files(self, filenames):
         """ Adds a dict of files to the list of existing output files """
-        for (filename, value) in filenames.items():
+        for filename in filenames:
             if filename in self.output_files:
                 raise KeyError("%s already in output files table" % filename)
-            self.output_files[filename] = value
+        self.output_files.update(filenames)
     
     def get_output_filenames(self, condition = None):
         """ Return output file names, optionally those that match a condition
@@ -236,7 +236,7 @@ class WorkDir(object):
         return
 
 
-class Statistics():
+class Statistics(object):
     """ Class that holds statistics on program execution, and can merge two
     such statistics.
     """
@@ -334,7 +334,7 @@ class Statistics():
         return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
     
     def weigh(samples, weights):
-      return [sample*weight for (sample, weight) in zip(samples, weights)]
+        return [sample*weight for (sample, weight) in zip(samples, weights)]
     
     def combine_mean(means, samples):
         """ From two lists, one containing values and the other containing
@@ -383,12 +383,15 @@ class Statistics():
         
         from random import randrange
         
-        def mean(x): return float(sum(x))/float(len(x))
-        def var(x): E=mean(x); return mean([(a-E)**2 for a in x])
+        def mean(x):
+            return float(sum(x))/float(len(x))
+        def var(x):
+            E = mean(x)
+            return mean([(a-E)**2 for a in x])
         
         # Generate between 1 and 5 random integers in [1,100]
         lengths = [randrange(100) + 1 for i in range(randrange(5) + 1)]
-        lengths=[1,10]
+        lengths = [1, 10]
         # Generate lists of random integers in [1,100]
         lists = [[randrange(100) for i in range(l)] for l in lengths]
         stats = [(length, mean(l), var(l)) for (length, l) in zip(lengths, lists)]
@@ -419,25 +422,7 @@ class Statistics():
         return concat[0:10]
 
 
-class HasStatistics(object, metaclass=abc.ABCMeta):
-    @abc.abstractproperty
-    def stat_conversions(self):
-        pass
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.statistics = Statistics(self.stat_conversions)
-    def get_statistics_as_strings(self):
-        return self.statistics.as_strings()
-
-
-class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
-           metaclass=abc.ABCMeta):
-    """ A base class that represents one task that needs to be processed. 
-    
-    Sub-classes must define class variables:
-    """
-    
-    # Properties that subclasses need to define
+class HasName(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
     def name(self):
         # The name of the task in a simple form that can be used as
@@ -445,10 +430,85 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         # part of an SQL table name, etc. That pretty much limits it to
         # alphabetic first letter, and alphanumeric rest. 
         pass
+
+class HasTitle(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
     def title(self):
         # A pretty name for the task, will be used in screen output
         pass
+
+class DoesLogging(HasTitle, metaclass=abc.ABCMeta):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = logging.getLogger(self.title)
+
+class MakesTablenames(HasName):
+    @property
+    def tablename_prefix(self):
+        """ Prefix string for table names
+        
+        By default, the table name prefix is the name attribute, but this can
+        be overridden
+        """
+        return self.name
+    
+    @staticmethod
+    def check_tablename(name):
+        no_ = name.replace("_", "")
+        if not no_[0].isalpha() or not no_[1:].isalnum():
+            raise Exception("%s is not valid for an SQL table name" % name)
+    
+    def make_tablename(self, extra = None):
+        """ Return a name for a DB table """
+        # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
+        # Could be tricky to avoid collisions
+        name = self.tablename_prefix
+        if extra:
+            name = name + '_' + extra
+        self.check_tablename(name)
+        return name
+
+class HasDbConnection(wudb.DbAccess):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_connection = self.get_db_connection()
+
+class HasState(MakesTablenames, HasDbConnection):
+    """ Declares that the class has a DB-backed dictionary in which the class
+    can store state information.
+    
+    The dicatonary is available as an instance attribute "state".
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        name = self.make_tablename()
+        self.state = self.make_db_dict(name, connection=self.db_connection)
+
+class UsesWorkunitDb(HasDbConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wuar = self.make_wu_access(self.db_connection)
+
+class HasStatistics(object, metaclass=abc.ABCMeta):
+    @abc.abstractproperty
+    def stat_conversions(self):
+        pass
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.statistics = Statistics(self.stat_conversions)
+    def get_statistics_as_strings(self):
+        return self.statistics.as_strings()
+
+
+class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
+           DoesLogging, metaclass=abc.ABCMeta):
+    """ A base class that represents one task that needs to be processed. 
+    
+    Sub-classes must define class variables:
+    """
+    
+    # Properties that subclasses need to define
     @abc.abstractproperty
     def programs(self):
         # A list of classes of Programs which this tasks uses
@@ -476,11 +536,8 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.logger = logging.getLogger(self.title)
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
-        # DB-backed dictionary with the state of this task
-        self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
         # Set default parameters for this task, if any are given
         self.params = self.parameters.myparams(self.paramnames)
@@ -500,22 +557,6 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
-    @staticmethod
-    def check_tablename(name):
-        no_ = name.replace("_", "")
-        if not no_[0].isalpha() or not no_[1:].isalnum():
-            raise Exception("%s is not valid for an SQL table name" % name)
-    
-    def make_tablename(self, extra = None):
-        """ Return a table name for the DB-backed dictionary """
-        # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
-        # Could be tricky to avoid collisions
-        name = self.name
-        if extra:
-            name = name + '_' + extra
-        self.check_tablename(name)
-        return name
-
     def translate_input_filename(self, filename):
         return filename
 
@@ -683,7 +724,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters,
 
 
 
-class ClientServerTask(Task, patterns.Observer):
+class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
         return super().paramnames + ("maxwu",)
@@ -709,25 +750,38 @@ class ClientServerTask(Task, patterns.Observer):
             self.send_notification(Notification.REGISTER_FILENAME, {basename:filename})
         
         self.logger.info("Adding workunit %s to database", wuid)
-        self.send_notification(Notification.SUBMIT_WU, wutext)
+        # print ("WU:\n%s" % wutext)
+        self.wuar.create(wutext)
         self.state["wu_submitted"] += 1
     
     def verification(self, message, ok):
         wuid = message.get_wu_id()
-        not_str = "ok"
-        if not ok:
-            not_str = "not ok"
-        self.logger.info("Marking workunit %s as %s", wuid, not_str)
+        ok_str = "ok" if ok else "not ok"
+        self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
         # FIXME: these two should be updated atomically
         self.state["wu_received"] += 1
-        self.send_notification(Notification.VERIFY_WU, {message.get_wu_id(): ok})
+        self.wuar.verification(message.get_wu_id(), ok)
+    
+    def cancel_available_wus(self):
+        self.logger.info("Cancelling remaining workunits")
+        self.wuar.cancel_all_available()
+    
+    def check_timedout_wus(self):
+        # Check at most once per minute
+        key = "last_check_timedout_wus"
+        last_check = self.state.get(key, None)
+        now = time.time()
+        if last_check is None or last_check + 60. < now:
+            # TODO
+            # self.wuar.timeout_wus(self.params.get("wu_timeout", 3600))
+            self.state[key] = now
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
 
     def get_number_available_wus(self):
-        return self.send_request(Request.GET_NR_AVAILABLE_WU, None)
+        return self.wuar.count_available()
 
     def test_outputfile_exists(self, filename):
         # Can't test
@@ -1264,28 +1318,31 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
-        stderr = message.get_stderr(0)
-        assert not stderr is None
-        ok = self.parse_output_files(output_files[0], stderr)
-        if ok:
-            self.parse_stats(stderr)
-        self.verification(message, ok)
+        stderrfilename = message.get_stderr(0)
+        assert not stderrfilename is None
+        rels = self.parse_rel_count(stderrfilename)
+        if rels is None:
+            self.verification(message, False)
+            self.logger.error("Number of relations message not found in "
+                              "file %s", stderrfilename)
+            return
+        self.state["rels_found"] += rels
+        self.add_output_files({output_files[0]: rels})
+        self.verification(message, not rels is None)
+        self.parse_stats(stderrfilename)
+        self.logger.info("Found %d relations in %s, total is now %d",
+                         rels, output_files[0], self.state["rels_found"])
     
-    def parse_output_files(self, filename, stderr):
-        size = os.path.getsize(stderr)
-        with open(stderr, "r") as f:
+    def parse_rel_count(self, filename):
+        size = os.path.getsize(filename)
+        with open(filename, "r") as f:
             f.seek(max(size - self.file_end_offset, 0))
             for line in f:
                 match = re.match(r"# Total (\d+) reports ", line)
                 if match:
                     rels = int(match.group(1))
-                    self.add_output_files({filename: rels})
-                    self.state["rels_found"] += rels
-                    self.logger.info("Found %d relations in %s, total is now %d",
-                                     rels, filename, self.state["rels_found"])
-                    return True
-        self.logger.error("Number of relations message not found in file %s", filename)
-        return False
+                    return rels
+        return None
     
     def get_statistics_as_strings(self):
         strings = ["Total number of relations: %d" % self.get_nrels()]
@@ -1465,7 +1522,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return True
     
-    def parse_output_files(self, stderr):
+    @staticmethod
+    def parse_output_files(stderr):
         files = {}
         for line in stderr.splitlines():
             match = re.match(r'# Opening output file for slice (\d+) : (.+)$', line)
@@ -1609,7 +1667,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
         return True
     
-    def parse_remaining(self, text):
+    @staticmethod
+    def parse_remaining(text):
         # "     112889 remaining relations"
         for line in text:
             match = re.match(r'At the end:\s*(\d+) remaining relations', line)
@@ -1832,7 +1891,6 @@ class PurgeTask(Task):
         if input_nrels == 0:
             return # Nothing sensible that we can do
         last_input_nrels = self.state.get("last_input_nrels", 0)
-        last_input_nprimes = self.state.get("last_input_nprimes", 0)
         last_nrels = self.state.get("last_output_nrels", 0)
         last_nprimes = self.state.get("last_output_nprimes", 0)
         if last_input_nrels >= input_nrels:
@@ -1860,8 +1918,8 @@ class PurgeTask(Task):
         self.logger.info("Gained %f output relations and %f primes per input relation",
                          delta_r, delta_p)
         update = {"last_output_nrels": nrels, "last_output_nprimes": nprimes,
-                  "last_input_nrels": input_nrels, "last_input_nprimes": input_nprimes,
-                  "delta_r": delta_r, "delta_p": delta_p}
+                  "last_input_nrels": input_nrels, "delta_r": delta_r,
+                  "delta_p": delta_p}
         self.state.update(update) 
     
     def parse_stdout(self, stdout):
@@ -2314,7 +2372,7 @@ class StartClientsTask(Task):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep
         # or some such
-        (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
+        rc = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
     def launch_clients(self):
@@ -2457,11 +2515,8 @@ class Notification(Message):
     HAVE_ENOUGH_RELATIONS = object()
     REGISTER_FILENAME = object()
     UNREGISTER_FILENAME = object()
-    SUBMIT_WU = object()
-    VERIFY_WU = object()
     WANT_TO_RUN = object()
     SUBSCRIBE_WU_NOTIFICATIONS = object()
-    CHECK_TIMEDOUT_WUS = object()
 
 class Request(Message):
     # Lacking a proper enum before Python 3.3, we generate dummy objects
@@ -2487,9 +2542,9 @@ class Request(Message):
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
     GET_WU_RESULT = object()
-    GET_NR_AVAILABLE_WU = object()
 
-class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
+class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
+                            DoesLogging, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     @property
     def name(self):
@@ -2497,18 +2552,17 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     @property
     def param_nodename(self):
         return self.name
-    
-    CAN_CANCEL_WUS = 0
+    @property
+    def title(self):
+        return "Complete Factorization"
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.logger = logging.getLogger("Complete Factorization")
         self.params = self.parameters.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
         self.registered_filenames = self.make_db_dict('server_registered_filenames')
-        self.chores = []
         
-        # Init WU DB
+        # Init WU BD
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
         
@@ -2613,7 +2667,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
-            Request.GET_NR_AVAILABLE_WU: self.wuar.count_available
         }
     
     def run(self):
@@ -2624,9 +2677,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 clients.launch_clients()
             
             while self.run_next_task():
-                self.do_chores()
-            
-            self.do_chores()
+                pass
             
             for task in self.tasks:
                 task.print_stats()
@@ -2648,26 +2699,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 return task.run()
         return False
     
-    def do_chores(self):
-        while self.chores:
-            chore = self.chores.pop()
-            if chore == self.CAN_CANCEL_WUS:
-                self.logger.info("Cancelling remaining workunits")
-                self.cancel_available_wus()
-            else:
-                raise Exception("Unknown chore %s" % chore)
-    
-    def add_wu(self, wutext):
-        # print ("WU:\n%s" % wutext)
-        self.wuar.create(wutext)
-    
-    def verify_wu(self, wuinfo):
-        for wuid in wuinfo:
-            self.wuar.verification(wuid, wuinfo[wuid])
-    
-    def cancel_available_wus(self):
-        self.wuar.cancel_all_available()
-    
     def register_filename(self, d):
         for key in d:
             if not key in self.registered_filenames:
@@ -2683,23 +2714,14 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 # Was already registered with the same target. Nothing to do
                 pass
     
-    def check_timedout_wus(self, sender):
-        # Check at most once per minute
-        attr = "last_check_timedout_wus"
-        if getattr(self, attr, 0.) + 60. > time.time():
-            # TODO
-            # self.wuar.timeout_wus(self.params.get("wu_timeout", 3600))
-            pass
-        setattr(self, attr, time.time())
-    
     def relay_notification(self, message):
+        """ The relay for letting Tasks talk to us and each other """
         assert isinstance(message, Notification)
         sender = message.get_sender()
         key = message.get_key()
         value = message.get_value()
         self.logger.message("Received notification from %s, key = %s, value = %s",
                             sender, Notification.reverse_lookup(key), value)
-        """ The relay for letting Tasks talk to us and each other """
         if key is Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
                 self.dup2.request_more_relations(value)
@@ -2711,8 +2733,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 raise Exception("Got WANT_MORE_RELATIONS from unknown sender")
         elif key is Notification.HAVE_ENOUGH_RELATIONS:
             if sender is self.purge:
-                # TODO: cancel only sieving WUs?
-                self.chores.append(self.CAN_CANCEL_WUS)
+                self.sieving.cancel_available_wus()
             else:
                 raise Exception("Got HAVE_ENOUGH_RELATIONS from unknown sender")
         elif key is Notification.REGISTER_FILENAME:
@@ -2720,16 +2741,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 self.register_filename(value)
             else:
                 raise Exception("Got REGISTER_FILENAME, but not from a ClientServerTask")
-        elif key is Notification.SUBMIT_WU:
-            if isinstance(sender, ClientServerTask):
-                self.add_wu(value)
-            else:
-                raise Exception("Got SUBMIT_WU, but not from a ClientServerTask")
-        elif key is Notification.VERIFY_WU:
-            if isinstance(sender, ClientServerTask):
-                self.verify_wu(value)
-            else:
-                raise Exception("Got VERIFY_WU, but not from a ClientServerTask")
         elif key is Notification.WANT_TO_RUN:
             if sender in self.tasks_that_want_to_run:
                 raise Exception("Got request from %s to run, but it was in run queue already",
@@ -2737,15 +2748,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             else:
                 self.tasks_that_want_to_run.append(sender)
         elif key is Notification.SUBSCRIBE_WU_NOTIFICATIONS:
-            if isinstance(sender, ClientServerTask):
-                return self.db_listener.subscribeObserver(sender)
-            else:
-                raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
-        elif key is Notification.CHECK_TIMEDOUT_WUS:
-            if isinstance(sender, ClientServerTask):
-                return self.check_timedout_wus(sender)
-            else:
-                raise Exception("Got CHECK_TIMEDOUT_WUS, but not from a ClientServerTask")
+            return self.db_listener.subscribeObserver(sender)
         else:
             raise KeyError("Notification from %s has unknown key %s" % (sender, key))
     
