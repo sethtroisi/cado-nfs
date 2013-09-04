@@ -18,10 +18,10 @@ import cadocommand
 import wuserver
 
 # Some parameters are provided by the param file but can change during
-# the factorization, like rels_wanted. On one hand, we want automatic 
+# the factorization, like rels_wanted. On one hand, we want automatic
 # updates to parameters to be stored in the DB, otoh, we want to allow
-# externally setting new parameters. Need to distinguish between new 
-# external parameters that overwrite DB, and old external parameters 
+# externally setting new parameters. Need to distinguish between new
+# external parameters that overwrite DB, and old external parameters
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
@@ -37,7 +37,8 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.output_files = self.make_db_dict(self.make_tablename("outputfiles"))
+        tablename = self.make_tablename("outputfiles")
+        self.output_files = self.make_db_dict(tablename)
     
     def add_output_files(self, filenames):
         """ Adds a dict of files to the list of existing output files """
@@ -71,23 +72,23 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
 class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
-    # when turning a polynomial back into a string. 
+    # when turning a polynomial back into a string.
     
-    paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda", 
+    paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda",
         "alambda")
-    keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True), 
+    keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True),
             ("c1", True), ("c2", True), ("c3", True), ("c4", True),
             ("c5", False), ("c6", False), ("m", True), ("skew", True) )
     
     def __init__(self, lines):
-        """ Parse a polynomial file in the syntax as produced by polyselect2l 
+        """ Parse a polynomial file in the syntax as produced by polyselect2l
         """
         self.poly = None
         self.MurphyE = 0.
         poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
-            # If this is a comment line telling the Murphy E value, 
+            # If this is a comment line telling the Murphy E value,
             # extract the value and store it
             match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
             if match:
@@ -131,8 +132,8 @@ class Polynomial(object):
         self.MurphyE = float(MurphyE)
     
     def create_file(self, filename, params):
-        # Write polynomial to a file, and add lines with parameters such as 
-        # "alim" if supplied in params 
+        # Write polynomial to a file, and add lines with parameters such as
+        # "alim" if supplied in params
         with open(str(filename), "w") as poly_file:
             poly_file.write(str(self))
             for key in self.paramnames:
@@ -159,13 +160,13 @@ class FilePath(object):
 
 
 class WorkDir(object):
-    """ A class that allows generating file and directory names under a 
+    """ A class that allows generating file and directory names under a
     working directory.
     
     The directory layout is as follows:
     The current project (i.e., the factorization) has a jobname, e.g.,
     "RSA512". Each task has a name, e.g., "sieving".
-    A task can create various files under 
+    A task can create various files under
     workdir/jobname.taskname.file
     or put them in a subdirectory
     workdir/jobname.taskname/file
@@ -198,7 +199,7 @@ class WorkDir(object):
                                                  extra))
     
     def make_dirname(self, subdir = None):
-        """ Make a directory name of the form workdir/jobname.taskname/ if 
+        """ Make a directory name of the form workdir/jobname.taskname/ if
         subdir is not given, or workdir/jobname.taskname/subdir/ if it is
         """
         if subdir:
@@ -207,11 +208,12 @@ class WorkDir(object):
             return self._make_path(os.sep)
     
     def make_filename(self, name, use_subdir = False, subdir = None):
-        """ If use_subdir is False, make a filename of the form 
-        workdir/jobname.taskname.name 
-        If use_subdir is True and subdir is None, make a filename of the form 
+        """ If use_subdir is False, make a filename of the form
+        workdir/jobname.taskname.name
+        If use_subdir is True and subdir is None, make a filename of the form
         workdir/jobname.taskname/name
-        If use_subdir is True and subdir is a string, make a filename of the form 
+        If use_subdir is True and subdir is a string, make a filename of the
+        form
         workdir/jobname.taskname/subdir/name
         """
         if use_subdir:
@@ -267,7 +269,8 @@ class Statistics(object):
             (msgfmt, key, types, defaults, combine, regex) = conversion
             if key in stats:
                 assert not key in self.stats
-                self.stats[key] = self._from_str(stats.get(key, defaults), types)
+                self.stats[key] = self._from_str(stats.get(key, defaults),
+                                                 types)
                 assert not self.stats[key] is None
     
     def parse_line(self, line):
@@ -358,14 +361,15 @@ class Statistics(object):
         
         stats is a list of 3-tuples, each containing number of sample points,
         mean, and std.dev.
-        Returns a 3-tuple with the combined number of sample points, mean, 
+        Returns a 3-tuple with the combined number of sample points, mean,
         and std. dev.
         """
         
         # FIXME: buggy!
         
-        # Samples is a list containing the first item (number of samples) of each
-        # item of stats, means is list means, stdvars is list of std. var.s
+        # Samples is a list containing the first item (number of samples) of
+        # each item of stats, means is list means, stdvars is list of
+        # std. var.s
         (samples, means, stddevs) = zip(*stats)
         
         (total_mean, total_samples) = Statistics.combine_mean(means, samples)
@@ -394,17 +398,18 @@ class Statistics(object):
         lengths = [1, 10]
         # Generate lists of random integers in [1,100]
         lists = [[randrange(100) for i in range(l)] for l in lengths]
-        stats = [(length, mean(l), var(l)) for (length, l) in zip(lengths, lists)]
+        stats = [(length, mean(l), var(l))
+            for (length, l) in zip(lengths, lists)]
         
-        combined_list = []
+        combined = []
         for l in lists:
-            combined_list += l
+            combined += l
         
         combined1 = Statistics.combine_stats(*stats)
-        combined2 = [len(combined_list), mean(combined_list), var(combined_list)]
+        combined2 = [len(combined), mean(combined), var(combined)]
         if abs(combined1[2] - combined2[2]) > 0.2 * combined2[2]:
             print("lists = %r" % lists)
-            print("combined_lists = %r" % combined_list)
+            print("combineds = %r" % combined)
             print("stats = %r" % stats)
             print("combined1 = %r" % combined1)
             print("combined2 = %r" % combined2)
@@ -428,7 +433,7 @@ class HasName(object, metaclass=abc.ABCMeta):
         # The name of the task in a simple form that can be used as
         # a Python dictionary key, a directory name, part of a file name,
         # part of an SQL table name, etc. That pretty much limits it to
-        # alphabetic first letter, and alphanumeric rest. 
+        # alphabetic first letter, and alphanumeric rest.
         pass
 
 class HasTitle(object, metaclass=abc.ABCMeta):
@@ -460,7 +465,7 @@ class MakesTablenames(HasName):
     
     def make_tablename(self, extra = None):
         """ Return a name for a DB table """
-        # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
+        # Maybe replace SQL-disallowed characters here, like digits and '.' ?
         # Could be tricky to avoid collisions
         name = self.tablename_prefix
         if extra:
@@ -503,7 +508,7 @@ class HasStatistics(object, metaclass=abc.ABCMeta):
 
 class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
            DoesLogging, metaclass=abc.ABCMeta):
-    """ A base class that represents one task that needs to be processed. 
+    """ A base class that represents one task that needs to be processed.
     
     Sub-classes must define class variables:
     """
@@ -527,16 +532,16 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         return self.name
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        ''' Sets up a database connection and a DB-backed dictionary for 
+        ''' Sets up a database connection and a DB-backed dictionary for
         parameters. Reads parameters from DB, and merges with hierarchical
-        parameters in the parameters argument. Parameters passed in by 
-        parameters argument do not override values in the DB-backed 
+        parameters in the parameters argument. Parameters passed in by
+        parameters argument do not override values in the DB-backed
         parameter dictionary.
         '''
         
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.logger.debug("Enter Task.__init__(%s)", 
+        self.logger.debug("Enter Task.__init__(%s)",
                           self.name)
         self.logger.debug("state = %s", self.state)
         # Set default parameters for this task, if any are given
@@ -546,12 +551,13 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            progparams = self.parameters.myparams(prog.get_accepted_keys(), prog.name)
+            progparams = self.parameters.myparams(prog.get_accepted_keys(),
+                                                  prog.name)
             self.progparams.append(progparams)
         # FIXME: whether to init workdir or not should not be controlled via
         # presence of a "workdir" parameter, but by class definition
         if "workdir" in self.params:
-            self.workdir = WorkDir(self.params["workdir"], self.params["name"], 
+            self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
         self.init_stats()
         self.logger.debug("Exit Task.__init__(%s)", self.name)
@@ -565,7 +571,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
-        """ Check that the output files in "filenames" exist or don't exist, 
+        """ Check that the output files in "filenames" exist or don't exist,
         according to shouldexist.
         
         Raise IOError if any check fails, return None
@@ -578,7 +584,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
                 raise IOError("%s file %s already exists" % (filedesc, f))
         return
     
-    # These two function go together, one produces a workunit name from the 
+    # These two function go together, one produces a workunit name from the
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
     wu_paste_char = '_'
@@ -586,7 +592,8 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         assert not self.wu_paste_char in self.params["name"]
         assert not self.wu_paste_char in self.name
         assert not self.wu_paste_char in identifier
-        return self.wu_paste_char.join([self.params["name"], self.name, identifier])
+        return self.wu_paste_char.join([self.params["name"], self.name,
+                                        identifier])
     
     def split_wuname(self, wuname):
         return wuname.split(self.wu_paste_char)
@@ -633,7 +640,8 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         stdout = message.get_stdout(0)
         stderr = message.get_stderr(0)
         output_files = message.get_output_files()
-        self.logger.message("%s: Received notification for wuid=%s, rc=%d, output_files=[%s]",
+        self.logger.message("%s: Received notification for wuid=%s, rc=%d, "
+                            "output_files=[%s]",
                             self.name, wuid, rc, ", ".join(output_files))
         if rc != 0:
             self.logger.error("Return code is: %d", rc)
@@ -747,7 +755,8 @@ class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
         wutext = command.make_wu(wuid)
         for filename in command.get_exec_files() + command.get_input_files():
             basename = os.path.basename(filename)
-            self.send_notification(Notification.REGISTER_FILENAME, {basename:filename})
+            self.send_notification(Notification.REGISTER_FILENAME,
+                                   {basename:filename})
         
         self.logger.info("Adding workunit %s to database", wuid)
         # print ("WU:\n%s" % wutext)
@@ -788,8 +797,8 @@ class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
         return False
     
     def wait(self):
-        # Ask the mediator to check for workunits of status Received, 
-        # and if there are any, to send WU result notifications to the 
+        # Ask the mediator to check for workunits of status Received,
+        # and if there are any, to send WU result notifications to the
         # subscribed listeners.
         # If we get notification on new results reliably from the HTTP server,
         # we might not need this poll. But they probably won't be totally
@@ -846,7 +855,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
              PolyselTask.update_lognorms,
              re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
             ),
-            ("tried ad-value(s): %d, found polynomial(s): %d, below maxnorm: %d",
+            ("tried ad-value(s): %d, found polynomial(s): %d, " \
+                "below maxnorm: %d",
              "stats_tries",
              (int, )*3,
              "0 0 0",
@@ -854,16 +864,17 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
              re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
             ),
             # Note for "best logmu" pattern: a regex like (%s )* does not work;
-            # the number of the capture group is determined by the paratheses in
-            # the regex string, so trying to repeat a group like this will always
-            # capture to the *same* group, overwriting previous matches, so that
-            # in the end, only the last match is in the capture group.
+            # the number of the capture group is determined by the parentheses
+            # in the regex string, so trying to repeat a group like this will
+            # always capture to the *same* group, overwriting previous matches,
+            # so that in the end, only the last match is in the capture group.
             ("10 best logmu: %g %g %g %g %g %g %g %g %g %g",
              "stats_logmu",
              (float, )*10,
              "",
              Statistics.smallest_10,
-             re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s" % ((cap_fp, )*10))
+             re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s"
+                        % ((cap_fp, )*10))
             ),
             ("total time: %f",
              "stats_total_time",
@@ -896,12 +907,13 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         
         if self.is_done():
-            self.logger.info("Polynomial selection already finished - nothing to do")
+            self.logger.info("Polynomial selection already finished - "
+                             "nothing to do")
             return not self.bestpoly is None
         
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
-                             "Murphy_E = %g", 
+                             "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
         else:
             self.logger.info("No polynomial was previously found")
@@ -961,7 +973,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             try:
                 poly = Polynomial(polyfile)
             except Exception as e:
-                self.logger.error("Invalid polyselect file %s: %s", 
+                self.logger.error("Invalid polyselect file %s: %s",
                                   filename, e)
                 return False
         
@@ -995,7 +1007,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         # New maximum
         lognorm[3] = max(old_lognorm[3], new_lognorm[3])
         # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
-        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2], new_lognorm[0::2])
+        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2],
+                                                 new_lognorm[0::2])
         return lognorm
     
     def write_poly_file(self):
@@ -1073,7 +1086,8 @@ class FactorBaseTask(Task):
             prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
                 if "outputfile" in self.state:
-                    self.logger.info("Received different polynomial, discarding old one")
+                    self.logger.info("Received different polynomial, "
+                                     "discarding old one")
                     del(self.state["outputfile"])
                 self.state["poly"] = str(poly)
         else:
@@ -1092,14 +1106,15 @@ class FactorBaseTask(Task):
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     stdout = str(outputfilename),
                                     **self.progparams[0])
-            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            (identifier, rc, stdout, stderr, output_files) = \
+                self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
             
             self.state["outputfile"] = outputfilename.get_relative()
             self.logger.info("Finished")
 
-        self.check_files_exist([self.get_filename()], "output", 
+        self.check_files_exist([self.get_filename()], "output",
                                shouldexist=True)
         return True
     
@@ -1150,7 +1165,8 @@ class FreeRelTask(Task):
             prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
                 if "freerelfilename" in self.state:
-                    self.logger.info("Received different polynomial, discarding old one")
+                    self.logger.info("Received different polynomial, "
+                                     "discarding old one")
                     del(self.state["freerelfilename"])
                     del(self.state["renumberfilename"])
                 self.state["poly"] = str(poly)
@@ -1177,7 +1193,7 @@ class FreeRelTask(Task):
                     self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
-            found = self.parse_file(stderr)
+            found = self.parse_file(stderr.decode("ascii").splitlines())
             self.state.update(found)
             self.logger.info("Found %d free relations" % self.state["nfree"])
             
@@ -1186,13 +1202,13 @@ class FreeRelTask(Task):
             self.logger.info("Finished")
 
         self.check_files_exist([self.get_freerel_filename(),
-                                self.get_renumber_filename()], "output", 
+                                self.get_renumber_filename()], "output",
                                shouldexist=True)
         return True
 
-    def parse_file(self, stderr):
+    def parse_file(self, text):
         found = {}
-        for line in stderr.decode("ascii").splitlines():
+        for line in text:
             for (key, (regex, datatype)) in self.wanted_regex.items():
                 match = re.match(regex, line)
                 if match:
@@ -1218,7 +1234,8 @@ class FreeRelTask(Task):
         return self.state["nprimes"]
 
 
-class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observer):
+class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
+                  patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
@@ -1264,7 +1281,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
                 re.compile(r"# Total wct time %ss" % cap_fp)
             )
         )
-    # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
+    # We seek to this many bytes before the EOF to look for the
+    # "Total xxx reports" message
     file_end_offset = 1000
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
@@ -1279,7 +1297,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("maxwu", "10")
-        self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
+        self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0),
                                         self.params.get("rels_wanted", 0))
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
@@ -1297,7 +1315,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             use_gz = ".gz" if self.params.get("gzip", True) else ""
             outputfilename = \
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
-            self.check_files_exist([outputfilename], "output", shouldexist=False)
+            self.check_files_exist([outputfilename], "output",
+                                   shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
             p = cadoprograms.Las(q0=q0, q1=q1,
@@ -1366,11 +1385,13 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics, patterns.Observ
             self.send_notification(Notification.WANT_TO_RUN, None)
             self.logger.info("New goal for number of relations is %d, "
                              "currently have %d. Need to sieve more",
-                             self.state["rels_wanted"], self.state["rels_found"])
+                             self.state["rels_wanted"],
+                             self.state["rels_found"])
         else:
             self.logger.info("New goal for number of relations is %d, but "
                              "already have %d. No need to sieve more",
-                             self.state["rels_wanted"], self.state["rels_found"])
+                             self.state["rels_wanted"],
+                             self.state["rels_found"])
 
 class Duplicates1Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
@@ -1406,7 +1427,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.nr_slices = 2**self.params["nslices_log"]
-        self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
+        tablename = self.make_tablename("infiles")
+        self.already_split_input = self.make_db_dict(tablename)
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
@@ -1421,8 +1443,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
             if parts != self.nr_slices:
-                # TODO: ask interactively (or by -recover) whether to delete 
-                # old output files and generate new ones, if input file is 
+                # TODO: ask interactively (or by -recover) whether to delete
+                # old output files and generate new ones, if input file is
                 # still available
                 # If input file is not available but the previously split
                 # parts are, we could join them again... not sure if want
@@ -1454,8 +1476,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             if self.nr_slices == 1:
                 # If we should split into only 1 part, we don't actually
                 # split at all. We simply write the input file name
-                # to the table of output files, so the next stages will 
-                # read the original siever output file, thus avoiding 
+                # to the table of output files, so the next stages will
+                # read the original siever output file, thus avoiding
                 # having another copy of the data on disk. Since we don't
                 # process the file at all, we need to ask the Siever task
                 # for the relation count in the files
@@ -1507,7 +1529,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                     stderr = stderrfile.read()
                 outfilenames = self.parse_output_files(stderr)
                 self.logger.debug("Output file names: %s", outfilenames)
-                self.check_files_exist(outfilenames.keys(), "output", 
+                self.check_files_exist(outfilenames.keys(), "output",
                                        shouldexist=True)
                 current_counts = self.parse_slice_counts(stderr)
                 self.parse_stats(str(stderrpath))
@@ -1526,7 +1548,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def parse_output_files(stderr):
         files = {}
         for line in stderr.splitlines():
-            match = re.match(r'# Opening output file for slice (\d+) : (.+)$', line)
+            match = re.match(r'# Opening output file for slice (\d+) : (.+)$',
+                             line)
             if match:
                 (slicenr, filename) = match.groups()
                 files[filename] = int(slicenr)
@@ -1593,7 +1616,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.nr_slices = 2**self.params["nslices_log"]
-        self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
+        tablename = self.make_tablename("infiles")
+        self.already_done_input = self.make_db_dict(tablename)
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
@@ -1648,9 +1672,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             if rc:
                 raise Exception("Program failed")
             assert stderr is None
-            with open(str(stderrpath), "rb") as stderrfile:
-                stderr = stderrfile.read()
-            nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
+            with open(str(stderrpath), "r") as stderrfile:
+                nr_rels = self.parse_remaining(stderrfile)
             # Mark input file names and output file names
             for f in files:
                 self.already_done_input[f] = True
@@ -1659,11 +1682,13 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             # Disabled for now, there are multiple lines of the same format
             # which we can't parse atm.
             # self.parse_stats(str(stderrpath))
-            self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
+            self.logger.info("%d unique relations remain on slice %d",
+                             nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
         self.update_ratio(input_nrel, self.get_nrels())
         self.state["last_input_nrel"] = input_nrel
-        self.logger.info("%d unique relations remain in total", self.get_nrels())
+        self.logger.info("%d unique relations remain in total",
+                         self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
         return True
     
@@ -1698,8 +1723,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                               new_out, new_in)
             return
         ratio = new_out / new_in
-        self.logger.info("Of %d newly added relations %d were unique (ratio %f)",
-                         new_in, new_out, ratio)
+        self.logger.info("Of %d newly added relations %d were unique "
+                         "(ratio %f)", new_in, new_out, ratio)
         self.state.update({"last_input_nrel": input_nrel,
             "last_output_nrel": output_nrel, "unique_ratio": ratio})
     
@@ -1711,7 +1736,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         ratio = self.state.get("unique_ratio", 1.)
         additional_in = int(additional_out / ratio)
         newtarget = self.state["last_input_nrel"] + additional_in
-        self.logger.info("Got request for %d (%d additional) output relations, estimate %d (%d additional) needed in input",
+        self.logger.info("Got request for %d (%d additional) output relations, "
+                         "estimate %d (%d additional) needed in input",
                          target, additional_out, newtarget, additional_in)
         self.send_notification(Notification.WANT_MORE_RELATIONS, newtarget)
         self.send_notification(Notification.WANT_TO_RUN, None)
@@ -1751,7 +1777,8 @@ class PurgeTask(Task):
             raise Exception("No unique relation count received")
         input_nrels = nfree + nunique
         
-        if "purgedfile" in self.state and input_nrels == self.state["input_nrels"]:
+        if "purgedfile" in self.state and \
+                input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
             return True
@@ -1772,7 +1799,7 @@ class PurgeTask(Task):
                                    nrels=input_nrels, out=purgedfile,
                                    minindex=minindex, nprimes=nprimes,
                                    stdout=str(stdoutpath),
-                                   stderr=str(stderrpath), 
+                                   stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
             filelistname = self.workdir.make_filename("filelist")
@@ -1782,7 +1809,7 @@ class PurgeTask(Task):
                                    out=purgedfile, minindex=minindex,
                                    nprimes=nprimes, filelist=filelistname,
                                    stdout=str(stdoutpath),
-                                   stderr=str(stderrpath), 
+                                   stderr=str(stderrpath),
                                    **self.progparams[0])
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
         assert stdout is None
@@ -1808,7 +1835,7 @@ class PurgeTask(Task):
     
     def request_more_relations(self, nunique):
         r"""
-        We want an excess of $e = 0.1 n_p$, 
+        We want an excess of $e = 0.1 n_p$,
         with $n_p$ primes among $n_r$ relations in the output file.
         
         We have $\Delta_r$ additional relations in the output file per
@@ -1819,7 +1846,7 @@ class PurgeTask(Task):
         \begin{eqnarray*}
             n_r + a  \Delta_r - (n_p + a  \Delta_p) & = & 0.1  (n_p + a  \Delta_p) \\
             n_r + a  \Delta_r & = & 1.1  (n_p + a  \Delta_p) \\
-            n_r - 1.1 n_p & = & 1.1 a \Delta_p - a \Delta_r \\ 
+            n_r - 1.1 n_p & = & 1.1 a \Delta_p - a \Delta_r \\
             \frac{n_r - 1.1 n_p}{1.1 \Delta_p - \Delta_r} & = & a \\
         \end{eqnarray*}
         """
@@ -1846,22 +1873,25 @@ class PurgeTask(Task):
         additional = max(additional, 10000)
         
         self.logger.info("Requesting %d additional relations", additional)
-        self.send_notification(Notification.WANT_MORE_RELATIONS, nunique + additional)
+        self.send_notification(Notification.WANT_MORE_RELATIONS,
+                               nunique + additional)
         self.send_notification(Notification.WANT_TO_RUN, None)
     
     def get_purged_filename(self):
         return self.get_state_filename("purgedfile")
     
     def parse_stderr(self, stderr, input_nrels):
-        # If stderr ends with 
+        # If stderr ends with
         # b'excess < 0.10 * #primes. See -required_excess argument.'
         # then we need more relations from filtering and return False
         input_nprimes = None
         have_enough = True
         # not_enough1 = re.compile(r"excess < (\d+.\d+) \* #primes")
-        not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. See -required_excess argument.")
+        not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. "
+                                 r"See -required_excess argument.")
         not_enough2 = re.compile(r"number of relations <= number of ideals")
-        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); excess=(-?\d+)")
+        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); "
+                                   r"excess=(-?\d+)")
         for line in stderr.decode("ascii").splitlines():
             match = not_enough1.match(line)
             if match:
@@ -1883,7 +1913,8 @@ class PurgeTask(Task):
         # input_nrels, input_nprimes: rels and primes among input
         # nrels, nprimes, excess: rels and primes when purging stopped
         if not input_nprimes is None:
-            self.update_excess_per_input(input_nrels, input_nprimes, nrels, nprimes)
+            self.update_excess_per_input(input_nrels, input_nprimes, nrels,
+                                         nprimes)
         return have_enough
     
     def update_excess_per_input(self, input_nrels, input_nprimes, nrels,
@@ -1915,12 +1946,12 @@ class PurgeTask(Task):
                          input_nrels, nrels, nprimes)
         delta_r = (nrels - last_nrels) / (input_nrels - last_input_nrels)
         delta_p = (nprimes - last_nprimes) / (input_nrels - last_input_nrels)
-        self.logger.info("Gained %f output relations and %f primes per input relation",
-                         delta_r, delta_p)
+        self.logger.info("Gained %f output relations and %f primes per input "
+                         "relation", delta_r, delta_p)
         update = {"last_output_nrels": nrels, "last_output_nprimes": nprimes,
                   "last_input_nrels": input_nrels, "delta_r": delta_r,
                   "delta_p": delta_p}
-        self.state.update(update) 
+        self.state.update(update)
     
     def parse_stdout(self, stdout):
         # Program stdout is expected in the form:
@@ -2066,7 +2097,7 @@ class LinAlgTask(Task):
             matrix = os.path.realpath(str(mergedfile))
             wdir = os.path.realpath(str(workdir))
             p = cadoprograms.BWC(complete=True,
-                                 matrix=matrix,  wdir=wdir, nullspace="left", 
+                                 matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
@@ -2344,7 +2375,7 @@ class StartClientsTask(Task):
             with open(match.group(1)) as f:
                 self.hosts_to_launch = [line.strip() for line in f]
         else:
-            self.hosts_to_launch = [host.strip() for host in 
+            self.hosts_to_launch = [host.strip() for host in
                     self.params["hostnames"].split(",")]
 
         if "nrclients" in self.params:
@@ -2353,7 +2384,7 @@ class StartClientsTask(Task):
 
     @staticmethod
     def make_multiplicity(names, multi):
-        """ Produce a list in which each unique entry of the list "names" 
+        """ Produce a list in which each unique entry of the list "names"
         occurs "multi" times. The order of elements in names is preserved.
         
         >>> names = ['a', 'b', 'a', 'c', 'c', 'a', 'a']
@@ -2378,7 +2409,8 @@ class StartClientsTask(Task):
     def launch_clients(self):
         for host in self.hosts_to_launch:
             self.launch_one_client(host.strip())
-        running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in self.pids.items()]
+        running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
+            self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
         self.logger.info("Running clients: %s" % s)
         # Check for old clients which we did not mean to start this run
@@ -2410,7 +2442,8 @@ class StartClientsTask(Task):
     
     # Cases:
     # Client was never started. Start it, add to state
-    # Client was started, but does not exist any more. Remove from state, then start and add again
+    # Client was started, but does not exist any more. Remove from state,
+    #   then start and add again
     # Client was started, and does still exists. Nothing to do.
     
     def launch_one_client(self, host, clientid = None):
@@ -2420,7 +2453,8 @@ class StartClientsTask(Task):
         if clientid in self.pids:
             assert self.hosts[clientid] == host
             if self.is_alive(clientid):
-                self.logger.info("Client %s on host %s with PID %d already running",
+                self.logger.info("Client %s on host %s with PID %d already "
+                                 "running",
                                  clientid, host, self.pids[clientid])
                 self.used_ids[clientid] = True
                 return
@@ -2572,16 +2606,16 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
-        self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
+        self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(),
             self.registered_filenames, uploaddir, bg=True, only_registered=True)
         
         # Init client lists
         self.clients = []
         for (path, key) in self.parameters.get_parameters().find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(serveraddress, serverport, 
+            self.clients.append(StartClientsTask(serveraddress, serverport,
                                                  mediator = self,
-                                                 db = db, 
-                                                 parameters = self.parameters, 
+                                                 db = db,
+                                                 parameters = self.parameters,
                                                  path_prefix = path))
         
         parampath = self.parameters.get_param_path()
@@ -2590,48 +2624,48 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         linalgpath = parampath + ['linalg']
         
         self.polysel = PolyselTask(mediator = self,
-                                   db = db, 
-                                   parameters = self.parameters, 
+                                   db = db,
+                                   parameters = self.parameters,
                                    path_prefix = parampath)
         self.fb = FactorBaseTask(mediator = self,
-                                 db = db, 
-                                 parameters = self.parameters, 
+                                 db = db,
+                                 parameters = self.parameters,
                                  path_prefix = sievepath)
         self.freerel = FreeRelTask(mediator = self,
-                                   db = db, 
-                                   parameters = self.parameters, 
+                                   db = db,
+                                   parameters = self.parameters,
                                    path_prefix = sievepath)
         self.sieving = SievingTask(mediator = self,
-                                   db = db, 
-                                   parameters = self.parameters, 
+                                   db = db,
+                                   parameters = self.parameters,
                                    path_prefix = sievepath)
         self.dup1 = Duplicates1Task(mediator = self,
-                                    db = db, 
-                                    parameters = self.parameters, 
+                                    db = db,
+                                    parameters = self.parameters,
                                     path_prefix = filterpath)
         self.dup2 = Duplicates2Task(mediator = self,
-                                    db = db, 
-                                    parameters = self.parameters, 
+                                    db = db,
+                                    parameters = self.parameters,
                                     path_prefix = filterpath)
         self.purge = PurgeTask(mediator = self,
-                               db = db, 
-                               parameters = self.parameters, 
+                               db = db,
+                               parameters = self.parameters,
                                path_prefix = filterpath)
         self.merge = MergeTask(mediator = self,
-                               db = db, 
-                               parameters = self.parameters, 
+                               db = db,
+                               parameters = self.parameters,
                                path_prefix = filterpath)
         self.linalg = LinAlgTask(mediator = self,
-                                 db = db, 
-                                 parameters = self.parameters, 
+                                 db = db,
+                                 parameters = self.parameters,
                                  path_prefix = linalgpath)
         self.characters = CharactersTask(mediator = self,
-                                         db = db, 
-                                         parameters = self.parameters, 
+                                         db = db,
+                                         parameters = self.parameters,
                                          path_prefix = linalgpath)
         self.sqrt = SqrtTask(mediator = self,
-                             db = db, 
-                             parameters = self.parameters, 
+                             db = db,
+                             parameters = self.parameters,
                              path_prefix = parampath)
         
         # Defines an order on tasks in which tasks that want to run should be
@@ -2640,7 +2674,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
         
-        # Assume that all tasks want to run. Ff they are finished already, 
+        # Assume that all tasks want to run. Ff they are finished already,
         # they will just return immediately
         self.tasks_that_want_to_run = list(self.tasks)
         
