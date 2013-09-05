@@ -390,6 +390,7 @@ class WorkunitProcessor(object):
             child = subprocess.Popen(command, shell=True, 
                                      stdout = subprocess.PIPE, 
                                      stderr = subprocess.PIPE, 
+                                     close_fds = True,
                                      preexec_fn = renice_func)
             # Wait for command to finish executing, capturing stdout and stderr 
             # in output tuple
