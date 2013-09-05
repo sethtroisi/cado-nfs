@@ -89,6 +89,8 @@ def conn_commit(conn):
 
 def conn_close(conn):
     logger.transaction("Closing connection %d", id(conn))
+    if conn.in_transaction:
+        logger.warning("Connection %d being closed while in transaction", id(conn))
     conn.close()
 
 # Dummy class for defining "constants"
