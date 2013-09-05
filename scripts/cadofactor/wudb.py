@@ -30,6 +30,13 @@ import cadologger
 import logging
 
 DEBUG = 1
+if DEBUG > 1:
+    import traceback
+    exclusive_transaction = [None, None]
+
+DEFERRED = object()
+IMMEDIATE = object()
+EXCLUSIVE = object()
 
 logger = logging.getLogger("Database")
 logger.setLevel(logging.NOTSET)
@@ -73,6 +80,11 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
 
 def conn_commit(conn):
     logger.transaction("Commit on connection %d", id(conn))
+    if DEBUG > 1:
+        if not exclusive_transaction[0] is None and not conn is exclusive_transaction[0]:
+            logger.warning("Commit on connection %d, but exclusive lock was on %d", id(conn), id(exclusive_transaction[0]))
+        exclusive_transaction[0] = None
+        exclusive_transaction[1] = None
     conn.commit()
 
 def conn_close(conn):
@@ -175,6 +187,32 @@ class MyCursor(sqlite3.Cursor):
         logger.transaction("%s.%s(): connection = %s, command finished",
                            classname, parent, id(self._conn))
 
+    def begin(self, mode=None):
+        if mode is None:
+            self._exec("BEGIN")
+        elif mode is DEFERRED:
+            self._exec("BEGIN DEFERRED")
+        elif mode is IMMEDIATE:
+            self._exec("BEGIN IMMEDIATE")
+        elif mode is EXCLUSIVE:
+            if DEBUG > 1:
+                tb = traceback.extract_stack()
+                if not exclusive_transaction == [None, None]:
+                    old_tb_str = "".join(traceback.format_list(exclusive_transaction[1]))
+                    new_tb_str = "".join(traceback.format_list(tb))
+                    logger.warning("Called MyCursor.begin(EXCLUSIVE) when there was aleady an exclusive transaction %d\n%s",
+                                        id(exclusive_transaction[0]), old_tb_str)
+                    logger.warning("New transaction: %d\n%s", id(self.connection), new_tb_str)
+            
+            self._exec("BEGIN EXCLUSIVE")
+            
+            if DEBUG > 1:
+                assert exclusive_transaction == [None, None]
+                exclusive_transaction[0] = self.connection
+                exclusive_transaction[1] = tb
+        else:
+            raise TypeError("Invalid mode parameter: %r" % mode)
+    
     def pragma(self, prag):
         self._exec("PRAGMA %s;" % prag)
     
@@ -567,25 +605,25 @@ class DictDbAccess(collections.MutableMapping):
         # Update the in-memory dict
         self._data[key] = value
     
-    def _setitem(self, key, value, commit=True):
-        """ Set a dict entry to a value and update the DB """
+    def __setitem__(self, key, value):
+        """ Access by indexing, e.g., d["foo"]. Always commits """
         cursor = self._conn.cursor(MyCursor)
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         self.__setitem_nocommit(cursor, key, value)
+        conn_commit(self._conn)
+        cursor.close()
+    
+    def __delitem__(self, key, commit=True):
+        """ Delete a key from the dictionary """
+        cursor = self._conn.cursor(MyCursor)
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
+        self._table.delete(cursor, eq={"key": key})
         if commit:
             conn_commit(self._conn)
         cursor.close()
-    
-    def __setitem__(self, key, value):
-        """ Access by indexing, e.g., d["foo"]. Always commits """
-        self._setitem(key, value, commit=True)
-    
-    def __delitem__(self, key):
-        """ Delete a key from the dictionary. Always commits """
         del(self._data[key])
-        cursor = self._conn.cursor(MyCursor)
-        self._table.delete(cursor, eq={"key": key})
-        conn_commit(self._conn)
-        cursor.close()
     
     def setdefault(self, key, default = None, commit=True):
         ''' Setdefault function that allows a mapping as input
@@ -593,20 +631,18 @@ class DictDbAccess(collections.MutableMapping):
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
         if key is None and isinstance(default, collections.Mapping):
-            cursor = self._conn.cursor(MyCursor)
-            for (key, value) in default.items():
-                if not key in self:
-                    self.__setitem_nocommit(cursor, key, value)
-            if commit:
-                conn_commit(self._conn)
-            cursor.close()
+            update = {key:default[key] for key in default if not key in self}
+            if update:
+                self.update(update, commit=commit)
             return None
         elif not key in self:
-            self._setitem(key, default, commit)
+            self.update({key:default}, commit=commit)
         return self._data[key]
     
     def update(self, other, commit=True):
         cursor = self._conn.cursor(MyCursor)
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         for (key, value) in other.items():
             self.__setitem_nocommit(cursor, key, value)
         if commit:
@@ -616,6 +652,8 @@ class DictDbAccess(collections.MutableMapping):
     def clear(self, args = None, commit=True):
         """ Overridden clear that allows removing several keys atomically """
         cursor = self._conn.cursor(MyCursor)
+        if not self._conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         if args is None:
             self._data.clear()
             self._table.delete(cursor)
@@ -864,6 +902,8 @@ class WuAccess(object): # {
         """ Create new workunits from wus which contains the texts of the 
             workunit files """
         cursor = self.conn.cursor(MyCursor)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         if isinstance(wus, str):
             self._create1(cursor, wus, priority)
         else:
@@ -878,6 +918,8 @@ class WuAccess(object): # {
             Returns the text of the workunit, or None if no available 
             workunit exists """
         cursor = self.conn.cursor(MyCursor)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         r = self.mapper.table.where(cursor, limit = 1, 
                                     order=("priority", "DESC"), 
                                     eq={"status": WuStatus.AVAILABLE})
@@ -911,6 +953,8 @@ class WuAccess(object): # {
     def result(self, wuid, clientid, files, errorcode=None,
                failedcommand=None, commit=True):
         cursor = self.conn.cursor(MyCursor)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             if commit:
@@ -938,6 +982,8 @@ class WuAccess(object): # {
 
     def verification(self, wuid, ok, commit=True):
         cursor = self.conn.cursor(MyCursor)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
             if commit:
@@ -968,6 +1014,8 @@ class WuAccess(object): # {
     
     def cancel_by_condition(self, commit=True, **conditions):
         cursor = self.conn.cursor(MyCursor)
+        if not self.conn.in_transaction:
+            cursor.begin(EXCLUSIVE)
         d = {"status": WuStatus.CANCELLED}
         self.mapper.table.update(cursor, d, **conditions)
         conn_commit(self.conn)
