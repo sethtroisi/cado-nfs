@@ -170,6 +170,7 @@ class MyCursor(sqlite3.Cursor):
                     self.execute(command, values)
                 break
             except sqlite3.OperationalError as e:
+                i += 1
                 if i == 10 or str(e) != "database is locked":
                     raise
 
