@@ -29,45 +29,8 @@ import wuserver
 re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 cap_fp = "(%s)" % re_fp
 
-class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
-    """ A base class for classes that produce a list of output files, with
-    some auxiliary information stored with each file (e.g., nr. of relations).
-    This info is stored in the form of a DB-backed dictionary, with the file
-    name as the key and the auxiliary data as the value.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        tablename = self.make_tablename("outputfiles")
-        self.output_files = self.make_db_dict(tablename)
-    
-    def add_output_files(self, filenames):
-        """ Adds a dict of files to the list of existing output files """
-        for filename in filenames:
-            if filename in self.output_files:
-                raise KeyError("%s already in output files table" % filename)
-        self.output_files.update(filenames)
-    
-    def get_output_filenames(self, condition = None):
-        """ Return output file names, optionally those that match a condition
-        
-        If a condition is given, it must be callable with 1 parameter and
-        boolean return type; then only those filenames are returned where
-        for the auxiliary data s (i.e., the value stored in the dictionary
-        with the file name as key) satisfies condition(s) == True.
-        """
-        if condition is None:
-            return list(self.output_files.keys())
-        else:
-            return [f for (f, s) in self.output_files.items() if condition(s)]
-    
-    def forget_output_filenames(self, filenames):
-        for filename in filenames:
-            del(self.output_files[filename])
-    
-    @abc.abstractclassmethod
-    def make_tablename(self, name):
-        pass
-
+class PolynomialParseException(Exception):
+    pass
 
 class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
@@ -102,16 +65,16 @@ class Polynomial(object):
             # All remaining lines must be of the form "x: y"
             array = line2.split(":")
             if not len(array) == 2:
-                raise Exception("Invalid line %s" % line)
+                raise PolynomialParseException("Invalid line %s" % line)
             key = array[0].strip()
             value = array[1].strip()
             if not key in dict(self.keys):
-                raise Exception("Invalid key %s in line %s" %
+                raise PolynomialParseException("Invalid key %s in line %s" %
                                 (key, line))
             poly[key] = value
         for (key, isrequired) in self.keys:
             if isrequired and not key in poly:
-                raise Exception("Key %s missing" % key)
+                raise PolynomialParseException("Key %s missing" % key)
         self.poly = poly
         return
     
@@ -474,6 +437,9 @@ class MakesTablenames(HasName):
         return name
 
 class HasDbConnection(wudb.DbAccess):
+    """ Gives sub-classes a db_connection attribute which is a database
+    connection instance.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.db_connection = self.get_db_connection()
@@ -489,7 +455,47 @@ class HasState(MakesTablenames, HasDbConnection):
         name = self.make_tablename()
         self.state = self.make_db_dict(name, connection=self.db_connection)
 
+
+class FilesCreator(MakesTablenames, HasDbConnection, metaclass=abc.ABCMeta):
+    """ A base class for classes that produce a list of output files, with
+    some auxiliary information stored with each file (e.g., nr. of relations).
+    This info is stored in the form of a DB-backed dictionary, with the file
+    name as the key and the auxiliary data as the value.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tablename = self.make_tablename("outputfiles")
+        self.output_files = self.make_db_dict(tablename,
+                                              connection=self.db_connection)
+    
+    def add_output_files(self, filenames, *, commit):
+        """ Adds a dict of files to the list of existing output files """
+        for filename in filenames:
+            if filename in self.output_files:
+                raise KeyError("%s already in output files table" % filename)
+        self.output_files.update(filenames, commit=commit)
+    
+    def get_output_filenames(self, condition=None):
+        """ Return output file names, optionally those that match a condition
+        
+        If a condition is given, it must be callable with 1 parameter and
+        boolean return type; then only those filenames are returned where
+        for the auxiliary data s (i.e., the value stored in the dictionary
+        with the file name as key) satisfies condition(s) == True.
+        """
+        if condition is None:
+            return list(self.output_files.keys())
+        else:
+            return [f for (f, s) in self.output_files.items() if condition(s)]
+    
+    def forget_output_filenames(self, filenames, *, commit):
+        self.output_files.clear(filenames, commit=commit)
+
+
 class UsesWorkunitDb(HasDbConnection):
+    """ Gives sub-classes a wuar attribute which is WuAccess instance, using
+    the sub-classes' shared database connection.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = self.make_wu_access(self.db_connection)
@@ -619,7 +625,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             assert command_nr == 0
             return self.rc
     
-    def submit_command(self, command, identifier):
+    def submit_command(self, command, identifier, commit=True):
         ''' Run a command.
         Return the result tuple. If the caller is an Observer, also send
         result to updateObserver().
@@ -676,7 +682,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     def get_number_outstanding_wus(self):
         return 0
     
-    def verification(self, message, ok):
+    def verification(self, message, ok, *, commit):
         pass
 
     def get_state_filename(self, key):
@@ -717,7 +723,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             for msg in stat_msgs:
                 self.logger.info(msg)
     
-    def parse_stats(self, filename):
+    def parse_stats(self, filename, *, commit):
         if not isinstance(self, HasStatistics):
             return
         new_stats = Statistics(self.stat_conversions)
@@ -728,8 +734,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         self.statistics.merge_stats(new_stats)
         update = self.statistics.as_dict()
         self.logger.debug("Combined stats: %s", update)
-        self.state.update(update)
-
+        self.state.update(update, commit=commit)
 
 
 class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
@@ -746,7 +751,7 @@ class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
-    def submit_command(self, command, identifier):
+    def submit_command(self, command, identifier, commit=True):
         ''' Submit a workunit to the database. '''
         
         while self.get_number_available_wus() >= self.params["maxwu"]:
@@ -760,17 +765,18 @@ class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
         
         self.logger.info("Adding workunit %s to database", wuid)
         # print ("WU:\n%s" % wutext)
-        self.wuar.create(wutext)
-        self.state["wu_submitted"] += 1
+        key = "wu_submitted"
+        self.state.update({key: self.state[key] + 1}, commit=False)
+        self.wuar.create(wutext, commit=commit)
     
-    def verification(self, message, ok):
+    def verification(self, message, ok, *, commit):
         wuid = message.get_wu_id()
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
-        # FIXME: these two should be updated atomically
-        self.state["wu_received"] += 1
-        self.wuar.verification(message.get_wu_id(), ok)
+        key = "wu_received"
+        self.state.update({key: self.state[key] + 1}, commit=False)
+        self.wuar.verification(message.get_wu_id(), ok, commit=commit)
     
     def cancel_available_wus(self):
         self.logger.info("Cancelling remaining workunits")
@@ -944,11 +950,21 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if not identifier:
             # This notification was not for me
             return
-        output_files = message.get_output_files()
-        assert len(output_files) == 1
-        ok = self.parse_poly(output_files[0])
-        self.parse_stats(output_files[0])
-        self.verification(message, ok)
+        (filename, ) = message.get_output_files()
+        try:
+            poly = self.parse_poly(filename)
+        except PolynomialParseException as e:
+            self.logger.error("Invalid polyselect file %s: %s",
+                              filename, e)
+            self.verification(message, False, commit=True)
+            return
+        if not poly is None:
+            self.bestpoly = poly
+            update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
+                      "bestfile": filename}
+            self.state.update(update, commit=False)
+        self.parse_stats(filename, commit=False)
+        self.verification(message, True, commit=True)
     
     def parse_poly(self, filename):
         poly = None
@@ -972,31 +988,27 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
                     break
             try:
                 poly = Polynomial(polyfile)
-            except Exception as e:
+            except PolynomialParseException as e:
                 self.logger.error("Invalid polyselect file %s: %s",
                                   filename, e)
-                return False
+                return None
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', filename)
-            # No polynomial found an a given polyselec run is not an error
-            return True
+            return None
         if not poly.MurphyE:
             self.logger.warn("Polynomial in file %s has no Murphy E value",
                              filename)
         if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
-            self.bestpoly = poly
-            update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
-                      "bestfile": filename}
-            self.state.update(update)
             self.logger.info("New best polynomial from file %s:"
                              " Murphy E = %g" % (filename, poly.MurphyE))
             self.logger.debug("New best polynomial is:\n%s", poly)
+            return poly
         else:
             self.logger.info("Best polynomial from file %s with E=%g is "
                              "no better than current best with E=%g",
                              filename, poly.MurphyE, self.bestpoly.MurphyE)
-        return True
+        return None
     
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
@@ -1043,8 +1055,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
                                           stdout=str(outputfile),
                                           **self.progparams[0])
-            self.submit_command(p, "%d-%d" % (adstart, adend))
-        self.state["adnext"] = adend
+            self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
+        self.state.update({"adnext": adend}, commit=True)
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
@@ -1322,8 +1334,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
                                  poly=polyfilename, factorbase=factorbase,
                                  out=outputfilename, stats_stderr = True,
                                  **self.progparams[0])
-            self.submit_command(p, "%d-%d" % (q0, q1))
-            self.state["qnext"] = q1
+            self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
+            self.state.update({"qnext": q1}, commit=True)
         self.logger.info("Reached target of %d relations, now have %d",
                          self.state["rels_wanted"], self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
@@ -1340,14 +1352,14 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         assert not stderrfilename is None
         rels = self.parse_rel_count(stderrfilename)
         if rels is None:
-            self.verification(message, False)
+            self.verification(message, False, commit=True)
             self.logger.error("Number of relations message not found in "
                               "file %s", stderrfilename)
             return
         self.state["rels_found"] += rels
-        self.add_output_files({output_files[0]: rels})
-        self.verification(message, not rels is None)
-        self.parse_stats(stderrfilename)
+        self.add_output_files({output_files[0]: rels}, commit=False)
+        self.parse_stats(stderrfilename, commit=False)
+        self.verification(message, True, commit=True)
         self.logger.info("Found %d relations in %s, total is now %d",
                          rels, output_files[0], self.state["rels_found"])
     
@@ -1427,8 +1439,10 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                          path_prefix = path_prefix)
         self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
-        self.already_split_input = self.make_db_dict(tablename)
-        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
+        self.already_split_input = self.make_db_dict(tablename,
+                                                     connection=self.db_connection)
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"),
+                                                 connection=self.db_connection)
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
@@ -1482,19 +1496,17 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 # for the relation count in the files
                 # TODO: pass a list or generator expression in the request
                 # here?
-                total = 0
+                total = self.slice_relcounts["0"]
                 for f in newfiles:
-                    count = self.send_request(Request.GET_SIEVER_RELCOUNT, f)
-                    total += count
-                self.slice_relcounts["0"] += total
-                update = dict.fromkeys(newfiles, self.nr_slices)
-                self.already_split_input.update(update)
-                update = dict.fromkeys(newfiles, 0)
-                self.add_output_files(update)
+                    total += self.send_request(Request.GET_SIEVER_RELCOUNT, f)
+                self.slice_relcounts.update({"0": total}, commit=False)
+                update1 = dict.fromkeys(newfiles, self.nr_slices)
+                self.already_split_input.update(update1, commit=False)
+                update2 = dict.fromkeys(newfiles, 0)
+                self.add_output_files(update2, commit=True)
             else:
                 outputdir = self.workdir.make_dirname()
                 run_counter = self.state.get("run_counter", 0)
-                self.state["run_counter"] = run_counter + 1
                 prefix = "dup1.%s" % run_counter
                 (stdoutpath, stderrpath) = \
                         self.make_std_paths(cadoprograms.Duplicates1.name)
@@ -1529,13 +1541,22 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 self.logger.debug("Output file names: %s", outfilenames)
                 self.check_files_exist(outfilenames.keys(), "output",
                                        shouldexist=True)
+                self.state.update({"run_counter": run_counter + 1},
+                                  commit=False)
                 current_counts = self.parse_slice_counts(stderr)
-                self.parse_stats(str(stderrpath))
-                for idx in range(self.nr_slices):
-                    self.slice_relcounts[str(idx)] += current_counts[idx]
-                update = dict.fromkeys(newfiles, self.nr_slices)
-                self.already_split_input.update(update)
-                self.add_output_files(outfilenames)
+                self.parse_stats(str(stderrpath), commit=False)
+                # Add relation count from the newly processed files to the
+                # relations-per-slice dict
+                update1 = {str(idx): self.slice_relcounts[str(idx)] + 
+                                     current_counts[idx]
+                           for idx in range(self.nr_slices)}
+                self.slice_relcounts.update(update1, commit=False)
+                # Add the newly processed input files to the list of already
+                # processed input files
+                update2 = dict.fromkeys(newfiles, self.nr_slices)
+                self.already_split_input.update(update2, commit=False)
+                # Add the newly produced output files and commit everything
+                self.add_output_files(outfilenames, commit=True)
         totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
                   for i in range(0, self.nr_slices)]
         self.logger.info("Relations per slice: %s", ", ".join(totals))
@@ -1615,8 +1636,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                          path_prefix = path_prefix)
         self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
-        self.already_done_input = self.make_db_dict(tablename)
-        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
+        self.already_done_input = self.make_db_dict(tablename, connection=self.db_connection)
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"), connection=self.db_connection)
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
@@ -1642,7 +1663,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             # in another pass
             # Forget about the previous output filenames of this slice
             # FIXME: Should we delete the files, too?
-            self.forget_output_filenames(self.get_output_filenames(i.__eq__))
+            self.forget_output_filenames(self.get_output_filenames(i.__eq__),
+                                         commit=True)
             del(self.slice_relcounts[str(i)])
             name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
             (stdoutpath, stderrpath) = self.make_std_paths(name)
@@ -1675,7 +1697,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             for f in files:
                 self.already_done_input[f] = True
             outfilenames = {f:i for f in files}
-            self.add_output_files(outfilenames)
+            self.add_output_files(outfilenames, commit=True)
             # Disabled for now, there are multiple lines of the same format
             # which we can't parse atm.
             # self.parse_stats(str(stderrpath))
@@ -1811,15 +1833,14 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         assert message.get_stdout(0) is None
         assert message.get_stderr(0) is None
-        with open(str(stderrpath), "rb") as stderrfile:
+        with open(str(stderrpath), "r") as stderrfile:
             stderr = stderrfile.read()
-        with open(str(stdoutpath), "rb") as stdoutfile:
+        with open(str(stdoutpath), "r") as stdoutfile:
             stdout = stdoutfile.read()
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            # Update both atomically
             self.state.update({"purgedfile": purgedfile.get_relative(),
                                "input_nrels": input_nrels})
             self.logger.info("Have enough relations")
@@ -1889,7 +1910,7 @@ class PurgeTask(Task):
         not_enough2 = re.compile(r"number of relations <= number of ideals")
         nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); "
                                    r"excess=(-?\d+)")
-        for line in stderr.decode("ascii").splitlines():
+        for line in stderr.splitlines():
             match = not_enough1.match(line)
             if match:
                 have_enough = False
@@ -1958,7 +1979,7 @@ class PurgeTask(Task):
         # but we allow some extra whitespace
         r = {}
         keys = ("nrels", "nprimes", "weight", "excess")
-        for line in stdout.decode("ascii").splitlines():
+        for line in stdout.splitlines():
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
@@ -2187,7 +2208,7 @@ class SqrtTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.factors = self.make_db_dict(self.make_tablename("factors"))
+        self.factors = self.make_db_dict(self.make_tablename("factors"), connection=self.db_connection)
         self.add_factor(self.params["N"])
     
     def run(self):
@@ -2350,8 +2371,8 @@ class StartClientsTask(Task):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.used_ids = {}
-        self.pids = self.make_db_dict(self.make_tablename("client_pids"))
-        self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
+        self.pids = self.make_db_dict(self.make_tablename("client_pids"), connection=self.db_connection)
+        self.hosts = self.make_db_dict(self.make_tablename("client_hosts"), connection=self.db_connection)
         assert set(self.pids) == set(self.hosts)
         # Invariants: the keys of self.pids and of self.hosts are the same set.
         # The keys of self.used_ids are a subset of the keys of self.pids.
