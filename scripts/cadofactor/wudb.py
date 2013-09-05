@@ -884,13 +884,14 @@ class WuAccess(object): # {
                  "timeassigned": str(datetime.now())}
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
-            if commit:
-                conn_commit(self.conn)
-            cursor.close()
-            return r[0]["wu"]
+            result = r[0]["wu"]
         else:
-            cursor.close()
-            return None
+            result = None
+        
+        if commit:
+            conn_commit(self.conn)
+        cursor.close()
+        return result
 
     def get_by_wuid(self, cursor, wuid):
         r = self.mapper.where(cursor, eq={"wuid": wuid})
@@ -905,6 +906,8 @@ class WuAccess(object): # {
         cursor = self.conn.cursor(MyCursor)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
+            if commit:
+                conn_commit(self.conn)
             cursor.close()
             return False
         self._checkstatus(data, WuStatus.ASSIGNED)
@@ -924,11 +927,14 @@ class WuAccess(object): # {
         if commit:
             conn_commit(self.conn)
         cursor.close()
+        return True
 
     def verification(self, wuid, ok, commit=True):
         cursor = self.conn.cursor(MyCursor)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
+            if commit:
+                conn_commit(self.conn)
             cursor.close()
             return False
         # FIXME: should we do the update by wuid and skip these checks?
@@ -942,6 +948,7 @@ class WuAccess(object): # {
         if commit:
             conn_commit(self.conn)
         cursor.close()
+        return True
 
     def cancel(self, wuid, commit=True):
         self.cancel_by_condition(eq={"wuid":wuid}, commit=commit)
