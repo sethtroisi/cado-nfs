@@ -546,8 +546,7 @@ class DictDbAccess(collections.MutableMapping):
         cursor = self._conn.cursor(MyCursor)
         rows = self._table.where(cursor)
         cursor.close()
-        dict = {r["key"]: self.__convert_value(r) for r in rows}
-        return dict
+        return {r["key"]: self.__convert_value(r) for r in rows}
     
     def __setitem_nocommit(self, cursor, key, value):
         """ Set dictioary key to value and update/insert into table,
