@@ -9,6 +9,8 @@ import sys
 from tempfile import mkstemp
 from shutil import copyfileobj
 import wudb
+if DEBUG > 1:
+    import logging
 
 def diag(level, text, var = None):
     if DEBUG > level:
@@ -169,6 +171,11 @@ if __name__ == '__main__':
         print ('Script error: Environment variable %s not set'
                % DBFILENAMEKEY)
         sys.exit(1)
+
+    if DEBUG > 1:
+        sys.stderr = open("upload.stderr", "a")
+        sys.stderr.write("upload.py: PID = %d\n" % os.getpid())
+        logging.basicConfig(level=logging.DEBUG)
 
     DBFILENAME = os.environ[DBFILENAMEKEY]
     diag(1, "About to call do_upload()")
