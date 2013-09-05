@@ -390,21 +390,38 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 }
 
 
-void usage(const char * me)
+static void declare_usage(param_list pl)
 {
-  fprintf(stderr, "Usage: %s --poly polyname --purged purgedname "
-      "--index indexname --out outname --gorder group-order "
-      "--smexp sm-exponent [-mt nb_thread]\n", me);
+  param_list_decl_usage(pl, "poly", "(required) poly file");
+  param_list_decl_usage(pl, "purged", "(required) purged file");
+  param_list_decl_usage(pl, "index", "(required) index file");
+  param_list_decl_usage(pl, "out", "output file");
+  param_list_decl_usage(pl, "gorder", "(required) group order");
+  param_list_decl_usage(pl, "smexp", "(required) sm-exponent");
+  param_list_decl_usage(pl, "mt", "number of threads (default 1)");
 }
+
+static void usage (const char *argv, const char * missing, param_list pl)
+{
+  if (missing) {
+    fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
+        missing);
+  }
+  param_list_print_usage(pl, argv, stderr);
+  exit (EXIT_FAILURE);
+}
+
 
 /* -------------------------------------------------------------------------- */
 
 int main (int argc, char **argv)
 {
-  
-  const char *purgedname = NULL;
-  const char *indexname = NULL;
-  const char *outname = NULL;
+  char *argv0 = argv[0];
+
+  const char *polyfile = NULL;
+  const char *purgedfile = NULL;
+  const char *indexfile = NULL;
+  const char *outfile = NULL;
   const char *group_order = NULL;
   const char *sm_exponent = NULL;
 
@@ -417,52 +434,69 @@ int main (int argc, char **argv)
   int sr;
   mpz_t ell, ell2, eps;
   int mt = 1;
-
   double t0;
 
-  char * me = *argv;
-
-  /* print the command line */
-  fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-  for (int i = 1; i < argc; i++)
-    fprintf (stderr, " %s", argv[i]);
-  fprintf(stderr, "\n");
-
+  /* read params */
   param_list_init(pl);
-  argc--,argv++;
+  declare_usage(pl);
 
-  if (!argc) {
-      usage(me);
-      exit(1);
+  if (argc == 1)
+    usage (argv[0], NULL, pl);
+
+  argc--,argv++;
+  for ( ; argc ; ) {
+    if (param_list_update_cmdline (pl, &argc, &argv)) { continue; }
+    fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
+    usage (argv0, NULL, pl);
   }
-  for( ; argc ; ) {
-    if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-    if (strcmp(*argv, "--help") == 0) {
-      usage(me);
-      exit(0);
-    } else {
-      fprintf(stderr, "unexpected argument: %s\n", *argv);
-      usage(me);
-      exit(1);
-    }
+
+
+  if ((polyfile = param_list_lookup_string(pl, "poly")) == NULL) {
+      fprintf(stderr, "Error: parameter -poly is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
   }
-  
-  purgedname = param_list_lookup_string(pl, "purged");
-  indexname = param_list_lookup_string(pl, "index");
-  outname = param_list_lookup_string(pl, "out");
-  group_order = param_list_lookup_string(pl, "gorder");
-  sm_exponent = param_list_lookup_string(pl, "smexp");
+
+  if ((purgedfile = param_list_lookup_string(pl, "purged")) == NULL) {
+      fprintf(stderr, "Error: parameter -purged is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
+  if ((indexfile = param_list_lookup_string(pl, "index")) == NULL) {
+      fprintf(stderr, "Error: parameter -index is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
+  if ((group_order = param_list_lookup_string(pl, "gorder")) == NULL) {
+      fprintf(stderr, "Error: parameter -gorder is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
+  if ((sm_exponent = param_list_lookup_string(pl, "smexp")) == NULL) {
+      fprintf(stderr, "Error: parameter -smexp is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
   param_list_parse_int(pl, "mt", &mt);
+  if (mt < 1) {
+    fprintf(stderr, "Error: parameter mt must be at least 1\n");
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+  }
+
+  outfile = param_list_lookup_string(pl, "out");
 
   cado_poly_init (pol);
-
-  const char * tmp;
-
-  ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
-  cado_poly_read(pol, tmp);
+  cado_poly_read(pol, polyfile);
   
   if (param_list_warn_unused(pl))
-    exit(1);
+    usage (argv0, NULL, pl);
+  param_list_print_command_line (stdout, pl);
+
 
   /* Construct poly_t F from cado_poly pol (algebraic side) */
   deg = pol->pols[ALGEBRAIC_SIDE]->degree;
@@ -471,12 +505,6 @@ int main (int argc, char **argv)
   poly_alloc (F, deg);
   for (int i = deg; i >= 0; --i)
     poly_setcoeff (F, i, f[i]);
-
-  ASSERT_ALWAYS(purgedname != NULL);
-  ASSERT_ALWAYS(indexname != NULL);
-  ASSERT_ALWAYS(group_order != NULL);
-  ASSERT_ALWAYS(sm_exponent != NULL);
-  ASSERT_ALWAYS(mt >= 1);
 
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
@@ -495,14 +523,14 @@ int main (int argc, char **argv)
   fprintf(stderr, "\n");
 
   t0 = seconds();
-  rels = build_rel_sets(purgedname, indexname, &sr, F, ell2);
+  rels = build_rel_sets(purgedfile, indexfile, &sr, F, ell2);
 
   fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
 
   if (mt == 1)
-    shirokauer_maps(outname, rels, sr, F, eps, ell, ell2);
+    shirokauer_maps(outfile, rels, sr, F, eps, ell, ell2);
   else
-    mt_sm(mt, outname, rels, sr, F, eps, ell, ell2);
+    mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2);
 
   fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
 
