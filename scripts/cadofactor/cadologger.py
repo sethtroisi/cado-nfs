@@ -2,8 +2,10 @@ import logging
 
 from logging import DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
 MESSAGE = DEBUG - 1
+TRANSACTION = MESSAGE - 1
 COMMAND = DEBUG + 1
 logging.addLevelName(MESSAGE, "Message")
+logging.addLevelName(TRANSACTION, "Transaction")
 logging.addLevelName(COMMAND, "COMMAND")
 
 
@@ -36,6 +38,7 @@ class ScreenFormatter(logging.Formatter):
     with colorized logger level name (like cadofct.pl used to). """
     colours = {
         MESSAGE: ANSI.GREEN,
+        TRANSACTION: ANSI.CYAN,
         INFO : ANSI.BRIGHTGREEN,
         WARNING : ANSI.BRIGHTYELLOW,
         ERROR : ANSI.BRIGHTRED,
@@ -141,7 +144,11 @@ class MyLogger(logging.Logger):
     def message(self, msg, *args, **kwargs):
         """ Log a message with a level of cadologger.MESSAGE """
         self.log(MESSAGE, msg, *args, **kwargs)
-
+    
+    def transaction(self, msg, *args, **kwargs):
+        """ Log a message with a level of cadologger.TRANSACTION """
+        self.log(TRANSACTION, msg, *args, **kwargs)
+    
 
 logging.setLoggerClass(MyLogger)
 root = logging.getLogger()
