@@ -26,15 +26,14 @@ if sys.version_info.major == 3:
 else:
     from Queue import Queue
 import patterns
+import cadologger
+import logging
 
-debug = 1
+DEBUG = 1
 
-def diag(level, text, var=None):
-    if debug > level:
-        if var is None:
-            print (text, file=sys.stderr)
-        else:
-            print ("%s%s" % (text, var), file=sys.stderr)
+logger = logging.getLogger("Database")
+logger.setLevel(logging.NOTSET)
+
 
 def join3(l, pre=None, post=None, sep=", "):
     """ 
@@ -73,11 +72,11 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
     return sep.join([pre + op.join(k) + post for k in d.items()])
 
 def conn_commit(conn):
-    diag(1, "Commit on connection %s" % id(conn))
+    logger.transaction("Commit on connection %d", id(conn))
     conn.commit()
 
 def conn_close(conn):
-    diag(1, "Closing connection %s" % id(conn))
+    logger.transaction("Closing connection %d", id(conn))
     conn.close()
 
 # Dummy class for defining "constants"
@@ -150,16 +149,17 @@ class MyCursor(sqlite3.Cursor):
     def _exec(self, command, values=None):
         """ Wrapper around self.execute() that prints arguments 
             for debugging and retries in case of "database locked" exception """
-        if debug > 1:
-            # FIXME: should be the caller's class name, as _exec could be 
-            # called from outside this class
-            classname = self.__class__.__name__
-            parent = sys._getframe(1).f_code.co_name
-            diag (1, "%s.%s(): conn = %s, command = %s"
-                  % (classname, parent, id(self._conn), command))
-            if not values is None:
-                diag (1, "%s.%s(): conn = %s, values = %s"
-                      % (classname, parent, id(self._conn), values))
+        
+        # FIXME: should be the caller's class name, as _exec could be 
+        # called from outside this class
+        classname = self.__class__.__name__
+        parent = sys._getframe(1).f_code.co_name
+        command_str = command.replace("?", "%r")
+        if not values is None:
+            command_str = command_str % tuple(values)
+        logger.transaction("%s.%s(): connection = %s, command = %s",
+                           classname, parent, id(self._conn), command_str)
+        
         i = 0
         while True:
             try:
@@ -172,6 +172,9 @@ class MyCursor(sqlite3.Cursor):
                 i += 1
                 if i == 10 or str(e) != "database is locked":
                     raise
+        logger.transaction("%s.%s(): connection = %s, command finished",
+                           classname, parent, id(self._conn))
+
     def pragma(self, prag):
         self._exec("PRAGMA %s;" % prag)
     
@@ -277,7 +280,7 @@ class MyCursor(sqlite3.Cursor):
         desc = [k[0] for k in self.description]
         row = self.fetchone()
         while row is not None:
-            diag (2, "MyCursor.where_as_dict(): row = ", row)
+            # print("MyCursor.where_as_dict(): row = %s" % row)
             result.append(dict(zip(desc, row)))
             row = self.fetchone()
         return result
@@ -780,11 +783,11 @@ class WuAccess(object): # {
 
     @staticmethod
     def _checkstatus(wu, status):
-        diag (2, "WuAccess._checkstatus(%s, %s)" % (wu, status))
+        logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
         if wu["status"] != status:
             msg = "Workunit %s has status %s, expected %s" \
                   % (wu["wuid"], wu["status"], status)
-            diag (0, "WuAccess._checkstatus(): %s" % msg)
+            logger.error ("WuAccess._checkstatus(): %s" % msg)
             raise StatusUpdateError(msg)
 
     @staticmethod
@@ -881,7 +884,7 @@ class WuAccess(object): # {
         assert len(r) <= 1
         if len(r) == 1:
             self._checkstatus(r[0], WuStatus.AVAILABLE)
-            if debug > 0:
+            if DEBUG > 0:
                 self.check(r[0])
             d = {"status": WuStatus.ASSIGNED, 
                  "assignedclient": clientid,
@@ -915,7 +918,7 @@ class WuAccess(object): # {
             cursor.close()
             return False
         self._checkstatus(data, WuStatus.ASSIGNED)
-        if debug > 0:
+        if DEBUG > 0:
             self.check(data)
         d = {"resultclient": clientid,
              "errorcode": errorcode,
@@ -943,7 +946,7 @@ class WuAccess(object): # {
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         self._checkstatus(data, WuStatus.RECEIVED_OK)
-        if debug > 0:
+        if DEBUG > 0:
             self.check(data)
         d = {"timeverified": str(datetime.now())}
         d["status"] = WuStatus.VERIFIED_OK if ok else WuStatus.VERIFIED_ERROR
@@ -1305,7 +1308,7 @@ if __name__ == '__main__': # {
         doctest.testmod()
 
     if args["debug"]:
-        debug = int(args["debug"])
+        DEBUG = int(args["debug"])
     prio = 0
     if args["prio"]:
         prio = int(args["prio"][0])
