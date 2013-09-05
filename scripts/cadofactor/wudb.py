@@ -118,7 +118,6 @@ class MyCursor(sqlite3.Cursor):
         # Enable foreign key support
         self._conn = conn
         super().__init__(conn)
-        self._exec("PRAGMA foreign_keys = ON;")
 
     @staticmethod
     def _without_None(d):
@@ -173,7 +172,9 @@ class MyCursor(sqlite3.Cursor):
                 i += 1
                 if i == 10 or str(e) != "database is locked":
                     raise
-
+    def pragma(self, prag):
+        self._exec("PRAGMA %s;" % prag)
+    
     def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
         command = "CREATE TABLE IF NOT EXISTS %s( %s );" % \
@@ -749,6 +750,10 @@ class WuAccess(object): # {
         else:
             self.conn = db
             self._ownconn = False
+        cursor = self.conn.cursor(MyCursor)
+        cursor.pragma("foreign_keys = ON")
+        conn_commit(self.conn)
+        cursor.close()
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
@@ -835,7 +840,7 @@ class WuAccess(object): # {
 
     def create_tables(self):
         cursor = self.conn.cursor(MyCursor)
-        cursor._exec("PRAGMA journal_mode=WAL;")
+        cursor.pragma("journal_mode=WAL")
         self.mapper.create(cursor)
         conn_commit(self.conn)
         cursor.close()
