@@ -2261,7 +2261,7 @@ sub dup {
 
     # dup1 is nice enough to give us the per-slice count, but since the
     # perl script is a dead end, I'm not insisting too much.
-    my $nrels_slice = $nrels / $nslices;
+    my $nrels_slice = int($nrels / $nslices);
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
