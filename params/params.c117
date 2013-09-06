@@ -35,9 +35,9 @@ polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
 polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=38.0          # max. lognorm of polynomials (before rootsieve)
-polsel_admax=2e8             # max value for lc(f)
-polsel_adrange=2e6           # individual tasks
+polsel_maxnorm=38.1          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=5e8             # max value for lc(f)
+polsel_adrange=5e6           # individual tasks
 polsel_incr=27720            # forced divisor of lc(f)
 
 ###########################################################################
@@ -63,7 +63,7 @@ alambda=3.2
 
 I=12                    # Sieving range in lattice siever
 qmin=8000000            # Start of the special-q range
-qrange=60000            # The size of an elementary sieving task
+qrange=10000            # The size of an elementary sieving task
 firstcheck=11000000
 sievenice=10
 sieve_max_threads=2

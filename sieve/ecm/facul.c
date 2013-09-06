@@ -72,8 +72,8 @@ facul_make_strategy (const unsigned long fbb,
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
 
-  /* below is an "optimal" strategy generated using find_best_chain(S,2,33)
-     with the optimize.sage file on an AMD Phenom */
+  /* below is an "optimal" strategy generated using init_pr(29,33) then
+     find_best_chain(S,2,33) with the optimize.sage file on an AMD Phenom */
 
   /* 37: pp1_65 138 2625 */
   methods[0].method = PP1_65_METHOD;
@@ -105,7 +105,7 @@ facul_make_strategy (const unsigned long fbb,
       methods[i].plan = malloc (sizeof (ecm_plan_t));
       if (i != 29)
         ecm_make_plan (methods[i].plan, 244, 4095, MONTY12, i - 1, 1, 0);
-      else
+      else /* 163: ecm 321 5985 11 */
         ecm_make_plan (methods[i].plan, 321, 5985, BRENT12, 11, 1, 0);
     }
 
