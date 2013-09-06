@@ -1199,13 +1199,13 @@ class FreeRelTask(Task):
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params.get("gzip", True) else ""
-            freerelfilename = self.workdir.make_filename("freerel")
+            freerelfilename = self.workdir.make_filename("freerel" + use_gz)
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.FreeRel(poly=polyfilename,
                                      renumber=renumberfilename,
-                                     stdout=str(freerelfilename),
+                                     out=str(freerelfilename),
                                      **self.progparams[0])
             message = self.submit_command(p, "")
             if message.get_exitcode(0) != 0:

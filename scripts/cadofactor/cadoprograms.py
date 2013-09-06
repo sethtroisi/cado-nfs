@@ -547,11 +547,12 @@ class FreeRel(Program):
     binary = "freerel"
     name = binary
     subdir = "sieve"
-    def __init__(self,
+    def __init__(self, *,
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_output_file = True),
                  lpbr: Parameter(),
                  lpba: Parameter(),
+                 out: Parameter(is_output_file = True) = None,
                  badideals: Parameter(is_output_file = True) = None,
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,
