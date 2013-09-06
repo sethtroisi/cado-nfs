@@ -308,6 +308,7 @@ class Statistics(object):
         the combined mean (i.e. the weighted mean of the values).
         The two lists must have equal length.
         """
+        assert len(means) == len(samples)
         total_samples = sum(samples)
         weighted_sum = sum(Statistics.weigh(means, samples))
         return [weighted_sum / total_samples, total_samples]
@@ -316,6 +317,8 @@ class Statistics(object):
         """ From a list of 2-tuples, each tuple containing a value and a
         weight, compute the weighted average of the values.
         """
+        for l in lists:
+            assert len(l) == 2
         (means, samples) = zip(*lists)
         return Statistics.combine_mean(means, samples)
     
@@ -328,16 +331,17 @@ class Statistics(object):
         and std. dev.
         """
         
-        # FIXME: buggy!
-        
         # Samples is a list containing the first item (number of samples) of
-        # each item of stats, means is list means, stdvars is list of
-        # std. var.s
+        # each item of stats, means is list of means, stddevs is list of
+        # std. dev.s
+        for s in stats:
+            assert len(s) == 3
+        
         (samples, means, stddevs) = zip(*stats)
         
         (total_mean, total_samples) = Statistics.combine_mean(means, samples)
         # t is the E[X^2] part of V(X)=E(X^2) - (E[X])^2
-        t = [mean**2 + stdvar**2 for (mean, stdvar) in zip(means, stddevs)]
+        t = [mean**2 + stddev**2 for (mean, stddev) in zip(means, stddevs)]
         # Compute combined variance
         total_var = Statistics.combine_mean(t, samples)[0] - total_mean**2
         return [total_samples, total_mean, sqrt(total_var)]
@@ -346,6 +350,7 @@ class Statistics(object):
         """ Test function for combine_stats()
         
         >>> Statistics.test_combine_stats()
+        True
         """
         
         from random import randrange
@@ -355,13 +360,15 @@ class Statistics(object):
         def var(x):
             E = mean(x)
             return mean([(a-E)**2 for a in x])
+        def stddev(x):
+            return sqrt(var(x))
         
         # Generate between 1 and 5 random integers in [1,100]
         lengths = [randrange(100) + 1 for i in range(randrange(5) + 1)]
         lengths = [1, 10]
         # Generate lists of random integers in [1,100]
         lists = [[randrange(100) for i in range(l)] for l in lengths]
-        stats = [(length, mean(l), var(l))
+        stats = [(length, mean(l), stddev(l))
             for (length, l) in zip(lengths, lists)]
         
         combined = []
@@ -369,7 +376,7 @@ class Statistics(object):
             combined += l
         
         combined1 = Statistics.combine_stats(*stats)
-        combined2 = [len(combined), mean(combined), var(combined)]
+        combined2 = [len(combined), mean(combined), stddev(combined)]
         if abs(combined1[2] - combined2[2]) > 0.2 * combined2[2]:
             print("lists = %r" % lists)
             print("combineds = %r" % combined)
