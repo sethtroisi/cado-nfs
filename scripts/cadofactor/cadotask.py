@@ -1097,7 +1097,7 @@ class FactorBaseTask(Task):
         # Get best polynomial found by polyselect
         poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
-            raise Exception("FactorBaseOrFreerelTask(): no polynomial "
+            raise Exception("FactorBaseTask(): no polynomial "
                             "received from PolyselTask")
         
         # Check if we have already computed the target file for this polynomial
@@ -1175,7 +1175,7 @@ class FreeRelTask(Task):
         # Get best polynomial found by polyselect
         poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
-            raise Exception("FactorBaseOrFreerelTask(): no polynomial "
+            raise Exception("FreerelTask(): no polynomial "
                             "received from PolyselTask")
         
         # Check if we have already computed the target file for this polynomial
