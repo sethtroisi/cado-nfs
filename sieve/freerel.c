@@ -40,11 +40,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 static unsigned long MAYBE_UNUSED
 allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
-        unsigned long lpb[2], renumber_t renumber_table)
+                  unsigned long lpb[2], renumber_t renumber_table,
+                  const char *outfilename)
 {
   unsigned long p, *roots[2], nfree = 0;
   int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
   index_t old_table_size = renumber_table->size;
+  FILE *fpout = stdout;
+
+  if (outfilename != NULL)
+    fpout = fopen_maybe_compressed (outfilename, "w");
 
   rat_side = renumber_table->rat;
   alg_side = 1 - rat_side;
@@ -96,10 +101,10 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     {
       //print the free rels
       index_t l;
-      printf ("%lx,0:%lx", p, (unsigned long) old_table_size);
+      fprintf (fpout, "%lx,0:%lx", p, (unsigned long) old_table_size);
       for (l = old_table_size + 1; l < renumber_table->size; l++)
-        printf (",%lx", (unsigned long) l);
-      printf ("\n");
+        fprintf (fpout, ",%lx", (unsigned long) l);
+      fprintf (fpout, "\n");
       nfree++;
     }
 
@@ -109,6 +114,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   getprime (0);
   free (roots[0]);
   free (roots[1]);
+  if (outfilename != NULL)
+    fclose_maybe_compressed (fpout, outfilename);
   return nfree;
 }
 
@@ -116,6 +123,7 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "renumber", "renumber file");
+  param_list_decl_usage(pl, "out", "output file");
   param_list_decl_usage(pl, "lpbr", "rational large prime bound");
   param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
@@ -137,6 +145,7 @@ main (int argc, char *argv[])
     const char *renumberfilename = NULL;
     const char *badidealsfilename = NULL;
     const char *polyfilename = NULL;
+    const char *outfilename = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
     int k;
@@ -175,6 +184,9 @@ main (int argc, char *argv[])
     }
 
     polyfilename = param_list_lookup_string(pl, "poly");
+    outfilename = param_list_lookup_string(pl, "out");
+    /* param_list_lookup_string returns NULL if there is no -out argument,
+       in which case we output on stdout */
     badidealsfilename = param_list_lookup_string(pl, "badideals");
     renumberfilename = param_list_lookup_string(pl, "renumber");
 
@@ -209,7 +221,8 @@ main (int argc, char *argv[])
     renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
                          add_full_col);
 
-    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table);
+    nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table,
+                              outfilename);
     fprintf (stderr, "# Free relations: %lu\n", nfree);
 
     renumber_close_write (renumber_table, renumberfilename);
