@@ -1306,10 +1306,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.state["qnext"] = self.params.get("qmin", self.params["alim"])
         
         self.state.setdefault("rels_found", 0)
-        self.state.setdefault("rels_wanted", 0)
+        self.state["rels_wanted"] = self.params.get("rels_wanted", 0)
         self.params.setdefault("maxwu", "10")
-        self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0),
-                                        self.params.get("rels_wanted", 0))
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
