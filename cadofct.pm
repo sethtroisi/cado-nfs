@@ -2265,7 +2265,7 @@ sub dup {
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
-            "-nrels $nslicerels -poly $param{'prefix'}.poly ".
+            "-nrels $nrels_slice -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.dup2.filelist ".
             "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",
