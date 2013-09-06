@@ -2259,11 +2259,13 @@ sub dup {
     }
     close FILE;
 
-    my $K = int ( 100 + (1.2 * $nrels / $nslices) );
+    # dup1 is nice enough to give us the per-slice count, but since the
+    # perl script is a dead end, I'm not insisting too much.
+    my $nrels_slice = $nrels / $nslices;
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup2 ".
-            "-K $K -poly $param{'prefix'}.poly ".
+            "-nrels $nslicerels -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.dup2.filelist ".
             "-renumber $param{'prefix'}.renumber.gz ".
             "-basepath $param{'prefix'}.nodup/$i ",

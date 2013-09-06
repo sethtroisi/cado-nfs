@@ -68,6 +68,7 @@ renumber_t renumber_tab;
 
 static uint32_t *H; /* H contains the hash table */
 static unsigned long K = 0; /* Size of the hash table */
+static unsigned long nrels_expected = 0;
 static double cost = 0.0; /* Cost to insert all rels in the hash table */
 /* Number of duplicates and rels on the current file */
 static index_t ndup, nrels;
@@ -504,7 +505,7 @@ usage(const char *argv0)
     fprintf (stderr, "Mandatory command line options:\n");
     fprintf (stderr, "     -poly xxx     - polynomial file\n");
     fprintf (stderr, "     -renumber xxx - file with renumbering table\n");
-    fprintf (stderr, "     -K <K>        - size of the hashtable\n");
+    fprintf (stderr, "     -nrels <K>    - number of relations to be found in the slice\n");
     fprintf (stderr, "\nOther command line options:\n");
     fprintf (stderr, "    -outdir dir  - by default input files are overwritten\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
@@ -562,10 +563,12 @@ main (int argc, char *argv[])
     renumberfilename = param_list_lookup_string(pl, "renumber");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
-    param_list_parse_ulong(pl, "K", &K);
+    param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
-    if (param_list_warn_unused(pl) || polyfilename == NULL)
+    if (param_list_warn_unused(pl) || polyfilename == NULL || nrels_expected == 0)
       usage(argv0);
+
+    K = 100 + 1.2 * nrels_expected;
 
     cado_poly_init (cpoly);
 #ifndef FOR_FFS
@@ -599,7 +602,7 @@ main (int argc, char *argv[])
 
     if (renumberfilename == NULL)
       {
-        fprintf (stderr, "Missing -renumber option\n");
+        fprintf (stderr, "Missing -renumber option (file created by freerel)\n");
         exit (1);
       }
 
@@ -759,6 +762,10 @@ main (int argc, char *argv[])
                    1.0 + cost / (double) nrels_tot);
   fprintf (stderr, "  [found %lu true duplicates on sample of %lu relations]\n",
            sanity_collisions, sanity_checked);
+
+  if (nrels_tot != nrels_expected) {
+      fprintf(stderr, "Warning: number of relations read (%"PRIu32") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+  }
 
   free (H);
   free (sanity_a);

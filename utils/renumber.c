@@ -416,7 +416,10 @@ renumber_read_table (renumber_t tab, const char * filename)
   //open file for reading
   fprintf (stderr, "Opening %s to read the renumbering table\n", filename);
   tab->file = fopen_maybe_compressed (filename, "r");
-  ASSERT_ALWAYS(tab->file != NULL);
+  if (tab->file == NULL) {
+      fprintf(stderr, "Cannot open %s ; please create it with freerel\n", filename);
+      abort();
+  }
 
   // read size of renumbering table
   uint64_t tmp_size;
@@ -645,6 +648,11 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
       }
 #ifdef DEBUG_RENUMB
       nstep++;
+      if (nstep >= 64) {
+          fprintf(stderr, "BUG() in %s: nstep=%d>=64 (p=%"PRpr" not prime ?)\n",
+                  __func__, nstep, p);
+          abort();
+      }
       ASSERT_ALWAYS (nstep < 64);
 #endif
     }

@@ -1669,7 +1669,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
-                                             rel_count=rel_count * 12 // 10,
+                                             rel_count=rel_count,
                                              renumber=renumber_filename,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
