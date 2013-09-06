@@ -1686,7 +1686,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                 with open(str(filelistname), "w") as filelistfile:
                     filelistfile.write("\n".join(files) + "\n")
                 p = cadoprograms.Duplicates2(poly=polyfilename,
-                                             rel_count=rel_count * 12 // 10,
+                                             rel_count=rel_count,
                                              renumber=renumber_filename,
                                              filelist=filelistname,
                                              stdout=str(stdoutpath),
