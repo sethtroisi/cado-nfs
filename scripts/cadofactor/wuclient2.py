@@ -373,7 +373,10 @@ class WorkunitProcessor(object):
 
     def run_commands(self):
         if self.result_exists():
-            return True
+            if self.settings["KEEPOLDRESULT"]:
+                return True
+            else:
+                self.cleanup()
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             command = Template(command).safe_substitute(self.settings)
             logging.info ("Running command for workunit %s: %s", 
@@ -776,6 +779,8 @@ if __name__ == '__main__':
                 parser.add_option('--' + arg.lower(), help=default[1])
         parser.add_option("-d", "--daemon", action="store_true", dest="daemon",
                           help="Daemonize the client")
+        parser.add_option("--keepoldresult", default=False, action="store_true", 
+                          help="Keep and upload old results when client starts")
         # Parse command line
         (options, args) = parser.parse_args()
         if args:
@@ -812,6 +817,8 @@ if __name__ == '__main__':
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]
+
+    SETTINGS["KEEPOLDRESULT"] = options.keepoldresult
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
