@@ -751,6 +751,7 @@ class WuClient(Program):
     def __init__(self,
                  server: Parameter(prefix='--'),
                  daemon: Toggle(prefix='--') = None,
+                 keepoldresult: Toggle(prefix='--') = None,
                  dldir: Parameter(prefix='--') = None,
                  workdir: Parameter(prefix='--') = None,
                  clientid: Parameter(prefix='--') = None,
