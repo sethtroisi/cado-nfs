@@ -57,10 +57,10 @@ FILE * cado_popen(const char * command, const char * mode)
         /* I'm the father. I only want to use pipefd[imode]. */
         close(pipefd[!imode]);
         *kid = child;
-        /*
         fprintf(stderr, "%s child %d (%s) through fd %d\n",
                 imode ?  "Writing to" : "Reading from",
                 child, command, pipefd[imode]);
+        /*
                 */
         return fdopen(pipefd[imode], mode);
     } else {
@@ -84,11 +84,11 @@ FILE * cado_popen(const char * command, const char * mode)
             }
         }
         popenlist->n = 0;       /* who cares, we're exec()'ing anyway */
-        /*
         fprintf(stderr, "Child process %d (parent %d) executing %s\n",
                 getpid(),
                 getppid(),
                 command);
+        /*
                 */
         execl("/bin/sh", "sh", "-c", command, NULL);
         fprintf(stderr, "execve() failed\n");
@@ -106,6 +106,10 @@ void cado_pclose2(FILE * stream, struct rusage * nr)
     for(int i = 0 ; i < popenlist->n ; i++) {
         popenlist->p[nn] = popenlist->p[i];
         if (popenlist->p[i].fd == fd) {
+            if (kid) {
+                fprintf(stderr, "Error: two or more child processes (%d and %d) hold a reference to fd %d\n", kid, popenlist->p[i].kid, fd);
+                abort();
+            }
             ASSERT_ALWAYS(kid == 0);
             kid = popenlist->p[i].kid;
         } else {

@@ -28,7 +28,8 @@ void purgedfile_stream_clear(purgedfile_stream_ptr ps)
 void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
 {
     ASSERT_ALWAYS(ps->source == NULL);
-    ps->source = fopen_maybe_compressed2(fname, "r", &(ps->pipe), NULL);
+    ps->fname = strdup(fname);
+    ps->source = fopen_maybe_compressed(fname, "r");
     if (ps->source == NULL) {
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);
@@ -40,28 +41,12 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
 
 void purgedfile_stream_closefile(purgedfile_stream_ptr ps)
 {
-    ASSERT_ALWAYS(ps->pipe != -1);
     if (ps->source) {
-        if (ps->pipe) pclose(ps->source); else fclose(ps->source);
+        fclose_maybe_compressed(ps->source, ps->fname);
+        free(ps->fname); ps->fname = NULL;
     }
     ps->source = NULL;
-    ps->pipe = 0;
 }
-
-#if 0
-void purgedfile_stream_bind(purgedfile_stream_ptr ps, FILE * f)
-{
-    ps->source = f;
-    ps->pipe = -1;
-}
-
-void purgedfile_stream_unbind(purgedfile_stream_ptr ps)
-{
-    ps->source = NULL;
-    ps->pipe = 0;
-}
-#endif
-
 
 int purgedfile_stream_disp_progress_now_p(purgedfile_stream_ptr ps)
 {
