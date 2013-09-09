@@ -6,39 +6,40 @@
 #include <time.h>
 
 /*
-  1<<NFR = Number of computation threads.
-  The best is 2 (NFR = 1).
-  if you have 2 cores or less, you could try NFR=1.
-  if you have >4 cores, or hyperthreading, AND very slow cores (< 2 Ghz): NFR=2
-*/
+ * 1<<NFR = Number of computation threads.
+ * The best is 2 (NFR = 1).
+ * if you have 2 cores or less, you could try NFR=1.
+ * if you have >4 cores, or hyperthreading, AND very slow cores (< 2 Ghz): NFR=2
+ */
 #define NFR (1)
-/* 1<<NNFR = Number of sentences computed of (find root + hashkey of each term)
-   computed in one pass. If the number is too big, the buffer between these
-   threaded computations and insertRelation (which cannot be parallelized,
-   because the hashkey is not bijective) is too big (memory waste) and
-   the pipe-line is slow to start;
-   If the number is too small, the computation threads are too often in
-   nanosleep to keep CPU.
-   NNFR=8 to 16, the greatest is the fastest for fast processors & fast
-   memory; 14 seems to be the best choice (maximal speed for medium memory use).
+
+/* 1<<NNFR = Number of sentences computed of (find root + hashkey of each
+ * term) computed in one pass. If the number is too big, the buffer
+ * between these threaded computations and insertRelation (which cannot
+ * be parallelized, because the hashkey is not bijective) is too big
+ * (memory waste) and the pipe-line is slow to start; If the number is
+ * too small, the computation threads are too often in nanosleep to keep
+ * the CPU busy.  NNFR=8 to 16, the largest is the fastest for fast
+ * processors & fast memory; 14 seems to be the best compromise (maximal
+ * speed for medium memory footprint).
 */
 #define NNFR (14)
 
 /* Size of relations buffer between parsing & processing.
-   CAREFUL! SIZE_BUF_REL must be greater (at least double) than (1<<(NNFR+1)).
-   Stocks the sentences precomputed but not insered. 
-   About 64K sentences for the optimal.
-*/
+ * CAREFUL! SIZE_BUF_REL must be greater (at least double) than (1<<(NNFR+1)).
+ * Stores the sentences precomputed but not insered. 
+ * About 64K sentences for the optimal.
+ */
 #define SIZE_BUF_REL MAX((1<<(NFR+NNFR+1+(NFR==0))),(1<<6))
 
 /* The realistic minimal non-CPU waiting with nanosleep is about
-   10 to 40 µs (1<<13 for nanosleep).
-   But all the I/O between the threads have been buffered,
-   and a thread do a nanosleep only if its buffer is empty.
-   So I use here ~2ms (1<<21) to optimize CPU scheduler.
-   Max pause is about 4 to 8ms (1<<22, 1<<23); after the program
-   is slow down.
-*/
+ * 10 to 40 microseconds (1<<13 for nanosleep).
+ * But all the I/O between the threads have been buffered,
+ * and a thread does a nanosleep only if its buffer is empty.
+ * So I use here ~2ms (1<<21) to optimize CPU scheduler.
+ * Max pause is about 4 to 8ms (1<<22, 1<<23); after the program
+ * is slowed down.
+ */
 #ifndef HAVE_NANOSLEEP
 #ifdef HAVE_USLEEP
 #define NANOSLEEP() usleep((unsigned long) (1<<21 / 1000UL))

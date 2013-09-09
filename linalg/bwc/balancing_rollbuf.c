@@ -27,23 +27,6 @@
  * this size are paused */
 #define ROLLBUF_MAX_SIZE        (1 << 26)
 
-/* Getting data from a rolling buffer can be done via two interfaces. One
- * interface (rollbuf_get) provides a pointer, while the other
- * (rollbuf_get2) does not, and asks the rollbuf interface to provide a
- * pointer.
- *
- * The area pointed to by the pointer returned from rollbuf_get2 is free
- * to be read from by the calling thread until the next call to
- * rollbuf_get. This implies in particular that we assume that there is
- * exactly one threading getting data, no more.
- *
- * Note though that this is not implemented by means of a zero-copy
- * mechanism (doing so would make rollback_put break the active area of
- * data being read, in case a realloc() occurs). The data is copied to a
- * buffer exclusively dedicated to reading.
- *
- * (the reading buffer is allocated only if needed)
- */
 #define ROLLBUF_READING_BUFFER_SIZE     (1 << 16)
 
 void rollbuf_init(rollbuf_ptr r)
