@@ -97,7 +97,11 @@ FILE * cado_popen(const char * command, const char * mode)
     return NULL;
 }
 
+#ifdef HAVE_GETRUSAGE
 void cado_pclose2(FILE * stream, struct rusage * nr)
+#else
+void cado_pclose2(FILE * stream, void * nr MAYBE_UNUSED)
+#endif
 {
     pid_t kid = 0;
     int fd = fileno(stream);
@@ -126,8 +130,13 @@ void cado_pclose2(FILE * stream, struct rusage * nr)
     close(fd);
     /* we must wait() for the kid now */
     int status;
+#ifdef HAVE_GETRUSAGE
     struct rusage r[1];
     wait4(kid, &status, 0, r);
+#else
+    /* if we have no getrusage(), we probably don't have wait4 either */
+    waitpid(kid, &status, 0);
+#endif
     char long_status[80] = {'\0'};
 
     if (WIFEXITED(status)) {
@@ -147,6 +156,8 @@ void cado_pclose2(FILE * stream, struct rusage * nr)
     fprintf(stderr, "Child process %d %s, having spent %.2fs+%.2fs on cpu\n",
             kid, long_status, u, s);
             */
+#ifdef HAVE_GETRUSAGE
     if (nr) memcpy(nr, r, sizeof(struct rusage));
+#endif
 }
 
