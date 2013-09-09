@@ -517,7 +517,7 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
         // not enforcing at the moment.
         // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
         sorted = sorted && pr >= last_prime;
-        if (n && pr == rel->primes[n-1].h) {
+        if (n && pr == rel->primes[n-1].p) {
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
