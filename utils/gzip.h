@@ -7,27 +7,67 @@
 #ifdef  HAVE_GETRUSAGE
 #include <sys/resource.h>
 #endif
-#include "preempt.h"
+
+/* Length of preempt buffer. Must be a power of 2. */
+#define PREEMPT_BUF (1<<22)
+
+/* Length of one write in preempt buffer. Between 64 and 1024 Ko
+   seems best. */
+#define PREEMPT_ONE_READ (PREEMPT_BUF>>2)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Put in sfx the suffix in s (can be "" or NULL) */
-void get_suffix_from_filename (char *s, char const **sfx);
+/* Return a unix commands list with antebuffer. Example:
+ * antebuffer X file_relation1 | cat -
+ * antebuffer X file_relation2.gz file_relation3.gz | gzip -dc -
+ * antebuffer X file_relation4.bz2 file_relation5.bz2 | bzip2 -dc -
+ * [empty string]
 
-/* Put the directory of cado in rep_cado */
-void set_rep_cado(const char *argv0, char *rep_cado, size_t);
+ * antebuffer_cmd is /path/to/antebuffer <X>, where <X> is an integer
+ * denoting the size of the antebuffer (24 means 2^24 bytes).
+*/
+extern char ** prepare_grouped_command_lines (char ** list_of_files);
 
 /* Search the executable in PATH and, if found, return in real_path the
    complete path WITH the executable in the end */
 char * search_real_exec_in_path(const char *executable, char *real_path);
 
-/* Search the path of antebuffer and put the complete path + name of
-   the executable ("antebuffer" or, if not found, cat) in antebuffer.
-   Needs in rep_cado the cado directory, and, if it's given, in path_antebuffer
-   the argument -path_antebuffer */
-void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char *antebuffer);
+/* Search the path of antebuffer and put the complete path + name of the
+ * executable "antebuffer" in a static variable used by the gzip.c layer.
+ * Arguments are the $0 variable (path from cwd to the current executable
+ * file), and path_antebuffer, which is obtained from the command line if
+ * it happens to exist. Either, or both, may be NULL. The rule for
+ * deriving the path to the antebuffer binary is as follows (first match
+ * wins):
+ *
+ *  - if path_antebuffer is a complete path to an executable program, use
+ *  it.
+ *  - if executable_filename is non-NULL, use `dirname
+ *  $0`/../utils/antebuffer, if that happens to point to a valid
+ *  executable filename.
+ *  - otherwise, antebuffer is disabled.
+ *
+ * Configuring to *not* use antebuffer can be done by calling
+ * set_antebuffer_path(NULL, NULL), or not calling it at all.
+ *
+ * The return value is 1 if an executable has been found.
+ *
+ * This is a configuration function which must be called at most once, and in
+ * a monothreaded context.
+ */
+int set_antebuffer_path (const char *executable_filename, const char *path_antebuffer);
+
+/* Set a static variable in gzip.c, used to tune the calls to the
+ * antebuffer binary to use that buffer size. The argument to this
+ * function if the log to base 2 of the desired buffer size. The default
+ * is 24, hence 16MB.
+ *
+ * This is a configuration function which must be called at most once,
+ * and in a monothreaded context.
+ */
+void set_antebuffer_buffer_size(int bufsize);
 
 /* There are of course scores of existing basename() codes accessible,
  * starting with POSIX basename. However we fear posible inconsistencies
@@ -38,6 +78,9 @@ void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char 
 extern const char * path_basename(const char * path);
 
 extern int is_supported_compression_format(const char * s);
+
+/* Put in sfx the suffix in s (can be "" or NULL) */
+extern void get_suffix_from_filename (char *s, char const **sfx);
 
 /* Takes a filename, possibly ending with any recognized compression
  * extension, and returns the associated file stream. The stream may have

@@ -153,39 +153,14 @@ fillmat (filter_matrix_t *mat)
   }
 }
 
-void *
-thread_insert (buf_arg_t *arg)
+void * insert_rel_into_table (info_mat_t * info, earlyparsed_relation_ptr rel)
 {
-  unsigned int j;
-  unsigned long cpy_cpt_rel_b;
-  buf_rel_t *my_rel;
-
-  cpy_cpt_rel_b = cpt_rel_b;
-  for ( ; ; )
-  {
-    while (cpt_rel_a == cpy_cpt_rel_b)
-    {
-      if (!is_finish())
-        NANOSLEEP();
-      else if (cpt_rel_a == cpy_cpt_rel_b)
-        pthread_exit(NULL);
-    }
-
-    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->rels[j]);
-
-    if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP();
-
     //FIXME big bug this does not take into account the exponent....
-    arg->info.nprimes += insert_rel_in_table_with_e (my_rel, 0, 0, rel_compact,
+    info->nprimes += insert_rel_in_table_with_e (rel, 0, 0, rel_compact,
                                                       ideals_weight);
-    arg->info.W += (double) my_rel->nb;
+    info->W += (double) rel->nb;
 
-    test_and_print_progress_now ();
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
-  }
+    return NULL;
 }
 
 /* Callback function called by preempt_scan_relations */
@@ -203,13 +178,18 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
     index_t j;
     info_mat_t info;
+    memset(&info, 0, sizeof(info));
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
             mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
     mat->weight = 0;
 
     char *fic[2] = {(char *) purgedname, NULL};
-    info = process_rels (fic, &thread_insert, NULL, 0, NULL, NULL, STEP_MERGE);
+    info.nrels = filter_rels(
+            fic,
+            (filter_rels_callback_t) &insert_rel_into_table, &info,
+            EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
+            NULL, NULL);
 
     ASSERT_ALWAYS (info.nprimes == (index_t) mat->rem_ncols);
     ASSERT_ALWAYS (info.nrels == (index_t) mat->rem_nrows);

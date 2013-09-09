@@ -81,7 +81,7 @@ extern int ringbuf_skip_get(ringbuf_ptr r, size_t s);
  * ringbug_skip_get(r_, n)
  */
 #define RINGBUF_GET_ONE_BYTE(c_, r_, s_) do {				\
-    c_ = *s_++;								\
+    c_ = *(s_)++;							\
     if (s_ >= r_->p + r_->alloc) {					\
         s_ = r_->p;							\
     }									\

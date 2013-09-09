@@ -273,6 +273,7 @@ char ** filelist_from_file(const char * basepath, const char * filename,
 
 void filelist_clear(char ** filelist)
 {
+    if (!filelist) return;
     for(char ** p = filelist ; *p ; p++)
         free(*p);
     free(filelist);

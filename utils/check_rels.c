@@ -77,7 +77,7 @@ check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read,
         unsigned long bad0 = bad;
         int nread;
         nbfiles ++;
-        for( ; (nread = relation_stream_get (rs, line, forced_read, 10)) >= 0 ; )
+        for( ; (nread = relation_stream_get (rs, line, sizeof(line), forced_read, 10, 0)) >= 0 ; )
         {
             unsigned long l = rs->lnum - l0;
             if (nread > 0 && check_relation (&rs->rel, cpoly))

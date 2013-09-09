@@ -139,7 +139,8 @@ computeroots (relation_t *rel)
   }
 }
 
-void
+/* {{{ a few conversion relations. We happen to export these */
+static inline void
 sswap(char *pd, char *pe)
 {
   char c;
@@ -205,6 +206,7 @@ d64toa16 (char *p, int64_t m)
     }
   return (u64toa16 (p, (uint64_t) m));
 }
+/*}}}*/
 
 void
 fprint_relation (FILE *file, relation_t * rel)
@@ -453,13 +455,18 @@ void relation_compress_alg_primes(relation_t * rel)
  * In case of an error:
  * - if forced_read is zero, fails by an ASSERT
  * - if forced_read is non-zero, return 0.
+ *
+ * The flag allow_comment allows this function to return also in the case
+ * of comments in the relation files.
  */
-int relation_stream_get(relation_stream_ptr rs, char * supplied_line,
-                        int forced_read, unsigned int ab_base)
+int relation_stream_get(relation_stream_ptr rs,
+        char * supplied_line, size_t supplied_size,
+        int forced_read, unsigned int ab_base, int allow_comment)
 {
     FILE * f = rs->source;
     char tbuf[RELATION_MAX_BYTES];
     char * line = supplied_line ? supplied_line : tbuf;
+    size_t lsize = supplied_line ? supplied_size : sizeof(tbuf);
     int64_t * pa = &rs->rel.a;
     uint64_t * pb = &rs->rel.b;
 
@@ -493,7 +500,17 @@ another_line:
     if (c == EOF) return -1;
     if (c == '\n') goto another_line;
     if (c == '#') {
-        for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
+        for( ; c != EOF && c != '\n' && (size_t) (p-line) < lsize; *p++ = (c=getc_unlocked(f))) ;
+        if ((size_t) (p-line) == lsize) {
+            fprintf(stderr, "Warning: in %s: encountered very long comment, will have rubbish on next line\n", __func__);
+        }
+        if (allow_comment) {
+            ASSERT_ALWAYS(supplied_line);
+            p[-1]='\0'; /* replace newline by '\0' */
+            rs->pos += p-line;
+            return p-line;
+        }
+
         goto another_line;
     }
 

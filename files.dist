@@ -56,7 +56,7 @@ factor.sh
 filter/CMakeLists.txt
 filter/Makefile
 filter/filter_badideals.h
-filter/filter_io.c
+filter/filter_io.cpp
 filter/filter_io.h
 filter/filter_utils.c
 filter/filter_utils.h

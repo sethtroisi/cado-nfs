@@ -38,6 +38,8 @@ the same as dup1 with abhexa
 File XXX.renumber
 ==============
 
+This file is created by the freerels program
+
 It contains the table that links an ideal (p on rational side, (p,r) on
 algebraic side) to its index that going to be used during filtering.
 
@@ -46,11 +48,11 @@ nbits size nbad add
 where
   - nbits is 32 or 64 (depending on the maximum value of p possible, ie the large
     prime bounds).
-  - size is the number of ideal in the table.
+  - size is the number of ideals in the table.
   - nbad is the number of bad ideals (should be 0 for factorization)
   - add is 0 or 1 (should be 0 for factorization). If add is 1, a column is
-    added to the matrix. It is usefull to take into account the logarithm of J
-    ideal for DL.
+    added to the matrix. It is useful to take into account the logarithm of
+    the denominator ideal (often denoted J) for DLP problems.
 nbits, size, nbad and add are written in decimal.
 
 Then, the file contains nbad line of the following format:

@@ -33,8 +33,8 @@ typedef struct {
 #include "filter_memalloc.h"
 
 
-index_t insert_rel_in_table_no_e (buf_rel_t *, index_t, index_t **, weight_t *);
-index_t insert_rel_in_table_with_e (buf_rel_t *, index_t, uint8_t,
+index_t insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
+index_t insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t, uint8_t,
                                     ideal_merge_t **, weight_t *);
 
 #endif /* FILTER_UTILS_H_ */

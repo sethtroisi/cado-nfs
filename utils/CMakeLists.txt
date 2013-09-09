@@ -46,7 +46,7 @@ add_executable(random_integer random_integer.c)
 # To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
 set (CMAKE_OLD_C_FLAGS "${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "prout -D _POSIX_C_SOURCE=200809L ${CMAKE_C_FLAGS}")
-add_executable(antebuffer antebuffer.c)
+add_executable(antebuffer antebuffer.c timing.c memusage.c)
 set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
 
 target_link_libraries(test_mod_ul utils)

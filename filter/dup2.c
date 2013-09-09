@@ -86,9 +86,6 @@ unsigned long sanity_collisions = 0;
 
 static double factor = 1.0;
 
-char ** files, ** files_already_renumbered, ** files_new;
-unsigned int nb_files, nb_f_new, nb_f_renumbered;
-
 static int is_for_dl; /* Do we reduce mod 2 or not */
 
 static inline void
@@ -131,7 +128,7 @@ print_warning_size ()
 //TODO take care of bad ideals and add a col of 1 if necessary (added column is
 //always 0)
 static inline void
-print_relation (FILE * file, buf_rel_t * rel)
+print_relation (FILE * file, earlyparsed_relation_srcptr rel)
 {
   char buf[1 << 12], *p, *op;
   size_t t;
@@ -171,7 +168,7 @@ print_relation (FILE * file, buf_rel_t * rel)
  * return i for sanity check
  */
 static inline uint32_t
-insert_relation_in_dup_hashtable (buf_rel_t * rel, unsigned int *is_dup)
+insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int *is_dup)
 {
   uint64_t h;
   uint32_t i, j;
@@ -204,8 +201,12 @@ insert_relation_in_dup_hashtable (buf_rel_t * rel, unsigned int *is_dup)
   return i;
 }
 
+/* modify in place the relation rel to take into account:
+ *  - the renumbering
+ *  - the bad ideals
+ */
 static inline void
-compute_index_rel (buf_rel_t * rel)
+compute_index_rel (earlyparsed_relation_ptr rel)
 {
   unsigned int i;
   p_r_values_t r;
@@ -241,15 +242,16 @@ compute_index_rel (buf_rel_t * rel)
 #endif
       }
       else
-        r = 0; // on rational side the value of r is meaningless
+        r = 0; // on the rational side we need not compute r, which is m mod p.
       
-      int nb; //nb of ideal above the bad ideal
-      index_t first_index; // first index of the ideals above a bad ideals
+      int nb; //number of ideals above the bad ideal
+      index_t first_index; // first index of the ideals above a bad ideal
       if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r, side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS];
         handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e);
         
+        /* allocate room for (nb) more valuations */
         if (rel->nb + nb > rel->nb_alloc)
         {
           if (rel->nb_alloc == NB_PRIMES_OPT)
@@ -267,6 +269,10 @@ compute_index_rel (buf_rel_t * rel)
           }
         }
 
+        /* the first is put in place, while the other are put at the end
+         * of the relation. As a side-effect, the relations produced are
+         * unsorted. Anyway, given that we're mixing sides when
+         * renumbering, we're bound to do sorting downhill. */
         pr[i].h = first_index;
         pr[i].e = exp_above[0];
         for (int n = 1; n < nb; n++)
@@ -282,47 +288,17 @@ compute_index_rel (buf_rel_t * rel)
   }
 }
 
-#if 0
-static inline void
-print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
-             char *s)
-{
-  unsigned long j, k;
-  p_r_values_t r;
-  int nb;
-  index_t first_index;
-
-  if (side == renumber_tab->rat)
-    r = 0;
-  else
-#ifndef FOR_FFS
-    r = findroot(a, b, p);
-#else
-    r = findroot_ffs (a, b, p);
-#endif
-
-  // Here we have to take care of bad ideals that
-  // generate several columns:
-  if (renumber_is_bad (&nb, &first_index, renumber_tab, p, r, side))
-  {
-    int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS];
-    handle_bad_ideals (exp_above, a, b, p, e);
-    for (int n = 0; n < nb; n++)
-    {
-      for (k = 0; k < (unsigned long) exp_above[n]; k++)
-        sprintf (s, "%s%"PRxid",", s, first_index);
-      first_index++;
-    }
-  }
-  else
-  {
-    j = renumber_get_index_from_p_r (renumber_tab, p, r, side);
-    for (k = 0; k < (unsigned long) e; k++)
-      sprintf (s, "%s%lx,", s, j);
-  }
-}
-#endif
-
+/* return in *oname and *oname_tmp two file names for writing the output
+ * of processing the given input file infilename. Both files are placed
+ * in the directory outdir if not NULL, otherwise in the current
+ * directory.  The parameter outfmt specifies the output file extension
+ * and format (semantics are as for fopen_maybe_compressed).
+ *
+ * proper use requires that data be first written to the file whose name
+ * is *oname_tmp, and later on upon successful completion, that file must
+ * be renamed to *oname. Otherwise disaster may occur, as there is a slim
+ * possibility that *oname == infilename on return.
+ */
 static void
 get_outfilename_from_infilename (char *infilename, const char *outfmt,
                                  const char *outdir, char **oname,
@@ -337,23 +313,16 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
     ASSERT_ALWAYS(strlen(suffix_in) <= strlen(newname));
     newname[strlen(newname)-strlen(suffix_in)]='\0';
 
-    if(outdir != NULL)
-    {
-      int rc;
+#define chkrcp(x) do { int rc = x; ASSERT_ALWAYS(rc>=0); } while (0)
+    if(outdir) {
       const char * basename = path_basename(newname);
-      rc = asprintf(oname_tmp, "%s/%s.tmp%s", outdir, basename, suffix_out);
-      ASSERT_ALWAYS(rc >= 0);
-      rc = asprintf(oname, "%s/%s%s", outdir, basename, suffix_out);
-      ASSERT_ALWAYS(rc >= 0);
+      chkrcp(asprintf(oname_tmp, "%s/%s.tmp%s", outdir, basename, suffix_out));
+      chkrcp(asprintf(oname, "%s/%s%s", outdir, basename, suffix_out));
+    } else {
+      chkrcp(asprintf(oname_tmp, "%s.tmp%s", newname, suffix_out));
+      chkrcp(asprintf(oname, "%s%s", newname, suffix_out));
     }
-    else
-    {
-      int rc;
-      rc = asprintf(oname_tmp, "%s.tmp%s", newname, suffix_out);
-      ASSERT_ALWAYS(rc >= 0);
-      rc = asprintf(oname, "%s%s", newname, suffix_out);
-      ASSERT_ALWAYS(rc >= 0);
-    }
+#undef  chkrcp
 
 #if DEBUG >= 1
   fprintf (stderr, "DEBUG: Input file name: %s,\nDEBUG: temporary output file "
@@ -373,128 +342,103 @@ dup_print_stat (const char *s, index_t nrels, index_t ndup)
 }
 
 static void *
-thread_only_hash (buf_arg_t *arg)
+hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr rel)
 {
-  unsigned int j;
-  unsigned long cpy_cpt_rel_b;
-  buf_rel_t *my_rel;
-  uint32_t i;
-  unsigned int is_dup;
-
-  cpy_cpt_rel_b = cpt_rel_b;
-  for ( ; ; )
-  {
-    while (cpt_rel_a == cpy_cpt_rel_b)
-    {
-      if (!is_finish())
-        NANOSLEEP();
-      else if (cpt_rel_a == cpy_cpt_rel_b)
-        pthread_exit(NULL);
-    }
-
-    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->rels[j]);
-
-    if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP();
+    unsigned int is_dup;
 
     nrels++;
     nrels_tot++;
-    i = insert_relation_in_dup_hashtable (my_rel, &is_dup);
-#if DEBUG >= 1
-    // They should be no duplicate in already renumbered file
-    ASSERT_ALWAYS (is_dup == 0);
-#endif
-    if (i < sanity_size)
-      sanity_check(i, my_rel->a, my_rel->b);
-    if (cost >= factor * (double) (nrels_tot - ndup_tot))
-      print_warning_size ();
+    uint32_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
 
-    test_and_print_progress_now ();
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
-  }
+    // They should be no duplicate in already renumbered file
+    ASSERT(!is_dup);
+
+    if (i < sanity_size)
+        sanity_check(i, rel->a, rel->b);
+
+    if (cost >= factor * (double) (nrels_tot - ndup_tot))
+        print_warning_size ();
+
+    return NULL;
 }
 
 static void *
-thread_dup2 (buf_arg_t *arg)
+thread_dup2 (void * context_data, earlyparsed_relation_ptr rel)
 {
-  unsigned int j, is_dup;
-  uint32_t i;
-  unsigned long cpy_cpt_rel_b;
-  buf_rel_t *myrel;
-
-  cpy_cpt_rel_b = cpt_rel_b;
-  for ( ; ; )
-  {
-    while (cpt_rel_a == cpy_cpt_rel_b)
-      if (!is_finish())
-        NANOSLEEP();
-      else if (cpt_rel_a == cpy_cpt_rel_b)
-          pthread_exit(NULL);
-
-    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    myrel = &(arg->rels[j]);
-
-    if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP();
-
+    unsigned int is_dup;
+    uint32_t i;
+    FILE * output = (FILE*) context_data;
     nrels++;
     nrels_tot++;
-    i = insert_relation_in_dup_hashtable (myrel, &is_dup);
-    if (!is_dup)
-    {
-      if (i < sanity_size)
-        sanity_check(i, myrel->a, myrel->b);
-      if (cost >= factor * (double) (nrels_tot - ndup_tot))
-        print_warning_size ();
+    i = insert_relation_in_dup_hashtable (rel, &is_dup);
+    if (!is_dup) {
+        if (i < sanity_size)
+            sanity_check(i, rel->a, rel->b);
+        if (cost >= factor * (double) (nrels_tot - ndup_tot))
+            print_warning_size ();
 
-      print_relation (arg->fd[0], myrel);
-    }
-    else
-    {
-      ndup++;
-      ndup_tot++;
+        print_relation (output, rel);
+    } else {
+        ndup++;
+        ndup_tot++;
     }
 
-    test_and_print_progress_now ();
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
-  }
-  return NULL;
+    return NULL;
 }
 
 
 void *
-thread_root(fr_t *mfr)
+thread_root(void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr rel)
 {
-  unsigned int j;
-
-  for (;;)
-  {
-    switch(mfr->ok)
-    {
-      case 0:
-        NANOSLEEP();
-        break;
-      case 1 :
-        for (j = mfr->num; j <= mfr->end; j++)
-        {
-          buf_rel_t *myrel = &(mfr->buf_data[j]);
-
-          if (!is_for_dl) /* Do we reduce mod 2 */
-            for (unsigned int i = 0; i < myrel->nb; i++)
-              myrel->primes[i].e &= 1;
-
-          compute_index_rel (myrel);
-        }
-        mfr->ok = 0;
-        break;
-      case 2:
-        mfr->ok = 3;
-        pthread_exit(NULL);
+    if (!is_for_dl) { /* Do we reduce mod 2 */
+        /* XXX should we compress as well ? */
+        for (unsigned int i = 0; i < rel->nb; i++)
+            rel->primes[i].e &= 1;
     }
-  }
+
+    compute_index_rel (rel);
+
+    return NULL;
+}
+
+int check_whether_file_is_renumbered(const char * filename)
+{
+    unsigned int count = 0;
+    char s[1024];
+    FILE *f_tmp = fopen_maybe_compressed (filename, "rb");
+    ASSERT_ALWAYS(f_tmp != NULL);
+
+    /* Look for first non-comment line */
+    while (1) {
+      char *ret = fgets (s, 1024, f_tmp);
+      if (ret == NULL)
+      {
+        fprintf (stderr, "Error while reading %s\n", filename);
+        exit (1);
+      }
+      if (strlen (s) >= 1023)
+      {
+        fprintf (stderr, "Too long line while reading %s\n", filename);
+        exit (1);
+      }
+      size_t i = 0;
+      while (s[i] == ' ')
+        i++;
+      if (s[i] != '#')
+        break;
+    }
+    for (unsigned int i = 0; i < strlen (s); i++)
+      count += s[i] == ':';
+    fclose_maybe_compressed (f_tmp, filename);
+    
+    if (count == 1)
+        return 1;
+    else if (count == 2)
+        return 0;
+    else {
+      fprintf (stderr, "Error: invalid line in %s (has %u colons):\n %s", filename, count, s);
+      exit(EXIT_FAILURE);
+    }
 }
 
 static void
@@ -522,8 +466,6 @@ main (int argc, char *argv[])
     argv0 = argv[0];
     //TODO remove useless polynomials
     cado_poly cpoly;
-    const char *renumberfilename = NULL;
-    char **p;
 
     /* print command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -560,7 +502,7 @@ main (int argc, char *argv[])
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
     const char * outdir = param_list_lookup_string(pl, "outdir");
-    renumberfilename = param_list_lookup_string(pl, "renumber");
+    const char * renumberfilename = param_list_lookup_string(pl, "renumber");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     param_list_parse_ulong(pl, "nrels", &nrels_expected);
@@ -648,109 +590,102 @@ main (int argc, char *argv[])
       usage(argv0);
   }
 
-
   /* Construct the two filelists : new files and already renumbered files */
-  fprintf(stderr, "Constructing the two filelists...\n");
-  files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
-  for (p = files, nb_files = 0; *p; p++)
-    nb_files++;
-
-  SMALLOC(files_already_renumbered, nb_files + 1, "files_already_renumbered");
-  SMALLOC(files_new, nb_files + 1, "files_new");
-
-  /* separate already process files
-   * check if f_tmp is in raw format a,b:...:... or
-   *            in renumbered format a,b:...
-   */
-  nb_f_new = 0;
-  nb_f_renumbered = 0;
-  for (p = files; *p; p++)
+  char ** files_already_renumbered, ** files_new;
   {
-    unsigned int count = 0;
-    char s[1024];
-    FILE *f_tmp = fopen_maybe_compressed (*p, "rb");
-    ASSERT_ALWAYS(f_tmp != NULL);
+      unsigned int nb_files = 0;
+      fprintf(stderr, "Constructing the two filelists...\n");
+      char ** files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
+      for (char ** p = files; *p; p++)
+          nb_files++;
 
-    /* Look for first non-comment line */
-    while (1) {
-      char *ret = fgets (s, 1024, f_tmp);
-      if (ret == NULL)
-      {
-        fprintf (stderr, "Error while reading %s\n", *p);
-        exit (1);
+      files_already_renumbered = malloc((nb_files + 1) * sizeof(char*));
+      files_new = malloc((nb_files + 1) * sizeof(char*));
+
+      /* separate already processed files
+       * check if f_tmp is in raw format a,b:...:... or 
+       *            in renumbered format a,b:... 
+       */
+      unsigned int nb_f_new = 0;
+      unsigned int nb_f_renumbered = 0;
+      for (char ** p = files; *p; p++) {
+          /* always strdup these, so that we can safely call
+           * filelist_clear in the end */
+          if (check_whether_file_is_renumbered(*p)) {
+              files_already_renumbered[nb_f_renumbered++] = strdup(*p);
+          } else {
+              files_new[nb_f_new++] = strdup(*p);
+          }
       }
-      if (strlen (s) >= 1023)
-      {
-        fprintf (stderr, "Too long line while reading %s\n", *p);
-        exit (1);
-      }
-      size_t i = 0;
-      while (s[i] == ' ')
-        i++;
-      if (s[i] != '#')
-        break;
-    }
-    for (unsigned int i = 0; i < strlen (s); i++)
-      count += s[i] == ':';
-
-    if (count == 1)
-      files_already_renumbered[nb_f_renumbered++] = *p;
-    else if (count == 2)
-      files_new[nb_f_new++] = *p;
-    else {
-      fprintf (stderr, "Error: invalid line (has %u colons): %s", count, s);
-      exit(EXIT_FAILURE);
-    }
-
-    fclose_maybe_compressed (f_tmp, *p);
+      files_new[nb_f_new] = NULL;
+      files_already_renumbered[nb_f_renumbered] = NULL;
+      fprintf (stderr, "%u files (%u new and %u already renumbered)\n", nb_files, 
+              nb_f_new, nb_f_renumbered);
+      ASSERT_ALWAYS (nb_f_new + nb_f_renumbered == nb_files);
+      /* if filelist was not given, then files == argv, which of course
+       * must not be cleared */
+      if (filelist) filelist_clear(files);
   }
-  files_new[nb_f_new] = NULL;
-  files_already_renumbered[nb_f_renumbered] = NULL;
-  ASSERT_ALWAYS (nb_f_new + nb_f_renumbered == nb_files);
-  fprintf (stderr, "%u files (%u new and %u already renumbered)\n", nb_files,
-                   nb_f_new, nb_f_renumbered);
 
 
   fprintf (stderr, "Reading files already renumbered:\n");
-  process_rels (files_already_renumbered, &thread_only_hash, NULL, 0, NULL, NULL,
-                STEP_DUP2_PASS1);
+  filter_rels(files_already_renumbered,
+          (filter_rels_callback_t) &hash_renumbered_rels,
+          NULL,
+          EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
 
-  fprintf (stderr, "Reading new files:\n");
-
-  for (char **p = files_new; *p != NULL; p++)
   {
-    FILE *outputfile = NULL;
-    char * oname = NULL;
-    char * oname_tmp = NULL;
-    char *fic[2] = { *p, NULL};
-    info_mat_t info;
-    nrels = ndup = 0;
+      struct filter_rels_description desc[3] = {
+          { .f = thread_root, .arg=0, .n=4, },
+          { .f = thread_dup2, .arg=0, .n=1, },
+          { .f = NULL, },
+      };
+      fprintf (stderr, "Reading new files"
+              " (using %d auxiliary threads for roots mod p):\n",
+              desc[0].n);
 
-    get_outfilename_from_infilename (*p, outfmt, outdir, &oname, &oname_tmp);
-    outputfile = fopen_maybe_compressed(oname_tmp, "w");
-    FILE *outfiles[2] = { outputfile, NULL};
-    info = process_rels (fic, &thread_dup2, &thread_root, 0, (void **)outfiles, NULL,
-                         STEP_DUP2_PASS2);
-    ASSERT_ALWAYS (info.nrels == nrels);
+      for (char **p = files_new; *p ; p++) {
+          FILE * output = NULL;
+          char * oname, * oname_tmp;
+          char * local_filelist[] = { *p, NULL};
 
-    fclose_maybe_compressed(outputfile, oname_tmp);
+          get_outfilename_from_infilename (*p, outfmt, outdir, &oname, &oname_tmp);
+          output = fopen_maybe_compressed(oname_tmp, "w");
+          desc[1].arg = (void*) output;
+
+          nrels = ndup = 0;
+
+#ifdef FOR_FFS
+          index_t loc_nrels = filter_rels2(local_filelist, desc,
+                  EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES,
+                  NULL, NULL);
+#else
+          index_t loc_nrels = filter_rels2(local_filelist, desc,
+                  EARLYPARSE_NEED_AB_DECIMAL | EARLYPARSE_NEED_PRIMES,
+                  NULL, NULL);
+#endif
+
+          ASSERT_ALWAYS(loc_nrels == nrels);
+
+          fclose_maybe_compressed(output, oname_tmp);
 
 #ifdef HAVE_MINGW /* For MinGW, rename cannot overwrite an existing file */
-    remove (oname);
+          remove (oname);
 #endif
-    if (rename(oname_tmp, oname))
-    {
-      fprintf(stderr, "Error while renaming %s into %s\n", oname_tmp, oname);
-      abort();
-    }
+          if (rename(oname_tmp, oname))
+          {
+              fprintf(stderr, "Error while renaming %s into %s\n", oname_tmp, oname);
+              abort();
+          }
 
-    // stat for the current file
-    dup_print_stat (path_basename(*p), nrels, ndup);
-    // stat for all the files already read
-    dup_print_stat ("Total so far", nrels_tot, ndup_tot);
+          // stat for the current file
+          dup_print_stat (path_basename(*p), nrels, ndup);
+          // stat for all the files already read
+          dup_print_stat ("Total so far", nrels_tot, ndup_tot);
 
-    free(oname);
-    free(oname_tmp);
+          free(oname);
+          free(oname_tmp);
+      }
   }
 
   fprintf (stderr, "At the end: %" PRid " remaining relations\n",
@@ -763,17 +698,23 @@ main (int argc, char *argv[])
   fprintf (stderr, "  [found %lu true duplicates on sample of %lu relations]\n",
            sanity_collisions, sanity_checked);
 
-  if (nrels_tot != nrels_expected) {
-      fprintf(stderr, "Warning: number of relations read (%"PRIu32") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+  if (!*files_already_renumbered) {
+      if (nrels_tot != nrels_expected) {
+          fprintf(stderr, "Warning: number of relations read (%"PRIu32") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+      }
+  } else {
+      /* when we have renumbered files, we know that we won't have the
+       * total number of relations... */
+      if (nrels_tot > nrels_expected) {
+          fprintf(stderr, "Warning: number of relations read (%"PRIu32") exceeds the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+      }
   }
 
   free (H);
   free (sanity_a);
   free (sanity_b);
-  if (filelist)
-    filelist_clear(files);
-  free(files_already_renumbered);
-  free(files_new);
+  filelist_clear(files_already_renumbered);
+  filelist_clear(files_new);
 
   param_list_clear(pl);
   renumber_free (renumber_tab);
