@@ -88,10 +88,26 @@
 #define DEFAULT_NPT 4
 
 /* Main variables */
-char *argv0;			/* = argv[0]; */
 
-static index_t **rel_compact = NULL;	/* see above */
-weight_t *ideals_weight = NULL;
+/* This one is passed to all functions, so it's morally a global */
+struct purge_data_s {
+    /* for minimal changes, don't put these here _yet_ */
+    // uint64_t min_index;
+    // index_t **rel_compact;	/* see main documentation */
+    // weight_t *ideals_weight;
+    info_mat_t info;
+    /* fd[0]: printed relations */
+    /* fd[1]: deleted relations */
+    FILE * fd[2];
+};
+typedef struct purge_data_s purge_data[1];
+typedef struct purge_data_s * purge_data_ptr;
+typedef const struct purge_data_s * purge_data_srcptr;
+
+uint64_t min_index;
+index_t **rel_compact;	/* see main documentation */
+weight_t *ideals_weight;
+
 
 static bit_vector rel_used, Tbv;
 static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
@@ -499,99 +515,36 @@ static void singletons_and_cliques_removal(index_t * nrels, index_t * nprimes)
 /*****************************************************************************/
 /* I/O functions */
 
-/* We don't use memory barrier nor (pre)processor orders for portability.
- * So, if a ring buffer is empty, one problem exists if the producter
- * produces one and the consumer takes it immediatly: the slot might be not
- * complety written.
- * Same problem exists when the buffer is full in the other sense.
- * It's NOT a bug code, but the instructions reordonnancing of the
- * optimiser compiler, which in the case of an empty buffer, may
- * increase the producter counter BEFORE the end of the complete
- * writing of the slot.
- * The only << solution >> without synchronous barrier or (pre)processor
- * order is a nanosleep after the end of the waiting loop.
- * * empty buffer :
- *     if (A == B + 1) NANOSLEEP();
- * * full buffer :
- *     if (A + 1 == B + SIZEBUF) NANOSLEEP();
- * It's very dirty!
- */
-
-/* Callback function called by preempt_scan_relations */
-
-void *thread_insert(buf_arg_t * arg)
+/* Callback functions called by filter_rels */
+void *insert_rel_into_table(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 {
-    unsigned int j;
-    unsigned long cpy_cpt_rel_b;
-    buf_rel_t *my_rel;
+    ASSERT_ALWAYS(rel->num < nrelmax);
 
-    cpy_cpt_rel_b = cpt_rel_b;
-    for (;;) {
-	while (cpt_rel_a == cpy_cpt_rel_b) {
-	    if (!is_finish())
-		NANOSLEEP();
-	    else if (cpt_rel_a == cpy_cpt_rel_b)
-		pthread_exit(NULL);
-	}
-
-	j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-	my_rel = &(arg->rels[j]);
-
-	if (cpt_rel_a == cpy_cpt_rel_b + 1)
-	    NANOSLEEP();
-
-	if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num)) {
-	    arg->info.nprimes +=
-		insert_rel_in_table_no_e(my_rel, arg->min_index, 
-                                    rel_compact, ideals_weight);
+    arg->info.nprimes +=
+        insert_rel_in_table_no_e(rel, min_index, 
+                rel_compact, ideals_weight);
 #ifdef STAT
-	    arg->info.W += (double) my_rel->nb_above_min_index;
+    /* here we also used to accumulate the number of primes above
+     * min_index in arg->info.W */
+    arg->info.W += earlyparsed_relation_nb_above_min_index(rel, min_index);
 #endif
-	}
 
-	test_and_print_progress_now();
-	cpy_cpt_rel_b++;
-	cpt_rel_b = cpy_cpt_rel_b;
-    }
+    return NULL;
 }
 
-/* Callback function called by preempt_scan_relations */
-
-static void *thread_print(buf_arg_t * arg)
+void *thread_print(purge_data_ptr arg, earlyparsed_relation_ptr rel)
 {
-    unsigned int j, aff;
-    unsigned long cpy_cpt_rel_b;
-    buf_rel_t *my_rel;
-
-    cpy_cpt_rel_b = cpt_rel_b;
-    for (;;) {
-	while (cpt_rel_a == cpy_cpt_rel_b)
-	    if (!is_finish())
-		NANOSLEEP();
-	    else if (cpt_rel_a == cpy_cpt_rel_b)
-		pthread_exit(NULL);
-
-	j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-	my_rel = &(arg->rels[j]);
-
-	if (cpt_rel_a == cpy_cpt_rel_b + 1)
-	    NANOSLEEP();
-
-	aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
-	if (aff) {
-	    arg->info.W += (double) my_rel->nb;
-	    fputs(my_rel->line, arg->fd[0]);
-	} else if (arg->fd[1] != NULL)
-	    fputs(my_rel->line, arg->fd[1]);
-
-	test_and_print_progress_now();
-	cpy_cpt_rel_b++;
-	cpt_rel_b = cpy_cpt_rel_b;
+    if (bit_vector_getbit(rel_used, rel->num)) {
+        arg->info.W += rel->nb;
+        fputs(rel->line, arg->fd[0]);
+    } else if (arg->fd[1] != NULL) {
+        fputs(rel->line, arg->fd[1]);
     }
+    return NULL;
 }
 
 
-/***************** utils functions for purge binary **************************/
+/*********** utility functions for purge binary ****************/
 
 
 
@@ -665,13 +618,12 @@ static void usage(const char *argv0)
 
 int main(int argc, char **argv)
 {
-    argv0 = argv[0];
+    char * argv0 = argv[0];
     int k;
     param_list pl;
-    uint64_t min_index = UMAX(uint64_t);
+    min_index = UMAX(uint64_t);
     index_t nrels, nprimes;
     size_t tot_alloc_bytes = 0;
-    FILE *f_remaining = NULL, *f_deleted = NULL;
     char ** input_files;
 
 #ifdef HAVE_MINGW
@@ -713,12 +665,12 @@ int main(int argc, char **argv)
     param_list_parse_uint(pl, "npthr", &npt);
     param_list_parse_uint(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
-    const char *path_antebuffer =
-	param_list_lookup_string(pl, "path_antebuffer");
 
-    /* These three specify the set of input files, of the form <base
-     * path>/<one of the possible subdirs>/<one of the possible file
-     * names>
+    set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));       
+
+    /* These three parameters specify the set of input files, of the form
+     * <base path>/<one of the possible subdirs>/<one of the possible
+     * file names>
      *
      * possible subdirs are lister in the file passed as subdirlist.
      * Ditto for possible file names.
@@ -736,9 +688,9 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Unused options in command-line\n");
 	usage(argv0);
     }
+
     /* }}} */
 
-    set_antebuffer_path(argv0, path_antebuffer);
 
     /*{{{ build the list of input files from the given args*/
     if ((basepath || subdirlist) && !filelist) {
@@ -833,27 +785,44 @@ int main(int argc, char **argv)
 } while (0)
     /* }}} */
 
-    ALLOC_VERBOSE_CALLOC(weight_t, ideals_weight, nprimemax);
-    ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrelmax);
-
-    bit_vector_set(rel_used, 1);
-    nrels = nrelmax;
-
     ALLOC_VERBOSE_BIT_VECTOR(Tbv, nrelmax);
     ALLOC_VERBOSE_MALLOC(index_t, sum2_index, nprimemax);
-    ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
+
 
     /* }}} */
 
     /****************** Begin interesting stuff *************************/
-    info_mat_t info;
+    purge_data pd;
+
+    memset(pd, 0, sizeof(purge_data));
+
+    ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
+    ALLOC_VERBOSE_CALLOC(weight_t, ideals_weight, nprimemax);
+
     fprintf(stderr, "Pass 1, reading and storing ideals with index h >= "
             "%" PRIu64 "\n", min_index);
 
+    nrels = nrelmax;
+
     /* first pass over relations in files */
-    info = process_rels(input_files, &thread_insert, NULL, min_index, NULL, rel_used,
-			STEP_PURGE_PASS1);
-    nprimes = info.nprimes;
+    /* Note: Now that we no longer take a bitmap on input, all
+     * relations are considered active at this point, so that we
+     * do not need to pass a bitmap to filter_rels */
+    pd->info.nrels = filter_rels(
+            input_files,
+            (filter_rels_callback_t) &insert_rel_into_table, pd,
+            EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
+            NULL, NULL);
+
+    if (pd->info.nrels != nrels) {
+	fprintf(stderr,
+		"Error, -nrels value should match the number of scanned "
+		"relations\nexpected %" PRIu64 " relations, found %" PRid
+		"\n", nrelmax, pd->info.nrels);
+        abort();
+    }
+
+    nprimes = pd->info.nprimes;
 
     tot_alloc_bytes += get_my_malloc_bytes();
     fprintf(stderr, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
@@ -870,13 +839,8 @@ int main(int argc, char **argv)
     }
 #endif
 
-    if (info.nrels != nrelmax) {
-	fprintf(stderr,
-		"Error, -nrels value should match the number of scanned "
-		"relations\nexpected %" PRIu64 " relations, found %" PRid
-		"\n", nrelmax, info.nrels);
-	exit(1);
-    }
+    ALLOC_VERBOSE_BIT_VECTOR(rel_used, nrels);
+    bit_vector_set(rel_used, 1);
 
     singletons_and_cliques_removal(&nrels, &nprimes);
     if (nrels < nprimes) {
@@ -888,7 +852,7 @@ int main(int argc, char **argv)
       exit(2);
     }
 
-    /* free rel_compact[i] and rel_compact. We do not need it anymore */
+    /* free rel_compact[i] and rel_compact. We no longer need them */
     my_malloc_free_all();
     tot_alloc_bytes -= get_my_malloc_bytes();
     fprintf(stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
@@ -906,39 +870,44 @@ int main(int argc, char **argv)
     /* reread the relation files and convert them to the new coding */
     fprintf(stderr, "Storing remaining relations...\n");
 
-    if (!(f_remaining = fopen_maybe_compressed(purgedname, "w"))) {
+    if (!(pd->fd[0] = fopen_maybe_compressed(purgedname, "w"))) {
 	fprintf(stderr, "Error, cannot open file %s for writing.\n",
 		purgedname);
 	exit(1);
     }
-    if (deletedname != NULL)
-	if (!(f_deleted = fopen_maybe_compressed(deletedname, "w"))) {
+
+    if (deletedname != NULL) {
+	if (!(pd->fd[1] = fopen_maybe_compressed(deletedname, "w"))) {
 	    fprintf(stderr, "Error, cannot open file %s for writing.\n",
 		    deletedname);
 	    exit(1);
 	}
+    }
 
-    // compute last index i such that ideals_weight[i] != 0
+    /* Write the header line for the file of remaining relations:
+     * compute last index i such that ideals_weight[i] != 0
+     */
     {
 	index_t last_used = nprimemax - 1;
 	while (ideals_weight[last_used] == 0)
 	    last_used--;
 
-	fprintf(f_remaining, "# %" PRid " %" PRid " %" PRid "\n", nrels,
+	fprintf(pd->fd[0], "# %" PRid " %" PRid " %" PRid "\n", nrels,
 		last_used + 1, nprimes);
     }
 
     /* second pass over relations in files */
-    FILE *outfd[2] = { f_remaining, f_deleted };
-    info = process_rels(input_files, &thread_print, NULL, 0, (void **)outfd, rel_used,
-			STEP_PURGE_PASS2);
-
+    filter_rels(
+            input_files,
+            (filter_rels_callback_t) &thread_print, pd,
+            EARLYPARSE_NEED_LINE | EARLYPARSE_NEED_NB,
+            rel_used, NULL);
 
     /* write final values to stdout */
     fprintf(stdout, "Final values:\nnrels=%" PRid " nprimes=%" PRid " "
             "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
-            nrels, nprimes, ((int64_t) nrels) - nprimes, info.W,
-            info.W * (double) nrels);
+            nrels, nprimes, ((int64_t) nrels) - nprimes, pd->info.W,
+            pd->info.W * (double) nrels);
     fflush(stdout);
 
     /* Free allocated stuff */
@@ -952,17 +921,16 @@ int main(int argc, char **argv)
     bit_vector_clear(rel_used);
     bit_vector_clear(Tbv);
 
-    if (filelist)
-	filelist_clear(input_files);
+    if (!filelist)
+        filelist_clear(input_files);
 
-    fclose_maybe_compressed(f_remaining, purgedname);
-    if (f_deleted != NULL)
-	fclose_maybe_compressed(f_deleted, deletedname);
-
-    param_list_clear(pl);
+    fclose_maybe_compressed(pd->fd[0], purgedname);
+    if (pd->fd[1]) fclose_maybe_compressed(pd->fd[1], deletedname);
 
     /* print usage of time and memory */
     print_timing_and_memory(wct0);
+
+    param_list_clear(pl);
 
     return 0;
 }

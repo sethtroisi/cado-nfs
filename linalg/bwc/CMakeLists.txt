@@ -43,7 +43,7 @@ set(balancing_sources
     balancing_mpi_source.c)
 
 if (HAVE_CURL)
-set(balancing_sources ${balancing_sources} balancing_rollbuf.c balancing_curl_source.c)
+set(balancing_sources ${balancing_sources} balancing_curl_source.c)
 endif (HAVE_CURL)
 
 add_library(balancing ${balancing_sources})
@@ -82,7 +82,6 @@ set(bwc_base_sources
     xvectors.c
     bw-common.c
     bw-common-mpi.c
-    rusage.c
     async.c
     rolling.c
     matmul.c

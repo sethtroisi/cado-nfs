@@ -76,7 +76,11 @@ if(CMAKE_COMPILER_IS_GNUCC)
     else (MINGW)
         set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
     endif (MINGW)
-    set (CMAKE_CXX_FLAGS "-g -W -Wall ${CMAKE_CXX_FLAGS}")
+    # we've been quite lenient so far on c++ standard conformance, and
+    # just used to pick what we found. c++98 is probably a small common
+    # denominator, in that it lacks the integration of many of the
+    # goodies we like from c99. But OTOH, c++11 is too new.
+    set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
 #####################################################################

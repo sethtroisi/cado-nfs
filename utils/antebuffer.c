@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <time.h>
 #include "portability.h"
+#include "timing.h"
 
 #ifdef HAVE_MINGW
 int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
@@ -167,6 +168,9 @@ int main(int argc, char **argv) {
   pthread_join(ab_tc, NULL);
   free(ab_buf);
   ab_buf = NULL;
+  double tt[2];
+  seconds_user_sys(tt);
+  fprintf(stderr, "antebuffer exits after having spent %.2fs+%2.fs on cpu\n",
+          tt[0], tt[1]);
   exit (0);
 }
-    

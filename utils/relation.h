@@ -56,7 +56,7 @@ struct relation_stream_s {
     double dt, mb_s, rels_s;
 
     // temporaries, + various stuff for internal use.
-    int pipe;
+    int pipe;   /* whether source was popen()ed */
     double t0, t1;
 };
 
@@ -115,7 +115,7 @@ extern void relation_stream_openfile(relation_stream_ptr rs, const char * name);
 extern void relation_stream_bind(relation_stream_ptr rs, FILE * f);
 extern void relation_stream_unbind(relation_stream_ptr rs);
 extern int relation_stream_disp_progress_now_p(relation_stream_ptr rs);
-extern int relation_stream_get(relation_stream_ptr rs, char * line, int forced_read, unsigned int ab_base);
+extern int relation_stream_get(relation_stream_ptr rs, char * line, size_t lsize, int forced_read, unsigned int ab_base, int allow_comment);
 extern int relation_stream_get_skip(relation_stream_ptr rs);
 extern void relation_stream_trigger_disp_progress(relation_stream_ptr rs);
 

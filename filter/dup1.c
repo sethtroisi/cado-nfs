@@ -77,6 +77,10 @@ split_iter_init(const char *prefix, const char *suffix,
   return iter; 
 }
 
+/* used for counting time in different processes */
+timingstats_dict_t stats;
+
+
 static void
 split_iter_end(split_output_iter_t *iter)
 {
@@ -93,8 +97,12 @@ split_iter_end(split_output_iter_t *iter)
 void 
 split_iter_open_next_file(split_output_iter_t *iter)
 {
-  if (iter->file != NULL)
-    fclose_maybe_compressed(iter->file, iter->filename);
+  if (iter->file != NULL) {
+    struct rusage r[1];
+    fclose_maybe_compressed2(iter->file, iter->filename, r);
+    timingstats_dict_add(stats, iter->prefix, r);
+  }
+
   free (iter->filename);
   int rc = asprintf(&(iter->filename), "%s%04x%s", 
                     iter->prefix, iter->next_idx++, iter->suffix);
@@ -130,48 +138,26 @@ compute_slice (int64_t a, uint64_t b)
 /* Callback function called by prempt_scan_relations */
 
 static void *
-thread_dup1(buf_arg_t *arg)
+thread_dup1 (void * context_data, earlyparsed_relation_ptr rel)
 {
-  unsigned int slice, j;
-  unsigned long cpy_cpt_rel_b;
-  buf_rel_t *my_rel;
-
-  cpy_cpt_rel_b = cpt_rel_b;
-  for ( ; ; )
-  {
-    while (cpt_rel_a == cpy_cpt_rel_b)
-      if (!is_finish())
-        NANOSLEEP();
-      else if (cpt_rel_a == cpy_cpt_rel_b)
-          pthread_exit(NULL);
-
-    if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP();
-
-    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->rels[j]);
-
-    slice = compute_slice (my_rel->a, my_rel->b);
+    unsigned int slice = compute_slice (rel->a, rel->b);
+    split_output_iter_t **outiters = (split_output_iter_t**)context_data;
 
     if (do_slice[slice])
     {
       if (only_ab)
       {
-        char *p = my_rel->line;
+        char *p = rel->line;
         while (*p != ':')
           p++;
         *p = '\n';
       }
 
-      split_output_iter_t *iter = arg->fd[slice];
-      split_iter_write_next(iter, my_rel->line);
+      split_output_iter_t *iter = outiters[slice];
+      split_iter_write_next(iter, rel->line);
       nr_rels_tot[slice]++;
     }
-
-    test_and_print_progress_now ();
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
-  }
+    return NULL;
 }
 
 static void
@@ -202,9 +188,9 @@ main (int argc, char * argv[])
     param_list_init(pl);
     argv++,argc--;
 
-    int ab_hexa = 0;
+    int abhexa = 0;
     param_list_configure_switch(pl, "ab", &only_ab);
-    param_list_configure_switch(pl, "abhexa", &ab_hexa);
+    param_list_configure_switch(pl, "abhexa", &abhexa);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -278,6 +264,7 @@ main (int argc, char * argv[])
       get_suffix_from_filename (files[0], &outfmt);
 
     memset (nr_rels_tot, 0, sizeof(index_t) * nslices);
+
     split_output_iter_t **outiters;
     outiters = malloc(sizeof(split_output_iter_t *) * nslices);
     ASSERT_ALWAYS(outiters != NULL);
@@ -297,13 +284,11 @@ main (int argc, char * argv[])
       free(msg);
     }
 
-    unsigned int step;
-    if (ab_hexa)
-      step = STEP_DUP1_HEXA;
-    else
-      step = STEP_DUP1_DECIMAL;
-    
-    process_rels (files, &thread_dup1, NULL, 0, (void **)outiters, NULL, step);
+    timingstats_dict_init(stats);
+    filter_rels(files, (filter_rels_callback_t) &thread_dup1, (void*)outiters,
+            EARLYPARSE_NEED_LINE |
+            (abhexa ? EARLYPARSE_NEED_AB_HEXA : EARLYPARSE_NEED_AB_DECIMAL),
+            NULL, stats);
 
     for(int i = 0 ; i < nslices ; i++)
       split_iter_end(outiters[i]);
@@ -315,6 +300,13 @@ main (int argc, char * argv[])
     if (filelist) filelist_clear(files);
 
     param_list_clear(pl);
+
+    // double thread_times[2];
+    // thread_seconds_user_sys(thread_times);
+    timingstats_dict_add_mythread(stats, "main");
+    // fprintf(stderr, "Main thread ends after having spent %.2fs+%.2fs on cpu \n", thread_times[0], thread_times[1]);
+    timingstats_dict_disp(stats);
+    timingstats_dict_clear(stats);
 
     return 0;
 }

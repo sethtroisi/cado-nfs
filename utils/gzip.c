@@ -5,18 +5,25 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <errno.h>
+
 
 #include "portability.h"
 #include "macros.h"
 #include "gzip.h"
 #include "misc.h"
+#include "cado_popen.h"
 
 struct suffix_handler {
     const char * suffix;
     const char * pfmt_in;
     const char * pfmt_out;
 };
+
+static char antebuffer[PATH_MAX];	/* "directory/antebuffer" or "cat" */
+static int antebuffer_buffer_size = 24; /* default value 2^24 = 16 Mo */
 
 #if 0
 const char * suffix = NULL;
@@ -89,175 +96,171 @@ void get_suffix_from_filename (char *s, char const **sfx)
   return;
 }
 
-/* Put the directory of cado in rep_cado */
-void set_rep_cado (const char *argv0, char *rep_cado, size_t size) {
-  char *p, *q;
-  p = strdup(argv0);
-  q = dirname(p);
-  strlcat_check(rep_cado, q, size);
-  strlcat_check(rep_cado, "/../", size);
-  free(p);
+void set_antebuffer_buffer_size(int bufsize) {
+    antebuffer_buffer_size = bufsize;
 }
 
-/* Search the executable in PATH and, if found, return in real_path the
-   complete path WITH the executable in the end */
-char *
-search_real_exec_in_path (const char *executable, char *real_path) {
-  char dummy[PATH_MAX];
-  char *p = getenv("PATH");
-  char *path = (p == NULL || strlen(p) == 0) ? strdup(".") : strdup(p);
-  char *pp = path;
-  unsigned int end = 0;
-  while (!end) {
-    char *ppe = strchr(pp, ':');
-    if (UNLIKELY(!ppe))
-      ppe = pp + strlen (pp);
-    if (LIKELY(ppe != pp)) {
-      memcpy (dummy, pp, ppe - pp);
-      dummy[ppe - pp] = '/';
-      dummy[ppe - pp + 1] = 0;
+static int try_antebuffer_path()
+{
+    int rc = access(antebuffer, X_OK);
+    if (rc >= 0) {
+        fprintf(stderr, "antebuffer set to %s\n", antebuffer);
+        return 1;
     }
-    else
-      strlcpy_check(dummy, "./", sizeof(dummy));
-    strlcat_check(dummy, executable, sizeof(dummy));
-#ifdef EXECUTABLE_SUFFIX
-    strlcat_check (dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
-#endif
-    if (LIKELY(*ppe))
-      pp = ppe + 1;
-    else
-      end = 1;
-    if (UNLIKELY(realpath(dummy, real_path) != NULL))
-      end = 2;
-  }
-  free (path);
-  if (end != 2) *real_path = 0;
-  return(real_path);
+    fprintf(stderr, "access to %s: %s\n", antebuffer, strerror(errno));
+    *antebuffer = 0;
+    return 0;
 }
 
-/* Search the path for antebuffer. Must be call one time before all I/O by
-   executable, but after the computation of rep_cado */
-void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char *antebuffer) {
+int set_antebuffer_path (const char *executable_filename, const char *path_antebuffer)
+{
   *antebuffer = 0;
   /* First, if we have path_antebuffer, we must have antebuffer or error */
-  if (path_antebuffer != NULL) {
-    char dummy[PATH_MAX];
-    strlcpy_check(dummy, path_antebuffer, sizeof(dummy));
-    strlcat_check(dummy, "/antebuffer", sizeof(dummy));
+  if (path_antebuffer) {
+      struct stat sbuf[1];
+      int rc = stat(path_antebuffer, sbuf);
+      if (rc < 0) {
+          fprintf(stderr, "%s: path_antebuffer=\"%s\" access error: %s\n",
+                  __func__, path_antebuffer, strerror(errno));
+      } else {
+          /* Older versions had path_antebuffer be a directory. We still
+           * support this, but only as a compatibility measure. */
+          if (S_ISDIR(sbuf->st_mode)) {
 #ifdef EXECUTABLE_SUFFIX
-    strlcat_check (dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
+              snprintf(antebuffer, PATH_MAX, "%s/antebuffer" EXECUTABLE_SUFFIX, path_antebuffer);
+#else
+              snprintf(antebuffer, PATH_MAX, "%s/antebuffer", path_antebuffer);
 #endif
-    if (realpath(dummy, antebuffer) == NULL) {
-      fprintf (stderr, "search_antebuffer: antebuffer path (%s) error : %s\n", dummy, strerror(errno));
-      exit (1);
-    }
+          } else {
+              strncpy(antebuffer, path_antebuffer, PATH_MAX);
+          }
+          if (try_antebuffer_path()) return 1;
+      }
   }
-  /* Second, we search antebuffer in cado directory */
-  if (!*antebuffer) {
-    char dummy[PATH_MAX];
-    strlcpy_check(dummy, rep_cado, sizeof(dummy));
-    strlcat_check(dummy, "utils/antebuffer", sizeof(dummy));
+  /* Second option: if we failed for any reason, and if $0 was given to
+   * us, use that as a potential fallback */
+  if (executable_filename) {
+      char dummy[PATH_MAX];
+      char dummy2[PATH_MAX];
+      char * slash = strrchr(executable_filename, '/');
+      if (slash) {
+          int len = MIN(PATH_MAX - 1, slash - executable_filename);
+          strncpy(dummy, executable_filename, len);
+          dummy[len]='\0';
+      } else {
+          dummy[0]='.';
+          dummy[1]='\0';
+      }
 #ifdef EXECUTABLE_SUFFIX
-    strlcat_check(dummy, EXECUTABLE_SUFFIX, sizeof(dummy));
+      snprintf(dummy2, PATH_MAX, "%s/../utils/antebuffer" EXECUTABLE_SUFFIX, dummy);
+#else
+      snprintf(dummy2, PATH_MAX, "%s/../utils/antebuffer", dummy);
 #endif
-    if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
+      if (realpath(dummy2, antebuffer) && try_antebuffer_path())
+          return 1;
   }
-  /* 3th, we try the PATH */
-  if (!*antebuffer)
-    search_real_exec_in_path ("antebuffer", antebuffer);
-  /* 4th, OK, antebuffer is not here. cat is need to replace it */
-  if (!*antebuffer) {
-    search_real_exec_in_path ("cat", antebuffer);
-    if (!*antebuffer) {
-      fprintf (stderr, "search_antebuffer: antebuffer or cat paths not found: %s\n", strerror(errno));
-      exit (1);
-    }
-    /* cat needs no argument... except a space after its name! */
-    strcat (antebuffer, " ");
+  /* Third option: walk $PATH */
+  if ((path_resolve("antebuffer", antebuffer)) != NULL && try_antebuffer_path()) {
+      return 1;
   }
-  else /* real antebuffer is found : add its arguments */
-    strcat (antebuffer, " 24 ");
+  fprintf(stderr, "No antebuffer configured\n");
+  return 0;
 }
 
-/* Return a unix commands list. Exemple :
-   cat file_relation1
-   gzip -dc file_relation2.gz file_relation3.gz
-   bzip2 -dc file_relation4.gz file_relation5.gz
-   [empty string]
-*/
-char **
-preempt_open_compressed_rs (char *antebuffer, char **ficname)
+/* Return a list of unix commands to _read_ a set of files. Consecutive
+ * files sharing the same decompression mechanism are grouped into a
+ * single command line.
+ *
+ * antebuffer file1.gz file2.gz file3.gz | gzip -dc
+ * antebuffer file4.bz2 | gzip -dc
+ * antebuffer file5.gz | gzip -dc
+ * antebuffer file6.gz | cat    // useless use of cat, should be fixed.
+ *
+ * Note that antebuffer may also not be defined. In that case, the
+ * simpler command formats like "gzip -dc file1.gz file2.gz file3.gz" are
+ * used.
+ *
+ * All strings returned are meant to be passed to popen(). The return
+ * value is a malloc()-ed array of malloc()-ed strings, and the caller is
+ * in charge of freeing it (with filelist_clear, for instance).
+ */
+char **prepare_grouped_command_lines(char **list_of_files)
 {
-  const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
-  char **cmd;
-  size_t s_cmds = 2;
-  size_t p_cmds = 0;
-  int suffix_choice = 0;
-  char lastcom[256];
-  char *fic_realpath;
-  
-  if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
-    fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
-    exit (1);
-  }
-  if ((fic_realpath = (char *) malloc(PATH_MAX * sizeof(char))) == NULL) {
-    fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
-    exit (1);
-  }
-  while (*ficname) {
-    if (realpath(*ficname, fic_realpath) == NULL) {
-      fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
-      exit (1);
-    }
-    if (!suffix_choice) {
-      if (p_cmds + 1 >= s_cmds) {
-	if (!(cmd = realloc (cmd, sizeof(unsigned char *) * (s_cmds<<1)))) {
-	  fprintf (stderr, "fopen_compressed_rs: realloc erreur : %s\n", strerror(errno));
-	  exit (1);
-	}
-	memset(&cmd[s_cmds], 0, sizeof(unsigned char *) * s_cmds);
-	s_cmds <<= 1;
-      }
-      if (!(cmd[p_cmds] = malloc(PREEMPT_S_CMD))) {
-	fprintf (stderr, "fopen_compressed_rs: malloc erreur : %s\n", strerror(errno));
-	exit (1);
-      }
-      for (cp_r = r ; cp_r->suffix ; cp_r++)
-	if (has_suffix (fic_realpath, cp_r->suffix)) break;
-      strlcpy_check (cmd[p_cmds], antebuffer, PREEMPT_S_CMD);
-      strlcpy_check (lastcom, " | ", sizeof(lastcom));
-      strlcat_check (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s", sizeof(lastcom));
-      ASSERT_ALWAYS(strlen(lastcom) >= 2);
-      lastcom[strlen(lastcom)-2] = 0;
-      strlcat_check (lastcom, "-", sizeof(lastcom)); /* "%s" remplaces by "-" */
-      suffix_choice = 1;
-      strlcat_check (cmd[p_cmds], fic_realpath, PREEMPT_S_CMD);
-      ficname++;
-    } else {
-      if (has_suffix (fic_realpath, cp_r->suffix) &&
-	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREEMPT_S_CMD))
-	{
-	  strcat (cmd[p_cmds], " ");
-	  strcat (cmd[p_cmds], fic_realpath);
-	  ficname++;
-	}
-      else {
-	strcat (cmd[p_cmds], lastcom);
-	suffix_choice = 0;
-	p_cmds++;
-      }
-    }
-  }
-  if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
-    strcat (cmd[p_cmds], lastcom);
-  free (fic_realpath);  
-  return cmd;
-}
+    const struct suffix_handler *r = supported_compression_formats;
+    char ** new_commands = NULL;
+    size_t n_new_commands = 0;
+    for(char ** grouphead = list_of_files ; *grouphead ; ) {
+        const struct suffix_handler * this_suffix = r;
+        for (; this_suffix && this_suffix->suffix; this_suffix++)
+            if (has_suffix(*grouphead, this_suffix->suffix))
+                break;
+        ASSERT_ALWAYS(this_suffix);
+        size_t filenames_total_size = 0;
+        char ** grouptail;
+        for(grouptail = grouphead ; *grouptail ; grouptail++) {
+            if (!has_suffix(*grouptail, this_suffix->suffix))
+                break;
+            /* Add 1 for a space */
+            size_t ds = strlen(*grouptail) + 1;
+            if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX))
+                break;
+            filenames_total_size += ds;
+        }
+        filenames_total_size++; /* for '\0' */
+        /* Now all file names referenced by pointers in the interval
+         * [grouphead..grouptail[ have the same suffix. Create a new
+         * command for unpacking them.
+         */
+        new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
 
-/* The pipe capacity is 2^16 by default, we can increase it, but it does not
-   seem to make a difference, thus we don't change it by default (patch from
-   Alain Filbois). */
-#define PIPE_CAPACITY 1UL << 20
+        /* intermediary string for the list of file names */
+        char * tmp = malloc(filenames_total_size);
+        size_t k = 0;
+        for(char ** g = grouphead ; g != grouptail ; g++) {
+            k += snprintf(tmp + k, filenames_total_size - k, "%s ", *g);
+        }
+        tmp[k-1]='\0';  /* turn final space to a null byte */
+            
+        char * cmd;
+        int rc;
+
+        if (*antebuffer) {
+            if (this_suffix->pfmt_in) {
+                /* antebuffer 24 file1.gz file2.gz file3.gz | gzip -dc - */
+                char * tailcmd;
+                rc = asprintf(&tailcmd, this_suffix->pfmt_in, "-");
+                ASSERT_ALWAYS(rc >= 0);
+                rc = asprintf(&cmd, "%s %d %s | %s",
+                        antebuffer, antebuffer_buffer_size, tmp, tailcmd);
+                free(tailcmd);
+            } else {
+                /* antebuffer 24 file1.txt file2.txt file3.txt */
+                /* avoid piping through cat */
+                rc = asprintf(&cmd, "%s %d %s",
+                        antebuffer, antebuffer_buffer_size, tmp);
+            }
+        } else {
+            if (this_suffix->pfmt_in) {
+                /* gzip -dc file1.gz file2.gz file3.gz */
+                rc = asprintf(&cmd, this_suffix->pfmt_in, tmp);
+            } else {
+                /* cat file1.txt file2.txt file3.txt */
+                /* There's potential for this to qualify as a useless use
+                 * of cat, but anyway we don't expect to meet this case
+                 * often.
+                 */
+                rc = asprintf(&cmd, "cat %s", tmp);
+            }
+        }
+        ASSERT_ALWAYS(rc >= 0);
+        new_commands[n_new_commands-1] = cmd;
+        free(tmp);
+        grouphead = grouptail;
+    }
+    new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
+    new_commands[n_new_commands-1] = NULL;
+    return new_commands;
+}
 
 FILE*
 fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, char const ** suf)
@@ -281,12 +284,13 @@ fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, 
           /* apparently popen() under Linux does not accept the 'b' modifier */
             char pmode[2] = "x";
             pmode[0] = mode[0];
-            f = popen(command, pmode);
+            f = cado_popen(command, pmode);
             if (p_pipeflag) *p_pipeflag = 1;
 #ifdef F_SETPIPE_SZxxx
-                /* increase the pipe capacity (2^16 by default), thanks to
-                   Alain Filbois */
-                fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
+            /* The pipe capacity is 2^16 by default; we can increase it,
+             * but it does not seem to make a difference, thus we don't
+             * change it by default (patch from Alain Filbois). */
+            fcntl (fileno (f), F_SETPIPE_SZ, 1UL << 20);
 #endif
             free(command);
         } else {
@@ -307,9 +311,13 @@ fopen_maybe_compressed (const char * name, const char * mode)
     return fopen_maybe_compressed2(name, mode, NULL, NULL);
 }
 
-
+#ifdef  HAVE_GETRUSAGE
 void
-fclose_maybe_compressed (FILE * f, const char * name)
+fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
+#else
+void
+fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
+#endif
 {
     const struct suffix_handler * r = supported_compression_formats;
 
@@ -319,8 +327,16 @@ fclose_maybe_compressed (FILE * f, const char * name)
          * may exist and not the other */
         ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
         if (r->pfmt_in || r->pfmt_out) {
-            pclose(f);
+#ifdef  HAVE_GETRUSAGE
+            if (rr)
+                cado_pclose2(f, rr);
+            else
+#endif
+                cado_pclose(f);
         } else {
+#ifdef  HAVE_GETRUSAGE
+            if (rr) memset(rr, 0, sizeof(*rr));
+#endif
             fclose(f);
         }
         return;
@@ -328,4 +344,10 @@ fclose_maybe_compressed (FILE * f, const char * name)
     /* If we arrive here, it's because "" is not among the suffixes */
     abort();
     return;
+}
+
+void
+fclose_maybe_compressed (FILE * f, const char * name)
+{
+    fclose_maybe_compressed2(f, name, NULL);
 }

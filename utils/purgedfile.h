@@ -36,7 +36,7 @@ struct purgedfile_stream_s {
     double dt, mb_s, rows_s;
 
     // temporaries, + various stuff for internal use.
-    int pipe;
+    char * fname; /* filename being read */
     double t0, t1;
 };
 

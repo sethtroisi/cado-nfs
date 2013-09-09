@@ -1,5 +1,5 @@
 set (sources
-        filter_utils.c filter_io.c filter_memalloc.c
+        filter_utils.c filter_io.cpp filter_memalloc.c
         utils_ffs.c
 )
 

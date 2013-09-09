@@ -313,38 +313,13 @@ check_unknown_log (mpz_t *log, index_t nprimes)
 }
 #endif
 
-/* Callback function called by preempt_scan_relations */
+/* Callback function called by filter_rels */
 void *
-thread_insert (buf_arg_t *arg)
+insert_rel_into_table(void * foo MAYBE_UNUSED, earlyparsed_relation_ptr rel)
 {
-  unsigned int j;
-  unsigned long cpy_cpt_rel_b;
-  buf_rel_t *my_rel;
-
-  cpy_cpt_rel_b = cpt_rel_b;
-  for ( ; ; )
-  {
-    while (cpt_rel_a == cpy_cpt_rel_b)
-    {
-      if (!is_finish())
-        NANOSLEEP();
-      else if (cpt_rel_a == cpy_cpt_rel_b)
-        pthread_exit(NULL);
-    }
-
-    if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      NANOSLEEP();
-
-    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
-    my_rel = &(arg->rels[j]);
-
-    arg->info.nprimes += insert_rel_in_table_with_e (my_rel, 0, 0, rel_purged,
-                                                           ideals_weight);
-
-    test_and_print_progress_now ();
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
-  }
+    /* It seems that we don't even need nprimes, do we ? */
+    insert_rel_in_table_with_e (rel, 0, 0, rel_purged, ideals_weight);
+    return NULL;
 }
 
 static void
@@ -544,7 +519,9 @@ main(int argc, char *argv[])
   fprintf (stderr, "Reading relations from %s\n", relspfilename);
   set_antebuffer_path (argv0, NULL);
   char *fic[2] = {(char *) relspfilename, NULL};
-  process_rels (fic, &thread_insert, NULL, 0, NULL, NULL, STEP_RECONSTRUCT);
+  filter_rels (fic,
+          (filter_rels_callback_t) insert_rel_in_table_with_e, NULL,
+          EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES, NULL, NULL);
 
   /* computing missing log */
   fprintf (stderr, "Computing missing logarithms from rels left "
@@ -570,7 +547,8 @@ main(int argc, char *argv[])
   /* Reading all relations */
   fprintf (stderr, "Reading relations from %s\n", relsdfilename);
   char *fic2[2] = {(char *) relsdfilename, NULL};
-  process_rels (fic2, &thread_insert, NULL, 0, NULL, NULL, STEP_RECONSTRUCT);
+  filter_rels (fic2, &insert_rel_into_table, NULL,
+          EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES, NULL, NULL);
 
   /* computing missing log */
   fprintf (stderr, "Computing missing logarithms from all rels...\n");
