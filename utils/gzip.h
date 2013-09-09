@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <libgen.h>
 #include <sys/time.h>
+#ifdef  HAVE_GETRUSAGE
 #include <sys/resource.h>
+#endif
 #include "preempt.h"
 
 #ifdef __cplusplus
@@ -58,8 +60,12 @@ extern FILE * fopen_maybe_compressed(const char * name, const char * mode);
  * fclose() accordingly.  */
 extern void fclose_maybe_compressed(FILE *, const char * name);
 
+#ifdef  HAVE_GETRUSAGE
 /* Same, but recovers the time taken by the underlying process */
 extern void fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * r);
+#else
+extern void fclose_maybe_compressed2 (FILE * f, const char * name, void *);
+#endif
 
 #ifdef __cplusplus
 }

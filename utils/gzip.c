@@ -308,9 +308,13 @@ fopen_maybe_compressed (const char * name, const char * mode)
     return fopen_maybe_compressed2(name, mode, NULL, NULL);
 }
 
-
+#ifdef  HAVE_GETRUSAGE
 void
 fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
+#else
+void
+fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
+#endif
 {
     const struct suffix_handler * r = supported_compression_formats;
 
@@ -320,12 +324,16 @@ fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
          * may exist and not the other */
         ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
         if (r->pfmt_in || r->pfmt_out) {
+#ifdef  HAVE_GETRUSAGE
             if (rr)
                 cado_pclose2(f, rr);
             else
+#endif
                 cado_pclose(f);
         } else {
+#ifdef  HAVE_GETRUSAGE
             if (rr) memset(rr, 0, sizeof(*rr));
+#endif
             fclose(f);
         }
         return;
