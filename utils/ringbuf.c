@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "macros.h"
 #include "ringbuf.h"
+#include "misc.h"
 #include "portability.h"
 
 /* This is a hack. Define to 1 to disable */
@@ -42,7 +43,7 @@ static void ringbuf_grow__(ringbuf_ptr r, size_t claim)
     size_t newalloc = r->alloc;
     if (!claim) {
         newalloc += newalloc / 2;
-        newalloc |= sysconf(_SC_PAGESIZE) - 1;
+        newalloc |= pagesize(); /* home-made wrapper */
         newalloc++;
     } else if (claim <= r->alloc) {
         return;
@@ -50,7 +51,7 @@ static void ringbuf_grow__(ringbuf_ptr r, size_t claim)
         newalloc = claim;
         /* round to page size */
         newalloc--;
-        newalloc |= sysconf(_SC_PAGESIZE) - 1;
+        newalloc |= pagesize();
         newalloc++;
     }
 
