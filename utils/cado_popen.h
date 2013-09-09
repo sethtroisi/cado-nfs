@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#ifndef MinGW
+#ifndef HAVE_MINGW
 FILE * cado_popen(const char * command, const char * mode);
 #ifdef HAVE_GETRUSAGE
 void cado_pclose2(FILE * stream, struct rusage * r);
