@@ -921,7 +921,7 @@ int main(int argc, char **argv)
     bit_vector_clear(rel_used);
     bit_vector_clear(Tbv);
 
-    if (!filelist)
+    if (filelist)
         filelist_clear(input_files);
 
     fclose_maybe_compressed(pd->fd[0], purgedname);
