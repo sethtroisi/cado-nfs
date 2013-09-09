@@ -11,6 +11,13 @@
 #include "memusage.h"
 #include "portability.h"
 
+#ifdef HAVE_GETRUSAGE
+/* I'm including some STL code for the timer info layer, but this could
+ * equally well be done in C */
+#include <map>
+#include <string>
+#endif
+
 /* return total user time (all threads) */
 uint64_t
 microseconds (void)
@@ -188,3 +195,54 @@ void thread_seconds_user_sys(double * res)
 }
 #endif
 
+#ifdef HAVE_GETRUSAGE
+typedef std::multimap<std::string, struct rusage> real_timingstats_dict_t;
+
+void timingstats_dict_init(timingstats_dict_ptr p)
+{
+    *p = static_cast<void*>(new real_timingstats_dict_t());
+}
+
+void timingstats_dict_clear(timingstats_dict_ptr p)
+{
+    delete static_cast<real_timingstats_dict_t*>(*p);
+}
+
+void timingstats_dict_add(timingstats_dict_ptr p, const char * key, struct rusage * r)
+{
+    real_timingstats_dict_t& s(*static_cast<real_timingstats_dict_t*>(*p));
+    s.insert(std::make_pair(std::string(key), *r));
+}
+
+void timingstats_dict_add_mythread(timingstats_dict_ptr p, const char * key)
+{
+    struct rusage ru[1];
+    getrusage (RUSAGE_THREAD, ru);
+    timingstats_dict_add(p, key, ru);
+}
+
+void timingstats_dict_add_myprocess(timingstats_dict_ptr p, const char * key)
+{
+    struct rusage ru[1];
+    getrusage (RUSAGE_SELF, ru);
+    timingstats_dict_add(p, key, ru);
+}
+
+void timingstats_dict_disp(timingstats_dict_ptr p)
+{
+    real_timingstats_dict_t& s(*static_cast<real_timingstats_dict_t*>(*p));
+    /* multimap is sorted */
+    typedef real_timingstats_dict_t::const_iterator it_t;
+    for(it_t i = s.begin(), j ; i != s.end() ; i = j) {
+        double tu = 0;
+        double ts = 0;
+        int n = 0;
+        for(j = i ; j != s.end() && j->first == i->first ; j++, n++) {
+            tu += j->second.ru_utime.tv_sec + (j->second.ru_utime.tv_usec / 1.0e6);
+            ts += j->second.ru_stime.tv_sec + (j->second.ru_stime.tv_usec / 1.0e6);
+        }
+        printf("%s: %d process%s, total %.2fs+%.2fs on cpu\n",
+                i->first.c_str(), n, n>1 ? "es" : "", tu, ts);
+    }
+}
+#endif

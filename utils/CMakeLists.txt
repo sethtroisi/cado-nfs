@@ -1,6 +1,6 @@
 
 set (sources 
-        cado_poly.c relation.c timing.c plain_poly.c getprime.c mod_ul.c
+        cado_poly.c relation.c timing.cpp plain_poly.c getprime.c mod_ul.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         mpz_poly.c fpoly.c rootfinder.c params.c gcd.c
         discriminant.c mpz_array.c gzip.c misc.c
@@ -46,7 +46,7 @@ add_executable(random_integer random_integer.c)
 # To avoid the warning: implicit declaration of function nanosleep. It's POSIX, non c99.
 set (CMAKE_OLD_C_FLAGS "${CMAKE_C_FLAGS}")
 set (CMAKE_C_FLAGS "prout -D _POSIX_C_SOURCE=200809L ${CMAKE_C_FLAGS}")
-add_executable(antebuffer antebuffer.c timing.c memusage.c)
+add_executable(antebuffer antebuffer.c timing.cpp memusage.c)
 set (CMAKE_C_FLAGS "${CMAKE_OLD_C_FLAGS}")
 
 target_link_libraries(test_mod_ul utils)

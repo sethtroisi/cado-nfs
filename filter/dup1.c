@@ -78,7 +78,7 @@ split_iter_init(const char *prefix, const char *suffix,
 }
 
 /* used for counting time in different processes */
-filter_io_timingstats_t stats;
+timingstats_dict_t stats;
 
 
 static void
@@ -100,7 +100,7 @@ split_iter_open_next_file(split_output_iter_t *iter)
   if (iter->file != NULL) {
     struct rusage r[1];
     fclose_maybe_compressed2(iter->file, iter->filename, r);
-    filter_io_timing_add(stats, iter->prefix, r);
+    timingstats_dict_add(stats, iter->prefix, r);
   }
 
   free (iter->filename);
@@ -284,7 +284,7 @@ main (int argc, char * argv[])
       free(msg);
     }
 
-    filter_io_timing_init(stats);
+    timingstats_dict_init(stats);
     filter_rels(files, (filter_rels_callback_t) &thread_dup1, (void*)outiters,
             EARLYPARSE_NEED_LINE |
             (abhexa ? EARLYPARSE_NEED_AB_HEXA : EARLYPARSE_NEED_AB_DECIMAL),
@@ -303,10 +303,10 @@ main (int argc, char * argv[])
 
     // double thread_times[2];
     // thread_seconds_user_sys(thread_times);
-    filter_io_timing_add_mythread(stats, "main");
+    timingstats_dict_add_mythread(stats, "main");
     // fprintf(stderr, "Main thread ends after having spent %.2fs+%.2fs on cpu \n", thread_times[0], thread_times[1]);
-    filter_io_timing_disp(stats);
-    filter_io_timing_clear(stats);
+    timingstats_dict_disp(stats);
+    timingstats_dict_clear(stats);
 
     return 0;
 }

@@ -5,11 +5,6 @@
 #include <pthread.h>
 #include <errno.h>
 
-/* I'm including some STL code for the timer info layer, but this could
- * equally well be done in C */
-#include <map>
-#include <string>
-
 #include "portability.h"
 #include "utils.h"
 #include "filter_utils.h"
@@ -168,7 +163,7 @@ inflight_rels_buffer<locking, n>::inflight_rels_buffer(int nthreads_total)
 template<typename locking, int n>
 void inflight_rels_buffer<locking, n>::drain()
 {
-    // int c = completed[0];
+    // size_t c = completed[0];
     active[0]--;
 
     for(int k = 0 ; k < n ; k++) {
@@ -239,7 +234,7 @@ inflight_rels_buffer<locking, n>::schedule(int k)
         locking::unlock(m + prev);
         /* we emulate the equivalent of ::complete(), and terminate */
         locking::lock(m + k);
-        int c = completed[k];
+        size_t c = completed[k];
         for( ; c < s ; c++) {
             if (level_processed[c & (SIZE_BUF_REL-1)] < k)
                 break;
@@ -318,8 +313,8 @@ inflight_rels_buffer<locking, n>::complete(int k,
      *
      */
     locking::lock(m + k);
-    int c = completed[k];
-    int zslot = ((completed[k] - slot + SIZE_BUF_REL - 1) & -SIZE_BUF_REL) + slot;
+    size_t c = completed[k];
+    size_t zslot = ((completed[k] - slot + SIZE_BUF_REL - 1) & -SIZE_BUF_REL) + slot;
 
     ASSERT(level_processed[slot] == (int8_t) (k-1));
     /* The big question is how far we should go. By not exactly
@@ -526,7 +521,11 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            rel->primes[n++] = (prime_t) { .h = (uint32_t) side,.p = (p_r_values_t) pr,.e = 1};
+            // rel->primes[n++] = (prime_t) { .h = (uint32_t) side,.p = (p_r_values_t) pr,.e = 1};
+            rel->primes[n].h = (uint32_t) side;
+            rel->primes[n].p = (p_r_values_t) pr;
+            rel->primes[n].e = 1;
+            n++;
         }
         last_prime = pr;
     }
@@ -580,7 +579,11 @@ earlyparser_abh(earlyparsed_relation_ptr rel, ringbuf_ptr r)
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            rel->primes[n++] = (prime_t) { .h = pr,.p = 0,.e = 1};
+            // rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
+            rel->primes[n].h = (index_t) pr;
+            rel->primes[n].p = 0;
+            rel->primes[n].e = 1;
+            n++;
         }
         last_prime = pr;
     }
@@ -688,7 +691,11 @@ earlyparser_hmin(earlyparsed_relation_ptr rel, ringbuf_ptr r)
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
+            // rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
+            rel->primes[n].h = (index_t) pr;
+            rel->primes[n].p = 0;
+            rel->primes[n].e = 1;
+            n++;
         }
         // last_prime = pr;
     }
@@ -709,7 +716,7 @@ struct filter_rels_producer_thread_arg_s {
      * (in fact, shell commands for providing filename contents).
      */
     char ** input_files;
-    filter_io_timingstats_ptr stats;
+    timingstats_dict_ptr stats;
 };
 
 void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
@@ -727,7 +734,7 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
         FILE * f = cado_popen(*filename, "r");
         ssize_t rc = ringbuf_feed_stream(r, f);
         cado_pclose2(f, &rus);
-        if (arg->stats) filter_io_timing_add(arg->stats, "feed-in", &rus);
+        if (arg->stats) timingstats_dict_add(arg->stats, "feed-in", &rus);
         if (rc < 0) {
             fprintf(stderr,
                     "%s: load error (%s) from\n%s\n",
@@ -737,7 +744,7 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
         }
     }
     ringbuf_mark_done(r);
-    if (arg->stats) filter_io_timing_add_mythread(arg->stats, "producer");
+    if (arg->stats) timingstats_dict_add_mythread(arg->stats, "producer");
     /*
     double thread_times[2];
     thread_seconds_user_sys(thread_times);
@@ -755,7 +762,7 @@ struct filter_rels_consumer_thread_arg_s {
     void * callback_arg;
     int k;
     inflight_t * inflight;
-    filter_io_timingstats_ptr stats;
+    timingstats_dict_ptr stats;
     static void * f(struct filter_rels_consumer_thread_arg_s<inflight_t> * arg)
     {
         arg->inflight->enter(arg->k);
@@ -771,7 +778,7 @@ struct filter_rels_consumer_thread_arg_s {
         thread_seconds_user_sys(thread_times);
         fprintf(stderr, "Consumer thread (level %d) ends after having spent %.2fs+%.2fs on cpu\n", arg->k, thread_times[0], thread_times[1]);
         */
-        if (arg->stats) filter_io_timing_add_mythread(arg->stats, "consumer");
+        if (arg->stats) timingstats_dict_add_mythread(arg->stats, "consumer");
         return NULL;
     }
 };
@@ -803,7 +810,7 @@ index_t filter_rels2_inner(char ** input_files,
         filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
-        filter_io_timingstats_ptr stats)
+        timingstats_dict_ptr stats)
 {
     relation_stream rs;         /* only for displaying progress */
 
@@ -997,7 +1004,7 @@ index_t filter_rels2(char ** input_files,
         filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
-        filter_io_timingstats_ptr stats)
+        timingstats_dict_ptr stats)
 {
     int multi = 0;
     int n;      /* number of levels of the pipe */
@@ -1026,52 +1033,3 @@ index_t filter_rels2(char ** input_files,
     }
 }
 
-typedef std::multimap<std::string, struct rusage> real_filter_io_timingstats_t;
-
-void filter_io_timing_init(filter_io_timingstats_ptr p)
-{
-    *p = static_cast<void*>(new real_filter_io_timingstats_t());
-}
-
-void filter_io_timing_clear(filter_io_timingstats_ptr p)
-{
-    delete static_cast<real_filter_io_timingstats_t*>(*p);
-}
-
-void filter_io_timing_add(filter_io_timingstats_ptr p, const char * key, struct rusage * r)
-{
-    real_filter_io_timingstats_t& s(*static_cast<real_filter_io_timingstats_t*>(*p));
-    s.insert(std::make_pair(std::string(key), *r));
-}
-
-void filter_io_timing_add_mythread(filter_io_timingstats_ptr p, const char * key)
-{
-    struct rusage ru[1];
-    getrusage (RUSAGE_THREAD, ru);
-    filter_io_timing_add(p, key, ru);
-}
-
-void filter_io_timing_add_myprocess(filter_io_timingstats_ptr p, const char * key)
-{
-    struct rusage ru[1];
-    getrusage (RUSAGE_SELF, ru);
-    filter_io_timing_add(p, key, ru);
-}
-
-void filter_io_timing_disp(filter_io_timingstats_ptr p)
-{
-    real_filter_io_timingstats_t& s(*static_cast<real_filter_io_timingstats_t*>(*p));
-    /* multimap is sorted */
-    typedef real_filter_io_timingstats_t::const_iterator it_t;
-    for(it_t i = s.begin(), j ; i != s.end() ; i = j) {
-        double tu = 0;
-        double ts = 0;
-        int n = 0;
-        for(j = i ; j != s.end() && j->first == i->first ; j++, n++) {
-            tu += j->second.ru_utime.tv_sec + (j->second.ru_utime.tv_usec / 1.0e6);
-            ts += j->second.ru_stime.tv_sec + (j->second.ru_stime.tv_usec / 1.0e6);
-        }
-        printf("%s: %d process%s, total %.2fs+%.2fs on cpu\n",
-                i->first.c_str(), n, n>1 ? "es" : "", tu, ts);
-    }
-}

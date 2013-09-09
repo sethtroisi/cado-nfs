@@ -222,7 +222,7 @@ gf2x/src/mul9k2.c
 gf2x/src/mul9k3.c
 gf2x/src/replace.c
 gf2x/src/replace.h
-gf2x/src/timing.c
+gf2x/src/timing.cpp
 gf2x/src/timing.h
 gf2x/src/tune-lowlevel.pl
 gf2x/src/tunefft.c

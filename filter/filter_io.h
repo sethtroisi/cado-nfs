@@ -95,41 +95,26 @@ struct filter_rels_description {
 
 typedef void *(*filter_rels_callback_t) (void *, earlyparsed_relation_ptr);
 
-/* we provide an interface to collect the timings of the subprocesses.
- * Each subprocess is identified in the filter_io layer by some key, and
- * the caller has to call the proper function to display the tally of the
- * timings.
- */
-
-typedef void * filter_io_timingstats_t[1];
-typedef void ** filter_io_timingstats_ptr;
-void filter_io_timing_init(filter_io_timingstats_ptr);
-void filter_io_timing_clear(filter_io_timingstats_ptr);
-/* display the tally */
-void filter_io_timing_disp(filter_io_timingstats_ptr);
-void filter_io_timing_add(filter_io_timingstats_ptr, const char * key, struct rusage * r);
-void filter_io_timing_add_mythread(filter_io_timingstats_ptr, const char * key);
-void filter_io_timing_add_myprocess(filter_io_timingstats_ptr, const char * key);
-
 extern index_t filter_rels2(char ** input_files,
         struct filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
-        filter_io_timingstats_ptr);
+        timingstats_dict_ptr);
 
 static inline index_t filter_rels(char ** input_files,
         filter_rels_callback_t f,
         void * arg,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
-        filter_io_timingstats_ptr stats)
+        timingstats_dict_ptr stats)
 {
-    /* this header is also included by C++, so I doubt that using
-     * designated intializers is legit, as I'm at least almost certain
-     * that it is not in C++98. Is it in c++11 ? */
+    /* Of course I would prefer designated intializers here.
+     * Unfortunately this header is included by C++ code as well, which
+     * makes them illegal (at least with gcc-4.6.3 ; gcc-4.8.1 groks
+     * them). So I stick to dumb code.
+     */
     struct filter_rels_description desc[2] = {
-        { .f = f, .arg = arg, .n = 1, },
-        { .f = NULL, .arg=NULL, .n = 0, }
+        { f, arg, 1, }, { NULL, NULL, 0, },
     };
     return filter_rels2(input_files, desc, earlyparse_needed_data, active, stats);
 }
