@@ -22,7 +22,7 @@ static inline void cado_pclose(FILE * stream) { cado_pclose2(stream, NULL); }
 #else
 
 static inline FILE * cado_popen(const char * command, const char * mode) { return popen(command, mode); }
-static inline FILE * cado_pclose(FILE * stream) { pclose(stream); }
+static inline void cado_pclose(FILE * stream) { pclose(stream); }
 /* we don't even provide cado_pclose2 for mingw */
 #endif
 
