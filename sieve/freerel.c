@@ -48,8 +48,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   index_t old_table_size = renumber_table->size;
   FILE *fpout = stdout;
 
-  if (outfilename != NULL)
-    fpout = fopen_maybe_compressed (outfilename, "w");
+  fpout = fopen_maybe_compressed (outfilename, "w");
 
   rat_side = renumber_table->rat;
   alg_side = 1 - rat_side;
@@ -114,8 +113,9 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   getprime (0);
   free (roots[0]);
   free (roots[1]);
-  if (outfilename != NULL)
-    fclose_maybe_compressed (fpout, outfilename);
+
+  fclose_maybe_compressed (fpout, outfilename);
+
   return nfree;
 }
 
@@ -185,13 +185,12 @@ main (int argc, char *argv[])
 
     polyfilename = param_list_lookup_string(pl, "poly");
     outfilename = param_list_lookup_string(pl, "out");
-    /* param_list_lookup_string returns NULL if there is no -out argument,
-       in which case we output on stdout */
     badidealsfilename = param_list_lookup_string(pl, "badideals");
     renumberfilename = param_list_lookup_string(pl, "renumber");
 
     
-    if (polyfilename == NULL || renumberfilename == NULL)
+    if (polyfilename == NULL || renumberfilename == NULL ||
+        outfilename == NULL)
       usage (pl, argv0);
 
     cado_poly_init(cpoly);
