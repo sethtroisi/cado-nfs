@@ -761,10 +761,11 @@ int main(int argc, char **argv)
 #define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {			\
     variable_ = (type_ *) malloc(amount_ * sizeof(type_));		\
     ASSERT_ALWAYS(variable_ != NULL);					\
-    tot_alloc_bytes += amount_ * sizeof(type_);				\
+    size_t cur_alloc = amount_ * sizeof(type_);                         \
+    tot_alloc_bytes += cur_alloc;                                       \
     fprintf(stderr,							\
             "Allocated " #variable_ " of %zuMb (total %zuMb so far)\n",	\
-	    (amount_ * sizeof(type_)) >> 20, tot_alloc_bytes >> 20);	\
+	    cur_alloc >> 20, tot_alloc_bytes >> 20);                  	\
 } while (0)
 
 #define ALLOC_VERBOSE_CALLOC(type_, variable_, amount_) do {		\
