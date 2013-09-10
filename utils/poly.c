@@ -663,6 +663,47 @@ poly_div_r (poly_t h, const poly_t f, const mpz_t p)
   mpz_clear (tmp);
 }
 
+/* 
+   computes q, r such that f = q*g + r mod p, with deg(r) < deg(g) and p in mpz_t
+   q and r must be allocated!                                   
+*/
+void poly_div_qr (poly_t q, poly_t r, const poly_t f, const poly_t g, const mpz_t p)
+{
+  int k, j, df = f->deg, dg = g->deg, dq = df - dg;
+  mpz_t tmp, lg, invlg;
+
+  ASSERT_ALWAYS(df >= dg);
+  ASSERT_ALWAYS(q->alloc >= dq+1);
+
+  mpz_init(tmp);
+  mpz_init(lg);
+  mpz_init_set_ui(invlg, 1);
+
+  poly_copy(r, f);
+  q->deg = dq;
+
+  mpz_set (lg, g->coeff[dg]);
+  mpz_mod (lg, lg, p);
+  /* invlg = 1/g[dg] mod p */
+  if (mpz_cmp_ui(lg, 1) != 0)
+    mpz_invert(invlg, lg, p);
+
+  for (k = df-dg ; k >=0 ; k--) {
+    mpz_mul(q->coeff[k], r->coeff[k+dg], invlg);
+    mpz_mod(q->coeff[k], q->coeff[k], p);
+    for (j = dg+k ; j >= k ; j--) {
+      mpz_mul(tmp, q->coeff[k], g->coeff[j-k]);
+      mpz_sub(r->coeff[j], r->coeff[j], tmp);
+      mpz_mod(r->coeff[j], r->coeff[j], p);
+    }
+  }
+  cleandeg(r, r->deg);
+
+  mpz_clear(invlg);
+  mpz_clear(lg);
+  mpz_clear(tmp);
+}
+
 /* q=divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
 void
 poly_divexact (poly_t q, poly_t h, const poly_t f, const mpz_t p) {
@@ -1254,7 +1295,7 @@ poly_swap (poly_t f, poly_t g)
   g->coeff = t;
 }
 
-/* f=gcd(f,g) with p in mpz_t */
+/* f=gcd(f,g) mod p, with p in mpz_t */
 void
 poly_gcd_mpz (poly_t f, poly_t g, const mpz_t p)
 {
@@ -1265,6 +1306,76 @@ poly_gcd_mpz (poly_t f, poly_t g, const mpz_t p)
       poly_swap (f, g);
     }
 }
+
+/* computes d = gcd(f,g) = u*f + v*g mod p, with p in mpz_t */
+void
+poly_xgcd_mpz (poly_t d, const poly_t f, const poly_t g, poly_t u, poly_t v, const mpz_t p)
+{
+  poly_t q, tmp;
+  poly_t gg;
+
+  poly_alloc(d, f->alloc);
+  poly_alloc(gg, g->alloc);
+  poly_copy(d, f);
+  poly_copy(gg, g);
+
+  poly_t uu, vv;
+  poly_alloc (uu, 0);
+  poly_alloc (vv, 0);
+
+  u->deg = 0;
+  poly_setcoeff_si(u, 0, 1);
+  poly_set_zero(uu);
+
+  vv->deg = 0;
+  poly_setcoeff_si(vv, 0, 1);
+  poly_set_zero(v);
+
+  poly_alloc(q, d->deg);
+  poly_alloc(tmp, d->deg + gg->deg);
+    
+  while (gg->deg >= 0)
+    {
+
+      /* q, r := f div g mod p */
+      poly_div_qr (q, d, d, gg, p);
+
+      /* u := u - q * uu mod p */
+      poly_mul(tmp, q, uu);
+      poly_sub_mod_mpz(u, u, tmp, p);
+      poly_swap (u, uu);
+
+      /* v := v - q * vv mod p */
+      poly_mul(tmp, q, vv);
+      poly_sub_mod_mpz(v, v, tmp, p);
+      poly_swap (v, vv);
+ 
+      /* now deg(f) < deg(g): swap f and g */
+      poly_swap (d, gg);
+    }
+
+  /* make monic */
+  mpz_t inv;
+  if (mpz_cmp_ui(d->coeff[d->deg], 1) != 0)
+    {
+      mpz_init(inv);
+      mpz_invert(inv, d->coeff[0], p);
+      poly_mul_mpz(d, d, inv);
+      poly_reduce_mod_mpz(d, d, p);
+      poly_mul_mpz(u, u, inv);
+      poly_reduce_mod_mpz(u, u, p);
+      poly_mul_mpz(v, v, inv);
+      poly_reduce_mod_mpz(v, v, p);
+      mpz_clear(inv);
+    }
+
+  poly_free(gg);
+  poly_free(uu);
+  poly_free(vv);
+  poly_free(q);
+  poly_free(tmp);
+}
+
 
 /* Assuming f is a (squarefree) product of linear factors mod p, splits it
    and put the corresponding roots mod p in r[]. Return number of roots
