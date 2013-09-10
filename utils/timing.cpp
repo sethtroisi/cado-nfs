@@ -217,7 +217,12 @@ void timingstats_dict_add(timingstats_dict_ptr p, const char * key, struct rusag
 void timingstats_dict_add_mythread(timingstats_dict_ptr p, const char * key)
 {
     struct rusage ru[1];
+#ifdef HAVE_RUSAGE_THREAD
     getrusage (RUSAGE_THREAD, ru);
+#else
+    /* this will be plain bogus, but that's life */
+    getrusage (RUSAGE_SELF, ru);
+#endif
     timingstats_dict_add(p, key, ru);
 }
 

@@ -222,7 +222,7 @@ gf2x/src/mul9k2.c
 gf2x/src/mul9k3.c
 gf2x/src/replace.c
 gf2x/src/replace.h
-gf2x/src/timing.cpp
+gf2x/src/timing.c
 gf2x/src/timing.h
 gf2x/src/tune-lowlevel.pl
 gf2x/src/tunefft.c
@@ -771,7 +771,7 @@ utils/test_modredc_2ul2.c
 utils/test_modredc_ul.c
 utils/testbase-rootfinder.quick
 utils/testmpz-rootfinder.quick
-utils/timing.c
+utils/timing.cpp
 utils/timing.h
 utils/typedefs.h
 utils/ularith.h

@@ -98,6 +98,7 @@ void ringbuf_clear(ringbuf_ptr r)
     pthread_mutex_destroy(r->mx);
     pthread_cond_destroy(r->bored);
     free(r->rbuf);
+    free(r->p);
 }
 
 

@@ -73,6 +73,7 @@ void poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
                             const poly_t f, const mpz_t m,
                             const mpz_t invm);
 void poly_div_r (poly_t h, const poly_t f, const mpz_t p);
+void poly_div_qr (poly_t q, poly_t r, const poly_t f, const poly_t g, const mpz_t p);
 void poly_div_ui(poly_t f, const poly_t g, unsigned long a);
 void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a,
                         const unsigned long m);
@@ -104,7 +105,7 @@ int poly_is_constant(const poly_t f); // for rootsieve
 size_t poly_sizeinbase (poly_t f, int d, int base);
 void poly_swap (poly_t f, poly_t g);
 void poly_gcd_mpz (poly_t f, poly_t g, const mpz_t p);
-  
+  void poly_xgcd_mpz(poly_t gcd, const poly_t f, const poly_t g, poly_t u, poly_t v, const mpz_t p);
 int poly_cantor_zassenhaus (mpz_t *r, poly_t f, const mpz_t p, int depth);
 int poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
 void poly_swap (poly_t f, poly_t g);

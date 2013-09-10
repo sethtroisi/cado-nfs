@@ -299,6 +299,8 @@ main (int argc, char * argv[])
 
     if (filelist) filelist_clear(files);
 
+    free(outiters);
+
     param_list_clear(pl);
 
     // double thread_times[2];

@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "filter_utils.h"
 #include "ringbuf.h"
+#include "barrier.h"
 
 /*{{{ inflight buffer. See filter_io.tex for documentation. */
 
@@ -82,7 +83,7 @@ template<typename locking, int n>
 struct inflight_rels_buffer {
     typedef locking param_locking;
     static const int param_n = n;
-    pthread_barrier_t sync_point[1];
+    barrier_t sync_point[1];
     earlyparsed_relation * rels;        /* always malloc()-ed to SIZE_BUF_REL,
                                            which is a power of two */
     /* invariant:
@@ -105,7 +106,7 @@ struct inflight_rels_buffer {
     /* computation threads joining the computation are calling these */
     inline void enter(int k) {
         locking::lock(m+k); active[k]++; locking::unlock(m+k);
-        pthread_barrier_wait(sync_point);
+        barrier_wait(sync_point, NULL, NULL, NULL);
     }
     /* leave() is a no-op, since active-- is performed as part of the
      * normal drain() call */
@@ -153,7 +154,7 @@ inflight_rels_buffer<locking, n>::inflight_rels_buffer(int nthreads_total)
         locking::lock_init(m + i);
         locking::cond_init(bored + i);
     }
-    pthread_barrier_init(sync_point, NULL, nthreads_total);
+    barrier_init(sync_point, nthreads_total);
 }/*}}}*/
 /*{{{ ::drain() */
 /* This belongs to the buffer closing process.  The out condition of this
@@ -182,7 +183,7 @@ void inflight_rels_buffer<locking, n>::drain()
 template<typename locking, int n>
 inflight_rels_buffer<locking, n>::~inflight_rels_buffer()
 {
-    pthread_barrier_destroy(sync_point);
+    barrier_destroy(sync_point);
     for(int i = 0 ; i < n ; i++) {
         ASSERT_ALWAYS(active[i] == 0);
     }
@@ -517,7 +518,7 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
         // not enforcing at the moment.
         // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
         sorted = sorted && pr >= last_prime;
-        if (n && pr == rel->primes[n-1].h) {
+        if (n && pr == rel->primes[n-1].p) {
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
