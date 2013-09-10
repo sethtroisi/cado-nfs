@@ -31,11 +31,29 @@ from string import Template
 from io import BytesIO
 from workunit import Workunit
 
-if sys.version_info[0] == 3 and sys.version_info[1] < 4:
-    # In Python 3.[012], use a fixed BytesGenerator which accepts a bytes 
-    # input. The fact that the BytesGenerator in Python 3.[012] doesn't 
-    # is a bug, see http://bugs.python.org/issue16564
+# In Python 3.0, 3.1, 3.2.x < 3.2.4, 3.3.x < 3.3.1, use a fixed BytesGenerator
+# which accepts a bytes input. The fact that the BytesGenerator in these Python
+# versions doesn't is a bug, see http://bugs.python.org/issue16564
+# Update: the first bugfix committed in that bugtracker and shipped in Python
+# versions 3.2.4, 3.2.5, 3.3.2 is still buggy, and we have to use a different
+# work-around...
+
+# These Python version have bug type #1
+BUGGY_MIMEENCODER1 = (
+    (3,0,0), (3,0,1),
+    (3,1,0), (3,1,1), (3,1,2), (3,1,3), (3,1,4), (3,1,5),
+    (3,2,0), (3,2,1), (3,2,2), (3,2,3),
+    (3,3,0)
+)
+# These Python version have bug type #2
+BUGGY_MIMEENCODER2 = (
+    (3,2,4), (3,2,5),
+    (3,3,2)
+)
+
+if tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER1:
     class FixedBytesGenerator(email.generator.BytesGenerator):
+        bug_type = BUGGY_MIMEENCODER1
         # pylint: disable=W0232
         # pylint: disable=E1101
         # pylint: disable=E1102
@@ -53,14 +71,36 @@ if sys.version_info[0] == 3 and sys.version_info[1] < 4:
                 # Payload is neither bytes nor string - this can't be right
                 raise TypeError('bytes payload expected: %s' % type(payload))
         _writeBody = _handle_bytes
+elif tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER2:
+    import re
+    from email.utils import _has_surrogates
+
+    fcre = re.compile(r'^From ', re.MULTILINE)
+    class FixedBytesGenerator(email.generator.BytesGenerator):
+        bug_type = BUGGY_MIMEENCODER2
+        # pylint: disable=W0232
+        # pylint: disable=E1101
+        # pylint: disable=E1102
+        # pylint: disable=E1002
+        def _handle_application(self, msg):
+            # If the string has surrogates the original source was bytes,
+            # so just write it back out.
+            if msg._payload is None:
+                return
+            if _has_surrogates(msg._payload) and \
+                    not self.policy.cte_type == '7bit':
+                if self._mangle_from_:
+                    msg._payload = fcre.sub(">From ", msg._payload)
+                # DON'T use _write_lines() here as that mangles data
+                self.write(msg._payload)
+            else:
+                super()._handle_text(msg)
 elif sys.version_info[0] == 2:
     # In Python 2.x, use the regular email generator
     # pylint: disable=C0103
     FixedBytesGenerator = email.generator.Generator
-elif tuple(sys.version_info[:2]) >= (3, 4):
-    # The tuple() guarantees a tuple >= tuple comparison; comparing 
-    # tuple>=list does not work as desired
-    # In Python >=3.3, use the bug-fixed bytes generator
+else:
+    # In other Python versions, use the (hopefully) bug-fixed bytes generator
     # pylint: disable=E1101
     # pylint: disable=C0103
     FixedBytesGenerator = email.generator.BytesGenerator
@@ -841,6 +881,12 @@ if __name__ == '__main__':
         logfile = "%s/%s.log" % (SETTINGS["WORKDIR"], SETTINGS["CLIENTID"])
         SETTINGS["LOGFILE"] = logfile
     logging.basicConfig(level=loglevel, filename=logfile)
+
+    generator_bug_type = getattr(FixedBytesGenerator, "bug_type", None)
+    if generator_bug_type is BUGGY_MIMEENCODER1:
+        logging.info("Using work-around #1 for buggy BytesGenerator")
+    elif generator_bug_type is BUGGY_MIMEENCODER2:
+        logging.info("Using work-around #2 for buggy BytesGenerator")
 
     client_ok = True
     while client_ok:
