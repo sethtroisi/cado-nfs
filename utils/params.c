@@ -363,9 +363,12 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
 
 int param_list_configure_switch(param_list pl, const char * switchname, int * ptr)
 {
+    /* Some switches are passed as switchname = "switch", some as "-switch",
+       and some as "--switch" ... */
+    int offset = (switchname[0] == '-') ? (switchname[1] == '-' ? 2 : 1) : 0;
     ASSERT_ALWAYS(switchname != NULL);
     if (pl->use_doc)
-        if (!is_documented_key(pl, 1+switchname))
+        if (!is_documented_key(pl, offset+switchname))
             fprintf(stderr, "# Warning: a switch %s is declared but is undocumented\n", switchname);
 
     if ((pl->nswitches + 1) >= pl->nswitches_alloc) {
