@@ -552,7 +552,7 @@ class FreeRel(Program):
                  renumber: Parameter(is_output_file = True),
                  lpbr: Parameter(),
                  lpba: Parameter(),
-                 out: Parameter(is_output_file = True) = None,
+                 out: Parameter(is_output_file = True),
                  badideals: Parameter(is_output_file = True) = None,
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,

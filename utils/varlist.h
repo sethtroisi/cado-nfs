@@ -5,8 +5,17 @@
    Macros for variable-length lists with iterator protocol.
 */
 
+#ifdef TESTDRIVE
+#include "cado.h"
+#endif
+
 /* Need size_t */
 #include <stdlib.h>
+
+#ifdef TESTDRIVE
+#include <stdio.h>
+#include "macros.h"
+#endif
 
 
 /*
@@ -19,7 +28,7 @@
 #define VARLIST_DECLARE(__type) \
   struct { \
     __type *entries; \
-    size_t alloc, len, typesize; \
+    size_t alloc, len; \
   } \
 
 
@@ -33,7 +42,6 @@
     (__list).entries = NULL; \
     (__list).alloc = 0; \
     (__list).len = 0; \
-    (__list).typesize = sizeof((__list).entries[0]); \
   } while (0) \
 
 
@@ -50,7 +58,7 @@
       else \
         (__list).alloc *= 2; \
       (__list).entries = realloc((__list).entries, \
-                                 (__list).alloc * (__list).typesize); \
+                                 (__list).alloc * sizeof((__list).entries[0])); \
       ASSERT_ALWAYS((__list).entries != NULL); \
     } \
     (__list).entries[(__list).len++] = (__value); \
@@ -88,7 +96,6 @@
     (__list).entries = NULL; \
     (__list).alloc = 0; \
     (__list).len = 0; \
-    (__list).typesize = 0; \
   } while (0)\
 
 
@@ -99,6 +106,7 @@
 
     VARLIST_DECLARE(int) buffer;
     VARLIST_ITERATOR_DECLARE(int) iterator;
+
 */
 
 #define VARLIST_ITERATOR_DECLARE(__type) \
@@ -161,37 +169,38 @@
   } while (0) \
 
 
-#if 0
+#ifdef TESTDRIVE
 /* Example code: */
-
-#include "cado.h"
-#include <stdio.h>
-
-#include "macros.h"
-#include "varlist.h"
-
 
 int main() {
   /* Declare a list of int elements */
   VARLIST_DECLARE(int) intbuf;
-  /* Declare a pointer to a list of strings */
+
+  /* Declare a pointer to a variable-length-list of strings */
   VARLIST_DECLARE(char *) *strbuf;
+
   /* Declare an iterator over a list of strings */
   VARLIST_ITERATOR_DECLARE(char *) striter;
 
-  /* Simple example, varlist storage is allocated in declaration */
+  /* 1. Simple example, storage for the varlist strict is allocated in
+     definition */
   VARLIST_INIT(intbuf);
+
   /* Append some int values */
   VARLIST_APPEND(intbuf, 1);
   VARLIST_APPEND(intbuf, 2);
   VARLIST_SET(intbuf, 2, 42);
   VARLIST_SET(intbuf, 2, 3);
   ASSERT_ALWAYS(VARLIST_GET(intbuf, 2) == 3);
-  /* Done */
+  /* Done, free the memory allocated for the varlist array */
   VARLIST_CLEAR(intbuf);
 
-  /* Varlist storage is allocated with malloc and is passed around as pointer */
-  strbuf = malloc(sizeof(*strbuf));
+  /* 2. Varlist struct has its storage allocated with malloc and is passed
+     around as pointer */
+  strbuf = malloc(sizeof(*strbuf)); /* The varlist struct is never declared as
+                                       a named type, so we have to resort to
+                                       taking the size of the pointed-to
+                                       object */
   VARLIST_INIT(*strbuf);
   /* Append some strings */
   VARLIST_APPEND(*strbuf, "a");

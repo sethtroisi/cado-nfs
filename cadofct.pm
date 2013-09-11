@@ -2153,11 +2153,10 @@ sub do_freerels {
               "-lpbr $param{'lpbr'} ".
               "-lpba $param{'lpba'} ".
               "-renumber $param{'prefix'}.renumber.gz ".
-              "> $param{'prefix'}.freerels ";
+              "-out $param{'prefix'}.freerels.gz ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.freerel.log" });
-	cmd("gzip $param{'prefix'}.freerels");
     $tab_level--;
 }
 
