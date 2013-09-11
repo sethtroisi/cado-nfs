@@ -81,8 +81,6 @@ struct ifb_locking_lightweight {/*{{{*/
  * mechanism specified by the template class.  */
 template<typename locking, int n>
 struct inflight_rels_buffer {
-    typedef locking param_locking;
-    static const int param_n = n;
     barrier_t sync_point[1];
     earlyparsed_relation * rels;        /* always malloc()-ed to SIZE_BUF_REL,
                                            which is a power of two */
@@ -221,8 +219,16 @@ inflight_rels_buffer<locking, n>::schedule(int k)
     size_t a = k ? 0 : SIZE_BUF_REL;
     /* in 1-thread scenario, scheduled[k] == completed[k] */
     locking::lock(m + prev);
-    while((s=scheduled[k]) == a + completed[prev]) {
-        locking::wait(bored + prev, m + prev);
+    if (locking::max_supported_concurrent == 1) {       /* static check */
+        /* can't change */
+        s=scheduled[k];
+        while(s == a + completed[prev]) {
+            locking::wait(bored + prev, m + prev);
+        }
+    } else {
+        while((s=scheduled[k]) == a + completed[prev]) {
+            locking::wait(bored + prev, m + prev);
+        }
     }
     /* when completed[prev] == SIZE_MAX, the previous-level workers
      * are creating spuriouss relation created to trigger termination.
@@ -236,12 +242,15 @@ inflight_rels_buffer<locking, n>::schedule(int k)
         /* we emulate the equivalent of ::complete(), and terminate */
         locking::lock(m + k);
         size_t c = completed[k];
-        for( ; c < s ; c++) {
-            if (level_processed[c & (SIZE_BUF_REL-1)] < k)
-                break;
+        if (locking::max_supported_concurrent == 1) {       /* static check */
+            ASSERT_ALWAYS(c == s);
+        } else {
+            for( ; c < s ; c++) {
+                if (level_processed[c & (SIZE_BUF_REL-1)] < k)
+                    break;
+            }
+            completed[k] = c;
         }
-        // fprintf(stderr, "level-%d thread (among last %d) closing, catching up for %lu unmarked finished slots\n", k, active[k], c - completed[k]);
-        completed[k] = c;
         active[k]--;
         locking::signal_broadcast(bored + k);
         locking::unlock(m + k);
@@ -249,51 +258,14 @@ inflight_rels_buffer<locking, n>::schedule(int k)
     }
     // ASSERT(scheduled[k] < a + completed[prev]);
     scheduled[k]++;
-    int slot = s & (SIZE_BUF_REL - 1);
+    size_t slot = s & (SIZE_BUF_REL - 1);
     earlyparsed_relation_ptr rel = rels[slot];
-    /* XXX I have seen the following assert fail (at k==1 with multiple
-     * level-1 readers. level_processed[slot] was at -1...
-     */
-    ASSERT(!locking::isposix() || !k || level_processed[slot] == (int8_t)(k-1));
+    ASSERT(!k || level_processed[slot] == (int8_t)(k-1));
     level_processed[slot] = k-1;
     locking::unlock(m + prev);
     return rel;
 }
 /*}}}*/
-/*{{{ ::schedule() (fast case) */
-template<>
-earlyparsed_relation_ptr
-inflight_rels_buffer<ifb_locking_lightweight, 1>::schedule(int k)
-{
-    typedef ifb_locking_lightweight locking;
-    const int n = 1;
-    int prev = k ? (k-1) : (n-1);
-    ASSERT(active[k] <= locking::max_supported_concurrent);
-    locking::lock(m + prev);
-    size_t c;
-    size_t a = k ? 0 : SIZE_BUF_REL;
-    /* in 1-thread scenario, scheduled[k] == completed[k] */
-        c=scheduled[k];
-        while(c == a + completed[prev]) {
-            locking::wait(bored + prev, m + prev);
-        }
-    /* m+prev acquired */
-    if (UNLIKELY(completed[prev] == SIZE_MAX)) {
-        locking::lock(m + k);
-        scheduled[k]--;
-        active[k]--;
-        locking::signal(bored + k); /* awake waiting clear() */
-        locking::unlock(m + k);
-        return NULL;
-    } else {
-        ASSERT(scheduled[k] < a + completed[prev]);
-    }
-    scheduled[k]++;
-    locking::unlock(m + prev);
-    int slot = c & (SIZE_BUF_REL - 1);
-    earlyparsed_relation_ptr rel = rels[slot];
-    return rel;
-}/*}}}*/
 /*{{{ ::complete() (generic)*/
 template<typename locking, int n>
 void
@@ -302,6 +274,15 @@ inflight_rels_buffer<locking, n>::complete(int k,
 {
     ASSERT(active[k] <= locking::max_supported_concurrent);
 
+    if (locking::max_supported_concurrent == 1) {       /* static check */
+        locking::lock(m + k);
+        size_t slot = completed[k] & (SIZE_BUF_REL - 1);
+        completed[k]++;
+        level_processed[slot]++;
+        locking::signal(bored + k);
+        locking::unlock(m + k);
+        return;
+    }
     int slot = rel - (earlyparsed_relation_srcptr) rels;
 
     /* recover the integer relation number being currently processed from
@@ -336,24 +317,13 @@ inflight_rels_buffer<locking, n>::complete(int k,
     }
     completed[k] = c + (c == zslot);
     level_processed[slot]++;
-    ASSERT(level_processed[slot] == (int8_t) k);
+    if(level_processed[slot] != (int8_t) k) {
+        fprintf(stderr, "Argh, assertion failed ; level_processed[%d] = %d ?\n",
+                slot, k);
+        abort();
+    }
+
     locking::signal_broadcast(bored + k);
-    locking::unlock(m + k);
-}
-/*}}}*/
-/* {{{ ::complete() (fast case) */
-template<>
-void
-inflight_rels_buffer<ifb_locking_lightweight, 1>::complete(int k,
-        earlyparsed_relation_srcptr rel MAYBE_UNUSED)
-{
-    ASSERT(active[k] == 1);
-
-    typedef ifb_locking_lightweight locking;
-
-    locking::lock(m + k);
-    completed[k]++;
-    locking::signal(bored + k);
     locking::unlock(m + k);
 }
 /*}}}*/
