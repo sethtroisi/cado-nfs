@@ -367,7 +367,7 @@ class WuMIMEMultipart(MIMEMultipart):
             logging.debug("Headers of mimedata as a dictionary: %s", 
                           dict(self.items()))
         bio = BytesIO()
-        gen = FixedBytesGenerator(bio)
+        gen = FixedBytesGenerator(bio, mangle_from_=False)
         gen.flatten(self, unixfrom=False)
         postdata = bio.getvalue() + b"\n"
         if debug >= 2:
