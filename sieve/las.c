@@ -827,6 +827,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     if (las->nb_threads <= 0) {
 	fprintf(stderr,
 		"Error, please provide a positive number of threads\n");
+	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     /* }}} */
@@ -836,11 +837,15 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     if ((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
         fprintf(stderr, "Error: -poly is missing\n");
         param_list_print_usage(pl, NULL, stderr);
+	cado_poly_clear(las->cpoly);
+	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
 
     if (!cado_poly_read(las->cpoly, tmp)) {
 	fprintf(stderr, "Error reading polynomial file %s\n", tmp);
+	cado_poly_clear(las->cpoly);
+	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
 
@@ -851,6 +856,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     if (las->cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
+	cado_poly_clear(las->cpoly);
+	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     /* }}} */
@@ -892,6 +899,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     if (!seen) {
         fprintf(stderr, "Error: options -I, -rlim, -lpbr, -mfbr, -rlambda,"
                 " -alim, -lpba, -mfba, -alambda are mandatory.\n");
+	cado_poly_clear(las->cpoly);
+	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
 
@@ -909,7 +918,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
             fprintf(stderr, "%s: %s\n", filename, strerror(errno));
             /* There's no point in proceeding, since it would really change
              * the behaviour of the program to do so */
-            exit(1);
+            cado_poly_clear(las->cpoly);
+            param_list_clear(pl);
+            exit(EXIT_FAILURE);
         }
     }
     /* }}} */
