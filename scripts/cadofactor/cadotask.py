@@ -1359,7 +1359,12 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderr(0)
-        assert not stderrfilename is None
+        if  stderrfilename is None:
+            self.logger.error("No stderr output received for workunit %s,"
+                              "ignoring (relations file: %s)",
+                              identifier, output_files[0])
+            self.verification(message, False, commit=True)
+            return
         rels = self.parse_rel_count(stderrfilename)
         if rels is None:
             self.verification(message, False, commit=True)
