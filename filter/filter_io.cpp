@@ -141,7 +141,7 @@ struct status_table {
 
 template<>
 struct status_table<ifb_locking_lightweight> {
-    typedef typename ifb_locking_lightweight::critical_datatype<size_t>::t csize_t;
+    typedef ifb_locking_lightweight::critical_datatype<size_t>::t csize_t;
     inline void catchup(csize_t & last_completed, size_t last_scheduled, int) {
         ASSERT_ALWAYS(last_completed == last_scheduled);
     }
