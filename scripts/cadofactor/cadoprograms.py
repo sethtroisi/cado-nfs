@@ -219,7 +219,7 @@ class Program(object, metaclass=InspectType):
 
     path = '.'
     subdir = ""
-    paramnames = ("execpath", "execsubdir", "execbin")
+    paramnames = ("execpath", "execsubdir", "execbin", "runprefix")
     # These should be abstract properties, but we want to reference them as
     # class attributes, which properties can't. Ergo dummy variables
     binary = None
@@ -233,7 +233,7 @@ class Program(object, metaclass=InspectType):
     def __init__(self, options, stdin = None,
                  stdout = None, append_stdout = False, stderr = None,
                  append_stderr = False, background = False, execpath = None,
-                 execsubdir = None, execbin = None):
+                 execsubdir = None, execbin = None, runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
         from the cadoaprams.Parameters instance parameters.
 
@@ -283,6 +283,7 @@ class Program(object, metaclass=InspectType):
         self.append_stdout = append_stdout
         self.stderr = stderr
         self.append_stderr = append_stderr
+        self.runprefix = runprefix
 
         # If we are to run in background, we add " &" to the command line.
         # We require that stdout and stderr are redirected to files.
@@ -409,7 +410,10 @@ class Program(object, metaclass=InspectType):
     def make_command_array(self, binpath = None, inputpath = None,
                            outputpath = None):
         # Begin command line with program to execute
-        command = [self.translate_path(self.get_exec_file(), binpath)]
+        command = []
+        if not self.runprefix is None:
+            command.append(self.runprefix)
+        command.append(self.translate_path(self.get_exec_file(), binpath))
 
         # Add keyword command line parameters, then positional parameters
         parameters = self.init_signature.kwonlyargs + self.init_signature.args
