@@ -697,23 +697,28 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             return None
         return self.workdir.path_in_workdir(self.state[key])
 
-    def make_std_paths(self, progname):
+    def make_std_paths(self, progname, do_increment=True):
         count = self.state.get("stdiocount", 0)
+        if do_increment:
+            count += 1
+        did_increment = do_increment
         while True:
             try:
-                count += 1
                 stdoutname = "%s.stdout.%d" % (progname, count)
                 stderrname = "%s.stderr.%d" % (progname, count)
                 self.check_files_exist((stdoutname, stderrname), "stdio",
                                        shouldexist=False)
             except IOError:
-                self.logger.warning("Stdout and stderr files with index %d "
+                count += 1
+                did_increment = True
+                self.logger.warning("Stdout or stderr files with index %d "
                                     "already exist", count)
             else:
                 break
-        self.state["stdiocount"] = count
         stdoutpath = self.workdir.make_filename(stdoutname)
         stderrpath = self.workdir.make_filename(stderrname)
+        if did_increment:
+            self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
     
     def init_stats(self):
@@ -1672,7 +1677,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                          commit=True)
             del(self.slice_relcounts[str(i)])
             name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
-            (stdoutpath, stderrpath) = self.make_std_paths(name)
+            (stdoutpath, stderrpath) = \
+                self.make_std_paths(name, do_increment=(i == 0))
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
