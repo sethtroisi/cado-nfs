@@ -106,7 +106,7 @@ struct status_table {
      * giving me this relation to process).
      */
     inline void catchup_until_mine_completed(csize_t & last_completed, size_t me, int level) {
-        size_t slot = me & SIZE_BUF_REL;
+        size_t slot = me & (SIZE_BUF_REL-1);
         size_t c = last_completed;
         ASSERT(x[slot] == (int8_t) (level-1));
         /* The big question is how far we should go. By not exactly answering
