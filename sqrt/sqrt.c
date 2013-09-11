@@ -1123,14 +1123,30 @@ void create_dependencies(const char * prefix, const char * indexname, const char
 }
 
 
-void usage(const char * me)
+void declare_usage(param_list pl)
 {
-    fprintf(stderr, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -prefix prefix -dep numdep", me);
-    fprintf(stderr, " -purged purgedname -index indexname -ker kername\n");
-    fprintf(stderr, "or %s (-rat || -alg || -gcd) -poly polyname -prefix prefix -dep numdep\n\n", me);
-    fprintf(stderr, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
-    fprintf(stderr, " rational sqrt in 'prefix.rat.numdep' ...\n");
-    exit(1);
+    param_list_decl_usage(pl, "poly", "Polynomial file");
+    param_list_decl_usage(pl, "purged", "Purged relations file, as produced by 'purge'");
+    param_list_decl_usage(pl, "index", "Index file, as produced by 'merge'");
+    param_list_decl_usage(pl, "ker", "Kernel file, as produced by 'characters'");
+    param_list_decl_usage(pl, "prefix", "File name prefix used for output files");
+    param_list_decl_usage(pl, "ab", "(switch) For each dependency, create file with the a,b-values of the relations used in that dependency");
+    param_list_decl_usage(pl, "rat", "(switch) Compute square root for the rational side and store in file");
+    param_list_decl_usage(pl, "alg", "(switch) Compute square root for the algebraic side and store in file");
+    param_list_decl_usage(pl, "gcd", "(switch) Compute gcd of the two square roots. Requires alg and rat square roots");
+    param_list_decl_usage(pl, "dep", "The number of the dependency for which to compute square roots");
+    param_list_decl_usage(pl, "v", "More verbose output");
+}
+
+void usage(param_list pl, const char * argv0, FILE *f)
+{
+    param_list_print_usage(pl, argv0, f);
+    fprintf(f, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -prefix prefix -dep numdep", argv0);
+    fprintf(f, " -purged purgedname -index indexname -ker kername\n");
+    fprintf(f, "or %s (-rat || -alg || -gcd) -poly polyname -prefix prefix -dep numdep\n\n", argv0);
+    fprintf(f, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
+    fprintf(f, " rational sqrt in 'prefix.rat.numdep' ...\n");
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[])
@@ -1147,6 +1163,7 @@ int main(int argc, char *argv[])
 
     param_list pl;
     param_list_init(pl);
+    declare_usage(pl);
 
     int opt_ab = 0;
     int opt_rat = 0;
@@ -1161,11 +1178,11 @@ int main(int argc, char *argv[])
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
         if (strcmp(*argv, "--help") == 0) {
-            usage(me);
+            usage(pl, me, stderr);
             exit(0);
         } else {
             fprintf(stderr, "unexpected argument: %s\n", *argv);
-            usage(me);
+            usage(pl, me, stderr);
             exit(1);
         }
     }
