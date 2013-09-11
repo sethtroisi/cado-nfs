@@ -77,6 +77,81 @@ struct ifb_locking_lightweight {/*{{{*/
 };
 /*}}}*/
 
+/* {{{ status table (utility for inflight_rels_buffer.
+ *
+ * In fact, when we use simple busy waits, we are restricted to
+ * scheduled[k]==completed[k]+(0 or 1), and keeping track of the
+ * processing level is useless. So we provide a trimmed-down
+ * specialization for this case.
+ *
+ * the status table depends on the maximum number of threads per step. We
+ * make it depend on the locking backend instead, for simplicity. */
+template<typename locking>
+struct status_table {
+    typedef typename locking::template critical_datatype<size_t>::t csize_t;
+    typename locking::template critical_datatype<int8_t>::t x[SIZE_BUF_REL];
+    /* {{{ ::catchup() (for ::schedule() termination) */
+    inline void catchup(csize_t & last_completed, size_t last_scheduled, int level) {
+        size_t c = last_completed;
+        for( ; c < last_scheduled ; c++) {
+            if (x[c & (SIZE_BUF_REL-1)] < level)
+                break;
+        }
+        last_completed = c;
+    }
+    /*}}}*/
+    /*{{{ ::catchup_until_mine_completed() (for ::complete()) */
+    /* (me) is the absolute relation index of the relation I'm currently
+     * processing (the value of schedule[k] when it was called prior to
+     * giving me this relation to process).
+     */
+    inline void catchup_until_mine_completed(csize_t & last_completed, size_t me, int level) {
+        size_t slot = me & SIZE_BUF_REL;
+        size_t c = last_completed;
+        ASSERT(x[slot] == (int8_t) (level-1));
+        /* The big question is how far we should go. By not exactly answering
+         * this question, we avoid the reading of scheduled[k], which is good
+         * because it is protected by m[k-1]. And even if we could consider
+         * doing a rwlock for reading this, it's too much burden. So we leave
+         * open the possibility that many relation slots ahead of us already
+         * have x[slot] set to k, yet we do not increment
+         * completed[k] that far. This will be caught later on by further
+         * processing at this level.
+         *
+         * This logic is problematic regarding termination, though. See the
+         * termination code in ::complete()
+         */
+        for( ; c < me ; c++) {
+            if (x[c & (SIZE_BUF_REL-1)] < level)
+                break;
+        }
+        last_completed = c + (c == me);
+        x[slot]++;
+        ASSERT(x[slot] == (int8_t) (level));
+    }
+    /*}}}*/
+    inline void update_shouldbealreadyok(size_t slot, int level) {
+        if (level < 0) {
+            x[slot & (SIZE_BUF_REL-1)]=level;
+        } else {
+            ASSERT(x[slot & (SIZE_BUF_REL-1)] == level);
+        }
+    }
+};
+
+template<>
+struct status_table<ifb_locking_lightweight> {
+    typedef typename ifb_locking_lightweight::template critical_datatype<size_t>::t csize_t;
+    inline void catchup(csize_t & last_completed, size_t last_scheduled, int) {
+        ASSERT_ALWAYS(last_completed == last_scheduled);
+    }
+    inline void catchup_until_mine_completed(csize_t & last_completed, size_t, int) {
+        last_completed++;
+    }
+    inline void update_shouldbealreadyok(size_t, int) {}
+};
+/* }}} */
+
 /* {{{ inflight_rels_buffer: n-level buffer, with underyling locking
  * mechanism specified by the template class.  */
 template<typename locking, int n>
@@ -89,7 +164,7 @@ struct inflight_rels_buffer {
      */
     typename locking::template critical_datatype<size_t>::t completed[n];
     typename locking::template critical_datatype<size_t>::t scheduled[n];
-    typename locking::template critical_datatype<int8_t>::t level_processed[SIZE_BUF_REL];
+    status_table<locking> status;
     typename locking::lock_t m[n];
     typename locking::cond_t bored[n];
     int active[n];     /* number of active threads */
@@ -200,6 +275,7 @@ inflight_rels_buffer<locking, n>::~inflight_rels_buffer()
     memset(this, 0, sizeof(*this));
 }
 /*}}}*/
+
 /*{{{ ::schedule() (generic) */
 /* Schedule a new relation slot for processing at level k.
  *
@@ -241,16 +317,7 @@ inflight_rels_buffer<locking, n>::schedule(int k)
         locking::unlock(m + prev);
         /* we emulate the equivalent of ::complete(), and terminate */
         locking::lock(m + k);
-        size_t c = completed[k];
-        if (locking::max_supported_concurrent == 1) {       /* static check */
-            ASSERT_ALWAYS(c == s);
-        } else {
-            for( ; c < s ; c++) {
-                if (level_processed[c & (SIZE_BUF_REL-1)] < k)
-                    break;
-            }
-            completed[k] = c;
-        }
+        status.catchup(completed[k], s, k);
         active[k]--;
         locking::signal_broadcast(bored + k);
         locking::unlock(m + k);
@@ -260,12 +327,12 @@ inflight_rels_buffer<locking, n>::schedule(int k)
     scheduled[k]++;
     size_t slot = s & (SIZE_BUF_REL - 1);
     earlyparsed_relation_ptr rel = rels[slot];
-    ASSERT(!k || level_processed[slot] == (int8_t)(k-1));
-    level_processed[slot] = k-1;
+    status.update_shouldbealreadyok(s, k-1);
     locking::unlock(m + prev);
     return rel;
 }
 /*}}}*/
+
 /*{{{ ::complete() (generic)*/
 template<typename locking, int n>
 void
@@ -273,56 +340,30 @@ inflight_rels_buffer<locking, n>::complete(int k,
         earlyparsed_relation_srcptr rel)
 {
     ASSERT(active[k] <= locking::max_supported_concurrent);
-
-    if (locking::max_supported_concurrent == 1) {       /* static check */
-        locking::lock(m + k);
-        size_t slot = completed[k] & (SIZE_BUF_REL - 1);
-        completed[k]++;
-        level_processed[slot]++;
-        locking::signal(bored + k);
-        locking::unlock(m + k);
-        return;
-    }
     int slot = rel - (earlyparsed_relation_srcptr) rels;
 
-    /* recover the integer relation number being currently processed from
-     * the one modulo SIZE_BUF_REL.
-     *
-     * We have (using ck = completed[k]):
-     *          ck <= zs < ck + N
-     *          ck <= s+xN < ck + N <= s+(x+1)N
-     *          xN < ck-s + N <= (x+1) N
-     *
-     */
     locking::lock(m + k);
-    size_t c = completed[k];
-    size_t zslot = ((completed[k] - slot + SIZE_BUF_REL - 1) & -SIZE_BUF_REL) + slot;
 
-    ASSERT(level_processed[slot] == (int8_t) (k-1));
-    /* The big question is how far we should go. By not exactly
-     * determining answering this question, we avoid the reading of
-     * scheduled[k], which is good because it is protected by m[k-1]. And
-     * even if we could consider doing a rwlock for reading this, it's
-     * too much burden. So we leave open the possibility that many
-     * relation slots ahead of us already have level_processed[slot] set
-     * to k, yet we do not increment completed[k] that far. This will be
-     * caught later on by further processing at this level.
-     *
-     * This logic is problematic regarding termination, though. See the
-     * termination code in ::complete()
-     */
-    for( ; c < zslot ; c++) {
-        if (level_processed[c & (SIZE_BUF_REL-1)] < k)
-            break;
-    }
-    completed[k] = c + (c == zslot);
-    level_processed[slot]++;
-    if(level_processed[slot] != (int8_t) k) {
-        fprintf(stderr, "Argh, assertion failed ; level_processed[%d] = %d ?\n",
-                slot, k);
-        abort();
+    size_t my_absolute_index;
+    if (locking::max_supported_concurrent == 1) {       /* static check */
+        my_absolute_index = completed[k];
+    } else {
+        /* recover the integer relation number being currently processed from
+         * the one modulo SIZE_BUF_REL.
+         *
+         * We have (using ck = completed[k]):
+         *          ck <= zs < ck + N
+         *          ck <= s+xN < ck + N <= s+(x+1)N
+         *          xN < ck-s + N <= (x+1) N
+         *
+         */
+        size_t c = completed[k];
+        my_absolute_index = slot;
+        my_absolute_index += ((c - slot + SIZE_BUF_REL - 1) & -SIZE_BUF_REL);
     }
 
+    /* morally, this is completed[k]++ */
+    status.catchup_until_mine_completed(completed[k], my_absolute_index, k);
     locking::signal_broadcast(bored + k);
     locking::unlock(m + k);
 }
