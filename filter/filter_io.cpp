@@ -88,7 +88,7 @@ struct ifb_locking_lightweight {/*{{{*/
  * make it depend on the locking backend instead, for simplicity. */
 template<typename locking>
 struct status_table {
-    typedef typename locking::template critical_datatype<size_t>::t csize_t;
+    typedef typename locking::critical_datatype<size_t>::t csize_t;
     typename locking::template critical_datatype<int8_t>::t x[SIZE_BUF_REL];
     /* {{{ ::catchup() (for ::schedule() termination) */
     inline void catchup(csize_t & last_completed, size_t last_scheduled, int level) {
