@@ -88,7 +88,7 @@ struct ifb_locking_lightweight {/*{{{*/
  * make it depend on the locking backend instead, for simplicity. */
 template<typename locking>
 struct status_table {
-    typedef typename locking::critical_datatype<size_t>::t csize_t;
+    typedef typename locking::template critical_datatype<size_t>::t csize_t;
     typename locking::template critical_datatype<int8_t>::t x[SIZE_BUF_REL];
     /* {{{ ::catchup() (for ::schedule() termination) */
     inline void catchup(csize_t & last_completed, size_t last_scheduled, int level) {
@@ -106,7 +106,7 @@ struct status_table {
      * giving me this relation to process).
      */
     inline void catchup_until_mine_completed(csize_t & last_completed, size_t me, int level) {
-        size_t slot = me & SIZE_BUF_REL;
+        size_t slot = me & (SIZE_BUF_REL-1);
         size_t c = last_completed;
         ASSERT(x[slot] == (int8_t) (level-1));
         /* The big question is how far we should go. By not exactly answering
@@ -141,7 +141,7 @@ struct status_table {
 
 template<>
 struct status_table<ifb_locking_lightweight> {
-    typedef typename ifb_locking_lightweight::template critical_datatype<size_t>::t csize_t;
+    typedef ifb_locking_lightweight::critical_datatype<size_t>::t csize_t;
     inline void catchup(csize_t & last_completed, size_t last_scheduled, int) {
         ASSERT_ALWAYS(last_completed == last_scheduled);
     }
