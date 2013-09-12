@@ -111,6 +111,7 @@ main (int argc, char *argv[])
     param_list pl;
     param_list_init (pl);
 
+    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
     argv++, argc--;
 
     for( ; argc ; ) {

@@ -76,6 +76,7 @@ static const unsigned char ugly[256] = {
 extern "C" {
 #endif
 
+extern int filter_rels_force_posix_threads;
 /*
  * A pointer to such a structure must be provided to filter_rels, and
  * termination is indicated by f==NULL. The function specified in the

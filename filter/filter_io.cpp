@@ -11,6 +11,11 @@
 #include "ringbuf.h"
 #include "barrier.h"
 
+/* This is a configuration variable which may be set by the caller (it's
+ * possible to bind it to a command-line argument)
+ */
+int filter_rels_force_posix_threads = 0;
+
 /*{{{ inflight buffer. See filter_io.tex for documentation. */
 
 /* macros for the two locking models */
@@ -1046,7 +1051,7 @@ index_t filter_rels2(char ** input_files,
     ASSERT_ALWAYS(n >= 2);
     /* Currently we only have had use for n==2 or n==3 */
 
-    if (n == 2 && !multi) {
+    if (n == 2 && !multi && !filter_rels_force_posix_threads) {
         typedef inflight_rels_buffer<ifb_locking_lightweight, 2> inflight_t;
         return filter_rels2_inner<inflight_t>(input_files, desc, earlyparse_needed_data, active, stats);
     } else if (n == 2) {

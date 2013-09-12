@@ -195,6 +195,7 @@ main (int argc, char * argv[])
     int abhexa = 0;
     param_list_configure_switch(pl, "ab", &only_ab);
     param_list_configure_switch(pl, "abhexa", &abhexa);
+    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
