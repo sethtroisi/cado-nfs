@@ -198,7 +198,11 @@ char **prepare_grouped_command_lines(char **list_of_files)
         size_t filenames_total_size = 0;
         char ** grouptail;
         for(grouptail = grouphead ; *grouptail ; grouptail++) {
-            if (!has_suffix(*grouptail, this_suffix->suffix))
+            const struct suffix_handler * other_suffix = r;
+            for (; other_suffix && other_suffix->suffix; other_suffix++)
+                if (has_suffix(*grouptail, other_suffix->suffix))
+                    break;
+            if (other_suffix != this_suffix)
                 break;
             /* Add 1 for a space */
             size_t ds = strlen(*grouptail) + 1;
