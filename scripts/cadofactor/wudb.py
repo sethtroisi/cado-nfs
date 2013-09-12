@@ -893,7 +893,7 @@ class WuAccess(object): # {
             "wuid": Workunit(wutext).get_id(),
             "wu": wutext,
             "status": WuStatus.AVAILABLE,
-            "timecreated": str(datetime.now())
+            "timecreated": str(datetime.utcnow())
             }
         if not priority is None:
             d["priority"] = priority
@@ -932,7 +932,7 @@ class WuAccess(object): # {
                 self.check(r[0])
             d = {"status": WuStatus.ASSIGNED, 
                  "assignedclient": clientid,
-                 "timeassigned": str(datetime.now())}
+                 "timeassigned": str(datetime.utcnow())}
             pk = self.mapper.getpk()
             self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
             result = r[0]["wu"]
@@ -969,7 +969,7 @@ class WuAccess(object): # {
         d = {"resultclient": clientid,
              "errorcode": errorcode,
              "failedcommand": failedcommand, 
-             "timeresult": str(datetime.now())}
+             "timeresult": str(datetime.utcnow())}
         if errorcode is None or errorcode == 0:
            d["status"] = WuStatus.RECEIVED_OK
         else:
@@ -996,7 +996,7 @@ class WuAccess(object): # {
         self._checkstatus(data, WuStatus.RECEIVED_OK)
         if DEBUG > 0:
             self.check(data)
-        d = {"timeverified": str(datetime.now())}
+        d = {"timeverified": str(datetime.utcnow())}
         d["status"] = WuStatus.VERIFIED_OK if ok else WuStatus.VERIFIED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
