@@ -202,8 +202,14 @@ char **prepare_grouped_command_lines(char **list_of_files)
                 break;
             /* Add 1 for a space */
             size_t ds = strlen(*grouptail) + 1;
+#ifdef HAVE_MINGW
+            /* no sysconf() under mingw, use a safe bet */
+            if (filenames_total_size + ds > (size_t) 8192)
+                break;
+#else
             if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX))
                 break;
+#endif
             filenames_total_size += ds;
         }
         filenames_total_size++; /* for '\0' */
@@ -315,7 +321,10 @@ fopen_maybe_compressed (const char * name, const char * mode)
 void
 fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
 #else
-void
+/* if we don't even have getrusage, then no fclose_maybe_compressed2 is
+ * exposed. Yet, we use one as a code shortcut
+ */
+static void
 fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
 #endif
 {

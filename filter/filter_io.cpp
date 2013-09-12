@@ -742,11 +742,15 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
          * prepare_grouped_command_lines, thus in fact be commands to be
          * passed through popen()
          */
-        struct rusage rus;
         FILE * f = cado_popen(*filename, "r");
         ssize_t rc = ringbuf_feed_stream(r, f);
+#ifdef  HAVE_GETRUSAGE
+        struct rusage rus;
         cado_pclose2(f, &rus);
         if (arg->stats) timingstats_dict_add(arg->stats, "feed-in", &rus);
+#else
+        cado_pclose(f);
+#endif
         if (rc < 0) {
             fprintf(stderr,
                     "%s: load error (%s) from\n%s\n",

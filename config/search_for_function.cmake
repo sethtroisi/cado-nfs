@@ -47,6 +47,7 @@ macro(search_for_function FUNCTION VARIABLE)
             else(CMAKE_REQUIRED_INCLUDES)
               set(sff_ADD_INCLUDES)
             endif(CMAKE_REQUIRED_INCLUDES)
+            # message(STATUS "Trying to compile with ${CMAKE_REQUIRED_DEFINITIONS} -DCOMPILE_DEFINITIONS:STRING=${MACRO_CHECK_FUNCTION_DEFINITIONS} and also ${sff_ADD_LIBRARIES} ${sff_ADD_INCLUDES}")
             try_compile(${VARIABLE}
               ${CMAKE_BINARY_DIR}
               ${CMAKE_ROOT}/Modules/CheckFunctionExists.c

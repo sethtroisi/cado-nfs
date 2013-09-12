@@ -1,6 +1,7 @@
 #ifndef CADO_UTILS_TIMING_H_
 #define CADO_UTILS_TIMING_H_
 
+#include "macros.h"     /* MAYBE_UNUSED */
 #include <stdint.h> /* for uint64_t */
 
 #ifdef  HAVE_GETRUSAGE
@@ -40,12 +41,12 @@ void timingstats_dict_add(timingstats_dict_ptr, const char * key, struct rusage 
 void timingstats_dict_add_mythread(timingstats_dict_ptr, const char * key);
 void timingstats_dict_add_myprocess(timingstats_dict_ptr, const char * key);
 #else   /* provide all of these as no-ops */
-static void timingstats_dict_init(timingstats_dict_ptr MAYBE_UNUSED) {}
-static void timingstats_dict_clear(timingstats_dict_ptr MAYBE_UNUSED) {}
-static void timingstats_dict_disp(timingstats_dict_ptr MAYBE_UNUSED) {}
-static void timingstats_dict_add(timingstats_dict_ptr, const char * key, struct rusage * r MAYBE_UNUSED) {}
-static void timingstats_dict_add_mythread(timingstats_dict_ptr, const char * key MAYBE_UNUSED) {}
-static void timingstats_dict_add_myprocess(timingstats_dict_ptr, const char * key MAYBE_UNUSED) {}
+static inline void timingstats_dict_init(timingstats_dict_ptr x MAYBE_UNUSED) {}
+static inline void timingstats_dict_clear(timingstats_dict_ptr x MAYBE_UNUSED) {}
+static inline void timingstats_dict_disp(timingstats_dict_ptr x MAYBE_UNUSED) {}
+// sta inline ic void timingstats_dict_add(timingstats_dict_ptr x MAYBE_UNUSED, const char * key MAYBE_UNUSED, void * r MAYBE_UNUSED) {}
+static inline void timingstats_dict_add_mythread(timingstats_dict_ptr x MAYBE_UNUSED, const char * key MAYBE_UNUSED) {}
+static inline void timingstats_dict_add_myprocess(timingstats_dict_ptr x MAYBE_UNUSED, const char * key MAYBE_UNUSED) {}
 #endif
 
 #ifdef __cplusplus

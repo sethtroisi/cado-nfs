@@ -71,16 +71,15 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
     # causes many prototypes and macros not to be defined. Using gnu99
     # prevents the definition of __STRICT_ANSI__
+    #
+    # Ditto for C++, with the c++98/gnu++98 subtlety.
     if (MINGW)
         set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        set (CMAKE_CXX_FLAGS "-std=gnu++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
     else (MINGW)
         set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+        set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
     endif (MINGW)
-    # we've been quite lenient so far on c++ standard conformance, and
-    # just used to pick what we found. c++98 is probably a small common
-    # denominator, in that it lacks the integration of many of the
-    # goodies we like from c99. But OTOH, c++11 is too new.
-    set (CMAKE_CXX_FLAGS "-std=c++98 -g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
 #####################################################################

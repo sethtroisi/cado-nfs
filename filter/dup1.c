@@ -98,9 +98,13 @@ void
 split_iter_open_next_file(split_output_iter_t *iter)
 {
   if (iter->file != NULL) {
+#ifdef  HAVE_GETRUSAGE
     struct rusage r[1];
     fclose_maybe_compressed2(iter->file, iter->filename, r);
     timingstats_dict_add(stats, iter->prefix, r);
+#else
+    fclose_maybe_compressed(iter->file, iter->filename);
+#endif
   }
 
   free (iter->filename);

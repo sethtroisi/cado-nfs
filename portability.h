@@ -98,6 +98,7 @@ static inline char * strndup(const char * const a, const size_t n)
 
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 #include "macros.h"
 
 static inline const char *

@@ -106,8 +106,6 @@ extern void fclose_maybe_compressed(FILE *, const char * name);
 #ifdef  HAVE_GETRUSAGE
 /* Same, but recovers the time taken by the underlying process */
 extern void fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * r);
-#else
-extern void fclose_maybe_compressed2 (FILE * f, const char * name, void *);
 #endif
 
 #ifdef __cplusplus
