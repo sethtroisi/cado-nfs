@@ -1337,6 +1337,10 @@ if __name__ == '__main__': # {
                         help = 'Return a result for wu from client')
     parser.add_argument('-test', action="store_true", 
                         help='Run some self tests')
+    parser.add_argument('-setdict', nargs = 4,
+                        metavar = ("dictname", "keyname", "type", "keyvalue"),
+                        help='Set an entry of a DB-backed dictionary')
+    
 
     for arg in queries:
         parser.add_argument('-' + arg, action="store_true", required = False)
@@ -1405,6 +1409,13 @@ if __name__ == '__main__': # {
                 for wu in wus:
                     print(wu[field])
 
+    # Dict manipulation
+    if args["setdict"]:
+        (name, keyname, itemtype, keyvalue) = args["setdict"]
+        # Type-cast value to the specified type
+        value =  getattr(__builtins__, itemtype)(keyvalue)
+        dbdict = DictDbAccess(dbname, name)
+        dbdict[keyname] = value
 
     # Functions for testing
     if args["assign"]:
