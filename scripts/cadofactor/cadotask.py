@@ -803,16 +803,6 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.logger.info("Cancelling remaining workunits")
         self.wuar.cancel_all_available()
     
-    def check_timedout_wus(self):
-        # Check at most once per minute
-        key = "last_check_timedout_wus"
-        last_check = self.state.get(key, None)
-        now = time.time()
-        if last_check is None or last_check + 60. < now:
-            # TODO
-            # self.wuar.timeout_wus(self.params.get("wu_timeout", 3600))
-            self.state[key] = now
-    
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
 
