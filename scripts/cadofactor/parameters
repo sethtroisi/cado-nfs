@@ -106,6 +106,15 @@ tasks.alambda=1.2
 tasks.threads=2
 
 
+# For tasks that use the client/server set-up, set a time-out in seconds
+# after which assigned workunits for which no result was returned get 
+# cancelled and re-submitted to the database, so that other clients can 
+# (hopefully) finish them
+
+# Workunits for this test factorization are quite short, 120s is ok
+tasks.wutimeout = 120
+
+
 # P, degree, admin, admax, adrange: Parameters for the polynomial search
 tasks.polyselect.P = 420
 tasks.polyselect.degree = 4

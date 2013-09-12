@@ -5,6 +5,7 @@ from fractions import gcd
 import abc
 import random
 import time
+import datetime
 from collections import OrderedDict
 from itertools import zip_longest
 from math import log, sqrt
@@ -16,6 +17,7 @@ import cadoprograms
 import cadoparams
 import cadocommand
 import wuserver
+from workunit import Workunit
 
 # Some parameters are provided by the param file but can change during
 # the factorization, like rels_wanted. On one hand, we want automatic
@@ -598,15 +600,25 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
     wu_paste_char = '_'
-    def make_wuname(self, identifier):
+    def make_wuname(self, identifier, attempt=None):
         assert not self.wu_paste_char in self.params["name"]
         assert not self.wu_paste_char in self.name
         assert not self.wu_paste_char in identifier
-        return self.wu_paste_char.join([self.params["name"], self.name,
-                                        identifier])
+        if attempt is None:
+            return self.wu_paste_char.join([self.params["name"], self.name,
+                                            identifier])
+        else:
+            assert isinstance(attempt, int)
+            return self.wu_paste_char.join([self.params["name"], self.name,
+                                            identifier, str(attempt)])
     
     def split_wuname(self, wuname):
-        return wuname.split(self.wu_paste_char)
+        arr = wuname.split(self.wu_paste_char)
+        if len(arr) == 3:
+            arr.append(None)
+        else:
+            arr[3] = int(arr[3])
+        return arr
     
     class ResultInfo(wudb.WuResultMessage):
         def __init__(self, wuid, rc, stdout, stderr, output_files):
@@ -661,12 +673,12 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             self.logger.debug("stderr is: %s", stderr)
         if output_files:
             self.logger.message("Output files are: %s", ", ".join(output_files))
-        (name, task, identifier) = self.split_wuname(wuid)
+        (name, task, identifier, attempt) = self.split_wuname(wuid)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
-            self.logger.debug("%s: Notification is not for me", self.name)
+            self.logger.message("Notification %s is not for me", wuid)
             return
-        self.logger.message("%s: Notification is for me", self.name)
+        self.logger.message("Notification %s is for me", wuid)
         return identifier
     
     def send_notification(self, key, value):
@@ -749,7 +761,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu",)
+        return super().paramnames + ("maxwu", "wutimeout")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -819,7 +831,48 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         # we might not need this poll. But they probably won't be totally
         # reliable
         if not self.send_request(Request.GET_WU_RESULT):
+            self.resubmit_timed_out_wus()
             time.sleep(1)
+    
+    def resubmit_one_wu(self, wu, commit=True):
+        """ Takes a Workunit instance and adds it to workunits table under
+        a modified name.
+        """
+        wuid = wu.get_id()
+        (name, task, identifier, attempt) = self.split_wuname(wuid)
+        attempt = 2 if attempt is None else attempt + 1
+        new_wuid = self.make_wuname(identifier, attempt)
+        wu.set_id(new_wuid)
+        self.logger.info("Resubmitting workunit %s as %s", wuid, new_wuid)
+        self.wuar.create(str(wu), commit=commit)
+
+    def resubmit_timed_out_wus(self):
+        # We don't store the lastcheck in state as we do *not* want to check
+        # instantly when we start up - clients should get a chance to upload
+        # results first
+        now = time.time()
+        if not hasattr(self, "last_timeout_check"):
+            self.logger.debug("Setting last timeout check to %f", now)
+            self.last_timeout_check = now
+            return
+        
+        check_every = 60 # Check every xx seconds
+        if self.last_timeout_check + check_every >= now:
+            # self.logger.info("It's not time to check yet, now = %f", now)
+            return
+        self.last_timeout_check = now
+        
+        timeout = int(self.params.get("wutimeout", 3600))
+        delta = datetime.timedelta(seconds=timeout)
+        cutoff = str(datetime.datetime.utcnow() - delta)
+        self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
+                          cutoff, now)
+        results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
+        if not results:
+            self.logger.debug("Found no timed-out workunits")
+        for entry in results:
+            self.resubmit_one_wu(Workunit(entry["wu"]), commit=False)
+            self.wuar.cancel(entry["wuid"], commit=True)
 
 
 class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
