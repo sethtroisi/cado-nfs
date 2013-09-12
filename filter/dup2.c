@@ -406,7 +406,10 @@ int check_whether_file_is_renumbered(const char * filename)
     unsigned int count = 0;
     char s[1024];
     FILE *f_tmp = fopen_maybe_compressed (filename, "rb");
-    ASSERT_ALWAYS(f_tmp != NULL);
+    if (!f_tmp) {
+        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+        abort();
+    }
 
     /* Look for first non-comment line */
     while (1) {
