@@ -406,6 +406,18 @@ static inline void realloc_buffer_primes(earlyparsed_relation_ptr buf)
 #endif
 }
 
+#define PARSER_ASSERT_ALWAYS(got, expect, sline, ptr) do {		\
+    if (UNLIKELY((got)!=(expect))) {					\
+        fprintf(stderr, "Parse error in %s at %s:%d\n"			\
+                "Expected character '%c', got '%c'"			\
+                " after reading %zd bytes from:\n"			\
+                "%s\n",							\
+                __func__,__FILE__,__LINE__,				\
+                expect, got, ptr - sline, sline);			\
+        abort();							\
+    }									\
+} while (0)
+
 /* decimal a,b is now an exception, and only for the first step of dup2
  * (when primes are not yet renumbered)
  *
@@ -427,7 +439,7 @@ static inline int earlyparser_inner_read_ab_withbase(ringbuf_ptr r, const char *
         w = w * base + v;
         RINGBUF_GET_ONE_BYTE(c, r, p);
     }
-    ASSERT_ALWAYS(c == ',');
+    PARSER_ASSERT_ALWAYS(c, ',', *pp, p);
     rel->a = negative ? -w : w;
     RINGBUF_GET_ONE_BYTE(c, r, p);
     for (w = 0; (v = ugly[c]) < base;) {
@@ -524,7 +536,7 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
         uint64_t pr;
         if (c == '\n') break;
         else if (c == ':') { last_prime = 0; side++; }
-        else ASSERT_ALWAYS(c==',');
+        else PARSER_ASSERT_ALWAYS(c, ',', r->rhead, p);
         c = earlyparser_inner_read_prime(r, &p, &pr);
         // not enforcing at the moment.
         // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
