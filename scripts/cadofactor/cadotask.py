@@ -924,17 +924,22 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         
-        if self.is_done():
-            self.logger.info("Polynomial selection already finished - "
-                             "nothing to do")
-            return not self.bestpoly is None
-        
         if not self.bestpoly is None:
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
         else:
             self.logger.info("No polynomial was previously found")
+        
+        if self.is_done():
+            self.logger.info("Polynomial selection already finished - "
+                             "nothing to do")
+            # If the poly file got lost somehow, write it again
+            filename = self.get_state_filename("polyfilename")
+            if filename is None or not os.path.isfile(str(filename)):
+                self.logger.warn("Polynomial file disappeared, writing again")
+                self.write_poly_file()
+            return True
         
         # Submit all the WUs we need to reach admax
         while self.need_more_wus():
