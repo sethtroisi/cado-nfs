@@ -118,8 +118,18 @@ class FilePath(object):
         self.filepath = filepath
     def __str__(self):
         return "%s%s%s" % (self.workdir, os.sep, self.filepath)
-    def get_relative(self):
+    def get_wdir_relative(self):
         return self.filepath
+    def isfile(self):
+        return os.path.isfile(str(self))
+    def isdir(self):
+        return os.path.isdir(str(self))
+    def mkdir(self):
+        os.mkdir(str(self))
+    def realpath(self):
+        return os.path.realpath(str(self))
+    def open(self, *args, **kwargs):
+        return open(str(self), *args, **kwargs)
 
 
 class WorkDir(object):
@@ -190,14 +200,14 @@ class WorkDir(object):
             return self._make_path(".%s" % name)
     
     def make_directories(self, subdirs = None):
-        dirname = str(self.make_dirname())
-        if not os.path.isdir(dirname):
-            os.mkdir(dirname)
+        dirname = self.make_dirname()
+        if not dirname.isdir():
+            dirname.mkdir()
         if subdirs:
             for subdir in subdirs:
-                dirname = str(self.make_dirname(subdir))
-                if not os.path.isdir(dirname):
-                    os.mkdir(dirname)
+                dirname = self.make_dirname(subdir)
+                if not dirname.isdir():
+                    dirname.mkdir()
         return
 
 
@@ -580,7 +590,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         return filename
 
     def test_outputfile_exists(self, filename):
-        return os.path.isfile(str(filename))
+        return filename.isfile()
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
@@ -590,7 +600,10 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         Raise IOError if any check fails, return None
         """
         for f in filenames:
-            exists = os.path.isfile(str(f))
+            if isinstance(f, FilePath):
+                exists = f.isfile()
+            else:
+                exists = os.path.isfile(f)
             if shouldexist and not exists:
                 raise IOError("%s file %s does not exist" % (filedesc, f))
             elif not shouldexist and exists:
@@ -936,7 +949,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
                              "nothing to do")
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
-            if filename is None or not os.path.isfile(str(filename)):
+            if filename is None or not filename.isfile():
                 self.logger.warn("Polynomial file disappeared, writing again")
                 self.write_poly_file()
             return True
@@ -1043,7 +1056,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
         self.bestpoly.create_file(filename, self.params)
-        self.state["polyfilename"] = filename.get_relative()
+        self.state["polyfilename"] = filename.get_wdir_relative()
     
     def get_poly(self):
         if not "bestpoly" in self.state:
@@ -1139,7 +1152,7 @@ class FactorBaseTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
-            self.state["outputfile"] = outputfilename.get_relative()
+            self.state["outputfile"] = outputfilename.get_wdir_relative()
             self.logger.info("Finished")
 
         self.check_files_exist([self.get_filename()], "output",
@@ -1225,8 +1238,8 @@ class FreeRelTask(Task):
             self.state.update(found)
             self.logger.info("Found %d free relations" % self.state["nfree"])
             
-            self.state["freerelfilename"] = freerelfilename.get_relative()
-            self.state["renumberfilename"] = renumberfilename.get_relative()
+            self.state["freerelfilename"] = freerelfilename.get_wdir_relative()
+            self.state["renumberfilename"] = renumberfilename.get_wdir_relative()
             self.logger.info("Finished")
 
         self.check_files_exist([self.get_freerel_filename(),
@@ -1539,7 +1552,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  **self.progparams[0])
                 else:
                     filelistname = self.workdir.make_filename("filelist")
-                    with open(str(filelistname), "w") as filelistfile:
+                    with filelistname.open("w") as filelistfile:
                         filelistfile.write("\n".join(newfiles) + "\n")
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  prefix=prefix,
@@ -1555,7 +1568,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                     # process failed, but that should raise a return code
                     # exception
                 assert message.get_stderr(0) is None
-                with open(str(stderrpath), "r") as stderrfile:
+                with stderrpath.open("r") as stderrfile:
                     stderr = stderrfile.read()
                 outfilenames = self.parse_output_files(stderr)
                 self.logger.debug("Output file names: %s", outfilenames)
@@ -1699,7 +1712,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              **self.progparams[0])
             else:
                 filelistname = self.workdir.make_filename("filelist")
-                with open(str(filelistname), "w") as filelistfile:
+                with filelistname.open("w") as filelistfile:
                     filelistfile.write("\n".join(files) + "\n")
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count,
@@ -1712,7 +1725,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             assert message.get_stderr(0) is None
-            with open(str(stderrpath), "r") as stderrfile:
+            with stderrpath.open("r") as stderrfile:
                 nr_rels = self.parse_remaining(stderrfile)
             # Mark input file names and output file names
             for f in files:
@@ -1843,7 +1856,7 @@ class PurgeTask(Task):
                                    **self.progparams[0])
         else:
             filelistname = self.workdir.make_filename("filelist")
-            with open(str(filelistname), "w") as filelistfile:
+            with filelistname.open("w") as filelistfile:
                 filelistfile.write("\n".join(files))
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
@@ -1854,15 +1867,15 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         assert message.get_stdout(0) is None
         assert message.get_stderr(0) is None
-        with open(str(stderrpath), "r") as stderrfile:
+        with stderrpath.open("r") as stderrfile:
             stderr = stderrfile.read()
-        with open(str(stdoutpath), "r") as stdoutfile:
+        with stdoutpath.open("r") as stdoutfile:
             stdout = stdoutfile.read()
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            self.state.update({"purgedfile": purgedfile.get_relative(),
+            self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
                                "input_nrels": input_nrels})
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
@@ -2078,15 +2091,15 @@ class MergeTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
-            if not os.path.isfile(str(indexfile)):
+            if not indexfile.isfile():
                 raise Exception("Output file %s does not exist" % indexfile)
-            if not os.path.isfile(str(mergedfile)):
+            if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
-            self.state["indexfile"] = indexfile.get_relative()
-            self.state["mergedfile"] = mergedfile.get_relative()
+            self.state["indexfile"] = indexfile.get_wdir_relative()
+            self.state["mergedfile"] = mergedfile.get_wdir_relative()
             densefilename = self.workdir.make_filename("small.dense.bin")
-            if os.path.isfile(str(densefilename)):
-                self.state["densefile"] = densefilename.get_relative()
+            if densefilename.isfile():
+                self.state["densefile"] = densefilename.get_wdir_relative()
             
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
         return True
@@ -2131,8 +2144,8 @@ class LinAlgTask(Task):
             self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
-            matrix = os.path.realpath(str(mergedfile))
-            wdir = os.path.realpath(str(workdir))
+            matrix = mergedfile.realpath()
+            wdir = workdir.realpath()
             p = cadoprograms.BWC(complete=True,
                                  matrix=matrix,  wdir=wdir, nullspace="left",
                                  stdout=str(stdoutpath),
@@ -2142,9 +2155,9 @@ class LinAlgTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir = True)
-            if not os.path.isfile(str(dependencyfilename)):
+            if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
-            self.state["dependency"] =  dependencyfilename.get_relative()
+            self.state["dependency"] =  dependencyfilename.get_wdir_relative()
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
         return True
 
@@ -2200,9 +2213,9 @@ class CharactersTask(Task):
             message = self.submit_command(p, "")
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            if not os.path.isfile(str(kernelfilename)):
+            if not kernelfilename.isfile():
                 raise Exception("Output file %s does not exist" % kernelfilename)
-            self.state["kernel"] = kernelfilename.get_relative()
+            self.state["kernel"] = kernelfilename.get_wdir_relative()
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return True
     
