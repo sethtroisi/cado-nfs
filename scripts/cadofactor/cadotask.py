@@ -862,7 +862,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return
         self.last_timeout_check = now
         
-        timeout = int(self.params.get("wutimeout", 3600))
+        timeout = int(self.params.get("wutimeout", 10800))
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
         self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
