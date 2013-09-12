@@ -78,27 +78,31 @@ class Workunit(object):
     
     def  __str__(self):
         """ Produce text for a WU, as could be stored in a WU file """
-        str = ""
+        result = ""
         for (key, keytype) in self.__class__.KEYS:
             if not key in self.wudata:
                 continue
             if not keytype.takes_value:
-                str = str + key + "\n"
+                result = result + key + "\n"
             elif not keytype.takes_multiple:
-                str = str + key + " " + self.wudata[key] + "\n"
+                result = result + key + " " + self.wudata[key] + "\n"
             elif keytype.takes_checksum:
                 for (name, checksum) in self.wudata[key]:
-                    str = str + key + " " + name + "\n"
+                    result = result + key + " " + name + "\n"
                     if not checksum == None:
-                        str = str + "CHECKSUM " + checksum + "\n"
+                        result = result + "CHECKSUM " + checksum + "\n"
             else:
                 for value in self.wudata[key]:
-                    str = str + key + " " + value + "\n"
-        return str
+                    result = result + key + " " + value + "\n"
+        return result
     
     def get_id(self):
         """ Get the Workunit ID """
         return self.wudata["WORKUNIT"]
+
+    def set_id(self, wuid):
+        """ Set the Workunit ID, overriding the old value """
+        self.wudata["WORKUNIT"] = wuid
 
     def get(self, *args, **kwargs):
         """ Delegates to the wudata dictionary """
