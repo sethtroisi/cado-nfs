@@ -453,15 +453,7 @@ class MakesTablenames(HasName):
         self.check_tablename(name)
         return name
 
-class HasDbConnection(wudb.DbAccess):
-    """ Gives sub-classes a db_connection attribute which is a database
-    connection instance.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.db_connection = self.get_db_connection()
-
-class HasState(MakesTablenames, HasDbConnection):
+class HasState(MakesTablenames, wudb.HasDbConnection):
     """ Declares that the class has a DB-backed dictionary in which the class
     can store state information.
     
@@ -473,7 +465,7 @@ class HasState(MakesTablenames, HasDbConnection):
         self.state = self.make_db_dict(name, connection=self.db_connection)
 
 
-class FilesCreator(MakesTablenames, HasDbConnection, metaclass=abc.ABCMeta):
+class FilesCreator(MakesTablenames, wudb.HasDbConnection, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
     some auxiliary information stored with each file (e.g., nr. of relations).
     This info is stored in the form of a DB-backed dictionary, with the file
@@ -508,14 +500,6 @@ class FilesCreator(MakesTablenames, HasDbConnection, metaclass=abc.ABCMeta):
     def forget_output_filenames(self, filenames, *, commit):
         self.output_files.clear(filenames, commit=commit)
 
-
-class UsesWorkunitDb(HasDbConnection):
-    """ Gives sub-classes a wuar attribute which is WuAccess instance, using
-    the sub-classes' shared database connection.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.wuar = self.make_wu_access(self.db_connection)
 
 class HasStatistics(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
@@ -762,7 +746,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         self.state.update(update, commit=commit)
 
 
-class ClientServerTask(Task, UsesWorkunitDb, patterns.Observer):
+class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
         return super().paramnames + ("maxwu",)

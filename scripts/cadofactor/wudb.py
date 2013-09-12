@@ -1201,6 +1201,24 @@ class DbAccess(object):
             return DbListener(db=connection)
 
 
+class HasDbConnection(DbAccess):
+    """ Gives sub-classes a db_connection attribute which is a database
+    connection instance.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_connection = self.get_db_connection()
+
+
+class UsesWorkunitDb(HasDbConnection):
+    """ Gives sub-classes a wuar attribute which is WuAccess instance, using
+    the sub-classes' shared database connection.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wuar = self.make_wu_access(self.db_connection)
+
+
 class DbWorker(DbAccess, threading.Thread):
     """Thread executing WuAccess requests from a given tasks queue"""
     def __init__(self, taskqueue, *args, daemon=None, **kwargs):
