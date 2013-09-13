@@ -2293,6 +2293,7 @@ class SqrtTask(Task):
             while not self.is_done():
                 self.state.setdefault("next_dep", 0)
                 dep = self.state["next_dep"]
+                self.logger.info("Trying dependency %d", dep)
                 p = cadoprograms.Sqrt(ab=False, rat=True,
                         alg=True, gcd=True, dep=dep, poly=polyfilename,
                         purged=purgedfilename, index=indexfilename,
