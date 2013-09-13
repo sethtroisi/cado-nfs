@@ -1416,7 +1416,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.logger.error("Number of relations message not found in "
                               "file %s", stderrfilename)
             return
-        self.state["rels_found"] += rels
+        update = {"rels_found": self.state["rels_found"] + rels}
+        self.state.update(update, commit=False)
         self.add_output_files({output_files[0]: rels}, commit=False)
         self.parse_stats(stderrfilename, commit=False)
         self.verification(message, True, commit=True)
