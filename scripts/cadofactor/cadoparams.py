@@ -128,6 +128,7 @@ class Parameters(object):
         "skip": int,
         "N": int,
         "nrclients": int,
+        "threads": int,
         "port": int
     }
 
@@ -485,7 +486,7 @@ DEFAULTS_OLD = (
     'degree         = 5',
     'polsel_nq      = 1000',
     'polsel_incr    = 60',
-    'polsel_admin   = 0',
+    # 'polsel_admin   = 0', # 0 is default anyway
     #'polsel_admax   = undef',
     'polsel_adrange = 1e7',
     'polsel_delay   = 120',
@@ -512,8 +513,8 @@ DEFAULTS_OLD = (
     'sievenice    = 19',
     'keeprelfiles = 0',
     'sieve_max_threads = 2',
-    'poly_max_threads = 1',
-    'ratq	 = 0',
+    # 'poly_max_threads = 1', # 1 is the default anyway
+    # 'ratq	 = 0', # 0 is the default anyway
 
     # filtering
     # 'skip         = -1', # should be about bwc_mn - 32
@@ -523,7 +524,7 @@ DEFAULTS_OLD = (
     'ratio        = 1.5',
     'bwstrat      = 3',
     'coverNmax    = 100',
-    'nslices_log  = 1',
+    # 'nslices_log  = 1', # 1 is the default anyway
     'filterlastrels = 1',
     # 'dup_rm = $on_mingw', # Give -rm parameter to dup2 when on MinGW
 
@@ -590,10 +591,9 @@ if __name__ == "__main__":
         filtered.reverse()
         
         for (key ,value, comment, oldkey) in filtered:
-            if  not key is None or oldkey is None:
-                output = []
-                if not key is None:
-                    output.append("%s = %s" % (key, value))
-                if not comment is None:
-                    output.append("#%s" % comment)
-                print("\t\t".join(output))
+            output = []
+            if not key is None:
+                output.append("%s = %s" % (key, value))
+            if not comment is None:
+                output.append("#%s" % comment)
+            print("\t\t".join(output))
