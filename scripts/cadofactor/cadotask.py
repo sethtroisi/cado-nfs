@@ -1261,12 +1261,11 @@ class FreeRelTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             stderr = message.get_stderr(0)
-            found = self.parse_file(stderr.decode("ascii").splitlines())
-            self.state.update(found)
+            update = self.parse_file(stderr.decode("ascii").splitlines())
+            update["freerelfilename"] = freerelfilename.get_wdir_relative()
+            update["renumberfilename"] = renumberfilename.get_wdir_relative()
+            self.state.update(update) 
             self.logger.info("Found %d free relations" % self.state["nfree"])
-            
-            self.state["freerelfilename"] = freerelfilename.get_wdir_relative()
-            self.state["renumberfilename"] = renumberfilename.get_wdir_relative()
             self.logger.info("Finished")
 
         self.check_files_exist([self.get_freerel_filename(),
@@ -1767,7 +1766,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                              nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
         self.update_ratio(input_nrel, self.get_nrels())
-        self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total",
                          self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
@@ -2123,11 +2121,12 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
-            self.state["indexfile"] = indexfile.get_wdir_relative()
-            self.state["mergedfile"] = mergedfile.get_wdir_relative()
+            update = {"indexfile": indexfile.get_wdir_relative(),
+                      "mergedfile": mergedfile.get_wdir_relative()}
             densefilename = self.workdir.make_filename("small.dense.bin")
             if densefilename.isfile():
-                self.state["densefile"] = densefilename.get_wdir_relative()
+                update["densefile"] = densefilename.get_wdir_relative()
+            self.state.update(update)
             
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
         return True
@@ -2137,11 +2136,10 @@ class MergeTask(Task):
     
     def get_merged_filename(self):
         return self.get_state_filename("mergedfile")
-
     
     def get_dense_filename(self):
         return self.get_state_filename("densefile")
-    
+
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
