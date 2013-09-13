@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Parameter file format
 
@@ -53,7 +55,7 @@ class Parameters(object):
         "bwc_mn": "tasks.linalg.mn",
         "bwc_shuffled_product": "tasks.linalg.shuffled_product",
         "bwmt": "tasks.linalg.bwc.threads",
-        "bwstrat": "tasks.filter.forbw",
+        "bwstrat": "tasks.filter.merge.forbw",
         "checkrange": None,
         "coverNmax": "tasks.merge.coverNmax",
         "degree": "tasks.polyselect.degree",
@@ -72,8 +74,8 @@ class Parameters(object):
         "lpbr": "lpbr",
         "machines": None, # FIXME: how to handle this?
         "maxlevel": "tasks.filter.maxlevel",
-        "mfba": "mfba",
-        "mfbr": "mfbr",
+        "mfba": "tasks.sieve.mfba",
+        "mfbr": "tasks.sieve.mfbr",
         "mpi": None, # FIXME: Implement this
         "n": "N",
         "name": "name",
@@ -89,7 +91,7 @@ class Parameters(object):
         "polsel_delay": None,
         "polsel_incr": "tasks.polyselect.incr",
         "polsel_maxnorm": "tasks.polyselect.maxnorm",
-        "polsel_nice": None,
+        "polsel_nice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
         "polsel_nq": "tasks.polyselect.nq",
         "polsel_P": "tasks.polyselect.P",
         "qmin": "tasks.sieve.qmin",
@@ -101,7 +103,7 @@ class Parameters(object):
         "scriptpath": "slaves.scriptpath",
         "serveraddress": "server.address",
         "sieve_max_threads": "tasks.sieve.threads",
-        "sievenice": None,
+        "sievenice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
         "slaves": "slaves.hostnames",
         "skip": "tasks.purge.skip",
         "wdir": "tasks.workdir",
@@ -346,11 +348,11 @@ class Parameters(object):
         An open file handle, or an array of strings, work.
         
         >>> p = Parameters()
-        >>> p.readparams(DEFAULTS)
-        >>> p.data["tasks"]["parallel"]
-        '0'
-        >>> p.myparams(["degree", "incr", "parallel"], "tasks.polyselect") == \
-        {'parallel': '0', 'incr': '60', 'degree': '5'}
+        >>> p.readparams(DEFAULTS_OLD, True)
+        >>> p.data["tasks"]["sieve"]["rels_wanted"]
+        1
+        >>> p.myparams(["degree", "incr"], "tasks.polyselect") == \
+        {'incr': '60', 'degree': '5'}
         True
         """
         for line in infile:
@@ -456,76 +458,6 @@ class UseParameters(metaclass=abc.ABCMeta):
         super().__init__(*args, **kwargs)
 
 
-DEFAULTS = (
-    "logfile = cado.log",
-    "tasks.parallel = 0",
-    "tasks.niceness = 10",
-    
-    "tasks.polyselect.degree = 5",
-    "tasks.polyselect.lq = 1",
-    "tasks.polyselect.nq = 1000",
-    "tasks.polyselect.incr = 60",
-    "tasks.polyselect.admin = 0",
-    "tasks.polyselect.adrange = 1e7",
-    "tasks.polyselect.delay  = 120",
-    "tasks.polyselect.maxnorm = 1e9",
-    
-    "tasks.sieve.rlim = 8000000",
-    "tasks.sieve.alim = 8000000",
-    "tasks.sieve.lpbr = 29",
-    "tasks.sieve.lpba = 29",
-    "tasks.sieve.mfbr = 58",
-    "tasks.sieve.mfba = 58",
-    "tasks.sieve.rlambda = 2.3",
-    "tasks.sieve.alambda = 2.3",
-    "tasks.sieve.I = 13",
-    "tasks.sieve.qmin = 12000000",
-    "tasks.sieve.qrange = 1000000",
-    "tasks.sieve.checkrange = 1",
-    "tasks.sieve.firstcheck = 1",
-    "tasks.sieve.delay = 120",
-    "tasks.sieve.niceness = 19",
-    "tasks.sieve.keeprelfiles = 0",
-    "tasks.sieve.sieve_max_threads = 2",
-    "tasks.sieve.poly_max_threads = 1",
-    "tasks.sieve.ratq = 0",
-
-    # filtering
-    # "tasks.purge.skip = -1", # should be about bwc_mn - 32
-    "tasks.purge.keep = 208", # should be 160 + #ideals <= FINAL_BOUND 
-                              # (cf purge.c)
-    "tasks.purge.nslices_log = 1",
-    "tasks.purge.filterlastrels = 1",
-    
-    # "tasks.merge.skip = -1", # should be about bwc_mn - 32
-    "tasks.merge.forbw = 3",
-    "tasks.merge.coverNmax = 100",
-    "tasks.merge.ratio = 1.5",
-    # "tasks.merge.keep = -1", # should be 128 + skip
-    "tasks.merge.maxlevel = 15",
-
-    # linalg
-    "tasks.linalg.algo = bwc",
-    "tasks.linalg.threads = 2",
-    "tasks.linalg.mpi = 0",
-    "tasks.linalg.hosts = foo",
-    "tasks.linalg.bwc.interval = 1000",
-    "tasks.linalg.bwc.mm_impl = 'bucket'",
-    "tasks.linalg.bwc.interleaving = 0",
-    # bwc_mn should be 64 or 128
-    "tasks.linalg.bwc.mn = 64",
-    # shuffled product is expected to be better in most cases, at least
-    # when we use MPI. Since it is the preferred communication algorithm
-    # for large runs, we prefer to force its use also for mid-range
-    # examples.
-    "tasks.linalg.bwc.shuffled_product = 1",
-
-    # characters
-    "tasks.sqrt.nkermax = 30",
-    "tasks.sqrt.nchar = 50",
-    "tasks.sqrt.nthchar = 2",
-    )
-
 DEFAULTS_OLD = (
     # global
     #'wdir         = undef',
@@ -579,7 +511,7 @@ DEFAULTS_OLD = (
     'coverNmax    = 100',
     'nslices_log  = 1',
     'filterlastrels = 1',
-    'dup_rm = $on_mingw', # Give -rm parameter to dup2 when on MinGW
+    # 'dup_rm = $on_mingw', # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     'linalg       = bwc',
