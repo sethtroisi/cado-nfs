@@ -237,7 +237,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     exp_end = MAX(mmt->n[0], mmt->n[1]);
     exp_end = iceildiv(exp_end, bw->n);
 
-    timing_init(timing, bw->start, exp_end);
+    timing_init(timing, bw->start, bw->interval * iceildiv(exp_end, bw->interval));
 
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
@@ -441,6 +441,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         // reached s + bw->interval. Count our time on cpu, and compute the sum.
         timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, 1);
     }
+    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print);
 
     if (tcan_print) {
         printf("Done.\n");

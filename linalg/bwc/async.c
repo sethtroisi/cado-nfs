@@ -223,6 +223,22 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     grid_print(pi, buf, sizeof(buf), print);
 }
 
+void pi_allreduce_doubles(parallelizing_info pi, double * x, int n)
+{
+    double total[n];
+    memset(total,0,n*sizeof(double));
+    void * ptr = (void*) total;
+    thread_broadcast(pi->m, &ptr, 0);
+    double * main_total = ptr;
+    my_pthread_mutex_lock(pi->m->th->m);
+    for(int i = 0 ; i < n ; i++)
+        main_total[i] += x[i];
+    my_pthread_mutex_unlock(pi->m->th->m);
+    serialize_threads(pi->m);
+    for(int i = 0 ; i < n ; i++)
+        x[i] = main_total[i];
+}
+
 /* stage=0 for krylov, 1 for mksol */
 void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
 {
@@ -253,35 +269,12 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
-    /* dt_recent[] contains the JOB seconds. So we don't have to sum it up over
-     * threads. However, we do for ncoeffs ! */
-    double ncoeffs_total = 0;
-    {
-        void * ptr = &ncoeffs_total;
-        thread_broadcast(pi->m, &ptr, 0);
-        double * main_ncoeffs_total = ptr;
-        my_pthread_mutex_lock(pi->m->th->m);
-        * main_ncoeffs_total += ncoeffs_d;
-        my_pthread_mutex_unlock(pi->m->th->m);
-        serialize_threads(pi->m);
-        ncoeffs_d = * main_ncoeffs_total;
-    }
+    pi_allreduce_doubles(pi, &ncoeffs_d, 1);
 
     /* wct intervals are not aggregated over threads either, so we must
      * do it by hand */
-    double aggr_dwct[2] = {0,0};
-    {
-        void * ptr = aggr_dwct;
-        thread_broadcast(pi->m, &ptr, 0);
-        double * px = ptr;
-        my_pthread_mutex_lock(pi->m->th->m);
-        px[0] += since_last_reset[0]->wct;
-        px[1] += since_last_reset[1]->wct;
-        my_pthread_mutex_unlock(pi->m->th->m);
-        serialize_threads(pi->m);
-        since_last_reset[0]->wct = px[0];
-        since_last_reset[1]->wct = px[1];
-    }
+    double aggr_dwct[2] = { since_last_reset[0]->wct, since_last_reset[1]->wct };
+    pi_allreduce_doubles(pi, aggr_dwct, 2);
 
     if (print) {
         {
@@ -358,6 +351,83 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     serialize_threads(pi->m);
 }
 
+void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print)
+{
+    timing_interval_data since_last_reset[2]; /* 0 = general, 1 = cpu-bound */
+    timing_interval_data since_beginning[2];
+    extract_interval(since_last_reset, since_beginning, timing);
+
+    int di = timing->end_mark - timing->go_mark;
+
+    double dwct0 = since_beginning[0]->wct;
+    double dwct1 = since_beginning[1]->wct;
+
+    int ndoubles = sizeof(since_last_reset) / sizeof(double);
+
+    // dt must be collected.
+    int err;
+    double ncoeffs_d = ncoeffs;
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(pi->m) {
+        err = MPI_Allreduce(MPI_IN_PLACE, since_beginning, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+
+        err = MPI_Allreduce(MPI_IN_PLACE, &ncoeffs_d, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
+    pi_allreduce_doubles(pi, &ncoeffs_d, 1);
+    double aggr_dwct[2] = { since_beginning[0]->wct, since_beginning[1]->wct };
+    pi_allreduce_doubles(pi, aggr_dwct, 2);
+
+    if (print) {
+        {
+            double puser = since_beginning[1]->job[0] / dwct1;
+            double psys = since_beginning[1]->job[1] / dwct1;
+            double pidle = aggr_dwct[1] / dwct1 - puser - psys;
+            double avwct = dwct1 / di;
+            // nanoseconds per coefficient are computed based on the
+            // total (aggregated) wall-clock time per iteration within
+            // the cpu-bound part, and divided by the total number of
+            // coefficients.
+            double nsc = (aggr_dwct[0] + aggr_dwct[1]) / di / ncoeffs_d * 1.0e9;
+            char * what_wct = "s";
+            if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
+
+            printf("Done, N=%d ; CPU: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+                    ", %.2f %s/iter"
+                    ", %.2f ns/coeff"
+                    "\n",
+                    timing->end_mark,
+                    since_beginning[1]->job[0] + since_beginning[1]->job[1],
+                    100.0 * puser,
+                    100.0 * psys,
+                    100.0 * pidle,
+                    avwct, what_wct, nsc);
+        }
+
+        {
+            double puser = since_beginning[0]->job[0] / dwct0;
+            double psys = since_beginning[0]->job[1] / dwct0;
+            double pidle = aggr_dwct[0] / dwct0 - puser - psys;
+            double avwct = dwct0 / di;
+            char * what_wct = "s";
+            if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
+
+            printf("Done, N=%d ; COMM: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+                    ", %.2f %s/iter"
+                    "\n",
+                    timing->end_mark,
+                    since_beginning[0]->job[0] + since_beginning[0]->job[1],
+                    100.0 * puser,
+                    100.0 * psys,
+                    100.0 * pidle,
+                    avwct, what_wct);
+        }
+    }
+    serialize_threads(pi->m);
+}
 
 void block_control_signals()
 {
