@@ -35,6 +35,8 @@ import cadologger
 
 logger = logging.Logger("Parameters")
 
+parse_array = []
+
 class Parameters(object):
     """ Class that stores parameters for cadofactor in hierarchical dictionaries
     """
@@ -342,6 +344,24 @@ class Parameters(object):
             else:
                 dic[key] = self._convert_one_type(path, key, dic[key])
 
+    def parseline(self, line, old_format):
+        (line2, comment) = line.split('#', 1) if '#' in line else (line, None)
+        line2 = line2.strip()
+        if not line2:
+            return (None, None, comment, None)
+        if not '=' in line2:
+            raise Exception('Invalid line, missing "=": %s' % line)
+        # Which one is worse?
+        # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
+        (key, value) = (s.strip() for s in line2.split('=', 1))
+        oldkey = None
+        if old_format:
+            oldkey = key
+            key = self.translate_old_key(key)
+            if key is None:
+                value = None
+        return (key, value, comment, oldkey)
+
     def readparams(self, infile, old_format = False):
         """ 
         Read configuration file lines from infile, which must be an iterable.
@@ -356,18 +376,12 @@ class Parameters(object):
         True
         """
         for line in infile:
-            line2 = line.split('#', 1)[0].strip()
-            if not line2:
+            line = line.strip('\n')
+            (key ,value, comment, oldkey) = self.parseline(line, old_format)
+            # print ("%s = %s # %s", (key ,value, comment))
+            parse_array.append((key ,value, comment, oldkey))
+            if key is None:
                 continue
-            if not '=' in line2:
-                raise Exception('Invalid line, missing "=": %s' % line)
-            # Which one is worse?
-            # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
-            (key, value) = (s.strip() for s in line2.split('=', 1))
-            if old_format:
-                key = self.translate_old_key(key)
-                if key is None:
-                    continue
             value = self.subst_env_var(key, value)
             self._insertkey(key, value)
         self._subst_references(self.data, [])
@@ -542,33 +556,44 @@ DEFAULTS_OLD = (
 )
 
 if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
-
-    bug1 = """
-        Problem: parameters for slaves are searched under slaves.slaves.
-        This is because we search for "hostnames" keys under "slaves", which
-        produces the path "slaves", assuming there is a "slaves.hostnames".
+    import sys
+    if len(sys.argv) == 1:
+        import doctest
+        doctest.testmod()
+    elif len(sys.argv) == 2:
+        argsold = True
+        paramfile = sys.argv[1]
+        parameters = Parameters()
+        if argsold:
+            parameters.read_old_defaults()
+        parameters.readfile(paramfile, old_format = argsold)
         
-        Then StartClientsTask() is instantiated, with path_prefix="slaves".
-        We do need to pass this path_prefix, as it might be, say,
-        "slaves.catrel", and we need to know that we find out parameters
-        under that node.
+        # Keep only the last occurence of each key. First reverse
+        parse_array.reverse()
+        # Now keep only the first occurence of each key
+        keys_seen = set()
+        filtered = []
+        for (key, value, comment, oldkey) in parse_array:
+            # We keep entries without an oldkey, as those correspond to comment
+            # or blank lines in the input file, which we try to preserve.
+            # This is also why we use two arrays instead of an OrderedDict.
+            # Lines with an oldkey that maps to None are discarded.
+            keep = oldkey is None or not (key is None or key in keys_seen)
+            if False:
+                print("%skeeping %s=%s #%s /%s" %
+                      ("" if keep else "not ", key, value, comment, oldkey) )
+            keys_seen.add(key)
+            if keep:
+                filtered.append((key, value, comment, oldkey))
         
-        The UseParameters class is instantiated with path_prefix="slaves",
-        which instantiates the MyParameters class with name=self.name and
-        path_prefix="slaves", where self.name is the property defined by the
-        class that inherits UseParameters. If that name is "slaves" again,
-        then "slaves" is appended to path_prefix, even if path_prefix is,
-        in fact, the full path and nothing should be appended.
+        # Revert again to original order
+        filtered.reverse()
         
-        Fix: use "param_nodename" instead of "name" as the property defining
-        the name of the node in the parameter tree, so that this node name
-        can have a different value from the name used for, e.g., making
-        database table names. Tasks can default self.param_nodename to
-        self.name.
-        Allow None for name in MyParameters; if name is None, then name is
-        NOT appended to path_prefix in MyParameters.get_param_path(). This
-        allows specifying the complete path in path_prefix, without anything
-        getting appended.
-    """
+        for (key ,value, comment, oldkey) in filtered:
+            if  not key is None or oldkey is None:
+                output = []
+                if not key is None:
+                    output.append("%s = %s" % (key, value))
+                if not comment is None:
+                    output.append("#%s" % comment)
+                print("\t\t".join(output))
