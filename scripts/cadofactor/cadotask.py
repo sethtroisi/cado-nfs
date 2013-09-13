@@ -1515,7 +1515,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**self.params["nslices_log"]
+        self.nr_slices = 2**self.params.get("nslices_log", 1)
         tablename = self.make_tablename("infiles")
         self.already_split_input = self.make_db_dict(tablename,
                                                      connection=self.db_connection)
@@ -1712,7 +1712,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**self.params["nslices_log"]
+        self.nr_slices = 2**self.params.get("nslices_log", 1)
         tablename = self.make_tablename("infiles")
         self.already_done_input = self.make_db_dict(tablename, connection=self.db_connection)
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"), connection=self.db_connection)
