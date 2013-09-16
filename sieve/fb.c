@@ -780,7 +780,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     unsigned long nr_primes = 0;
     int error = 0;
 
-    fbfile = fopen (filename, "r");
+    fbfile = fopen_maybe_compressed (filename, "r");
     if (fbfile == NULL) {
         fprintf (stderr, "# Could not open file %s for reading\n", filename);
         return 0;
@@ -789,13 +789,13 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc(MAXDEGREE));
     if (fb_cur == NULL) {
         fprintf (stderr, "# Could not allocate memory for factor base\n");
-        fclose (fbfile);
+        fclose_maybe_compressed (fbfile, filename);
         return 0;
     }
 
     if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
         free (fb_cur);
-        fclose (fbfile);
+        fclose_maybe_compressed (fbfile, filename);
         return 0;
     }
 
@@ -856,7 +856,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 
-    fclose (fbfile);
+    fclose_maybe_compressed (fbfile, filename);
     free (fb_cur);
 
     return error ? 0 : 1;
