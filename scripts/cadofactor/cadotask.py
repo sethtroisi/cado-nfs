@@ -1199,7 +1199,7 @@ class FactorBaseTask(Task):
 
             # Run command to generate factor base/free relations file
             p = cadoprograms.MakeFB(poly=polyfilename,
-                                    stdout = str(outputfilename),
+                                    out = str(outputfilename),
                                     **self.progparams[0])
             message = self.submit_command(p, "")
             if message.get_exitcode(0) != 0:

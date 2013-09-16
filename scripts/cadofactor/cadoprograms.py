@@ -544,6 +544,7 @@ class MakeFB(Program):
                  alim: Parameter(),
                  nopowers: Toggle() = None,
                  maxbits: Parameter() = None,
+                 out: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
