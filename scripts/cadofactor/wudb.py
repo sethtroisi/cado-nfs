@@ -927,7 +927,13 @@ class WuAccess(object): # {
                                     eq={"status": WuStatus.AVAILABLE})
         assert len(r) <= 1
         if len(r) == 1:
-            self._checkstatus(r[0], WuStatus.AVAILABLE)
+            try:
+                self._checkstatus(r[0], WuStatus.AVAILABLE)
+            except StatusUpdateError:
+                if commit:
+                    conn_commit(self.conn)
+                cursor.close()
+                raise
             if DEBUG > 0:
                 self.check(r[0])
             d = {"status": WuStatus.ASSIGNED, 
@@ -963,7 +969,13 @@ class WuAccess(object): # {
                 conn_commit(self.conn)
             cursor.close()
             return False
-        self._checkstatus(data, WuStatus.ASSIGNED)
+        try:
+            self._checkstatus(data, WuStatus.ASSIGNED)
+        except StatusUpdateError:
+            if commit:
+                conn_commit(self.conn)
+            cursor.close()
+            raise
         if DEBUG > 0:
             self.check(data)
         d = {"resultclient": clientid,
@@ -993,7 +1005,13 @@ class WuAccess(object): # {
             cursor.close()
             return False
         # FIXME: should we do the update by wuid and skip these checks?
-        self._checkstatus(data, WuStatus.RECEIVED_OK)
+        try:
+            self._checkstatus(data, WuStatus.RECEIVED_OK)
+        except StatusUpdateError:
+            if commit:
+                conn_commit(self.conn)
+            cursor.close()
+            raise
         if DEBUG > 0:
             self.check(data)
         d = {"timeverified": str(datetime.utcnow())}
