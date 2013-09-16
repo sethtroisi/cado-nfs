@@ -340,13 +340,13 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
 }
 
 
-void makefb_with_powers(mpz_t *f, int d, unsigned long alim, 
+void makefb_with_powers(FILE* outfile, mpz_t *f, int d, unsigned long alim, 
         int maxbits) {
-    printf("# Roots for polynomial ");
-    fprint_polynomial(stdout, f, d);
-    printf("# DEGREE: %d\n", d);
-    printf("# alim = %lu\n", alim);
-    printf("# maxbits = %d\n", maxbits);
+    fprintf(outfile, "# Roots for polynomial ");
+    fprint_polynomial(outfile, f, d);
+    fprintf(outfile, "# DEGREE: %d\n", d);
+    fprintf(outfile, "# alim = %lu\n", alim);
+    fprintf(outfile, "# maxbits = %d\n", maxbits);
 
     entry_list L;
     unsigned long p;
@@ -361,19 +361,19 @@ void makefb_with_powers(mpz_t *f, int d, unsigned long alim,
             int n0 = L.list[i].n0;
             unsigned long r =  L.list[i].r;
             if (q == oldq && n1 == oldn1 && n0 == oldn0)
-                printf(",%lu", r);
+                fprintf(outfile, ",%lu", r);
             else {
                 if (i > 0)
-                    printf("\n");
+                    fprintf(outfile, "\n");
                 oldq = q; oldn1 = n1; oldn0 = n0;
                 if (n1 == 1 && n0 == 0) 
-                    printf("%lu: %lu", q, r);
+                    fprintf(outfile, "%lu: %lu", q, r);
                 else
-                    printf("%lu:%d,%d: %lu", q, n1, n0, r);
+                    fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
             }
         }
         if (L.len > 0) 
-            printf("\n");
+            fprintf(outfile, "\n");
         entry_list_clear(&L);
     }
 }
@@ -384,6 +384,7 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "alim", "factor base bound");
     param_list_decl_usage(pl, "maxbits", "(optional) maximal number of "
             "bits of powers");
+    param_list_decl_usage(pl, "out", "(optional) name of the output file");
 }
 
 int
@@ -391,7 +392,8 @@ main (int argc, char *argv[])
 {
   param_list pl;
   cado_poly cpoly;
-  FILE * f;
+  FILE * f, *outputfile;
+  const char *outfilename = NULL;
   int maxbits = 1;  // disable powers by default
   unsigned long alim = 0;
   char *argv0 = argv[0];
@@ -433,6 +435,14 @@ main (int argc, char *argv[])
 
   param_list_parse_int(pl, "maxbits", &maxbits);
 
+  outfilename = param_list_lookup_string(pl, "out");
+  if (outfilename != NULL) {
+    outputfile = fopen_maybe_compressed(outfilename, "w");
+  } else {
+    outputfile = stdout;
+  }
+  
+
   if (!cado_poly_read(cpoly, filename))
     {
       fprintf (stderr, "Error reading polynomial file %s\n", filename);
@@ -440,10 +450,13 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  makefb_with_powers (cpoly->alg->f, cpoly->alg->degree, 
+  makefb_with_powers (outputfile, cpoly->alg->f, cpoly->alg->degree, 
           alim, maxbits);
 
   cado_poly_clear (cpoly);
+  if (outfilename != NULL) {
+    fclose_maybe_compressed(outputfile, outfilename);
+  }
 
   return 0;
 }
