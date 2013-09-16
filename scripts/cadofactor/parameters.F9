@@ -1,0 +1,55 @@
+name = F9
+N = 5529373746539492451469451709955220061537996975706118061624681552800446063738635599565773930892108210210778168305399196915314944498011438291393118209
+sourcedir=${HOME}/git/cado-nfs
+builddir=${HOME}/build/cado-nfs/normal
+workdir = /tmp/F9/
+tasks.execpath=$(builddir)
+tasks.verbose = 1
+
+rlim = 1000000
+alim = 2000000
+lpbr = 26
+lpba = 26
+
+tasks.threads=2
+tasks.wutimeout = 1200
+
+tasks.polyselect.admin = 0
+tasks.polyselect.admax = 0
+tasks.polyselect.import = F9.poly
+
+tasks.sieve.mfbr = 52
+tasks.sieve.mfba = 52
+tasks.sieve.rlambda = 2.1
+tasks.sieve.alambda = 2.2
+tasks.sieve.I = 12
+tasks.sieve.qmin = 2000000
+tasks.sieve.qrange = 5000
+tasks.sieve.rels_wanted = 4000000
+tasks.sieve.threads = 2
+
+tasks.filter.nslices_log=1
+tasks.filter.keep = 160
+tasks.filter.skip = 32
+tasks.filter.forbw = 3
+tasks.filter.coverNmax  = 100
+tasks.filter.maxlevel = 20
+tasks.filter.ratio = 1.1
+tasks.filter.merge.coverNmax = 100
+
+tasks.linalg.mn = 64
+tasks.linalg.verbose = 0
+tasks.linalg.nchar = 64
+tasks.linalg.interval = 1000
+tasks.linalg.interleaving = 0
+tasks.linalg.shuffled_product = 1
+tasks.linalg.bwc.threads = 2x2
+
+tasks.characters.threads = 2
+
+slaves.hostnames = localhost
+slaves.nrclients = 2
+slaves.scriptpath = $(sourcedir)/scripts/cadofactor
+slaves.downloadretry = 10
+slaves.basepath = $(workdir)/$(name).wuclient
+slaves.niceness = 10
