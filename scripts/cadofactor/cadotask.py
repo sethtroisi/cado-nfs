@@ -898,7 +898,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("adrange", "admin", "admax") + \
+            ("adrange", "admin", "admax", "import") + \
             Polynomial.paramnames
     # Stat: potential collisions=124.92 (2.25e+00/s)
     # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
@@ -990,6 +990,10 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         else:
             self.logger.info("No polynomial was previously found")
         
+        if "import" in self.params:
+            self.process_polyfile(self.params["import"])
+            self.write_poly_file()
+        
         if self.is_done():
             self.logger.info("Polynomial selection already finished - "
                              "nothing to do")
@@ -1027,20 +1031,23 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             # This notification was not for me
             return
         (filename, ) = message.get_output_files()
+        ok = self.process_polyfile(filename, commit=False)
+        self.parse_stats(filename, commit=False)
+        self.verification(message, ok, commit=True)
+    
+    def process_polyfile(self, filename, commit=True):
         try:
             poly = self.parse_poly(filename)
         except PolynomialParseException as e:
             self.logger.error("Invalid polyselect file %s: %s",
                               filename, e)
-            self.verification(message, False, commit=True)
-            return
+            return False
         if not poly is None:
             self.bestpoly = poly
             update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
                       "bestfile": filename}
-            self.state.update(update, commit=False)
-        self.parse_stats(filename, commit=False)
-        self.verification(message, True, commit=True)
+            self.state.update(update, commit=commit)
+        return True
     
     def parse_poly(self, filename):
         poly = None
