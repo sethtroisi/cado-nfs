@@ -42,8 +42,9 @@ class Polynomial(object):
     paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda",
         "alambda")
     keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True),
-            ("c1", True), ("c2", True), ("c3", True), ("c4", True),
-            ("c5", False), ("c6", False), ("m", True), ("skew", True) )
+            ("c1", False), ("c2", False), ("c3", False), ("c4", False),
+            ("c5", False), ("c6", False), ("m", True), ("skew", True),
+            ("type", False))
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
