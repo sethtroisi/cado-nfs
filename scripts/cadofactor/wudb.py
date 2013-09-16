@@ -823,7 +823,7 @@ class WuAccess(object): # {
 
     @staticmethod
     def _checkstatus(wu, status):
-        logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
+        # logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
         if wu["status"] != status:
             msg = "Workunit %s has status %s, expected %s" \
                   % (wu["wuid"], wu["status"], status)
