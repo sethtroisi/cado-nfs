@@ -74,7 +74,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         wuid = form['WUid']
         clientid = form['clientid']
         if 'errorcode' in form:
-            errorcode = form['errorcode'].value
+            errorcode = int(form['errorcode'].value)
             diag(1, "errorcode = ", errorcode)
         else:
             errorcode = None
@@ -139,9 +139,11 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             # testrun_polyselect_0-5000 was uploaded successfully by client
             # localhost and stored as /localdisk/kruppaal/work/testrun.upload/
             # testrun.polyselect.0-5000.kcudj7, received 84720 bytes.
-            message = message + 'The file "%s" for workunit %s was uploaded ' \
+            message += 'The file "%s" for workunit %s was uploaded ' \
             'successfully by client %s and stored as %s, received %d bytes.\n' \
             % (basename, wuid.value, clientid.value, filename, nr_bytes)
+            if errorcode:
+                message += 'Error code = %d.\n' % errorcode
         diag(1, "Getting WuAccess object")
         wuar = wudb.WuAccess(dbfilename)
         diag(1, "Got WuAccess object. Calling .result()")
