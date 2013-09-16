@@ -142,6 +142,11 @@ fillmat (filter_matrix_t *mat)
     if (wj <= mat->cwmax)
     {
       Rj = (index_t *) malloc((wj + 1) * sizeof(index_t));
+      if (Rj == NULL)
+        {
+          fprintf (stderr, "Cannot allocate memory in fillmat\n");
+          abort ();
+        }
       Rj[0] = 0; /* last index used */
       mat->R[j] = Rj;
     }
@@ -254,6 +259,11 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       }
       
       mat->rows[i] = (typerow_t*) malloc ((next+1) * sizeof (typerow_t));
+      if (mat->rows[i] == NULL)
+        {
+          fprintf (stderr, "Cannot allocate memory\n");
+          abort ();
+        }
       matLengthRow(mat, i) = next;
       memcpy(mat->rows[i]+1, buf, next * sizeof(typerow_t));
       // sort indices in val to ease row merges
