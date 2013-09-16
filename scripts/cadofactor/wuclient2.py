@@ -759,12 +759,16 @@ class WorkunitClient(object):
             logging.info ("Received TERMINATE, exiting")
             return False
 
-        if not self.get_files():
-            return False
-        processor = WorkunitProcessor(self.workunit, self.settings)
-        processor.run_commands()
-        upload_ok = self.upload_result(processor)
-        processor.cleanup()
+        if self.get_files():
+            processor = WorkunitProcessor(self.workunit, self.settings)
+            processor.run_commands()
+            upload_ok = self.upload_result(processor)
+            processor.cleanup()
+        else:
+            # TODO: notify server of error so it can re-issue immediately?
+            logging.error("Could not download a required file, discarding "
+                          "workunit %s", self.workunit.get_id())
+            upload_ok = True # Client should continue
         self.cleanup()
         return upload_ok
 
