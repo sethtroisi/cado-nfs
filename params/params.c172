@@ -38,7 +38,7 @@ polsel_P=2000000             # choose lc(g) with two prime factors in [P,2P]
 polsel_maxnorm=56.0          # max. lognorm of polynomials (before rootsieve)
 polsel_admax=5e9             # max value for lc(f)
 polsel_adrange=5e7           # individual tasks
-polsel_incr=30030            # forced divisor of lc(f)
+polsel_incr=60            # forced divisor of lc(f)
 
 ###########################################################################
 # Sieve

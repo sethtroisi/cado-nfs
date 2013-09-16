@@ -37,9 +37,9 @@ polsel_nice=4            # nice level for selection
 # note: those parameters are just a guess, they might be far from optimal
 polsel_P=5000000             # choose lc(g) with two prime factors in [P,2P]
 polsel_maxnorm=65            # max. lognorm of polynomials (before rootsieve)
-polsel_admax=2e11            # max value for lc(f)
-polsel_adrange=2e9           # individual tasks
-polsel_incr=360360           # forced divisor of lc(f)
+polsel_admax=5e7             # max value for lc(f)
+polsel_adrange=5e5           # individual tasks
+polsel_incr=60               # forced divisor of lc(f)
 
 # Shi Bai got for RSA-190
 # lognorm: 64.90, alpha -8.81
