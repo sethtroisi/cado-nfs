@@ -195,7 +195,17 @@ void init_rat_norms_bucket_region(unsigned char *S,
        is the sign of u1 (g+u1 is the next g value). CAREFUL:
        g ~== 0 is coded g + u0j == u0j. It's possible it's not suffisant;
        in this case, the right test will be g >= fabs(u0j)*(1./(1ULL<<51)) */
-    if (LIKELY(g + u0j != u0j))
+    /* Bug #16388 :
+       u0 = 5.19229685853482763e+33, u1 = 4.27451782396958897e+33.
+       So, u0j = 8.75421250348971938e+36, rac = -2.04800000000000000e+03.
+       At the beginning, int_i = -2048, so the true value of g is 0.
+       In fact, the computed value of g is 1.18059162071741130e+21.
+       And u0j + g = 8.75421250348972056e+36; so u0j + g != u0j.
+       => This test is false!
+       => We have to use the slower but correct test,
+       fabs(g) * (double) (((uint64_t) 1)<<51) >= fabs(u0j).
+    */
+    if (LIKELY(fabs(g) * (double) (((uint64_t) 1)<<51) >= fabs(u0j)))
       if (signbit(g)) {
 	g = -g;
 	y = COMPUTE_Y(g);
