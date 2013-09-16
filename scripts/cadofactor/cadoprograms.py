@@ -127,7 +127,8 @@ class Toggle(Option):
 class Sha1Cache(object):
     """ A class that computes SHA1 sums for files and caches them, so that a
     later request for the SHA1 sum for the same file is not computed again.
-    File identity is checked only via the file's realpath.
+    File identity is checked via the file's realpath and the file's inode, size,
+    and modification time.
     """
     def __init__(self):
         self._sha1 = {}
@@ -143,6 +144,13 @@ class Sha1Cache(object):
 
     def get_sha1(self, filename):
         realpath = os.path.realpath(filename)
+        stat = os.stat(realpath)
+        file_id = (stat.st_ino, stat.st_size, stat.st_mtime)
+        # Check whether the file on disk changed
+        if realpath in self._sha1 and not self._sha1[realpath][1] == file_id:
+            logger = logging.getLogger("Sha1Cache")
+            logger.warn("File %s changed! Discarding old SHA1 sum", realpath)
+            del(self._sha1[realpath])
         if not realpath in self._sha1:
             logger = logging.getLogger("Sha1Cache")
             logger.debug("Computing SHA1 for file %s", realpath)
@@ -150,9 +158,10 @@ class Sha1Cache(object):
                 sha1 = hashlib.sha1()
                 for data in self._read_file_in_blocks(inputfile):
                     sha1.update(data)
-            self._sha1[realpath] = sha1.hexdigest()
-            logger.debug("SHA1 for file %s is %s", realpath, self._sha1[realpath])
-        return self._sha1[realpath]
+            self._sha1[realpath] = (sha1.hexdigest(), file_id)
+            logger.debug("SHA1 for file %s is %s", realpath,
+                         self._sha1[realpath])
+        return self._sha1[realpath][0]
 
 sha1cache = Sha1Cache()
 
