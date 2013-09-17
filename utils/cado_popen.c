@@ -91,7 +91,7 @@ FILE * cado_popen(const char * command, const char * mode)
                 command);
                 */
         execl("/bin/sh", "sh", "-c", command, NULL);
-        fprintf(stderr, "execve() failed\n");
+        perror("execve() failed");
         exit(1);
     }
     return NULL;
