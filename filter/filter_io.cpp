@@ -936,6 +936,11 @@ index_t filter_rels2_inner(char ** input_files,
     if (earlyparse_needed_data & _(LINE)) {
         for (int i = 0 ; i < SIZE_BUF_REL; i++) {
             inflight->rels[i]->line = (char*) malloc(RELATION_MAX_BYTES);
+	    if (inflight->rels[i]->line == NULL)
+	      {
+		fprintf (stderr, "Cannot allocate memory\n");
+		abort ();
+	      }
         }
     }
 #undef _
