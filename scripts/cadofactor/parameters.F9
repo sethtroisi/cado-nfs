@@ -6,8 +6,8 @@ workdir = /tmp/F9/
 tasks.execpath=$(builddir)
 tasks.verbose = 1
 
-rlim = 1000000
-alim = 2000000
+rlim = 2300000
+alim = 1200000
 lpbr = 26
 lpba = 26
 
@@ -25,7 +25,7 @@ tasks.sieve.alambda = 2.2
 tasks.sieve.I = 12
 tasks.sieve.qmin = 2000000
 tasks.sieve.qrange = 5000
-tasks.sieve.rels_wanted = 4000000
+tasks.sieve.rels_wanted = 6000000
 tasks.sieve.threads = 2
 
 tasks.filter.nslices_log=1
