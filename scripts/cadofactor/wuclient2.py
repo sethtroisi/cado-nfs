@@ -328,7 +328,7 @@ class WuMIMEMultipart(MIMEMultipart):
     MIMEMultipart object
     '''
     
-    def attach_data(self, name, filename, data):
+    def attach_data(self, name, filename, data, filetype=None, command=None):
         ''' Attach the data as a file
 
         name is the string that is sent to the server as the name of the form 
@@ -341,9 +341,14 @@ class WuMIMEMultipart(MIMEMultipart):
         result = MIMEApplication(data, _encoder=email.encoders.encode_noop)
         result.add_header('Content-Disposition', 'form-data', 
                           name=name, filename=filename)
+        if not filetype is None:
+            result.add_header("filetype", filetype)
+        if not command is None:
+            result.add_header("command", str(command))
         self.attach(result)
     
-    def attach_file(self, name, filename, filepath):
+    def attach_file(self, name, filename, filepath, filetype=None,
+                    command=None):
         ''' Attach the file as a file
 
         Parameters as in attach_data(), but filepath is the path to the file 
@@ -352,7 +357,7 @@ class WuMIMEMultipart(MIMEMultipart):
         logging.debug ("Adding result file %s to upload", filepath)
         with open(filepath, "rb") as infile:
             filedata = infile.read()
-        self.attach_data(name, filename, filedata)
+        self.attach_data(name, filename, filedata, filetype, command)
 
     def attach_key(self, key, value):
         ''' Attach a simple key=value pair '''
@@ -688,13 +693,15 @@ class WorkunitClient(object):
         for filename in self.workunit.get("RESULT", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
             logging.info("Attaching file %s to upload", filepath)
-            mimedata.attach_file("results", filename, filepath)
+            mimedata.attach_file("results", filename, filepath, "RESULT")
         for name in processor.stdio:
             for (counter, data) in enumerate(processor.stdio[name]):
                 if data:
                     logging.info ("Attaching %s for command %s to upload", 
                                   name, counter)
-                    mimedata.attach_data("results", name + str(counter), data)
+                    filename = "%s%d" % (name, counter)
+                    mimedata.attach_data("results", filename, data, name,
+                                         counter)
         return mimedata
 
     def upload_result(self, processor):
@@ -702,7 +709,7 @@ class WorkunitClient(object):
         mimedata = WuMIMEMultipart()
         self.attach_result(processor, mimedata)
         postdata = mimedata.flatten(debug=int(self.settings["DEBUG"]))
-        logging.debug("POST data: %s", mimedata)
+        # logging.debug("POST data: %s", mimedata)
 
         url = self.settings["SERVER"].rstrip("/") + "/" + \
                 self.settings["POSTRESULTPATH"].lstrip("/")
