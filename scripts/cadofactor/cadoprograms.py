@@ -83,7 +83,7 @@ class Option(object, metaclass=abc.ABCMeta):
         """
         if not self.checktype is None:
             assert isinstance(value, self.checktype)
-        return self._map(str(value))
+        return self._map(value)
 
     @abc.abstractmethod
     def _map(self, value):
@@ -97,32 +97,31 @@ class Option(object, metaclass=abc.ABCMeta):
 class PositionalParameter(Option):
     ''' Positional command line parameter '''
     def _map(self, value):
-        return [value]
+        return [str(value)]
 
 class Parameter(Option):
     ''' Command line option that takes a parameter '''
     def _map(self, value):
-        return [self.prefix + self.get_arg(), value]
+        return [self.prefix + self.get_arg(), str(value)]
 
 class ParameterEq(Option):
     ''' Command line option that takes a parameter, used on command line in
     the form of "key=value" '''
     def _map(self, value):
-        return [self.get_arg() + "=" + value]
+        return ["%s=%s" % (self.get_arg(), value)]
 
 class Toggle(Option):
     ''' Command line option that does not take a parameter.
     value is interpreted as a truth value, the option is either added or not
     '''
     def _map(self, value):
-        if value is True or isinstance(value, str) and \
-                value.lower() in ["yes", "true", "on", "1"]:
+        if value is True:
             return [self.prefix + self.get_arg()]
-        elif value is False or isinstance(value, str) and \
-                value.lower() in ["no", "false", "off", "0"]:
+        elif value is False:
             return []
         else:
-            raise ValueError("Toggle.map() requires a boolean type argument")
+            raise ValueError("Toggle.map() for %s requires a boolean "
+                             "type argument" % self.get_arg())
 
 class Sha1Cache(object):
     """ A class that computes SHA1 sums for files and caches them, so that a
@@ -414,7 +413,8 @@ class Program(object, metaclass=InspectType):
         if not path:
             return filename
         else:
-            return path.rstrip(os.sep) + os.sep + os.path.basename(filename)
+            return str(path).rstrip(os.sep) + os.sep + \
+                    os.path.basename(str(filename))
 
     def make_command_array(self, binpath = None, inputpath = None,
                            outputpath = None):
@@ -430,7 +430,7 @@ class Program(object, metaclass=InspectType):
         for key in parameters:
             if key in self.parameters:
                 ann = self.__init__.__annotations__[key]
-                value = str(self.parameters[key])
+                value = self.parameters[key]
                 # If this is an input or an output file name, we may have to
                 # translate it, e.g., for workunits
                 assert not (ann.is_input_file and ann.is_output_file)
