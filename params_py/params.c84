@@ -1,0 +1,96 @@
+###########################################################################
+#     Parameter file for Cado-NFS
+###########################################################################
+# See params/params.c91 for an example which contains some documentation.
+
+# Anything after a # is a comment, until end of line.
+# Any empty line is ignored
+#
+#
+# Each parameter should be on an individual line, like
+#   param0=42.17
+#
+
+###########################################################################
+# General parameters
+###########################################################################
+
+# Sample parameter file for a 84-digit gnfs input
+# Example: cadofactor.pl wdir=... name=... n=...
+
+name = c84
+
+# computation
+
+###########################################################################
+# Polynomial selection with Kleinjung's algorithm
+###########################################################################
+
+tasks.polyselect.degree = 4		# degree of the algebraic polynomial
+
+## Parameters of polyselect
+tasks.polyselect.admax = 125e3		# max value for lc(f)
+tasks.polyselect.adrange = 2000		# individual tasks
+tasks.polyselect.incr = 60		# forced divisor of lc(f)
+tasks.polyselect.P = 10000		# choose lc(g) with two prime factors in [P,2P]
+tasks.polyselect.maxnorm = 31.1		# maximal lognorm before rootsieve
+tasks.polyselect.nq = 1000
+
+###########################################################################
+# Sieve
+###########################################################################
+
+# (r,a) means rational or algebraic side
+# rlim/alim is the bound for sieving
+# lpbr/lpba is the (base 2 log of the) large prime bound
+# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try to
+#                                      split into large primes.
+# rlambda/alambda is the early-abort ratio: if after sieving the
+#                                      approximate norm is more than
+#                                      lambda times lpb, we reject.
+rlim = 100000
+alim = 200000
+lpbr = 23
+lpba = 23
+tasks.sieve.mfbr = 46
+tasks.sieve.mfba = 46
+tasks.sieve.rlambda = 2.1
+tasks.sieve.alambda = 2.2
+
+tasks.sieve.I = 11		# Sieving range in lattice siever
+tasks.sieve.qmin = 200000		# Start of the special-q range
+tasks.sieve.qrange = 10000		# The size of an elementary sieving task
+tasks.sieve.rels_wanted = 787000		# Try filtering only up from that many relations
+slaves.niceness = 10		# nice level for the sieving jobs
+tasks.sieve.threads = 2
+
+###########################################################################
+# Filtering
+###########################################################################
+
+# (don't start merge otherwise)
+tasks.filter.purge.keep = 160		# maximal excess wanted after purge
+# (purge shrinks if needed)
+tasks.filter.maxlevel = 15
+tasks.filter.ratio = 1.1
+tasks.filter.merge.forbw = 3
+tasks.merge.coverNmax = 100
+
+###########################################################################
+# Linear algebra
+###########################################################################
+
+tasks.linalg.bwc.threads = 2x2		# Multithreading level of Block-Wiedemann ; Use
+# <m>x<n> for bwc, or only one integer for bw.
+tasks.linalg.bwc.interval = 100		# checkpointing interval for bwc.
+tasks.linalg.bwc.interleaving = 0
+tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.shuffled_product = 1
+
+###########################################################################
+# Characters
+###########################################################################
+
+tasks.linalg.characters.nchar = 50		# number of characters
+tasks.linalg.characters.threads = 2
+
