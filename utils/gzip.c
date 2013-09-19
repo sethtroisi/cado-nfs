@@ -211,7 +211,7 @@ char **prepare_grouped_command_lines(char **list_of_files)
             if (filenames_total_size + ds > (size_t) 8192)
                 break;
 #else
-            if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX))
+            if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX) - 1024)
                 break;
 #endif
             filenames_total_size += ds;
