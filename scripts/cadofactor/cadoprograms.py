@@ -6,6 +6,7 @@ import hashlib
 import logging
 import cadocommand
 import cadologger
+from cadoparams import BoolParam
 
 
 class InspectType(type):
@@ -115,6 +116,8 @@ class Toggle(Option):
     value is interpreted as a truth value, the option is either added or not
     '''
     def _map(self, value):
+        if isinstance(value, BoolParam):
+            value = bool(value)
         if value is True:
             return [self.prefix + self.get_arg()]
         elif value is False:
