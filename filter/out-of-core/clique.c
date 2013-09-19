@@ -925,7 +925,7 @@ static void
 pass1 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[ARG_MAX], *pg;
+  char *g, *pg;
   int i, j = 0, nbt = 0, notload, nbf, notfirst = 0, avoidwarning = 0;
   tab_t *T;
   pthread_t tid[MAX_THREADS+1], sid;
@@ -942,6 +942,7 @@ pass1 (int nthreads, char *filelist)
     fprintf (stderr, "Error, cannot open %s\n", filelist);
     exit (1);
   }
+  g = malloc(ARG_MAX);
   T = malloc ((nthreads + 1) * sizeof (tab_t));
   memset(T, 0, (nthreads + 1) * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads);
@@ -1016,6 +1017,7 @@ pass1 (int nthreads, char *filelist)
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
+  free (g);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 1/3 DONE *\n"
@@ -1027,7 +1029,7 @@ static void
 pass2 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[ARG_MAX], *pg;
+  char *g, *pg;
   tab_t *T;
   pthread_t tid[MAX_THREADS+1];
   double st = seconds(), rt = realtime(), art;
@@ -1040,6 +1042,7 @@ pass2 (int nthreads, char *filelist)
 	   "* PASS 2/3 *\n"
 	   "************\n\n");
   f = fopen (filelist, "r");
+  g = malloc(ARG_MAX);
   T = malloc ((nthreads + 1) * sizeof (tab_t));
   memset(T, 0, (nthreads + 1) * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads);
@@ -1107,6 +1110,7 @@ pass2 (int nthreads, char *filelist)
 	   (unsigned long) (art - rt));
   sem_destroy(&sem_pt);
   fclose (f);
+  free (g);
   free (T);
   stat2 ();
   /* propagate weights to speed up clique_weight */
