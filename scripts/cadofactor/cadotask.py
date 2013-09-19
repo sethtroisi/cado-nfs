@@ -276,7 +276,7 @@ class Statistics(object):
         "new_stats"
         """
         
-        assert self.conversions == new_stats.conversions
+        assert self.conversions is new_stats.conversions
         for conversion in self.conversions:
             (msgfmt, key, types, defaults, combine, regex) = conversion
             if key in new_stats.stats:
@@ -900,6 +900,19 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         return super().paramnames + \
             ("adrange", "admin", "admax", "import") + \
             Polynomial.paramnames
+    def update_lognorms(old_lognorm, new_lognorm):
+        lognorm = [0, 0, 0, 0, 0]
+        # print("update_lognorms: old_lognorm: %s" % old_lognorm)
+        # print("update_lognorms: new_lognorm: %s" % new_lognorm)
+        # New minimum. Don't use default value of 0 for minimum
+        lognorm[1] = min(old_lognorm[1] or new_lognorm[1], new_lognorm[1])
+        # New maximum
+        lognorm[3] = max(old_lognorm[3], new_lognorm[3])
+        # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
+        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2],
+                                                 new_lognorm[0::2])
+        return lognorm
+    
     # Stat: potential collisions=124.92 (2.25e+00/s)
     # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
     # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
@@ -908,66 +921,67 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
     # Stat: total phase took 55.47s
     # Stat: rootsieve took 54.54s
+    _stat_conversions = (
+        ("potential collisions: %f",
+         "stats_collisions",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"# Stat: potential collisions=%s" % cap_fp)
+        ),
+        ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
+         "stats_rawlognorm",
+         (int, float, float, float, float),
+         "0 0 0 0 0",
+         update_lognorms,
+         re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+        ),
+        ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
+         "stats_optlognorm",
+         (int, float, float, float, float),
+         "0 0 0 0 0",
+         update_lognorms,
+         re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+        ),
+        ("tried ad-value(s): %d, found polynomial(s): %d, " \
+            "below maxnorm: %d",
+         "stats_tries",
+         (int, )*3,
+         "0 0 0",
+         Statistics.add_list,
+         re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+        ),
+        # Note for "best logmu" pattern: a regex like (%s )* does not work;
+        # the number of the capture group is determined by the parentheses
+        # in the regex string, so trying to repeat a group like this will
+        # always capture to the *same* group, overwriting previous matches,
+        # so that in the end, only the last match is in the capture group.
+        ("10 best logmu: %g %g %g %g %g %g %g %g %g %g",
+         "stats_logmu",
+         (float, )*10,
+         "",
+         Statistics.smallest_10,
+         re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s"
+                    % ((cap_fp, )*10))
+        ),
+        ("total time: %f",
+         "stats_total_time",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"# Stat: total phase took %ss" % cap_fp)
+        ),
+        ("rootsieve time: %f",
+         "rootsieve_time",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
+        )
+    )
     @property
     def stat_conversions(self):
-        return (
-            ("potential collisions: %f",
-             "stats_collisions",
-             (float,),
-             "0",
-             Statistics.add_list,
-             re.compile(r"# Stat: potential collisions=%s" % cap_fp)
-            ),
-            ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
-             "stats_rawlognorm",
-             (int, float, float, float, float),
-             "0 0 0 0 0",
-             PolyselTask.update_lognorms,
-             re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
-            ),
-            ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
-             "stats_optlognorm",
-             (int, float, float, float, float),
-             "0 0 0 0 0",
-             PolyselTask.update_lognorms,
-             re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
-            ),
-            ("tried ad-value(s): %d, found polynomial(s): %d, " \
-                "below maxnorm: %d",
-             "stats_tries",
-             (int, )*3,
-             "0 0 0",
-             Statistics.add_list,
-             re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
-            ),
-            # Note for "best logmu" pattern: a regex like (%s )* does not work;
-            # the number of the capture group is determined by the parentheses
-            # in the regex string, so trying to repeat a group like this will
-            # always capture to the *same* group, overwriting previous matches,
-            # so that in the end, only the last match is in the capture group.
-            ("10 best logmu: %g %g %g %g %g %g %g %g %g %g",
-             "stats_logmu",
-             (float, )*10,
-             "",
-             Statistics.smallest_10,
-             re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s"
-                        % ((cap_fp, )*10))
-            ),
-            ("total time: %f",
-             "stats_total_time",
-             (float,),
-             "0",
-             Statistics.add_list,
-             re.compile(r"# Stat: total phase took %ss" % cap_fp)
-            ),
-            ("rootsieve time: %f",
-             "rootsieve_time",
-             (float,),
-             "0",
-             Statistics.add_list,
-             re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
-            )
-        )
+        return PolyselTask._stat_conversions
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1092,19 +1106,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
                              "no better than current best with E=%g",
                              filename, poly.MurphyE, self.bestpoly.MurphyE)
         return None
-    
-    def update_lognorms(old_lognorm, new_lognorm):
-        lognorm = [0, 0, 0, 0, 0]
-        # print("update_lognorms: old_lognorm: %s" % old_lognorm)
-        # print("update_lognorms: new_lognorm: %s" % new_lognorm)
-        # New minimum. Don't use default value of 0 for minimum
-        lognorm[1] = min(old_lognorm[1] or new_lognorm[1], new_lognorm[1])
-        # New maximum
-        lognorm[3] = max(old_lognorm[3], new_lognorm[3])
-        # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
-        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2],
-                                                 new_lognorm[0::2])
-        return lognorm
     
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
@@ -1343,37 +1344,38 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def paramnames(self):
         return super().paramnames + \
             ("qmin", "qrange", "rels_wanted", "alim")
+    _stat_conversions = (
+        (
+            "Average J: %f for %d special-q",
+            "stats_avg_J",
+            (float, int),
+            "0 0",
+            Statistics.zip_combine_mean,
+            re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+        ),
+        (
+            "Max bucket fill: %f",
+            "stats_max_bucket_fill",
+            (float, ),
+            "0",
+            max,
+            re.compile(r"#.*max bucket fill %s" % cap_fp)
+        ),
+        (
+            "Total wall clock time: %f",
+            "stats_total_wall_clock_time",
+            (float, ),
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Total wct time %ss" % cap_fp)
+        )
+    )
     @property
     def stat_conversions(self):
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
         # Total wct time 7.0s [precise timings available only for mono-thread]
         # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        return (
-            (
-                "Average J: %f for %d special-q",
-                "stats_avg_J",
-                (float, int),
-                "0 0",
-                Statistics.zip_combine_mean,
-                re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
-            ),
-            (
-                "Max bucket fill: %f",
-                "stats_max_bucket_fill",
-                (float, ),
-                "0",
-                max,
-                re.compile(r"#.*max bucket fill %s" % cap_fp)
-            ),
-            (
-                "Total wall clock time: %f",
-                "stats_total_wall_clock_time",
-                (float, ),
-                "0",
-                Statistics.add_list,
-                re.compile(r"# Total wct time %ss" % cap_fp)
-            )
-        )
+        return SievingTask._stat_conversions
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
     file_end_offset = 1000
@@ -1505,21 +1507,21 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def paramnames(self):
         return super().paramnames + \
             ("nslices_log",)
+    _stat_conversions = (
+        (
+            "CPU time for dup1: %fs",
+            "stats_dup1_time",
+            (float, ),
+            "0",
+            Statistics.add_list,
+            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+        ),
+    )
     @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return (
-            (
-                "CPU time for dup1: %fs",
-                "stats_dup1_time",
-                (float, ),
-                "0",
-                Statistics.add_list,
-                re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
-            ),
-        )
-    
+        return Duplicates1Task._stat_conversions
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
@@ -1702,20 +1704,21 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     @property
     def paramnames(self):
         return super().paramnames + ("nslices_log", "alim", "rlim")
+    _stat_conversions = (
+        (
+            "CPU time for dup2: %fs",
+            "stats_dup2_time",
+            (float, ),
+            "0",
+            Statistics.add_list,
+            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+        ),
+    )
     @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return (
-            (
-                "CPU time for dup2: %fs",
-                "stats_dup2_time",
-                (float, ),
-                "0",
-                Statistics.add_list,
-                re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
-            ),
-        )
+        return Duplicates2Task._stat_conversions
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
