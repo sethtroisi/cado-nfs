@@ -51,11 +51,11 @@ class Parameters(object):
         "alambda": "tasks.sieve.alambda",
         "alim": "alim",
         "bindir": "tasks.execpath",
-        "bwc_interleaving": "tasks.linalg.interleaving", 
-        "bwc_interval": "tasks.linalg.interval",
+        "bwc_interleaving": "tasks.linalg.bwc.interleaving", 
+        "bwc_interval": "tasks.linalg.bwc.interval",
         "bwc_mm_impl": None, # This parameter seems to be gone
-        "bwc_mn": "tasks.linalg.mn",
-        "bwc_shuffled_product": "tasks.linalg.shuffled_product",
+        "bwc_mn": "tasks.linalg.bwc.mn",
+        "bwc_shuffled_product": "tasks.linalg.bwc.shuffled_product",
         "bwmt": "tasks.linalg.bwc.threads",
         "bwstrat": "tasks.filter.merge.forbw",
         "checkrange": None,
@@ -81,10 +81,10 @@ class Parameters(object):
         "mpi": None, # FIXME: Implement this
         "n": "N",
         "name": "name",
-        "nchar": "tasks.linalg.nchar",
+        "nchar": "tasks.linalg.characters.nchar",
         "nkermax": None, # FIXME: implement this
         "nslices_log": "tasks.filter.nslices_log",
-        "nthchar": "tasks.characters.threads",
+        "nthchar": "tasks.linalg.characters.threads",
         "poly_max_threads": "tasks.polyselect.threads", 
         "parallel": None, # We (currently) always use client/server
         "polsel_admax": "tasks.polyselect.admax",
