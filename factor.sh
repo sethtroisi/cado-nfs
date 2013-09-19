@@ -136,30 +136,33 @@ cado_prefix="@CMAKE_INSTALL_PREFIX@"
 cado_source_dir="@CADO_NFS_SOURCE_DIR@"
 cado_build_dir="@CADO_NFS_BINARY_DIR@"
 example_subdir="@example_subdir@"
+example_subdir_py="@example_subdir_py@"
 mpiexec="@MPIEXEC@"
 
 if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     # We're called in the install tree.
-    paramdir="$cado_prefix/$example_subdir"
     bindir="$cado_prefix/bin"
     if $python
     then
     	scriptpath="$bindir"
     	cadofactor="$scriptpath/cadofactor.py"
+    	paramdir="$cado_prefix/$example_subdir_py"
     else
     	cadofactor="$bindir/cadofactor.pl"
+    	paramdir="$cado_prefix/$example_subdir"
     fi
     cputime="$bindir/cpu_time.sh"
 elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
-    paramdir="$cado_source_dir/params"
     cputime="$cado_source_dir/scripts/cpu_time.sh"
     if $python
     then
     	scriptpath="$cado_source_dir/scripts/cadofactor"
+        paramdir="$cado_source_dir/params_py"
         cadofactor="$scriptpath/cadofactor.py"
     else
         cadofactor="$cado_source_dir/cadofactor.pl"
+        paramdir="$cado_source_dir/params"
     fi
     # Make the path absolute.
     bindir="$cado_build_dir"
@@ -173,14 +176,15 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       eval `cd $srcdir ; $call_cmake show`
     fi
     if ! [ -z "$build_tree" ] ; then
-      paramdir="${srcdir}/params/"
       cputime="$srcdir/scripts/cpu_time.sh"
       if $python
       then
           scriptpath="${srcdir}/scripts/cadofactor"
           cadofactor="${scriptpath}/cadofactor.py"
+          paramdir="${srcdir}/params_py/"
       else
           cadofactor="${srcdir}/cadofactor.pl"
+          paramdir="${srcdir}/params/"
       fi
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
@@ -246,7 +250,7 @@ if $python; then
     # provided, in the case there is no python3 script in the path, or if
     # one which is named otherwise, or placed in a non-prority location
     # is the path, is preferred. If $PYTHON is empty, this is a no-op
-  "${TIMEOUT[@]}" $PYTHON $cadofactor --old "$t/param" n=$n tasks.execpath="$bindir" \
+  "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
   threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
   slaves.nrclients=$slaves \
   slaves.scriptpath="$scriptpath" server.address=localhost \

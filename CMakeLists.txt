@@ -212,6 +212,7 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 set(package_basename ${CADO_DIST_ARCHIVE_NAME})
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
 set(example_subdir share/${package_basename}/examples)
+set(example_subdir_py share/${package_basename}/examples_py)
 
 # These refer only to the place where files are put in the *build tree* !
 # set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
@@ -257,6 +258,7 @@ install(PROGRAMS cadofactor.pl DESTINATION bin)
 install(FILES cadofct.pm DESTINATION bin)
 
 install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
+install(DIRECTORY params_py/ DESTINATION ${example_subdir_py} FILES_MATCHING PATTERN "params.*")
 
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/factor.sh
