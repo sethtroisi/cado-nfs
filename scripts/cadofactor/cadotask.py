@@ -1889,6 +1889,7 @@ class PurgeTask(Task):
                 input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
+            self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
             return True
         
         self.state.pop("purgedfile", None)
@@ -2812,8 +2813,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         self.server.serve()
         
         try:
-            for clients in self.clients:
-                clients.launch_clients()
+            self.start_all_clients()
             
             while self.run_next_task():
                 pass
@@ -2824,10 +2824,17 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
         
-        for c in self.clients:
-            c.kill_all_clients()
+        self.stop_all_clients()
         
         self.server.shutdown()
+    
+    def start_all_clients(self):
+        for clients in self.clients:
+            clients.launch_clients()
+    
+    def stop_all_clients(self):
+        for clients in self.clients:
+            clients.kill_all_clients()
     
     def run_next_task(self):
         for task in self.tasks:
@@ -2873,6 +2880,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         elif key is Notification.HAVE_ENOUGH_RELATIONS:
             if sender is self.purge:
                 self.sieving.cancel_available_wus()
+                self.stop_all_clients()
             else:
                 raise Exception("Got HAVE_ENOUGH_RELATIONS from unknown sender")
         elif key is Notification.REGISTER_FILENAME:
