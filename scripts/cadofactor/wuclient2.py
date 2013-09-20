@@ -587,7 +587,7 @@ class WorkunitClient(object):
         request = self._urlopen(url, wait)
         # Try to open the file exclusively
         try:
-            fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+            fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
         except OSError as err:
             if err.errno == 17: # File exists error
                 # There is a possible race condition here. If process A creates 
