@@ -3771,9 +3771,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
-  param_list_decl_usage(pl, "descent-hint", "hint file ?????");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
-  param_list_decl_usage(pl, "mkhint", "(switch) ?????");
+  param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
+  param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
