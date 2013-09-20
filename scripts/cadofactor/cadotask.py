@@ -39,8 +39,6 @@ class Polynomial(object):
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string.
     
-    paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda",
-        "alambda")
     keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True),
             ("c1", False), ("c2", False), ("c3", False), ("c4", False),
             ("c5", False), ("c6", False), ("m", True), ("skew", True),
@@ -97,14 +95,11 @@ class Polynomial(object):
     def setE(self, MurphyE):
         self.MurphyE = float(MurphyE)
     
-    def create_file(self, filename, params):
+    def create_file(self, filename):
         # Write polynomial to a file, and add lines with parameters such as
         # "alim" if supplied in params
         with open(str(filename), "w") as poly_file:
             poly_file.write(str(self))
-            for key in self.paramnames:
-                if key in params:
-                    poly_file.write(key + ": %s\n" % params[key])
 
 
 class FilePath(object):
@@ -898,8 +893,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("adrange", "admin", "admax", "import") + \
-            Polynomial.paramnames
+            ("adrange", "admin", "admax", "import")
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
@@ -1109,7 +1103,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     
     def write_poly_file(self):
         filename = self.workdir.make_filename("poly")
-        self.bestpoly.create_file(filename, self.params)
+        self.bestpoly.create_file(filename)
         self.state["polyfilename"] = filename.get_wdir_relative()
     
     def get_poly(self):
