@@ -2755,6 +2755,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
       if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
         return 0; /* case (h) */
     }
+  // TODO: replace this by the primality test of mod_ul.
   if (mpz_probab_prime_p (n, 1))
     return 0; /* n is a pseudo-prime larger than L */
   return 1;
