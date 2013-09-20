@@ -882,7 +882,7 @@ if __name__ == '__main__':
     # Daemonize before we open the log file, or we close the log file's 
     # file descriptor
     if options.daemon:
-        create_daemon(umask = 0)
+        create_daemon()
 
     loglevel = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
     if not isinstance(loglevel, int):
