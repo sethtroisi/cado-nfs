@@ -43,18 +43,18 @@ class Polynomial(object):
             ("c1", False), ("c2", False), ("c3", False), ("c4", False),
             ("c5", False), ("c6", False), ("m", True), ("skew", True),
             ("type", False))
+    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$")
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
         """
-        self.poly = None
+        self.poly = {}
         self.MurphyE = 0.
-        poly = {}
         for line in lines:
             # print ("Parsing line: >%s<" % line)
             # If this is a comment line telling the Murphy E value,
             # extract the value and store it
-            match = re.match(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
+            match = self.re_Murphy.match(line)
             if match:
                 self.MurphyE = float(match.group(1))
                 continue
@@ -72,16 +72,20 @@ class Polynomial(object):
             if not key in dict(self.keys):
                 raise PolynomialParseException("Invalid key %s in line %s" %
                                 (key, line))
-            poly[key] = value
+            if key in self.poly:
+                raise PolynomialParseException("Key %s in line %s occurred "
+                                               "before" % (key, line))
+            self.poly[key] = value
         for (key, isrequired) in self.keys:
-            if isrequired and not key in poly:
+            if isrequired and not key in self.poly:
                 raise PolynomialParseException("Key %s missing" % key)
-        self.poly = poly
         return
     
     def __str__(self):
-        arr = [(key + ": " + self.poly[key] + '\n')
-               for (key,req) in self.keys if key in self.poly]
+        arr = ["%s: %s\n" % (key, self.poly[key])
+               for (key, req) in self.keys if key in self.poly]
+        if not self.MurphyE == 0.:
+            arr.append("# MurphyE = %g\n" % self.MurphyE)
         return "".join(arr)
 
     def __eq__(self, other):
@@ -89,12 +93,6 @@ class Polynomial(object):
     def __ne__(self, other):
         return self.poly != other.poly
 
-    def is_valid(self):
-        return not self.poly is None
-    
-    def setE(self, MurphyE):
-        self.MurphyE = float(MurphyE)
-    
     def create_file(self, filename):
         # Write polynomial to a file, and add lines with parameters such as
         # "alim" if supplied in params
@@ -985,7 +983,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
-            self.bestpoly.setE(self.state["bestE"])
     
     def run(self):
         self.logger.info("Starting")
@@ -1052,8 +1049,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             return False
         if not poly is None:
             self.bestpoly = poly
-            update = {"bestE": poly.MurphyE, "bestpoly": str(poly),
-                      "bestfile": filename}
+            update = {"bestpoly": str(poly), "bestfile": filename}
             self.state.update(update, commit=commit)
         return True
     
@@ -1084,7 +1080,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
                                   filename, e)
                 return None
         
-        if not poly or not poly.is_valid():
+        if not poly:
             self.logger.info('No polynomial found in %s', filename)
             return None
         if not poly.MurphyE:
