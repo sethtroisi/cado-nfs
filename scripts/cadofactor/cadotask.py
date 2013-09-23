@@ -43,7 +43,7 @@ class Polynomial(object):
             ("c1", False), ("c2", False), ("c3", False), ("c4", False),
             ("c5", False), ("c6", False), ("m", True), ("skew", True),
             ("type", False))
-    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*\(.*\)=(.*)$")
+    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=(.*)$")
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
