@@ -1058,8 +1058,8 @@ class WuAccess(object): # {
     
     def get_one_result(self):
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
-        if not r:
-            r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
+        #if not r:
+        #    r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
         if not r:
             return None
         else:
