@@ -121,9 +121,18 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             (filedesc, filename) = mkstemp(prefix=basename + '.',
                 suffix=suffix, dir=os.environ[UPLOADDIRKEY])
             diag(1, "output filename = ", filename)
-            filestuple = (fileitem.filename, filename)
+            filestuple = [fileitem.filename, filename]
+            
+            filetype = fileitem.headers.get("filetype", None)
+            if not filetype is None:
+                filestuple.append(filetype)
+                diag(1, "filetype = ", filetype)
+                command = fileitem.headers.get("command", None)
+                if not command is None:
+                    filestuple.append(command)
+                    diag(1, "command = ", command)
             if False:
-                filestuple = (fileitem.filename, os.path.basename(filename))
+                filestuple[1] = os.path.basename(filestuple[1])
             filetuples.append(filestuple)
             
             # fd is a file descriptor, make a file object from it
