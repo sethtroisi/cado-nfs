@@ -2793,6 +2793,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         }
     
     def run(self):
+        had_interrupt = False
         self.server.serve()
         
         try:
@@ -2806,10 +2807,12 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
             
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
+            had_interrupt = True
         
         self.stop_all_clients()
         
         self.server.shutdown()
+        return not had_interrupt
     
     def start_all_clients(self):
         for clients in self.clients:

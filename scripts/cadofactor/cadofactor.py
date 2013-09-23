@@ -61,4 +61,5 @@ if __name__ == '__main__':
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
                                                parameters = parameters,
                                                path_prefix = [])
-    factorjob.run()
+    if not factorjob.run():
+        sys.exit("Error occurred, terminating")
