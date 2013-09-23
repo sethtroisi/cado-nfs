@@ -1057,32 +1057,25 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.state.update(update, commit=commit)
         return True
     
-    def parse_poly(self, filename):
-        poly = None
-        with open(filename, "r") as polyfile:
-            for line in polyfile:
-                # A "# WARNING:" line can occur when a bad gcc version was
-                # used for compilation
-                if re.match("# WARNING", line):
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
                     self.logger.warn("File %s contains: %s",
                                      filename, line.strip())
-                # If there is a "No polynomial found" message in the file,
-                # we just skip it. If there is no polynomial in this file,
-                # we'll reach EOF next and get the poly==None case below.
-                # If the file happens to be the concatenation of several
-                # polyselect output files, we should keep looking.
-                if re.match("# No polynomial found", line):
-                    continue
-                # If we get the "Best polynomial" marker, we stop reading
-                # the file, and let Polynomial.__init__() parse the rest
-                if re.match("# Best polynomial found:", line):
-                    break
-            try:
-                poly = Polynomial(polyfile)
-            except PolynomialParseException as e:
-                self.logger.error("Invalid polyselect file %s: %s",
-                                  filename, e)
-                return None
+                yield line
+
+    def parse_poly(self, filename):
+        poly = None
+        try:
+            poly = Polynomial(self.read_log_warning(filename))
+        except PolynomialParseException as e:
+            self.logger.error("Invalid polyselect file %s: %s",
+                              filename, e)
+            return None
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', filename)
