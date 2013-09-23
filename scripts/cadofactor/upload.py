@@ -158,7 +158,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             message = message + 'Workunit ' + wuid.value + ' completed.\n'
         diag(1, "Finished .result()")
 
-    diag (0, sys.argv[0] + ': ', message.rstrip("\n"))
+    diag (1, sys.argv[0] + ': ', message.rstrip("\n"))
     if output == sys.stdout:
         output.write(header + message)
     else:
