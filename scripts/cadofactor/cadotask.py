@@ -1071,7 +1071,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
                 # we'll reach EOF next and get the poly==None case below.
                 # If the file happens to be the concatenation of several
                 # polyselect output files, we should keep looking.
-                if re.match("No polynomial found", line):
+                if re.match("# No polynomial found", line):
                     continue
                 # If we get the "Best polynomial" marker, we stop reading
                 # the file, and let Polynomial.__init__() parse the rest

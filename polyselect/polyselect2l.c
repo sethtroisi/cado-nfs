@@ -2348,7 +2348,7 @@ main (int argc, char *argv[])
 
   if (best_E == 0.0)
     /* This line is required by the script: */
-    printf ("No polynomial found, please increase the ad range or decrease P\n");
+    printf ("# No polynomial found, please increase the ad range or decrease P\n");
   else {
     /* This line is required by the script: */
     printf ("# Best polynomial found:\n");
