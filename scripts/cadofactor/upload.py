@@ -79,7 +79,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         else:
             errorcode = None
         if 'failedcommand' in form:
-            failedcommand = form['failedcommand'].value
+            failedcommand = int(form['failedcommand'].value)
             diag(1, "failedcommand = ", failedcommand)
         else:
             failedcommand = None
@@ -106,6 +106,8 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
 
         message = ""
         for fileitem in fileitems:
+            if not fileitem.file:
+                continue
             analyze (2, "f", fileitem)
             diag(1, "Processing file ", fileitem.filename)
             # strip leading path from file name to avoid directory traversal
@@ -167,7 +169,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
 if __name__ == '__main__':
     if DEBUG > 0:
         import cgitb
-        cgitb.enable()
+        cgitb.enable(display=0, logdir="/tmp/cgitb/")
 
     if DBFILENAMEKEY not in os.environ:
         print ('Script error: Environment variable %s not set'
