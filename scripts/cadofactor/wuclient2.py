@@ -334,9 +334,14 @@ class WuMIMEMultipart(MIMEMultipart):
         name is the string that is sent to the server as the name of the form 
         input field for the upload; for us it is always 'result'.
         filename is the string that is sent to the server as the source file 
-        name, this is the name as given in the RESULT lines, or stdout1 for 
-        stdout of the first command that ran, etc.
+        name, this is the name as given in the RESULT lines, or some generated
+        name for captured stdout/stderr.
         data is the content of the file to send.
+        filetype is "RESULT" if the file to upload is specified by a RESULT
+        line; "stdout" if it is captured stdout, and "stderr" if it is captured
+        stderr.
+        command is specified only if the data is captured stdout/stderr, and
+        gives the index of the COMMAND line that produced this stdout/stderr.
         '''
         result = MIMEApplication(data, _encoder=email.encoders.encode_noop)
         result.add_header('Content-Disposition', 'form-data', 
@@ -699,7 +704,8 @@ class WorkunitClient(object):
                 if data:
                     logging.info ("Attaching %s for command %s to upload", 
                                   name, counter)
-                    filename = "%s%d" % (name, counter)
+                    filename = "%s.%s%d" % (self.workunit.get_id(), name,
+                                            counter)
                     mimedata.attach_data("results", filename, data, name,
                                          counter)
         return mimedata
