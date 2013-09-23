@@ -418,7 +418,7 @@ class WuTable(DbTable):
         ("errorcode", "INTEGER", ""), 
         ("failedcommand", "INTEGER", ""), 
         ("timeverified", "TEXT", ""),
-        ("retryof", "TEXT", ""),
+        ("retryof", "INTEGER", "REFERENCES %s" % tablename),
         ("priority", "INTEGER", "")
     )
     primarykey = fields[0][0]
@@ -430,7 +430,9 @@ class FilesTable(DbTable):
     fields = (
         ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
-        ("path", "TEXT", "UNIQUE NOT NULL")
+        ("path", "TEXT", "UNIQUE NOT NULL"),
+        ("type", "TEXT", ""),
+        ("command", "INTEGER", "")
     )
     primarykey = fields[0][0]
     references = WuTable()
@@ -780,7 +782,8 @@ class WuAccess(object): # {
         and a dictionary 
         {"wuid": string, ..., "timeverified": string, "files": list}
         where list is None or a list of dictionaries of the from
-        {"id": int, "wuid": string, "filename": string, "path": string
+        {"id": int, "type": int, "wuid": string, "filename": string,
+        "path": string}
         Operations on instances of WuAcccess are directly carried 
         out on the database persistent storage, i.e., they behave kind 
         of as if the WuAccess instance were itself a persistent 
@@ -874,7 +877,9 @@ class WuAccess(object): # {
                 rowid = wu[pk]
             else:
                 return False
-        d = ({"filename": f[0], "path": f[1]} for f in files)
+        colnames = ("filename", "path", "type", "command")
+        # zipped length is that of shortest list, so "command" is optional 
+        d = (dict(zip(colnames, f)) for f in files)
         # These two should behave identically
         if True:
             self.mapper.insert(cursor, [{pk:rowid, "files": d},])
@@ -1104,30 +1109,30 @@ class ResultInfo(WuResultMessage):
         """
         files = []
         for f in self.record["files"]:
-            if not f["filename"].startswith("stdout") and not f["filename"].startswith("stderr"):
+            if f["type"] == "RESULT":
                 files.append(f["path"])
         return files
-    
-    def get_file(self, filename):
-        """ Get the file location of the file that was uploaded under the
-        name filename. Used internally.
+
+    def _get_stdio(self, filetype, command_nr):
+        """ Get the file location of the stdout or stderr file of the
+        command_nr-th command. Used internally.
         """
         for f in self.record["files"]:
-            if f["filename"] == filename:
+            if f["type"] == filetype and int(f["command"]) == command_nr:
                 return f["path"]
         return None
-    
+
     def get_stdout(self, command_nr):
         """ Return the path to the file that captured stdout of the 
         command_nr-th COMMAND in the workunit, or None if there was no stdout 
         output. Note that explicitly redirected stdout that was uploaded via 
         RESULT does not appear here, but in get_files()
         """
-        return self.get_file("stdout%d" % command_nr)
+        return self._get_stdio("stdout", command_nr)
     
     def get_stderr(self, command_nr):
         """ Like get_stdout(), but for stderr """
-        return self.get_file("stderr%d" % command_nr)
+        return self._get_stdio("stderr", command_nr)
     
     def get_exitcode(self, command_nr):
         """ Return the exit code of the command_nr-th command """
@@ -1368,8 +1373,9 @@ if __name__ == '__main__': # {
     parser.add_argument('-limit', metavar = 'N', 
                         help = 'Limit number of records in queries',
                         default = None)
-    parser.add_argument('-result', nargs = 4, 
-                        metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
+    parser.add_argument('-result', nargs = 6, 
+                        metavar = ('wuid', 'clientid', 'filename', 'filepath',
+                                   'filetype', 'command'), 
                         help = 'Return a result for wu from client')
     parser.add_argument('-test', action="store_true", 
                         help='Run some self tests')
@@ -1468,8 +1474,8 @@ if __name__ == '__main__': # {
             wus = db_pool.cancel(wuid)
 
     if args["result"]:
-        (wuid, clientid, filename, filepath) = args["result"]
-        db_pool.result(wuid, clientid, [(filename, filepath)])
+        result = args["result"]
+        db_pool.result(result.wuid, result.clientid, result[2:])
     
     if use_pool:
         db_pool.terminate()
