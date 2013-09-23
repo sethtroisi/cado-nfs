@@ -2294,10 +2294,13 @@ class SqrtTask(Task):
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
+            (stdoutpath, stderrpath) = \
+                self.make_std_paths(cadoprograms.Sqrt.name)
             p = cadoprograms.Sqrt(ab = True,
                     poly=polyfilename, purged=purgedfilename,
                     index=indexfilename, kernel=kernelfilename,
-                    prefix=prefix, **self.progparams[0])
+                    prefix=prefix, stdout=str(stdoutpath),
+                    stderr=str(stderrpath), **self.progparams[0])
             message = self.submit_command(p, "")
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -2306,16 +2309,19 @@ class SqrtTask(Task):
                 self.state.setdefault("next_dep", 0)
                 dep = self.state["next_dep"]
                 self.logger.info("Trying dependency %d", dep)
+                (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, rat=True,
                         alg=True, gcd=True, dep=dep, poly=polyfilename,
                         purged=purgedfilename, index=indexfilename,
                         kernel=kernelfilename, prefix=prefix,
+                        stdout=str(stdoutpath), stderr=str(stderrpath), 
                         **self.progparams[0])
                 message = self.submit_command(p, "dep%d" % self.state["next_dep"])
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
-                stdout = message.get_stdout(0)
-                lines = stdout.decode("ascii").splitlines()
+                stdout = stdoutpath.open("r").read()
+                lines = stdout.splitlines()
                 # Skip last factor which cannot produce a new split on top
                 # of what the smaller factors did
                 for line in lines[:-1]:
