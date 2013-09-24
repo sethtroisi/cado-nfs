@@ -760,7 +760,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         if not isinstance(self, HasStatistics):
             return
         new_stats = Statistics(self.stat_conversions)
-        with open(filename, "r") as inputfile:
+        with open(str(filename), "r") as inputfile:
             for line in inputfile:
                 new_stats.parse_line(line)
         self.logger.debug("Newly arrived stats: %s", new_stats.as_dict())
@@ -1431,8 +1431,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         self.add_output_files({output_files[0]: rels}, commit=False)
         self.parse_stats(stderrfilename, commit=False)
         self.verification(message, True, commit=True)
-        self.logger.info("Found %d relations in %s, total is now %d",
-                         rels, output_files[0], self.state["rels_found"])
+        self.logger.info("Found %d relations in %s, total is now %d/%d",
+                         rels, output_files[0], self.state["rels_found"],
+                         self.state["rels_wanted"])
     
     def parse_rel_count(self, filename):
         size = os.path.getsize(filename)
@@ -1615,7 +1616,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 self.state.update({"run_counter": run_counter + 1},
                                   commit=False)
                 current_counts = self.parse_slice_counts(stderr)
-                self.parse_stats(str(stderrpath), commit=False)
+                self.parse_stats(stderrpath, commit=False)
                 # Add relation count from the newly processed files to the
                 # relations-per-slice dict
                 update1 = {str(idx): self.slice_relcounts[str(idx)] + 
@@ -1773,7 +1774,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             self.add_output_files(outfilenames, commit=True)
             # Disabled for now, there are multiple lines of the same format
             # which we can't parse atm.
-            # self.parse_stats(str(stderrpath))
+            # self.parse_stats(stderrpath)
             self.logger.info("%d unique relations remain on slice %d",
                              nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
@@ -2154,7 +2155,7 @@ class MergeTask(Task):
         return self.get_state_filename("densefile")
 
 
-class LinAlgTask(Task):
+class LinAlgTask(Task, HasStatistics):
     """ Runs the linear algebra step """
     @property
     def name(self):
@@ -2167,8 +2168,49 @@ class LinAlgTask(Task):
         return (cadoprograms.BWC,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ()
+        return super().paramnames
+    _stat_conversions = (
+        ("Krylov CPU time %f",
+         "krylov_time",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"krylov done, N=\d+ ; CPU: %s" % cap_fp)
+        ),
+        ("Krylov COMM time %f",
+         "krylov_comm",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"krylov done, N=\d+ ; COMM: %s" % cap_fp)
+        ),
+        (
+            "Lingen CPU time %f",
+            "lingen_time",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"Total computation took %s" % cap_fp)
+        ),
+        ("Mksol CPU time %f",
+         "mksol_time",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"mksol done, N=\d+ ; CPU: %s" % cap_fp)
+        ),
+        ("Mksol COMM time %f",
+         "mksol_comm",
+         (float,),
+         "0",
+         Statistics.add_list,
+         re.compile(r"mksol done, N=\d+ ; COMM: %s" % cap_fp)
+        ),
+    )
+    @property
+    def stat_conversions(self):
+        return LinAlgTask._stat_conversions
+    
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
@@ -2196,7 +2238,9 @@ class LinAlgTask(Task):
             dependencyfilename = self.workdir.make_filename("W", use_subdir = True)
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
-            self.state["dependency"] =  dependencyfilename.get_wdir_relative()
+            self.parse_stats(stdoutpath, commit=False)
+            update = {"dependency": dependencyfilename.get_wdir_relative()}
+            self.state.update(update, commit=True)
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
         return True
 
@@ -2498,7 +2542,7 @@ class StartClientsTask(Task):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep
         # or some such
-        rc = self.kill_client(clientid, signal=0)
+        (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
     def launch_clients(self):
@@ -2687,7 +2731,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.params = self.parameters.myparams(("name", "workdir"))
+        self.params = self.parameters.myparams(("name", "workdir", "N"))
         self.db_listener = self.make_db_listener()
         self.registered_filenames = self.make_db_dict('server_registered_filenames')
         
@@ -2800,6 +2844,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
     
     def run(self):
         had_interrupt = False
+        self.logger.info("Factoring %s", self.params["N"])
         self.server.serve()
         
         try:
