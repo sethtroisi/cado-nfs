@@ -3490,22 +3490,22 @@ void * process_bucket_region(thread_data_ptr th)
             thread_side_data_ptr ts = th->sides[side];
         
             /* Init rational norms */
-            rep->tn[side] -= seconds ();
+            rep->tn[side] -= seconds_thread ();
             init_rat_norms_bucket_region(S[side], i, si);
+            rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
               fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
-            rep->tn[side] += seconds ();
 
             /* Apply rational buckets */
-            rep->ttbuckets_apply -= seconds();
+            rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            rep->ttbuckets_apply += seconds();
+            rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small rational primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
@@ -3524,24 +3524,24 @@ void * process_bucket_region(thread_data_ptr th)
             thread_side_data_ptr ts = th->sides[side];
 
             /* Init algebraic norms */
-            rep->tn[side] -= seconds ();
+            rep->tn[side] -= seconds_thread ();
 
             unsigned char * xS = S[side ^ 1];
             init_alg_norms_bucket_region(S[side], xS, i, si);
-            rep->tn[side] += seconds ();
+            rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
               fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply algebraic buckets */
-            rep->ttbuckets_apply -= seconds();
+            rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            rep->ttbuckets_apply += seconds();
+            rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
@@ -3553,9 +3553,9 @@ void * process_bucket_region(thread_data_ptr th)
         }
 
         /* Factor survivors */
-        rep->ttf -= seconds ();
+        rep->ttf -= seconds_thread ();
         rep->reports += factor_survivors (th, i, S, w);
-        rep->ttf += seconds ();
+        rep->ttf += seconds_thread ();
 
         /* For the descent mode, we bail out as early as possible */
         if (las->hint_table && rep->reports) break;
@@ -3696,7 +3696,10 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     if (rep->both_even) {
         fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
-    fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
+    if (las->nb_threads > 1) {
+        fprintf (las->output, "# Time for this special-q: %1.4fs [tally only available in mono-thread]\n", qt0);
+    } else {
+        fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
             rep->tn[RATIONAL_SIDE],
@@ -3706,9 +3709,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
             rep->ttbuckets_apply,
             qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
             rep->ttf);
-#if 0   /* incompatible with the todo list */
-    rep_bench += rep->reports;
-#endif
+    }
     las_report_accumulate(report, rep);
     las_report_clear(rep);
 }/*}}}*/
@@ -4116,9 +4117,9 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /*{{{ Display tally */
     if (las->nb_threads > 1) 
-        print_stats (las->output, "# Total cpu time %1.1fs\n", t0);
+        print_stats (las->output, "# Total cpu time %1.1fs [tally only available in mono-thread]\n", t0);
     else
-        print_stats (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+        print_stats (las->output, "# Total cpu time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
