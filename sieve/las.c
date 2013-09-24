@@ -4116,7 +4116,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /*{{{ Display tally */
     if (las->nb_threads > 1) 
-        print_stats (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
+        print_stats (las->output, "# Total cpu time %1.1fs\n", t0);
     else
         print_stats (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
