@@ -6,7 +6,7 @@ import abc
 import random
 import time
 import datetime
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from itertools import zip_longest
 from math import log, sqrt
 import logging
@@ -211,8 +211,9 @@ class Statistics(object):
     """ Class that holds statistics on program execution, and can merge two
     such statistics.
     """
-    def __init__(self, conversions):
+    def __init__(self, conversions, formats):
         self.conversions = conversions
+        self.stat_formats = formats
         self.stats = {}
     
     @staticmethod
@@ -235,7 +236,7 @@ class Statistics(object):
         dictionary
         """
         for conversion in self.conversions:
-            (msgfmt, key, types, defaults, combine, regex) = conversion
+            (key, types, defaults, combine, regex) = conversion
             if key in stats:
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
@@ -248,7 +249,7 @@ class Statistics(object):
         If they are found, they are added to self.stats.
         """
         for conversion in self.conversions:
-            (msgfmt, key, types, defaults, combine, regex) = conversion
+            (key, types, defaults, combine, regex) = conversion
             match = regex.match(line)
             if match:
                 assert not key in self.stats
@@ -271,7 +272,7 @@ class Statistics(object):
         
         assert self.conversions is new_stats.conversions
         for conversion in self.conversions:
-            (msgfmt, key, types, defaults, combine, regex) = conversion
+            (key, types, defaults, combine, regex) = conversion
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
@@ -279,12 +280,27 @@ class Statistics(object):
         return {key:self._to_str(self.stats[key]) for key in self.stats}
     
     def as_strings(self):
+        """ Convert statistics to lines of output
+        
+        The self.stat_formats is an array, with each entry corresponding to
+        a line that should be output.
+        Each such entry is again an array, containing the format strings that
+        should be used for the conversion of statistics. If a conversion
+        fails with a KeyError or an IndexError, it is silently skipped over.
+        This is to allow producing lines on which some statistics are not
+        printed if the value is not known.
+        """
         result = []
-        for conversion in self.conversions:
-            (msgfmt, key, types, defaults, combine, regex) = conversion
-            if key in self.stats:
-                if len(self.stats[key]) == len(types):
-                    result.append(msgfmt % tuple(self.stats[key]))
+        stats = self.stats
+        for format_arr in self.stat_formats:
+            line = []
+            for format_str in format_arr:
+                try:
+                    line.append(format_str.format(**stats))
+                except (KeyError, IndexError):
+                    pass
+            if line:
+                result.append("".join(line))
         return result
     
     # Helper functions for processing statistics.
@@ -501,10 +517,13 @@ class HasStatistics(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
     def stat_conversions(self):
         pass
+    @abc.abstractproperty
+    def stat_formats(self):
+        pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.statistics = Statistics(self.stat_conversions)
+        self.statistics = Statistics(self.stat_conversions, self.stat_formats)
     def get_statistics_as_strings(self):
         return self.statistics.as_strings()
 
@@ -759,7 +778,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     def parse_stats(self, filename, *, commit):
         if not isinstance(self, HasStatistics):
             return
-        new_stats = Statistics(self.stat_conversions)
+        new_stats = Statistics(self.stat_conversions, self.stat_formats)
         with open(str(filename), "r") as inputfile:
             for line in inputfile:
                 new_stats.parse_line(line)
@@ -914,66 +933,77 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     # Stat: total phase took 55.47s
     # Stat: rootsieve took 54.54s
     _stat_conversions = (
-        ("potential collisions: %f",
-         "stats_collisions",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"# Stat: potential collisions=%s" % cap_fp)
+        (
+            "stats_collisions",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: potential collisions=%s" % cap_fp)
         ),
-        ("raw lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
-         "stats_rawlognorm",
-         (int, float, float, float, float),
-         "0 0 0 0 0",
-         update_lognorms,
-         re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+        (
+            "stats_rawlognorm",
+            (int, float, float, float, float),
+            "0 0 0 0 0",
+            update_lognorms,
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
         ),
-        ("optimized lognorm (nr/min/av/max/std): %d/%f/%f/%f/%f",
-         "stats_optlognorm",
-         (int, float, float, float, float),
-         "0 0 0 0 0",
-         update_lognorms,
-         re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+        (
+            "stats_optlognorm",
+            (int, float, float, float, float),
+            "0 0 0 0 0",
+            update_lognorms,
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
         ),
-        ("tried ad-value(s): %d, found polynomial(s): %d, " \
-            "below maxnorm: %d",
-         "stats_tries",
-         (int, )*3,
-         "0 0 0",
-         Statistics.add_list,
-         re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+        (
+            "stats_tries",
+            (int, )*3,
+            "0 0 0",
+            Statistics.add_list,
+            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
         ),
         # Note for "best logmu" pattern: a regex like (%s )* does not work;
         # the number of the capture group is determined by the parentheses
         # in the regex string, so trying to repeat a group like this will
         # always capture to the *same* group, overwriting previous matches,
         # so that in the end, only the last match is in the capture group.
-        ("10 best logmu: %g %g %g %g %g %g %g %g %g %g",
-         "stats_logmu",
-         (float, )*10,
-         "",
-         Statistics.smallest_10,
-         re.compile(r"# Stat: best logmu: %s %s %s %s %s %s %s %s %s %s"
-                    % ((cap_fp, )*10))
+        (
+            "stats_logmu",
+            (float, )*10,
+            "",
+            Statistics.smallest_10,
+            re.compile(r"# Stat: best logmu:" + (" " + cap_fp)*10)
         ),
-        ("total time: %f",
-         "stats_total_time",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"# Stat: total phase took %ss" % cap_fp)
+        (
+            "stats_total_time",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: total phase took %ss" % cap_fp)
         ),
-        ("rootsieve time: %f",
-         "rootsieve_time",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
+        (
+            "stats_rootsieve_time",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
         )
     )
     @property
     def stat_conversions(self):
-        return PolyselTask._stat_conversions
+        return self._stat_conversions
+    @property
+    def stat_formats(self):
+        return (
+            ["potential collisions: {stats_collisions[0]}"],
+            ["raw lognorm (nr/min/av/max/std): {stats_rawlognorm[0]:d}"] + 
+                ["/{stats_rawlognorm[%d]:.3f}" % i for i in range(1, 5)],
+            ["optimized lognorm (nr/min/av/max/std): {stats_optlognorm[0]:d}"] +
+                ["/{stats_optlognorm[%d]:.3f}" % i for i in range(1, 5)],
+            ["10 best logmu: {stats_logmu[0]}"] +
+                [" {stats_logmu[%d]}" % i for i in range(1, 10)],
+            ["Total time: {stats_total_time[0]}",
+             ", rootsieve time: {stats_rootsieve_time[0]}"]
+            )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1329,7 +1359,6 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             ("qmin", "qrange", "rels_wanted", "alim")
     _stat_conversions = (
         (
-            "Average J: %f for %d special-q",
             "stats_avg_J",
             (float, int),
             "0 0",
@@ -1337,7 +1366,6 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
         ),
         (
-            "Max bucket fill: %f",
             "stats_max_bucket_fill",
             (float, ),
             "0",
@@ -1345,12 +1373,18 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             re.compile(r"#.*max bucket fill %s" % cap_fp)
         ),
         (
-            "Total wall clock time: %f",
             "stats_total_wall_clock_time",
             (float, ),
             "0",
             Statistics.add_list,
             re.compile(r"# Total wct time %ss" % cap_fp)
+        ),
+        (
+            "stats_total_time",
+            (float, ),
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Total time %ss" % cap_fp)
         )
     )
     @property
@@ -1358,7 +1392,15 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
         # Total wct time 7.0s [precise timings available only for mono-thread]
         # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        return SievingTask._stat_conversions
+        return self._stat_conversions
+    @property
+    def stat_formats(self):
+        return (
+            ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
+                ", max bucket fill: {stats_max_bucket_fill[0]}"],
+            ["Total wall clock time: {stats_total_wall_clock_time[0]}s"],
+            ["Total time: {stats_total_time[0]}s"],
+        )
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
     file_end_offset = 1000
@@ -1493,7 +1535,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             ("nslices_log",)
     _stat_conversions = (
         (
-            "CPU time for dup1: %fs",
             "stats_dup1_time",
             (float, ),
             "0",
@@ -1505,7 +1546,12 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return Duplicates1Task._stat_conversions
+        return self._stat_conversions
+    @property
+    def stat_formats(self):
+        return (
+            ["CPU time for dup1: {stats_dup1_time[0]}s"],
+        )
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
@@ -1690,7 +1736,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return super().paramnames + ("nslices_log", "alim", "rlim")
     _stat_conversions = (
         (
-            "CPU time for dup2: %fs",
             "stats_dup2_time",
             (float, ),
             "0",
@@ -1702,7 +1747,12 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return Duplicates2Task._stat_conversions
+        return self._stat_conversions
+    @property
+    def stat_formats(self):
+        return (
+            ["CPU time for dup2: {stats_dup2_time[0]}s"],
+        )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2170,46 +2220,52 @@ class LinAlgTask(Task, HasStatistics):
     def paramnames(self):
         return super().paramnames
     _stat_conversions = (
-        ("Krylov CPU time %f",
-         "krylov_time",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"krylov done, N=\d+ ; CPU: %s" % cap_fp)
-        ),
-        ("Krylov COMM time %f",
-         "krylov_comm",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"krylov done, N=\d+ ; COMM: %s" % cap_fp)
+        (
+            "krylov_time",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"krylov done, N=\d+ ; CPU: %s" % cap_fp)
         ),
         (
-            "Lingen CPU time %f",
+            "krylov_comm",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"krylov done, N=\d+ ; COMM: %s" % cap_fp)
+        ),
+        (
             "lingen_time",
             (float,),
             "0",
             Statistics.add_list,
             re.compile(r"Total computation took %s" % cap_fp)
         ),
-        ("Mksol CPU time %f",
-         "mksol_time",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"mksol done, N=\d+ ; CPU: %s" % cap_fp)
+        (
+            "mksol_time",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"mksol done, N=\d+ ; CPU: %s" % cap_fp)
         ),
-        ("Mksol COMM time %f",
-         "mksol_comm",
-         (float,),
-         "0",
-         Statistics.add_list,
-         re.compile(r"mksol done, N=\d+ ; COMM: %s" % cap_fp)
+        (
+            "mksol_comm",
+            (float,),
+            "0",
+            Statistics.add_list,
+            re.compile(r"mksol done, N=\d+ ; COMM: %s" % cap_fp)
         ),
     )
     @property
     def stat_conversions(self):
-        return LinAlgTask._stat_conversions
+        return self._stat_conversions
+    @property
+    def stat_formats(self):
+        return (
+            ["Krylov: CPU time {krylov_time[0]}", ", COMM time {krylov_comm[0]}"],
+            ["Lingen CPU time {lingen_time[0]}"],
+            ["Mksol: CPU time {mksol_time[0]}", ", COMM time {mksol_comm[0]}"],
+        )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
