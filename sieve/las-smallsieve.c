@@ -9,18 +9,6 @@
 #include "misc.h"
 #include "portability.h"
 
-static inline uint64_t cputicks()
-{
-        uint64_t r;
-        __asm__ __volatile__(
-                "rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rdx, %%rax\n\t"
-                : "=a"(r)
-                :
-                : "%rdx", "cc");
-        return r;
-}
 
 /* It's defined as a global variable in las.c */
 extern pthread_mutex_t io_mutex;
@@ -439,12 +427,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                                int side,
 			       where_am_I_ptr w MAYBE_UNUSED)
 {
-  /*
-  static uint64_t cpt0 = 0, cpt1 = 0;
-  static uint8_t cpt2 = 0;
-  cpt0 -= cputicks();
-  */
-
     const uint32_t I = si->I;
     const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
     unsigned long j;
@@ -648,8 +630,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     /* use size_t for k, i and twop to speed up in x86 with LEA asm instructions */
     for(size_t k = 0 ; k < (size_t) ssd->nb_ssp ; k++) {
       int fence = next_marker->index;
-      /* cpt1 -= cputicks(); */
-      
       /* Some defines for the critical part of small sieve.
 	 0. The C code and the asm X86 code have the same algorithm.
 	 Read first the C code to understand easily the asm code.
@@ -762,7 +742,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #undef U1
 #undef U2
 #undef U
-        /* cpt1 += cputicks(); */
         unsigned int event = (next_marker++)->event;
         if (event == SSP_END) {
             ASSERT_ALWAYS(fence == ssd->nb_ssp);
@@ -930,10 +909,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             ssdpos[k] = i0;
         }
     }
-    /*		  
-    cpt0 += cputicks();
-    if (!cpt2++) fprintf (stderr, "ALM %lu %lu\n", cpt0 / 3000, cpt1 / 3000);
-    */
 }
 /* }}} */
 

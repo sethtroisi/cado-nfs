@@ -33,6 +33,7 @@
 #cmakedefine    HAVE_LIBGEN_H
 #cmakedefine    HAVE_SIGHUP
 #cmakedefine    HAVE_GETRUSAGE
+#cmakedefine    HAVE_RUSAGE_THREAD
 #cmakedefine    HAVE_GETC_UNLOCKED
 #cmakedefine    HAVE_NANOSLEEP
 #cmakedefine    HAVE_USLEEP
