@@ -1431,8 +1431,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         self.add_output_files({output_files[0]: rels}, commit=False)
         self.parse_stats(stderrfilename, commit=False)
         self.verification(message, True, commit=True)
-        self.logger.info("Found %d relations in %s, total is now %d",
-                         rels, output_files[0], self.state["rels_found"])
+        self.logger.info("Found %d relations in %s, total is now %d/%d",
+                         rels, output_files[0], self.state["rels_found"],
+                         self.state["rels_wanted"])
     
     def parse_rel_count(self, filename):
         size = os.path.getsize(filename)
