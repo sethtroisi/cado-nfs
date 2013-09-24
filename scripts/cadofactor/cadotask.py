@@ -2542,7 +2542,7 @@ class StartClientsTask(Task):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep
         # or some such
-        rc = self.kill_client(clientid, signal=0)
+        (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
     def launch_clients(self):
