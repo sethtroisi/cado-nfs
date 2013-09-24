@@ -11,6 +11,7 @@ from itertools import zip_longest
 from math import log, sqrt
 import logging
 import socket
+import gzip
 import patterns
 import wudb
 import cadoprograms
@@ -724,7 +725,7 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     def get_number_outstanding_wus(self):
         return 0
     
-    def verification(self, message, ok, *, commit):
+    def verification(self, wuid, ok, *, commit):
         pass
 
     def get_state_filename(self, key):
@@ -821,14 +822,13 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.create(wutext, commit=commit)
     
-    def verification(self, message, ok, *, commit):
-        wuid = message.get_wu_id()
+    def verification(self, wuid, ok, *, commit):
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
         key = "wu_received"
         self.state.update({key: self.state[key] + 1}, commit=False)
-        self.wuar.verification(message.get_wu_id(), ok, commit=commit)
+        self.wuar.verification(wuid, ok, commit=commit)
     
     def cancel_available_wus(self):
         self.logger.info("Cancelling remaining workunits")
@@ -1068,7 +1068,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         (filename, ) = message.get_output_files()
         ok = self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
-        self.verification(message, ok, commit=True)
+        self.verification(message.get_wu_id(), ok, commit=True)
     
     def process_polyfile(self, filename, commit=True):
         try:
@@ -1456,36 +1456,45 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderr(0)
-        if  stderrfilename is None:
-            self.logger.error("No stderr output received for workunit %s,"
-                              "ignoring (relations file: %s)",
-                              identifier, output_files[0])
-            self.verification(message, False, commit=True)
-            return
-        rels = self.parse_rel_count(stderrfilename)
+        ok = self.add_file(output_files[0], stderrfilename, commit=False)
+        self.verification(message.get_wu_id(), ok, commit=True)
+
+    def add_file(self, filename, stats_filename=None, commit=True):
+        use_stats_filename = stats_filename
+        if stats_filename is None:
+            self.logger.warn("No statistics output received for file %s, "
+                              "have to scan file", filename)
+            use_stats_filename = filename
+        rels = self.parse_rel_count(use_stats_filename)
         if rels is None:
-            self.verification(message, False, commit=True)
-            self.logger.error("Number of relations message not found in "
-                              "file %s", stderrfilename)
-            return
+            self.logger.error("Number of relations not found in "
+                              "file %s", use_stats_filename)
+            return False
         update = {"rels_found": self.state["rels_found"] + rels}
         self.state.update(update, commit=False)
-        self.add_output_files({output_files[0]: rels}, commit=False)
-        self.parse_stats(stderrfilename, commit=False)
-        self.verification(message, True, commit=True)
+        self.add_output_files({filename: rels}, commit=False)
+        if stats_filename:
+            self.parse_stats(stats_filename, commit=commit)
         self.logger.info("Found %d relations in %s, total is now %d/%d",
-                         rels, output_files[0], self.state["rels_found"],
+                         rels, filename, self.state["rels_found"],
                          self.state["rels_wanted"])
+        return True
     
     def parse_rel_count(self, filename):
-        size = os.path.getsize(filename)
-        with open(filename, "r") as f:
+        (name, ext) = os.path.splitext(filename)
+        if ext == ".gz":
+            f = gzip.open(filename, "rb")
+        else:
+            size = os.path.getsize(filename)
+            f = open(filename, "rb")
             f.seek(max(size - self.file_end_offset, 0))
-            for line in f:
-                match = re.match(r"# Total (\d+) reports ", line)
-                if match:
-                    rels = int(match.group(1))
-                    return rels
+        for line in f:
+            match = re.match(br"# Total (\d+) reports ", line)
+            if match:
+                rels = int(match.group(1))
+                f.close()
+                return rels
+        f.close()
         return None
     
     def get_statistics_as_strings(self):
