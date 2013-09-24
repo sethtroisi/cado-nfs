@@ -1356,7 +1356,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("qmin", "qrange", "rels_wanted", "alim")
+            ("qmin", "qrange", "rels_wanted", "alim", "import")
     _stat_conversions = (
         (
             "stats_avg_J",
@@ -1426,7 +1426,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        while self.state["rels_found"] < self.state["rels_wanted"]:
+        if "import" in self.params:
+            self.import_files(self.params["import"])
+        
+        while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
             # We use .gzip by default, unless set to no in parameters
@@ -1444,7 +1447,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
             self.state.update({"qnext": q1}, commit=True)
         self.logger.info("Reached target of %d relations, now have %d",
-                         self.state["rels_wanted"], self.state["rels_found"])
+                         self.state["rels_wanted"], self.get_nrels())
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return True
     
@@ -1470,13 +1473,13 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.logger.error("Number of relations not found in "
                               "file %s", use_stats_filename)
             return False
-        update = {"rels_found": self.state["rels_found"] + rels}
+        update = {"rels_found": self.get_nrels() + rels}
         self.state.update(update, commit=False)
-        self.add_output_files({filename: rels}, commit=False)
+        self.add_output_files({filename: rels}, commit=commit)
         if stats_filename:
             self.parse_stats(stats_filename, commit=commit)
         self.logger.info("Found %d relations in %s, total is now %d/%d",
-                         rels, filename, self.state["rels_found"],
+                         rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
     
@@ -1497,6 +1500,20 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         f.close()
         return None
     
+    def import_files(self, input_filename):
+        if input_filename.startswith('@'):
+            with open(input_filename[1:], "r") as f:
+                filenames = f.read().splitlines()
+        else:
+            filenames = [input_filename]
+        for filename in filenames:
+            if filename in self.get_output_filenames():
+                self.logger.info("Re-scanning file %s", filename)
+                nrels = self.get_nrels() - self.get_nrels(filename)
+                self.state.update({"rels_found": nrels})
+                self.forget_output_filenames([filename], commit=True)
+            self.add_file(filename)
+
     def get_statistics_as_strings(self):
         strings = ["Total number of relations: %d" % self.get_nrels()]
         strings += super().get_statistics_as_strings()
@@ -1513,19 +1530,20 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             return self.output_files[filename]
     
     def request_more_relations(self, target):
-        if target > self.state["rels_wanted"]:
+        wanted = self.state["rels_wanted"]
+        if target > wanted:
             self.state["rels_wanted"] = target
-        if self.state["rels_wanted"] > self.state["rels_found"]:
+            wanted = target
+        nrels = self.get_nrels()
+        if wanted > nrels:
             self.send_notification(Notification.WANT_TO_RUN, None)
             self.logger.info("New goal for number of relations is %d, "
                              "currently have %d. Need to sieve more",
-                             self.state["rels_wanted"],
-                             self.state["rels_found"])
+                             wanted, nrels)
         else:
             self.logger.info("New goal for number of relations is %d, but "
                              "already have %d. No need to sieve more",
-                             self.state["rels_wanted"],
-                             self.state["rels_found"])
+                             wanted, nrels)
 
 class Duplicates1Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
