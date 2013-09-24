@@ -3696,7 +3696,12 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     if (rep->both_even) {
         fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
-    if (las->nb_threads > 1) {
+#ifdef HAVE_RUSAGE_THREAD
+    int dont_print_tally = 0;
+#else
+    int dont_print_tally = 1;
+#endif
+    if (dont_print_tally && las->nb_threads > 1) {
         fprintf (las->output, "# Time for this special-q: %1.4fs [tally only available in mono-thread]\n", qt0);
     } else {
         fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
@@ -4116,7 +4121,12 @@ int main (int argc0, char *argv0[])/*{{{*/
         facul_print_stats (las->output);
 
     /*{{{ Display tally */
-    if (las->nb_threads > 1) 
+#ifdef HAVE_RUSAGE_THREAD
+    int dont_print_tally = 0;
+#else
+    int dont_print_tally = 1;
+#endif
+    if (dont_print_tally && las->nb_threads > 1) 
         print_stats (las->output, "# Total cpu time %1.1fs [tally only available in mono-thread]\n", t0);
     else
         print_stats (las->output, "# Total cpu time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
