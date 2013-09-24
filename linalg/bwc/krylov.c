@@ -278,7 +278,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print, 0);
     }
 
-    timing_final_tally(pi, timing, mmt->mm->ncoeffs, tcan_print);
+    timing_final_tally("krylov", pi, timing, mmt->mm->ncoeffs, tcan_print);
 
 #if 0
     pi_log_clear(pi->m);
