@@ -1468,7 +1468,14 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.logger.warn("No statistics output received for file %s, "
                               "have to scan file", filename)
             use_stats_filename = filename
-        rels = self.parse_rel_count(use_stats_filename)
+        try:
+            rels = self.parse_rel_count(use_stats_filename)
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File %s does not exist", use_stats_filename)
+                return False
+            else:
+                raise
         if rels is None:
             self.logger.error("Number of relations not found in "
                               "file %s", use_stats_filename)
