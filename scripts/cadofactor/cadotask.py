@@ -2687,7 +2687,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.params = self.parameters.myparams(("name", "workdir"))
+        self.params = self.parameters.myparams(("name", "workdir", "N"))
         self.db_listener = self.make_db_listener()
         self.registered_filenames = self.make_db_dict('server_registered_filenames')
         
@@ -2800,6 +2800,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
     
     def run(self):
         had_interrupt = False
+        self.logger.info("Factoring %s", self.params["N"])
         self.server.serve()
         
         try:
