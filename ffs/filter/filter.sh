@@ -1,9 +1,9 @@
 #!/bin/bash
 # usage: ./filter.sh [OPTIONS]
 # Mandatory options:
-#     name=<name> 
-#     rels=/path/to/rels 
-#     cadobuild=/path/to/cado/bin 
+#     name=<name>
+#     rels=/path/to/rels
+#     cadobuild=/path/to/cado/bin
 #     param=/path/to/param/file
 # Other options:
 #     wdir=path/to/output/directory (default ./<name>.filter.`date`)
@@ -15,7 +15,7 @@
 #     maxlevel=nn                   (default 30)
 #     addfullcol=[0|1]              (default 0)
 #     badideals=file                (default "")
-# ex: 
+# ex:
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
 
 check_error () {
@@ -72,7 +72,7 @@ check_dir_exists () {
   fi
 }
 
-for i in "$@" ; do 
+for i in "$@" ; do
   case "$i" in
     *=*)
       shift
@@ -106,6 +106,14 @@ for i in "$@" ; do
         fi
       elif [ "x${p}" = "xbadideals" ] ; then
         declare BADIDEALS="-badideals $value"
+      elif [ "x${p}" = "xnfsdl" ] ; then
+        if [ "x$value" = "x1" ] ; then
+          declare NFSDL="1"
+        fi
+      elif [ "x${p}" = "xell" ] ; then
+        declare MOD_ELL="$value"
+      elif [ "x${p}" = "xsmexp" ] ; then
+        declare SM_EXP="$value"
       else
         echo "Invalid option: $i"
         exit 1
@@ -131,12 +139,15 @@ check_file_exists "${ORIGINAL_PARAMFILE}"
 : ${DIR:="${NAME}.filter.`date +%y%m%d-%H%M`"}
 : ${TIDY:="0"}
 : ${COVERNMAX:="100"}
-: ${EXCESS:="0"} 
+: ${EXCESS:="0"}
 : ${REQ_EXCESS:="-1"}  # -1.0 means no parameter is passed in purge
 : ${MAXLEVEL:="30"}
 : ${BADIDEALS:=""}
 : ${ADDFULLCOL:=""}
 : ${VERBOSE:="0"}
+: ${NFSDL:="0"}
+: ${MOD_ELL:="<modulus>"}
+: ${SM_EXP:="<sm_exp>"}
 
 
 # Def variables to continue a filtering step that was stopped ######
@@ -149,12 +160,20 @@ DO_DUP21="1"
 DO_PURGE="1"
 DO_MERGE="1"
 DO_REPLAY="1"
+DO_SM="1"
 
 # Init variables
 
 mkdir -p ${DIR}
 
-GF=`grep "^gf=" ${ORIGINAL_PARAMFILE} | cut -d = -f 2`
+#For FFS case, recover the caracteristic from the param file
+if [ "x${NFSDL}" != "x1" ] ; then
+  GF=`grep "^gf=" ${ORIGINAL_PARAMFILE} | cut -d = -f 2`
+else
+  LPBA=`grep "^lpba" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
+  LPBR=`grep "^lpbr" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
+  EXCESS=`grep -m 1 "^c[0-9]:" ${ORIGINAL_PARAMFILE} | cut -c 2`
+fi
 
 CMDFILE="${DIR}/${NAME}.cmd"
 
@@ -171,6 +190,7 @@ LOGD21="${DIR}/${NAME}.dup2_1.log"
 LOGP="${DIR}/${NAME}.purge.log"
 LOGM="${DIR}/${NAME}.merge.log"
 LOGR="${DIR}/${NAME}.replay.log"
+LOGSM="${DIR}/${NAME}.sm.log"
 
 NRELSFILE="${DIR}/${NAME}.nrels"
 
@@ -180,22 +200,34 @@ RENUMBERFILE="${DIR}/${NAME}.renumber"
 RELSFILE="${DIR}/${NAME}.rels.purged.gz"
 DELRELSFILE="${DIR}/${NAME}.rels.deleted"
 HISFILE="${DIR}/${NAME}.merge.his"
+INDEXFILE="${DIR}/${NAME}.replay.index"
+SMFILE="${DIR}/${NAME}.sm"
 
 PREFIX_MATRIX="${DIR}/${NAME}.matrix"
 INDEX_ID_MERGE="${DIR}/${NAME}.ideals"
 
+#For FFS case, use dup-ffs-f*. For NFS-DL use dup2
+if [ "x${NFSDL}" != "x1" ] ; then
 BIN_FREE="${CADO_BUILD}/ffs/f${GF}/freerels";
-BIN_DUP1="${CADO_BUILD}/filter/dup1";
 BIN_DUP2="${CADO_BUILD}/filter/dup2-ffs-f${GF}";
+else
+BIN_FREE="${CADO_BUILD}/sieve/freerel";
+BIN_DUP2="${CADO_BUILD}/filter/dup2";
+fi
+BIN_DUP1="${CADO_BUILD}/filter/dup1";
 BIN_PURGE="${CADO_BUILD}/filter/purge";
 BIN_MERGE="${CADO_BUILD}/filter/merge-dl";
 BIN_REPLAY="${CADO_BUILD}/filter/replay-dl";
+BIN_SM="${CADO_BUILD}/linalg/sm";
 check_file_exists "${BIN_FREE}"
 check_file_exists "${BIN_DUP1}"
 check_file_exists "${BIN_DUP2}"
 check_file_exists "${BIN_PURGE}"
 check_file_exists "${BIN_MERGE}"
 check_file_exists "${BIN_REPLAY}"
+if [ "x${NFSDL}" = "x1" ] ; then
+check_file_exists "${BIN_SM}"
+fi
 
 INITDONE="${DIR}/${NAME}.init_done"
 FREEDONE="${DIR}/${NAME}.freerels_done"
@@ -205,23 +237,27 @@ DUP21DONE="${DIR}/${NAME}.dup2_1_done"
 PURGEDONE="${DIR}/${NAME}.purge_done"
 MERGEDONE="${DIR}/${NAME}.merge_done"
 REPLAYDONE="${DIR}/${NAME}.replay_done"
+SMDONE="${DIR}/${NAME}.sm_done"
 
-if [ -e ${INITDONE} ] ; then 
+if [ -e ${INITDONE} ] ; then
   DO_INIT="0"
-  if [ -e ${FREEDONE} ] ; then 
+  if [ -e ${FREEDONE} ] ; then
     DO_FREEREL="0"
-    if [ -e ${DUP1DONE} ] ; then 
+    if [ -e ${DUP1DONE} ] ; then
       DO_DUP1="0"
-      if [ -e ${DUP20DONE} ] ; then 
+      if [ -e ${DUP20DONE} ] ; then
         DO_DUP20="0"
-        if [ -e ${DUP21DONE} ] ; then 
+        if [ -e ${DUP21DONE} ] ; then
           DO_DUP21="0"
-          if [ -e ${PURGEDONE} ] ; then 
+          if [ -e ${PURGEDONE} ] ; then
             DO_PURGE="0"
-            if [ -e ${MERGEDONE} ] ; then 
+            if [ -e ${MERGEDONE} ] ; then
               DO_MERGE="0"
-              if [ -e ${REPLAYDONE} ] ; then 
+              if [ -e ${REPLAYDONE} ] ; then
                 DO_REPLAY="0"
+                if [ -e ${SMDONE} ] ; then
+                  DO_SM="0"
+                fi
               fi
             fi
           fi
@@ -235,7 +271,7 @@ fi
 if [ "${DO_INIT}" -eq "1" ] ; then
 
   echo "Start initialisation."
-  
+ 
   ls -1 "${RELDIR}/" > ${FILELIST_DUP1} # all files in RELDIR goes to FILELIST
   check_error "$?" "could not construct list of relation files from ${RELDIR}."
   NB_RELFILE=`wc -l ${FILELIST_DUP1} | cut -d " " -f 1`
@@ -262,14 +298,17 @@ fi
 ###### FREERELS ######
 if [ "${DO_FREEREL}" -eq "1" ] ; then
 
+#For FFS case, use dup-ffs-f*. For NFS-DL use dup2
+if [ "x${NFSDL}" != "x1" ] ; then
   argsf1="${PARAMFILE} -renumber ${RENUMBERFILE} "
-  argsf2="${BADIDEALS} ${ADDFULLCOL} "
-  CMD="${BIN_FREE} $argsf1 $argsf2"
-  run_cmd "${CMD}" "${FREERELSFILE}" "${LOGF}" "${VERBOSE}" "${FREEDONE}"
-  
-  rm -rf ${FREEGZFILE}
-  gzip ${FREERELSFILE}
-  check_error "$?" "Error running gzip."
+  argsf2=""
+else
+  argsf1="-poly ${PARAMFILE} -renumber ${RENUMBERFILE} "
+  argsf2="-lpba ${LPBA} -lpbr ${LPBR} "
+fi
+  argsf3="-out ${FREEGZFILE} ${BADIDEALS} ${ADDFULLCOL} "
+  CMD="${BIN_FREE} $argsf1 $argsf2 $argsf3"
+  run_cmd "${CMD}" "${LOGF}" "${LOGF}" "${VERBOSE}" "${FREEDONE}"
 else
   echo "freerels already done."
 fi
@@ -287,14 +326,15 @@ else
   echo "dup1 already done."
 fi
 ##################
-  
-ESTIMATED_NB_REL="`tail -n 3 ${LOGD1} | head -n 1 | cut -d \" \" -f 4`"
+ 
 ls -1 "${NODUPDIR}/0/" > ${FILELIST_DUP2}
-argsd2="-K ${ESTIMATED_NB_REL} -filelist ${FILELIST_DUP2} -poly ${PARAMFILE} "
+argsd2="-filelist ${FILELIST_DUP2} -poly ${PARAMFILE} -renumber ${RENUMBERFILE} "
 
 ###### DUP2_0 ######
 if [ "${DO_DUP20}" -eq "1" ] ; then
-  CMD="${BIN_DUP2} $argsd2 -basepath ${NODUPDIR}/0 -renumber ${RENUMBERFILE}"
+  NRELSDUP20=`grep "^# slice 0" ${LOGD1} | cut -d " " -f 5`
+  argsd20="-nrels ${NRELSDUP20} -basepath ${NODUPDIR}/0 "
+  CMD="${BIN_DUP2} -dl $argsd2 $argsd20"
   run_cmd "${CMD}" "${LOGD20}" "${LOGD20}" "${VERBOSE}" "${DUP20DONE}"
 else
   echo "dup2_0 already done."
@@ -303,7 +343,9 @@ fi
 
 ###### DUP2_1 ######
 if [ "${DO_DUP21}" -eq "1" ] ; then
-  CMD="${BIN_DUP2} $argsd2 -basepath ${NODUPDIR}/1 -renumber ${RENUMBERFILE}"
+  NRELSDUP21=`grep "^# slice 1" ${LOGD1} | cut -d " " -f 5`
+  argsd21="-nrels ${NRELSDUP21} -basepath ${NODUPDIR}/1 "
+  CMD="${BIN_DUP2} -dl $argsd2 $argsd21"
   run_cmd "${CMD}" "${LOGD21}" "${LOGD21}" "${VERBOSE}" "${DUP21DONE}"
 else
   echo "dup2_1 already done."
@@ -318,7 +360,7 @@ echo "${NBREL} unique relations remaining."
 
 NBPR=`grep nprimes ${LOGD20} | cut -d "=" -f 2`
 #MIN=`grep min_index ${LOGD20} | cut -d "=" -f 2`
-MIN="0" # FIXME MIN=ceil(2*minlim/log(minlim)) (in the integers case, not true 
+MIN="0" # FIXME MIN=ceil(2*minlim/log(minlim)) (in the integers case, not true
 #in the polynomials case (as in FFS))
 
 ###### PURGE ######
@@ -346,7 +388,7 @@ echo "${STAT_END_PURGE} ."
 ###### MERGE ######
 if [ "${DO_MERGE}" -eq "1" ] ; then
   argm0="-out ${HISFILE} -mat ${RELSFILE} -forbw 3 -coverNmax ${COVERNMAX} "
-  argm1="-keep ${EXCESS} -maxlevel ${MAXLEVEL} -skip 0 " 
+  argm1="-keep ${EXCESS} -maxlevel ${MAXLEVEL} -skip 0 "
 
   CMD="${BIN_MERGE} $argm0 $argm1"
   run_cmd "${CMD}" "${LOGM}" "${LOGM}" "${VERBOSE}" "${MERGEDONE}"
@@ -360,7 +402,11 @@ fi
 
 ###### REPLAY ######
 if [ "${DO_REPLAY}" -eq "1" ] ; then
-  argsr0="--noindex -purged ${RELSFILE} -his ${HISFILE} "
+  if [ "x${NFSDL}" != "x1" ] ; then
+    argsr0="--noindex -purged ${RELSFILE} -his ${HISFILE} "
+  else
+    argsr0="-index ${INDEXFILE} -purged ${RELSFILE} -his ${HISFILE} "
+  fi
   argsr1="-out ${PREFIX_MATRIX} -ideals ${INDEX_ID_MERGE} -skip 0"
 
   CMD="${BIN_REPLAY} $argsr0 $argsr1 $argsr2"
@@ -370,6 +416,20 @@ else
 fi
 ####################
 
+
+######## SM ########   # only for NFS-DL
+if [ "${DO_SM}" -eq "1" ] ; then
+  echo "${MOD_ELL}" > ${DIR}/${NAME}.q
+  argssm0="-poly ${PARAMFILE} -purged ${RELSFILE} -index ${INDEXFILE} "
+  argssm1="-out ${SMFILE} -gorder ${MOD_ELL} -smexp ${SM_EXP}"
+  CMD="${BIN_SM} $argssm0 $argssm1 "
+  run_cmd "${CMD}" "${LOGSM}" "${LOGSM}" "${VERBOSE}" "${SMDONE}"
+else
+  echo "sm already done."
+fi
+####################
+
+
 # Help: output the command line needed to recontruct all logarithms from the
 # ones computed by linear algebra
 
@@ -377,7 +437,7 @@ BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
 OUTLOG="${DIR}/${NAME}.logarithms.values"
 argsre0="-ideals ${INDEX_ID_MERGE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
 argsre1="-relspurged ${RELSFILE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
-argsre2="-out ${OUTLOG} -log <file> -q <modulus>"
+argsre2="-out ${OUTLOG} -log <file> -q ${MOD_ELL}"
 echo "${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2 "
 
 ###### If tidy is asked ######
