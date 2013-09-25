@@ -75,9 +75,6 @@ polsel_adrange=5000          # individual tasks
 polsel_incr=60               # forced divisor of lc(f)
     # This factor is usually a smooth number, which forces projective roots in
     # the algebraic polynomial. 60 is a good start, 210 is popular as well.
-    # This controls the computational effort put into the rotation step.
-    # The higher this value is, the better the found polynomial will be,
-    # but it will take more time.
      
 # - runtime environment parameters for polyselect -
 polsel_delay=60              # time between two checks
