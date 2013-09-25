@@ -22,6 +22,7 @@ import subprocess
 import hashlib
 import logging
 import socket
+import signal
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -139,7 +140,6 @@ def create_daemon(workdir = None, umask = None):
     __revision__ = "$Id$"
     __version__ = "0.2"
     
-    import signal
     # Use a one-element array to fool Python into not binding a local
     # name in handler(). Python3 has 'nonlocal' for that
     sigusr1_received = [False]
@@ -214,7 +214,6 @@ def create_daemon(workdir = None, umask = None):
         # SIGHUP signal.  In any case, there are no ill-effects if it is
         # ignored.
         #
-        # import signal           # Set handlers for asynchronous events.
         # signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
         try:
@@ -445,10 +444,33 @@ class WorkunitProcessor(object):
                                      stderr = subprocess.PIPE, 
                                      close_fds = True,
                                      preexec_fn = renice_func)
+
+            # If we receive SIGTERM (the default signal for "kill") while a
+            # subprocess is running, we want to be able to terminate the
+            # subprocess, too, so that the system is not kepy busy with
+            # orphaned processes.
+            # Python installs by default a signal handler for SIGINT which
+            # raises the KeyboardInterrupt exception. This is convenient, as
+            # it lets us simply terminate the child in an exception handler.
+            # Thus we install the signal handler of SIGINT for SIGTERM as well,
+            # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+
+            sigint_handler = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGTERM , sigint_handler)  
+
             # Wait for command to finish executing, capturing stdout and stderr 
             # in output tuple
-            (child_stdout, child_stderr) = child.communicate()
-
+            try:
+                (child_stdout, child_stderr) = child.communicate()
+            except KeyboardInterrupt:
+                logging.critical("KeyboardInterrupt received, killing child "
+                                 "process with PID %d", child.pid)
+                child.terminate()
+                raise # Re-raise KeyboardInterrupt to terminate wuclient.py
+            
+            # Un-install our handler and revert to the default handler
+            signal.signal(signal.SIGTERM , signal.SIG_DFL)
+            
             self.stdio["stdout"].append(child_stdout)
             self.stdio["stderr"].append(child_stderr)
 
