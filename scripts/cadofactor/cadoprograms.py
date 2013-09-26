@@ -545,7 +545,6 @@ class MakeFB(Program):
     def __init__(self, *,
                  poly: Parameter(is_input_file = True),
                  alim: Parameter(),
-                 nopowers: Toggle() = None,
                  maxbits: Parameter() = None,
                  out: Parameter() = None,
                  **kwargs):
