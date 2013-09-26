@@ -22,6 +22,7 @@ import subprocess
 import hashlib
 import logging
 import socket
+import signal
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -139,7 +140,6 @@ def create_daemon(workdir = None, umask = None):
     __revision__ = "$Id$"
     __version__ = "0.2"
     
-    import signal
     # Use a one-element array to fool Python into not binding a local
     # name in handler(). Python3 has 'nonlocal' for that
     sigusr1_received = [False]
@@ -214,7 +214,6 @@ def create_daemon(workdir = None, umask = None):
         # SIGHUP signal.  In any case, there are no ill-effects if it is
         # ignored.
         #
-        # import signal           # Set handlers for asynchronous events.
         # signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
         try:
@@ -334,9 +333,14 @@ class WuMIMEMultipart(MIMEMultipart):
         name is the string that is sent to the server as the name of the form 
         input field for the upload; for us it is always 'result'.
         filename is the string that is sent to the server as the source file 
-        name, this is the name as given in the RESULT lines, or stdout1 for 
-        stdout of the first command that ran, etc.
+        name, this is the name as given in the RESULT lines, or some generated
+        name for captured stdout/stderr.
         data is the content of the file to send.
+        filetype is "RESULT" if the file to upload is specified by a RESULT
+        line; "stdout" if it is captured stdout, and "stderr" if it is captured
+        stderr.
+        command is specified only if the data is captured stdout/stderr, and
+        gives the index of the COMMAND line that produced this stdout/stderr.
         '''
         result = MIMEApplication(data, _encoder=email.encoders.encode_noop)
         result.add_header('Content-Disposition', 'form-data', 
@@ -440,10 +444,33 @@ class WorkunitProcessor(object):
                                      stderr = subprocess.PIPE, 
                                      close_fds = True,
                                      preexec_fn = renice_func)
+
+            # If we receive SIGTERM (the default signal for "kill") while a
+            # subprocess is running, we want to be able to terminate the
+            # subprocess, too, so that the system is not kepy busy with
+            # orphaned processes.
+            # Python installs by default a signal handler for SIGINT which
+            # raises the KeyboardInterrupt exception. This is convenient, as
+            # it lets us simply terminate the child in an exception handler.
+            # Thus we install the signal handler of SIGINT for SIGTERM as well,
+            # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+
+            sigint_handler = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGTERM , sigint_handler)  
+
             # Wait for command to finish executing, capturing stdout and stderr 
             # in output tuple
-            (child_stdout, child_stderr) = child.communicate()
-
+            try:
+                (child_stdout, child_stderr) = child.communicate()
+            except KeyboardInterrupt:
+                logging.critical("KeyboardInterrupt received, killing child "
+                                 "process with PID %d", child.pid)
+                child.terminate()
+                raise # Re-raise KeyboardInterrupt to terminate wuclient.py
+            
+            # Un-install our handler and revert to the default handler
+            signal.signal(signal.SIGTERM , signal.SIG_DFL)
+            
             self.stdio["stdout"].append(child_stdout)
             self.stdio["stderr"].append(child_stderr)
 
@@ -587,7 +614,7 @@ class WorkunitClient(object):
         request = self._urlopen(url, wait)
         # Try to open the file exclusively
         try:
-            fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+            fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
         except OSError as err:
             if err.errno == 17: # File exists error
                 # There is a possible race condition here. If process A creates 
@@ -699,7 +726,8 @@ class WorkunitClient(object):
                 if data:
                     logging.info ("Attaching %s for command %s to upload", 
                                   name, counter)
-                    filename = "%s%d" % (name, counter)
+                    filename = "%s.%s%d" % (self.workunit.get_id(), name,
+                                            counter)
                     mimedata.attach_data("results", filename, data, name,
                                          counter)
         return mimedata
@@ -882,7 +910,7 @@ if __name__ == '__main__':
     # Daemonize before we open the log file, or we close the log file's 
     # file descriptor
     if options.daemon:
-        create_daemon(umask = 0)
+        create_daemon()
 
     loglevel = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
     if not isinstance(loglevel, int):

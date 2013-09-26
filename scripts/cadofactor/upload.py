@@ -79,7 +79,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         else:
             errorcode = None
         if 'failedcommand' in form:
-            failedcommand = form['failedcommand'].value
+            failedcommand = int(form['failedcommand'].value)
             diag(1, "failedcommand = ", failedcommand)
         else:
             failedcommand = None
@@ -106,6 +106,8 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
 
         message = ""
         for fileitem in fileitems:
+            if not fileitem.file:
+                continue
             analyze (2, "f", fileitem)
             diag(1, "Processing file ", fileitem.filename)
             # strip leading path from file name to avoid directory traversal
@@ -119,9 +121,18 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             (filedesc, filename) = mkstemp(prefix=basename + '.',
                 suffix=suffix, dir=os.environ[UPLOADDIRKEY])
             diag(1, "output filename = ", filename)
-            filestuple = (fileitem.filename, filename)
+            filestuple = [fileitem.filename, filename]
+            
+            filetype = fileitem.headers.get("filetype", None)
+            if not filetype is None:
+                filestuple.append(filetype)
+                diag(1, "filetype = ", filetype)
+                command = fileitem.headers.get("command", None)
+                if not command is None:
+                    filestuple.append(command)
+                    diag(1, "command = ", command)
             if False:
-                filestuple = (fileitem.filename, os.path.basename(filename))
+                filestuple[1] = os.path.basename(filestuple[1])
             filetuples.append(filestuple)
             
             # fd is a file descriptor, make a file object from it
@@ -156,7 +167,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             message = message + 'Workunit ' + wuid.value + ' completed.\n'
         diag(1, "Finished .result()")
 
-    diag (0, sys.argv[0] + ': ', message.rstrip("\n"))
+    diag (1, sys.argv[0] + ': ', message.rstrip("\n"))
     if output == sys.stdout:
         output.write(header + message)
     else:
@@ -167,7 +178,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
 if __name__ == '__main__':
     if DEBUG > 0:
         import cgitb
-        cgitb.enable()
+        cgitb.enable(display=0, logdir="/tmp/cgitb/")
 
     if DBFILENAMEKEY not in os.environ:
         print ('Script error: Environment variable %s not set'

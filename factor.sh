@@ -25,6 +25,7 @@ options:
                     selection and sieve steps on localhost. For broader
                     use on several machines, use the advanced script
                     cadofactor.pl
+    -pl           - use Perl cadofactor script as worker
     -py           - use Python cadofactor script as worker
     -timeout <integer>
                   - abort computation after this many seconds
@@ -114,6 +115,9 @@ for ((i=1; i<=3; i=i+1)) ; do
     shift
   elif [ "$1" = "-py" ]; then
     python=true
+    shift
+  elif [ "$1" = "-pl" ]; then
+    python=false
     shift
   else
     break

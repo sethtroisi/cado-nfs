@@ -1267,132 +1267,10 @@ typedef uint64_t plattice_x_t;
 // of the computation time.
 
 
-// 4 reduce_plattice optimized versions.
-// - First is the optimized original & use the subtractive Euclidean algorithm
-//   to avoid the 32 bits integer division. It's the fastest for old processors
-//   and AMD processors.
-// - Second is the optimized version with the 32 bits integer division.
-//   It's the fastest for Intel beginning from the Nehalem processor.
-// - Third is the version with double. No interest for X86 (use the next); maybe
-//   for others processors ?
-// - Last is the SSE(2) version with double. In Nehalem, it's the slowest version
-//   except the previous, of course. Maybe in the Intel lastest procesors ?
-
-#define reduce_plattice reduce_plattice1
-
 NOPROFILE_INLINE int
-reduce_plattice0 (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
+reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
-  int32_t a0 = - (int32_t) p, a1 = 0, b0 = (int32_t) r, b1 = 1, k;
-#if MOD2_CLASSES_BS
-  const int32_t hI = (int32_t) ((si->I) >> 1);
-#else
-  const int32_t hI = (int32_t) (si->I);
-#endif
-  const int32_t mhI = -hI;
-    /* subtractive variant of Euclid's algorithm */
-    for(;;) {
-        /* a0 < 0 <= b0 < -a0 */
-        if (b0 < hI) break;
-        /* a0 < 0 < b0 < -a0 */
-        /* for( ; a0 += b0, a1 += b1, a0 + b0 <= 0 ; ); */
-	for (;;) {
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	  a0 += b0; a1 += b1; if (a0 + b0 > 0) break;
-	}
-        /* -b0 < a0 <= 0 < b0 */
-        if (a0 > mhI) break;
-        /* -b0 < a0 < 0 < b0 */
-        /* for( ; b0 += a0, b1 += a1, b0 + a0 >= 0 ; ); */
-	for (;;) {
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	  b0 += a0; b1 += a1; if (b0 + a0 < 0) break;
-	}
-        /* a0 < 0 <= b0 < -a0 */
-    }
-    k = b0 - hI - a0;
-    if (b0 > -a0) {
-        if (UNLIKELY(!a0)) return 0;
-        /* Now that |a0| < hI, we switch to classical division, since
-           if say |a0|=1 and b0 is large, the subtractive variant
-           will be very expensive.
-           We want b0 + k*a0 < hI, i.e., b0 - hI + 1 <= k*(-a0),
-           i.e., k = ceil((b0-hI+1)/a0). */
-	k /= a0; b0 -= k * a0; b1 -= k * a1;
-    } else {
-        if (UNLIKELY(!b0)) return 0;
-        /* we switch to the classical algorithm here too */
-	k /= b0; a0 += k * b0; a1 += k * b1;
-    }
-    pli->a0 = a0; pli->a1 = a1; pli->b0 = b0; pli->b1 = b1;
-#if 0
-    /* Too expensive checks */
-    /*
-    ASSERT (a1 > 0);
-    ASSERT (b1 > 0);
-    ASSERT ((a0 <= 0) && (a0 > -hI));
-    ASSERT ((b0 >= 0) && (b0 <  hI));
-    ASSERT (b0 - a0 >= hI);
-    */
-    int32_t J = si->J;
-#if MOD2_CLASSES_BS
-#if 1
-#endif
-
-#if 1 || !MOD2_CLASSES
-    // left-shift everybody, since the following correspond to the
-    // lattice 2p.
-    a0 <<= 1; a1 <<= 1;
-    b0 <<= 1; b1 <<= 1;
-#endif
-#endif
-
-    pli->a = ((a1 << si->conf->logI) + a0);
-    pli->c = ((b1 << si->conf->logI) + b0);
-    if (a1 > J || (a1 == J && a0 > 0)) { pli->a = INT32_MAX/2; }
-    if (b1 > J || (b1 == J && b0 > 0)) { pli->c = INT32_MAX/2; }
-
-    /* It's difficult to encode everybody in 32 bits, and still keep
-     * relevant information...
-     */
-    pli->bound0 = -a0;
-    pli->bound1 = si->I - b0;
-#endif
-    return 1;
-}
-
-NOPROFILE_INLINE int
-reduce_plattice1 (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
-{
-  int32_t a1 = 0, a0 = -((int32_t) p), b1 = 1, b0 = (int32_t) r, k;
+  int32_t a0 = -((int32_t) p), b0 = (int32_t) r, a1 = 0, b1 = 1, k;
 #if MOD2_CLASSES_BS
   const int32_t hI = (int32_t) ((si->I) >> 1);
 #else
@@ -1427,139 +1305,6 @@ reduce_plattice1 (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, si
   }
   pli->a0 = (int32_t) a0; pli->a1 = (uint32_t) a1; pli->b0 = (int32_t) b0; pli->b1 = (uint32_t) b1;
   return 1;
-}
-
-NOPROFILE_INLINE int
-reduce_plattice2 (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
-{
-  double a1 = 0., a0 = (double) -((int) p), b1 = 1., b0 = (double) r, k;
-#if MOD2_CLASSES_BS
-  const double hI = (double) ((si->I) >> 1);
-#else
-  const double hI = (double) (si->I);
-#endif
-  const double mhI = -hI;
-  for(;;) {
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = trunc(a0 / b0); a0 -= k * b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = trunc(b0 / a0); b0 -= k * a0; b1 -= k * a1;
-  }
-  k = b0 - hI - a0;
-  if (b0 > -a0) {
-    if (UNLIKELY(a0 == 0.)) return 0;
-    k = trunc(k / a0); b0 -= k * a0; b1 -= k * a1;
-  } else {
-    if (UNLIKELY(b0 == 0.)) return 0;
-    k = trunc(k / b0); a0 += k * b0; a1 += k * b1;
-  }
-  pli->a0 = (int32_t) a0; pli->a1 = (uint32_t) a1; pli->b0 = (int32_t) b0; pli->b1 = (uint32_t) b1;
-  return 1;
-}
-
-/* I have tried to use the intrinsics only. But it's too boring, the code
-   is too long & with many tests + loop. So, ASM x86 is your friend.
-   But it's obvious the initialisation and the end must be done in intrinsics
-   to avoid a waste of general registers (gcc could use the stack if possible).
-   NB: To avoid a stupid gcc false warning, I have to clear hI for nothing. Grrr. */
-NOPROFILE_INLINE int
-reduce_plattice3 (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
-{
-  int ret;
-  static const double one = 1.0;
-  __m128d a, b, hI, mhI; /* args 1 to 4; ret is the 0th arg */
-  a = b = hI = mhI = _mm_setzero_pd();
-  b = _mm_cvtsi32_sd(b, p); a = _mm_sub_sd (a, b);     /* a   = 0     -p */
-  b = _mm_loadh_pd(b, &one); b = _mm_cvtsi32_sd(b, r); /* b   = 1      r */ 
-#if MOD2_CLASSES_BS
-  hI = _mm_cvtsi32_sd(hI, (si->I) >> 1);               /* hI  = 0  (si->I)>>1 */
-#else
-  hI = _mm_cvtsi32_sd(hI, si->I);                      /* hI  = 0  si->I */
-#endif
-  mhI = _mm_sub_sd (mhI, hI);                          /* mhI = -hI */
-  __asm__ ( "xor %0, %0\n"
-    ".balign 8\n 0:\n"          /* Main loop */
-
-#define INLOOP								\
-    "ucomisd %3, %2\n"							\
-      "movsd %1, %%xmm0\n"						\
-      "jb 1f\n"                   /* if (b0 < hI ) break; */		\
-      "divsd %2, %%xmm0\n"						\
-      "unpcklpd %%xmm0, %%xmm0\n" /* a0/b0 a0/b0 */			\
-      "cvttpd2dq %%xmm0, %%xmm0\n"					\
-      "cvtdq2pd %%xmm0, %%xmm0\n" /* trunc(a0/b0) trunc(a0/b0) */	\
-      "mulpd %2, %%xmm0\n"						\
-      "subpd %%xmm0, %1\n"        /* a -= b * trunc(a0/b0) */		\
-									\
-      "ucomisd %1, %4\n"						\
-      "movsd %2, %%xmm0\n"						\
-      "jb 1f\n"                   /* if (mhI < a0) break; */		\
-      "divsd %1, %%xmm0\n"						\
-      "unpcklpd %%xmm0, %%xmm0\n" /* b0/a0 b0/a0 */			\
-      "cvttpd2dq %%xmm0, %%xmm0\n"					\
-      "cvtdq2pd %%xmm0, %%xmm0\n" /* trunc(b0/a0) trunc(b0/a0) */	\
-      "mulpd %1, %%xmm0\n"						\
-      "subpd %%xmm0, %2\n"        /* b -= a * trunc(b0/a0) */		\
-    
-    INLOOP INLOOP INLOOP INLOOP INLOOP INLOOP INLOOP INLOOP
-#undef INLOOP 
-    "jmp 0b\n"
-    
-    "1:\n"
-    "xorpd %%xmm0, %%xmm0\n"
-    "subsd %1, %%xmm0\n"        /* 0 -a0 */
-    "ucomisd %%xmm0, %2\n"  
-    "xorpd %%xmm1, %%xmm1\n"
-    "addsd %2, %%xmm0\n"    
-    "jb 2f\n"                   /* if (-a0 < b0) goto 2nd part*/
-    
-    "ucomisd %%xmm1, %1\n"      /* part 1 (then) : -a0 >= b0 */
-    "subsd %3, %%xmm0\n"        /* 0 b0-a0-hI */
-    "je 4f\n"                   /* if (a0 == 0) goto 4 (error) */
-    
-    "divsd %1, %%xmm0\n"
-    "cvttpd2dq %%xmm0, %%xmm0\n"
-    "cvtdq2pd %%xmm0, %%xmm0\n"
-    "unpcklpd %%xmm0, %%xmm0\n" /* trunc((b0-hI-a0)/a0) trunc((b0-hI-a0)/a0) */
-    "mulpd %1, %%xmm0\n"
-    "subpd %%xmm0, %2\n"        /* b -= a * trunc((b0-hI-a0)/a0) */
-    "jmp 3f\n"
-    
-    "2:\n"           
-    "ucomisd %%xmm1, %2\n"      /* part 2 (else) : -a0 < b0 */
-    "subsd %3, %%xmm0\n"        /* 0 b0-a0-hI */
-    "je 4f\n"                   /* if (b0 == 0) goto return 1 (error) */
-    
-    "divsd %2, %%xmm0\n"
-    "cvttpd2dq %%xmm0, %%xmm0\n"
-    "cvtdq2pd %%xmm0, %%xmm0\n"
-    "unpcklpd %%xmm0, %%xmm0\n" /* trunc((b0-hI-a0)/b0) trunc((b0-hI-a0)/b0) */
-    "mulpd %2, %%xmm0\n"
-    "addpd %%xmm0, %1\n"        /* a += b * trunc((b0-hI-a0)/b0) */
-    
-    "3:\n"
-    "cvttpd2dq %1, %1\n"
-    "cvttpd2dq %2, %2\n"
-    "unpcklpd %2, %1\n"         /* final result : a = b1 b0 a1 a0 in (u)int32_t * 4 */
-    "inc %0\n"
-    
-    "4:\n"
-	    
-    : "=&r"(ret), "+&x"(a), "+&x"(b) : "x"(hI), "x"(mhI) : "%xmm0", "%xmm1", "cc");
-  _mm_storeu_pd((double *) pli, a);
-  return(ret);
 }
 
 #if MOD2_CLASSES_BS
@@ -2755,6 +2500,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
       if (3 * lpb < s && mpz_cmp (n, si->BBBB[side]) < 0)
         return 0; /* case (h) */
     }
+  // TODO: replace this by the primality test of mod_ul.
   if (mpz_probab_prime_p (n, 1))
     return 0; /* n is a pseudo-prime larger than L */
   return 1;
@@ -3489,22 +3235,22 @@ void * process_bucket_region(thread_data_ptr th)
             thread_side_data_ptr ts = th->sides[side];
         
             /* Init rational norms */
-            rep->tn[side] -= seconds ();
+            rep->tn[side] -= seconds_thread ();
             init_rat_norms_bucket_region(S[side], i, si);
+            rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
               fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
-            rep->tn[side] += seconds ();
 
             /* Apply rational buckets */
-            rep->ttbuckets_apply -= seconds();
+            rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            rep->ttbuckets_apply += seconds();
+            rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small rational primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
@@ -3523,24 +3269,24 @@ void * process_bucket_region(thread_data_ptr th)
             thread_side_data_ptr ts = th->sides[side];
 
             /* Init algebraic norms */
-            rep->tn[side] -= seconds ();
+            rep->tn[side] -= seconds_thread ();
 
             unsigned char * xS = S[side ^ 1];
             init_alg_norms_bucket_region(S[side], xS, i, si);
-            rep->tn[side] += seconds ();
+            rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
               fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply algebraic buckets */
-            rep->ttbuckets_apply -= seconds();
+            rep->ttbuckets_apply -= seconds_thread();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
 	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
-            rep->ttbuckets_apply += seconds();
+            rep->ttbuckets_apply += seconds_thread();
 
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
@@ -3552,9 +3298,9 @@ void * process_bucket_region(thread_data_ptr th)
         }
 
         /* Factor survivors */
-        rep->ttf -= seconds ();
+        rep->ttf -= seconds_thread ();
         rep->reports += factor_survivors (th, i, S, w);
-        rep->ttf += seconds ();
+        rep->ttf += seconds_thread ();
 
         /* For the descent mode, we bail out as early as possible */
         if (las->hint_table && rep->reports) break;
@@ -3695,7 +3441,15 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     if (rep->both_even) {
         fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
-    fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
+#ifdef HAVE_RUSAGE_THREAD
+    int dont_print_tally = 0;
+#else
+    int dont_print_tally = 1;
+#endif
+    if (dont_print_tally && las->nb_threads > 1) {
+        fprintf (las->output, "# Time for this special-q: %1.4fs [tally only available in mono-thread]\n", qt0);
+    } else {
+        fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
             rep->tn[RATIONAL_SIDE],
@@ -3705,9 +3459,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
             rep->ttbuckets_apply,
             qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
             rep->ttf);
-#if 0   /* incompatible with the todo list */
-    rep_bench += rep->reports;
-#endif
+    }
     las_report_accumulate(report, rep);
     las_report_clear(rep);
 }/*}}}*/
@@ -3770,9 +3522,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
-  param_list_decl_usage(pl, "descent-hint", "hint file ?????");
-  param_list_decl_usage(pl, "no-prepare-hints", "(switch) ?????");
-  param_list_decl_usage(pl, "mkhint", "(switch) ?????");
+  param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
+  param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
+  param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -3782,20 +3534,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     unsigned long sq = 0;
     int allow_largesq = 0;
     double totJ = 0.0;
-    /* following command-line values override those in the polynomial file */
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
-#if 0   /* incompatible with the todo list */
-    int bench = 0;
-    int bench2 = 0;
-    double skip_factor = 1.01;  /* next_q = q*skip_factor in bench mode */
-    double bench_percent = 1e-3; 
-    long bench_tot_rep = 0;
-    double bench_tot_time = 0.0;
-    const char *statsfilename = NULL;
-    const char *sievestatsfilename = NULL;
-#endif
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -3813,10 +3554,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
-#if 0   /* incompatible with the todo list */
-    param_list_configure_switch(pl, "-bench", &bench);
-    param_list_configure_switch(pl, "-bench2", &bench2);
-#endif
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_alias(pl, "-skew", "-S");
 
@@ -3848,14 +3585,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     */
     int descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
 
-#if 0   /* incompatible with the todo list */
-    statsfilename = param_list_lookup_string (pl, "stats");
-    sievestatsfilename = param_list_lookup_string (pl, "sievestats");
-    param_list_parse_double(pl, "skfact", &skip_factor);
-    param_list_parse_double(pl, "percent", &bench_percent);
-    param_list_parse_double (pl, "stats_prob", &stats_prob);
-#endif
-
     /* We have the following dependency chain (not sure the account below
      * is exhaustive).
      *
@@ -3869,7 +3598,6 @@ int main (int argc0, char *argv0[])/*{{{*/
      * This is probably enough to justify having separate sieve_info's
      * for the given sizes.
      */
-
 
     if (!param_list_parse_switch(pl, "-no-prepare-hints")) {
         /* Create a default siever instance among las->sievers if needed */
@@ -3886,86 +3614,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
     }
 
-
-#if 0   /* incompatible with the todo list */
-    /* {{{ stats stuff */
-    si->bench=bench + bench2;
-    if (statsfilename != NULL) /* a file was given */
-      {
-        /* if the file exists, we open it in read-mode, otherwise we create
-           it */
-        stats_file = fopen (statsfilename, "r");
-        if (stats_file != NULL)
-          stats = 2;
-        else
-          {
-            stats_file = fopen (statsfilename, "w");
-            if (stats_file == NULL)
-              {
-                fprintf (stderr, "Error, cannot create file %s\n",
-                         statsfilename);
-                exit (EXIT_FAILURE);
-              }
-            stats = 1;
-          }
-      }
-
-    if (sievestatsfilename != NULL) /* a file was given */
-      {
-        sievestats_file = fopen (sievestatsfilename, "w");
-        if (sievestats_file == NULL)
-          {
-            fprintf (stderr, "Error, cannot create file %s\n",
-                     sievestatsfilename);
-            exit (EXIT_FAILURE);
-          }
-      }
-    if (stats != 0)
-      {
-        cof_call = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
-        cof_succ = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
-        for (i = 0; i <= si->cpoly->rat->mfb; i++)
-          {
-            cof_call[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
-                                              * sizeof(uint32_t));
-            cof_succ[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
-                                              * sizeof(uint32_t));
-            for (j = 0; j <= si->cpoly->alg->mfb; j++)
-              cof_call[i][j] = cof_succ[i][j] = 0;
-          }
-        if (stats == 2)
-          {
-            fprintf (las->output,
-                    "# Use learning file %s with threshold %1.2e\n",
-                     statsfilename, stats_prob);
-            while (!feof (stats_file))
-              {
-                uint32_t c, s;
-                if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
-                  {
-                    fprintf (stderr, "Error while reading file %s\n",
-                             statsfilename);
-                    exit (EXIT_FAILURE);
-                  }
-                if (i <= si->cpoly->rat->mfb && j <= si->cpoly->alg->mfb)
-                  {
-                    /* When s=0 and c>0, whatever STATS_PROB, we will always
-                       have s/c < STATS_PROB, thus (i,j) will be discarded.
-                       We allow a small error by considering (s+1)/(c+1)
-                       instead. In case s=0, (i,j) is discarded only when
-                       1/(c+1) < STATS_PROB (always discarded for c=0). */
-                    cof_call[i][j] = c + 1;
-                    cof_succ[i][j] = s + 1;
-                  }
-              }
-          }
-      }
-    int rep_bench = 0;
-    int nbq_bench = 0;
-    double t_bench = seconds();
-    /* }}} */
-#endif
-    
     thread_data * thrs = thread_data_alloc(las, las->nb_threads);
 
     las_report report;
@@ -4196,79 +3844,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* thread_buckets_free(thrs, las->nb_threads); */
 
         trace_per_sq_clear(si);
-#if 0   /* incompatible with the todo list */
-        /* {{{ bench stats */
-        if (bench) {
-            mpz_t newq0, savq0;
-            mpz_init_set(savq0, q0);
-            mpz_init_set(newq0, q0);
-            {
-                mpq_t nq;
-                mpq_init(nq);
-                mpq_set_d(nq, skip_factor);
-                mpz_mul(mpq_numref(nq), mpq_numref(nq), q0);
-                mpz_fdiv_q(newq0, mpq_numref(nq), mpq_denref(nq));
-                mpq_clear(nq);
-            }
-            // print some estimates for special-q's between q0 and the next
-            int nb_q = 1;
-            do {
-                mpz_nextprime(q0, q0);
-                nb_q ++;
-            } while (mpz_cmp(q0, newq0) < 0);
-            mpz_set(q0, newq0);
-            nroots=0;
-            t_bench = seconds() - t_bench;
-            gmp_fprintf(las->output,
-                    "# Stats for q=%Zd: %d reports in %1.1f s\n",
-                    savq0, rep_bench, t0);
-            fprintf(las->output,
-                    "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
-                    nb_q, nb_q*rep_bench, t_bench*nb_q, t_bench/((double)rep_bench));
-            bench_tot_time += t_bench*nb_q;
-            bench_tot_rep += nb_q*rep_bench;
-            rep_bench = 0;
-            fprintf(las->output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
-                    bench_tot_rep, bench_tot_time,
-                    (double) bench_tot_time / (double) bench_tot_rep);
-            t_bench = seconds();
-            mpz_clear(newq0);
-            mpz_clear(savq0);
-        }
-        /* }}} */
-        /* {{{ bench stats */
-        if (bench2) {
-            nbq_bench++;
-            const int BENCH2 = 50;
-            if (rep_bench >= BENCH2) {
-                t_bench = seconds() - t_bench;
-                fprintf(las->output,
-                        "# Got %d reports in %1.1f s using %d specialQ\n",
-                        rep_bench, t_bench, nbq_bench);
-                double relperq = (double)rep_bench / (double)nbq_bench;
-                double est_rep = (double)rep_bench;
-                do {
-                    mpz_nextprime(q0, q0);
-                    est_rep += relperq;
-                } while (est_rep <= BENCH2 / bench_percent);
-                gmp_fprintf(las->output,
-                        "# Extrapolate to %ld reports up to q = %Zd\n",
-                        (long) est_rep, q0);
-                bench_tot_time += t_bench / bench_percent;
-                bench_tot_rep += BENCH2 / bench_percent;
-                fprintf(las->output,
-                        "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
-                        bench_tot_rep, bench_tot_time,
-                        (double) bench_tot_time / (double) bench_tot_rep);
-                // reinit for next slice of bench:
-                t_bench = seconds();
-                nbq_bench = 0;
-                rep_bench = 0;
-                nroots=0;
-            }
-        }
-        /* }}} */
-#endif
+
       } // end of loop over special q ideals.
 
     thread_buckets_free(thrs, las->nb_threads);
@@ -4288,41 +3864,17 @@ int main (int argc0, char *argv0[])/*{{{*/
     tts -= report->ttf;
     if (las->verbose)
         facul_print_stats (las->output);
-#if 0
-    /* {{{ stats */
-    if (sievestats_file != NULL)
-    {
-        fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
-        fprintf (sievestats_file, "# Format: S1 S2 #relations #survivors ratio\n");
-        fprintf (sievestats_file, "# where S1 is the sieve residue on the rational side, S2 algebraic side\n");
-        fprintf (sievestats_file, "# Make a pretty graph with gnuplot:\n");
-        fprintf (sievestats_file, "# splot \"sievestatsfile\" using 1:2:3 with pm3d\n");
-        fprintf (sievestats_file, "# plots histogram for relations, 1:2:4 for survivors, 1:2:($3/$4) for ratio\n");
-        for(int i1 = 0 ; i1 < 256 ; i1++) {
-            for (int i2 = 0; i2 < 256; i2++) {
-                unsigned long r1 = report->report_sizes[i1][i2];
-                unsigned long r2 = report->survivor_sizes[i1][i2];
-                if (r1 > r2) {
-                    fprintf(stderr, "Error, statistics report more relations (%lu) than "
-                            "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2);
-                }
-                if (r2 > 0)
-                    fprintf (sievestats_file, "%d %d %lu %lu\n", 
-                            i1, i2, r1, r2);
-            }
-            fprintf (sievestats_file, "\n");
-        }
-        fprintf (sievestats_file, "# ");
-        fclose(sievestats_file);
-        sievestats_file = NULL;
-    }
-    /* }}} */
-#endif
+
     /*{{{ Display tally */
-    if (las->nb_threads > 1) 
-        print_stats (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
+#ifdef HAVE_RUSAGE_THREAD
+    int dont_print_tally = 0;
+#else
+    int dont_print_tally = 1;
+#endif
+    if (dont_print_tally && las->nb_threads > 1) 
+        print_stats (las->output, "# Total cpu time %1.1fs [tally only available in mono-thread]\n", t0);
     else
-        print_stats (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+        print_stats (las->output, "# Total cpu time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
@@ -4337,41 +3889,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
     
-#if 0
-    fprintf (stderr, "rat:");
-    for (int i = 0; i < 256; i++)
-      if (cof_calls[RATIONAL_SIDE][i] > 0)
-        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[RATIONAL_SIDE][i],
-                 cof_calls[RATIONAL_SIDE][i]);
-    fprintf (stderr, "\n");
-    fprintf (stderr, "alg:");
-    for (int i = 0; i < 256; i++)
-      if (cof_calls[ALGEBRAIC_SIDE][i] > 0)
-        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[ALGEBRAIC_SIDE][i],
-                 cof_calls[ALGEBRAIC_SIDE][i]);
-    fprintf (stderr, "\n");
-#endif
     /*}}}*/
-#if 0   /* incompatible with the todo list */
-    /* {{{ stats */
-    if (bench || bench2) {
-        fprintf(las->output, "# Total (estimated): %lu reports in %1.1f s\n",
-                bench_tot_rep, bench_tot_time);
-    }
-    if (bucket_prime_stats) 
-    {
-        printf ("# Number of bucket primes: %ld\n", nr_bucket_primes);
-        printf ("# Number of divisibility tests of bucket primes: %ld\n", 
-                nr_div_tests);
-        printf ("# Number of compositeness tests of bucket primes: %ld\n", 
-                nr_composite_tests);
-        printf ("# Number of wrapped composite values while dividing out "
-                "bucket primes: %ld\n", nr_wrap_was_composite);
-      }
-    if (stats == 2)
-      fprintf (las->output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
-    /* }}} */
-#endif
 
     thread_data_free(thrs, las->nb_threads);
 
@@ -4381,23 +3899,5 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     param_list_clear(pl);
 
-#if 0   /* incompatible with the todo list */
-    if (stats != 0) /* {{{ */
-      {
-        for (i = 0; i <= si->cpoly->rat->mfb; i++)
-          {
-            if (stats == 1)
-              for (j = 0; j <= si->cpoly->alg->mfb; j++)
-                fprintf (stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
-                         cof_succ[i][j]);
-            free (cof_call[i]);
-            free (cof_succ[i]);
-          }
-        free (cof_call);
-        free (cof_succ);
-        fclose (stats_file);
-      }
-    /* }}} */
-#endif
     return 0;
 }/*}}}*/

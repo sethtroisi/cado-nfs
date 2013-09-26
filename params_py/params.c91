@@ -4,206 +4,351 @@
 
 # This file is a sample parameter file for a 91-digit gnfs input
 
-# Anything after a # is a comment, until end of line.
-# Any empty line is ignored
-#
-# Each parameter should be on an individual line, like
-#   param0=42.17
+# Anything after a # is a comment, until end of line. Any empty line is
+# ignored. All quotes in the comments in this file are for emphasis and
+# not part of the parameters.
+
+# Each parameter should be on an individual line.
+# The parameters form a tree structure. A parameter of the form
+#   foo.bar.baz = 42
+# is said to have path "foo.bar", key "baz", and value "42".
+
+# Objects of the Python scripts that take parameters from the parameter file
+# have a path associated with them; for example, the Sieving task uses path
+# "tasks.sieving", and the las siever run in the Sieving task uses
+# "tasks.sieving.las". When looking for a parameter, we start at the object's
+# path, then work towards to root of the tree until the key is found.
+# This means that, in principle, all parameters could be specified without a
+# path, so long as no two parameters of the same key with different values
+# occur. In this file we specify most parameters will full path to clarify
+# which part of the computation they affect.
+
+# Some variable substitution occurs in the values specified in the parameters:
+# A string of the form "${FOO}" is substituted by the value of the shell
+# environment variable "$FOO".
+# A string of the form "$(foo)" is substituted by the value of the parameter
+# with key "foo", where the search starts at the path where "$(foo)"
+# occurred.
 
 # Some parameters apply to all steps of the algorithm (General parameters
 # below), and are related to the execution environment. Some other
 # parameters control the many different tunables of the execution of the
-# algorithm. Such parameters are relevant to only one of the steps of NFS, and
-# are thus listed under the section related to the corresponding
-# binary. Each of the section corresponding to one step in particular
+# algorithm. Such parameters are relevant to only one of the steps of NFS,
+# and are thus listed under the section related to the corresponding
+# binary. Each of the sections corresponding to one step in particular
 # also contains a couple of parameters relative to the execution
 # environment (for that step only).
+
+# The cadofactor.py script may be used as:
+# cadofactor.py <parametersfile> [<additional parameters> [...]]
+# Additional parameters on the command line are specified in the same
+# format as in this file, e.g., "foo.bar=42", and override values found in
+# the parameter file.
 
 ###########################################################################
 # General parameters
 ###########################################################################
 
-# General parameters are relevant to the cadofactor.pl script only.
-
-# This script may be used as: cadofactor.pl wdir=... name=... n=...
+# General parameters are relevant to the behaviour of the cadofactor.py script.
 
 # - location and name of files -
-# All files created by cadofactor.pl will be put into <wdir> and its
-# subdirectories.
 name = c91
 # All files created by cadofactor will be prefixed by this name.
 
-# - parallel computation -
-# computation
-# The cadofactor.pl script has the ability to spawn jobs on many
-# machines using ssh, in a master/slave manner. For this to work, a
-# machines description file is mandatory.
-# This is only used in the polynomial selection and sieving steps.
-# Only the master machine needs access to the <wdir> directory
-# (unless MPI is used for the linear algebra step).
-# Slave machines put their temporary data in the <tmpdir> specified on a
-# per-(group of)machine basis in the machines description file.
+# N: The number to be factored
+N = 90377629292003121684002147101760858109247336549001090677693
+
+# Adjust sourcedir to point to the root of your CADO source directory.
+# This parameter is not actually used by cadofactor directly, but it is
+# referenced as $(sourcedir) further down in this parameter file.
+sourcedir=${HOME}/cado-nfs
+
+# Adjust builddir to point to the root of your CADO build directory
+# Not used directly, either, but referenced, too.
+builddir=${HOME}/build/cado-nfs/
+
+# workdir: the path of the working directory; if a relative path is
+# specified, it is relative to the CWD from which cadofactor is run.
+# All the output files of sieving, filtering, etc., are stored under the
+# working directory.
+workdir = /tmp/
+
 
 ###########################################################################
-# Polynomial selection with Kleinjung's algorithm (2008)
+# Parameters for Tasks
 ###########################################################################
 
-tasks.polyselect.degree = 4		# degree of the algebraic polynomial
-tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
-# Setting a large value will most likely find better polynomials,
-# but the number of found polynomials will be smaller.
-# As a rule of thumb, we want at least 100 found polynomials in total
-# (without norm limitation, see below).
-tasks.polyselect.maxnorm = 33.4		# max. lognorm of polynomials (before rootsieve)
-# If not set, a default value of 1e9 (in practice infinity) is used.
-# Setting this value right might speed up a lot the polynomial
-# selection, by discarding right away polynomials which are not
-# promising. As a rule of thumb, we want at least 10 polynomials
-# in total below this bound.
-tasks.polyselect.admin = 0		# min value for lc(f)
-# If not set, the default is 0.
-tasks.polyselect.admax = 50000		# max value for lc(f)
-# The polynomial selection search time is proportional to the
-# length of the interval [polsel_admin,polsel_admax]
-tasks.polyselect.adrange = 5000		# individual tasks
-# Polynomial selection is split into several individual tasks. The
-# complete range from polsel_admin to polsel_admax has to be covered for the
-# polynomial selection to complete. The number of individual tasks is
-# obviously (polsel_admax-polsel_admin)/polsel_adrange. 
-tasks.polyselect.incr = 60		# forced divisor of lc(f)
-tasks.polyselect.nq = 1000
-# This factor is usually a smooth number, which forces projective roots in
-# the algebraic polynomial. 60 is a good start, 210 is popular as well.
-# This controls the computational effort put into the rotation step.
-# The higher this value is, the better the found polynomial will be,
-# but it will take more time.
+# Tasks are the different steps of an NFS factorization: polynomial
+# selection, generating the factor base, sieving, etc.
 
-# - runtime environment parameters for polyselect -
-# The existence of result files from polyselect jobs is checked at
-# regular intervals. Tune this parameter to check more/less
-# frequently.
-# This sets the posix ``nice level'' for polyselect jobs. If you
-# don't know what it is, you may leave as is, or set to 0.
+# execpath: Specify the search path for binary programs that should be run.
+# Each binary program that is run can be specified with "execpath",
+# "execsubdir", and "execbin" parameters; the script looks for the binary
+# executable as "execpath/execsubdir/execbin" and "execpath/execbin", in this
+# order. Defaults for these parameters are defined for each program in
+# cadoprograms.py; usually it is sufficient to set "execpath".
+tasks.execpath=$(builddir)
 
-###########################################################################
-# Sieve
-###########################################################################
+# verbose: Verbosity of program output. Many programs accept a -v (or
+# similar) command line flag; this parameter specified whether verbose
+# output should be enabled. Has no effect on cadofactor itself, just on the
+# sub-programs.
+tasks.verbose = 1
+
+# For tasks that use the client/server set-up, currently polynomial selection
+# and sieving, set a time-out in seconds after which assigned workunits for
+# which no result was returned get cancelled and re-submitted, so that other
+# clients can (hopefully) finish them
+tasks.wutimeout = 3600 # one hour
+
+# Various tasks refer to the factor base bounds rlim, alim, and to the
+# large prime bounds lpbr, lpba. By adding these value to the root node of
+# the parameter tree, all tasks can find them.
 
 # (r,a) means rational or algebraic side
 rlim = 200000
 alim = 400000
-# rlim/alim are the factor base bounds. The number of rational (resp.
-# algebraic) primes is roughly rlim/log(rlim) (resp. alim/log(rlim))
+# The number of rational (resp. # algebraic) primes is roughly rlim/log(rlim)
+# (resp. alim/log(rlim))
 lpbr = 24
 lpba = 24
 # lpbr/lpba is the (base 2 log of the) large prime bound
+
+###########################################################################
+# Polynomial selection task with Kleinjung's algorithm (2008)
+###########################################################################
+
+tasks.polyselect.degree = 4		# degree of the algebraic polynomial
+
+tasks.polyselect.threads = 2
+    # How many threads to use per polyselect process
+
+tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
+    # Setting a large value will most likely find better polynomials,
+    # but the number of found polynomials will be smaller.
+    # As a rule of thumb, we want at least 100 found polynomials in total
+    # (without norm limitation, see below).
+
+tasks.polyselect.maxnorm = 33.4		# max. lognorm of polynomials (before rootsieve)
+    # If not set, a default value of 1e9 (in practice infinity) is used.
+    # Setting this value right might speed up a lot the polynomial
+    # selection, by discarding right away polynomials which are not
+    # promising. As a rule of thumb, we want at least 10 polynomials
+    # in total below this bound.
+
+tasks.polyselect.admin = 0		# min value for lc(f)
+    # If not set, the default is 0.
+
+tasks.polyselect.admax = 50000		# max value for lc(f)
+    # The polynomial selection search time is proportional to the
+    # length of the interval [polsel_admin,polsel_admax]
+
+tasks.polyselect.adrange = 5000		# size of individual tasks
+    # Polynomial selection is split into several individual tasks. The
+    # complete range from polsel_admin to polsel_admax has to be covered for
+    # the polynomial selection to complete. The number of individual tasks is
+    # (polsel_admax-polsel_admin)/polsel_adrange. Each such task is issued as
+    # a workunit to a slave for computation.
+
+tasks.polyselect.incr = 60		# forced divisor of lc(f)
+    # This factor is usually a smooth number, which forces projective roots in
+    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
+
+tasks.polyselect.nq = 1000 # FIXME: what does this do?
+
+
+###########################################################################
+# Sieve task
+###########################################################################
+
 tasks.sieve.mfbr = 48
 tasks.sieve.mfba = 48
-# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try
-# to split into large primes.
+    # mfbr/mfba is the (base 2 log of the) limit for the cofactor we try
+    # to split into large primes.
+
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.2
-# rlambda/alambda is the early-abort ratio: if after sieving, and
-# subtracting from the base 2 log of the norm the contribution of the
-# sieved primes, the remaining approximate of the base 2 log of the
-# norm is larger than lambda times lpb, we reject.
-# Note that this has in particular the effect that if e.g. rlambda <
-# some integer k+1, then at most k large primes are allowed on the
-# rational side. It is customary, when at most k large primes are
-# allowed, to set rlambda to e.g. k + 0.2, in order to compensate for
-# inaccuracies due to sieving.
+    # rlambda/alambda is the early-abort ratio: if after sieving, and
+    # subtracting from the base 2 log of the norm the contribution of the
+    # sieved primes, the remaining approximate of the base 2 log of the
+    # norm is larger than lambda times lpb, we reject.
+    # Note that this has in particular the effect that if e.g. rlambda <
+    # some integer k+1, then at most k large primes are allowed on the
+    # rational side. It is customary, when at most k large primes are
+    # allowed, to set rlambda to e.g. k + 0.2, in order to compensate for
+    # inaccuracies due to sieving.
 
 tasks.sieve.I = 11		# Sieving range in lattice siever
-# The lattice siever sieves over a range in the (i,j) plane which is
-# 2^I times 2^(I-1), to put things simply (some rescaling may change
-# this, but the size of the sieve area remains constant). Increasing
-# I by 1 multiplies the amount of required RAM for the siever by a
-# factor of 4.
-tasks.sieve.ratq = 0
-tasks.sieve.qmin = 400000		# Start of the special-q range
-# The ratq parameters specifies whether or not the special q is to be
-# taken on the rational side (ratq=1) or on the algebraic side
-# (ratq=0).  qmin is usually above the corresponding factor base
-# bound, but this is not a requirement.
-# ratq should be set on the side where the largest norms are
-# expected. As a very rough rule of thumb, this means ratq=0 for gnfs
-# runs, and on some occasions ratq=1 for snfs runs.
+    # The lattice siever sieves over a range in the (i,j) plane which is
+    # 2^I times 2^(I-1), to put things simply (some rescaling may change
+    # this, but the size of the sieve area remains constant). Increasing
+    # I by 1 multiplies the amount of required RAM for the siever by a
+    # factor of 4.
 
-tasks.sieve.qrange = 20000		# The size of an elementary sieving task
-# The sieving process is split into many individual tasks. This
-# parameter controls the size of individual tasks.
+tasks.sieve.ratq = 0
+    # The ratq parameters specifies whether or not the special-q is to be
+    # taken on the rational side (ratq=1) or on the algebraic side
+    # (ratq=0). ratq should be set on the side where the largest norms are
+    # expected. As a very rough rule of thumb, this means ratq=0 for gnfs
+    # runs, and on some occasions ratq=1 for snfs runs.
+
+tasks.sieve.qmin = 400000		# Start of the special-q range
+    # qmin is usually above the corresponding factor base bound, but this
+    # is not a requirement.
+
+tasks.sieve.qrange = 10000		# The size of an elementary sieving task
+    # The sieving process is split into many individual tasks, where each task is
+    # assigned as a workunit to a client. This parameter controls the size of
+    # individual tasks.
 
 tasks.sieve.rels_wanted = 1660000		# Start of filtering tries
-# We only try to do filtering (and thus check if we have enough relations)
-# once we have accumulated <firstcheck> relations (including duplicates).
-# A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or
-# 0.8*2^lpba/log(2^lpba) + 0.8*2^lpbrlog(2^lpbr) when lpba <> lpbr.
-# The default value is 1, which means that with checkrange=1 filtering
-# tries are done at the very beginning of the sieving.
-# Make sure to update <firstcheck> whenever you update lpba or lpbr.
-
-# Each time <checkrange> new relations have been imported by
-# cadofactor.pl, a test is done to see whether enough relations have
-# been collected or not. It is usual to set it to 1 (= always do the
-# check) for small factorizations, but obviously it would be
-# counter-productive to do this check too often for large
-# factorizations. Note that this check is performed on the host
-# running the cadofactor.pl script, and does require a significant
-# amount of RAM.
+    # We only try to do filtering (and thus check if we have enough relations)
+    # once we have accumulated <rels_wanted> relations (including duplicates).
+    # A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or
+    # 0.8*2^lpba/log(2^lpba) + 0.8*2^lpbrlog(2^lpbr) when lpba <> lpbr.
+    # The default value is 1, which means that with checkrange=1 filtering
+    # tries are done at the very beginning of the sieving.
+    # Make sure to update <rels_wanted> whenever you update lpba or lpbr.
 
 tasks.sieve.threads = 2
-# The lattice siever program las may run in a multithreaded manner.
-# This keeps the amount of memory used constant, and just runs
-# faster.
-
-# - runtime environment -
-# The existence of result files from siever jobs is checked at
-# regular intervals. Tune this parameter to check more/less
-# frequently.
-slaves.niceness = 10		# nice level for the sieving jobs
-# This sets the posix ``nice level'' for polyselect jobs. If you
-# don't know what it is, you may leave as is, or set to 0.
+    # The lattice siever program las may run in a multithreaded manner.
+    # This keeps the amount of memory used constant, and just runs
+    # faster.
 
 ###########################################################################
-# Filtering
+# Filtering task
 ###########################################################################
-
-# there. If non-zero (and parallel=1), we incorporate all
-# new relations in the current sieving jobs (which are killed),
-# and do another filtering step with those relations.
-# The default behaviour is 0.
 
 tasks.filter.purge.keep = 160		# maximal excess wanted after purge
-# (purge shrinks if needed)
+					# (purge shrinks if needed)
 tasks.filter.maxlevel = 15		# perform up to <maxlevel>-way merges
 tasks.filter.ratio = 1.1		# used only when bwstrat=0 (see below)
 tasks.filter.merge.forbw = 3		# bwstrat=0: stops the merge when the weight of
+					#    the matrix multiplied by the number of rows c*N
+					#    exceeds ratio*min(c*N)
+					# bwstrat=1: stops when the product c*N is minimal
+					#    (more exactly when it increases 20 times in a row)
+					# bwstrat=3: stops when the average number of non-zero
+					#    coefficients c/N exceeds coverNmax (default 100)
 tasks.merge.coverNmax = 100
-#    the matrix multiplied by the number of rows c*N
-#    exceeds ratio*min(c*N)
-# bwstrat=1: stops when the product c*N is minimal
-#    (more exactly when it increases 20 times in a row)
-# bwstrat=3: stops when the average number of non-zero
-#    coefficients c/N exceeds coverNmax (default 100)
 
 ###########################################################################
-# Linear algebra
+# Linear algebra and characters tasks
 ###########################################################################
 
 # - runtime environment -
-# cadofactor.pl supports only running the linear system solving on the
-# host running cadofactor.pl itself, using posix threads. More advanced
+# cadofactor.py supports only running the linear system solving on the
+# host running cadofactor.py itself, using posix threads. More advanced
 # usage has to go by hand.
 tasks.linalg.bwc.threads = 2x2		# Multithreading level of Block-Wiedemann ; Use
-# <m>x<n> for bwc, or only one integer for bw.
+					# <mn> (a single integer) or <m>x<n>; if a single
+					# integer is given, a split close to sqrt(mn) is chosen
 tasks.linalg.bwc.interval = 100		# checkpointing interval for bwc.
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.mn = 64
 tasks.linalg.bwc.shuffled_product = 1
-
-###########################################################################
-# Characters
-###########################################################################
-
 tasks.linalg.characters.nchar = 50		# number of characters
 tasks.linalg.characters.threads = 2
+
+
+###########################################################################
+# Work unit server
+###########################################################################
+
+# address: The server of the client/server set-up will listen at this
+# address. Note that listening on address "localhost" will allow only
+# clients running on the same machine to connect. If not specified, the
+# computer's host name will be used, which usually resolves to a network-
+# visible address so clients on other machines can connect.
+# server.address = localhost
+
+# port: The server of the client/server set-up will listen at this port
+server.port = 8001
+
+
+###########################################################################
+# Worker slaves
+###########################################################################
+
+# The cadofactor.py script has the ability to spawn client scripts on many
+# machines using ssh, in a master/slave manner. The client scripts then
+# request workunits describing a small part of the computation that needs
+# to be done, perform this computation, upload the result to the master
+# running the cadofactor.py script, then request and process the next
+# workunit. Client scripts can be launched manually as well to participate
+# in an ongoing factorization.
+
+# Clients which cadofactor.py should start are specified under "slaves".
+# We look for any path under "slaves" with a "hostnames" key, then for each
+# host name specified (comma separated list, with multiplicity), one slave is
+# launched on that host.
+# If the "hostnames" value is of the form "@filename", then the host names
+# are read from the file "filename", one host name per line, with the same
+# multiplicity rule.
+# Note: if the host name for a client is "localhost", then the client is
+# started directly as sub-processes of the cadofactor script; if it is not
+# "localhost", then clients are started through SSH. This affects the
+# client's current working directory: if the client is started as a
+# sub-process, its CWD is the same as that of the cadofactor script; if it
+# is started through SSH, its CWD is the CWD after an SSH login (usually the
+# user's home directory).
+
+slaves.hostnames = localhost
+
+# Example with multiple host names. This launches one client on localhost,
+# two on otherhost1, and one on otherhost2, assuming there is no nrclients
+# parameter (see below) that would override the multiplicity
+# slaves.hostnames = localhost, otherhost1, otherhost1, otherhost2
+
+# Modifies the behaviour of the "hostnames" list: if nrclients is specified,
+# then multiplicity in the "hostnames" list is ignored, and "nrclients" client
+# scripts are launched on each unique host name.
+
+slaves.nrclients = 2
+
+# scriptpath: The path to the wuclient2.py scripts, on the slave's file
+# system.
+
+slaves.scriptpath = $(sourcedir)/scripts/cadofactor
+
+# downloadretry: Number of seconds a client should wait between failed
+# download attempts from the server
+
+slaves.downloadretry = 10
+
+# This sets the posix ``nice level'' for programs launched by a slave.
+# If you don't know what it is, you may leave as is, or set to 0.
+
+slaves.niceness = 10		# nice level for the sieving jobs
+
+# basepath: defines the base directory under which wuclient creates its
+# download and working directories. It is permissible to let all clients of
+# the same factorization use the same download directory; files are
+# protected by locking to prevent download races. If the download directory
+# is on a shared file system, then this filesystem must support locking.
+# The working directories should be unique; the default choice for the 
+# working directory includes the clientid which should ensure uniqueness.
+
+# Since this example runs its slaves on localhost, we use a subdirectory 
+# of the cadofactor.py working directory, so that all files of both master
+# and clients can be cleaned up easily.
+slaves.basepath = $(workdir)/testrun.wuclient
+
+# If you want to launch clients on multiple groups of slave machines, with
+# different parameters per group, you can group them by different parameter
+# paths, like so:
+# slaves.downloadretry = 10
+# slaves.basepath = /tmp/wuclient
+# slaves.home.hostnames = localhost
+# slaves.home.nrclients = 1
+# slaves.home.scriptpath = $(sourcedir)/scripts/cadofactor
+# slaves.work.desktop.hostnames = workstation1, workstation2
+# slaves.work.desktop.scriptpath = /path/to/scripts/cadofactor
+# slaves.work.cluster.hostnames = clusternode1, clusternode2, clusternode3
+# slaves.work.cluster.scriptpath = /other/path/to/scripts/cadofactor
+## Use 4 slaves on all "work" slaves, both "desktop" and "cluster"
+# slaves.work.nrclients = 4
+
+# Here, "home", "work", "desktop", and "cluster" are arbitrary alphanumeric
+# strings; their sole purpose is to create different nodes in the parameter
+# tree under which hosts that should use the same parameters can be grouped.

@@ -351,7 +351,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     serialize_threads(pi->m);
 }
 
-void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print)
+void timing_final_tally(const char *name, parallelizing_info pi, struct timing_data * timing, unsigned long ncoeffs, int print)
 {
     timing_interval_data since_last_reset[2]; /* 0 = general, 1 = cpu-bound */
     timing_interval_data since_beginning[2];
@@ -395,10 +395,11 @@ void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsi
             char * what_wct = "s";
             if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 
-            printf("Done, N=%d ; CPU: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+            printf("%s done, N=%d ; CPU: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
                     ", %.2f %s/iter"
                     ", %.2f ns/coeff"
                     "\n",
+                    name,
                     timing->end_mark,
                     since_beginning[1]->job[0] + since_beginning[1]->job[1],
                     100.0 * puser,
@@ -415,9 +416,10 @@ void timing_final_tally(parallelizing_info pi, struct timing_data * timing, unsi
             char * what_wct = "s";
             if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 
-            printf("Done, N=%d ; COMM: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+            printf("%s done, N=%d ; COMM: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
                     ", %.2f %s/iter"
                     "\n",
+                    name,
                     timing->end_mark,
                     since_beginning[0]->job[0] + since_beginning[0]->job[1],
                     100.0 * puser,

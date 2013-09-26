@@ -37,6 +37,21 @@ logger = logging.Logger("Parameters")
 
 parse_array = []
 
+class BoolParam(object):
+    def __init__(self, value):
+        if value is True or isinstance(value, str) and \
+                value.lower() in ["yes", "true", "on", "1"]:
+            self.value = True
+        elif value is False or isinstance(value, str) and \
+                value.lower() in ["no", "false", "off", "0"]:
+            self.value = False
+        else:
+            raise ValueError("Could not parse %s as truth value" % value)
+    
+    def __bool__(self):
+        return self.value
+
+
 class Parameters(object):
     """ Class that stores parameters for cadofactor in hierarchical dictionaries
     """
@@ -129,7 +144,21 @@ class Parameters(object):
         "N": int,
         "nrclients": int,
         "threads": int,
-        "port": int
+        "port": int,
+        "verbose": BoolParam,
+        "rm": BoolParam,
+        "quite": BoolParam,
+        "sizeonly": BoolParam,
+        "nopowers": BoolParam,
+        "ratq": BoolParam,
+        "bzip": BoolParam,
+        "raw": BoolParam,
+        "binary": BoolParam,
+        "complete": BoolParam,
+        "wipeout": BoolParam,
+        "dryrun": BoolParam,
+        "keepoldresult": BoolParam,
+        "compression": BoolParam,
     }
 
     def __init__(self, *args, **kwargs):

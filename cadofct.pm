@@ -1936,7 +1936,7 @@ my $polysel_check = sub {
         or die "Cannot open `$f' for reading: $!.\n";
     while (<FILE>) {
         s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-        if (/^No polynomial found/) {
+        if (/^# No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
 	     "please increase [polsel_]adrange or [polsel_]maxnorm.\n"
                if ($ENV{'CADO_DEBUG'});

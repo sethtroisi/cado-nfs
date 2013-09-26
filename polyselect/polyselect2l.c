@@ -25,10 +25,17 @@
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
 #define INIT_FACTOR 8UL
+#define PREFIX_HASH
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
 #include "ropt.h"
+#endif
+
+#ifdef PREFIX_HASH
+char *phash = "# ";
+#else
+char *phash = "";
 #endif
 
 #define BATCH_SIZE 20 /* number of special (q, r) per batch */
@@ -152,14 +159,15 @@ void
 print_poly_info ( mpz_t *f,
                   unsigned int d,
                   mpz_t g[2],
-                  int raw )
+                  int raw,
+                  char *prefix )
 {
   unsigned int i, nroots;
   double skew, logmu, alpha;
 
-  gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
+  gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
-    gmp_printf ("c%u: %Zd\n", i, f[i]);
+    gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
 
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
@@ -499,14 +507,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
         printf ("# Raw polynomial:\n");
-        gmp_printf ("n: %Zd\n", N);
-        print_poly_info (fold, d, gold, 1);
+        gmp_printf ("%sn: %Zd\n", phash, N);
+        print_poly_info (fold, d, gold, 1, phash);
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
         gmp_printf ("# Optimized polynomial:\n");
-        gmp_printf ("n: %Zd\n", N);
-        print_poly_info (f, d, g, 0);
+        gmp_printf ("%sn: %Zd\n", phash, N);
+        print_poly_info (f, d, g, 0, phash);
         printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
                 BOUND_F, BOUND_G, AREA, E, best_E);
         printf ("\n");
@@ -866,14 +874,14 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       printf ("# Raw polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold, 1);
+      gmp_printf ("%sn: %Zd\n", phash, N);
+      print_poly_info (fold, d, gold, 1, phash);
       if (d == 6)
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       gmp_printf ("# Optimized polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (f, d, g, 0);
+      gmp_printf ("#%sn: %Zd\n", phash, N);
+      print_poly_info (f, d, g, 0, phash);
       printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
               BOUND_F, BOUND_G, AREA, E, best_E);
       printf ("\n");
@@ -2340,7 +2348,7 @@ main (int argc, char *argv[])
 
   if (best_E == 0.0)
     /* This line is required by the script: */
-    printf ("No polynomial found, please increase the ad range or decrease P\n");
+    printf ("# No polynomial found, please increase the ad range or decrease P\n");
   else {
     /* This line is required by the script: */
     printf ("# Best polynomial found:\n");

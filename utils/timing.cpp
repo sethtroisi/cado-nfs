@@ -110,20 +110,11 @@ print_timing_and_memory (double wct0)
            Memusage () >> 10, PeakMemusage () >> 10);
 }
 
-#if defined(__linux) && defined(__GLIBC__)
-#include <linux/version.h>
-#include <features.h>
-#if LINUX_VERSION_CODE >= 0x20611 && LEXGE2(__GLIBC__,__GLIBC_MINOR__,2,9)
-#define HAVE_GETRUSAGE_THREAD
-#endif
-#endif
-
 /* We need some way to detect the time spent by threads. Unfortunately,
  * this is something not defined by POSIX.
  */
 
-/* Only on linux >= 2.6.26, and IRIX, solaris. */
-#if defined(HAVE_GETRUSAGE_THREAD)
+#if defined(HAVE_RUSAGE_THREAD)
 void thread_seconds_user_sys(double * res)
 {
     struct rusage ru[1];
@@ -132,7 +123,10 @@ void thread_seconds_user_sys(double * res)
     res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
 }
 #elif defined(__linux)
+#include <unistd.h>
 #include <sys/syscall.h>
+#include <stdarg.h>
+#include <string.h>
 
 static inline pid_t gettid() { return syscall(SYS_gettid); }
 
