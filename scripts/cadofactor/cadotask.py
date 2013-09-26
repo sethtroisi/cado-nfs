@@ -39,11 +39,23 @@ class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string.
+    r""" A class that represents a polynomial
     
-    keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True),
-            ("c1", False), ("c2", False), ("c3", False), ("c4", False),
-            ("c5", False), ("c6", False), ("m", True), ("skew", True),
-            ("type", False))
+    >>> t="n: 127\nc0: 1\nc1: -1\nc5: 1\nY0: 11\nY1: -1\nm: 11\nskew: 1\n"
+    >>> p=Polynomial(t.splitlines())
+    >>> str(p)
+    'n: 127\nc0: 1\nc1: -1\nc5: 1\nY0: 11\nY1: -1\nm: 11\nskew: 1\n# f(x) = x^5-x+1\n'
+    >>> t="n: 127\nc0: -1\nc1: 1\nc5: -1\nY0: -11\nY1: 1\nm: 11\nskew: 1\n"
+    >>> p=Polynomial(t.splitlines())
+    >>> str(p)
+    'n: 127\nc0: -1\nc1: 1\nc5: -1\nY0: -11\nY1: 1\nm: 11\nskew: 1\n# f(x) = -x^5+x-1\n'
+    """
+    
+    pol_f_keys = (("c0", True), ("c1", False), ("c2", False), ("c3", False),
+        ("c4", False), ("c5", False), ("c6", False))
+    pol_g_keys = (("Y0", True), ("Y1", True))
+    keys = (("n", True),) + pol_f_keys + pol_g_keys + \
+        (("m", True), ("skew", True), ("type", False))
     re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=(.*)$")
     
     def __init__(self, lines):
@@ -83,10 +95,17 @@ class Polynomial(object):
         return
     
     def __str__(self):
+        xpow = ["", "*x"] + ["*x^%d" % i for i in range(2,10)]
+        arr = ["%s%s" % (self.poly[key], xpow[idx]) for (idx, (key, req))
+               in enumerate(self.pol_f_keys) if key in self.poly]
+        poly = "+".join(reversed(arr)).replace("+-", "-")
+        poly = re.sub(r'\b1\*', "", poly)
+        
         arr = ["%s: %s\n" % (key, self.poly[key])
                for (key, req) in self.keys if key in self.poly]
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
+        arr.append("# f(x) = %s\n" % poly)
         return "".join(arr)
 
     def __eq__(self, other):
