@@ -367,15 +367,17 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F, co
 
     if (rels[i].denom->deg == 0)
       {
-    	mpz_invert(tmp, rels[i].denom->coeff[0], ell2);
-    	poly_mul_mpz(rels[i].num, rels[i].num, tmp);
-    	poly_reduce_mod_mpz(rels[i].num, rels[i].num, ell2);
+        mpz_invert(tmp, rels[i].denom->coeff[0], ell2);
+        poly_mul_mpz(rels[i].num, rels[i].num, tmp);
+        poly_reduce_mod_mpz(rels[i].num, rels[i].num, ell2);
       }
     else
       {
-    	poly_xgcd_mpz (g, F, rels[i].denom, U, V, ell2);
-	poly_mul (rels[i].num, rels[i].num, V);
-    	poly_reduce_mod_mpz(rels[i].num, rels[i].num, ell2);
+        poly_xgcd_mpz (g, F, rels[i].denom, U, V, ell2);
+        poly_mul (rels[i].num, rels[i].num, V);
+        int d = poly_mod_f_mod_mpz (rels[i].num->coeff, rels[i].num->deg,
+                                    F->coeff, F->deg, ell2, NULL);
+        cleandeg(rels[i].num, d);
       }
 
     poly_power_mod_f_mod_mpz_Barrett(SM, rels[i].num, F, eps, ell2, invl2);
@@ -515,7 +517,6 @@ int main (int argc, char **argv)
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
   param_list_print_command_line (stdout, pl);
-
 
   /* Construct poly_t F from cado_poly pol (algebraic side) */
   deg = pol->pols[ALGEBRAIC_SIDE]->degree;
