@@ -1169,8 +1169,7 @@ class FactorBaseTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("alim", "gzip")
-
+            ("alim", "gzip", "I")
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1212,8 +1211,9 @@ class FactorBaseTask(Task):
             outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
+            self.progparams[0].setdefault("maxbits", int(self.params["I"]) - 1)
             p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out = str(outputfilename),
+                                    out=str(outputfilename),
                                     **self.progparams[0])
             message = self.submit_command(p, "")
             if message.get_exitcode(0) != 0:
