@@ -253,6 +253,11 @@ install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 set(plingen_prime_nwords 4)
 
+if(WITH_MPIR)
+    file(GLOB flint_fft_files flint-fft/*.c)
+    add_library(flint-fft ${flint_fft_files})
+endif(WITH_MPIR)
+
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
