@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #ifndef HAVE_MINGW
 #include <sys/wait.h>
-#include <sys/stat.h>
 #endif
 #include <errno.h>
 
