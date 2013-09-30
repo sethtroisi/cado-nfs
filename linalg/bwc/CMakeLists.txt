@@ -256,6 +256,8 @@ set(plingen_prime_nwords 4)
 if(WITH_MPIR)
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
+    add_executable(test-flint test-flint.c)
+    target_link_libraries(test-flint flint-fft ${gmp_libname})
 endif(WITH_MPIR)
 
 

@@ -1029,6 +1029,8 @@ linalg/bwc/flint-fft/revbin.c
 linalg/bwc/flint-fft/scanf.c
 linalg/bwc/flint-fft/split_bits.c
 linalg/bwc/flint-fft/ulong_extras.h
+linalg/bwc/flint-fft/transform_interface.c
+linalg/bwc/test-flint.c
 filter/filter_badideals.c
 params_dl/params.p59
 scripts/badideals.mag

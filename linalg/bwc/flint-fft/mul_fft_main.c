@@ -80,6 +80,12 @@ void flint_mpn_mul_fft_main(mp_ptr r1, mp_srcptr i1, mp_size_t n1,
 	j2 = (bits2 - 1) / bits + 1;
     }
 
+    FLINT_ASSERT(j1 + j2 - 1 <= 4 * n);
+    FLINT_ASSERT(j1 * bits >= bits1);
+    FLINT_ASSERT(j2 * bits >= bits2);
+    FLINT_ASSERT(2*bits + (depth + 1) <= n*w);
+    FLINT_ASSERT(w==1 || w==2);
+
     if (depth < 11) {
 	mp_size_t wadj = 1;
 
