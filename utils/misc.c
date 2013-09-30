@@ -7,10 +7,18 @@
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
+#include <limits.h>
 #include <unistd.h>
 #include <ctype.h>
 #ifdef HAVE_SSE2
 #include <emmintrin.h>
+#endif
+#ifdef HAVE_LINUX_BINFMTS_H
+/* linux/binfmts.h defines MAX_ARG_STRLEN in terms of PAGE_SIZE, but does not
+   include a header where PAGE_SIZE is defined, so we include sys/user.h
+   as well. */
+#include <sys/user.h>
+#include <linux/binfmts.h>
 #endif
 /* For MinGW Build */
 #if defined(_WIN32) || defined(_WIN64)
@@ -110,9 +118,37 @@ long pagesize (void)
   SYSTEM_INFO si;
   GetSystemInfo(&si);
   return si.dwPageSize;
-#else
+#elif defined(HAVE_SYSCONF)
   return sysconf (_SC_PAGESIZE);
+#else
+  #error "Cannot determine page size"
 #endif
+}
+
+/* Wrapper around sysconf(ARG_MAX) that deals with availability of sysconf()
+   and additional constraints on command line length */
+long get_arg_max(void)
+{
+  long arg_max;
+#ifdef HAVE_SYSCONF
+  arg_max = sysconf (_SC_ARG_MAX);
+#elif defined(ARG_MAX)
+  /* Use value from limits.h */
+  arg_max = ARG_MAX;
+#else
+  /* POSIX requires ARG_MAX >= 4096, and all but prehistoric systems allow
+     at least as much */
+  arg_max = 4096;
+#endif
+  /* Linux since 2.6.23 does not allow more than MAX_ARG_STRLEN characers in a
+     single word on the command line. Since we need to be able to run
+     "sh" "-c" "actual_command", this limit is effectively the limit on the
+     command line length. */
+#ifdef MAX_ARG_STRLEN
+  if (arg_max > MAX_ARG_STRLEN)
+    arg_max = MAX_ARG_STRLEN;
+#endif
+  return arg_max;
 }
 
 void *malloc_pagealigned(size_t sz)

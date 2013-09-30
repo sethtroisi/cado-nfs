@@ -207,14 +207,9 @@ char **prepare_grouped_command_lines(char **list_of_files)
                 break;
             /* Add 1 for a space */
             size_t ds = strlen(*grouptail) + 1;
-#ifdef HAVE_MINGW
-            /* no sysconf() under mingw, use a safe bet */
-            if (filenames_total_size + ds > (size_t) 8192)
+            /* Allow a few bytes extra for popen's "/bin/sh" "-c" prefix */
+            if (filenames_total_size + ds + 20 > (size_t) get_arg_max())
                 break;
-#else
-            if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX) - 1024)
-                break;
-#endif
             filenames_total_size += ds;
         }
         filenames_total_size++; /* for '\0' */
