@@ -14,15 +14,15 @@ extern "C" {
 #ifndef HAVE_MINGW
 FILE * cado_popen(const char * command, const char * mode);
 #ifdef HAVE_GETRUSAGE
-void cado_pclose2(FILE * stream, struct rusage * r);
+int cado_pclose2(FILE * stream, struct rusage * r);
 #else
-void cado_pclose2(FILE * stream, void * r);
+int cado_pclose2(FILE * stream, void * r);
 #endif
-static inline void cado_pclose(FILE * stream) { cado_pclose2(stream, NULL); }
+static inline int cado_pclose(FILE * stream) { return cado_pclose2(stream, NULL); }
 #else
 
 static inline FILE * cado_popen(const char * command, const char * mode) { return popen(command, mode); }
-static inline void cado_pclose(FILE * stream) { pclose(stream); }
+static inline int cado_pclose(FILE * stream) { return pclose(stream); }
 /* we don't even provide cado_pclose2 for mingw */
 #endif
 

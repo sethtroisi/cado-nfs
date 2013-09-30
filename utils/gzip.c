@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <errno.h>
 
@@ -322,13 +323,13 @@ fopen_maybe_compressed (const char * name, const char * mode)
 }
 
 #ifdef  HAVE_GETRUSAGE
-void
+int
 fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
 #else
 /* if we don't even have getrusage, then no fclose_maybe_compressed2 is
  * exposed. Yet, we use one as a code shortcut
  */
-static void
+static int
 fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
 #endif
 {
@@ -340,27 +341,32 @@ fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
          * may exist and not the other */
         ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
         if (r->pfmt_in || r->pfmt_out) {
+            int status;
 #ifdef  HAVE_GETRUSAGE
             if (rr)
-                cado_pclose2(f, rr);
+                status = cado_pclose2(f, rr);
             else
 #endif
-                cado_pclose(f);
+                status = cado_pclose(f);
+            /* Unless child process finished normally and with exit status 0,
+               we return an error */
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+                return EOF;
+            return 0;
         } else {
 #ifdef  HAVE_GETRUSAGE
             if (rr) memset(rr, 0, sizeof(*rr));
 #endif
-            fclose(f);
+            return fclose(f);
         }
-        return;
     }
     /* If we arrive here, it's because "" is not among the suffixes */
     abort();
-    return;
+    return EOF;
 }
 
-void
+int
 fclose_maybe_compressed (FILE * f, const char * name)
 {
-    fclose_maybe_compressed2(f, name, NULL);
+    return fclose_maybe_compressed2(f, name, NULL);
 }

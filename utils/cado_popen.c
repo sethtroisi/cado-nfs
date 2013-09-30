@@ -98,9 +98,9 @@ FILE * cado_popen(const char * command, const char * mode)
 }
 
 #ifdef HAVE_GETRUSAGE
-void cado_pclose2(FILE * stream, struct rusage * nr)
+int cado_pclose2(FILE * stream, struct rusage * nr)
 #else
-void cado_pclose2(FILE * stream, void * nr MAYBE_UNUSED)
+int cado_pclose2(FILE * stream, void * nr MAYBE_UNUSED)
 #endif
 {
     pid_t kid = 0;
@@ -129,14 +129,17 @@ void cado_pclose2(FILE * stream, void * nr MAYBE_UNUSED)
     fclose(stream);
     close(fd);
     /* we must wait() for the kid now */
-    int status;
+    int status, error;
 #ifdef HAVE_GETRUSAGE
     struct rusage r[1];
-    wait4(kid, &status, 0, r);
+    error = wait4(kid, &status, 0, r);
 #else
     /* if we have no getrusage(), we probably don't have wait4 either */
-    waitpid(kid, &status, 0);
+    error = waitpid(kid, &status, 0);
 #endif
+    if (error == -1) {
+        return -1;
+    }
     char long_status[80] = {'\0'};
 
     if (WIFEXITED(status)) {
@@ -159,5 +162,8 @@ void cado_pclose2(FILE * stream, void * nr MAYBE_UNUSED)
 #ifdef HAVE_GETRUSAGE
     if (nr) memcpy(nr, r, sizeof(struct rusage));
 #endif
+    /* Linux man page: 
+       "returns the exit status of the command as returned by wait4(2)"
+    */
+    return status;
 }
-
