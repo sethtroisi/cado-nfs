@@ -4,7 +4,9 @@
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
-
+#include <sys/types.h>
+#include <sys/wait.h>
+          
 #include "portability.h"
 #include "utils.h"
 #include "filter_utils.h"
