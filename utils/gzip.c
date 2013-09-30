@@ -190,7 +190,14 @@ char **prepare_grouped_command_lines(char **list_of_files)
     const struct suffix_handler *r = supported_compression_formats;
     char ** new_commands = NULL;
     size_t n_new_commands = 0;
+    
+    /* Allow a few bytes extra for popen's "/bin/sh" "-c" prefix */
+    ASSERT_ALWAYS(get_arg_max() >= 20);
+    size_t arg_max = get_arg_max() - 20;
+    
     for(char ** grouphead = list_of_files ; *grouphead ; ) {
+        char *cmd_prefix = NULL, *cmd_postfix = "";
+        size_t prefix_len, postfix_len;
         const struct suffix_handler * this_suffix = r;
         for (; this_suffix && this_suffix->suffix; this_suffix++)
             if (has_suffix(*grouphead, this_suffix->suffix))
@@ -198,6 +205,42 @@ char **prepare_grouped_command_lines(char **list_of_files)
         ASSERT_ALWAYS(this_suffix);
         size_t filenames_total_size = 0;
         char ** grouptail;
+
+        if (*antebuffer) {
+            if (this_suffix->pfmt_in) {
+                /* antebuffer 24 file1.gz file2.gz file3.gz | gzip -dc - */
+                int rc = asprintf(&cmd_prefix, "%s %d ", antebuffer, antebuffer_buffer_size);
+                ASSERT_ALWAYS(rc >= 0);
+                char *tmp;
+                rc = asprintf(&tmp, this_suffix->pfmt_in, "-");
+                ASSERT_ALWAYS(rc >= 0);
+                rc = asprintf(&cmd_postfix, " | %s", tmp);
+                ASSERT_ALWAYS(rc >= 0);
+                free(tmp);
+            } else {
+                /* antebuffer 24 file1.txt file2.txt file3.txt */
+                /* avoid piping through cat */
+                int rc = asprintf(&cmd_prefix, "%s %d ", antebuffer, antebuffer_buffer_size);
+                ASSERT_ALWAYS(rc >= 0);
+            }
+        } else {
+            if (this_suffix->pfmt_in) {
+                /* gzip -dc file1.gz file2.gz file3.gz */
+                int rc = asprintf(&cmd_prefix, this_suffix->pfmt_in, "");
+                ASSERT_ALWAYS(rc >= 0);
+            } else {
+                /* cat file1.txt file2.txt file3.txt */
+                /* There's potential for this to qualify as a useless use
+                 * of cat, but anyway we don't expect to meet this case
+                 * often.
+                 */
+                int rc = asprintf(&cmd_prefix, "cat ");
+                ASSERT_ALWAYS(rc >= 0);
+            }
+        }
+        prefix_len = strlen(cmd_prefix);
+        postfix_len = strlen(cmd_postfix);
+        
         for(grouptail = grouphead ; *grouptail ; grouptail++) {
             const struct suffix_handler * other_suffix = r;
             for (; other_suffix && other_suffix->suffix; other_suffix++)
@@ -207,12 +250,10 @@ char **prepare_grouped_command_lines(char **list_of_files)
                 break;
             /* Add 1 for a space */
             size_t ds = strlen(*grouptail) + 1;
-            /* Allow a few bytes extra for popen's "/bin/sh" "-c" prefix */
-            if (filenames_total_size + ds + 20 > (size_t) get_arg_max())
+            if (filenames_total_size + prefix_len + postfix_len + ds > arg_max)
                 break;
             filenames_total_size += ds;
         }
-        filenames_total_size++; /* for '\0' */
         /* Now all file names referenced by pointers in the interval
          * [grouphead..grouptail[ have the same suffix. Create a new
          * command for unpacking them.
@@ -220,45 +261,21 @@ char **prepare_grouped_command_lines(char **list_of_files)
         new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
 
         /* intermediary string for the list of file names */
-        char * tmp = malloc(filenames_total_size);
+        char * tmp = malloc(filenames_total_size + 1);
         size_t k = 0;
         for(char ** g = grouphead ; g != grouptail ; g++) {
-            k += snprintf(tmp + k, filenames_total_size - k, "%s ", *g);
+            k += snprintf(tmp + k, filenames_total_size + 1 - k, "%s ", *g);
         }
         tmp[k-1]='\0';  /* turn final space to a null byte */
+        filenames_total_size--; /* and adjust filenames_total_size for deleted space */
             
         char * cmd;
         int rc;
 
-        if (*antebuffer) {
-            if (this_suffix->pfmt_in) {
-                /* antebuffer 24 file1.gz file2.gz file3.gz | gzip -dc - */
-                char * tailcmd;
-                rc = asprintf(&tailcmd, this_suffix->pfmt_in, "-");
-                ASSERT_ALWAYS(rc >= 0);
-                rc = asprintf(&cmd, "%s %d %s | %s",
-                        antebuffer, antebuffer_buffer_size, tmp, tailcmd);
-                free(tailcmd);
-            } else {
-                /* antebuffer 24 file1.txt file2.txt file3.txt */
-                /* avoid piping through cat */
-                rc = asprintf(&cmd, "%s %d %s",
-                        antebuffer, antebuffer_buffer_size, tmp);
-            }
-        } else {
-            if (this_suffix->pfmt_in) {
-                /* gzip -dc file1.gz file2.gz file3.gz */
-                rc = asprintf(&cmd, this_suffix->pfmt_in, tmp);
-            } else {
-                /* cat file1.txt file2.txt file3.txt */
-                /* There's potential for this to qualify as a useless use
-                 * of cat, but anyway we don't expect to meet this case
-                 * often.
-                 */
-                rc = asprintf(&cmd, "cat %s", tmp);
-            }
-        }
+        rc = asprintf(&cmd, "%s%s%s", cmd_prefix, tmp, cmd_postfix);
         ASSERT_ALWAYS(rc >= 0);
+        ASSERT_ALWAYS(strlen(cmd) <= arg_max);
+        ASSERT_ALWAYS(strlen(cmd) == filenames_total_size + prefix_len + postfix_len);
         new_commands[n_new_commands-1] = cmd;
         free(tmp);
         grouphead = grouptail;
