@@ -76,7 +76,30 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
 
 #define PARI
 
-int test_fppol(gmp_randstate_t rstate)
+#ifdef PARI
+#define ppol(_name, _x, _nx) do {					\
+    printf("v"_name"=[");						\
+    for(int i = 0 ; i < _nx ; i++) {					\
+        MPZ_SET_MPN(tmp, _x + (_nx-1-i) * np, np);			\
+        if (i) gmp_printf(", ");					\
+        gmp_printf("%Zd", tmp);	        		        	\
+    }									\
+    printf("];\n");							\
+    printf(_name"=Pol(vector(#v"_name",i,Mod(v"_name"[i],p)));\n");			\
+} while (0)
+#else
+#define ppol(_name, _x, _nx) do {					\
+    printf(_name ":=Polynomial(GF(p),[");				\
+    for(int i = 0 ; i < _nx ; i++) {					\
+        MPZ_SET_MPN(tmp, _x + i * np, np);				\
+        if (i) gmp_printf(", ");					\
+        gmp_printf("%Zd", tmp);	        		                \
+    }									\
+    printf("]);\n");							\
+} while (0)
+#endif
+
+int test_mul_fppol(gmp_randstate_t rstate)
 {
     mpz_t p;
     mpz_t tmp;
@@ -167,31 +190,9 @@ int test_fppol(gmp_randstate_t rstate)
 #ifdef PARI
     printf("allocatemem(800000000)\n");
     gmp_printf("p=%Zd;\n", p);
-    // printf("KP<x>:=PolynomialRing(GF(p));\n");
-
-#define ppol(_name, _x, _nx) do {					\
-    printf("v"_name"=[");						\
-    for(int i = 0 ; i < _nx ; i++) {					\
-        MPZ_SET_MPN(tmp, _x + (_nx-1-i) * np, np);			\
-        if (i) gmp_printf(", ");					\
-        gmp_printf("%Zd", tmp);	        		        	\
-    }									\
-    printf("];\n");							\
-    printf(_name"=Pol(vector(#v"_name",i,Mod(v"_name"[i],p)));\n");			\
-} while (0)
 #else
     gmp_printf("p:=%Zd;\n", p);
     printf("KP<x>:=PolynomialRing(GF(p));\n");
-
-#define ppol(_name, _x, _nx) do {					\
-    printf(_name ":=Polynomial(GF(p),[");				\
-    for(int i = 0 ; i < _nx ; i++) {					\
-        MPZ_SET_MPN(tmp, _x + i * np, np);				\
-        if (i) gmp_printf(", ");					\
-        gmp_printf("%Zd", tmp);	        		                \
-    }									\
-    printf("]);\n");							\
-} while (0)
 #endif
 
     ppol("P0", x, nx);
@@ -230,6 +231,147 @@ int test_fppol(gmp_randstate_t rstate)
     free(x);
     free(y);
     free(z);
+    return 0;
+}
+
+int test_mp_fppol(gmp_randstate_t rstate)
+{
+    mpz_t p;
+    mpz_t tmp;
+
+    int seed = getpid();
+    int s = 0;
+    int longstrings = 0;
+
+    // seed=6286; longstrings=0;
+
+    gmp_randseed_ui(rstate, seed);
+    int rs = 10 + gmp_urandomm_ui(rstate, 200);
+    if (s == 0) s = rs;
+
+    fprintf(stderr, "s=%d; seed=%d; longstrings=%d;\n", s, seed, longstrings);
+
+    size_t bits_of_p = 32 + gmp_urandomm_ui(rstate, 512);
+
+
+    int n = 120 * s + gmp_urandomm_ui(rstate, 20 * s);
+    int nx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+    int nz = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+    if (nx < 10) nx = 10;
+    if (nz < 10) nz = 10;
+
+    // finer-grain control can go here. But it does not change the
+    // picture much.
+
+    fprintf(stderr, "nx=%d; nz=%d; bits_of_p=%zu;\n", nx, nz, bits_of_p);
+
+    int ny = MAX(nx, nz) - MIN(nx, nz) + 1;
+
+    mpz_init(p);
+    mpz_ui_pow_ui(p, 2, bits_of_p);
+    mpz_sub_ui(p, p, 1);
+    for( ; !mpz_probab_prime_p(p, 2) ; mpz_sub_ui(p, p, 2));
+    mp_size_t np = mpz_size(p);
+
+    mpz_init(tmp);
+    mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
+    mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
+    mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
+
+    if (longstrings) {
+        mpn_rrandom(x, rstate, nx*np);
+        mpn_rrandom(z, rstate, nz*np);
+    } else {
+        mpn_randomb(x, rstate, nx*np);
+        mpn_randomb(z, rstate, nz*np);
+    }
+
+    // mul_mfa_truncate_sqrt2(y, x, nx*np, z, nz*np, 10, 6);
+
+    for(int i = 0 ; i < nx ; i++) {
+        MPZ_SET_MPN(tmp, x + i * np, np);
+        mpz_mod(tmp, tmp, p);
+        MPN_SET_MPZ(x + i * np, np, tmp);
+    }
+    for(int i = 0 ; i < nz ; i++) {
+        MPZ_SET_MPN(tmp, z + i * np, np);
+        mpz_mod(tmp, tmp, p);
+        MPN_SET_MPZ(z + i * np, np, tmp);
+    }
+
+    struct fft_transform_info fti[1];
+    size_t fft_alloc_sizes[3];
+
+    /* 3 is the maximum number of products we intend to accumulate */
+
+    /* important: use really ny here */
+    fft_get_transform_info_fppol(fti, p, MIN(nx, nz), ny, 3);
+
+#ifndef PARI
+    printf("fti_bits:=%lu; fti_ks_coeff_bits:=%lu; fti_depth:=%zu;\n",
+            fti->bits, fti->ks_coeff_bits, fti->depth);
+    printf("fti_trunc0:=%lu;\n", fti->trunc0);
+    printf("fti_w:=%lu;\n", fti->w);
+#endif
+
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
+
+    void * tx = malloc(fft_alloc_sizes[0]);
+    void * tz = malloc(fft_alloc_sizes[0]);
+    void * ty = malloc(fft_alloc_sizes[0]);
+    void * tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
+    fft_transform_prepare(tx, fti);
+    fft_transform_prepare(tz, fti);
+    fft_transform_prepare(ty, fti);
+
+#ifdef PARI
+    printf("allocatemem(800000000)\n");
+    gmp_printf("p=%Zd;\n", p);
+#else
+    gmp_printf("p:=%Zd;\n", p);
+    printf("KP<x>:=PolynomialRing(GF(p));\n");
+#endif
+
+    ppol("P0", x, nx);
+    ppol("P1", z, nz);
+
+    fft_do_dft_fppol(tx, x, nx * np, tt, fti, p);
+    // get_ft_hash(tmp, 1, tx, fti);
+    // gmp_fprintf(stderr, "%yx\n", tmp);
+    rename("/tmp/before_dft.m", "/tmp/P0_before_dft.m");
+    rename("/tmp/after_dft.m", "/tmp/P0_after_dft.m");
+
+    fft_do_dft_fppol(tz, z, nz * np, tt, fti, p);
+    rename("/tmp/before_dft.m", "/tmp/P1_before_dft.m");
+    rename("/tmp/after_dft.m", "/tmp/P1_after_dft.m");
+
+    /* TODO: we're doing a middle product, which means that we must pick
+     * our result coefficients precisely from the point where they sit in
+     * the in-memory data. It's not the same as ift_fppol. Or if we
+     * insist on using fft_do_ift_fppol, then we first have to rotate the
+     * data appropriately (this will be clumsy). */
+    abort();
+    fft_mul(ty, tx, tz, tt, fti);
+    fft_do_ift_fppol(y, ny * np, ty, tt, fti, p);
+    rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
+    rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
+
+    ppol("P2", y, ny);
+
+#ifdef  PARI
+    /* P2 should contain the middle product of P0 and P1, but we do not
+     * have complete code at this point */
+    printf("print(-1)\n");
+    printf("quit\n");
+#endif
+
+    free(tx);
+    free(tz);
+    free(ty);
+    free(tt);
+    free(x);
+    free(z);
+    free(y);
     return 0;
 }
 
@@ -281,7 +423,8 @@ int main()
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    test_fppol(rstate);
+    // test_mul_fppol(rstate);
+    test_mp_fppol(rstate);
     gmp_randclear(rstate);
     return 0;
 }
