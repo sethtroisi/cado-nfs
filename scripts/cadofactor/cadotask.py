@@ -1709,6 +1709,10 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 with stderrpath.open("r") as stderrfile:
                     stderr = stderrfile.read()
                 outfilenames = self.parse_output_files(stderr)
+                if not outfilenames:
+                    self.logger.critical("No output files produced by %s",
+                                         p.name)
+                    return False
                 self.logger.debug("Output file names: %s", outfilenames)
                 self.check_files_exist(outfilenames.keys(), "output",
                                        shouldexist=True)
