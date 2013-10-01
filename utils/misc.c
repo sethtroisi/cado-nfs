@@ -145,7 +145,7 @@ long get_arg_max(void)
      "sh" "-c" "actual_command", this limit is effectively the limit on the
      command line length. */
 #ifdef MAX_ARG_STRLEN
-  if (arg_max > MAX_ARG_STRLEN)
+  if ((size_t) arg_max > (size_t) MAX_ARG_STRLEN)
     arg_max = MAX_ARG_STRLEN;
 #endif
   return arg_max;
