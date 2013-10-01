@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifndef HAVE_MINGW
+#ifdef HAVE_WAIT_H
 #include <sys/wait.h>
 #endif
 #include <errno.h>
@@ -362,10 +362,10 @@ fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
             else
 #endif
                 status = cado_pclose(f);
-#ifndef HAVE_MINGW
+#if defined(WIFEXITED) && defined(WEXITSTATUS)
             /* Unless child process finished normally and with exit status 0,
                we return an error */
-            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+            if (status == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
                 return EOF;
 #else
             /* What do under MinGW? -1 definitely means an error, but how do

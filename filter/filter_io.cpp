@@ -5,7 +5,9 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/types.h>
+#ifdef HAVE_WAIT_H
 #include <sys/wait.h>
+#endif
           
 #include "portability.h"
 #include "utils.h"
@@ -771,7 +773,11 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
 #else
         status = cado_pclose(f);
 #endif
-        if (rc < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        if (rc < 0 || status == -1
+#if defined(WIFEXITED) && defined(WEXITSTATUS)
+            || !WIFEXITED(status) || WEXITSTATUS(status) != 0
+#endif
+           ) {
             fprintf(stderr,
                     "%s: load error (%s) from\n%s\n",
                     __func__,
