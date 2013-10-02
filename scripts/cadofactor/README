@@ -43,3 +43,27 @@ slaves.catrel.nrclients = 8
 which tells the script to launch 8 clients on each unique host name (=node); the parameter
 threads=2
 causes all the programs to use two threads, resulting in 16 threads per node.
+
+Importing a polynomial file
+===========================
+
+If you want to import a polynomial file (either a SNFS polynomial, or
+polynomial selection was already done), use:
+
+tasks.polyselect.import=xxx.poly
+
+where xxx.poly is the name of the polynomial file (in CADO-NFS format).
+
+Importing relations
+===================
+
+If you want to import already computed relations, use:
+
+tasks.sieve.import=foo
+
+where "foo" is the name of the relation file to be imported (in CADO-NFS
+format). Alternatively you can do:
+
+tasks.sieve.import=@foo
+
+where "foo" is a file containing several names of relation files, one per line.
