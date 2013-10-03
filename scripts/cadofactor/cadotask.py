@@ -182,6 +182,8 @@ class Polynomials(object):
         with open(str(filename), "w") as poly_file:
             poly_file.write(str(self))
 
+    def getN(self):
+        return self.poly["N"]
 
 class FilePath(object):
     """ A class that represents a path to a file, where the path should be
@@ -2549,6 +2551,7 @@ class SqrtTask(Task):
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Sqrt.name)
+            self.logger.info("Creating file of (a,b) values")
             p = cadoprograms.Sqrt(ab = True,
                     poly=polyfilename, purged=purgedfilename,
                     index=indexfilename, kernel=kernelfilename,
@@ -2559,8 +2562,7 @@ class SqrtTask(Task):
                 raise Exception("Program failed")
             
             while not self.is_done():
-                self.state.setdefault("next_dep", 0)
-                dep = self.state["next_dep"]
+                dep = self.state.get("next_dep", 0)
                 self.logger.info("Trying dependency %d", dep)
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
@@ -2570,7 +2572,7 @@ class SqrtTask(Task):
                         kernel=kernelfilename, prefix=prefix,
                         stdout=str(stdoutpath), stderr=str(stderrpath), 
                         **self.progparams[0])
-                message = self.submit_command(p, "dep%d" % self.state["next_dep"])
+                message = self.submit_command(p, "dep%d" % dep)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
                 stdout = stdoutpath.open("r").read()
@@ -2581,7 +2583,7 @@ class SqrtTask(Task):
                     if line == "Failed":
                         break
                     self.add_factor(int(line))
-                self.state["next_dep"] += 1
+                self.state["next_dep"] = dep+1
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
