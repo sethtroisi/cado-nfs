@@ -5,8 +5,8 @@
 /* Note: A patch adding pclmul functionality (if enabled) has been added
  * on top of the MPFQ generated file */
 
-#include "mpfq/mpfq.h"
-#include "mpfq/mpfq_gf2n_common.h"
+#include "mpfq.h"
+#include "mpfq_gf2n_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,14 +47,14 @@
 /* Active handler: Mpfq::gf2n::mul */
 /* Active handler: Mpfq::defaults::poly */
 /* Options used:{
-   w=64,
-   output_path=.,
-   tag=2_64,
    coeffs=[ 64, 4, 3, 1, 0, ],
    helper=/tmp/mpfq-cado/gf2n/helper/helper,
    n=64,
-   table=/tmp/mpfq-cado/gf2x/wizard.table,
+   output_path=.,
    slice=4,
+   table=/tmp/mpfq-cado/gf2x/wizard.table,
+   tag=2_64,
+   w=64,
    } */
 
 typedef mpfq_2_field mpfq_2_64_field;
@@ -88,6 +88,12 @@ typedef mpfq_2_64_poly_struct * mpfq_2_64_src_poly;
 #ifdef  __cplusplus
 extern "C" {
 #endif
+/* *Mpfq::defaults::code_for_impl_name */
+#define mpfq_2_64_impl_name()	"2_64"
+/* *Mpfq::gf2n::field::code_for_impl_max_characteristic_bits */
+#define mpfq_2_64_impl_max_characteristic_bits()	2
+/* *Mpfq::gf2n::field::code_for_impl_max_degree */
+#define mpfq_2_64_impl_max_degree()	1
 
 /* Functions operating on the field structure */
 /* *Mpfq::gf2n::field::code_for_field_characteristic */

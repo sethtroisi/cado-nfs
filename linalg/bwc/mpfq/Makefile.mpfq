@@ -15,9 +15,8 @@ MPFQ_TEMP:=/tmp/mpfq-cado
 basic:
 	$(MPFQ)/simd/abase.pl w=64 $(mpfq_tag_list)
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
-	/bin/cp -f $(MPFQ)/include/mpfq/mpfq.h .
+	/bin/cp -f $(MPFQ)/include/mpfq.h .
 	/bin/cp -f $(MPFQ)/gfp/mpfq_gfp_common.h .
-	ls abase_*[ch] mpfq*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
 	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift general_prefix=abase > mpfq_name_ab.h
 
 .PHONY: mpfq-buildtree
@@ -47,8 +46,7 @@ binary-fields: mpfq-buildtree
 prime-fields: mpfq-buildtree
 	$(MAKE) -C $(MPFQ_TEMP) fixmp_files
 	# $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
-	/bin/cp -f $(MPFQ_TEMP)/include/mpfq/fixmp*h .
-	ls fixmp*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
+	/bin/cp -f $(MPFQ_TEMP)/include/fixmp*h .
 
 
 clean:
