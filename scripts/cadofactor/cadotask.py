@@ -1734,7 +1734,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             self.logger.info("No new files to split")
         else:
             self.logger.info("Splitting %d new files", len(newfiles))
-            self.workdir.make_directories(map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
@@ -1758,6 +1757,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 update2 = dict.fromkeys(newfiles, 0)
                 self.add_output_files(update2, commit=True)
             else:
+                self.workdir.make_directories(map(str, range(0, self.nr_slices)))
                 outputdir = self.workdir.make_dirname()
                 run_counter = self.state.get("run_counter", 0)
                 prefix = "dup1.%s" % run_counter
