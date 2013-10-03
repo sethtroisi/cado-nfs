@@ -203,8 +203,29 @@ class FilePath(object):
         return os.path.isfile(str(self))
     def isdir(self):
         return os.path.isdir(str(self))
-    def mkdir(self):
-        os.mkdir(str(self))
+    def mkdir(self, *, parent=False, mode=None):
+        """ Creates a directory.
+        
+        parent acts much like the Unix mkdir's '-p' parameter: required parent
+        directories are created if they don't exist, and no error is raised
+        if the directory to be created already exists.
+        If parent==True, a mode for the directory to be created can be specified
+        as well.
+        """
+        if parent:
+            # os.makedirs specifies 0o777 as the default value for mode,
+            # thus we can't pass None to get the default value. We also
+            # want to avoid hard-coding 0x777 as the default in this
+            # method's signature, or using **kwargs magic. Thus we use
+            # a default of None in this method, and pass the mode value
+            # to makedirs only if it is not None.
+            if mode is None:
+                os.makedirs(str(self), exist_ok=True)
+            else:
+                os.makedirs(str(self), exist_ok=True, mode=mode)
+        else:
+            assert not kwargs
+            os.mkdir(str(self))
     def realpath(self):
         return os.path.realpath(str(self))
     def open(self, *args, **kwargs):
@@ -246,7 +267,7 @@ class WorkDir(object):
         return FilePath(self.workdir, filename)
     
     def _make_path(self, extra):
-        """ Make a path of the form: "workdir/jobname.taskname""extra" """
+        """ Make a path of the form: 'workdir/jobname.taskname''extra' """
         return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname,
                                                  extra))
     
@@ -278,15 +299,13 @@ class WorkDir(object):
             assert subdir is None
             return self._make_path(".%s" % name)
     
-    def make_directories(self, subdirs = None):
+    def make_directories(self, subdirs=None):
         dirname = self.make_dirname()
-        if not dirname.isdir():
-            dirname.mkdir()
+        dirname.mkdir(parent=True)
         if subdirs:
             for subdir in subdirs:
                 dirname = self.make_dirname(subdir)
-                if not dirname.isdir():
-                    dirname.mkdir()
+                dirname.mkdir(parent=True)
         return
 
 
