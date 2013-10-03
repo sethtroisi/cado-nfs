@@ -250,8 +250,6 @@ class WorkDir(object):
     >>> f = WorkDir("/foo/bar", "jobname", "taskname")
     >>> str(f.make_dirname())
     '/foo/bar/jobname.taskname/'
-    >>> str(f.make_dirname('subdir'))
-    '/foo/bar/jobname.taskname/subdir/'
     >>> str(f.make_filename('file'))
     '/foo/bar/jobname.taskname.file'
     >>> str(f.make_filename('file', use_subdir=True))
@@ -259,7 +257,7 @@ class WorkDir(object):
     >>> str(f.make_filename('file', use_subdir=True, subdir='subdir'))
     '/foo/bar/jobname.taskname/subdir/file'
     """
-    def __init__(self, workdir, jobname, taskname):
+    def __init__(self, workdir, jobname=None, taskname=None):
         self.workdir = str(workdir).rstrip(os.sep)
         self.jobname = jobname
         self.taskname = taskname
@@ -280,14 +278,9 @@ class WorkDir(object):
         return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname,
                                                  extra))
     
-    def make_dirname(self, subdir = None):
-        """ Make a directory name of the form workdir/jobname.taskname/ if
-        subdir is not given, or workdir/jobname.taskname/subdir/ if it is
-        """
-        if subdir:
-            return self._make_path("%s%s%s" % (os.sep, subdir, os.sep))
-        else:
-            return self._make_path(os.sep)
+    def make_dirname(self):
+        """ Make a directory name of the form workdir/jobname.taskname/ """
+        return self._make_path(os.sep)
     
     def make_filename(self, name, use_subdir = False, subdir = None):
         """ If use_subdir is False, make a filename of the form
@@ -307,15 +300,6 @@ class WorkDir(object):
         else:
             assert subdir is None
             return self._make_path(".%s" % name)
-    
-    def make_directories(self, subdirs=None):
-        dirname = self.make_dirname()
-        dirname.mkdir(parent=True)
-        if subdirs:
-            for subdir in subdirs:
-                dirname = self.make_dirname(subdir)
-                dirname.mkdir(parent=True)
-        return
 
 
 class Statistics(object):
@@ -1773,8 +1757,20 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                 update2 = dict.fromkeys(newfiles, 0)
                 self.add_output_files(update2, commit=True)
             else:
-                self.workdir.make_directories(map(str, range(0, self.nr_slices)))
+                # Make a task-specific subdirectory name under out working
+                # directory
                 outputdir = self.workdir.make_dirname()
+                # Create this directory if it does not exist
+                # self.logger.info("Creating directory %s", outputdir)
+                outputdir.mkdir(parent=True)
+                # Create a WorkDir instance for this subdirectory
+                dup1_subdir = WorkDir(outputdir)
+                # For each slice index [0, ..., nr_slices-1], create under the
+                # subdirectory another directory for that slice's output files
+                for i in range(0, self.nr_slices):
+                    subdir = dup1_subdir.make_filename2(filename=str(i))
+                    # self.logger.info("Creating directory %s", subdir)
+                    subdir.mkdir(parent=True)
                 run_counter = self.state.get("run_counter", 0)
                 prefix = "dup1.%s" % run_counter
                 (stdoutpath, stderrpath) = \
@@ -2433,7 +2429,7 @@ class LinAlgTask(Task, HasStatistics):
         if not "dependency" in self.state:
             self.logger.info("Starting")
             workdir = self.workdir.make_dirname()
-            self.workdir.make_directories()
+            workdir.mkdir()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
