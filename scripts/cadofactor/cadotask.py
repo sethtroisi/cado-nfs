@@ -224,7 +224,6 @@ class FilePath(object):
             else:
                 os.makedirs(str(self), exist_ok=True, mode=mode)
         else:
-            assert not kwargs
             os.mkdir(str(self))
     def realpath(self):
         return os.path.realpath(str(self))
