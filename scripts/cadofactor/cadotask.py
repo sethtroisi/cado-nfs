@@ -259,12 +259,20 @@ class WorkDir(object):
     '/foo/bar/jobname.taskname/subdir/file'
     """
     def __init__(self, workdir, jobname, taskname):
-        self.workdir = workdir.rstrip(os.sep)
+        self.workdir = str(workdir).rstrip(os.sep)
         self.jobname = jobname
         self.taskname = taskname
     
     def path_in_workdir(self, filename):
         return FilePath(self.workdir, filename)
+    
+    def make_filename2(self, jobname=None, taskname=None, filename=None):
+        if jobname is None:
+            jobname = self.jobname
+        if taskname is None:
+            taskname = self.taskname
+        filename_arr = [s for s in [jobname, taskname, filename] if s]
+        return FilePath(self.workdir, ".".join(filename_arr))
     
     def _make_path(self, extra):
         """ Make a path of the form: 'workdir/jobname.taskname''extra' """
@@ -922,6 +930,13 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         key = "wu_submitted"
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.create(wutext, commit=commit)
+        # Write command line to a file
+        cmdline = command.make_command_line()
+        client_cmd_filename = self.workdir.make_filename2(taskname="",
+                                                          filename="wucmd")
+        with client_cmd_filename.open("a") as client_cmd_file:
+            client_cmd_file.write("# Command for work unit: %s\n%s\n" %
+                                  (wuid, cmdline))
     
     def verification(self, wuid, ok, *, commit):
         ok_str = "ok" if ok else "not ok"
