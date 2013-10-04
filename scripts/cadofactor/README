@@ -54,6 +54,12 @@ tasks.polyselect.import=xxx.poly
 
 where xxx.poly is the name of the polynomial file (in CADO-NFS format).
 
+By default this will consider this polynomial in addition to those found during
+the polynomial selection. If you want to avoid polynomial selection, also add:
+
+tasks.polyselect.admin=0
+tasks.polyselect.admax=0
+
 Importing relations
 ===================
 
