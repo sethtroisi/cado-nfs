@@ -3020,7 +3020,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
         
-        # Assume that all tasks want to run. Ff they are finished already,
+        # Assume that all tasks want to run. If they are finished already,
         # they will just return immediately
         self.tasks_that_want_to_run = list(self.tasks)
         
