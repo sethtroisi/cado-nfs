@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
-# Run cadofactor.pl on the current machine. This script is recommended only
-# for small factorizations (less than 100 digits). For larger numbers, you
-# should use the cadofactor.pl script (see the documentation in that script).
+# Run cadofactor.pl or cadofactor.py on the current machine. This script is 
+# recommended only for small factorizations (less than 100 digits). For 
+# larger numbers, you should use the cadofactor.pl or cadofactor.py script
+# (see the documentation in that script).
 #
 # All partial data are put in a temp dir that is removed at the end in
 # case of success. The temp dir is left here in case of failure. If
 # CADO_DEBUG is set, the temp dir is never removed.
 
 # Mac OS X's mktemp requires a prefix.
-# And we need $t to be an absolute pathname, or else ./new_cadofactor.pl
+# And we need $t to be an absolute pathname, or else ./cadofactor.pl
 # will fail.
 
 usage() {
@@ -17,16 +18,16 @@ usage() {
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
     <integer>     - integer to be factored. must be at least 57 digits,
                     and free of small prime factors [parameters are
-                    optimized only for 85 digits and above].
+                    optimized only for 85 digits and above]
 options:
-    -t <integer>  - numbers of cores to be used.
-    -s <integer>  - numbers of slave scripts to be used (only with -py).
-    -ssh          - use ssh (see README) for distributing the polynomial
-                    selection and sieve steps on localhost. For broader
-                    use on several machines, use the advanced script
-                    cadofactor.pl
-    -pl           - use Perl cadofactor script as worker
-    -py           - use Python cadofactor script as worker
+    -t <integer>  - numbers of cores to be used
+    -pl           - use Perl cadofactor.pl script as worker
+    -py           - use Python cadofactor.py script as worker (default)
+    -s <integer>  - numbers of slave scripts to be used (only with -py)
+    -ssh          - When using cadofactor.pl, use ssh (see README) for
+                    distributing the polynomial selection and sieve steps 
+                    on localhost. For broader use on several machines, use
+                    the advanced script cadofactor.pl (or use cadofactor.py)
     -timeout <integer>
                   - abort computation after this many seconds
 
@@ -41,25 +42,24 @@ EOF
 # or if the timeout binary is not found, leave TIMEOUT unset.
 # Returns 1 (false) if a timeout was requested and the binary was not found.
 # Otherwise returns 0 (true).
-# We use an array for TIMEOUT so that we can expand it to exactly 2 words on
+# We use an array for TIMEOUT so that we can expand it to exactly 3 words on
 # the resulting command line.
 function find_timeout() {
     local TIMEOUT_DURATION="$1"
     test -z "$TIMEOUT_DURATION" && return 0
-    TIMEOUT_BIN="`which timeout 2>/dev/null`"
-    if [ -z "$TIMEOUT_BIN" ]
-    then
-        # Maybe it's not a GNU system, but with GNU coreutils installed
-        # with "g" prefix to all binaries
-        TIMEOUT_BIN="`which gtimeout 2>/dev/null`"
-    fi
-    if [ -n "$TIMEOUT_BIN" ]
-    then
-        TIMEOUT[0]="$TIMEOUT_BIN"
-        TIMEOUT[1]="--signal=SIGINT"
-        TIMEOUT[2]="$TIMEOUT_DURATION"
-        return 0
-    fi
+    # Maybe it's not a GNU system, but with GNU coreutils installed
+    # with "g" prefix to all binaries
+    for TIMEOUT_NAME in timeout gtimeout
+    do
+        TIMEOUT_BIN="`which timeout 2>/dev/null`"
+        if [ -n "$TIMEOUT_BIN" ]
+        then
+            TIMEOUT[0]="$TIMEOUT_BIN"
+            TIMEOUT[1]="--signal=SIGINT"
+            TIMEOUT[2]="$TIMEOUT_DURATION"
+            return 0
+        fi
+    done
     return 1
 }
 
