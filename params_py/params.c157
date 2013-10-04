@@ -61,7 +61,7 @@ tasks.sieve.alambda = 3.2
 
 tasks.sieve.I = 14		# Sieving range in lattice siever
 tasks.sieve.qmin = 40000000		# Start of the special-q range
-tasks.sieve.qrange = 50000		# The size of an elementary sieving task
+tasks.sieve.qrange = 5000		# The size of an elementary sieving task
 tasks.sieve.rels_wanted = 100389418		# Try filtering only up from that many relations
 slaves.niceness = 10
 tasks.sieve.threads = 2
