@@ -78,7 +78,7 @@ if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
 fi
 
 ssh=false
-python=false
+python=true
 cores=1
 slaves=1
 for ((i=1; i<=3; i=i+1)) ; do
