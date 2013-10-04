@@ -81,6 +81,7 @@ ssh=false
 python=true
 cores=1
 slaves=1
+verbose=false
 for ((i=1; i<=3; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
@@ -118,6 +119,9 @@ for ((i=1; i<=3; i=i+1)) ; do
     shift
   elif [ "$1" = "-pl" ]; then
     python=false
+    shift
+  elif [ "$1" = "-v" ]; then
+    verbose=true
     shift
   else
     break
@@ -266,14 +270,17 @@ tmpdir=$t/tmp
 bindir=$bindir
 $host cores=$cores
 EOF
+  if $verbose; then
+    VERBOSE="-v"
+  fi
   if ! $ssh; then
     "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
     sieve_max_threads=$cores nthchar=$cores\
-    bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+    bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out $VERBOSE "$@"
   else
     "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
     machines=$t/mach_desc nthchar=$cores bwmt=$cores wdir=$t \
-    sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+    sievenice=0 polsel_nice=0 logfile=$t/out $VERBOSE "$@"
   fi
 fi
 
