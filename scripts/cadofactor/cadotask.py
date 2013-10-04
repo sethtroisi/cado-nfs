@@ -887,16 +887,29 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout")
+        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
+        self.state.setdefault("wu_cancelled", 0)
         self.params.setdefault("maxwu", 10)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
+    
+    def submit_wu(self, wu, commit=True):
+        """ Submit a WU and update wu_submitted counter """
+        key = "wu_submitted"
+        self.state.update({key: self.state[key] + 1}, commit=False)
+        self.wuar.create(str(wu), commit=commit)
+    
+    def cancel_wu(self, wuid, commit=True):
+        """ Cancel a WU and update wu_cancelled counter """
+        key = "wu_cancelled"
+        self.state.update({key: self.state[key] + 1}, commit=False)
+        self.wuar.cancel(wuid, commit=commit)
     
     def submit_command(self, command, identifier, commit=True):
         ''' Submit a workunit to the database. '''
@@ -911,10 +924,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                    {basename:filename})
         
         self.logger.info("Adding workunit %s to database", wuid)
-        # print ("WU:\n%s" % wutext)
-        key = "wu_submitted"
-        self.state.update({key: self.state[key] + 1}, commit=False)
-        self.wuar.create(wutext, commit=commit)
+        # self.logger.debug("WU:\n%s" % wutext)
+        self.submit_wu(wutext, commit=commit)
         # Write command line to a file
         cmdline = command.make_command_line()
         client_cmd_filename = self.workdir.make_filename2(taskname="",
@@ -924,6 +935,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                   (wuid, cmdline))
     
     def verification(self, wuid, ok, *, commit):
+        """ Mark a workunit as received and update wu_received counter """
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
@@ -936,7 +948,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.wuar.cancel_all_available()
     
     def get_number_outstanding_wus(self):
-        return self.state["wu_submitted"] - self.state["wu_received"]
+        return self.state["wu_submitted"] - self.state["wu_received"] \
+                - self.state["wu_cancelled"]
 
     def get_number_available_wus(self):
         return self.wuar.count_available()
@@ -963,11 +976,15 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         wuid = wu.get_id()
         (name, task, identifier, attempt) = self.split_wuname(wuid)
         attempt = 2 if attempt is None else attempt + 1
+        if attempt > int(self.params.get("maxresubmit", 5)):
+            self.logger.info("Not resubmitting workunit %s, failed %d times",
+                             wuid, attempt - 1)
+            return
         new_wuid = self.make_wuname(identifier, attempt)
         wu.set_id(new_wuid)
         self.logger.info("Resubmitting workunit %s as %s", wuid, new_wuid)
-        self.wuar.create(str(wu), commit=commit)
-
+        self.submit_wu(wu, commit=commit)
+        
     def resubmit_timed_out_wus(self):
         # We don't store the lastcheck in state as we do *not* want to check
         # instantly when we start up - clients should get a chance to upload
@@ -984,7 +1001,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return
         self.last_timeout_check = now
         
-        timeout = int(self.params.get("wutimeout", 10800))
+        timeout = int(self.params.get("wutimeout", 10800)) # Default: 3h
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
         self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
@@ -994,7 +1011,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             self.logger.debug("Found no timed-out workunits")
         for entry in results:
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=False)
-            self.wuar.cancel(entry["wuid"], commit=True)
+            self.cancel_wu(entry["wuid"], commit=True)
 
 
 class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
