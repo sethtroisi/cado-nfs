@@ -1,8 +1,9 @@
-Main changes between cado-nfs-1.1 and cado-nfs-1.2:
+Main changes between cado-nfs-1.1 and cado-nfs-2.0:
 
 * the default parameters in the params subdirectory have been improved
-* major speedup in the purge step
-* the purge step produces a smaller matrix (about 5% less rows)
+* major speedups in the polynomial selection, sieving and filtering steps
+* the filtering step produces a smaller matrix (about 5% less rows),
+  see http://hal.inria.fr/hal-00734654 for more details.
 * the replay step is faster and uses less memory
 * fixed bug in the lattice siever (las) on 32-bit computers
 
