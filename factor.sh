@@ -24,6 +24,10 @@ options:
     -pl           - use Perl cadofactor.pl script as worker
     -py           - use Python cadofactor.py script as worker (default)
     -s <integer>  - numbers of slave scripts to be used (only with -py)
+    -h <host1>,<host2>,...,<hostn>
+                  - comma-separated list of hosts to use for factorization.
+                    With -s <n>, run <n> many scripts per host.
+                    Only for -py. Default: localhost
     -ssh          - When using cadofactor.pl, use ssh (see README) for
                     distributing the polynomial selection and sieve steps 
                     on localhost. For broader use on several machines, use
@@ -99,6 +103,9 @@ for ((i=1; i<=3; i=i+1)) ; do
       exit 1
     fi
     shift 2
+  elif [ "$1" = "-h" ]; then
+    hostnames="$2"
+    shift 2
   elif [ "$1" = "-timeout" ]; then
     timeout="$2"
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $timeout)" ]; then
@@ -132,6 +139,14 @@ if [ $slaves -ne 1 ] && ! $python
 then
   echo "The -slaves parameter is used only for the Python script. Ignoring it."
 fi
+
+if [ -n "$hostnames" ] && ! $python
+then
+  echo "The -h parameter is used only for the Python script. Ignoring it."
+fi
+
+# Set default value
+: ${hostnames:=localhost}
 
 #########################################################################
 # Set paths properly.
@@ -244,7 +259,7 @@ fi
 cp $file $t/param
 
 # Sets the machine description file
-if [ -z "$CADO_USEHOST" ] ; then
+if [ -z "$CADO_USEHOST" ] && [ "$hostnames" = localhost ]; then
    host=localhost
 else
    host=`hostname --short`
@@ -259,9 +274,9 @@ if $python; then
     # one which is named otherwise, or placed in a non-prority location
     # is the path, is preferred. If $PYTHON is empty, this is a no-op
   "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
-  threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
+  threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
   slaves.nrclients=$slaves \
-  slaves.scriptpath="$scriptpath" server.address=localhost \
+  slaves.scriptpath="$scriptpath" server.address=$host \
   slaves.basepath="$t/client/" "$@"
 else
   cat > $t/mach_desc <<EOF
