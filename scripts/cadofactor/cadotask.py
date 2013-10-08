@@ -1494,11 +1494,11 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             re.compile(r"#.*max bucket fill %s" % cap_fp)
         ),
         (
-            "stats_total_wall_clock_time",
+            "stats_total_cpu_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"# Total wct time %ss" % cap_fp)
+            re.compile(r"# Total cpu time %ss" % cap_fp)
         ),
         (
             "stats_total_time",
@@ -1511,7 +1511,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def stat_conversions(self):
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
-        # Total wct time 7.0s [precise timings available only for mono-thread]
+        # Total cpu time 7.0s [precise timings available only for mono-thread]
         # Total 26198 reports [0.000267s/r, 155.9r/sq]
         return self._stat_conversions
     @property
@@ -1519,7 +1519,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         return (
             ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
                 ", max bucket fill: {stats_max_bucket_fill[0]}"],
-            ["Total wall clock time: {stats_total_wall_clock_time[0]}s"],
+            ["Total CPU time: {stats_total_cpu_time[0]}s"],
             ["Total time: {stats_total_time[0]}s"],
         )
     # We seek to this many bytes before the EOF to look for the
