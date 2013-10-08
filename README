@@ -159,11 +159,20 @@ machine. This example uses two clients, which use two threads each.
 If the number of cores is greater than 4, it is very recommended (sometimes
 mandatory if the script crashes) to use multiple clients.
 
-For a larger factorization (distributed on several machines),
-please use directly the main script cadofactor.py (doc included in
+Run a factorization on several machines:
+=======================================
+
+./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 2 -s 2 -h hostname1,hostname2,hostname3
+
+This starts 2 clients each on hosts hostname1, hostname2, and hostname3,
+where each client uses two cpus (threads). For hostnames that are not
+localhost, ssh is used to connect to the host and start a client there.
+To configure ssh, see the next section.
+
+For a larger factorization (distributed on several machines, possibly
+with different parameters for different machines), please use directly
+the main script cadofactor.py (doc included in
 scripts/cadofactor/README and scripts/cadofactor/parameters).
-Clients will be launched on remote machines via ssh. To configure ssh, see
-the next section.
 
 Check that your SSH configuration is correct:
 =============================================
