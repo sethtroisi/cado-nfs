@@ -6,6 +6,13 @@ Main changes between cado-nfs-1.1 and cado-nfs-2.0:
   see http://hal.inria.fr/hal-00734654 for more details.
 * the replay step is faster and uses less memory
 * fixed bug in the lattice siever (las) on 32-bit computers
+* allow compilation on MinGW32. Performance is poor, however. MinGW64 is
+  currently not supported
+* new cadofactory script written in Python, allows larger-scale distribution
+  with client/server model
+* implementations of NFS-DL and NFS-FFS (experimental, requires some
+  background knowledge to use)
+
 
 Main changes between cado-nfs-1.0 and cado-nfs-1.1:
 
