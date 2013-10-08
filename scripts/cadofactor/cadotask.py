@@ -1131,6 +1131,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
+        self.did_import = False
     
     def run(self):
         self.logger.info("Starting")
@@ -1143,9 +1144,11 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         else:
             self.logger.info("No polynomial was previously found")
         
-        if "import" in self.params:
+        if "import" in self.params and not self.did_import:
             self.process_polyfile(self.params["import"])
-            self.write_poly_file()
+            if not self.bestpoly is None:
+                self.write_poly_file()
+            self.did_import = True
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - "
@@ -1538,14 +1541,16 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
+        self.did_import = False
     
     def run(self):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        if "import" in self.params:
+        if "import" in self.params and not self.did_import:
             self.import_files(self.params["import"])
+            self.did_import = True
         
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
