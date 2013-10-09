@@ -544,12 +544,6 @@ class MakesTablenames(HasName):
         """
         return self.name
     
-    @staticmethod
-    def check_tablename(name):
-        no_ = name.replace("_", "")
-        if not no_[0].isalpha() or not no_[1:].isalnum():
-            raise Exception("%s is not valid for an SQL table name" % name)
-    
     def make_tablename(self, extra = None):
         """ Return a name for a DB table """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ?
@@ -557,7 +551,7 @@ class MakesTablenames(HasName):
         name = self.tablename_prefix
         if extra:
             name = name + '_' + extra
-        self.check_tablename(name)
+        wudb.check_tablename(name)
         return name
 
 class HasState(MakesTablenames, wudb.HasDbConnection):

@@ -110,6 +110,15 @@ class WuStatus:
             cls.RECEIVED_ERROR, cls.VERIFIED_OK, cls.VERIFIED_ERROR, 
             cls.CANCELLED)
 
+def check_tablename(name):
+    """ Test whether name is a valid SQL table name.
+    
+    Raise an exception if it isn't.
+    """
+    no_ = name.replace("_", "")
+    if not no_[0].isalpha() or not no_[1:].isalnum():
+        raise Exception("%s is not valid for an SQL table name" % name)
+
 # If we try to update the status in any way other than progressive 
 # (AVAILABLE -> ASSIGNED -> ...), we raise this exception
 class StatusUpdateError(Exception):
