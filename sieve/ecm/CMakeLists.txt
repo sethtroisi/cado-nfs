@@ -26,6 +26,15 @@
 # variant_facul(ecm ul)
 # variant_facul(facul_doit ul)
 
+# Useful for debugging: disables optimization for facul() and facul_doit_*()
+# which makes # tracing program flow easier, but does not slow down the 
+# arithmetic in pm1_*(), pp1_*(), ecm_*() 
+# set_property(SOURCE facul.c PROPERTY COMPILE_FLAGS "-O0 -g")
+# set_property(SOURCE facul_doit_ul.c PROPERTY COMPILE_FLAGS "-O0 -g")
+# set_property(SOURCE facul_doit_15ul.c PROPERTY COMPILE_FLAGS "-O0 -g")
+# set_property(SOURCE facul_doit_2ul2.c PROPERTY COMPILE_FLAGS "-O0 -g")
+# set_property(SOURCE facul_doit_mpz.c PROPERTY COMPILE_FLAGS "-O0 -g")
+
 # We now have wrappers, so it's very easy from the cmake perspective.
 add_library(facul
         ecm_ul.c
