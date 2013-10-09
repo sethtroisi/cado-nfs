@@ -2701,6 +2701,22 @@ class SqrtTask(Task):
                 return False
         return True
 
+    @staticmethod
+    def nextprime(N):
+        """ Return the smallest strong probable prime no smaller than N
+        >>> prps = [SqrtTask.nextprime(i) for i in range(30)]
+        >>> prps == [2, 2, 2, 3, 5, 5, 7, 7, 11, 11, 11, 11, 13, 13, 17, 17, \
+                     17, 17, 19, 19, 23, 23, 23, 23, 29, 29, 29, 29, 29, 29]
+        True
+        """
+        if N <= 2:
+            return 2
+        if N % 2 == 0:
+            N += 1
+        while not SqrtTask.miller_rabin_tests(N, 5):
+            N += 2     
+        return N
+
 class StartClientsTask(Task):
     """ Starts clients on slave machines """
     @property
