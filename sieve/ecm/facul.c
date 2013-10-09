@@ -55,7 +55,7 @@ nb_curves (const unsigned int lpb)
 
 facul_strategy_t *
 facul_make_strategy (const unsigned long fbb,
-		     const unsigned int lpb)
+		     const unsigned int lpb, const int verbose)
 {
   facul_strategy_t *strategy;
   facul_method_t *methods;
@@ -78,24 +78,24 @@ facul_make_strategy (const unsigned long fbb,
   /* 37: pp1_65 138 2625 */
   methods[0].method = PP1_65_METHOD;
   methods[0].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[0].plan, 138, 2625, 0);
+  pp1_make_plan (methods[0].plan, 138, 2625, verbose);
 
   /* 81: pp1_27 200 3465 */
   methods[1].method = PP1_27_METHOD;
   methods[1].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[1].plan, 200, 3465, 0);
+  pp1_make_plan (methods[1].plan, 200, 3465, verbose);
 
   /* 215: pm1 468 8085 */
   methods[2].method = PM1_METHOD;
   methods[2].plan = malloc (sizeof (pm1_plan_t));
-  pm1_make_plan (methods[2].plan, 468, 8085, 0);
+  pm1_make_plan (methods[2].plan, 468, 8085, verbose);
 
   /* 54: ecmm12 166 2835 2  */
   if (n > 0)
     {
       methods[3].method = EC_METHOD;
       methods[3].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[3].plan, 166, 2835, MONTY12, 2, 1, 0);
+      ecm_make_plan (methods[3].plan, 166, 2835, MONTY12, 2, 1, verbose);
     }
 
   /* 239: ecmm12 244 4095 */
@@ -104,9 +104,9 @@ facul_make_strategy (const unsigned long fbb,
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
       if (i != 29)
-        ecm_make_plan (methods[i].plan, 244, 4095, MONTY12, i - 1, 1, 0);
+        ecm_make_plan (methods[i].plan, 244, 4095, MONTY12, i - 1, 1, verbose);
       else /* 163: ecm 321 5985 11 */
-        ecm_make_plan (methods[i].plan, 321, 5985, BRENT12, 11, 1, 0);
+        ecm_make_plan (methods[i].plan, 321, 5985, BRENT12, 11, 1, verbose);
     }
 
   methods[n + 3].method = 0;

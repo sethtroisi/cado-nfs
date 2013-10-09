@@ -521,7 +521,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         fprintf(las->output, "# Using %d+3 P-1/P+1/ECM curves\n",
                 nb_curves (sc->sides[s]->lpb));
         si->sides[s]->strategy = facul_make_strategy(
-                sc->sides[s]->lim, sc->sides[s]->lpb);
+                sc->sides[s]->lim, sc->sides[s]->lpb, 0);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
