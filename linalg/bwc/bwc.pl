@@ -305,7 +305,7 @@ while (defined($_ = shift @ARGV)) {
     if (/^(-h|--help)$/) { usage; }
     my ($k,$v);
     if (/^--([^=]+)$/ && scalar @ARGV) { $k=$1; $v=shift(@ARGV); }
-    elsif (/^(-.*)$/) { $k=$1; $v=1; }
+    elsif (/^(-.*)$/) { $k=$1; $v=undef; }
     elsif (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
     if (!defined($k)) {
         usage "Garbage not undertood on command line: $_";
@@ -409,7 +409,13 @@ while (my ($k,$v) = each %$param) {
     }
     # The rest is passed to subprograms, unless explicitly discarded on a
     # per-program basis.
-    push @main_args, "$k=$v";
+    if (defined($v)) {
+        push @main_args, "$k=$v";
+    } else {
+        # This is for switches (like -v) which don't have a "value"
+        # associated with them
+        push @main_args, "$k";
+    }
 
     # Yet it does make sense to read some parameters, are we are
     # interested by their value.
