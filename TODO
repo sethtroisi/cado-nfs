@@ -67,12 +67,6 @@ Sieve:
   relations, thus reducing pressure on the cofactorization phase,
   without losing too many relations.
 
-* take into account prime powers in las (the makefb command can do it,
-  however this is currently disabled since las does not correctly deal with
-  prime powers). An experiment made by Alexander Kruppa in October 2011 with
-  the c59 shows that taking into account prime powers increases by 15% the
-  number of relations found, and by 10% the yield per second.
-
 * [idea from Alexander Kruppa, October 2011] run a sieve test to determine,
   for each pair (s,t) of bit-sizes of cofactors on the algebraic and rational
   sides, the probability p(s,t) that we find a relation. Then we run again the
