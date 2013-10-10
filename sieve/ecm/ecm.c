@@ -544,6 +544,7 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
 	    break;
 	  case 11: /* Combined rule 3 and rule 0 */
             ellM_add (C, B, A, C, b, m);
+            /* (B,C,A) := (A,B,C)  */
             ellM_swap (B, C, m);
             ellM_swap (A, B, m);
 	    break;
@@ -985,7 +986,7 @@ curveW_from_Montgomery (residue_t a, ellW_point_t P, const residue_t X,
    Requires n > 1. Uses 4n-6 multiplications. */
 
 MAYBE_UNUSED
-static void
+static void ATTRIBUTE((__noinline__))
 common_z (const int n1, residue_t *x1, residue_t *z1, 
 	  const int n2, residue_t *x2, residue_t *z2,
 	  const modulus_t m)
@@ -993,9 +994,11 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   const int n = n1 + n2;
   int i, j;
   residue_t *t, p;
-
-  // printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n", 
-  //        n1, n2, n1 + n2, 4*(n1 + n2) - 6);
+  const int verbose = 0;
+  
+  if (verbose)
+    printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n", 
+            n1, n2, n1 + n2, 4*(n1 + n2) - 6);
   
   if (n < 2)
     return;
@@ -1004,7 +1007,7 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   for (i = 0; i < n; i++)
     mod_init (t[i], m);
   
-  /* Set t[i] = z_0 * z_1 * ... * z_n, where the z_i are taken
+  /* Set t[i] = z_0 * z_1 * ... * z_i, where the z_i are taken
      from the two lists z1 and z2 */
   i = j = 0;
   if (n1 == 0)
@@ -1020,6 +1023,14 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   
   /* Now t[i] contains z_0 * ... * z_i */
   
+#ifdef ECM15_UL
+  if (verbose) {
+    printf ("t[] = {");
+    for (int verbose_i = 0; verbose_i < n; verbose_i++)
+      printf ("{%lu,%lu}%s", t[verbose_i][0], t[verbose_i][1], (verbose_i < n-1) ? ", " : "");
+    printf ("}\n");
+  }
+#endif  
   mod_init (p, m);
   
   i = n - 1;
@@ -1066,7 +1077,7 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
 }
 
 
-static int 
+static int ATTRIBUTE((__noinline__))
 ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan, 
 	    const residue_t b, const modulus_t m)
 {
@@ -1303,8 +1314,50 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
      so we skip that one */
   {
     int skip = (plan->i0 == 0) ? 1 : 0;
+#if defined(ECM15_UL)
+    if (verbose)
+      {
+        residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
+        int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
+        
+        printf ("Before common_z():\n");
+        printf ("x1 = {");
+        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
+          printf ("{%luUL,%luUL}%s", x1[verbose_i][0], x1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
+        printf ("z1 = {");
+        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
+          printf ("{%luUL,%luUL}%s", z1[verbose_i][0], z1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
+        printf ("x2 = {");
+        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
+          printf ("{%luUL,%luUL}%s", x2[verbose_i][0], x2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
+        printf ("z2 = {");
+        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
+          printf ("{%luUL,%luUL}%s", z2[verbose_i][0], z2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
+      }
+#endif
     common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip, 
 	      Pid_x + skip, Pid_z + skip, m);
+#if defined(ECM15_UL)
+    if (verbose)
+      {
+        residue_t *x1 = Pj_x, *z1 = Pj_z, *x2 = Pid_x + skip, *z2 = Pid_z + skip;
+        int n1 = plan->s1, n2 = plan->i1 - plan->i0 - skip;
+        
+        printf ("After common_z():\n");
+        printf ("x1 = {");
+        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
+          printf ("{%luUL,%luUL}%s", x1[verbose_i][0], x1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
+        printf ("z1 = {");
+        for (int verbose_i = 0; verbose_i < n1; verbose_i++)
+          printf ("{%luUL,%luUL}%s", z1[verbose_i][0], z1[verbose_i][1], (verbose_i < n1-1) ? ", " : "}\n");
+        printf ("x2 = {");
+        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
+          printf ("{%luUL,%luUL}%s", x2[verbose_i][0], x2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
+        printf ("z2 = {");
+        for (int verbose_i = 0; verbose_i < n2; verbose_i++)
+          printf ("{%luUL,%luUL}%s", z2[verbose_i][0], z2[verbose_i][1], (verbose_i < n2-1) ? ", " : "}\n");
+      }
+#endif
   }
 
   if (verbose)
@@ -1320,6 +1373,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
                 mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
       printf ("]\n");
+      fflush(stdout);
     }
 
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
