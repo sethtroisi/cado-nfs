@@ -7,6 +7,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef HAVE_WAIT_H
+#include <sys/wait.h>
+#endif
 #include <errno.h>
 
 
@@ -189,7 +192,14 @@ char **prepare_grouped_command_lines(char **list_of_files)
     const struct suffix_handler *r = supported_compression_formats;
     char ** new_commands = NULL;
     size_t n_new_commands = 0;
+    
+    /* Allow a few bytes extra for popen's "/bin/sh" "-c" prefix */
+    ASSERT_ALWAYS(get_arg_max() >= 20);
+    size_t arg_max = get_arg_max() - 20;
+    
     for(char ** grouphead = list_of_files ; *grouphead ; ) {
+        char *cmd_prefix = NULL, *cmd_postfix = "";
+        size_t prefix_len, postfix_len;
         const struct suffix_handler * this_suffix = r;
         for (; this_suffix && this_suffix->suffix; this_suffix++)
             if (has_suffix(*grouphead, this_suffix->suffix))
@@ -197,6 +207,42 @@ char **prepare_grouped_command_lines(char **list_of_files)
         ASSERT_ALWAYS(this_suffix);
         size_t filenames_total_size = 0;
         char ** grouptail;
+
+        if (*antebuffer) {
+            if (this_suffix->pfmt_in) {
+                /* antebuffer 24 file1.gz file2.gz file3.gz | gzip -dc - */
+                int rc = asprintf(&cmd_prefix, "%s %d ", antebuffer, antebuffer_buffer_size);
+                ASSERT_ALWAYS(rc >= 0);
+                char *tmp;
+                rc = asprintf(&tmp, this_suffix->pfmt_in, "-");
+                ASSERT_ALWAYS(rc >= 0);
+                rc = asprintf(&cmd_postfix, " | %s", tmp);
+                ASSERT_ALWAYS(rc >= 0);
+                free(tmp);
+            } else {
+                /* antebuffer 24 file1.txt file2.txt file3.txt */
+                /* avoid piping through cat */
+                int rc = asprintf(&cmd_prefix, "%s %d ", antebuffer, antebuffer_buffer_size);
+                ASSERT_ALWAYS(rc >= 0);
+            }
+        } else {
+            if (this_suffix->pfmt_in) {
+                /* gzip -dc file1.gz file2.gz file3.gz */
+                int rc = asprintf(&cmd_prefix, this_suffix->pfmt_in, "");
+                ASSERT_ALWAYS(rc >= 0);
+            } else {
+                /* cat file1.txt file2.txt file3.txt */
+                /* There's potential for this to qualify as a useless use
+                 * of cat, but anyway we don't expect to meet this case
+                 * often.
+                 */
+                int rc = asprintf(&cmd_prefix, "cat ");
+                ASSERT_ALWAYS(rc >= 0);
+            }
+        }
+        prefix_len = strlen(cmd_prefix);
+        postfix_len = strlen(cmd_postfix);
+        
         for(grouptail = grouphead ; *grouptail ; grouptail++) {
             const struct suffix_handler * other_suffix = r;
             for (; other_suffix && other_suffix->suffix; other_suffix++)
@@ -206,17 +252,10 @@ char **prepare_grouped_command_lines(char **list_of_files)
                 break;
             /* Add 1 for a space */
             size_t ds = strlen(*grouptail) + 1;
-#ifdef HAVE_MINGW
-            /* no sysconf() under mingw, use a safe bet */
-            if (filenames_total_size + ds > (size_t) 8192)
+            if (filenames_total_size + prefix_len + postfix_len + ds > arg_max)
                 break;
-#else
-            if (filenames_total_size + ds > (size_t) sysconf(_SC_ARG_MAX) - 1024)
-                break;
-#endif
             filenames_total_size += ds;
         }
-        filenames_total_size++; /* for '\0' */
         /* Now all file names referenced by pointers in the interval
          * [grouphead..grouptail[ have the same suffix. Create a new
          * command for unpacking them.
@@ -224,45 +263,21 @@ char **prepare_grouped_command_lines(char **list_of_files)
         new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
 
         /* intermediary string for the list of file names */
-        char * tmp = malloc(filenames_total_size);
+        char * tmp = malloc(filenames_total_size + 1);
         size_t k = 0;
         for(char ** g = grouphead ; g != grouptail ; g++) {
-            k += snprintf(tmp + k, filenames_total_size - k, "%s ", *g);
+            k += snprintf(tmp + k, filenames_total_size + 1 - k, "%s ", *g);
         }
         tmp[k-1]='\0';  /* turn final space to a null byte */
+        filenames_total_size--; /* and adjust filenames_total_size for deleted space */
             
         char * cmd;
         int rc;
 
-        if (*antebuffer) {
-            if (this_suffix->pfmt_in) {
-                /* antebuffer 24 file1.gz file2.gz file3.gz | gzip -dc - */
-                char * tailcmd;
-                rc = asprintf(&tailcmd, this_suffix->pfmt_in, "-");
-                ASSERT_ALWAYS(rc >= 0);
-                rc = asprintf(&cmd, "%s %d %s | %s",
-                        antebuffer, antebuffer_buffer_size, tmp, tailcmd);
-                free(tailcmd);
-            } else {
-                /* antebuffer 24 file1.txt file2.txt file3.txt */
-                /* avoid piping through cat */
-                rc = asprintf(&cmd, "%s %d %s",
-                        antebuffer, antebuffer_buffer_size, tmp);
-            }
-        } else {
-            if (this_suffix->pfmt_in) {
-                /* gzip -dc file1.gz file2.gz file3.gz */
-                rc = asprintf(&cmd, this_suffix->pfmt_in, tmp);
-            } else {
-                /* cat file1.txt file2.txt file3.txt */
-                /* There's potential for this to qualify as a useless use
-                 * of cat, but anyway we don't expect to meet this case
-                 * often.
-                 */
-                rc = asprintf(&cmd, "cat %s", tmp);
-            }
-        }
+        rc = asprintf(&cmd, "%s%s%s", cmd_prefix, tmp, cmd_postfix);
         ASSERT_ALWAYS(rc >= 0);
+        ASSERT_ALWAYS(strlen(cmd) <= arg_max);
+        ASSERT_ALWAYS(strlen(cmd) == filenames_total_size + prefix_len + postfix_len);
         new_commands[n_new_commands-1] = cmd;
         free(tmp);
         grouphead = grouptail;
@@ -322,13 +337,13 @@ fopen_maybe_compressed (const char * name, const char * mode)
 }
 
 #ifdef  HAVE_GETRUSAGE
-void
+int
 fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * rr)
 #else
 /* if we don't even have getrusage, then no fclose_maybe_compressed2 is
  * exposed. Yet, we use one as a code shortcut
  */
-static void
+static int
 fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
 #endif
 {
@@ -340,27 +355,38 @@ fclose_maybe_compressed2 (FILE * f, const char * name, void * rr MAYBE_UNUSED)
          * may exist and not the other */
         ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
         if (r->pfmt_in || r->pfmt_out) {
+            int status;
 #ifdef  HAVE_GETRUSAGE
             if (rr)
-                cado_pclose2(f, rr);
+                status = cado_pclose2(f, rr);
             else
 #endif
-                cado_pclose(f);
+                status = cado_pclose(f);
+#if defined(WIFEXITED) && defined(WEXITSTATUS)
+            /* Unless child process finished normally and with exit status 0,
+               we return an error */
+            if (status == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+                return EOF;
+#else
+            /* What do under MinGW? -1 definitely means an error, but how do
+               we parse the other possible status codes? */
+            return (status == -1) ? EOF : 0;
+#endif
+            return 0;
         } else {
 #ifdef  HAVE_GETRUSAGE
             if (rr) memset(rr, 0, sizeof(*rr));
 #endif
-            fclose(f);
+            return fclose(f);
         }
-        return;
     }
     /* If we arrive here, it's because "" is not among the suffixes */
     abort();
-    return;
+    return EOF;
 }
 
-void
+int
 fclose_maybe_compressed (FILE * f, const char * name)
 {
-    fclose_maybe_compressed2(f, name, NULL);
+    return fclose_maybe_compressed2(f, name, NULL);
 }

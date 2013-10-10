@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
-# Run cadofactor.pl on the current machine. This script is recommended only
-# for small factorizations (less than 100 digits). For larger numbers, you
-# should use the cadofactor.pl script (see the documentation in that script).
+# Run cadofactor.pl or cadofactor.py on the current machine. This script is 
+# recommended only for small factorizations (less than 100 digits). For 
+# larger numbers, you should use the cadofactor.pl or cadofactor.py script
+# (see the documentation in that script).
 #
 # All partial data are put in a temp dir that is removed at the end in
 # case of success. The temp dir is left here in case of failure. If
 # CADO_DEBUG is set, the temp dir is never removed.
 
 # Mac OS X's mktemp requires a prefix.
-# And we need $t to be an absolute pathname, or else ./new_cadofactor.pl
+# And we need $t to be an absolute pathname, or else ./cadofactor.pl
 # will fail.
 
 usage() {
@@ -17,16 +18,20 @@ usage() {
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
     <integer>     - integer to be factored. must be at least 57 digits,
                     and free of small prime factors [parameters are
-                    optimized only for 85 digits and above].
+                    optimized only for 85 digits and above]
 options:
-    -t <integer>  - numbers of cores to be used.
-    -s <integer>  - numbers of slave scripts to be used (only with -py).
-    -ssh          - use ssh (see README) for distributing the polynomial
-                    selection and sieve steps on localhost. For broader
-                    use on several machines, use the advanced script
-                    cadofactor.pl
-    -pl           - use Perl cadofactor script as worker
-    -py           - use Python cadofactor script as worker
+    -t <integer>  - numbers of cores to be used
+    -pl           - use Perl cadofactor.pl script as worker
+    -py           - use Python cadofactor.py script as worker (default)
+    -s <integer>  - numbers of slave scripts to be used (only with -py)
+    -h <host1>,<host2>,...,<hostn>
+                  - comma-separated list of hosts to use for factorization.
+                    With -s <n>, run <n> many scripts per host.
+                    Only for -py. Default: localhost
+    -ssh          - When using cadofactor.pl, use ssh (see README) for
+                    distributing the polynomial selection and sieve steps 
+                    on localhost. For broader use on several machines, use
+                    the advanced script cadofactor.pl (or use cadofactor.py)
     -timeout <integer>
                   - abort computation after this many seconds
 
@@ -41,25 +46,24 @@ EOF
 # or if the timeout binary is not found, leave TIMEOUT unset.
 # Returns 1 (false) if a timeout was requested and the binary was not found.
 # Otherwise returns 0 (true).
-# We use an array for TIMEOUT so that we can expand it to exactly 2 words on
+# We use an array for TIMEOUT so that we can expand it to exactly 3 words on
 # the resulting command line.
 function find_timeout() {
     local TIMEOUT_DURATION="$1"
     test -z "$TIMEOUT_DURATION" && return 0
-    TIMEOUT_BIN="`which timeout 2>/dev/null`"
-    if [ -z "$TIMEOUT_BIN" ]
-    then
-        # Maybe it's not a GNU system, but with GNU coreutils installed
-        # with "g" prefix to all binaries
-        TIMEOUT_BIN="`which gtimeout 2>/dev/null`"
-    fi
-    if [ -n "$TIMEOUT_BIN" ]
-    then
-        TIMEOUT[0]="$TIMEOUT_BIN"
-        TIMEOUT[1]="--signal=SIGINT"
-        TIMEOUT[2]="$TIMEOUT_DURATION"
-        return 0
-    fi
+    # Maybe it's not a GNU system, but with GNU coreutils installed
+    # with "g" prefix to all binaries
+    for TIMEOUT_NAME in timeout gtimeout
+    do
+        TIMEOUT_BIN="`which timeout 2>/dev/null`"
+        if [ -n "$TIMEOUT_BIN" ]
+        then
+            TIMEOUT[0]="$TIMEOUT_BIN"
+            TIMEOUT[1]="--signal=SIGINT"
+            TIMEOUT[2]="$TIMEOUT_DURATION"
+            return 0
+        fi
+    done
     return 1
 }
 
@@ -78,9 +82,10 @@ if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
 fi
 
 ssh=false
-python=false
+python=true
 cores=1
 slaves=1
+verbose=false
 for ((i=1; i<=3; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
@@ -97,6 +102,9 @@ for ((i=1; i<=3; i=i+1)) ; do
       usage
       exit 1
     fi
+    shift 2
+  elif [ "$1" = "-h" ]; then
+    hostnames="$2"
     shift 2
   elif [ "$1" = "-timeout" ]; then
     timeout="$2"
@@ -119,6 +127,9 @@ for ((i=1; i<=3; i=i+1)) ; do
   elif [ "$1" = "-pl" ]; then
     python=false
     shift
+  elif [ "$1" = "-v" ]; then
+    verbose=true
+    shift
   else
     break
   fi
@@ -128,6 +139,14 @@ if [ $slaves -ne 1 ] && ! $python
 then
   echo "The -slaves parameter is used only for the Python script. Ignoring it."
 fi
+
+if [ -n "$hostnames" ] && ! $python
+then
+  echo "The -h parameter is used only for the Python script. Ignoring it."
+fi
+
+# Set default value
+: ${hostnames:=localhost}
 
 #########################################################################
 # Set paths properly.
@@ -240,7 +259,7 @@ fi
 cp $file $t/param
 
 # Sets the machine description file
-if [ -z "$CADO_USEHOST" ] ; then
+if [ -z "$CADO_USEHOST" ] && [ "$hostnames" = localhost ]; then
    host=localhost
 else
    host=`hostname --short`
@@ -255,9 +274,9 @@ if $python; then
     # one which is named otherwise, or placed in a non-prority location
     # is the path, is preferred. If $PYTHON is empty, this is a no-op
   "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
-  threads=$cores tasks.workdir="$t" slaves.hostnames="$host" \
+  threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
   slaves.nrclients=$slaves \
-  slaves.scriptpath="$scriptpath" server.address=localhost \
+  slaves.scriptpath="$scriptpath" server.address=$host \
   slaves.basepath="$t/client/" "$@"
 else
   cat > $t/mach_desc <<EOF
@@ -266,14 +285,17 @@ tmpdir=$t/tmp
 bindir=$bindir
 $host cores=$cores
 EOF
+  if $verbose; then
+    VERBOSE="-v"
+  fi
   if ! $ssh; then
     "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
     sieve_max_threads=$cores nthchar=$cores\
-    bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+    bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out $VERBOSE "$@"
   else
     "${TIMEOUT[@]}" $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
     machines=$t/mach_desc nthchar=$cores bwmt=$cores wdir=$t \
-    sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+    sievenice=0 polsel_nice=0 logfile=$t/out $VERBOSE "$@"
   fi
 fi
 

@@ -36,9 +36,8 @@ typedef struct {
 } facul_strategy_t;
 
 
-int nb_curves (const unsigned int);
-facul_strategy_t * facul_make_strategy (const unsigned long,
-					const unsigned int);
+int nb_curves (unsigned int);
+facul_strategy_t * facul_make_strategy (unsigned long, unsigned int, int);
 void facul_clear_strategy (facul_strategy_t *);
 void facul_print_stats (FILE *);
 int facul (unsigned long *, const mpz_t, const facul_strategy_t *);

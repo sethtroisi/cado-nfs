@@ -10,9 +10,10 @@ using two cores:
 More details follow.
 
 Important note: For a larger factorization (distributed on several machines),
-please use directly the main script cadofactor.pl (whose documentation is
-included in the script) instead of factor.sh (see section "Run a factorization
-on current machine").
+please use directly the main script scripts/cadofactor/cadofactor.py (whose
+documentation is in scripts/cadofactor/README, and documented example parameter
+files are in params_py/params.c91 and scripts/cadofactor/parameters) instead of
+factor.sh (see section "Run a factorization on current machine").
 
 Supported platforms:
 ====================
@@ -28,7 +29,8 @@ Anything else than the primary platform perhaps works, perhaps does not work.
    been installed, notably for Leopard. ABI selection is sometimes
    tricky.
  - 32-bit linux with gcc-4.4 or later is supposed to work.
- - Windows is not supported (see a longer note at the end of this file).
+ - Windows is only partly supported (see a longer note at the end of this
+   file).
 
 Required software tools:
 ========================
@@ -44,8 +46,8 @@ Required software tools:
 *) GNU make and CMake for building (CMake is installed on the fly if missing
    (requires an Internet connection))
 *) Support for posix threads.
-*) The main cadofactor.pl script uses a lot of unix tools: perl, ssh, rsync,
-   gzip to mention but a few.
+*) The main cadofactor.py script uses a lot of unix tools: Python, Python3, 
+   ssh, rsync, gzip to mention but a few.
 
 Optionally:
 *) Support for curl library.
@@ -126,52 +128,58 @@ the shared library mechanism).
 
 (3) $PREFIX/bin/factor.sh
     This calls binaries from $PREFIX/bin, and loads parameter files from
-    $PREFIX/share/cado-nfs-1.1/examples
+    $PREFIX/share/cado-nfs-2.0/examples
 
 Linux, BSD: All three methods work
 MacOS X:
     For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
     variable must be set up properly. The easiest method is to do make
     install, and include in these environment variables the directory
-    $PREFIX/lib/cado-nfs-1.1.
+    $PREFIX/lib/cado-nfs-2.0.
 
 Run a factorization on current machine:
 =======================================
 
 ./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2
 
-where the option '-t 2' tells how many cores to use on the current machine
-(for sieving and linear algebra).
+where the option '-t 2' tells how many cores (via threads) to use on the
+current machine (for polynomial selection, sieving and linear algebra).
 
 CADO-NFS is optimized only for numbers above 85 digits, and no support will
-be provided for numbers of less than 60 digits. Note that it is a
-good idea to remove small prime factors using special-purpose algorithms
-such as trial division, P-1, P+1, or ECM, and use CADO-NFS only for the
-remaining composite factor.
+be provided for numbers of less than 59 digits. Note that it is a good idea
+to remove small prime factors using special-purpose algorithms such as trial
+division, P-1, P+1, or ECM, and use CADO-NFS only for the remaining composite
+factor.
 
-./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
+./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 2 -s 2
 
-If the number of cores is strictly greater than 2, it is more efficient
-to use ssh to distribute the polynomial selection and sieve on the current
-machine.
-If the number of cores is strictly greater than 4, it is very recommended
-(sometimes mandatory if the script crashes) to use the option '-ssh'.
+If the number of cores is greater than 2, it is more efficient to use multiple
+clients with -s to distribute the polynomial selection and sieve on the current
+machine. This example uses two clients, which use two threads each.
+If the number of cores is greater than 4, it is very recommended (sometimes
+mandatory if the script crashes) to use multiple clients.
+
+Run a factorization on several machines:
+=======================================
+
+./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 2 -s 2 -h hostname1,hostname2,hostname3
+
+This starts 2 clients each on hosts hostname1, hostname2, and hostname3,
+where each client uses two cpus (threads). For hostnames that are not
+localhost, ssh is used to connect to the host and start a client there.
 To configure ssh, see the next section.
 
-Note: you might add the -v option at the end of the command line, to see more
-details about the different stages of the factorization:
-
-./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2 -v
-
-For a larger factorization (distributed on several machines),
-please use directly the main script cadofactor.pl (doc included in the script).
+For a larger factorization (distributed on several machines, possibly
+with different parameters for different machines), please use directly
+the main script cadofactor.py (doc included in
+scripts/cadofactor/README and scripts/cadofactor/parameters).
 
 Check that your SSH configuration is correct:
 =============================================
 
-The master script uses SSH to connect to available computing resources
-(including localhost). In order to avoid the script asking your password
-or passphrase, you must have a public-key authentication and an agent.
+The master script uses SSH to connect to available computing resources.
+In order to avoid the script asking your password or passphrase, you must
+have a public-key authentication and an agent.
 
 Also, since localhost has an IP and key that varies, you'd better have
 those 3 lines in your $HOME/.ssh/config:
@@ -191,7 +199,7 @@ type any password/passphrase.
 
 Most of the recent Linux distributions will run an ssh-agent for you. But
 if this is not the case with your distribution, or if you are running
-cadofactor.pl inside a ``screen'' in order to logout of your desktop, you
+cadofactor.py inside a ``screen'' in order to logout of your desktop, you
 will need to run the ssh-agent by hand (see man ssh-agent). As a short
 recipe, you can type:
    eval `ssh-agent`
@@ -200,25 +208,18 @@ recipe, you can type:
 Restarting an interrupted factorization:
 ========================================
 
-If you have started a factorization with the cadofactor.pl script, and it was
+If you have started a factorization with the cadofactor.py script, and it was
 interrupted (for example because of a power failure) you can restart it simply
-with the same cadofactor.pl command line.
-
-If the factorization was interrupted during the linear algebra step, the
-cadofactor.pl script will propose you to restart it from the last checkpoint
-by typing 'l' instead of 'y' (restarts the linear algebra from the beginning).
-
-Alternatively, you can launch the krylov or mksol binary by hand (expert mode),
-with the same command line (see the *.bwc.log file), but with an extra
-argument ``start='', where start is the number of the last checkpoint saved.
+with the same cadofactor.py command line.
 
 Factoring with SNFS:
 ====================
 
 It is possible to take advantage of the special form of an integer and
-use the Special Number Field Sieve. See the doc in cadofactor.pl for
-that. Note in particular that you can force the special-q to be on the
-rational side if this is more appropriate for your number.
+use the Special Number Field Sieve. See the doc in
+scripts/cadofactor/parameters.snfs for that. Note in particular that you
+can force the special-q to be on the rational side if this is more
+appropriate for your number.
 
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
@@ -250,14 +251,15 @@ under Windows:
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
   under Windows. Those instructions should work for CADO-NFS too.
-  See dev_docs/howto-MinGW.txt.
+  See dev_docs/howto-MinGW.txt. Complilation on MinGW32 is tested regularly
+  and should work, although performance of the 32-bit executables is poor.
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.
 
 * you might succeed in compiling the cado-nfs binaries with a
   cross-compiler for windows (which does not waive the runtime
-  requirements for cadofactor.pl, notably on unix-like utilities). See
+  requirements for cadofactor.py, notably on unix-like utilities). See
   dev_docs/README.cross in the source code repository for information on
   how to cross-compile.
 
@@ -268,7 +270,8 @@ Known problems:
   https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490),
   GCC 4.2.0, 4.2.1 and 4.2.2 are also affected
 * under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
-  work, please use bwmt=1x1 option in factor.sh or cadofactor.pl.
+  work, please use -t 1 option in factor.sh or
+  tasks.linalg.threads=1x1 cadofactor.py.
 * under AIX, if GMP is compiled in 64-bit mode, you should set the
   environment variable OBJECT_MODE, for example:
   export OBJECT_MODE=64

@@ -521,7 +521,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         fprintf(las->output, "# Using %d+3 P-1/P+1/ECM curves\n",
                 nb_curves (sc->sides[s]->lpb));
         si->sides[s]->strategy = facul_make_strategy(
-                sc->sides[s]->lim, sc->sides[s]->lpb);
+                sc->sides[s]->lim, sc->sides[s]->lpb, 0);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
@@ -1267,8 +1267,12 @@ typedef uint64_t plattice_x_t;
 // of the computation time.
 
 
+// Original version of reduce_plattice, always with a division for each step.
+// This version is pretty fast on new powerful processors, but slow on others.
+// I keep it because in fews years, if the int32_t division is faster, it's
+// possible this code might be the fastest.
 NOPROFILE_INLINE int
-reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
+reduce_plattice_original (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
   int32_t a0 = -((int32_t) p), b0 = (int32_t) r, a1 = 0, b1 = 1, k;
 #if MOD2_CLASSES_BS
@@ -1277,25 +1281,147 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
   const int32_t hI = (int32_t) (si->I);
 #endif
   const int32_t mhI = -hI;
-  for(;;) {
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (b0 < hI ) break; k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (a0 > mhI) break; k = b0 / a0; b0 %= a0; b1 -= k * a1;
+  /* Critical loop of the routine. The unrolling is optimal here. */
+  while (LIKELY(b0 >= hI)) {
+    k = a0 / b0; a0 %= b0; a1 -= k * b1;
+    if (UNLIKELY(a0 > mhI)) break;
+    k = b0 / a0; b0 %= a0; b1 -= k * a1;
+    if (UNLIKELY(b0 < hI )) break;
+    k = a0 / b0; a0 %= b0; a1 -= k * b1;
+    if (UNLIKELY(a0 > mhI)) break;
+    k = b0 / a0; b0 %= a0; b1 -= k * a1;
   }
   k = b0 - hI - a0;
+  if (b0 > -a0) {
+    if (UNLIKELY(!a0)) return 0;
+    k /= a0; b0 -= k * a0; b1 -= k * a1;
+  } else {
+    if (UNLIKELY(!b0)) return 0;
+    k /= b0; a0 += k * b0; a1 += k * b1;
+  }
+  pli->a0 = (int32_t) a0; pli->a1 = (uint32_t) a1; pli->b0 = (int32_t) b0; pli->b1 = (uint32_t) b1;
+  return 1;
+}
+
+// The really fastest version of reduce_plattice on processors >= Intel Nehalem & AMD Opteron.
+// The C version is for others architectures; it's almost (99%) faster than the asm version
+// on X86 with a GOOD C compiler (tested with gcc 4.6.X, 4.7.X, 4.8.X).
+// Avoid to modify this code...
+// This version has been tuned during several weeks; more than 50 versions of this routine
+// has been tested ever and ever. A. Filbois.
+
+// Main idea: to avoid a division & multiplication, I tried to test the sign of
+// aO + b0 * 4 (resp. b0 + a0 * 4). If this sign is different than a0 (resp. b0) sign,
+// the quotient of a0 / b0 is between 0 and 3, and needs (4-1)*2 conditional affectations.
+// The best optimisation is the right choice of the number of the conditional
+// affectations. It's not exactly the same between Intel Nehalem & AMD Opteron, but
+// this code is the best deal for both.
+//
+// NB: Be careful if you tried to change the "4" value. You have to change the constants
+// guards 0xe666667 = -0x7FFFFFFF/(4+1) & 0x19999999 = 0x7fffffff / (4+1).
+// These guards are needed because the conditional affectations use the sign change;
+// this sign may changed at max 1 times, not 2 (with an overflow).
+// In fact, these guards are 99.99999% useless.
+NOPROFILE_INLINE int
+reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
+{
+#if MOD2_CLASSES_BS
+  const int32_t hI = (int32_t) ((si->I) >> 1);
+#else
+  const int32_t hI = (int32_t) (si->I);
+#endif
+  int32_t a0 = - (int32_t) p, b0 = (int32_t) r, a1, b1;
+  
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#define RPA(LABEL) "addl %2, %0\n leal (%0,%2,4), %%edx\n addl %3, %1\n" \
+    "testl %%edx, %%edx\n movl %0, %%eax\n jng " LABEL			\
+    "addl %2, %%eax\n leal (%1,%3,1), %%edx\n cmovngl %%eax, %0\n cmovngl %%edx, %1\n" \
+    "addl %3, %%edx\n addl %2, %%eax\n        cmovngl %%edx, %1\n cmovngl %%eax, %0\n" \
+    "addl %3, %%edx\n addl %2, %%eax\n        cmovngl %%edx, %1\n cmovngl %%eax, %0\n"
+#define RPB(LABEL) "addl %0, %2\n leal (%2,%0,4), %%edx\n addl %1, %3\n" \
+    "testl %%edx, %%edx\n movl %2, %%eax\n jns " LABEL			\
+    "addl %0, %%eax\n leal (%1,%3,1), %%edx\n cmovnsl %%eax, %2\n cmovnsl %%edx, %3\n" \
+    "addl %1, %%edx\n addl %0, %%eax\n        cmovnsl %%edx, %3\n cmovnsl %%eax, %2\n" \
+    "addl %1, %%edx\n addl %0, %%eax\n        cmovnsl %%edx, %3\n cmovnsl %%eax, %2\n"
+#define RPC "cltd\n idivl %2\n imull %3, %%eax\n movl %%edx, %0\n subl %%eax, %1\n"
+#define RPD "cltd\n idivl %0\n imull %1, %%eax\n movl %%edx, %2\n subl %%eax, %3\n"
+  
+  int32_t mhI;
+  __asm__ ("xorl %1, %1\n cmpl %2, %5\n movl $0x1, %3\n jg 9f\n"	\
+	   "movl %0, %%eax\n cltd\n idivl %2\n"				\
+	   "movl %5, %4\n negl %4\n subl %%eax, %1\n movl %%edx, %0\n"	\
+	   "cmpl $0xe6666667, %%edx\n movl %%edx, %0\n jl 0f\n"		\
+	   ""								\
+	   ".balign 8\n"						\
+	   "1:\n cmpl %0, %4\n jl 9f\n" RPB("3f\n")			\
+	   "2:\n cmpl %2, %5\n jg 9f\n" RPA("4f\n")			\
+	   "jmp 1b\n"							\
+	   ""								\
+	   ".balign 8\n 3:\n" RPD "jmp 2b\n"				\
+	   ".balign 8\n 4:\n" RPC "jmp 1b\n"				\
+	   ""								\
+	   ".balign 8\n 0:\n"						\
+	   "movl %2, %%eax\n cltd\n idivl %0\n imull %1, %%eax\n"	\
+	   "subl %%eax, %3\n cmpl $0x19999999, %%edx\n"			\
+	   "movl %%edx, %2\n jle 2b\n"					\
+	   "movl %0, %%eax\n cltd\n idivl %2\n imull %3, %%eax\n"	\
+	   "subl %%eax, %1\n cmpl $0xe6666667, %%edx\n"			\
+	   "movl %%edx, %0\n jge 1b\n"					\
+	   "jmp 0b\n"							\
+	   ""								\
+	   ".balign 0\n 9:\n"						\
+	   : "+&r"(a0), "=&r"(a1), "+&r"(b0), "=&r"(b1),		\
+	   "=&r"(mhI) : "r"(hI) : "%eax", "%edx", "cc");  
+#else
+#define RPA do {							\
+    a0 += b0; a1 += b1;							\
+    if (LIKELY(a0 + b0 * 4 > 0)) {					\
+      int32_t c0 = a0, c1 = a1;						\
+      c0 += b0; c1 += b1; if (LIKELY(c0 <= 0)) { a0 = c0; a1 = c1; }	\
+      c0 += b0; c1 += b1; if (LIKELY(c0 <= 0)) { a0 = c0; a1 = c1; }	\
+      c0 += b0; c1 += b1; if (LIKELY(c0 <= 0)) { a0 = c0; a1 = c1; }	\
+    } else								\
+      RPC;								\
+  } while (0)
+#define RPB do {							\
+    b0 += a0; b1 += a1;							\
+    if (LIKELY(b0 + a0 * 4 < 0)) {					\
+      int32_t c0 = b0, c1 = b1;						\
+      c0 += a0; c1 += a1; if (LIKELY(c0 >= 0)) { b0 = c0; b1 = c1; }	\
+      c0 += a0; c1 += a1; if (LIKELY(c0 >= 0)) { b0 = c0; b1 = c1; }	\
+      c0 += a0; c1 += a1; if (LIKELY(c0 >= 0)) { b0 = c0; b1 = c1; }	\
+    } else								\
+      RPD;								\
+    } while (0)
+#define RPC do {					\
+    int32_t k = a0 / b0; a0 %= b0; a1 -= k * b1;	\
+  } while (0)
+#define RPD do {					\
+    int32_t k = b0 / a0; b0 %= a0; b1 -= k * a1;	\
+  } while (0)
+
+  /* This code seems odd (looks after the a0 <= mhI loop),
+     but gcc generates the fastest asm with it... */ 
+  a1 = 0; b1 = 1;
+  if (LIKELY(b0 >= hI)) {
+    const int32_t mhI = -hI;
+    RPC;
+    while (UNLIKELY(a0 < -0X7FFFFFFF / 5)) {
+      RPD;
+      if (UNLIKELY(b0 < 0X7FFFFFFF / 5)) goto p15;
+      RPC;
+    }
+    if (LIKELY(a0 <= mhI))
+      do {
+	RPB;
+      p15:
+	if (UNLIKELY(b0 < hI)) break;
+	RPA;
+      } while (LIKELY(a0 <= mhI));
+  }
+#endif /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+
+  int32_t k = b0 - hI - a0;
   if (b0 > -a0) {
     if (UNLIKELY(!a0)) return 0;
     k /= a0; b0 -= k * a0; b1 -= k * a1;

@@ -101,11 +101,11 @@ extern FILE * fopen_maybe_compressed(const char * name, const char * mode);
 /* This one just looks at the file name, and guesses again whether popen() or
  * fopen() was used. The file stream is then closed with pclose() or
  * fclose() accordingly.  */
-extern void fclose_maybe_compressed(FILE *, const char * name);
+extern int fclose_maybe_compressed(FILE *, const char * name);
 
 #ifdef  HAVE_GETRUSAGE
 /* Same, but recovers the time taken by the underlying process */
-extern void fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * r);
+extern int fclose_maybe_compressed2 (FILE * f, const char * name, struct rusage * r);
 #endif
 
 #ifdef __cplusplus

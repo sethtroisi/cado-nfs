@@ -4,7 +4,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
-
+#include <sys/types.h>
+#ifdef HAVE_WAIT_H
+#include <sys/wait.h>
+#endif
+          
 #include "portability.h"
 #include "utils.h"
 #include "filter_utils.h"
@@ -755,6 +759,7 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
     char ** filename = arg->input_files;
 
     for( ; *filename ; filename++) {
+        int status;
         /* We expect all the "filenames" to have been returned by
          * prepare_grouped_command_lines, thus in fact be commands to be
          * passed through popen()
@@ -763,12 +768,16 @@ void filter_rels_producer_thread(struct filter_rels_producer_thread_arg_s * arg)
         ssize_t rc = ringbuf_feed_stream(r, f);
 #ifdef  HAVE_GETRUSAGE
         struct rusage rus;
-        cado_pclose2(f, &rus);
+        status = cado_pclose2(f, &rus);
         if (arg->stats) timingstats_dict_add(arg->stats, "feed-in", &rus);
 #else
-        cado_pclose(f);
+        status = cado_pclose(f);
 #endif
-        if (rc < 0) {
+        if (rc < 0 || status == -1
+#if defined(WIFEXITED) && defined(WEXITSTATUS)
+            || !WIFEXITED(status) || WEXITSTATUS(status) != 0
+#endif
+           ) {
             fprintf(stderr,
                     "%s: load error (%s) from\n%s\n",
                     __func__,
