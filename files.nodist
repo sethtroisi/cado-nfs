@@ -5,7 +5,6 @@
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
 Toolchain-MinGW64.cmake
-WhoDunit
 gf2x/gf2x-fft/cantor128.m
 dev_docs/
 factor_from_rels
