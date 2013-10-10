@@ -390,7 +390,7 @@ inflight_rels_buffer<locking, n>::complete(int k,
 /* malloc()'s are avoided as long as there are less than NB_PRIMES_OPT in
  * the relation
  */
-inline void realloc_buffer_primes(earlyparsed_relation_ptr buf)
+void realloc_buffer_primes(earlyparsed_relation_ptr buf)
 {
     if (buf->nb_alloc == NB_PRIMES_OPT) {
 	buf->nb_alloc += buf->nb_alloc >> 1;
