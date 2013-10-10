@@ -169,25 +169,6 @@ int main(int argc, char **argv) {
     int dim;
     mpn_random(mat, limbs_per_row*nrows);
 
-#if 0
-    // special case for a 1024x128 matrix.
-    {
-        int i;
-        FILE * f;
-        f = fopen("/tmp/cado.ZxyM8F58ky//c59.bwc/K.1", "r");
-        for(i = 0 ; i < nrows ; i++) {
-            fread(&mat[i * limbs_per_row], sizeof(uint64_t), 1, f);
-        }
-        fclose(f);
-        f = fopen("/tmp/cado.ZxyM8F58ky//c59.bwc/K.0", "r");
-        for(i = 0 ; i < nrows ; i++) {
-            fread(&mat[1 + i * limbs_per_row], sizeof(uint64_t), 1, f);
-        }
-        fclose(f);
-    }
-#endif
-
-
 #if VERBOSE
     printf("M:=\n");
     printMatrix(mat, nrows, ncols, limbs_per_row);
