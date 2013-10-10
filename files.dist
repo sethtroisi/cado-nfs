@@ -87,6 +87,7 @@ filter/sparse.c
 filter/sparse.h
 filter/utils_ffs.c
 filter/utils_ffs.h
+filter/complete_rels2.c
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
