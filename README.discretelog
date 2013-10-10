@@ -5,7 +5,7 @@ following forms:
   - finite fields of characteristic 2   
   - finite fields of characteristic 3
 
-Discret logs in prime fields are computed with the number field sieve
+Discrete logs in prime fields are computed with the number field sieve
 (NFS), whereas in fields of small characteristic, the function field
 sieve (FFS) is implemented.
 
@@ -53,23 +53,27 @@ Notation:
   NB: there is also a script in the ffs/filter/ directory that is
   supposed to do all these steps automatically.
 
-- Schirohauher maps:
+- Schirokauher maps:
   Must be computed before the linear algebra, using the linalg/sm binary.
   Takes ell (= group order) and smexp as parameters (and obvious file
   names coming out from the filtering).
   smexp is the LCM(ell^k_i-1), where k_i takes all the degrees of the
-  factors of f(x) modulo ell. (this will be could computed automatically
-  some day)
+  factors of f(x) modulo ell. (this will be computed automatically
+  someday)
 
 - Linear algebra:
   This is highly experimental.
   Some hints about how to play is in
      linalg/bwc/bwc-ptrace.sh
-  This might allow you to call a very basic and very slow block-Wiedemann
-  implementation. Be aware that this does not include code for gluing
-  together the filtered matrix and the SM columns.
-  We have more efficient code that will be added in due time, and then
-  the scripts will be enhanced. In the meantime, you are on your own...
+  Following the steps here might allow you to call a very basic and very
+  slow block-Wiedemann implementation. Be aware that this does not
+  include code for gluing together the filtered matrix and the SM
+  columns.  We have more efficient code that will be added in due time,
+  and then the scripts will be enhanced. In the meantime, you are on your
+  own... Note that depending on the size of ell, using this code may
+  entail recompiling by changing the plingen_prime_nwords variable in the
+  file linalg/bwc/CMakeLists.txt, or worse, re-generate the code lin
+  linalg/bwc/Makefile.mpfq
 
 - Reconstruct dlogs of fb elements
   Nothing automatic here, but in filter/reconstructlog.c you will find
@@ -93,6 +97,8 @@ to configure according to what you want; then type 'make'.
 
 - polynomial selection:
   Nothing automatic. There are some tools in the polyselect subdirectory.
+  The code presently assumes that curves with only one place at infinity
+  are chosen.
 
 - relation collection:
   Create a parameter file, imitating the ones in the ffs/params/
@@ -111,7 +117,8 @@ to configure according to what you want; then type 'make'.
 - freerels/filtering
   The script ffs/filter/filter.sh is available for doing all this step.
   (like for NFS-DL, bad ideals must be taken care in a way or antoher,
-  and it is up to you; nothing automatic yet).
+  and it is up to you; nothing automatic yet). No Schirokauer maps are
+  needed here.
 
 - Linear algebra:
   Exactly the same as for NFS-DL
