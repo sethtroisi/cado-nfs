@@ -201,6 +201,34 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
   return i;
 }
 
+/* malloc()'s are avoided as long as there are less than NB_PRIMES_OPT in
+ * the relation
+ */
+inline void realloc_buffer_primes(earlyparsed_relation_ptr buf)
+{
+    if (buf->nb_alloc == NB_PRIMES_OPT) {
+	buf->nb_alloc += buf->nb_alloc >> 1;
+	prime_t *p = buf->primes;
+	buf->primes = (prime_t*) malloc(buf->nb_alloc * sizeof(prime_t));
+	if (!buf->primes) {
+            fprintf(stderr, "malloc failure: %s\n", __func__);
+            abort();
+        }
+	memcpy(buf->primes, p, NB_PRIMES_OPT * sizeof(prime_t));
+    } else {
+	buf->nb_alloc += buf->nb_alloc >> 1;
+	buf->primes = (prime_t *) realloc(buf->primes, buf->nb_alloc * sizeof(prime_t));
+	if (!buf->primes) {
+            fprintf(stderr, "malloc failure: %s\n", __func__);
+            abort();
+        }
+    }
+#if DEBUG >= 2
+    fprintf(stderr, "realloc_buffer_primes: num=%" PRid " nb_alloc=%u\n",
+	    buf->num, buf->nb_alloc);
+#endif
+}
+
 /* modify in place the relation rel to take into account:
  *  - the renumbering
  *  - the bad ideals
@@ -252,21 +280,10 @@ compute_index_rel (earlyparsed_relation_ptr rel)
         handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e);
         
         /* allocate room for (nb) more valuations */
-        if (rel->nb + nb > rel->nb_alloc)
+        if (rel->nb + nb - 1 > rel->nb_alloc)
         {
-          if (rel->nb_alloc == NB_PRIMES_OPT)
-          {
-            rel->nb_alloc += rel->nb_alloc >> 1;
-            prime_t *p = rel->primes;
-            SMALLOC(rel->primes, rel->nb_alloc, "realloc buffer primes");
-            memcpy(rel->primes, p, NB_PRIMES_OPT * sizeof(prime_t));
-          }
-          else
-          {
-            rel->nb_alloc += rel->nb_alloc >> 1;
-            rel->primes = (prime_t *) 
-                          realloc(rel->primes, rel->nb_alloc * sizeof(prime_t));
-          }
+           realloc_buffer_primes(rel);
+           pr = rel->primes;
         }
 
         /* the first is put in place, while the other are put at the end
