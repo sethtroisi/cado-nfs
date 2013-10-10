@@ -40,7 +40,8 @@ uint32_t
 get_uint32 (FILE *fp)
 {
   uint32_t w;
-  fread (&w, sizeof (uint32_t), 1, fp);
+  size_t ok = fread (&w, sizeof (uint32_t), 1, fp);
+  assert (ok != 0);
   return w;
 }
 
@@ -48,7 +49,8 @@ int32_t
 get_int32 (FILE *fp)
 {
   int32_t w;
-  fread (&w, sizeof (int32_t), 1, fp);
+  size_t ok = fread (&w, sizeof (int32_t), 1, fp);
+  assert (ok != 0);
   return w;
 }
 
@@ -542,8 +544,11 @@ read_relation_fk (FILE *fp, relation_t *rel, char *file)
   char *lp;
 
   /* Read the "W" line with the a and b values */
-  if (fk_read_line (line, 512, fp, file) == 0)
-    return -1; /* Signal EOF */
+  do
+  {
+    if (fk_read_line (line, 512, fp, file) == 0)
+      return -1; /* Signal EOF */
+  } while (line[0] == '\n');
 
   if (line[0] != 'W' || line[1] != ' ')
     {
@@ -780,9 +785,9 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
   unsigned int j;
   mpz_t norm;
   int ok;
-  int compressed;
+  size_t retfread;
 
-  fp = fopen_compressed_r (rels, &compressed, NULL);
+  fp = fopen_maybe_compressed (rels, "r");
   if (fp == NULL)
     {
       fprintf (stderr, "Error, unable to open relation file %s\n", rels);
@@ -797,7 +802,8 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 
   if (iformat == FORMAT_GGNFS)
     {
-      fread (&relsInFile, sizeof (int32_t), 1, fp);
+      retfread = fread (&relsInFile, sizeof (int32_t), 1, fp);
+      assert (retfread != 0);
       if (verbose)
         fprintf (stderr, "File %s: header says %d relations.\n",
                  rels, relsInFile);
@@ -870,10 +876,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 
   mpz_clear (norm);
 
-  if (compressed)
-    pclose (fp);
-  else
-    fclose (fp);
+  fclose_maybe_compressed (fp, rels);
 
   return outputRels;
 }
@@ -914,6 +917,7 @@ read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb,
 {
   int c, i, degf;
   long RFBsize, AFBsize;
+  int retscanf;
 
   /* read polynomial */
   get_string ("Y1: ", fp, verbose);
@@ -921,7 +925,8 @@ read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb,
   if (verbose)
     mpz_out_str (stderr, 10, f[0]);
   c = getc (fp); /* newline */
-  fscanf (fp, "c%d: ", &degf);
+  retscanf = fscanf (fp, "c%d: ", &degf);
+  assert (retscanf == 1);
   if (degf > DEGF_MAX)
     {
       fprintf (stderr, "Error, too large degree\n");
@@ -935,7 +940,7 @@ read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb,
   for (i = degf - 1; i >= 0; i--)
     {
       getc (fp); /* newline */
-      fscanf (fp, "c%d: ", &c);
+      retscanf = fscanf (fp, "c%d: ", &c);
       if (c != i)
 	{
 	  fprintf (stderr, "Error, missing coefficient of degree %d\n", i);
@@ -959,11 +964,11 @@ read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb,
 
   /* read header */
   get_string ("RFBsize: ", fp, verbose);
-  fscanf (fp, "%ld", &RFBsize);
+  retscanf = fscanf (fp, "%ld", &RFBsize);
   if (verbose)
     fprintf (stderr, "%ld", RFBsize);
   get_string ("AFBsize: ", fp, verbose);
-  fscanf (fp, "%ld", &AFBsize);
+  retscanf = fscanf (fp, "%ld", &AFBsize);
   if (verbose)
     fprintf (stderr, "%ld", AFBsize);
   get_string (END_HEADER, fp, verbose);
