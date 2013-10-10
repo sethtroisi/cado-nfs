@@ -76,6 +76,13 @@ static const unsigned char ugly[256] = {
 extern "C" {
 #endif
 
+extern void realloc_buffer_primes (earlyparsed_relation_ptr buf);
+
+static inline void realloc_buffer_primes_c (earlyparsed_relation_ptr buf)
+{
+  realloc_buffer_primes (buf);
+}
+
 extern int filter_rels_force_posix_threads;
 /*
  * A pointer to such a structure must be provided to filter_rels, and

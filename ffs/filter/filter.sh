@@ -1,22 +1,30 @@
 #!/bin/bash
 # usage: ./filter.sh [OPTIONS]
+# On can switch between NFS-DL or FFS computation with the following option:
+#     nfsdl=[0|1]                   (default 0) FFS (0) or NFS-DL (1) 
 # Mandatory options:
 #     name=<name>
 #     rels=/path/to/rels
 #     cadobuild=/path/to/cado/bin
 #     param=/path/to/param/file
+# Mandatory options for NFS-DL (for FFS they are not used):
+#     ell=NN                        group size (modulus for linear algebra)
+#     smexp=NN                      exponent for the Shirokauer maps
 # Other options:
 #     wdir=path/to/output/directory (default ./<name>.filter.`date`)
 #             if wdir already exists, continue previous computation
 #     tidy=[0|1]                    (default 0)
 #     covernmax=nn.nn               (default 100)
-#     excess=nn                     (default 1)
+#     excess=nn                     (default 0 for FFS, deg(poly_alg) for NFS-DL)
 #     req-excess=nn.nn              (default undefined)
 #     maxlevel=nn                   (default 30)
 #     addfullcol=[0|1]              (default 0)
 #     badideals=file                (default "")
+#     verbose=[0|1]                 (default 0)
 # ex:
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
+#
+# TODO: addfullcol should be 1 by default for NFS-DL, 0 for FFS
 
 check_error () {
   if [ $1 -ne 0 ] ; then
@@ -172,7 +180,9 @@ if [ "x${NFSDL}" != "x1" ] ; then
 else
   LPBA=`grep "^lpba" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
   LPBR=`grep "^lpbr" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
-  EXCESS=`grep -m 1 "^c[0-9]:" ${ORIGINAL_PARAMFILE} | cut -c 2`
+  if [ "x${EXCESS}" = "x0" ] ; then
+    EXCESS=`grep -m 1 "^c[0-9]:" ${ORIGINAL_PARAMFILE} | cut -c 2`
+  fi
 fi
 
 CMDFILE="${DIR}/${NAME}.cmd"
@@ -298,7 +308,7 @@ fi
 ###### FREERELS ######
 if [ "${DO_FREEREL}" -eq "1" ] ; then
 
-#For FFS case, use dup-ffs-f*. For NFS-DL use dup2
+#For FFS case, use param option is different
 if [ "x${NFSDL}" != "x1" ] ; then
   argsf1="${PARAMFILE} -renumber ${RENUMBERFILE} "
   argsf2=""
@@ -334,7 +344,11 @@ argsd2="-filelist ${FILELIST_DUP2} -poly ${PARAMFILE} -renumber ${RENUMBERFILE} 
 if [ "${DO_DUP20}" -eq "1" ] ; then
   NRELSDUP20=`grep "^# slice 0" ${LOGD1} | cut -d " " -f 5`
   argsd20="-nrels ${NRELSDUP20} -basepath ${NODUPDIR}/0 "
-  CMD="${BIN_DUP2} -dl $argsd2 $argsd20"
+  if [ "x${NFSDL}" != "x1" ] ; then
+    CMD="${BIN_DUP2} $argsd2 $argsd20"
+  else
+    CMD="${BIN_DUP2} -dl $argsd2 $argsd20"
+  fi
   run_cmd "${CMD}" "${LOGD20}" "${LOGD20}" "${VERBOSE}" "${DUP20DONE}"
 else
   echo "dup2_0 already done."
@@ -345,7 +359,11 @@ fi
 if [ "${DO_DUP21}" -eq "1" ] ; then
   NRELSDUP21=`grep "^# slice 1" ${LOGD1} | cut -d " " -f 5`
   argsd21="-nrels ${NRELSDUP21} -basepath ${NODUPDIR}/1 "
-  CMD="${BIN_DUP2} -dl $argsd2 $argsd21"
+  if [ "x${NFSDL}" != "x1" ] ; then
+    CMD="${BIN_DUP2} $argsd2 $argsd21"
+  else
+    CMD="${BIN_DUP2} -dl $argsd2 $argsd21"
+  fi
   run_cmd "${CMD}" "${LOGD21}" "${LOGD21}" "${VERBOSE}" "${DUP21DONE}"
 else
   echo "dup2_1 already done."
@@ -418,14 +436,16 @@ fi
 
 
 ######## SM ########   # only for NFS-DL
-if [ "${DO_SM}" -eq "1" ] ; then
-  echo "${MOD_ELL}" > ${DIR}/${NAME}.q
-  argssm0="-poly ${PARAMFILE} -purged ${RELSFILE} -index ${INDEXFILE} "
-  argssm1="-out ${SMFILE} -gorder ${MOD_ELL} -smexp ${SM_EXP}"
-  CMD="${BIN_SM} $argssm0 $argssm1 "
-  run_cmd "${CMD}" "${LOGSM}" "${LOGSM}" "${VERBOSE}" "${SMDONE}"
-else
-  echo "sm already done."
+if [ "x${NFSDL}" = "x1" ] ; then
+  if [ "${DO_SM}" -eq "1" ] ; then
+    echo "${MOD_ELL}" > ${DIR}/${NAME}.q
+    argssm0="-poly ${PARAMFILE} -purged ${RELSFILE} -index ${INDEXFILE} "
+    argssm1="-out ${SMFILE} -gorder ${MOD_ELL} -smexp ${SM_EXP}"
+    CMD="${BIN_SM} $argssm0 $argssm1 "
+    run_cmd "${CMD}" "${LOGSM}" "${LOGSM}" "${VERBOSE}" "${SMDONE}"
+  else
+    echo "sm already done."
+  fi
 fi
 ####################
 

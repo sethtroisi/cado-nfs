@@ -252,21 +252,10 @@ compute_index_rel (earlyparsed_relation_ptr rel)
         handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e);
         
         /* allocate room for (nb) more valuations */
-        if (rel->nb + nb > rel->nb_alloc)
+        if (rel->nb + nb - 1 > rel->nb_alloc)
         {
-          if (rel->nb_alloc == NB_PRIMES_OPT)
-          {
-            rel->nb_alloc += rel->nb_alloc >> 1;
-            prime_t *p = rel->primes;
-            SMALLOC(rel->primes, rel->nb_alloc, "realloc buffer primes");
-            memcpy(rel->primes, p, NB_PRIMES_OPT * sizeof(prime_t));
-          }
-          else
-          {
-            rel->nb_alloc += rel->nb_alloc >> 1;
-            rel->primes = (prime_t *) 
-                          realloc(rel->primes, rel->nb_alloc * sizeof(prime_t));
-          }
+           realloc_buffer_primes(rel);
+           pr = rel->primes;
         }
 
         /* the first is put in place, while the other are put at the end
