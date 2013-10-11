@@ -87,7 +87,6 @@ filter/sparse.c
 filter/sparse.h
 filter/utils_ffs.c
 filter/utils_ffs.h
-filter/complete_rels2.c
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
@@ -404,6 +403,7 @@ local.sh.macosx-leopard
 macros.h
 misc/CMakeLists.txt
 misc/convert_poly.c
+misc/complete_rels.c
 params/mach_desc
 params/params.c100
 params/params.c101
@@ -810,7 +810,6 @@ utils/cado_poly.h
 utils/cado_popen.c
 utils/cado_popen.h
 utils/check_rels.c
-utils/complete_rels.c
 utils/crc.c
 utils/crc.h
 utils/cut_n_roots.c
