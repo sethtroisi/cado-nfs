@@ -4,7 +4,8 @@ Instructions on how to use CADO-NFS with msieve
 Summary:
 
 I) Using CADO-NFS with relations computed with msieve (or ggnfs)
-II) Using msieve linear algebra after CADO-NFS filtering
+II) Using msieve filtering and linear algebra with relations in CADO format
+III) Using msieve linear algebra after CADO-NFS filtering
 
 ==============================================================================
 
@@ -47,7 +48,39 @@ available soon).
 
 ==============================================================================
 
-II) Using msieve linear algebra after CADO-NFS filtering
+II) Using msieve filtering and linear algebra with relations in CADO format
+
+1) Create a file msieve.fb, which contains:
+
+      N <number to be factored>
+      R0  <coeff of x^0, rational side>
+      R1  <coeff of x^1, rational side>
+      A0  <coeff of x^0, algebraic side>
+      A1  <etc>
+      A2  <etc>
+      A3  <etc>
+      A4  <etc>
+      A5  <etc>
+
+   This can be done with:
+
+      $ ./convert_poly -of msieve < cxxx.poly > msieve.fb
+
+2) create a file msieve.dat, which contains:
+
+      N <number to be factored>
+      <all the relations in GGNFS/CADO format>
+
+   (Do not include free relations, since the CADO-NFS format is not
+    recognized by msieve, and msieve includes them in the filtering.)
+
+3) then run "msieve -nc -v <number to be factored>"
+   The msieve output goes into msieve.log.
+   You can add the "-t 4" option to use 4 threads.   
+
+==============================================================================
+
+III) Using msieve linear algebra after CADO-NFS filtering
 
 up from SVN 891, msieve can read a cycle file produced by CADO-NFS. To use it,
 you will have to:
@@ -70,3 +103,6 @@ The string at the end may get extra options depending on whether
 the LA has more tweaking, like using MPI. The .cyc file gets
 overwritten during the LA, so re-running the LA does not require
 cado_filter=1.
+
+
+

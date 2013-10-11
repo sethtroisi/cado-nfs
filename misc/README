@@ -7,32 +7,3 @@
 
 % $CADO/misc/convert_rels -if cado -of fk -deg 5 rsa100.rels > part1
 
-3) use msieve linear algebra with relations in CADO format:
-
-   a) create a file msieve.fb, which contains:
-
-      N <number to be factored>
-      R0  <coeff of x^0, rational side>
-      R1  <coeff of x^1, rational side>
-      A0  <coeff of x^0, algebraic side>
-      A1  <etc>
-      A2  <etc>
-      A3  <etc>
-      A4  <etc>
-      A5  <etc>
-
-      This can be done with:
-
-      $ ./convert_poly -of msieve < cxxx.poly > msieve.fb
-
-   b) create a file msieve.dat, which contains:
-
-      N <number to be factored>
-      <all the relations in GGNFS/CADO format>
-
-      (Do not include free relations, since the CADO-NFS format is not
-       recognized by msieve, and msieve includes them in the filtering.)
-
-   c) then run "msieve -nc -v <number to be factored>"
-      The msieve output goes into msieve.log.
-      You can add the "-t 4" option to use 4 threads.   
