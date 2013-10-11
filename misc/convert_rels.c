@@ -20,6 +20,7 @@ static const char *format_names[4] = {
 };
 
 #include "cado.h"
+#include "macros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */
@@ -41,7 +42,7 @@ get_uint32 (FILE *fp)
 {
   uint32_t w;
   size_t ok = fread (&w, sizeof (uint32_t), 1, fp);
-  assert (ok != 0);
+  ASSERT_ALWAYS (ok != 0);
   return w;
 }
 
@@ -50,7 +51,7 @@ get_int32 (FILE *fp)
 {
   int32_t w;
   size_t ok = fread (&w, sizeof (int32_t), 1, fp);
-  assert (ok != 0);
+  ASSERT_ALWAYS (ok != 0);
   return w;
 }
 
@@ -785,7 +786,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
   unsigned int j;
   mpz_t norm;
   int ok;
-  size_t retfread;
+  size_t retfread MAYBE_UNUSED;
 
   fp = fopen_maybe_compressed (rels, "r");
   if (fp == NULL)
@@ -917,7 +918,7 @@ read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb,
 {
   int c, i, degf;
   long RFBsize, AFBsize;
-  int retscanf;
+  int retscanf MAYBE_UNUSED;
 
   /* read polynomial */
   get_string ("Y1: ", fp, verbose);

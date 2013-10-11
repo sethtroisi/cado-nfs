@@ -61,5 +61,8 @@ if __name__ == '__main__':
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
                                                parameters = parameters,
                                                path_prefix = [])
-    if not factorjob.run():
+    factors = factorjob.run()
+    if factors is None:
         sys.exit("Error occurred, terminating")
+    else:
+        print(" ".join(factors))

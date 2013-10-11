@@ -1,8 +1,5 @@
-# those parameters are based on those used by Sam Wagstaff to factor N240 c186
-# (numerator of the 240th Bernoulli number)
 
 ###########################################################################
-#     Parameter file for Cado-NFS
 ###########################################################################
 # See params/params.c91 for an example which contains some documentation.
 
@@ -15,7 +12,6 @@
 #
 
 ###########################################################################
-# General parameters
 ###########################################################################
 
 # Sample parameter file for a 180-digit gnfs input
@@ -26,10 +22,9 @@ name = c186
 # computation
 
 ###########################################################################
-# Polynomial selection
 ###########################################################################
 
-tasks.polyselect.degree = 5		# degree of the algebraic polynomial
+tasks.polyselect.degree = 5		
 
 # the polynomial (found by Shi Bai) for N240 c186 had
 # lognorm: 60.63, alpha: -8.76 (proj: -2.41), E: 51.87, nr: 3
@@ -37,15 +32,14 @@ tasks.polyselect.degree = 5		# degree of the algebraic polynomial
 
 ## Parameters of polyselect
 # note: those parameters are just a guess, they might be far from optimal
-tasks.polyselect.P = 500000		# choose lc(g) with two prime factors in [P,2P]
-tasks.polyselect.maxnorm = 60		# max. lognorm of polynomials (before rootsieve)
-tasks.polyselect.admax = 2e7		# max value for lc(f)
-tasks.polyselect.adrange = 2e5		# individual tasks
-tasks.polyselect.incr = 60		# forced divisor of lc(f)
+tasks.polyselect.P = 500000		
+tasks.polyselect.maxnorm = 60		
+tasks.polyselect.admax = 2e7		
+tasks.polyselect.adrange = 2e5		
+tasks.polyselect.incr = 60		
 tasks.polyselect.nq = 1000
 
 ###########################################################################
-# Sieve
 ###########################################################################
 
 # (r,a) means rational or algebraic side
@@ -65,39 +59,36 @@ tasks.sieve.mfba = 96
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 3.2
 
-tasks.sieve.I = 15		# Sieving range in lattice siever
+tasks.sieve.I = 15		
 # Wagstaff did use I=14, I=15 should be better
-tasks.sieve.qmin = 80000000		# Start of the special-q range
+tasks.sieve.qmin = 80000000		
 # Sam Wagstaff did sieve special-q's < 1660M
-tasks.sieve.qrange = 20000		# The size of an elementary sieving task
+tasks.sieve.qrange = 20000		
 # of that many relations found.
 slaves.niceness = 10
 tasks.sieve.threads = 2
 tasks.sieve.rels_wanted = 1
 
 ###########################################################################
-# Filtering
 ###########################################################################
 
-tasks.filter.purge.keep = 160		# shrink in purge if excess exceeds keeppurge
-tasks.filter.maxlevel = 25		# maximal merge level
+tasks.filter.purge.keep = 160		
+tasks.filter.maxlevel = 25		
 tasks.filter.ratio = 1.1
 tasks.filter.merge.forbw = 3
 tasks.merge.coverNmax = 100
 
 ###########################################################################
-# Linear algebra
 ###########################################################################
 
-tasks.linalg.bwc.threads = 2x2		# Multithreading level of Block-Wiedemann
+tasks.linalg.bwc.threads = 2x2		
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.mn = 64
 tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
-# Characters
 ###########################################################################
 
-tasks.linalg.characters.nchar = 50		# number of characters
+tasks.linalg.characters.nchar = 50		
 tasks.linalg.characters.threads = 2

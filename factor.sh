@@ -137,7 +137,7 @@ done
 
 if [ $slaves -ne 1 ] && ! $python
 then
-  echo "The -slaves parameter is used only for the Python script. Ignoring it."
+  echo "The -s parameter is used only for the Python script. Ignoring it."
 fi
 
 if [ -n "$hostnames" ] && ! $python

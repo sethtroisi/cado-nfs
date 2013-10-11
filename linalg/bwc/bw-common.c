@@ -45,6 +45,10 @@ static int intcmp(const int * a, const int * b)
 
 int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
+    bw->original_argc = *p_argc;
+    bw->original_argv = *p_argv;
+    bw->wct_base = wct_seconds();
+
     if (bw->can_print) {
         print_command_line(stderr, *p_argc, *p_argv);
         print_command_line(stdout, *p_argc, *p_argv);
