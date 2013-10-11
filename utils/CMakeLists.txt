@@ -19,9 +19,6 @@ add_library (utils ${CADO_SHARED} ${sources})
 target_link_libraries(utils pthread ${gmp_libname} m)
 install(TARGETS utils DESTINATION lib/${package_basename})
 
-add_executable(check_rels check_rels.c)
-target_link_libraries(check_rels utils)
-
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
 
@@ -59,5 +56,5 @@ target_link_libraries(antebuffer pthread)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
-install(TARGETS check_rels gmp_prob_prime random_integer RUNTIME DESTINATION bin/utils)
+install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION bin/utils)
 install(TARGETS cut_n_roots roots gmp_nextprime antebuffer RUNTIME DESTINATION bin/utils)
