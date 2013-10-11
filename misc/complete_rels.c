@@ -1,6 +1,5 @@
-/* complete_rels2: same as check_rels, but completes small factors if omitted
- * and check the primality of the factors in the norm factorization. Unlinke
- * check_rels and complete_rels, complete_rels2 use the fast filter I/O code */
+/* complete_rels: same as check_rels, but completes small factors if omitted
+ * and can check the primality of the factors in the norm factorization.     */
 
 #include "cado.h"
 
@@ -52,11 +51,12 @@ rel_add_prime (earlyparsed_relation_ptr rel, unsigned int side, p_r_values_t p,
 }
 
 /* return 0 if an error exists in the factorization of a norm (rat or alg)
- * return r > 0 if the factorization was correct. The possible value of r are:
- *   1 if the factorization was complete and contained only primes
- *   2 if the factorization was uncomplete but contained only primes
- *   3 if the factorization was complete but contained only a non-prime "ideal"
- *   4 if the factorization was uncomplete and contained only a non-prime "ideal"
+ * return r > 0 if the factorizations were correct. The possible value of r are:
+ *   1 if the factorizations were complete and contained only primes
+ *   2 if the factorizations were uncomplete but contained only primes
+ *   3 if the factorizations were complete but contained only a non-prime "ideal"
+ *   4 if the factorizations were uncomplete and contained at least a non-prime
+       "ideal"
  * At the end, if r > 0, the relation is always correct, complete and contains
  * only primes
  */
