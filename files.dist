@@ -338,6 +338,10 @@ linalg/bwc/mpfq/abase_p_1.c
 linalg/bwc/mpfq/abase_p_1.h
 linalg/bwc/mpfq/abase_p_1_t.c
 linalg/bwc/mpfq/abase_p_1_t.h
+linalg/bwc/mpfq/abase_p_2.c
+linalg/bwc/mpfq/abase_p_2.h
+linalg/bwc/mpfq/abase_p_2_t.c
+linalg/bwc/mpfq/abase_p_2_t.h
 linalg/bwc/mpfq/abase_p_4.c
 linalg/bwc/mpfq/abase_p_4.h
 linalg/bwc/mpfq/abase_p_4_t.c
@@ -910,6 +914,7 @@ linalg/bwc/mpfq/abase_p_3_t.c
 linalg/bwc/mpfq/abase_p_3_t.h
 linalg/bwc/plingen.c
 linalg/bwc/plingen.h
+linalg/bwc/plingen-tuning.h
 linalg/bwc/plingen-tuning.cpp
 linalg/bwc/lingen-matpoly.c
 linalg/bwc/lingen-matpoly.h
@@ -1035,4 +1040,3 @@ ffs/types.h
 ffs/version.sh
 ffs/Makefile.local.example
 filter/filter_io.tex
-linalg/bwc/plingen-tuning.h
