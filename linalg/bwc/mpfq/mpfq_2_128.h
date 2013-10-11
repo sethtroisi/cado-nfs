@@ -47,14 +47,14 @@
 /* Active handler: Mpfq::gf2n::mul */
 /* Active handler: Mpfq::defaults::poly */
 /* Options used:{
-   w=64,
-   n=128,
-   table=/tmp/mpfq-cado/gf2x/wizard.table,
    slice=4,
    helper=/tmp/mpfq-cado/gf2n/helper/helper,
+   n=128,
    output_path=.,
-   tag=2_128,
    coeffs=[ 128, 7, 2, 1, 0, ],
+   w=64,
+   tag=2_128,
+   table=/tmp/mpfq-cado/gf2x/wizard.table,
    } */
 
 typedef mpfq_2_field mpfq_2_128_field;

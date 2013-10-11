@@ -1,7 +1,7 @@
 /* MPFQ generated file -- do not edit */
 
 #define _POSIX_C_SOURCE 200112L
-#include "abase_p_1_t.h"
+#include "abase_p_2_t.h"
 
 /* Active handler: simd_gfp */
 /* Automatically generated code  */
@@ -18,32 +18,32 @@
     name=abase_vbase,
     global_prefix=abase_,
     substitutions=[
-     [ (?^:abase_p_1_elt \*), void *, ],
-     [ (?^:abase_p_1_src_elt\b), const void *, ],
-     [ (?^:abase_p_1_elt\b), void *, ],
-     [ (?^:abase_p_1_dst_elt\b), void *, ],
-     [ (?^:abase_p_1_elt_ur \*), void *, ],
-     [ (?^:abase_p_1_src_elt_ur\b), const void *, ],
-     [ (?^:abase_p_1_elt_ur\b), void *, ],
-     [ (?^:abase_p_1_dst_elt_ur\b), void *, ],
-     [ (?^:abase_p_1_vec \*), void *, ],
-     [ (?^:abase_p_1_src_vec\b), const void *, ],
-     [ (?^:abase_p_1_vec\b), void *, ],
-     [ (?^:abase_p_1_dst_vec\b), void *, ],
-     [ (?^:abase_p_1_vec_ur \*), void *, ],
-     [ (?^:abase_p_1_src_vec_ur\b), const void *, ],
-     [ (?^:abase_p_1_vec_ur\b), void *, ],
-     [ (?^:abase_p_1_dst_vec_ur\b), void *, ],
-     [ (?^:abase_p_1_poly \*), void *, ],
-     [ (?^:abase_p_1_src_poly\b), const void *, ],
-     [ (?^:abase_p_1_poly\b), void *, ],
-     [ (?^:abase_p_1_dst_poly\b), void *, ],
+     [ (?^:abase_p_2_elt \*), void *, ],
+     [ (?^:abase_p_2_src_elt\b), const void *, ],
+     [ (?^:abase_p_2_elt\b), void *, ],
+     [ (?^:abase_p_2_dst_elt\b), void *, ],
+     [ (?^:abase_p_2_elt_ur \*), void *, ],
+     [ (?^:abase_p_2_src_elt_ur\b), const void *, ],
+     [ (?^:abase_p_2_elt_ur\b), void *, ],
+     [ (?^:abase_p_2_dst_elt_ur\b), void *, ],
+     [ (?^:abase_p_2_vec \*), void *, ],
+     [ (?^:abase_p_2_src_vec\b), const void *, ],
+     [ (?^:abase_p_2_vec\b), void *, ],
+     [ (?^:abase_p_2_dst_vec\b), void *, ],
+     [ (?^:abase_p_2_vec_ur \*), void *, ],
+     [ (?^:abase_p_2_src_vec_ur\b), const void *, ],
+     [ (?^:abase_p_2_vec_ur\b), void *, ],
+     [ (?^:abase_p_2_dst_vec_ur\b), void *, ],
+     [ (?^:abase_p_2_poly \*), void *, ],
+     [ (?^:abase_p_2_src_poly\b), const void *, ],
+     [ (?^:abase_p_2_poly\b), void *, ],
+     [ (?^:abase_p_2_dst_poly\b), void *, ],
      ],
     },
    w=64,
    fieldtype=prime,
-   nn=3,
-   tag=p_1,
+   nn=5,
+   tag=p_2,
    vbase_stuff={
     choose_byfeatures=<code>,
     vc:includes=[ <stdarg.h>, ],
@@ -66,9 +66,9 @@
      },
     },
    opthw=,
-   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-   n=1,
-   vtag=p_1,
+   family=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+   n=2,
+   vtag=p_2,
    } */
 
 
@@ -100,37 +100,37 @@
 
 /* Object-oriented interface */
 /* *simd_gfp::code_for_member_template_dotprod */
-void abase_p_1_p_1_dotprod(abase_p_1_dst_field K0 MAYBE_UNUSED, abase_p_1_dst_field K1 MAYBE_UNUSED, abase_p_1_dst_vec xw, abase_p_1_src_vec xu1, abase_p_1_src_vec xu0, unsigned int n)
+void abase_p_2_p_2_dotprod(abase_p_2_dst_field K0 MAYBE_UNUSED, abase_p_2_dst_field K1 MAYBE_UNUSED, abase_p_2_dst_vec xw, abase_p_2_src_vec xu1, abase_p_2_src_vec xu0, unsigned int n)
 {
-        abase_p_1_elt_ur s,t;
-        abase_p_1_elt_ur_init(K0, &s);
-        abase_p_1_elt_ur_init(K0, &t);
-        abase_p_1_elt_ur_set_zero(K0, s);
+        abase_p_2_elt_ur s,t;
+        abase_p_2_elt_ur_init(K0, &s);
+        abase_p_2_elt_ur_init(K0, &t);
+        abase_p_2_elt_ur_set_zero(K0, s);
         for(unsigned int i = 0 ; i < n ; i++) {
-            abase_p_1_mul_ur(K0, t, xu0[i], xu1[i]);
-            abase_p_1_elt_ur_add(K0, s, s, t);
+            abase_p_2_mul_ur(K0, t, xu0[i], xu1[i]);
+            abase_p_2_elt_ur_add(K0, s, s, t);
         }
-        abase_p_1_reduce(K0, xw[0], s);
-        abase_p_1_elt_ur_clear(K0, &s);
-        abase_p_1_elt_ur_clear(K0, &t);
+        abase_p_2_reduce(K0, xw[0], s);
+        abase_p_2_elt_ur_clear(K0, &s);
+        abase_p_2_elt_ur_clear(K0, &t);
 }
 
 /* *simd_gfp::code_for_member_template_addmul_tiny */
-void abase_p_1_p_1_addmul_tiny(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_field L MAYBE_UNUSED, abase_p_1_dst_vec w, abase_p_1_src_vec u, abase_p_1_dst_vec v, unsigned int n)
+void abase_p_2_p_2_addmul_tiny(abase_p_2_dst_field K MAYBE_UNUSED, abase_p_2_dst_field L MAYBE_UNUSED, abase_p_2_dst_vec w, abase_p_2_src_vec u, abase_p_2_dst_vec v, unsigned int n)
 {
-        abase_p_1_elt s;
-        abase_p_1_init(K, &s);
+        abase_p_2_elt s;
+        abase_p_2_init(K, &s);
         for(unsigned int i = 0 ; i < n ; i++) {
-            abase_p_1_mul(K, s, u[i], v[0]);
-            abase_p_1_add(K, w[i], w[i], s);
+            abase_p_2_mul(K, s, u[i], v[0]);
+            abase_p_2_add(K, w[i], w[i], s);
         }
-        abase_p_1_clear(K, &s);
+        abase_p_2_clear(K, &s);
 }
 
 /* *simd_gfp::code_for_member_template_transpose */
-void abase_p_1_p_1_transpose(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_field L MAYBE_UNUSED, abase_p_1_dst_vec w, abase_p_1_src_vec u)
+void abase_p_2_p_2_transpose(abase_p_2_dst_field K MAYBE_UNUSED, abase_p_2_dst_field L MAYBE_UNUSED, abase_p_2_dst_vec w, abase_p_2_src_vec u)
 {
-    abase_p_1_set(K, w[0], u[0]);
+    abase_p_2_set(K, w[0], u[0]);
 }
 
 

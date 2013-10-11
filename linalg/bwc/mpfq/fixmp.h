@@ -15,16 +15,16 @@
 #include <assert.h>
 
 /* We need umul_ppmm. If available from gmp, take it, otherwise redefine
- * it.
- */
+ * it.  */
 /* #undef HAVE_GMP_LONGLONG_AND_IMPL */
 #ifdef HAVE_GMP_LONGLONG_AND_IMPL
 #include "gmp-impl.h"
 #include "longlong.h"
+#define mpfq_umul_ppmm(w1, w0, u, v) umul_ppmm(w1, w0, u, v)
 #else
 /* This function is adapted from gmp/longlong.h, copyright FSF. */
 static inline void 
-umul_ppmm_func(mp_limb_t *pw1,
+mpfq_umul_ppmm_func(mp_limb_t *pw1,
     mp_limb_t *pw0,
     mp_limb_t u,
     mp_limb_t v)
@@ -51,7 +51,7 @@ umul_ppmm_func(mp_limb_t *pw1,
     (*pw1) = x3 + (x1 >> (GMP_NUMB_BITS/2));                               
     (*pw0) = (x1 << GMP_NUMB_BITS/2) + (x0 & mask_high);
 }
-#define umul_ppmm(w1, w0, u, v) umul_ppmm_func(&(w1), &(w0), u, v)
+#define mpfq_umul_ppmm(w1, w0, u, v) mpfq_umul_ppmm_func(&(w1), &(w0), u, v)
 #endif
 
 #include "mpfq.h"

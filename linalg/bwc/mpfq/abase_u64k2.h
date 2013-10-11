@@ -31,30 +31,33 @@
 /* Active handler: simd_char2 */
 /* Options used:{
    w=64,
-   k=2,
+   family=[ u64k1, u64k2, ],
    tag=u64k2,
    vbase_stuff={
+    choose_byfeatures=<code>,
     vc:includes=[ <stdarg.h>, ],
-    member_templates_restrict={
-     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
-     u64k2=[ u64k1, u64k2, ],
-     p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
-     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     },
     families=[
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     [ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     [ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     [ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
      ],
-    choose_byfeatures=<code>,
+    member_templates_restrict={
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     p_2=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     u64k2=[ u64k1, u64k2, ],
+     p_3=[ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     u64k1=[ u64k1, u64k2, ],
+     p_4=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     },
     },
-   family=[ u64k1, u64k2, ],
    virtual_base={
     filebase=abase_vbase,
+    name=abase_vbase,
+    global_prefix=abase_,
     substitutions=[
      [ (?^:abase_u64k2_elt \*), void *, ],
      [ (?^:abase_u64k2_src_elt\b), const void *, ],
@@ -77,9 +80,8 @@
      [ (?^:abase_u64k2_poly\b), void *, ],
      [ (?^:abase_u64k2_dst_poly\b), void *, ],
      ],
-    name=abase_vbase,
-    global_prefix=abase_,
     },
+   k=2,
    } */
 
 typedef void * abase_u64k2_field[1];
@@ -330,9 +332,9 @@ MPI_Op abase_u64k2_mpi_addition_op_ur(abase_u64k2_dst_field);
 void abase_u64k2_mpi_ops_clear(abase_u64k2_dst_field);
 
 /* Object-oriented interface */
-#define abase_u64k2_oo_impl_name(v)	"u64k2"
 static inline
 void abase_u64k2_oo_field_clear(abase_vbase_ptr);
+#define abase_u64k2_oo_impl_name(v)	"u64k2"
 void abase_u64k2_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }

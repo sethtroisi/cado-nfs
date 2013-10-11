@@ -32,35 +32,37 @@
 /* Active handler: Mpfq::gfp::elt */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
-   w=64,
-   fieldtype=prime,
-   n=4,
-   nn=9,
    vtag=p_4,
    vbase_stuff={
+    choose_byfeatures=<code>,
     vc:includes=[ <stdarg.h>, ],
-    member_templates_restrict={
-     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
-     u64k2=[ u64k1, u64k2, ],
-     p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
-     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     },
     families=[
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     [ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     [ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ u64k1, u64k2, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     [ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
      ],
-    choose_byfeatures=<code>,
+    member_templates_restrict={
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     p_2=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     u64k2=[ u64k1, u64k2, ],
+     p_3=[ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     u64k1=[ u64k1, u64k2, ],
+     p_4=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+     },
     },
    tag=p_4,
-   type=plain,
    opthw=,
+   family=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+   n=4,
+   nn=9,
    virtual_base={
     filebase=abase_vbase,
+    name=abase_vbase,
+    global_prefix=abase_,
     substitutions=[
      [ (?^:abase_p_4_elt \*), void *, ],
      [ (?^:abase_p_4_src_elt\b), const void *, ],
@@ -83,10 +85,10 @@
      [ (?^:abase_p_4_poly\b), void *, ],
      [ (?^:abase_p_4_dst_poly\b), void *, ],
      ],
-    name=abase_vbase,
-    global_prefix=abase_,
     },
-   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+   type=plain,
+   fieldtype=prime,
+   w=64,
    } */
 
 typedef mpfq_p_field abase_p_4_field;
@@ -400,10 +402,10 @@ MPI_Op abase_p_4_mpi_addition_op_ur(abase_p_4_dst_field);
 void abase_p_4_mpi_ops_clear(abase_p_4_dst_field);
 
 /* Object-oriented interface */
+void abase_p_4_oo_field_init(abase_vbase_ptr);
 #define abase_p_4_oo_impl_name(v)	"p_4"
 static inline
 void abase_p_4_oo_field_clear(abase_vbase_ptr);
-void abase_p_4_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
