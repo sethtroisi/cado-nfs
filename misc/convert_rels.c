@@ -8,6 +8,20 @@
 
    p,0:
 
+
+  
+XXX: When converting from Franke-Kleinjung format to CADO format the following
+command line is faster than the current code:  
+  zgrep -vh -e "^F 0 X" -e "^#" $FILES | awk -f convert_rels.awk | tr " " "," | gzip -c --fast > rels.out.gz
+
+  where:
+    - convert_rels.awk contains
+       BEGIN { RS = "" ; FS = "[WYX] |\n" }
+       {
+         printf("%s:%s:%s\n", $2 ,$6 ,$4);
+       }
+    - $FILES is a list of relations files (in .gz format in this example) where
+      the three lines containing W Y and X should be separate by a blank line
 */
 
 #define FORMAT_CADO 0  /* CADO format (default output format) */
