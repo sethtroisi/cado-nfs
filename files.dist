@@ -54,6 +54,7 @@ config/test-rand.c
 config/test-rand.cmake
 config/odd_address_io_int.c
 config/odd_address_io_int.cmake
+config/python.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile

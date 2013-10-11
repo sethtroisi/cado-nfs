@@ -48,7 +48,7 @@ if (NOT _returncode EQUAL 0)
 "\n"
 "It may also be caused by the Python library module called \"sqlite3\" not "
 "being installed as part of your Python package. One known Linux distribution "
-"with this problem is Gentoo. Please read docs/Readme.Gentoo for information "
+"with this problem is Gentoo. Please read Readme.sqlite for information "
 "how to fix this problem.")
 else()
   message(STATUS "Importing module sqlite3 in Python succeeded.")
