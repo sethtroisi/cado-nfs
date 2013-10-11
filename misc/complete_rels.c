@@ -27,6 +27,7 @@
 static index_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 cado_poly cpoly;
 int verbose = 0;
+int check_primality = 0; /* By default no primality check */
 
 /* used for counting time in different processes */
 timingstats_dict_t stats;
@@ -74,7 +75,7 @@ complete_relation (earlyparsed_relation_ptr rel)
     mp_poly_homogeneous_eval_siui(norm[side], ps->f, ps->degree, rel->a, rel->b);
   }
 
-  // check for correctness
+  // check for correctness of the factorization of the norms
   for(weight_t i = 0; i < rel->nb ; i++)
   {
     unsigned int side = rel->primes[i].h;
@@ -98,48 +99,53 @@ complete_relation (earlyparsed_relation_ptr rel)
   }
 
   // check primality
-  weight_t len = rel->nb; // no need to check the prime that can be added
-  for(weight_t i = 0; i < len ; i++)
+  if (check_primality != 0)
   {
-    p_r_values_t p = rel->primes[i].p;
-    exponent_t e = rel->primes[i].e;
-    if (!modul_isprime(&p))
+    weight_t len = rel->nb; // no need to check the prime that can be added
+    for(weight_t i = 0; i < len ; i++)
     {
-      unsigned int side = rel->primes[i].h;
-      nonprime = 1;
-      if (verbose != 0)
+      p_r_values_t p = rel->primes[i].p;
+      exponent_t e = rel->primes[i].e;
+      if (!modul_isprime(&p))
       {
-        fprintf (stderr, "Given factor %lu is not prime on side %u for (%"
-                          PRId64 ", %" PRIu64 ")\n", p, side, rel->a, rel->b);
+        unsigned int side = rel->primes[i].h;
+        nonprime = 1;
+        if (verbose != 0)
+        {
+          fprintf (stderr, "Given factor %lu is not prime on side %u for (%"
+                            PRId64 ", %" PRIu64 ")\n", p, side, rel->a, rel->b);
+        }
+
+        unsigned long pr = 2;
+        do
+        {
+          exponent_t e_pr_in_p = 0;
+          while (p % pr == 0)
+          {
+            p = p / pr;
+            e_pr_in_p++;
+          }
+
+          if (p == 1)
+          {
+            rel->primes[i] = (prime_t) {.h = side, .p = pr, .e = e * e_pr_in_p};
+            break;
+          }
+          else if (e_pr_in_p != 0)
+            rel_add_prime (rel, side, pr, e * e_pr_in_p);
+
+          pr = getprime(pr);
+        } while (!modul_isprime(&p));
+        getprime(0);
+
+        if (p != 1) //means remaining p is prime
+          rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
       }
-
-      unsigned long pr = 2;
-      do
-      {
-        exponent_t e_pr_in_p = 0;
-        while (p % pr == 0)
-        {
-          p = p / pr;
-          e_pr_in_p++;
-        }
-
-        if (p == 1)
-        {
-          rel->primes[i] = (prime_t) {.h = side, .p = pr, .e = e * e_pr_in_p};
-          break;
-        }
-        else if (e_pr_in_p != 0)
-          rel_add_prime (rel, side, pr, e * e_pr_in_p);
-
-        pr = getprime(pr);
-      } while (!modul_isprime(&p));
-      getprime(0);
-
-      if (p != 1) //means remaining p is prime
-        rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
     }
   }
 
+
+  // complete relation if necessary.
   for (unsigned long p = 2; mpz_cmp_ui (norm[0], 1) != 0 ||
                             mpz_cmp_ui (norm[1], 1) != 0 ; p = getprime(p))
   {
@@ -226,10 +232,12 @@ usage(const char *argv0)
     fprintf (stderr, "Usage: %s [options] ", argv0);
     fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
     fprintf (stderr, "Mandatory command line options:\n");
-    fprintf (stderr, "     -out <file>  - output file\n");
-    fprintf (stderr, "     -poly <file> - polynomials file\n");
+    fprintf (stderr, "     -out <file>     - output file\n");
+    fprintf (stderr, "     -poly <file>    - polynomials file\n");
     fprintf (stderr, "\nOther command line options:\n");
-    fprintf (stderr, "    -abhexa      - read a and b as hexa no decimal\n");
+    fprintf (stderr, "    -abhexa          - read a and b as hexa no decimal\n");
+    fprintf (stderr, "    -check_primality - by default no primality check\n");
+    fprintf (stderr, "    -v               - more verbose output\n");
     exit (1);
 }
 
@@ -246,6 +254,7 @@ main (int argc, char * argv[])
     int abhexa = 0;
     param_list_configure_switch(pl, "abhexa", &abhexa);
     param_list_configure_switch(pl, "v", &verbose);
+    param_list_configure_switch(pl, "check_primality", &check_primality);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
