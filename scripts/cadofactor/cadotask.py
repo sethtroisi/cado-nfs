@@ -3102,7 +3102,10 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
         self.stop_all_clients()
         
         self.server.shutdown()
-        return not had_interrupt
+        if had_interrupt:
+            return None
+        else:
+            return self.sqrt.get_factors()
     
     def start_all_clients(self):
         for clients in self.clients:
