@@ -78,22 +78,20 @@ static inline char * strndup(const char * const a, const size_t n)
    know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
    functions that rewrite the %zu format accordingly, so the bulk of the
    code can continue to use C99 syntax.
-   We do these renames only if stdio.h has been parsed before this file.
-   Header files that need a certain include order are ugly, but that never
-   stopped us and renaming printf() before parsing stdio.h would be "bad." 
-   This way, when the renames are needed but don't happen, with any luck 
-   gcc will complain about not understanding "%zu". Note that C++ does not 
-   define _STDIO_H, so we test instead for a constant that all stdio.h 
-   headers should define, SEEK_SET, and hope that this is in fact a 
-   preprocessor macro (at least under MinGW which is the case that matters).
-   If NO_PRINTF_RENAME is defined, no renames happen. This is meant to allow 
-   the code that implements the format substitutions to refer to the plain
-   libc functions. */
+ */
 
 #ifdef HAVE_MINGW
 
-#ifndef SEEK_SET
-#error stdio.h must be included before portability.h
+#include <stdio.h>
+
+/* For C++, including cstdio too is mandatory. Not much because we want
+ * it, but because it does feel free to do things such as #undef fprintf,
+ * which of course will get in the way since we want these renamed
+ * (bear in mind that some side-effect may cause cstdio to be included
+ * well after this file, unless we want to be #include-order dependent).
+ */
+#ifdef  __cplusplus
+#include <cstdio>
 #endif
 
 #include <stdarg.h>
@@ -117,6 +115,9 @@ subst_zu(const char * const s)
         if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'u') {
             r[i+1] = prisiz[0];
             r[i+2] = prisiz[1];
+        } else if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'd') {
+            r[i+1] = priptrdiff[0];
+            r[i+2] = priptrdiff[1];
         } else if (r[i] == '%' && r[i+1] == 't' && r[i+2] == 'd') {
             r[i+1] = priptrdiff[0];
             r[i+2] = priptrdiff[1];
