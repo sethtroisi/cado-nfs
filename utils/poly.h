@@ -69,6 +69,8 @@ void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h,
 void poly_mul(poly_t f, const poly_t g, const poly_t h);
 void poly_mul_ui(poly_t f, const poly_t g, unsigned long a);
 void poly_mul_mpz(poly_t Q, const poly_t P, const mpz_t a);
+int poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
+                        const mpz_t invm);
 void poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
                             const poly_t f, const mpz_t m,
                             const mpz_t invm);
