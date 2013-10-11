@@ -34,9 +34,6 @@ set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 add_executable(reconstructlog-dl reconstructlog.c)
 target_link_libraries(reconstructlog-dl filterutils)
 
-add_executable(complete_rels2 complete_rels2.c)
-target_link_libraries(complete_rels2 filterutils)
-
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 
 include(CMakeLists-nodist.txt OPTIONAL)

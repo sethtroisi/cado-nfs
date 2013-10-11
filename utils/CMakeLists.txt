@@ -22,12 +22,8 @@ install(TARGETS utils DESTINATION lib/${package_basename})
 add_executable(check_rels check_rels.c)
 target_link_libraries(check_rels utils)
 
-add_executable(complete_rels ${EXCLUDE_FROM_RELEASE_BUILD} complete_rels.c)
-target_link_libraries(complete_rels utils)
-
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
-
 
 add_executable(roots roots.c)
 target_link_libraries(roots utils)
