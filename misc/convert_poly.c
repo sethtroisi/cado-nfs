@@ -188,6 +188,62 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
 }
 
 static void
+read_msieve (mpz_t N, mpz_t *X, mpz_t *Y)
+{
+  int i, ret;
+  char s[MAX_BUF]; /* input buffer */
+
+  while (feof (stdin) == 0)
+    {
+      ret = readline (s);
+      if (ret == EOF)
+        break;
+      if (strlen (s) + 1 >= MAX_BUF)
+        {
+          fprintf (stderr, "Error, buffer overflow\n");
+          exit (1);
+        }
+      if (strncmp (s, "N ", 2) == 0) /* N <input number> */
+        {
+          if (mpz_set_str (N, s + 2, 0) != 0)
+            {
+              fprintf (stderr, "Error while reading N");
+              exit (1);
+            }
+        }
+      else if (sscanf (s, "A%d ", &i) == 1) /* Ai <coeff of degree i> */
+        {
+          if (i > MAX_DEGREE)
+            {
+              fprintf (stderr, "Error, too large degree %d\n", i);
+              exit (1);
+            }
+          if (mpz_set_str (X[i], s + 3, 0) != 0)
+            {
+              fprintf (stderr, "Error while reading X[%d]", i);
+              exit (1);
+            }
+        }
+      else if (strncmp (s, "R1 ", 3) == 0)
+        {
+          if (mpz_set_str (Y[1], s + 3, 0) != 0)
+            {
+              fprintf (stderr, "Error while reading Y1");
+              exit (1);
+            }
+        }
+      else if (strncmp (s, "R0 ", 3) == 0)
+        {
+          if (mpz_set_str (Y[0], s + 3, 0) != 0)
+            {
+              fprintf (stderr, "Error while reading Y0");
+              exit (1);
+            }
+        }
+    }
+}
+
+static void
 read_cwi (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
 {
   int npoly; /* number of polynomials */
@@ -446,6 +502,8 @@ main (int argc, char *argv[])
     read_ggnfs (N, X, Y, M);
   else if (iformat == FORMAT_CWI)
     read_cwi (N, X, Y, M);
+  else if (iformat == FORMAT_MSIEVE)
+    read_msieve (N, X, Y);
   else
     {
       fprintf (stderr, "Input format not yet implemented\n");
