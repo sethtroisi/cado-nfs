@@ -7,6 +7,7 @@
 #include "bwc_config.h"
 #include "select_mpi.h"
 #include "bw-common-mpi.h"
+#include "timing.h"
 #include "portability.h"
 
 int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
@@ -38,6 +39,25 @@ int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char 
 }
 int bw_common_clear_mpi(struct bw_params * bw)
 {
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    double wct = wct_seconds() - bw->wct_base;
+    double cpu = seconds();
+    char * ptr = strrchr(bw->original_argv[0], '/');
+    if (ptr) {
+        ptr++;
+    } else {
+        ptr = bw->original_argv[0];
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &cpu, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    if (bw->can_print) {
+        printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over %d threads and %d MPI jobs)\n",
+                ptr,
+                wct, cpu,
+                bw->thr_split[0] * bw->thr_split[1],
+                size);
+    }
     bw_common_clear(bw);
     MPI_Finalize();
     return 0;

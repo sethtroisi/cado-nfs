@@ -119,6 +119,11 @@ struct bw_params {
      */
     int number_of_check_stops;
     int check_stops[MAX_NUMBER_OF_CHECK_STOPS];
+
+    int original_argc;
+    char ** original_argv;
+
+    double wct_base;
 };
 
 extern struct bw_params bw[1];
