@@ -11,50 +11,39 @@ II) Using msieve linear algebra after CADO-NFS filtering
 I) Using CADO-NFS with relations computed with msieve (or ggnfs)
 
 The format of relations used by CADO-NFS is the same as the one used by ggnfs
-or msieve. We assume here we want to factor a number c100.
+or msieve.
 
-1) create a working directory, say /tmp/c100
+1) First, convert the polynomial from Msieve format to CADO format using:
+   $ build/<hostname>/misc/convert_poly -if msieve < input.poly > output.poly
 
-2) create a file c100.n in /tmp/c100 containing a single line:
-   n: <number to factor>
+2) Since ggnfs doesn't print prime factors under 10000, and CADO-NFS requires
+   all prime factors, you will need to complete all relations files that are in
+   ggnfs or msieve format using:
 
-3) create in /tmp/c100 the polynomial file c100.poly in CADO-NFS format
-   (process the factor.sh example in the README, and look in the
-   /tmp/cado.xxx/c59.poly file to see that format)
+   $ build/<hostname>/utils/complete_rels -out rels.out.gz -poly <polyfile> file0 file1 ... filen 
+        or
+   $ build/<hostname>/utils/complete_rels -out rels.out.gz -poly <polyfile> -filelsit <filelist>
+        where <filelist> is a name of a file containing the list of all
+        relations files
 
-4) put all relations in ggnfs format into a single file c100.rels.0-1.gz
-   (into /tmp/c100) and in c100.nrels the number of relations.
+    See complete_rels -h for others options.
 
-   Note: since ggnfs doesn't print prime factors under 10000, and CADO-NFS
-   requires all prime factors, you will need first to complete factorizations:
+3) Create a parameterfile for the Python script: see, in the scripts/cadofactor
+directory, the files 'parameters' and 'REAMDE'. In the README file, read
+thoroughly the section on importing polynomial file and importing relations.
 
-   $ build/<hostname>/utils/complete_rels -f -poly c100.poly c100.rels.ggnfs >
-                                                             c100.rels.0-1
+4) run the cadofactor.py script (where $CADO is the CADO-NFS directory):
 
-5) create empty files in /tmp/c100 (in order):
-  
-   touch c100.polysel_done
-   touch c100.factbase_done
-   touch c100.freerels_done
-   touch c100.sieve_done
+   $ $CADO/scripts/cadofactor.py <parameterfile>
 
-6) run (where $CADO is the CADO-NFS directory):
+If the parameter file is correctly configure, the script will skip the
+polyselect step and the sieving. It will run all the remaining step of the
+factorization until the factors are found. 
 
-   $ $CADO/cadofactor.pl n=<number to factor> params=$CADO/params/params.c100 parallel=0 wdir=/tmp/c100 bindir=$CADO/build/<hostname>
-
-   The script should print:
-
-Info:There is already some data relative to `c100' in the working directory. Trying to recover...
-Info:Nothing to be done for polynomial selection.
-Info:Nothing to be done for factor base.
-Info:Nothing to be done for sieve and purge.
-
-   and ask:
-
-Warning:I will clean up the following tasks: duplicates.
-Warning:Are you OK to continue? [y/l/N] (30s timeout)
-
-   Asnwer 'y'.
+NB: If you want to do only the filtering step, you should remove the file
+'linalg/bwc/bwc.pl' in your __build directory__, this will make the script crash
+at the beginning of the linear algebra (a more elegant solution should be
+available soon).
 
 ==============================================================================
 
