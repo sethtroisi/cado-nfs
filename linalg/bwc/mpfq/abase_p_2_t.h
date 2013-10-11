@@ -1,9 +1,9 @@
-#ifndef ABASE_P_4_T_H_
-#define ABASE_P_4_T_H_
+#ifndef ABASE_P_2_T_H_
+#define ABASE_P_2_T_H_
 
 /* MPFQ generated file -- do not edit */
 
-#include "abase_p_4.h"
+#include "abase_p_2.h"
 /* Active handler: simd_gfp */
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
@@ -13,7 +13,38 @@
 /* Active handler: Mpfq::gfp::elt */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
-   vtag=p_4,
+   type=plain,
+   virtual_base={
+    filebase=abase_vbase,
+    name=abase_vbase,
+    global_prefix=abase_,
+    substitutions=[
+     [ (?^:abase_p_2_elt \*), void *, ],
+     [ (?^:abase_p_2_src_elt\b), const void *, ],
+     [ (?^:abase_p_2_elt\b), void *, ],
+     [ (?^:abase_p_2_dst_elt\b), void *, ],
+     [ (?^:abase_p_2_elt_ur \*), void *, ],
+     [ (?^:abase_p_2_src_elt_ur\b), const void *, ],
+     [ (?^:abase_p_2_elt_ur\b), void *, ],
+     [ (?^:abase_p_2_dst_elt_ur\b), void *, ],
+     [ (?^:abase_p_2_vec \*), void *, ],
+     [ (?^:abase_p_2_src_vec\b), const void *, ],
+     [ (?^:abase_p_2_vec\b), void *, ],
+     [ (?^:abase_p_2_dst_vec\b), void *, ],
+     [ (?^:abase_p_2_vec_ur \*), void *, ],
+     [ (?^:abase_p_2_src_vec_ur\b), const void *, ],
+     [ (?^:abase_p_2_vec_ur\b), void *, ],
+     [ (?^:abase_p_2_dst_vec_ur\b), void *, ],
+     [ (?^:abase_p_2_poly \*), void *, ],
+     [ (?^:abase_p_2_src_poly\b), const void *, ],
+     [ (?^:abase_p_2_poly\b), void *, ],
+     [ (?^:abase_p_2_dst_poly\b), void *, ],
+     ],
+    },
+   w=64,
+   fieldtype=prime,
+   nn=5,
+   tag=p_2,
    vbase_stuff={
     choose_byfeatures=<code>,
     vc:includes=[ <stdarg.h>, ],
@@ -35,41 +66,10 @@
      p_4=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
      },
     },
-   tag=p_4,
    opthw=,
-   family=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-   n=4,
-   nn=9,
-   virtual_base={
-    filebase=abase_vbase,
-    name=abase_vbase,
-    global_prefix=abase_,
-    substitutions=[
-     [ (?^:abase_p_4_elt \*), void *, ],
-     [ (?^:abase_p_4_src_elt\b), const void *, ],
-     [ (?^:abase_p_4_elt\b), void *, ],
-     [ (?^:abase_p_4_dst_elt\b), void *, ],
-     [ (?^:abase_p_4_elt_ur \*), void *, ],
-     [ (?^:abase_p_4_src_elt_ur\b), const void *, ],
-     [ (?^:abase_p_4_elt_ur\b), void *, ],
-     [ (?^:abase_p_4_dst_elt_ur\b), void *, ],
-     [ (?^:abase_p_4_vec \*), void *, ],
-     [ (?^:abase_p_4_src_vec\b), const void *, ],
-     [ (?^:abase_p_4_vec\b), void *, ],
-     [ (?^:abase_p_4_dst_vec\b), void *, ],
-     [ (?^:abase_p_4_vec_ur \*), void *, ],
-     [ (?^:abase_p_4_src_vec_ur\b), const void *, ],
-     [ (?^:abase_p_4_vec_ur\b), void *, ],
-     [ (?^:abase_p_4_dst_vec_ur\b), void *, ],
-     [ (?^:abase_p_4_poly \*), void *, ],
-     [ (?^:abase_p_4_src_poly\b), const void *, ],
-     [ (?^:abase_p_4_poly\b), void *, ],
-     [ (?^:abase_p_4_dst_poly\b), void *, ],
-     ],
-    },
-   type=plain,
-   fieldtype=prime,
-   w=64,
+   family=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
+   n=2,
+   vtag=p_2,
    } */
 
 
@@ -100,10 +100,10 @@
 /* MPI interface */
 
 /* Object-oriented interface */
-void abase_p_4_p_4_dotprod(abase_p_4_dst_field, abase_p_4_dst_field, abase_p_4_dst_vec, abase_p_4_src_vec, abase_p_4_src_vec, unsigned int);
-void abase_p_4_p_4_addmul_tiny(abase_p_4_dst_field, abase_p_4_dst_field, abase_p_4_dst_vec, abase_p_4_src_vec, abase_p_4_dst_vec, unsigned int);
-void abase_p_4_p_4_transpose(abase_p_4_dst_field, abase_p_4_dst_field, abase_p_4_dst_vec, abase_p_4_src_vec);
+void abase_p_2_p_2_dotprod(abase_p_2_dst_field, abase_p_2_dst_field, abase_p_2_dst_vec, abase_p_2_src_vec, abase_p_2_src_vec, unsigned int);
+void abase_p_2_p_2_addmul_tiny(abase_p_2_dst_field, abase_p_2_dst_field, abase_p_2_dst_vec, abase_p_2_src_vec, abase_p_2_dst_vec, unsigned int);
+void abase_p_2_p_2_transpose(abase_p_2_dst_field, abase_p_2_dst_field, abase_p_2_dst_vec, abase_p_2_src_vec);
 
-#endif  /* ABASE_P_4_T_H_ */
+#endif  /* ABASE_P_2_T_H_ */
 
 /* vim:set ft=cpp: */

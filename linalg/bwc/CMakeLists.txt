@@ -71,7 +71,7 @@ endforeach(v)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v p_1 p_3 p_4 p_8)
+foreach(v p_1 p_2 p_3 p_4 p_8)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
@@ -186,6 +186,7 @@ if (BUILD_DYNAMICALLY_LINKABLE_BWC)
     # See above
     if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
     configure_matmul_lib(p_1 basicp)
+    configure_matmul_lib(p_2 basicp)
     configure_matmul_lib(p_3 basicp)
     configure_matmul_lib(p_4 basicp)
     configure_matmul_lib(p_8 basicp)

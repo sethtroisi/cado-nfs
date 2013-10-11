@@ -87,6 +87,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define _ALL_SOURCE
 #endif  /* _AIX */
 
+
+#ifdef  __GNUC__
+#pragma GCC diagnostic error "-W"
+#pragma GCC diagnostic error "-Wall"
+#endif
+
 #include "cado_config.h"
 
 #endif  /* CADO_H_ */

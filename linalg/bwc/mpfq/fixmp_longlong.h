@@ -2922,7 +2922,7 @@ addmul1_nc_1(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -2941,7 +2941,7 @@ addmul1_nc_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -2949,7 +2949,7 @@ addmul1_nc_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -2968,7 +2968,7 @@ addmul1_nc_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -2976,7 +2976,7 @@ addmul1_nc_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -2984,7 +2984,7 @@ addmul1_nc_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3003,7 +3003,7 @@ addmul1_nc_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3011,7 +3011,7 @@ addmul1_nc_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3019,7 +3019,7 @@ addmul1_nc_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3027,7 +3027,7 @@ addmul1_nc_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3046,7 +3046,7 @@ addmul1_nc_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3054,7 +3054,7 @@ addmul1_nc_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3062,7 +3062,7 @@ addmul1_nc_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3070,7 +3070,7 @@ addmul1_nc_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3078,7 +3078,7 @@ addmul1_nc_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -3097,7 +3097,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3105,7 +3105,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3113,7 +3113,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3121,7 +3121,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3129,7 +3129,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -3137,7 +3137,7 @@ addmul1_nc_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -3156,7 +3156,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3164,7 +3164,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3172,7 +3172,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3180,7 +3180,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3188,7 +3188,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -3196,7 +3196,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -3204,7 +3204,7 @@ addmul1_nc_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -3223,7 +3223,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3231,7 +3231,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3239,7 +3239,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3247,7 +3247,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3255,7 +3255,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -3263,7 +3263,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -3271,7 +3271,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -3279,7 +3279,7 @@ addmul1_nc_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -3298,7 +3298,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3306,7 +3306,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3314,7 +3314,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3322,7 +3322,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -3330,7 +3330,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -3338,7 +3338,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -3346,7 +3346,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -3354,7 +3354,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -3362,7 +3362,7 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[7] = lo;
 
-  umul_ppmm(hi,lo,c,x[8]);
+  mpfq_umul_ppmm(hi,lo,c,x[8]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[8];
@@ -3396,7 +3396,7 @@ addmul1_nc_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3420,7 +3420,7 @@ addmul1_nc_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3431,7 +3431,7 @@ addmul1_nc_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3455,7 +3455,7 @@ addmul1_nc_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3466,7 +3466,7 @@ addmul1_nc_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3477,7 +3477,7 @@ addmul1_nc_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3501,7 +3501,7 @@ addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3512,7 +3512,7 @@ addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3523,7 +3523,7 @@ addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3534,7 +3534,7 @@ addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -3558,7 +3558,7 @@ addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3569,7 +3569,7 @@ addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3580,7 +3580,7 @@ addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3591,7 +3591,7 @@ addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -3602,7 +3602,7 @@ addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -3626,7 +3626,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3637,7 +3637,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3648,7 +3648,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3659,7 +3659,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -3670,7 +3670,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -3681,7 +3681,7 @@ addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -3705,7 +3705,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3716,7 +3716,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3727,7 +3727,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3738,7 +3738,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -3749,7 +3749,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -3760,7 +3760,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -3771,7 +3771,7 @@ addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[6]);
+      mpfq_umul_ppmm(hi,lo,c,x[6]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[6];
@@ -3795,7 +3795,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -3806,7 +3806,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -3817,7 +3817,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -3828,7 +3828,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -3839,7 +3839,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -3850,7 +3850,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -3861,7 +3861,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[6]);
+      mpfq_umul_ppmm(hi,lo,c,x[6]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[6];
@@ -3872,7 +3872,7 @@ addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi, buf;
-      umul_ppmm(hi,lo,c,x[7]);
+      mpfq_umul_ppmm(hi,lo,c,x[7]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[7];
@@ -3894,7 +3894,7 @@ addmul1_1(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3914,7 +3914,7 @@ addmul1_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3922,7 +3922,7 @@ addmul1_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3942,7 +3942,7 @@ addmul1_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3950,7 +3950,7 @@ addmul1_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3958,7 +3958,7 @@ addmul1_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -3978,7 +3978,7 @@ addmul1_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -3986,7 +3986,7 @@ addmul1_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -3994,7 +3994,7 @@ addmul1_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4002,7 +4002,7 @@ addmul1_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4022,7 +4022,7 @@ addmul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4030,7 +4030,7 @@ addmul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4038,7 +4038,7 @@ addmul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4046,7 +4046,7 @@ addmul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4054,7 +4054,7 @@ addmul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -4074,7 +4074,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4082,7 +4082,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4090,7 +4090,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4098,7 +4098,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4106,7 +4106,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -4114,7 +4114,7 @@ addmul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -4134,7 +4134,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4142,7 +4142,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4150,7 +4150,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4158,7 +4158,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4166,7 +4166,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -4174,7 +4174,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -4182,7 +4182,7 @@ addmul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -4202,7 +4202,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4210,7 +4210,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4218,7 +4218,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4226,7 +4226,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4234,7 +4234,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -4242,7 +4242,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -4250,7 +4250,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -4258,7 +4258,7 @@ addmul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -4278,7 +4278,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4286,7 +4286,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4294,7 +4294,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -4302,7 +4302,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -4310,7 +4310,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -4318,7 +4318,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -4326,7 +4326,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -4334,7 +4334,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -4342,7 +4342,7 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[7] = lo;
 
-  umul_ppmm(hi,lo,c,x[8]);
+  mpfq_umul_ppmm(hi,lo,c,x[8]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[8];
@@ -4382,7 +4382,7 @@ addmul1_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4411,7 +4411,7 @@ addmul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4422,7 +4422,7 @@ addmul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4451,7 +4451,7 @@ addmul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4462,7 +4462,7 @@ addmul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4473,7 +4473,7 @@ addmul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4502,7 +4502,7 @@ addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4513,7 +4513,7 @@ addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4524,7 +4524,7 @@ addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4535,7 +4535,7 @@ addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -4564,7 +4564,7 @@ addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4575,7 +4575,7 @@ addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4586,7 +4586,7 @@ addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4597,7 +4597,7 @@ addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -4608,7 +4608,7 @@ addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -4637,7 +4637,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4648,7 +4648,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4659,7 +4659,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4670,7 +4670,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -4681,7 +4681,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -4692,7 +4692,7 @@ addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -4721,7 +4721,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4732,7 +4732,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4743,7 +4743,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4754,7 +4754,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -4765,7 +4765,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -4776,7 +4776,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -4787,7 +4787,7 @@ addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[6]);
+      mpfq_umul_ppmm(hi,lo,c,x[6]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[6];
@@ -4816,7 +4816,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[0]);
+      mpfq_umul_ppmm(hi,lo,c,x[0]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[0];
@@ -4827,7 +4827,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[1]);
+      mpfq_umul_ppmm(hi,lo,c,x[1]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[1];
@@ -4838,7 +4838,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[2]);
+      mpfq_umul_ppmm(hi,lo,c,x[2]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[2];
@@ -4849,7 +4849,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[3]);
+      mpfq_umul_ppmm(hi,lo,c,x[3]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[3];
@@ -4860,7 +4860,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[4]);
+      mpfq_umul_ppmm(hi,lo,c,x[4]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[4];
@@ -4871,7 +4871,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[5]);
+      mpfq_umul_ppmm(hi,lo,c,x[5]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[5];
@@ -4882,7 +4882,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[6]);
+      mpfq_umul_ppmm(hi,lo,c,x[6]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[6];
@@ -4893,7 +4893,7 @@ addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 
   {
       mp_limb_t hi;
-      umul_ppmm(hi,lo,c,x[7]);
+      mpfq_umul_ppmm(hi,lo,c,x[7]);
       lo += carry;
       carry = (lo<carry) + hi;
       buf = z[7];
@@ -4920,7 +4920,7 @@ addmul1_smallz_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4939,7 +4939,7 @@ addmul1_smallz_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4947,7 +4947,7 @@ addmul1_smallz_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4966,7 +4966,7 @@ addmul1_smallz_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -4974,7 +4974,7 @@ addmul1_smallz_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -4982,7 +4982,7 @@ addmul1_smallz_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5001,7 +5001,7 @@ addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5009,7 +5009,7 @@ addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5017,7 +5017,7 @@ addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5025,7 +5025,7 @@ addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5044,7 +5044,7 @@ addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5052,7 +5052,7 @@ addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5060,7 +5060,7 @@ addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5068,7 +5068,7 @@ addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5076,7 +5076,7 @@ addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -5095,7 +5095,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5103,7 +5103,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5111,7 +5111,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5119,7 +5119,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5127,7 +5127,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -5135,7 +5135,7 @@ addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -5154,7 +5154,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5162,7 +5162,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5170,7 +5170,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5178,7 +5178,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5186,7 +5186,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -5194,7 +5194,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -5202,7 +5202,7 @@ addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -5221,7 +5221,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5229,7 +5229,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5237,7 +5237,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5245,7 +5245,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5253,7 +5253,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -5261,7 +5261,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -5269,7 +5269,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -5277,7 +5277,7 @@ addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -5296,7 +5296,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   mp_limb_t hi,lo,carry,buf;
   carry = 0;
 
-  umul_ppmm(hi,lo,c,x[0]);
+  mpfq_umul_ppmm(hi,lo,c,x[0]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[0];
@@ -5304,7 +5304,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[0] = lo;
 
-  umul_ppmm(hi,lo,c,x[1]);
+  mpfq_umul_ppmm(hi,lo,c,x[1]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[1];
@@ -5312,7 +5312,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[1] = lo;
 
-  umul_ppmm(hi,lo,c,x[2]);
+  mpfq_umul_ppmm(hi,lo,c,x[2]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[2];
@@ -5320,7 +5320,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[2] = lo;
 
-  umul_ppmm(hi,lo,c,x[3]);
+  mpfq_umul_ppmm(hi,lo,c,x[3]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[3];
@@ -5328,7 +5328,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[3] = lo;
 
-  umul_ppmm(hi,lo,c,x[4]);
+  mpfq_umul_ppmm(hi,lo,c,x[4]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[4];
@@ -5336,7 +5336,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[4] = lo;
 
-  umul_ppmm(hi,lo,c,x[5]);
+  mpfq_umul_ppmm(hi,lo,c,x[5]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[5];
@@ -5344,7 +5344,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[5] = lo;
 
-  umul_ppmm(hi,lo,c,x[6]);
+  mpfq_umul_ppmm(hi,lo,c,x[6]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[6];
@@ -5352,7 +5352,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[6] = lo;
 
-  umul_ppmm(hi,lo,c,x[7]);
+  mpfq_umul_ppmm(hi,lo,c,x[7]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[7];
@@ -5360,7 +5360,7 @@ addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
   carry += (lo<buf);
   z[7] = lo;
 
-  umul_ppmm(hi,lo,c,x[8]);
+  mpfq_umul_ppmm(hi,lo,c,x[8]);
   lo += carry;
   carry = (lo<carry) + hi;
   buf = z[8];
@@ -6066,7 +6066,7 @@ sqr_1(mp_limb_t *z, const mp_limb_t *x)
   for (i = 0; i < 2*1; ++i)
     buf[i] = 0;
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
   mpn_lshift(buf, buf, 2*1, 1);
   mpn_add_n(z, z, buf, 2*1);
 }
@@ -6084,8 +6084,8 @@ sqr_2(mp_limb_t *z, const mp_limb_t *x)
     buf[i] = 0;
   addmul1_nc_1(buf+1, x, x[1]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
   mpn_lshift(buf, buf, 2*2, 1);
   mpn_add_n(z, z, buf, 2*2);
 }
@@ -6104,9 +6104,9 @@ sqr_3(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_1(buf+1, x, x[1]);
   addmul1_nc_2(buf+2, x, x[2]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
   mpn_lshift(buf, buf, 2*3, 1);
   mpn_add_n(z, z, buf, 2*3);
 }
@@ -6126,10 +6126,10 @@ sqr_4(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_2(buf+2, x, x[2]);
   addmul1_nc_3(buf+3, x, x[3]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
   mpn_lshift(buf, buf, 2*4, 1);
   mpn_add_n(z, z, buf, 2*4);
 }
@@ -6150,11 +6150,11 @@ sqr_5(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_3(buf+3, x, x[3]);
   addmul1_nc_4(buf+4, x, x[4]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
   mpn_lshift(buf, buf, 2*5, 1);
   mpn_add_n(z, z, buf, 2*5);
 }
@@ -6176,12 +6176,12 @@ sqr_6(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_4(buf+4, x, x[4]);
   addmul1_nc_5(buf+5, x, x[5]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
   mpn_lshift(buf, buf, 2*6, 1);
   mpn_add_n(z, z, buf, 2*6);
 }
@@ -6204,13 +6204,13 @@ sqr_7(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_5(buf+5, x, x[5]);
   addmul1_nc_6(buf+6, x, x[6]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
-  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
   mpn_lshift(buf, buf, 2*7, 1);
   mpn_add_n(z, z, buf, 2*7);
 }
@@ -6234,14 +6234,14 @@ sqr_8(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_6(buf+6, x, x[6]);
   addmul1_nc_7(buf+7, x, x[7]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
-  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
-  umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  mpfq_umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
   mpn_lshift(buf, buf, 2*8, 1);
   mpn_add_n(z, z, buf, 2*8);
 }
@@ -6266,15 +6266,15 @@ sqr_9(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_7(buf+7, x, x[7]);
   addmul1_nc_8(buf+8, x, x[8]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
-  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
-  umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
-  umul_ppmm(z[2*8+1], z[2*8], x[8], x[8]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  mpfq_umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
+  mpfq_umul_ppmm(z[2*8+1], z[2*8], x[8], x[8]);
   mpn_lshift(buf, buf, 2*9, 1);
   mpn_add_n(z, z, buf, 2*9);
 }
@@ -6309,7 +6309,7 @@ sqr_2hw(mp_limb_t *z, const mp_limb_t *x)
     buf[i] = 0;
   addmul1_nc_1(buf+1, x, x[1]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
   z[2*1]=x[1]*x[1];
   mpn_lshift(buf, buf, 2*2-1, 1);
   mpn_add_n(z, z, buf, 2*2-1);
@@ -6329,8 +6329,8 @@ sqr_3hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_1(buf+1, x, x[1]);
   addmul1_nc_2(buf+2, x, x[2]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
   z[2*2]=x[2]*x[2];
   mpn_lshift(buf, buf, 2*3-1, 1);
   mpn_add_n(z, z, buf, 2*3-1);
@@ -6351,9 +6351,9 @@ sqr_4hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_2(buf+2, x, x[2]);
   addmul1_nc_3(buf+3, x, x[3]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
   z[2*3]=x[3]*x[3];
   mpn_lshift(buf, buf, 2*4-1, 1);
   mpn_add_n(z, z, buf, 2*4-1);
@@ -6375,10 +6375,10 @@ sqr_5hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_3(buf+3, x, x[3]);
   addmul1_nc_4(buf+4, x, x[4]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
   z[2*4]=x[4]*x[4];
   mpn_lshift(buf, buf, 2*5-1, 1);
   mpn_add_n(z, z, buf, 2*5-1);
@@ -6401,11 +6401,11 @@ sqr_6hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_4(buf+4, x, x[4]);
   addmul1_nc_5(buf+5, x, x[5]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
   z[2*5]=x[5]*x[5];
   mpn_lshift(buf, buf, 2*6-1, 1);
   mpn_add_n(z, z, buf, 2*6-1);
@@ -6429,12 +6429,12 @@ sqr_7hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_5(buf+5, x, x[5]);
   addmul1_nc_6(buf+6, x, x[6]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
   z[2*6]=x[6]*x[6];
   mpn_lshift(buf, buf, 2*7-1, 1);
   mpn_add_n(z, z, buf, 2*7-1);
@@ -6459,13 +6459,13 @@ sqr_8hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_6(buf+6, x, x[6]);
   addmul1_nc_7(buf+7, x, x[7]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
-  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
   z[2*7]=x[7]*x[7];
   mpn_lshift(buf, buf, 2*8-1, 1);
   mpn_add_n(z, z, buf, 2*8-1);
@@ -6491,14 +6491,14 @@ sqr_9hw(mp_limb_t *z, const mp_limb_t *x)
   addmul1_nc_7(buf+7, x, x[7]);
   addmul1_nc_8(buf+8, x, x[8]);
 
-  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
-  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
-  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
-  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
-  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
-  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
-  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
-  umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
+  mpfq_umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  mpfq_umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  mpfq_umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  mpfq_umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  mpfq_umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  mpfq_umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  mpfq_umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  mpfq_umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
   z[2*8]=x[8]*x[8];
   mpn_lshift(buf, buf, 2*9-1, 1);
   mpn_add_n(z, z, buf, 2*9-1);
