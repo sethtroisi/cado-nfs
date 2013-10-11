@@ -7,7 +7,6 @@ README.nonlinear
 Toolchain-MinGW64.cmake
 gf2x/gf2x-fft/cantor128.m
 dev_docs/
-TODO
 files.dist
 files.nodist
 files.unknown
