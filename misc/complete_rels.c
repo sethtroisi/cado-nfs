@@ -87,9 +87,9 @@ complete_relation (earlyparsed_relation_ptr rel)
       {
         if (verbose != 0)
         {
-          fprintf (stderr, "Given factor %lu with exponent %u does not divide "
-                           "norm on side %u for (%" PRId64 ", %" PRIu64 ")\n",
-                            p, e, side, rel->a, rel->b);
+          fprintf (stderr, "Given factor %" PRpr " with exponent %u does not "
+                           "divide the norm on side %u for (%" PRId64 ", "
+                           "%" PRIu64 ")\n", p, e, side, rel->a, rel->b);
         }
         mpz_clear(norm[0]);
         mpz_clear(norm[1]);
@@ -106,14 +106,15 @@ complete_relation (earlyparsed_relation_ptr rel)
     {
       p_r_values_t p = rel->primes[i].p;
       exponent_t e = rel->primes[i].e;
-      if (!modul_isprime(&p))
+      if (!modul_isprime((const long unsigned int *)&p))
       {
         unsigned int side = rel->primes[i].h;
         nonprime = 1;
         if (verbose != 0)
         {
-          fprintf (stderr, "Given factor %lu is not prime on side %u for (%"
-                            PRId64 ", %" PRIu64 ")\n", p, side, rel->a, rel->b);
+          fprintf (stderr, "Given factor %" PRpr " is not prime on side %u for "
+                           "(%" PRId64 ", %" PRIu64 ")\n", p, side, rel->a,
+                           rel->b);
         }
 
         unsigned long pr = 2;
@@ -135,7 +136,7 @@ complete_relation (earlyparsed_relation_ptr rel)
             rel_add_prime (rel, side, pr, e * e_pr_in_p);
 
           pr = getprime(pr);
-        } while (!modul_isprime(&p));
+        } while (!modul_isprime((const long unsigned int *)&p));
         getprime(0);
 
         if (p != 1) //means remaining p is prime
