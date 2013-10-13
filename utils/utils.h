@@ -29,7 +29,6 @@
 #include "discriminant.h"
 #include "mpz_array.h"
 #include "gzip.h"
-#include "hashpair.h"
 #include "misc.h"
 #include "poly.h"
 #include "crc.h"

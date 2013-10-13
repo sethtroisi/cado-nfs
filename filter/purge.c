@@ -140,7 +140,7 @@ static unsigned int delete_relation (uint64_t i)
 {
     index_t *tab;
     unsigned int nremoveprimes = 0;
-    HC_T *o;
+    weight_t *o;
 
     for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
 	o = &(ideals_weight[*tab]);
@@ -179,7 +179,7 @@ static int compare(const void *v1, const void *v2)
     return (w1->w >= w2->w) ? -1 : 1;
 }
 
-float weight_function_clique(HC_T w)
+float weight_function_clique(weight_t w)
 {
 #ifdef USE_CAVALLAR_WEIGHT_FUNCTION
     if (w >= 3)
@@ -356,7 +356,7 @@ static void onepass_thread_singleton_removal(ti_t * mti)
 {
     index_t *tab;
     uint64_t i;
-    HC_T *o;
+    weight_t *o;
     bv_t j;
 
     mti->sup_nrel = mti->sup_npri = 0;

@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include "hashpair.h"
 #include "cado_poly.h"
 #include "rootfinder.h"
 #include "timing.h"
@@ -32,7 +31,7 @@ struct __renumber_t
   FILE * file;           // file containing the renumbering table
   struct __bad_ideals_t bad_ideals;  // the bad ideals
   p_r_values_t * table;  //renumbering table
-  index_t size;          //number of elements in the renumbering table
+  uint64_t size;         //number of elements in the renumbering table
   uint8_t nb_bits;  // number of bits taken by an index in the file
                     // 32 or 64
 
