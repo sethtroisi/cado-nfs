@@ -43,7 +43,7 @@
  * ourselves with smaller .ab files */
 static int only_ab = 0;
 
-static index_t nr_rels_tot[MAX_NSLICES];
+static uint64_t nr_rels_tot[MAX_NSLICES];
 static int nslices_log = 1, do_slice[MAX_NSLICES];
 
 
@@ -270,7 +270,7 @@ main (int argc, char * argv[])
     if (!outfmt && files[0] != NULL)
       get_suffix_from_filename (files[0], &outfmt);
 
-    memset (nr_rels_tot, 0, sizeof(index_t) * nslices);
+    memset (nr_rels_tot, 0, sizeof(uint64_t) * nslices);
 
     split_output_iter_t **outiters;
     outiters = malloc(sizeof(split_output_iter_t *) * nslices);
@@ -301,7 +301,7 @@ main (int argc, char * argv[])
       split_iter_end(outiters[i]);
 
     for (int i = 0; i < nslices; i++)
-        fprintf (stderr, "# slice %d received %" PRid " relations\n", i,
+        fprintf (stderr, "# slice %d received %" PRIu64 " relations\n", i,
                                                                 nr_rels_tot[i]);
 
     if (filelist) filelist_clear(files);
