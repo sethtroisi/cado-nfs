@@ -15,8 +15,8 @@ typedef struct {
 } ideal_merge_t;
 
 typedef struct {
-  index_t nrels;
-  index_t nprimes;
+  uint64_t nrels;
+  uint64_t nprimes;
   double W; //weight of the active part of the matrix
 } info_mat_t;
 
@@ -33,8 +33,8 @@ typedef struct {
 #include "filter_memalloc.h"
 
 
-index_t insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
-index_t insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t, uint8_t,
+unsigned int insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
+unsigned int insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t, uint8_t,
                                     ideal_merge_t **, weight_t *);
 
 #endif /* FILTER_UTILS_H_ */

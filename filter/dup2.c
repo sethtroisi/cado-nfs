@@ -71,9 +71,9 @@ static unsigned long K = 0; /* Size of the hash table */
 static unsigned long nrels_expected = 0;
 static double cost = 0.0; /* Cost to insert all rels in the hash table */
 /* Number of duplicates and rels on the current file */
-static index_t ndup, nrels;
+static uint64_t ndup, nrels;
 /* Number of duplicates and rels on all read files */
-static index_t ndup_tot = 0, nrels_tot = 0;
+static uint64_t ndup_tot = 0, nrels_tot = 0;
 
 /* sanity check: we store (a,b) pairs for 0 <= i < sanity_size,
    and check for hash collisions */
@@ -109,7 +109,7 @@ sanity_check (uint32_t i, int64_t a, uint64_t b)
 static inline void
 print_warning_size ()
 {
-  index_t nodup = nrels_tot - ndup_tot;
+  uint64_t nodup = nrels_tot - ndup_tot;
   double full_table = 100.0 * (double) nodup / (double) K;
   fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
   if (full_table >= 99.0)
@@ -322,11 +322,11 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 }
 
 static void
-dup_print_stat (const char *s, index_t nrels, index_t ndup)
+dup_print_stat (const char *s, uint64_t nrels, uint64_t ndup)
 {
-  index_t nrem = nrels - ndup;
+  uint64_t nrem = nrels - ndup;
   double pdup = 100.0 * ((double) ndup) / ((double) nrels);
-  fprintf (stderr, "%s: nrels=%" PRid " dup=%" PRid " (%.2f%%) rem=%" PRid "\n",
+  fprintf (stderr, "%s: nrels=%" PRIu64 " dup=%" PRIu64 " (%.2f%%) rem=%" PRIu64 "\n",
                    s, nrels, ndup, pdup, nrem);
 }
 
@@ -649,11 +649,11 @@ main (int argc, char *argv[])
           nrels = ndup = 0;
 
 #ifdef FOR_FFS
-          index_t loc_nrels = filter_rels2(local_filelist, desc,
+          uint64_t loc_nrels = filter_rels2(local_filelist, desc,
                   EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES,
                   NULL, NULL);
 #else
-          index_t loc_nrels = filter_rels2(local_filelist, desc,
+          uint64_t loc_nrels = filter_rels2(local_filelist, desc,
                   EARLYPARSE_NEED_AB_DECIMAL | EARLYPARSE_NEED_PRIMES,
                   NULL, NULL);
 #endif
@@ -681,7 +681,7 @@ main (int argc, char *argv[])
       }
   }
 
-  fprintf (stderr, "At the end: %" PRid " remaining relations\n",
+  fprintf (stderr, "At the end: %" PRIu64 " remaining relations\n",
                    nrels_tot - ndup_tot);
 
   fprintf (stderr, "At the end: hash table is %1.2f%% full\n"
@@ -693,13 +693,13 @@ main (int argc, char *argv[])
 
   if (!*files_already_renumbered) {
       if (nrels_tot != nrels_expected) {
-          fprintf(stderr, "Warning: number of relations read (%"PRIu32") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+          fprintf(stderr, "Warning: number of relations read (%"PRIu64") does not match with the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
       }
   } else {
       /* when we have renumbered files, we know that we won't have the
        * total number of relations... */
       if (nrels_tot > nrels_expected) {
-          fprintf(stderr, "Warning: number of relations read (%"PRIu32") exceeds the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
+          fprintf(stderr, "Warning: number of relations read (%"PRIu64") exceeds the number of relations expected (%lu)\n", nrels_tot, nrels_expected);
       }
   }
 

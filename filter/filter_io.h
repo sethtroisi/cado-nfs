@@ -46,7 +46,7 @@ struct earlyparsed_relation_s {
    * so we defer it to the callback function instead.
    */
   // weight_t nb_above_min_index; /* nb of primes above min_index, must be <=nb */
-  index_t num;          /* (absolute) relation number */
+  uint64_t num;          /* (absolute) relation number */
   char *line;           /* If not NULL, contains the relation with a '\n' at the end */
 };
 typedef struct earlyparsed_relation_s earlyparsed_relation[1];
@@ -103,13 +103,13 @@ struct filter_rels_description {
 
 typedef void *(*filter_rels_callback_t) (void *, earlyparsed_relation_ptr);
 
-extern index_t filter_rels2(char ** input_files,
+extern uint64_t filter_rels2(char ** input_files,
         struct filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
         timingstats_dict_ptr);
 
-static inline index_t filter_rels(char ** input_files,
+static inline uint64_t filter_rels(char ** input_files,
         filter_rels_callback_t f,
         void * arg,
         int earlyparse_needed_data,

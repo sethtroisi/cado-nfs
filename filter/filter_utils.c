@@ -21,12 +21,12 @@ static inline unsigned int earlyparsed_relation_nb_above_min_index(earlyparsed_r
  * Return the number of new primes
  */
 
-inline index_t
+inline unsigned int
 insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
 			 index_t ** rel_compact,
 			 weight_t * ideals_weight)
 {
-    index_t nprimes = 0;
+    unsigned int nprimes = 0;
     unsigned int itmp;
     index_t *my_tmp;
     index_t h;
@@ -55,12 +55,12 @@ insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
     return nprimes;
 }
 
-inline index_t
+inline unsigned int
 insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
 			   uint8_t no_storage, ideal_merge_t ** rel_compact,
 			   weight_t * ideals_weight)
 {
-    index_t nprimes = 0;
+    unsigned int nprimes = 0;
     unsigned int i, itmp;
     ideal_merge_t *my_tmp;
     index_t h;

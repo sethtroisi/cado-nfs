@@ -848,7 +848,7 @@ struct filter_rels_consumer_thread_arg_s {
 /* see non-templated filter_rels2 below to see how this template is
  * instantiated */
 template<typename inflight_t>
-index_t filter_rels2_inner(char ** input_files,
+uint64_t filter_rels2_inner(char ** input_files,
         filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
@@ -1000,7 +1000,7 @@ index_t filter_rels2_inner(char ** input_files,
         int nl;
         for(size_t avail_offset = 0; avail_offset < avail_seen && (nl = ringbuf_strchr(rb, '\n', 0)) > 0 ; ) {
             if (*rb->rhead != '#') {
-                index_t relnum = rs->nrels++;
+                uint64_t relnum = rs->nrels++;
                 if (!active || bit_vector_getbit(active, relnum)) {
                     earlyparsed_relation_ptr slot = inflight->schedule(0);
                     slot->num = relnum;
@@ -1034,7 +1034,7 @@ index_t filter_rels2_inner(char ** input_files,
 
     /* NOTE: the inflight dtor is called automatically */
 
-    index_t nrels = rs->nrels;
+    uint64_t nrels = rs->nrels;
 
     /* clean producer stuff */
     relation_stream_trigger_disp_progress(rs);
@@ -1047,7 +1047,7 @@ index_t filter_rels2_inner(char ** input_files,
     return nrels;
 }
 
-index_t filter_rels2(char ** input_files,
+uint64_t filter_rels2(char ** input_files,
         filter_rels_description * desc,
         int earlyparse_needed_data,
         bit_vector_srcptr active,
