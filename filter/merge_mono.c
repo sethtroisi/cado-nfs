@@ -660,13 +660,12 @@ number_of_superfluous_rows(filter_matrix_t *mat)
 void
 print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
 {
-  printf ("N=%d (%d) w=%lu", mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
-                             mat->weight);
+  printf ("N=%" PRIu64 " (%" PRIu64 ") w=%" PRIu64 "", mat->rem_nrows,
+          mat->rem_nrows - mat->rem_ncols, mat->weight);
   if (forbw == 2)
     printf (" bw=%e", bwcost);
   else if (forbw == 3)
-    printf (" w*N=%" PRIu64 "",
-                        ((uint64_t)mat->rem_nrows) * ((uint64_t)mat->weight));
+    printf (" w*N=%" PRIu64 "", mat->rem_nrows * mat->weight);
   else if (forbw <= 1)
     printf (" w*N=%e", bwcost);
 
@@ -773,13 +772,13 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 
             /* if the excess is still larger than what is wanted,
                remove the heaviest rows and loop again */
-            printf ("remains %d rows\n", mat->rem_nrows);
+            printf ("remains %" PRIu64 " rows\n", mat->rem_nrows);
             deleteSuperfluousRows (rep, mat,
                        (mat->rem_nrows - mat->rem_ncols) - mat->keep, INT_MAX);
-            printf ("after deleteSuperfluousRows, remains %d rows\n",
+            printf ("after deleteSuperfluousRows, remains %" PRIu64 " rows\n",
                     mat->rem_nrows);
             removeSingletons (rep, mat);
-            printf ("after removeSingletons, remains %d rows\n",
+            printf ("after removeSingletons, remains %" PRIu64 " rows\n",
                     mat->rem_nrows);
             if (mat->rem_nrows == nrows)
               {
@@ -814,11 +813,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
     if (mat->itermax == 0)
       {
-        printf ("Removing final excess, nrows=%d\n", mat->rem_nrows);
+        printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
 	deleteSuperfluousRows(rep, mat,
 			      (mat->rem_nrows - mat->rem_ncols) - mat->keep,
                               INT_MAX);
-        printf ("Removing singletons, nrows=%d\n", mat->rem_nrows);
+        printf ("Removing singletons, nrows=%" PRIu64 "\n", mat->rem_nrows);
         removeSingletons (rep, mat);
       }
 
@@ -928,6 +927,6 @@ resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
 	    nactivej++;
     mat->rem_ncols = nactivej;
     printf ("At the end of resume, we have");
-    printf (" nrows=%d ncols=%d (%d)\n",
-	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
+    printf (" nrows=%" PRIu64 " ncols=%" PRIu64 " (%" PRIu64 ")\n",
+            mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
 }

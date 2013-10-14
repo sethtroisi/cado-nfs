@@ -5,12 +5,12 @@
 
 /* data type to store the (p,r) values */
 #ifndef p_r_values_size
-#define p_r_values_size 64
+#define p_r_values_size 32
 #endif
 
 /* data type to store the renumber table */
 #ifndef index_size
-#define index_size 64
+#define index_size 32
 #endif
 
 #if p_r_values_size == 32
@@ -25,10 +25,12 @@
 #define index_t uint32_t
 #define PRid PRIu32
 #define PRxid PRIx32
+#define SCNid SCNu32
 #else
 #define index_t uint64_t
 #define PRid PRIu64
 #define PRxid PRIx64
+#define SCNid SCNu64
 #endif 
 
 /* The weight of ideals saturates at 255 */

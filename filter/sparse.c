@@ -25,13 +25,13 @@ fprintRow(FILE *file, typerow_t *row)
 {
   index_t i;
 #ifdef FOR_DL
-    fprintf(file, "[%d]", row[0].id);
+    fprintf(file, "[%" PRid "]", row[0].id);
     for(i = 1; i <= row[0].id; i++)
-        fprintf(file, " %d(%d)", row[i].id, row[i].e);
+        fprintf(file, " %" PRid "(%" PRId32 ")", row[i].id, row[i].e);
 #else
-    fprintf(file, "[%d]", row[0]);
+    fprintf(file, "[%" PRid "]", row[0]);
     for(i = 1; i <= row[0]; i++)
-        fprintf(file, " %d", row[i]);
+        fprintf(file, " %" PRid "", row[i]);
 #endif
 }
 

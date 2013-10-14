@@ -24,7 +24,7 @@ read_matrix_indexing (index_t *tab, FILE *file, index_t ncols, index_t nprimes)
   index_t index;
   index_t j;
 
-  while (fscanf (file, "%u %x\n", &index, &j) == 2)
+  while (fscanf (file, "%" SCNid " %" SCNid "\n", &index, &j) == 2)
   {
     ASSERT_ALWAYS (index < ncols);
     ASSERT_ALWAYS (j < nprimes);
@@ -44,7 +44,7 @@ read_log (mpz_t *log, index_t *mat_renum, FILE *logfile, mpz_t q, index_t ncols)
 
   mpz_init (vlog);
 
-  while (gmp_fscanf (logfile, "%"PRid" %Zd\n", &i, vlog) == 2)
+  while (gmp_fscanf (logfile, "%" SCNid " %Zd\n", &i, vlog) == 2)
   {
     if (mpz_cmp_ui (vlog, 0) < 0)
     {
@@ -117,7 +117,8 @@ compute_log (index_t i, mpz_t *log, mpz_t q)
       }
       else
       {
-        fprintf (stderr, "Error, too much unknown ideals in relation %u\n", i);
+        fprintf (stderr, "Error, too much unknown ideals in relation "
+                         "%" PRid "\n", i);
         exit (1);
       }
     }

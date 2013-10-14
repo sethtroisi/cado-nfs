@@ -88,7 +88,7 @@ checkData(filter_matrix_t *mat)
 	if(mat->wt[j])
 	    nbj++;
     if(mat->rem_ncols != nbj){
-	fprintf(stderr, "rem_ncols=%d nbj=%d\n", mat->rem_ncols, nbj);
+	fprintf(stderr, "rem_ncols=%" PRIu64 " nbj=%" PRid "\n", mat->rem_ncols, nbj);
 	exit(1);
     }
 }
@@ -185,8 +185,9 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     info_mat_t info;
     memset(&info, 0, sizeof(info));
 
-    fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
-            mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
+    fprintf(stderr, "Reading matrix of %" PRIu64 " rows and %" PRIu64 " columns"
+                    ": excess is %" PRIu64 "\n", mat->rem_nrows, mat->rem_ncols,
+                    mat->rem_nrows - mat->rem_ncols);
     mat->weight = 0;
 
     char *fic[2] = {(char *) purgedname, NULL};

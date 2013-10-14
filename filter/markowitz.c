@@ -230,7 +230,7 @@ MkzCheck(filter_matrix_t *mat)
       if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (int32_t) dj)
               {
-		fprintf(stderr, "GASP: %d <> %d in MkzCheck\n",
+		fprintf(stderr, "GASP: %" PRId32 " <> %" PRid " in MkzCheck\n",
                         MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
                 exit (1);
               }

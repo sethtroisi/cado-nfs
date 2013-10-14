@@ -21,10 +21,10 @@ typedef struct {
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
-  index_t nrows;
-  index_t ncols;
-  index_t rem_nrows;     /* number of remaining rows */
-  index_t rem_ncols;     /* number of remaining columns */
+  uint64_t nrows;
+  uint64_t ncols;
+  uint64_t rem_nrows;     /* number of remaining rows */
+  uint64_t rem_ncols;     /* number of remaining columns */
   typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
                          with 1 <= k <= rows[i][0] */
                         /* FOR_DL: struct containing also the exponent */
@@ -32,10 +32,10 @@ typedef struct {
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
   index_t nburied;     /* the number of buried columns */
-  unsigned long weight;
+  uint64_t weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
-  int keep;          /* target for nrows-ncols */
+  int64_t keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
   index_t **R;           /* R[j][k] contains the indices of the rows containing
                             the ideal of index j, 0 <= j < ncols,
