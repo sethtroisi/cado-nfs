@@ -125,6 +125,10 @@ include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/odd_address_io_int.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/strlcpy.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/linux.cmake")
+string(COMPARE EQUAL "$ENV{NO_PYTHON_CHECK}" "" DO_PYTHON_CHECK)
+if (DO_PYTHON_CHECK)
+  include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
+endif()
 
 string(COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "" DISABLE_SHARED)
 
