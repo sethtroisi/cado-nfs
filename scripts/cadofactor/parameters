@@ -208,7 +208,7 @@ slaves.downloadretry = 10
 # The working directories should probably be unique; the default choice for
 # the working directory includes the clientid which should ensure uniqueness.
 
-slaves.basepath = /tmp/work/testrun.wuclient
+slaves.basepath = /tmp/work/$(name).wuclient
 
 
 # If you want to launch clients on multiple groups of slave machines, with
