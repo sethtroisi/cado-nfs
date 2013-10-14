@@ -766,7 +766,7 @@ int main(int argc, char **argv)
     size_t cur_alloc = amount_ * sizeof(type_);                         \
     tot_alloc_bytes += cur_alloc;                                       \
     fprintf(stderr,							\
-            "Allocated " #variable_ " of %zuMb (total %zuMb so far)\n",	\
+            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",	\
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);                  	\
 } while (0)
 
