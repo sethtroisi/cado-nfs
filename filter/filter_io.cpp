@@ -1015,8 +1015,9 @@ uint64_t filter_rels2_inner(char ** input_files,
             avail_seen -= nl;
             avail_offset += nl;
             if (relation_stream_disp_progress_now_p(rs))
-                fprintf(stderr, "Read %" PRid " relations in %.1fs -- %.1f MB/s -- "
-                        "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+                fprintf(stderr, "Read %" PRIu64 " relations in %.1fs -- %.1f "
+                                "MB/s -- %.1f rels/s\n", rs->nrels, rs->dt,
+                                rs->mb_s, rs->rels_s);
         }
     }
     inflight->drain();
@@ -1038,7 +1039,7 @@ uint64_t filter_rels2_inner(char ** input_files,
 
     /* clean producer stuff */
     relation_stream_trigger_disp_progress(rs);
-    fprintf(stderr, "Done, read %" PRid " relations in %.1fs -- %.1f MB/s -- "
+    fprintf(stderr, "Done, read %" PRIu64 " relations in %.1fs -- %.1f MB/s -- "
             "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     relation_stream_clear(rs);
     ringbuf_clear(rb);
