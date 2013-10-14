@@ -21,9 +21,9 @@ or msieve.
    all prime factors, you will need to complete all relations files that are in
    ggnfs or msieve format using:
 
-   $ build/<hostname>/utils/complete_rels -out rels.out.gz -poly <polyfile> file0 file1 ... filen 
+   $ build/<hostname>/misc/complete_rels -out rels.out.gz -poly <polyfile> file0 file1 ... filen 
         or
-   $ build/<hostname>/utils/complete_rels -out rels.out.gz -poly <polyfile> -filelsit <filelist>
+   $ build/<hostname>/misc/complete_rels -out rels.out.gz -poly <polyfile> -filelsit <filelist>
         where <filelist> is a name of a file containing the list of all
         relations files
 
