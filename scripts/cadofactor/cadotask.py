@@ -702,24 +702,53 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
     wu_paste_char = '_'
+    wu_attempt_char = '#'
     def make_wuname(self, identifier, attempt=None):
-        assert not self.wu_paste_char in self.params["name"]
-        assert not self.wu_paste_char in self.name
-        assert not self.wu_paste_char in identifier
-        if attempt is None:
-            return self.wu_paste_char.join([self.params["name"], self.name,
-                                            identifier])
-        else:
-            assert isinstance(attempt, int)
-            return self.wu_paste_char.join([self.params["name"], self.name,
-                                            identifier, str(attempt)])
+        """ Generates a wuname from project name, task name, identifier, and
+        attempt number.
+        """
+        assert not self.wu_paste_char in self.name # self.name is task name
+        assert not self.wu_paste_char in identifier # identifier is, e.g., range string
+        assert not self.wu_attempt_char in identifier
+        wuname = self.wu_paste_char.join([self.params["name"], self.name,
+                                          identifier])
+        if not attempt is None:
+            wuname += "%s%d" % (self.wu_attempt_char, attempt)
+        return wuname
     
     def split_wuname(self, wuname):
-        arr = wuname.split(self.wu_paste_char)
-        if len(arr) == 3:
-            arr.append(None)
-        else:
-            arr[3] = int(arr[3])
+        """ Splits a wuname into project name, task name, identifier, and
+        attempt number.
+        
+        Always returns a list of length 4; if there is not attempt given in
+        the wuname, then the last array entry is None
+
+        >>> # Test many possible combinations of "_" and "#" occuring in names
+        >>> # where these characters are allowed
+        >>> class Klass():
+        ...     params = {"name": None}
+        ...     wu_paste_char = '_'
+        ...     wu_attempt_char = '#'
+        >>> inst = Klass()
+        >>> from itertools import product
+        >>> prod = product(*[["", "_", "#"]] * 4 + [["", "#"]]*2)
+        >>> for sep in prod:
+        ...     inst.params["name"] = "%s%sprojectname%s%s" % sep[0:4]
+        ...     inst.name = "%staskname%s" % sep[4:6]
+        ...     for attempt in [None, 2, 3]:
+        ...         identifier = "identifier"
+        ...         wuname = Task.make_wuname(inst, "identifier", attempt=attempt)
+        ...         wu_split = Task.split_wuname(inst, wuname)
+        ...         assert wu_split == [inst.params["name"], inst.name, identifier, attempt]
+        """
+        arr = wuname.rsplit(self.wu_paste_char, 2)
+        assert len(arr) == 3
+        attempt = None
+        # Split off attempt number, if available
+        if "#" in arr[2]:
+            (arr[2], attempt) = arr[2].split('#')
+            attempt = int(attempt)
+        arr.append(attempt)
         return arr
     
     class ResultInfo(wudb.WuResultMessage):
