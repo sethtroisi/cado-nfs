@@ -2445,7 +2445,7 @@ class LinAlgTask(Task, HasStatistics):
         if not "dependency" in self.state:
             self.logger.info("Starting")
             workdir = self.workdir.make_dirname()
-            workdir.mkdir()
+            workdir.mkdir(parent=True)
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
