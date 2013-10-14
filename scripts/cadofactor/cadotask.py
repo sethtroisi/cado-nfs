@@ -910,15 +910,17 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit")
+        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
+                                     "maxtimedout")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.state.setdefault("wu_cancelled", 0)
+        self.state.setdefault("wu_timedout", 0)
         self.params.setdefault("maxwu", 10)
+        self.params.setdefault("maxtimedout", 100)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -929,8 +931,13 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.wuar.create(str(wu), commit=commit)
     
     def cancel_wu(self, wuid, commit=True):
-        """ Cancel a WU and update wu_cancelled counter """
-        key = "wu_cancelled"
+        """ Cancel a WU and update wu_timedout counter """
+        key = "wu_timedout"
+        maxtimedout = int(self.params["maxtimedout"])
+        if not self.state[key] < maxtimedout:
+            self.logger.error("Exceeded maximum number of timed out "
+                              "workunits, maxtimedout=%d ", maxtimedout)
+            raise Exception("Too many timed out work units")
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.cancel(wuid, commit=commit)
     
@@ -972,7 +979,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"] \
-                - self.state["wu_cancelled"]
+                - self.state["wu_timedout"]
 
     def get_number_available_wus(self):
         return self.wuar.count_available()
@@ -1009,6 +1016,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.submit_wu(wu, commit=commit)
         
     def resubmit_timed_out_wus(self):
+        """ Check for any timed out workunits and resubmit them """
         # We don't store the lastcheck in state as we do *not* want to check
         # instantly when we start up - clients should get a chance to upload
         # results first
@@ -1033,8 +1041,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         if not results:
             self.logger.debug("Found no timed-out workunits")
         for entry in results:
-            self.resubmit_one_wu(Workunit(entry["wu"]), commit=False)
-            self.cancel_wu(entry["wuid"], commit=True)
+            self.cancel_wu(entry["wuid"], commit=False)
+            self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
 
 
 class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
