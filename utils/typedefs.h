@@ -5,12 +5,12 @@
 
 /* data type to store the (p,r) values */
 #ifndef p_r_values_size
-#define p_r_values_size 32
+#define p_r_values_size 64
 #endif
 
 /* data type to store the renumber table */
 #ifndef index_size
-#define index_size 32
+#define index_size 64
 #endif
 
 #if p_r_values_size == 32

@@ -29,7 +29,7 @@ static const int ugly[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 static int
-copy_bad_ideals(const char * filename, FILE *out, index_t *size)
+copy_bad_ideals(const char * filename, FILE *out, uint64_t *size)
 {
   FILE *file = fopen(filename, "r"); /* never compressed, always small */
   ASSERT_ALWAYS(file != NULL);
@@ -207,7 +207,7 @@ get_one_line (FILE *f, char *s)
 }
 
 static void
-report_read (double t, index_t nread, size_t bytes_read, int end)
+report_read (double t, uint64_t nread, size_t bytes_read, int end)
 {
   double mb_s, dt = wct_seconds () - t;
   if (dt > 0.01)
@@ -216,10 +216,10 @@ report_read (double t, index_t nread, size_t bytes_read, int end)
     mb_s = 0.0;
 
   if (!end)
-    fprintf(stderr, "Renumbering table: read %"PRid" values from file "
+    fprintf(stderr, "Renumbering table: read %" PRIu64 " values from file "
                     "in %.1fs -- %.1f MB/s\n", nread, dt, mb_s);
   else
-    fprintf(stderr, "Renumbering table: end of read. Read %"PRid" values from "
+    fprintf(stderr, "Renumbering table: end of read. Read %" PRIu64 " values from "
                     "file in %.1fs -- %.1f MB/s\n", nread, dt, mb_s);
 
 }
@@ -374,7 +374,7 @@ renumber_close_write (renumber_t tab, const char *tablefile)
   ASSERT_ALWAYS (final != NULL);
 
   // First we put some data about the renumbering table.
-  fprintf (final, "%u %" PRid " %d %d %lu %lu\n", tab->nb_bits, tab->size,
+  fprintf (final, "%u %" PRIu64 " %d %d %lu %lu\n", tab->nb_bits, tab->size,
                                      tab->bad_ideals.n, tab->add_full_col,
                                      tab->lpbr, tab->lpba);
 
@@ -396,7 +396,7 @@ renumber_close_write (renumber_t tab, const char *tablefile)
   ASSERT_ALWAYS (remove(tablefile_tmp) == 0);
 
   free (tablefile_tmp);
-  fprintf(stderr, "Renumbering struct: nprimes=%"PRid"\n", tab->size);
+  fprintf(stderr, "Renumbering struct: nprimes=%" PRIu64 "\n", tab->size);
   renumber_free(tab);
 }
 
@@ -406,7 +406,8 @@ renumber_close_write (renumber_t tab, const char *tablefile)
 void
 renumber_read_table (renumber_t tab, const char * filename)
 {
-  index_t i, ret, report = 0;
+  uint64_t i, report = 0;
+  int ret;
   double t = wct_seconds ();
   uint8_t old_nb_bits = tab->nb_bits;
   char s[RENUMBER_MAXLINE];
@@ -440,7 +441,7 @@ renumber_read_table (renumber_t tab, const char * filename)
   ASSERT_ALWAYS (tmp_size != 0);
   if (tab->nb_bits == 32)
     ASSERT_ALWAYS (!(tmp_size >> 32));
-  tab->size = (index_t) tmp_size;
+  tab->size = (uint64_t) tmp_size;
 
   // Allocating memory
   renumber_alloc(tab);
@@ -502,8 +503,8 @@ renumber_read_table (renumber_t tab, const char * filename)
   ASSERT_ALWAYS(i == tab->size);
 
   print_info (stderr, tab);
-  fprintf(stderr, "Renumbering struct: nprimes=%"PRid"\n", tab->size);
-  fprintf(stderr, "Renumbering struct: first_not_cached=%"PRid"\n",
+  fprintf(stderr, "Renumbering struct: nprimes=%" PRIu64 "\n", tab->size);
+  fprintf(stderr, "Renumbering struct: first_not_cached=%" PRid "\n",
                                                         tab->first_not_cached);
 
   fclose_maybe_compressed (tab->file, filename);
