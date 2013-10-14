@@ -175,7 +175,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 self.send_error(404, "Access restricted to registered file "
                                 "names, %s is not registered" % self.path)
         else:
-            super().do_GET()
+            try:
+                super().do_GET()
+            except socket.error as e:
+                self.log_warning("Connection error: %s", str(e))
         sys.stdout.flush()
 
     def do_POST(self):
