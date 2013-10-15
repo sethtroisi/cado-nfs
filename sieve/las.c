@@ -1336,7 +1336,22 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 #endif
   int32_t a0 = - (int32_t) p, b0 = (int32_t) r, a1, b1;
   
+  /* Mac OS X 10.8 embarks a version of llvm which crashes on the code
+   * below (could be that the constraints are exerting too much of the
+   * compiler's behaviour).
+   *
+   * See tracker #16540
+   */
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if defined(__APPLE_CC__) && defined(__llvm__)
+#if __APPLE_CC__ == 5621
+#define AVOID_ASM_REDUCE_PLATTICE
+#endif
+#else
+#define AVOID_ASM_REDUCE_PLATTICE
+#endif
+
+#ifndef AVOID_ASM_REDUCE_PLATTICE
 #define RPA(LABEL) "addl %2, %0\n leal (%0,%2,4), %%edx\n addl %3, %1\n" \
     "testl %%edx, %%edx\n movl %0, %%eax\n jng " LABEL			\
     "addl %2, %%eax\n leal (%1,%3,1), %%edx\n cmovngl %%eax, %0\n cmovngl %%edx, %1\n" \
