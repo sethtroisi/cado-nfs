@@ -29,7 +29,7 @@ foreach(_TEST_VERSION ${_Python_ACCEPTED})
 endforeach()
 
 if (NOT _PYTHON_OK)
-  message(FATAL_ERROR "Did not find a Python interpreter of one of the versions: ${_Python_ACCEPTED}")
+  message(FATAL_ERROR "Did not find a Python interpreter of one of the versions: ${_Python_ACCEPTED}. Please see README.Python")
 else()
   message(STATUS "Found Python ${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}.${PYTHON_VERSION_PATCH}: ${PYTHON_EXECUTABLE}")
 endif()

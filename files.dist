@@ -11,6 +11,7 @@ NEWS
 README
 README.msieve
 README.discretelog
+README.Python
 cado.h
 cado_config_h.in
 cado_mpi_config_h.in
