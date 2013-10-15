@@ -38,6 +38,7 @@ static const char *format_names[4] = {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */
+#include <inttypes.h>
 #include <string.h>
 #include <assert.h>
 #include "../utils/gzip.h"
@@ -72,7 +73,7 @@ get_int32 (FILE *fp)
 typedef struct
 {
   int64_t a;
-  uint32_t b;
+  uint64_t b;
   unsigned int rfb_entries;
   unsigned int afb_entries;
   unsigned int sp_entries;
@@ -175,7 +176,7 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
   unsigned int i, j;
   int need_comma;
 
-  printf ("%ld,%u:", rel->a, rel->b);
+  printf ("%" PRId64 ",%" PRIu64 ":", rel->a, rel->b);
   need_comma = 0;
 
   /* rational side */
@@ -239,9 +240,9 @@ print_relation_fk (relation_t *rel, int32_t *rfb, int32_t *afb, int iformat)
   unsigned int i, j;
 
   if (rel->a > 0)
-    printf ("W %lx %x\n", rel->a, rel->b);
+    printf ("W %" PRIx64 " %" PRIx64 "\n", rel->a, rel->b);
   else
-    printf ("W -%lx %x\n", -rel->a, rel->b);
+    printf ("W %" PRIx64 " %" PRIx64 "\n", -rel->a, rel->b);
   /* algebraic side */
   printf ("X");
   for (i = 0; i < rel->afb_entries; i++)
@@ -328,7 +329,7 @@ print_relation_cwi (relation_t *rel, int32_t *rfb, int32_t *afb,
   for (i = 0; i < rel->sp_entries; i++)
     na += rel->sexp[i];
   
-  printf ("01%c%c %ld %u", cwi_idx_to_char (alg_first ? na : nr), 
+  printf ("01%c%c %" PRId64 " %" PRIu64, cwi_idx_to_char (alg_first ? na : nr), 
           cwi_idx_to_char (alg_first ? nr : na), rel->a, rel->b);
 
   for (i = 0; i < 2; i++)
@@ -433,7 +434,7 @@ read_relation_cado (FILE *fp, relation_t *rel)
   int c;
   unsigned long p;
 
-  if (fscanf (fp, "%ld,%u:", &(rel->a), &(rel->b)) != 2)
+  if (fscanf (fp, "%" SCNd64 ",%" SCNu64 ":", &(rel->a), &(rel->b)) != 2)
     {
       if (feof (fp))
         return 0;
@@ -628,7 +629,7 @@ read_relation_cwi (FILE *fp, relation_t *rel, const int alg_first)
   unsigned int i; /* number of given primes */
   char c, flag[4];
 
-  ret = fscanf (fp, "%4s %ld %u", flag, &(rel->a), &(rel->b));
+  ret = fscanf (fp, "%4s %" SCNd64 " %"SCNu64 "", flag, &(rel->a), &(rel->b));
   if (ret != 3)
     {
       if (feof (fp))
@@ -681,8 +682,8 @@ read_relation_cwi (FILE *fp, relation_t *rel, const int alg_first)
   ret = fscanf (fp, "%c\n", &c);
   if (ret != 1 || (c != ';' && c != ':'))
     {
-      fprintf (stderr, "Error, invalid relation for a=%ld b=%u\n",
-               rel->a, rel->b);
+      fprintf (stderr, "Error, invalid relation for a=%" PRId64 
+                       " b=%" PRIu64 "\n", rel->a, rel->b);
       exit (1);
     }
 
@@ -728,7 +729,8 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
             {
               static unsigned int count = 0;
               if (count++ < 10)
-                fprintf (stderr, "Warning, f(%ld,%u) not divisible by factor base prime %d\n", rel->a, rel->b, p);
+                fprintf (stderr, "Warning, f(%" PRId64 ",%" PRIu64 ") not "
+                    "divisible by factor base prime %d\n", rel->a, rel->b, p);
             }
           mpz_divexact_ui (norm, norm, p);
         }
@@ -757,8 +759,8 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
       get_uint32 (fp); /* corresponding root, not used here */
       rel->large_aprimes[i] = p;
       if (!mpz_divisible_ui_p (norm, p))
-        fprintf (stderr, "Warning, f(%ld,%u) not divisible by large prime %lu\n",
-                 rel->a, rel->b, p);
+        fprintf (stderr, "Warning, f(%" PRId64 ",%" PRIu64 ") not divisible "
+                         "by large prime %lu\n", rel->a, rel->b, p);
       else
         mpz_divexact_ui (norm, norm, p);
     }
