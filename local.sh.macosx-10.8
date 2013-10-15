@@ -1,0 +1,32 @@
+# This is an example local.sh file for a machine which says:
+# Darwin <hostname> 12.5.0 Darwin Kernel Version 12.5.0: Sun Sep 29 13:33:47 PDT
+# 2013; \
+# root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64 i386 MacBookPro9,2 Darwin
+#
+# IOW a MacIntel with a 64-bit kernel running mountain lion (10.8.5)
+#
+
+############################################################
+# cado-nfs (Block Wiedemann code) requires variable 
+# DISABLE_SHARED to be defined
+
+DISABLE_SHARED=1
+
+
+############################################################
+# CC: C Compiler
+
+# CC=gcc
+CC=clang
+
+############################################################
+# CXX: C++ Compiler (cado-nfs contains a few C++ programs)
+
+# CXX=g++
+CXX=clang++
+
+
+############################################################
+# Usual CC and CXX flags may be used. 
+# See local.sh.example for some examples.
+
