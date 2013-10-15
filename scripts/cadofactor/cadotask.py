@@ -18,6 +18,7 @@ import cadoprograms
 import cadoparams
 import cadocommand
 import wuserver
+from struct import error as structerror
 from workunit import Workunit
 
 # Some parameters are provided by the param file but can change during
@@ -1245,9 +1246,18 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         poly = None
         try:
             poly = Polynomials(self.read_log_warning(filename))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
         except PolynomialParseException as e:
-            self.logger.warn("Invalid polyselect file %s: %s",
+            self.logger.warn("Invalid polyselect file '%s': %s",
                               filename, e)
+            return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
             return None
         
         if not poly:
@@ -1614,46 +1624,55 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def add_file(self, filename, stats_filename=None, commit=True):
         use_stats_filename = stats_filename
         if stats_filename is None:
-            self.logger.warn("No statistics output received for file %s, "
+            self.logger.warn("No statistics output received for file '%s', "
                               "have to scan file", filename)
             use_stats_filename = filename
-        try:
-            rels = self.parse_rel_count(use_stats_filename)
-        except (OSError, IOError) as e:
-            if e.errno == 2: # No such file or directory
-                self.logger.error("File %s does not exist", use_stats_filename)
-                return False
-            else:
-                raise
+        rels = self.parse_rel_count(use_stats_filename)
         if rels is None:
-            self.logger.error("Number of relations not found in "
-                              "file %s", use_stats_filename)
             return False
         update = {"rels_found": self.get_nrels() + rels}
         self.state.update(update, commit=False)
         self.add_output_files({filename: rels}, commit=commit)
         if stats_filename:
             self.parse_stats(stats_filename, commit=commit)
-        self.logger.info("Found %d relations in %s, total is now %d/%d",
+        self.logger.info("Found %d relations in '%s', total is now %d/%d",
                          rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
     
     def parse_rel_count(self, filename):
         (name, ext) = os.path.splitext(filename)
-        if ext == ".gz":
-            f = gzip.open(filename, "rb")
-        else:
-            size = os.path.getsize(filename)
-            f = open(filename, "rb")
-            f.seek(max(size - self.file_end_offset, 0))
-        for line in f:
-            match = re.match(br"# Total (\d+) reports ", line)
-            if match:
-                rels = int(match.group(1))
-                f.close()
-                return rels
+        try:
+            if ext == ".gz":
+                f = gzip.open(filename, "rb")
+            else:
+                size = os.path.getsize(filename)
+                f = open(filename, "rb")
+                f.seek(max(size - self.file_end_offset, 0))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        try:
+            for line in f:
+                match = re.match(br"# Total (\d+) reports ", line)
+                if match:
+                    rels = int(match.group(1))
+                    f.close()
+                    return rels
+        except (IOError, TypeError, structerror) as e:
+            if isinstance(e, IOError) and str(e) == "Not a gzipped file" or \
+                    isinstance(e, TypeError) and str(e).startswith("ord() expected a character") or \
+                    isinstance(e, structerror) and str(e).startswith("unpack requires a bytes object"):
+                self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+                return None
+            else:
+                raise
         f.close()
+        self.logger.error("Number of relations not found in file '%s'", 
+                          filename)
         return None
     
     def import_files(self, input_filename):
