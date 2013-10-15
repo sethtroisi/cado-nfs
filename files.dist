@@ -840,8 +840,6 @@ utils/gmp_nextprime.c
 utils/gmp_prob_prime.c
 utils/gzip.c
 utils/gzip.h
-utils/hashpair.c
-utils/hashpair.h
 utils/memusage.c
 utils/memusage.h
 utils/misc.c
