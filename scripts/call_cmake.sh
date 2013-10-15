@@ -83,6 +83,7 @@ export CURL_LIBDIR
 export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
 export DISABLE_SHARED
+export NO_PYTHON_CHECK
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"

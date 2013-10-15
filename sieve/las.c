@@ -1303,25 +1303,29 @@ reduce_plattice_original (plattice_info_t *pli, const fbprime_t p, const fbprime
   return 1;
 }
 
-// The really fastest version of reduce_plattice on processors >= Intel Nehalem & AMD Opteron.
-// The C version is for others architectures; it's almost (99%) faster than the asm version
-// on X86 with a GOOD C compiler (tested with gcc 4.6.X, 4.7.X, 4.8.X).
+// The really fastest version of reduce_plattice on processors >= Intel
+// Nehalem & AMD Opteron.
+// The C version is for others architectures; it's almost (99%) faster
+// than the asm version on X86 with a GOOD C compiler (tested with gcc
+// 4.6.X, 4.7.X, 4.8.X).
 // Avoid to modify this code...
-// This version has been tuned during several weeks; more than 50 versions of this routine
-// has been tested ever and ever. A. Filbois.
+// This version has been tuned during several weeks; more than 50
+// versions of this routine has been tested ever and ever. A. Filbois.
 
-// Main idea: to avoid a division & multiplication, I tried to test the sign of
-// aO + b0 * 4 (resp. b0 + a0 * 4). If this sign is different than a0 (resp. b0) sign,
-// the quotient of a0 / b0 is between 0 and 3, and needs (4-1)*2 conditional affectations.
-// The best optimisation is the right choice of the number of the conditional
-// affectations. It's not exactly the same between Intel Nehalem & AMD Opteron, but
-// this code is the best deal for both.
+// Main idea: to avoid a division & multiplication, I tried to test the
+// sign of aO + b0 * 4 (resp. b0 + a0 * 4). If this sign is different
+// than a0 (resp. b0) sign, the quotient of a0 / b0 is between 0 and 3,
+// and needs (4-1)*2 conditional affectations.
+// The best optimisation is the right choice of the number of the
+// conditional affectations. It's not exactly the same between Intel
+// Nehalem & AMD Opteron, but this code is the best deal for both.
 //
-// NB: Be careful if you tried to change the "4" value. You have to change the constants
-// guards 0xe666667 = -0x7FFFFFFF/(4+1) & 0x19999999 = 0x7fffffff / (4+1).
-// These guards are needed because the conditional affectations use the sign change;
-// this sign may changed at max 1 times, not 2 (with an overflow).
-// In fact, these guards are 99.99999% useless.
+// NB: Be careful if you tried to change the "4" value. You have to
+// change the constants guards 0xe666667 = -0x7FFFFFFF/(4+1) & 0x19999999
+// = 0x7fffffff / (4+1).
+// These guards are needed because the conditional affectations use the
+// sign change; this sign may changed at max 1 times, not 2 (with an
+// overflow).  In fact, these guards are 99.99999% useless.
 NOPROFILE_INLINE int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
@@ -1332,7 +1336,23 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 #endif
   int32_t a0 = - (int32_t) p, b0 = (int32_t) r, a1, b1;
   
+  /* Mac OS X 10.8 embarks a version of llvm which crashes on the code
+   * below (could be that the constraints are exerting too much of the
+   * compiler's behaviour).
+   *
+   * See tracker #16540
+   */
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+#if defined(__APPLE_CC__) && defined(__llvm__)
+#if __APPLE_CC__ == 5621
+#define AVOID_ASM_REDUCE_PLATTICE
+#endif
+#else
+#define AVOID_ASM_REDUCE_PLATTICE
+#endif
+#endif
+
+#ifndef AVOID_ASM_REDUCE_PLATTICE
 #define RPA(LABEL) "addl %2, %0\n leal (%0,%2,4), %%edx\n addl %3, %1\n" \
     "testl %%edx, %%edx\n movl %0, %%eax\n jng " LABEL			\
     "addl %2, %%eax\n leal (%1,%3,1), %%edx\n cmovngl %%eax, %0\n cmovngl %%edx, %1\n" \

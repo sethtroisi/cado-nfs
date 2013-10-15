@@ -24,7 +24,7 @@
 # Everything needs to know the name of the factorization, so this should be
 # specified at the root of the parameter tree.
 
-name = testrun
+name = test_run
 
 
 # N: The number to be factored
@@ -41,8 +41,12 @@ sourcedir=${HOME}/git/cado-nfs
 
 # Adjust builddir to point to the root of your CADO build directory
 # Not used directly, either, but referenced, too.
+# This default value here points to the default build directory of
+# CADO, but a problem is that HOSTNAME may not be an exported variable
+# of the shell. In that case, the "${HOSTNAME}" here needs to be
+# replaced, or the HOSTNAME variable needs to be exported manually.
 
-builddir=${HOME}/build/cado-nfs/normal
+builddir=$(sourcedir)/build/${HOSTNAME}
 
 
 # Parameters for the various tasks performed during the factorization
@@ -204,7 +208,7 @@ slaves.downloadretry = 10
 # The working directories should probably be unique; the default choice for
 # the working directory includes the clientid which should ensure uniqueness.
 
-slaves.basepath = /tmp/work/testrun.wuclient
+slaves.basepath = /tmp/work/$(name).wuclient
 
 
 # If you want to launch clients on multiple groups of slave machines, with

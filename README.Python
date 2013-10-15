@@ -1,0 +1,43 @@
+This file describes some problems that can occur with the cadofactor.py
+script in relation to various distributions' Python installations.
+
+
+1. Python 3
+
+Python 3, version 3.2 or greater, is required for cadofactor.py. If you do
+not wish to use cadofactor.py, for example because you want to use the old
+cadofactor.pl Perl script or, for the brave, run all commands by hand, you
+can disable the Python check in CMake by setting NO_PYTHON_CHECK to any
+non-empty string in local.sh. See local.sh.example for a template.
+
+
+2. Sqlite 3
+
+The Python cadofactor.py script requires sqlite3. Unfortunately, not all
+distributions install the Python sqlite3 module by default.
+
+In fact, two things are required: the binary sqlite3 library, and the Python
+module called "sqlite3" which provides a Python interface to the sqlite3
+library.
+
+The binary sqlite3 library is installed by default on most systems, but it
+is worthwhile to check that it is. Use your distribution's package manager,
+and look for a package called "sqlite" or "sqlite3", which should contain a
+file "libsqlite3.so.*"
+
+The Python sqlite3 module unfortunately is not installed by default by some
+distributions, known culprits include Gentoo.
+
+Gentoo:
+For Gentoo, the Python 3 package by default does not include the sqlite3
+module. This link to a forum post briefly describes the situation:
+<http://forums.gentoo.org/viewtopic-t-876737-start-0.html>
+The sqlite3 module can be included in the Python installation by adding
+the sqlite USE flag to /etc/portage/make.conf as shown in this example:
+
+# These are the USE flags that were used in addition to what is provided by the
+# profile used for building.
+USE="bindist mmx sse sse2 sqlite"
+
+and then running
+emerge  --deep --newuse world

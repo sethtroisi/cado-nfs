@@ -18,6 +18,7 @@ import cadoprograms
 import cadoparams
 import cadocommand
 import wuserver
+from struct import error as structerror
 from workunit import Workunit
 
 # Some parameters are provided by the param file but can change during
@@ -702,24 +703,53 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
     wu_paste_char = '_'
+    wu_attempt_char = '#'
     def make_wuname(self, identifier, attempt=None):
-        assert not self.wu_paste_char in self.params["name"]
-        assert not self.wu_paste_char in self.name
-        assert not self.wu_paste_char in identifier
-        if attempt is None:
-            return self.wu_paste_char.join([self.params["name"], self.name,
-                                            identifier])
-        else:
-            assert isinstance(attempt, int)
-            return self.wu_paste_char.join([self.params["name"], self.name,
-                                            identifier, str(attempt)])
+        """ Generates a wuname from project name, task name, identifier, and
+        attempt number.
+        """
+        assert not self.wu_paste_char in self.name # self.name is task name
+        assert not self.wu_paste_char in identifier # identifier is, e.g., range string
+        assert not self.wu_attempt_char in identifier
+        wuname = self.wu_paste_char.join([self.params["name"], self.name,
+                                          identifier])
+        if not attempt is None:
+            wuname += "%s%d" % (self.wu_attempt_char, attempt)
+        return wuname
     
     def split_wuname(self, wuname):
-        arr = wuname.split(self.wu_paste_char)
-        if len(arr) == 3:
-            arr.append(None)
-        else:
-            arr[3] = int(arr[3])
+        """ Splits a wuname into project name, task name, identifier, and
+        attempt number.
+        
+        Always returns a list of length 4; if there is not attempt given in
+        the wuname, then the last array entry is None
+
+        >>> # Test many possible combinations of "_" and "#" occuring in names
+        >>> # where these characters are allowed
+        >>> class Klass():
+        ...     params = {"name": None}
+        ...     wu_paste_char = '_'
+        ...     wu_attempt_char = '#'
+        >>> inst = Klass()
+        >>> from itertools import product
+        >>> prod = product(*[["", "_", "#"]] * 4 + [["", "#"]]*2)
+        >>> for sep in prod:
+        ...     inst.params["name"] = "%s%sprojectname%s%s" % sep[0:4]
+        ...     inst.name = "%staskname%s" % sep[4:6]
+        ...     for attempt in [None, 2, 3]:
+        ...         identifier = "identifier"
+        ...         wuname = Task.make_wuname(inst, "identifier", attempt=attempt)
+        ...         wu_split = Task.split_wuname(inst, wuname)
+        ...         assert wu_split == [inst.params["name"], inst.name, identifier, attempt]
+        """
+        arr = wuname.rsplit(self.wu_paste_char, 2)
+        assert len(arr) == 3
+        attempt = None
+        # Split off attempt number, if available
+        if "#" in arr[2]:
+            (arr[2], attempt) = arr[2].split('#')
+            attempt = int(attempt)
+        arr.append(attempt)
         return arr
     
     class ResultInfo(wudb.WuResultMessage):
@@ -881,15 +911,17 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit")
+        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
+                                     "maxtimedout")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.state.setdefault("wu_cancelled", 0)
+        self.state.setdefault("wu_timedout", 0)
         self.params.setdefault("maxwu", 10)
+        self.params.setdefault("maxtimedout", 100)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -900,8 +932,13 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.wuar.create(str(wu), commit=commit)
     
     def cancel_wu(self, wuid, commit=True):
-        """ Cancel a WU and update wu_cancelled counter """
-        key = "wu_cancelled"
+        """ Cancel a WU and update wu_timedout counter """
+        key = "wu_timedout"
+        maxtimedout = int(self.params["maxtimedout"])
+        if not self.state[key] < maxtimedout:
+            self.logger.error("Exceeded maximum number of timed out "
+                              "workunits, maxtimedout=%d ", maxtimedout)
+            raise Exception("Too many timed out work units")
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.cancel(wuid, commit=commit)
     
@@ -943,7 +980,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"] \
-                - self.state["wu_cancelled"]
+                - self.state["wu_timedout"]
 
     def get_number_available_wus(self):
         return self.wuar.count_available()
@@ -980,6 +1017,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.submit_wu(wu, commit=commit)
         
     def resubmit_timed_out_wus(self):
+        """ Check for any timed out workunits and resubmit them """
         # We don't store the lastcheck in state as we do *not* want to check
         # instantly when we start up - clients should get a chance to upload
         # results first
@@ -1004,8 +1042,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         if not results:
             self.logger.debug("Found no timed-out workunits")
         for entry in results:
-            self.resubmit_one_wu(Workunit(entry["wu"]), commit=False)
-            self.cancel_wu(entry["wuid"], commit=True)
+            self.cancel_wu(entry["wuid"], commit=False)
+            self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
 
 
 class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
@@ -1186,12 +1224,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.verification(message.get_wu_id(), ok, commit=True)
     
     def process_polyfile(self, filename, commit=True):
-        try:
-            poly = self.parse_poly(filename)
-        except PolynomialParseException as e:
-            self.logger.error("Invalid polyselect file %s: %s",
-                              filename, e)
-            return False
+        poly = self.parse_poly(filename)
         if not poly is None:
             self.bestpoly = poly
             update = {"bestpoly": str(poly), "bestfile": filename}
@@ -1213,9 +1246,18 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         poly = None
         try:
             poly = Polynomials(self.read_log_warning(filename))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
         except PolynomialParseException as e:
-            self.logger.error("Invalid polyselect file %s: %s",
+            self.logger.warn("Invalid polyselect file '%s': %s",
                               filename, e)
+            return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
             return None
         
         if not poly:
@@ -1582,46 +1624,55 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def add_file(self, filename, stats_filename=None, commit=True):
         use_stats_filename = stats_filename
         if stats_filename is None:
-            self.logger.warn("No statistics output received for file %s, "
+            self.logger.warn("No statistics output received for file '%s', "
                               "have to scan file", filename)
             use_stats_filename = filename
-        try:
-            rels = self.parse_rel_count(use_stats_filename)
-        except (OSError, IOError) as e:
-            if e.errno == 2: # No such file or directory
-                self.logger.error("File %s does not exist", use_stats_filename)
-                return False
-            else:
-                raise
+        rels = self.parse_rel_count(use_stats_filename)
         if rels is None:
-            self.logger.error("Number of relations not found in "
-                              "file %s", use_stats_filename)
             return False
         update = {"rels_found": self.get_nrels() + rels}
         self.state.update(update, commit=False)
         self.add_output_files({filename: rels}, commit=commit)
         if stats_filename:
             self.parse_stats(stats_filename, commit=commit)
-        self.logger.info("Found %d relations in %s, total is now %d/%d",
+        self.logger.info("Found %d relations in '%s', total is now %d/%d",
                          rels, filename, self.get_nrels(),
                          self.state["rels_wanted"])
         return True
     
     def parse_rel_count(self, filename):
         (name, ext) = os.path.splitext(filename)
-        if ext == ".gz":
-            f = gzip.open(filename, "rb")
-        else:
-            size = os.path.getsize(filename)
-            f = open(filename, "rb")
-            f.seek(max(size - self.file_end_offset, 0))
-        for line in f:
-            match = re.match(br"# Total (\d+) reports ", line)
-            if match:
-                rels = int(match.group(1))
-                f.close()
-                return rels
+        try:
+            if ext == ".gz":
+                f = gzip.open(filename, "rb")
+            else:
+                size = os.path.getsize(filename)
+                f = open(filename, "rb")
+                f.seek(max(size - self.file_end_offset, 0))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        try:
+            for line in f:
+                match = re.match(br"# Total (\d+) reports ", line)
+                if match:
+                    rels = int(match.group(1))
+                    f.close()
+                    return rels
+        except (IOError, TypeError, structerror) as e:
+            if isinstance(e, IOError) and str(e) == "Not a gzipped file" or \
+                    isinstance(e, TypeError) and str(e).startswith("ord() expected a character") or \
+                    isinstance(e, structerror) and str(e).startswith("unpack requires a bytes object"):
+                self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+                return None
+            else:
+                raise
         f.close()
+        self.logger.error("Number of relations not found in file '%s'", 
+                          filename)
         return None
     
     def import_files(self, input_filename):
@@ -2445,7 +2496,7 @@ class LinAlgTask(Task, HasStatistics):
         if not "dependency" in self.state:
             self.logger.info("Starting")
             workdir = self.workdir.make_dirname()
-            workdir.mkdir()
+            workdir.mkdir(parent=True)
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()

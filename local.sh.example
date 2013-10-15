@@ -171,3 +171,13 @@
 # By default, mpicc calls the default compiler (gcc or g++) installed on your
 # computer. If this default compiler is too old or buggy, you might want to use
 # OMPI_CC and/or OMPI_CXX to specify a newer compiler (this is for Open MPI).
+
+############################################################
+# Python: Whether to test for a Python 3 interpreter or not
+# 
+# The cadofactor.py script needs Python 3 and the sqlite3
+# module. If you do not wish to use cadofactor.py, set
+# NO_PYTHON_CHECK to a non-empty string to disable testing
+# for Python 3 and sqlite in the CMake configuration
+#
+# NO_PYTHON_CHECK="foo"
