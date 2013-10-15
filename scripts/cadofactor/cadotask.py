@@ -1223,12 +1223,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         self.verification(message.get_wu_id(), ok, commit=True)
     
     def process_polyfile(self, filename, commit=True):
-        try:
-            poly = self.parse_poly(filename)
-        except PolynomialParseException as e:
-            self.logger.error("Invalid polyselect file %s: %s",
-                              filename, e)
-            return False
+        poly = self.parse_poly(filename)
         if not poly is None:
             self.bestpoly = poly
             update = {"bestpoly": str(poly), "bestfile": filename}
@@ -1251,7 +1246,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         try:
             poly = Polynomials(self.read_log_warning(filename))
         except PolynomialParseException as e:
-            self.logger.error("Invalid polyselect file %s: %s",
+            self.logger.warn("Invalid polyselect file %s: %s",
                               filename, e)
             return None
         
