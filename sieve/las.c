@@ -1350,6 +1350,7 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 #else
 #define AVOID_ASM_REDUCE_PLATTICE
 #endif
+#endif
 
 #ifndef AVOID_ASM_REDUCE_PLATTICE
 #define RPA(LABEL) "addl %2, %0\n leal (%0,%2,4), %%edx\n addl %3, %1\n" \
