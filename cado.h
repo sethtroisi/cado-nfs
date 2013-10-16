@@ -88,8 +88,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #endif  /* _AIX */
 
 
+/* This has the same effect as enforcing -Werror on the command line, so
+ * as to trigger as many warnings as we can, and fource ourselves to get
+ * them fixed.
+ * (useful to enable temporarily before releases, at least)
+ */
 #ifdef  __GNUC__
-#pragma GCC diagnostic error "-W"
+#pragma GCC diagnostic error "-Wextra"
 #pragma GCC diagnostic error "-Wall"
 #endif
 
