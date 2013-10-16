@@ -856,6 +856,14 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
   unsigned long dummy;
   __asm__ (
     /* Product of low words */
+// #define MODREDCUL15_VERBOSE_ASM 1
+#ifdef MODREDCUL15_VERBOSE_ASM
+    "# modredc15ul_mul(): asm output operands:\n\t"
+    "# t0: %[t0], t1: %[t1], t2: %[t2]\n\t"
+    "# modredc15ul_mul(): asm input operands:\n\t"
+    "# a0: %[a0], a1: %[a1], b0: %[b0], b1: %[b1]\n\t"
+    "# m0: %[m0], m1: %[m1], invm: %[invm]\n\t"
+#endif
     "movq %[a0], %%rax\n\t"
     "mulq %[b0]\n\t"         /* rdx:rax = a0*b0 */
     "movq %%rdx, %[t0]\n\t"
