@@ -2,9 +2,9 @@
 #define __POLYFACTOR_H__
 
 typedef struct {
-        int n;
-            int alloc;
-                fppol_t *factors;
+    int n;
+    int alloc;
+    fppol_t *factors;
 } fppol_fact_struct_t;
 
 typedef fppol_fact_struct_t fppol_fact_t[1];

@@ -79,19 +79,34 @@ int factor_survivor(fppol_t a, fppol_t b,
         fppol_sdiv(b, b, lc);
         fppol_sdiv(a, a, lc);
     }
-    fppol_fact_t factors;
-    fppol_fact_init(factors);
+    fppol_fact_t factors[2];
+    fppol_fact_init(factors[0]);
+    fppol_fact_init(factors[1]);
+    for (int twice = 0; twice < 2; twice++) {
+        ffspol_norm(Nab, F[twice], a, b);
+        fppol_factor(factors[twice], Nab);
+        // check again the smoothness for the rare cases where 
+        // a multiple factor was larger than the lpb.
+        for (int i = 0; i < factors[twice]->n; ++i) {
+            if (fppol_deg(factors[twice]->factors[i]) > B[twice]) {
+                fppol_fact_clear(factors[0]);
+                fppol_fact_clear(factors[1]);
+                fppol_clear(Nab);
+                return 0;
+            }
+        }
+    }
+
     fppol_out(stdout, a); printf(",");
     fppol_out(stdout, b); printf(":");
     for (int twice = 0; twice < 2; twice++) {
-        ffspol_norm(Nab, F[twice], a, b);
-        fppol_factor(factors, Nab);
-        fppol_fact_out(stdout, factors);
+        fppol_fact_out(stdout, factors[twice]);
         if (!twice)
             printf(":");
     }
     printf("\n");
-    fppol_fact_clear(factors);
+    fppol_fact_clear(factors[0]);
+    fppol_fact_clear(factors[1]);
     fppol_clear(Nab);
     return 1;
 }
