@@ -14,15 +14,18 @@ if sys.version_info[0] == 3:
     import urllib.request as urllib_request
     import urllib.error as urllib_error
     from http.client import BadStatusLine
+    from urllib.parse import urlparse
 elif sys.version_info[0] == 2:
     import urllib2 as urllib_request
     import urllib2 as urllib_error
     from httplib import BadStatusLine
+    from urlparse import urlparse
 import subprocess
 import hashlib
 import logging
 import socket
 import signal
+import re
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -31,6 +34,7 @@ import email.generator
 from string import Template
 from io import BytesIO
 from workunit import Workunit
+import ssl
 
 # In Python 3.0, 3.1, 3.2.x < 3.2.4, 3.3.x < 3.3.1, use a fixed BytesGenerator
 # which accepts a bytes input. The fact that the BytesGenerator in these Python
@@ -557,15 +561,40 @@ class WorkunitClient(object):
         os.remove(self.wu_filename)
 
     @staticmethod
-    def _urlopen(request, wait, is_upload = False):
+    def _urlopen_maybe_https(request, cafile=None):
+        """ Treat requests for HTTPS differently depending on whether we are
+        on Python 2 or Python 3.
+        """
+        if isinstance(request, urllib_request.Request):
+            scheme = request.get_type().lower()
+        else:
+            # Assume it's a URL string
+            scheme = request.split(":")[0].lower()
+        if scheme == "https":
+            if sys.version_info[0] == 3:
+                # Python 3 implements HTTPS certificate checks, we can just
+                # let urllib do the work for us
+                return urllib_request.urlopen(request, cafile=cafile)
+            else:
+                # Python 2 urllib does not implement certificate checks.
+                # We need a work-around
+                raise Exception("HTTPS not implemented for Python 2")
+        else:
+            # If we are not using HTTPS, we can just let urllib do it, 
+            # and there is no need for a cafile parameter (which Python 2
+            # urlopen() does not accept)
+            return urllib_request.urlopen(request)
+    
+    @staticmethod
+    def _urlopen(request, wait, is_upload=False, cafile=None):
         """ Wrapper around urllib2.urlopen() that retries in case of
         connection failure.
         """
         conn = None
         while conn is None:
             try:
-                conn = urllib_request.urlopen(request)
-            except (NameError, urllib_error.URLError, BadStatusLine) \
+                conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
+            except (urllib_error.URLError, BadStatusLine) \
                     as error:
                 conn = None
                 errorstr = str(error)
@@ -601,7 +630,7 @@ class WorkunitClient(object):
                     encoding = pair[1].strip()
         return encoding
 
-    def get_file(self, urlpath, dlpath = None, options = None):
+    def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
         if dlpath == None:
             filename = urlpath.split("/")[-1]
@@ -611,7 +640,8 @@ class WorkunitClient(object):
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)
         wait = float(self.settings["DOWNLOADRETRY"])
-        request = self._urlopen(url, wait)
+        cafile = self.settings.get("CERTFILE", None)
+        request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
         try:
             fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
@@ -646,8 +676,8 @@ class WorkunitClient(object):
         outfile.close() # This should also close the fd
         request.close()
     
-    def get_missing_file(self, urlpath, filename, checksum = None, 
-                         options = None):
+    def get_missing_file(self, urlpath, filename, checksum=None,
+                         options=None):
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
             logging.info ("%s already exists, not downloading", filename)
@@ -808,6 +838,12 @@ class WorkunitClient(object):
         return upload_ok
 
 
+def get_ssl_certificate(server, port=443):
+    cert = ssl.get_server_certificate((server, int(port)),
+                                      ssl_version=ssl.PROTOCOL_TLSv1,
+                                      ca_certs=None)
+    return cert
+
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
@@ -832,6 +868,7 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                      "ARCH" : ("", "Architecture string for this client"),
                      "DOWNLOADRETRY" : 
                      ("10", "Time to wait before download retries"),
+                     "CERTSHA1" : (None, "SHA1 of server SSL certificate"),
                      "NICENESS" : 
                      ("0", "Run subprocesses under this niceness"),
                      "LOGLEVEL" : ("INFO", "Verbosity of logging"),
@@ -926,6 +963,39 @@ if __name__ == '__main__':
         logging.info("Using work-around #1 for buggy BytesGenerator")
     elif generator_bug_type is BUGGY_MIMEENCODER2:
         logging.info("Using work-around #2 for buggy BytesGenerator")
+
+    (scheme, netloc) = urlparse(SETTINGS["SERVER"])[0:2]
+    if not SETTINGS["CERTSHA1"] is None and scheme != "https":
+        logging.warn("Option -certsha1 makes sense only with an https URL, ignoring it.")
+    elif SETTINGS["CERTSHA1"] is None and scheme == "https":
+        logging.warn("Option -certsha1 given but no https URL, NO SSL VALIDATION WILL BE PERFORMED.")
+    elif not SETTINGS["CERTSHA1"] is None and scheme == "https":
+        certfilename = os.path.join(SETTINGS["DLDIR"], "server.pem")
+        certfile_exists = os.path.isfile(certfilename)
+        if certfile_exists:
+            logging.info("Using certificate file stored in %s", certfilename)
+            with open(certfilename, 'r') as certfile:
+                cert = certfile.read()
+        else:
+            logging.info("Downloading certificate from %s", netloc)
+            address_port = netloc.split(":")
+            cert = get_ssl_certificate(*address_port)
+        bin_cert = ssl.PEM_cert_to_DER_cert(cert)
+        sha1hash = hashlib.sha1()
+        sha1hash.update(bin_cert)
+        cert_sha1 = sha1hash.hexdigest()
+        logging.debug("Certificate has SHA1 %s", cert_sha1)
+        if not cert_sha1.lower() == SETTINGS["CERTSHA1"].lower():
+            logging.critical("Server certificate's SHA1 hash (%s) differs "
+                             "from hash specified on command line (%s). "
+                             "Aborting.", cert_sha1, SETTINGS["CERTSHA1"])
+            sys.exit(1)
+        logging.info("Certificate SHA1 hash matches")
+        if not certfile_exists:
+            # FIXME: Set umask first?
+            with open(certfilename, 'w') as certfile:
+                certfile.write(cert)
+        SETTINGS["CERTFILE"] = certfilename
 
     client_ok = True
     while client_ok:
