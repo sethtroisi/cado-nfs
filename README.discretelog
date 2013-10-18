@@ -72,12 +72,12 @@ Notation:
   and then the scripts will be enhanced. In the meantime, you are on your
   own... Note that depending on the size of ell, using this code may
   entail recompiling by changing the plingen_prime_nwords variable in the
-  file linalg/bwc/CMakeLists.txt, or worse, re-generate the code lin
+  file linalg/bwc/CMakeLists.txt, or worse, re-generate the code in
   linalg/bwc/Makefile.mpfq
 
 - Reconstruct dlogs of fb elements
   Nothing automatic here, but in filter/reconstructlog.c you will find
-  some tool to help you.
+  some tools to help you.
 
 - Individual logarithms
   sieve/las is able to perform the special-q descent.
@@ -107,7 +107,7 @@ to configure according to what you want; then type 'make'.
     ffs/f2/makefb <paramfile>
   or 
     ffs/f3/makefb <paramfile>
-  depending if you are in characteristic 2 or 3. From now on, we assume
+  depending whether you are in characteristic 2 or 3. From now on, we assume
   characteristic 2.
 
   Computing relations is done with
@@ -116,7 +116,7 @@ to configure according to what you want; then type 'make'.
 
 - freerels/filtering
   The script ffs/filter/filter.sh is available for doing all this step.
-  (like for NFS-DL, bad ideals must be taken care in a way or antoher,
+  (like for NFS-DL, bad ideals must be taken care of in a way or antoher,
   and it is up to you; nothing automatic yet). No Schirokauer maps are
   needed here.
 
