@@ -297,7 +297,7 @@ void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
 
   // Main loop
   while ((i < sr) || (active_threads > 0)) {
-    // Start / restart threads as many threads as allowed
+    // Start / restart as many threads as allowed
     if ((active_threads < nt) && (i < sr)) { 
       tis[threads_head].offset = i;
       tis[threads_head].nb = MIN(SM_BLOCK, sr-i);
