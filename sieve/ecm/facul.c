@@ -36,11 +36,16 @@ unsigned long stats_found_n[STATS_LEN] = {
 int
 nb_curves (const unsigned int lpb)
 {
+  /* the following table, computed with the proba_cofactor() function in the
+     facul.sage file, ensures a probability of at least about 90% to find a
+     factor below 2^lpb with n = T[lpb] */
 #define LPB_MAX 33
-  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 0-9 */
-                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   /* 10-19 */
-                      0, 0, 1, 2, 3, 5, 6, 8, 10, 13, /* 20-29 */
-                      16, 18, 21, 30};                /* 30-33 */
+  int T[LPB_MAX+1] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0-9 */
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 10-19 */
+                      0, 0, 1 /*22:0.9074*/, 2 /*23:0.9059*/, 3 /*24:0.8990*/,
+                      5 /*25:0.9194*/, 6 /*26:0.9065*/, 8 /*27:0.9053*/,
+                      10 /*28:0.9010*/, 13 /*29:0.9091*/, 16 /*30:0.9134*/,
+                      18 /*31:0.9039*/, 21 /*32:0.9076*/, 24/*33:0.8963*/};
   return (lpb <= LPB_MAX) ? T[lpb] : T[LPB_MAX];
 #undef LPB_MAX
 }
@@ -72,41 +77,44 @@ facul_make_strategy (const unsigned long fbb,
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
 
-  /* below is an "optimal" strategy generated using init_pr(29,33) then
-     find_best_chain(S,2,33) with the optimize.sage file on an AMD Phenom */
+  /* run one P-1 curve with B1=315 and B2=2205 */
+  methods[0].method = PM1_METHOD;
+  methods[0].plan = malloc (sizeof (pm1_plan_t));
+  pm1_make_plan (methods[0].plan, 315, 2205, verbose);
 
-  /* 37: pp1_65 138 2625 */
-  methods[0].method = PP1_65_METHOD;
-  methods[0].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[0].plan, 138, 2625, verbose);
-
-  /* 81: pp1_27 200 3465 */
+  /* run one P+1 curve with B1=525 and B2=3255 */
   methods[1].method = PP1_27_METHOD;
   methods[1].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (methods[1].plan, 200, 3465, verbose);
+  pp1_make_plan (methods[1].plan, 525, 3255, verbose);
 
-  /* 215: pm1 468 8085 */
-  methods[2].method = PM1_METHOD;
-  methods[2].plan = malloc (sizeof (pm1_plan_t));
-  pm1_make_plan (methods[2].plan, 468, 8085, verbose);
+  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
+  methods[2].method = EC_METHOD;
+  methods[2].plan = malloc (sizeof (ecm_plan_t));
+  ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 1, verbose);
 
-  /* 54: ecmm12 166 2835 2  */
   if (n > 0)
     {
       methods[3].method = EC_METHOD;
       methods[3].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[3].plan, 166, 2835, MONTY12, 2, 1, verbose);
+      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, verbose);
     }
 
-  /* 239: ecmm12 244 4095 */
+  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  double B1 = 105.0;
   for (i = 4; i < n + 3; i++)
     {
+      double B2;
+      unsigned int k;
+
+      B1 += sqrt (B1);
+      B2 = 17.0 * B1;
+      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
+         B2/210-0.5 */
+      k = B2 / 210.0;
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
-      if (i != 29)
-        ecm_make_plan (methods[i].plan, 244, 4095, MONTY12, i - 1, 1, verbose);
-      else /* 163: ecm 321 5985 11 */
-        ecm_make_plan (methods[i].plan, 321, 5985, BRENT12, 11, 1, verbose);
+      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+                     MONTY12, i - 1, 1, 0);
     }
 
   methods[n + 3].method = 0;
