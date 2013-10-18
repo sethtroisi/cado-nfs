@@ -135,6 +135,7 @@ void print_help (char *programname)
 
 int main (int argc, char **argv)
 {
+  char *argv0 = argv[0];
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, total = 0;
   unsigned long fbb = 0, lpb = ULONG_MAX;
@@ -167,7 +168,7 @@ int main (int argc, char **argv)
     {
       if (argc > 1 && strcmp (argv[1], "-h") == 0)
 	{
-	  print_help (argv[0]);
+	  print_help (argv0);
 	  return 0;
 	}
       else if (argc > 3 && strcmp (argv[1], "-pm1") == 0 && 
@@ -392,7 +393,7 @@ int main (int argc, char **argv)
     {
       if (argc < 3)
 	{
-	  print_help (argv[0]);
+	  print_help (argv0);
 	  return 1;
 	}
       
