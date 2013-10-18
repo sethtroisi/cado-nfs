@@ -1347,9 +1347,9 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 #if __APPLE_CC__ == 5621
 #define AVOID_ASM_REDUCE_PLATTICE
 #endif
+#endif
 #else
 #define AVOID_ASM_REDUCE_PLATTICE
-#endif
 #endif
 
 #ifndef AVOID_ASM_REDUCE_PLATTICE
@@ -1365,11 +1365,11 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
     "addl %1, %%edx\n addl %0, %%eax\n        cmovnsl %%edx, %3\n cmovnsl %%eax, %2\n"
 #define RPC "cltd\n idivl %2\n imull %3, %%eax\n movl %%edx, %0\n subl %%eax, %1\n"
 #define RPD "cltd\n idivl %0\n imull %1, %%eax\n movl %%edx, %2\n subl %%eax, %3\n"
-  
+
   int32_t mhI;
   __asm__ ("xorl %1, %1\n cmpl %2, %5\n movl $0x1, %3\n jg 9f\n"	\
-	   "movl %0, %%eax\n cltd\n idivl %2\n"				\
-	   "movl %5, %4\n negl %4\n subl %%eax, %1\n movl %%edx, %0\n"	\
+	   "movl %5, %%eax\n negl %%eax\n movl %%eax, %4\n"		\
+	   "movl %0, %%eax\n cltd\n idivl %2\n subl %%eax, %1\n"	\
 	   "cmpl $0xe6666667, %%edx\n movl %%edx, %0\n jl 0f\n"		\
 	   ""								\
 	   ".balign 8\n"						\
@@ -1391,7 +1391,7 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 	   ""								\
 	   ".balign 0\n 9:\n"						\
 	   : "+&r"(a0), "=&r"(a1), "+&r"(b0), "=&r"(b1),		\
-	   "=&r"(mhI) : "r"(hI) : "%eax", "%edx", "cc");  
+	     "=&rm"(mhI) : "rm"(hI) : "%rax", "%rdx", "cc");  
 #else
 #define RPA do {							\
     a0 += b0; a1 += b1;							\
