@@ -55,6 +55,8 @@ void poly_set(poly_t f, mpz_t * coeffs, int d);
 void poly_set_zero(poly_t f);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
 void poly_setcoeff_si(poly_t f, int i, int z);
+void poly_setcoeff_int64(poly_t f, int i, int64_t z);
+void poly_setcoeff_uint64(poly_t f, int i, uint64_t z);
 void poly_setcoeff_str(poly_t f, int i,char *str, int base);
 void poly_get(poly_t f, mpz_t * coeffs, int d);
 void poly_getcoeff(mpz_t res, int i, const poly_t f);

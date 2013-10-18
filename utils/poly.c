@@ -325,6 +325,38 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
     cleandeg(f, i);
 }
 
+/* Set uint64 coefficient for the i-th term. */
+void poly_setcoeff_uint64(poly_t f, int i, uint64_t z) {
+  int j;
+  if (i >= f->alloc) {
+    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (j = f->alloc; j <= i; ++j)
+      mpz_init(f->coeff[j]);
+    f->alloc = i+1;
+  }
+  mpz_set_uint64(f->coeff[i], z);
+  if (i >= f->deg)
+    cleandeg(f, i);
+}
+
+
+/* Set int64 coefficient for the i-th term. */
+void poly_setcoeff_int64(poly_t f, int i, int64_t z) {
+  int j;
+  if (i >= f->alloc) {
+    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (j = f->alloc; j <= i; ++j)
+      mpz_init(f->coeff[j]);
+    f->alloc = i+1;
+  }
+  mpz_set_int64(f->coeff[i], z);
+  if (i >= f->deg)
+    cleandeg(f, i);
+}
+
+
 /* Set signed int coefficient for the i-th term. */
 void poly_setcoeff_si(poly_t f, int i, int z) {
   int j;

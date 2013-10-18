@@ -98,14 +98,14 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
     if (ps->b == 0) {
 	/* freerels */
 	poly_alloc(pairs[npairs], 0);
-	poly_setcoeff_si(pairs[npairs], 0, ps->a);
+	poly_setcoeff_int64(pairs[npairs], 0, ps->a);
 	pairs[npairs]->deg=0;
       }
     else {
       /* an (a,b)-pair is a degree-1 poly */
       poly_alloc(pairs[npairs], 1);
-      poly_setcoeff_si(pairs[npairs], 0, ps->a);
-      poly_setcoeff_si(pairs[npairs], 1, -ps->b);
+      poly_setcoeff_int64(pairs[npairs], 0, ps->a);
+      poly_setcoeff_int64(pairs[npairs], 1, -ps->b);
       pairs[npairs]->deg = 1;
     }
   }
