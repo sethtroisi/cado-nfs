@@ -1,14 +1,23 @@
+############################################################
 # This is an example local.sh file for a machine which says:
-# Darwin <hostname> 12.5.0 Darwin Kernel Version 12.5.0: Sun Sep 29 13:33:47 PDT
-# 2013; \
-# root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64 i386 MacBookPro9,2 Darwin
+# Darwin <hostname> 12.5.0 Darwin Kernel Version 12.5.0: Sun
+# Sep 29 13:33:47 PDT 2013; \
+# root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64 i386
+# MacBookPro9,2 Darwin
 #
 # IOW a MacIntel with a 64-bit kernel running mountain lion (10.8.5)
 #
 
 ############################################################
-# cado-nfs (Block Wiedemann code) requires variable 
-# DISABLE_SHARED to be defined
+# The variables set below are specific to OSX.
+# See local.sh.example for more configuration options, 
+# notably CFLAGS and CXXFLAGS
+############################################################
+
+
+############################################################
+# cado-nfs (Block Wiedemann code) fails on OSX with
+# shared libraries. Only static library should be built.
 
 DISABLE_SHARED=1
 
@@ -24,9 +33,4 @@ CC=clang
 
 # CXX=g++
 CXX=clang++
-
-
-############################################################
-# Usual CC and CXX flags may be used. 
-# See local.sh.example for some examples.
 

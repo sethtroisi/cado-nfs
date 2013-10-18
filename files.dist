@@ -406,6 +406,7 @@ linalg/rowset_heap.h
 linalg/sm.c
 local.sh.example
 local.sh.macosx-leopard
+local.sh.macosx-10.8
 macros.h
 misc/CMakeLists.txt
 misc/convert_poly.c
