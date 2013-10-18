@@ -773,11 +773,11 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             assert command_nr == 0
             return self.rc
     
-    def update_cputime(self, program, seconds, commit=True):
+    def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
         """
-        key = "cputime_%s" % program.name
+        key = "%s_%s" % ("cputime" if is_cpu else "realtime", program.name)
         total = self.state.get(key, 0.) + seconds
         if total:
             self.state.update({key: total}, commit=commit)
@@ -790,10 +790,13 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         '''
         wuname = self.make_wuname(identifier)
         process = cadocommand.Command(command)
-        times_start = os.times()[2] # CPU time of child processes
+        cputime_used = os.times()[2] # CPU time of child processes
+        realtime_used = time.time()
         (rc, stdout, stderr) = process.wait()
-        times_used = os.times()[2] - times_start
-        self.update_cputime(command, times_used, commit)
+        cputime_used = os.times()[2] - cputime_used
+        realtime_used = time.time() - realtime_used
+        self.update_cpu_or_real_time(True, command, cputime_used, False)
+        self.update_cpu_or_real_time(False, command, realtime_used, commit)
         message = Task.ResultInfo(wuname, rc, stdout, stderr,
                                   command.get_output_files())
         if isinstance(self, patterns.Observer):
@@ -882,10 +885,16 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
     
     def print_stats(self):
         for program in self.programs:
-            total = self.update_cputime(program, 0.)
-            if total:
-                self.logger.info("Total cpu time for %s: %f",
-                                 program.name, total)
+            cputotal = self.update_cpu_or_real_time(True, program, 0.)
+            realtotal = self.update_cpu_or_real_time(False, program, 0.)
+            pairs = zip((cputotal, realtotal), ("cpu", "real"))
+            usepairs = [pair for pair in pairs if pair[0] > 0]
+            if usepairs:
+                format = "/".join(["%g"] * len(usepairs))
+                usepairs = tuple(zip(*usepairs))
+                timestr = '/'.join(usepairs[1])
+                self.logger.info("Total %s time for %s: " + format,
+                                 timestr, program.name, *usepairs[0])
         if not isinstance(self, HasStatistics):
             return
         stat_msgs =  self.get_statistics_as_strings()
