@@ -181,7 +181,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 struct thread_info {
   int offset;
   int nb;
-  relset_srcptr rels;
+  relset_ptr rels;
   poly_srcptr F;
   mpz_srcptr eps;
   mpz_srcptr ell2;
@@ -191,37 +191,71 @@ struct thread_info {
 
 void * thread_start(void *arg) {
   struct thread_info *ti = (struct thread_info *) arg;
-  relset_srcptr rels = ti->rels;
+  relset_ptr rels = ti->rels;
   poly_srcptr F = ti->F;
   mpz_srcptr eps = ti->eps;
   mpz_srcptr ell2 = ti->ell2;
   mpz_srcptr invl2 = ti->invl2;
   poly_t *sm = ti->sm;
   int offset = ti->offset;
+  mpz_t tmp;
 
-  poly_t SMn, SMd;
-  poly_alloc(SMn, F->deg);
-  poly_alloc(SMd, F->deg);
+  mpz_init(tmp);
+
+  poly_t g, U, V;
+  poly_alloc(g, 0);
+  poly_alloc (U,0);
+  poly_alloc (V,0);
+
+
+  /* poly_t SMn, SMd; */
+  /* poly_alloc(SMn, F->deg); */
+  /* poly_alloc(SMd, F->deg); */
 
   for (int i = 0; i < ti->nb; i++) {
-    poly_power_mod_f_mod_mpz_Barrett(SMn, rels[offset+i].num,
-        F, eps, ell2, invl2);
-    poly_sub_ui(SMn, 1);
 
-    poly_power_mod_f_mod_mpz_Barrett(SMd, rels[offset+i].denom,
-        F, eps, ell2, invl2);
-    poly_sub_ui(SMd, 1);
+    if (rels[offset+i].denom->deg == 0)
+      {
+	mpz_invert(tmp, rels[offset+i].denom->coeff[0], ell2);
+	poly_mul_mpz(rels[offset+i].num, rels[offset+i].num, tmp);
+	poly_reduce_mod_mpz(rels[offset+i].num, rels[offset+i].num, ell2);
+      }
+    else
+      {
+	poly_xgcd_mpz(g, F, rels[offset+i].denom, U, V, ell2);
+	poly_mul(rels[offset+i].num, rels[offset+i].num, V);
+	int d = poly_mod_f_mod_mpz(rels[offset+i].num->coeff, rels[offset+i].num->deg,
+		    F->coeff, F->deg, ell2, NULL);
+	cleandeg(rels[offset+i].num, d);
+      }
 
-    poly_sub_mod_mpz(sm[i], SMn, SMd, ell2);
+    /* poly_power_mod_f_mod_mpz_Barrett(SMn, rels[offset+i].num, */
+    /*     F, eps, ell2, invl2); */
+    /* poly_sub_ui(SMn, 1); */
+
+    /* poly_power_mod_f_mod_mpz_Barrett(SMd, rels[offset+i].denom, */
+    /*     F, eps, ell2, invl2); */
+    /* poly_sub_ui(SMd, 1); */
+
+    poly_power_mod_f_mod_mpz_Barrett(sm[i], rels[offset+i].num,
+        F, eps, ell2, invl2);
+    poly_sub_ui(sm[i], 1);
+
+    /* poly_sub_mod_mpz(sm[i], SMn, SMd, ell2); */
   }
-  poly_free(SMn);
-  poly_free(SMd);
+
+  mpz_clear(tmp);
+  /* poly_free(SMn); */
+  /* poly_free(SMd); */
+  poly_free(g);
+  poly_free(U);
+  poly_free(V);
   return NULL;
 }
 
 #define SM_BLOCK 500
 
-void mt_sm(int nt, const char * outname, relset_srcptr rels, int sr, poly_t F,
+void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
     const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   // allocate space for results of threads
@@ -321,7 +355,8 @@ void mt_sm(int nt, const char * outname, relset_srcptr rels, int sr, poly_t F,
 }
 
 
-void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2)
+void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
+		     const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
   poly_t SM; //, SMn, SMd;
