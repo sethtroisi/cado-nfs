@@ -71,8 +71,9 @@
 # CFLAGS=-g
 # CFLAGS="-O2 -DNDEBUG"
 #
-# Note: the default value of CFLAGS is "-O2 -DNDEBUG". If you want to enable
-# the ASSERT() tests, define CFLAGS=-O2.
+# Note: the default value of CFLAGS is "-O2". If you want to disable
+# the ASSERT() tests, define CFLAGS="-O2 -DNDEBUG". This should provide a
+# small speed-up (don't expect too much improvement, though).
 #
 # Note that some flags, and some compile-time definitions are added
 # anyway and cannot be overridden. For example, one cannot remove
