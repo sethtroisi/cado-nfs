@@ -112,7 +112,6 @@ linalg/bwc/tool.sh
 misc/README
 misc/cachesim.c
 misc/contains_zerochar.c
-misc/convert_rels.c
 misc/phi.c
 misc/cacheline.c
 misc/get_valid_lines.c
