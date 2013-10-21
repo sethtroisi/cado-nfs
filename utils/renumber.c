@@ -596,6 +596,13 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
 
+#ifdef DEBUG_RENUMB
+    /* assert that p is below the large prime bound */
+    p_r_values_t lpb = 1UL << ((side == RATIONAL_SIDE) ? renumber_info->lpbr :
+                                                         renumber_info->lpba);
+    ASSERT_ALWAYS (p < lpb);
+#endif
+
   if (renumber_info->rat == -1)
   {
     vp = (p << 1) + 1;
@@ -607,7 +614,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     vr = (side == renumber_info->rat) ? vp : r;
   }
 
-  if ((p >> MAX_LOG_CACHED)) // p is not cached
+  if (p >> MAX_LOG_CACHED) // p is not cached
   {
 #ifdef DEBUG_RENUMB
     int nstep = 0;
