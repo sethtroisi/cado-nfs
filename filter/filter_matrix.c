@@ -10,15 +10,9 @@
 #include "filter_matrix.h"
 #include "sparse.h"
 
-typedef struct {
-  index_t i;
-  index_t w;
-} perm_t;
-
 //tmp
 ideal_merge_t **rel_compact;
 weight_t *ideals_weight;
-
 
 unsigned int weight_ffs (int e)
 {
@@ -79,53 +73,39 @@ clearMat (filter_matrix_t *mat)
   free(ideals_weight);
 }
 
-void
-checkData(filter_matrix_t *mat)
-{
-  index_t j, nbj = 0;
-
-    for(j = 0; j < mat->ncols; j++)
-	if(mat->wt[j])
-	    nbj++;
-    if(mat->rem_ncols != nbj){
-	fprintf(stderr, "rem_ncols=%" PRIu64 " nbj=%" PRid "\n", mat->rem_ncols, nbj);
-	exit(1);
-    }
-}
-
-
-#define MAX_LENGTH 1024
-
 /* compute the weight mat->wt[j] of each column j, for the set of relations
    in file purgedfile.
    Assume mat->wt is initialized to 0 (as done by initMat).
    Assume we have already read the 1st line of purgedfile (nrows, ncols).
 */
-void
-filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
+/* callback function called by filter_rels */
+static void *
+thread_read_weights (void * context_data, earlyparsed_relation_ptr rel)
 {
-    int32_t jmin = 0, jmax = mat->ncols;
-    for (; purgedfile_stream_get(ps,NULL) >= 0;) 
-      {
-#ifdef FOR_DL
-            int32_t previousj = -1;
+  int *tab_w = (int *) context_data;
+  for(weight_t i = 0; i < rel->nb ; i++)
+  {
+#ifndef FOR_DL
+    // For factorization, they should not be any multiplicity here
+    ASSERT_ALWAYS (rel->primes[i].e == 1);
 #endif
-        for (int k = 0; k < ps->nc; k++) 
-          {
-            int32_t j = ps->cols[k];
-            if (LIKELY((j >= jmin) && (j < jmax)))
-              {
-#ifdef FOR_DL
-                /* For DL we do not want to count multiplicity here*/
-                if (j != previousj)
-                    mat->wt[j]++;
-                previousj = j;
-#else
-                mat->wt[j]++;
-#endif
-              }
-          }
-      }
+    // For DL we do not want to count multiplicity here
+    tab_w[rel->primes[i].h]++;
+  }
+
+  return NULL;
+}
+
+void
+filter_matrix_read_weights(filter_matrix_t * mat, const char * purgedfile)
+{
+  char * local_filelist[2] = { (char *) purgedfile, NULL };
+  uint64_t nread = filter_rels (local_filelist,
+                                (filter_rels_callback_t) &thread_read_weights,
+                                mat->wt,
+                                EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
+                                NULL, NULL);
+  ASSERT_ALWAYS (nread == mat->nrows);
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
@@ -160,7 +140,6 @@ fillmat (filter_matrix_t *mat)
 
 void * insert_rel_into_table (info_mat_t * info, earlyparsed_relation_ptr rel)
 {
-    //FIXME big bug this does not take into account the exponent....
     info->nprimes += insert_rel_in_table_with_e (rel, 0, 0, rel_compact,
                                                       ideals_weight);
     info->W += (double) rel->nb;

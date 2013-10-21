@@ -177,14 +177,18 @@ main (int argc, char *argv[])
     if (param_list_warn_unused (pl))
       usage (argv0);
 
+    /* Read number of rows and cols on first line of purged file */
+    FILE *f_tmp = fopen_maybe_compressed (purgedname, "rb");
+    if (!f_tmp)
+    {
+      fprintf(stderr, "%s: %s\n", purgedname, strerror(errno));
+      abort();
+    }
+    int ret = fscanf(f_tmp, "# %" SCNu64 " %" SCNu64 "", &(mat->nrows),
+                                                         &(mat->ncols));
+    ASSERT_ALWAYS (ret == 2);
+    fclose_maybe_compressed(f_tmp, purgedname);
 
-
-    purgedfile_stream ps;
-    purgedfile_stream_init(ps);
-    purgedfile_stream_openfile (ps, purgedname);
-
-    mat->nrows = ps->nrows;
-    mat->ncols = ps->ncols;
     mat->keep  = keep;
     mat->cwmax = 2 * maxlevel;
     ASSERT_ALWAYS (mat->cwmax < 255);
@@ -196,12 +200,9 @@ main (int argc, char *argv[])
     initMat (mat);
 
     tt = seconds ();
-    filter_matrix_read_weights (mat, ps);
+    filter_matrix_read_weights (mat, purgedname);
     printf ("Getting column weights took %2.2lf\n", seconds () - tt);
     fflush (stdout);
-    /* note: we can't use purgedfile_stream_rewind on a compressed file,
-       thus we close and reopen */
-    purgedfile_stream_closefile (ps);
 
     /* print weight counts */
     {
@@ -262,8 +263,6 @@ main (int argc, char *argv[])
     fflush (stdout);
     MkzClose (mat);
     clearMat (mat);
-    purgedfile_stream_closefile (ps);
-    purgedfile_stream_clear (ps);
 
     param_list_clear (pl);
 
