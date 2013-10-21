@@ -16,7 +16,8 @@ static inline void bar(unsigned long *r)
   );
 }
 
-void foo(int n, unsigned long *x, unsigned long *y)
+static void __attribute__((__noinline__))
+foo(int n, unsigned long *x, unsigned long *y)
 {
   if (n == 0)
     bar(x);
@@ -24,13 +25,17 @@ void foo(int n, unsigned long *x, unsigned long *y)
     bar(y);
 }
 
-int n = 1;
-unsigned long x, y;
+int na = 0, nb = 1;
+unsigned long xa = 17, ya = 17;
+unsigned long xb = 17, yb = 17;
 
 int main (void)
 {
-  foo(n, &x, &y);
-  if (y != 42)
+  foo(na, &xa, &ya);
+  if (xa != 42 || ya != 17)
+    __builtin_abort ();
+  foo(nb, &xb, &yb);
+  if (xb != 17 || yb != 42)
     __builtin_abort ();
   return 0;
 }
