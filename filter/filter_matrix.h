@@ -28,13 +28,15 @@ typedef struct {
   typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
                          with 1 <= k <= rows[i][0] */
                         /* FOR_DL: struct containing also the exponent */
-  int *wt;           /* weight w of column j, if w <= cwmax,
+  int32_t *wt;        /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
+                      /* 32 bits is sufficient as we only want precise weight
+                         for column of low weight. If the weight exceed 2^32-1,
+                         we saturate */
   index_t nburied;     /* the number of buried columns */
   uint64_t weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
-  int rwmax;         /* if a weight(row) > rwmax, kill that row */
   int64_t keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
   index_t **R;           /* R[j][k] contains the indices of the rows containing

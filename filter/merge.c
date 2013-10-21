@@ -192,7 +192,6 @@ main (int argc, char *argv[])
     mat->keep  = keep;
     mat->cwmax = 2 * maxlevel;
     ASSERT_ALWAYS (mat->cwmax < 255);
-    mat->rwmax = INT_MAX;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
     mat->nburied = skip;
