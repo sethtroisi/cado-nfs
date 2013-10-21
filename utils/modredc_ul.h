@@ -98,7 +98,7 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
      will keep r from getting allocated in %rax, which is a shame
      since we often want the result in %rax for the next multiply. */
 
-  __asm__ (
+  __asm__ __VOLATILE (
     "imulq %[invm], %%rax\n\t"
     "cmpq $1, %%rax \n\t"                /* if plow != 0, increase t */
     "sbbq $-1, %[t]\n\t"
@@ -141,7 +141,7 @@ modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
   {
     unsigned long t = a[0] - m[0].m, tr = a[0] + b[0];
 
-    __asm__ (
+    __asm__ __VOLATILE (
       "add %2, %1\n\t"   /* t = t + b ( t == a - m + b (mod w)) */
       "cmovc %1, %0\n\t"  /* if (cy) tr = t */
       : "+r" (tr), "+&r" (t)
@@ -623,7 +623,7 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
   {
     unsigned long t = a[0] + b[0], tr = a[0] - m[0].m;
 
-    __asm__ (
+    __asm__ __VOLATILE (
       "add %2, %0\n\t"   /* tr += b */
       "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
       : "+&r" (tr)
@@ -681,7 +681,7 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 #if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long tr, t = a[0];
-    __asm__ (
+    __asm__ __VOLATILE (
       "sub %2, %1\n\t"  /* t -= b ( = a - b) */
       "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
       "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
@@ -793,7 +793,7 @@ modredcul_div2 (residueredcul_t r, const residueredcul_t a,
   unsigned long s = a[0], t = m[0].m;
   ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
 
-  __asm__(
+  __asm__ __VOLATILE(
 	  "add %1, %0\n\t"
 	  "rcr $1, %0\n\t"
 	  "shr $1, %1\n\t"

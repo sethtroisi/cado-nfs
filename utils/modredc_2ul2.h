@@ -708,7 +708,7 @@ modredc2ul2_sub (residueredc2ul2_t r, const residueredc2ul2_t a,
   {
     unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
-    __asm__ (
+    __asm__ __VOLATILE (
 	     "subq %4, %0\n\t"
 	     "sbbq %5, %1\n\t"    /* t -= b */
 	     "cmovncq %6, %2\n\t" /* If !carry, s = 0 */
@@ -831,7 +831,7 @@ modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a,
 #endif
 
   unsigned long dummy;
-  __asm__ (
+  __asm__ __VOLATILE (
     /* Product of low words */
     "movq %[a0], %%rax\n\t"
     "mulq %[b0]\n\t"         /* rdx:rax = a0*b0 <= (2^64-1)^2 */
@@ -985,7 +985,7 @@ modredc2ul2_sqr (residueredc2ul2_t r, const residueredc2ul2_t a,
    so an addition does not overflow */
 
   unsigned long dummy;
-  __asm__ (
+  __asm__ __VOLATILE (
     /* Product of low words */
     "movq %[a0], %%rax\n\t"
     "mulq %[a0]\n\t"         /* rdx:rax = a0^2 <= (2^64-1)^2 */

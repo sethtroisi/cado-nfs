@@ -167,6 +167,20 @@ LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z
 #ifndef ATTRIBUTE
 #define ATTRIBUTE(x)
 #endif
+#endif /* if defined(__GNUC__) */
+
+/* On 64 bit gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) with -O3, the inline
+   asm in ularith_div_2ul_ul_ul_r() is wrongly optimized (Alex Kruppa
+   finds that gcc optimizes away the whole asm block and simply
+   leaves a constant). */
+/* On gcc 4.8.0, ..., 4.8.2, asm() blocks can be optimized away erroneously
+   http://gcc.gnu.org/bugzilla/show_bug.cgi?id=58805 */
+/* In both cases we force gcc not to omit any asm() blocks by declaring them
+   volatile. */
+#if defined(VOLATILE_IF_GCC_UBUNTU_BUG) || defined(VOLATILE_IF_GCC_58805_BUG)
+#define __VOLATILE __volatile__
+#else
+#define __VOLATILE
 #endif
 
 #ifndef	LIKELY

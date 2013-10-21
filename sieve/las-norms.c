@@ -36,7 +36,8 @@
 */
 static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
-  __asm__ ( "psrlq $0x20,  %0    \n"
+  __asm__ __volatile__ (
+            "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
 	    : "+&x" (i));             /* Really need + here! i is not modified in C code! */
   return (uint8_t) ((i-add)*scale);
@@ -62,11 +63,12 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 */
 static inline void uint64truncfastlog2(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
 #ifdef HAVE_SSE2
-  __asm__ ( "psrlq $0x20,  %0                 \n"
+  __asm__ __volatile__ (
+            "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
 	    : "+&x" (i));
   i = (i - add) * scale;
-  __asm__ ( 
+  __asm__ __volatile__ ( 
 	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
@@ -87,7 +89,7 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
    exposant (numbers < 1.) !
 */
 static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
-  __asm__ (
+  __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n"
 	   "addpd     %1,       %0       \n"
@@ -95,7 +97,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "cvtdq2pd  %0,       %0       \n"
 	   : "+&x"(i):"x"(un));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
-  __asm__ (
+  __asm__ __volatile__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
 	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
@@ -106,7 +108,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 }
 
 static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
-  __asm__ (
+  __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n"
 	   "addpd     %1,       %0       \n"
@@ -120,7 +122,7 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 }
 
 static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal1, ssize_t decal2, __m128d un) {
-  __asm__ (
+  __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n"
 	   "addpd     %1,       %0       \n"
@@ -459,7 +461,7 @@ static inline void fpoly_scale(double * u, const double * t, unsigned int d, dou
 #endif
 
 /* This macro avoids a stupid & boring C types control */
-#define _MM_SHUFFLE_EPI32(A,B,C) __asm__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
+#define _MM_SHUFFLE_EPI32(A,B,C) __asm__ __volatile__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
 
 /* CAREFUL! __m128 a=x|y => x is the strongest quadword, higher in memory.
    INITALGN: uN= (j^N)*(alg->fijd[N]) | (j^N)*(alg->fijd[N])  
@@ -725,9 +727,9 @@ void init_alg_norms_bucket_region(unsigned char *S,
     INITALG0;
     for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
         if (UNLIKELY(!TSTZXMM(m))) {
-          __asm__( "movdqa %0,(%1,%2)\n"::"x"(uu0),"r"(S),"r"(ih));
+          __asm__ __volatile__ ( "movdqa %0,(%1,%2)\n"::"x"(uu0),"r"(S),"r"(ih));
         }}}}
     return;
   case 1 : {
@@ -737,7 +739,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG1(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
         if (UNLIKELY(!TSTZXMM(m))) {
 	  G1;
           w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -752,7 +754,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG2(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
         if (UNLIKELY(!TSTZXMM(m))) {
           g = h; G2;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -767,7 +769,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG3(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm____volatile__  ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G3;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -782,7 +784,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG4(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G4;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -797,7 +799,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG5(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G5;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -812,7 +814,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG6(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
  	  g = h; G6;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -827,7 +829,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG7(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G7;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -840,7 +842,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG8(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G8;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -855,7 +857,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALG9(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; G9;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -870,7 +872,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
       INITALGD(j);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
+	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
 	if (UNLIKELY(!TSTZXMM(m))) {
 	  g = h; GD;
 	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
@@ -1113,7 +1115,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   "add %%rbx, %0\n"
            
 #define ALG_IL_P                                                \
-           __asm__ (                                            \
+           __asm__ __volatile__  (                              \
            "pxor %%xmm1, %%xmm1\n"                              \
            "movq %2, %0\n"                                      \
            "xor %%rbx, %%rbx\n"                                 \
@@ -1205,7 +1207,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   "8:\n"
 
 #define ALG_ILP1							\
-  __asm__ ( "pxor %%xmm2, %%xmm2\n"					\
+  __asm__ __volatile__  ( "pxor %%xmm2, %%xmm2\n"			\
   "xor %%r12, %%r12\n"							\
   "sub %2, %%r12\n"							\
   "jmp 1f\n"								\
