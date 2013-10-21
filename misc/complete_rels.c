@@ -171,7 +171,7 @@ complete_relation (earlyparsed_relation_ptr rel)
 }
 
 
-/* Callback function called by prempt_scan_relations */
+/* Callback function called by filter_rels */
 
 static void *
 thread_complete (void * context_data, earlyparsed_relation_ptr rel)
