@@ -339,8 +339,8 @@ void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
 }
 
 
-void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
-		     const mpz_t eps, const mpz_t ell, const mpz_t ell2)
+void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
+	const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
   poly_t SM;
@@ -453,7 +453,7 @@ int main (int argc, char **argv)
   poly_t F;
   int deg;
   mpz_t *f;
-  relset_ptr rels;
+  relset_ptr rels = NULL;
   int sr;
   mpz_t ell, ell2, eps;
   int mt = 1;
@@ -550,12 +550,17 @@ int main (int argc, char **argv)
   t0 = seconds();
   rels = build_rel_sets(purgedfile, indexfile, &sr, F, ell2);
 
-
   fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
 
+  /* adjust the number of threads based on the number of relations */
+  double ntm = ceil((sr + 0.0)/SM_BLOCK);
+  if (mt > ntm)
+    mt = (int) ntm;
+
+  fprintf(stderr, "using %d threads\n", mt);
 
   if (mt == 1)
-    shirokauer_maps(outfile, rels, sr, F, eps, ell, ell2);
+    sm(outfile, rels, sr, F, eps, ell, ell2);
   else
     mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2);
 
