@@ -208,10 +208,6 @@ void * thread_start(void *arg) {
   poly_alloc (V,0);
 
 
-  /* poly_t SMn, SMd; */
-  /* poly_alloc(SMn, F->deg); */
-  /* poly_alloc(SMd, F->deg); */
-
   for (int i = 0; i < ti->nb; i++) {
 
     if (rels[offset+i].denom->deg == 0)
@@ -229,24 +225,12 @@ void * thread_start(void *arg) {
 	cleandeg(rels[offset+i].num, d);
       }
 
-    /* poly_power_mod_f_mod_mpz_Barrett(SMn, rels[offset+i].num, */
-    /*     F, eps, ell2, invl2); */
-    /* poly_sub_ui(SMn, 1); */
-
-    /* poly_power_mod_f_mod_mpz_Barrett(SMd, rels[offset+i].denom, */
-    /*     F, eps, ell2, invl2); */
-    /* poly_sub_ui(SMd, 1); */
-
     poly_power_mod_f_mod_mpz_Barrett(sm[i], rels[offset+i].num,
         F, eps, ell2, invl2);
     poly_sub_ui(sm[i], 1);
-
-    /* poly_sub_mod_mpz(sm[i], SMn, SMd, ell2); */
   }
 
   mpz_clear(tmp);
-  /* poly_free(SMn); */
-  /* poly_free(SMd); */
   poly_free(g);
   poly_free(U);
   poly_free(V);
@@ -359,7 +343,7 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
 		     const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
-  poly_t SM; //, SMn, SMd;
+  poly_t SM;
   mpz_t invl2;
   mpz_t tmp;
   
@@ -374,8 +358,6 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
   mpz_out_str(stderr, 10, ell2);
   fprintf(stderr, "\n");
 
-  /* poly_alloc(SMn, F->deg); */
-  /* poly_alloc(SMd, F->deg); */
   poly_alloc(SM, F->deg);
   SM->deg = 0;
   poly_setcoeff_si(SM, 0, 1);
@@ -388,17 +370,6 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
   fprintf(out, "%d\n", sr);
 
   for (int i=0; i<sr; i++) {
-
-    /* poly_power_mod_f_mod_mpz_Barrett(SMn, rels[i].num, F, eps, ell2, invl2); */
-    /* poly_sub_ui(SMn, 1); */
-
-    /* poly_power_mod_f_mod_mpz_Barrett(SMd, rels[i].denom, F, eps, ell2, invl2); */
-    /* poly_sub_ui(SMd, 1); */
-
-    /* fprintf(stderr, "rels[i].denom->alloc: %d\n", rels[i].denom->alloc); */
-    /* fprintf(stderr, "rels[i].denom->deg: %d\n", rels[i].denom->deg); */
-    /* fprintf(stderr, ">> %d   %d\n", i, F->deg); */
-    /* poly_print(rels[i].num); */
 
     if (rels[i].denom->deg == 0)
       {
@@ -418,8 +389,6 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
     poly_power_mod_f_mod_mpz_Barrett(SM, rels[i].num, F, eps, ell2, invl2);
     poly_sub_ui(SM, 1);
 
-    /* poly_sub_mod_mpz(SM, SMn, SMd, ell2); */
-
     for(int j=0; j<F->deg; j++) {
       if (j > SM->deg) {
           fprintf(out, "0 ");
@@ -435,8 +404,6 @@ void shirokauer_maps(const char * outname, relset_ptr rels, int sr, poly_t F,
     fprintf(out, "\n");
   }
 
-  /* poly_free(SMn); */
-  /* poly_free(SMd); */
   poly_free(SM);
   poly_free(U);
   poly_free(V);
