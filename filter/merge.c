@@ -178,16 +178,7 @@ main (int argc, char *argv[])
       usage (argv0);
 
     /* Read number of rows and cols on first line of purged file */
-    FILE *f_tmp = fopen_maybe_compressed (purgedname, "rb");
-    if (!f_tmp)
-    {
-      fprintf(stderr, "%s: %s\n", purgedname, strerror(errno));
-      abort();
-    }
-    int ret = fscanf(f_tmp, "# %" SCNu64 " %" SCNu64 "", &(mat->nrows),
-                                                         &(mat->ncols));
-    ASSERT_ALWAYS (ret == 2);
-    fclose_maybe_compressed(f_tmp, purgedname);
+    purgedfile_read_firstline (purgedname, &(mat->nrows), &(mat->ncols));
 
     /* initialize rep (i.e., mostly opens outname) and write matrix dimension */
     rep->type = 0;

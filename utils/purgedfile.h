@@ -56,6 +56,7 @@ extern void purgedfile_stream_trigger_disp_progress(purgedfile_stream_ptr ps);
 extern void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname);
 extern void purgedfile_stream_rewind(purgedfile_stream_ptr ps);
 extern int purgedfile_stream_get(purgedfile_stream_ptr ps, char * line);
+void purgedfile_read_firstline (const char *, uint64_t *, uint64_t *);
 
 #ifdef __cplusplus
 }
