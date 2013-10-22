@@ -295,10 +295,12 @@ cmp2 (const void *p, const void *q)
 // contains the new index for j. Heavier columns are in front of the new
 // matrix.
 static void
-renumber (int *small_ncols, int *colweight, int ncols,
+renumber (int *small_ncols, int *colweight, uint64_t ncols,
           MAYBE_UNUSED const char *idealsfilename)
 {
-    int j, k, nb, *tmp;
+    uint64_t k, nb;
+    int64_t j;
+    int *tmp;
 
 #ifdef FOR_DL
     FILE *renumberfile = fopen (idealsfilename, "w+");
@@ -313,14 +315,17 @@ renumber (int *small_ncols, int *colweight, int ncols,
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
     ASSERT_ALWAYS(tmp != NULL);
     memset(tmp, 0, (ncols<<1) * sizeof(int));
-    for(j = 0, nb = 0; j < ncols; j++)
-	if(colweight[j] > 0){
+    for(k = 0, nb = 0; k < ncols; k++)
+    {
+      if(colweight[k] > 0)
+      {
 #if DEBUG >= 1
-	    fprintf(stderr, "J %d %d\n", j, colweight[j]);
+        fprintf(stderr, "J %d %d\n", k, colweight[k]);
 #endif
-	    tmp[nb++] = colweight[j];
-	    tmp[nb++] = j;
-	}
+        tmp[nb++] = colweight[k];
+        tmp[nb++] = k;
+      }
+    }
     *small_ncols = nb>>1;
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
@@ -398,7 +403,7 @@ doAllAdds(typerow_t **newrows, char *str, index_data_t index_data)
 // renumbering.
 static int
 toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
-         int ncols, int small_nrows, int skip, int bin,
+         uint64_t ncols, int small_nrows, int skip, int bin,
          const char *idealsfilename)
 {
     unsigned long W;
@@ -507,9 +512,7 @@ readPurged (typerow_t **sparsemat, purgedfile_stream ps, int verbose,
          contains only relation i. Thus we only need to read the first line of
          the purged file, to get the number of relations-sets. */
 
-      long i;
-
-      for (i = 0; i < ps->nrows; i++)
+      for (uint64_t i = 0; i < ps->nrows; i++)
         {
           sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
           rowCell(sparsemat, i, 1) = i;
@@ -578,7 +581,7 @@ generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
-              uint64_t bwcostmin, int nrows, int ncols, int skip, int bin,
+              uint64_t bwcostmin, int nrows, uint64_t ncols, int skip, int bin,
               const char *idealsfilename, int for_msieve)
 {
     FILE *hisfile;
@@ -735,17 +738,13 @@ int
 main(int argc, char *argv[])
 {
   char * argv0 = argv[0];
-    FILE *hisfile;
-    uint64_t bwcostmin = 0;
-    int nrows, ncols;
-    typerow_t **newrows;
-    int verbose = 0;
-    int bin=0;
-    int skip = SKIP_DEFAULT;
-    int noindex = 0;
-    int for_msieve = 0;
-    char *rp, str[STRLENMAX];
-    double wct0 = wct_seconds ();
+  FILE *hisfile;
+  uint64_t bwcostmin = 0;
+  uint64_t nrows, ncols;
+  typerow_t **newrows;
+  int verbose = 0, bin=0, skip = SKIP_DEFAULT, noindex = 0, for_msieve = 0;
+  char *rp, str[STRLENMAX];
+  double wct0 = wct_seconds ();
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -834,11 +833,12 @@ main(int argc, char *argv[])
     fclose_maybe_compressed (hisfile, hisname);
 
     // read parameters that should be the same as in purgedfile!
-    sscanf(str, "%d %d", &nrows, &ncols);
+    sscanf(str, "%" SCNu64 " %" SCNu64 "", &nrows, &ncols);
     ASSERT_ALWAYS(nrows == ps->nrows);
     ASSERT_ALWAYS(ncols == ps->ncols);
 
-    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
+    fprintf(stderr, "Original matrix has size %" PRIu64 " x %" PRIu64 "\n",
+                    nrows, ncols);
 
     newrows = (typerow_t **)malloc(nrows * sizeof(typerow_t *));
     ASSERT_ALWAYS(newrows != NULL);

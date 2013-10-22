@@ -50,7 +50,7 @@ main (int argc, char **argv)
     rs->parse_only_ab = 1;
 
     FILE * out = fopen(outname, "w");
-    fprintf(out, "%d %d\n", ps->nrows, ps->ncols);
+    fprintf(out, "%" SCNu64 " %" SCNu64 "\n", ps->nrows, ps->ncols);
 
     int rn = 0;
     for( ; purgedfile_stream_get(ps, line) >= 0 ; ) {
@@ -66,7 +66,7 @@ main (int argc, char **argv)
         ASSERT_ALWAYS((p = strchr(line, ' ')) != NULL);
         fprintf(out,"%d %" PRId64 " %" PRIu64 "%s", ps->nodup_index, rs->rel.a, rs->rel.b, p);
         if (purgedfile_stream_disp_progress_now_p(ps)) {
-            fprintf(stderr, "Treated %d/%d purged relations\n",
+            fprintf(stderr, "Treated %d/%" PRIu64 " purged relations\n",
                     ps->rrows, ps->nrows);
         }
     }

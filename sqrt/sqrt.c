@@ -1073,7 +1073,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
 
     unsigned int nonzero_deps = 0;
     uint64_t sanity = 0;
-    for(int i = 0 ; i < ps->nrows ; i++) {
+    for(uint64_t i = 0 ; i < ps->nrows ; i++) {
         sanity |= abs[i];
     }
     uint64_t dep_masks[64]={0,};
@@ -1093,7 +1093,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         ASSERT_ALWAYS(dep_files[i] != NULL);
     }
     ps->parse_only_ab = 1;
-    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+    for(uint64_t i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
         ASSERT_ALWAYS(i < ps->nrows);
         for(unsigned int j = 0 ; j < nonzero_deps ; j++) {
             if (abs[i] & dep_masks[j]) {
@@ -1102,12 +1102,12 @@ void create_dependencies(const char * prefix, const char * indexname, const char
             }
         }
         if (purgedfile_stream_disp_progress_now_p(ps)) {
-            fprintf(stderr, "read (a,b) pair # %d / %d at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
+            fprintf(stderr, "read (a,b) pair # %d / %" PRIu64 " at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
                     ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
         }
     }
     purgedfile_stream_trigger_disp_progress(ps);
-    fprintf(stderr, "read (a,b) pair # %d / %d at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
+    fprintf(stderr, "read (a,b) pair # %d / %" PRIu64 " at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
             ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
 
     purgedfile_stream_closefile(ps);

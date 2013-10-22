@@ -92,7 +92,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
   /* Parse purgedfile (a,b)-pairs only */
   ps->parse_only_ab = 1;
-  int npairs;
+  uint64_t npairs;
   for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
     ASSERT_ALWAYS(npairs < ps->nrows);
     if (ps->b == 0) {

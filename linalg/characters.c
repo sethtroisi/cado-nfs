@@ -293,7 +293,7 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
 
     blockmatrix_set_zero(res);
 
-    fprintf(stderr, "Computing %u characters for %u (a,b) pairs\n",
+    fprintf(stderr, "Computing %u characters for %" PRIu64 " (a,b) pairs\n",
             nchars2, ps->nrows);
     ps->parse_only_ab = 1;
 
@@ -317,7 +317,7 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
         }
         i += bs;
         if (purgedfile_stream_disp_progress_now_p(ps)) {
-            fprintf(stderr, "Read %d/%d (a,b) pairs -- %.1f MB/s -- %.1f pairs/s\n",
+            fprintf(stderr, "Read %d/%" PRIu64 " (a,b) pairs -- %.1f MB/s -- %.1f pairs/s\n",
                     ps->rrows, ps->nrows, ps->mb_s, ps->rows_s);
         }
         if (bs < batchsize)

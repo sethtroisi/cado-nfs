@@ -12,7 +12,7 @@
 
 struct purgedfile_stream_s {
     FILE * source;
-    int nrows, ncols;
+    uint64_t nrows, ncols;
 
     int nodup_index;    // parsed, but useless.
     int64_t a;

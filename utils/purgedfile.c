@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 #include "purgedfile.h"
 #include "timing.h"
 #include "macros.h"
@@ -34,7 +35,8 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);
     }
-    int rc = fscanf (ps->source, "# %d %d %*d\n", &ps->nrows, &ps->ncols);
+    int rc = fscanf (ps->source, "# %" SCNu64 " %" SCNu64 " %*u\n",
+                                 &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
     ps->rrows = 0;
 }
@@ -78,7 +80,8 @@ void purgedfile_stream_rewind(purgedfile_stream_ptr ps)
     int rc = fseek(ps->source, 0, SEEK_SET);
     ASSERT_ALWAYS(rc == 0);
     /* re-parse header */
-    rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
+    rc = fscanf (ps->source, "# %" SCNu64 " %" SCNu64 " %*u\n",
+                             &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
     ps->rrows = 0;
 }
