@@ -25,7 +25,7 @@ target_link_libraries(merge-dl filterutils)
 set_target_properties(merge-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
 add_executable(replay replay.c sparse.c)
-target_link_libraries(replay utils)
+target_link_libraries(replay filterutils)
 
 add_executable(replay-dl replay.c sparse.c)
 target_link_libraries(replay-dl filterutils)
