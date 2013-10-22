@@ -732,7 +732,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 	njproc += old_ncols - mat->rem_ncols;
 	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
                           forbw);
-	//if (mat->rem_nrows % REPORT == 0)
   if ((((double)mat->weight)/((double)mat->rem_nrows)) > REPORT)
   {
       REPORT += FREQ_REPORT;

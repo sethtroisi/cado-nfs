@@ -10,18 +10,6 @@
 #include "filter_matrix.h"
 #include "sparse.h"
 
-//tmp
-ideal_merge_t **rel_compact;
-weight_t *ideals_weight;
-
-unsigned int weight_ffs (int e)
-{
-  if (e == 0)
-      return 0;
-  else
-      return 1; /* Should depend on e, for now jsut constant*/
-}
-
 int
 decrS (int w)
 {
@@ -35,220 +23,185 @@ incrS (int w)
   return (w >= 0 ? w + 1 : w - 1);
 }
 
-/* initialize the sparse matrix mat,
-   where we consider only columns from jmin to jmax-1 */
-// TODO: ncols could be a new renumbered ncols...
+/* initialize the sparse matrix mat */
 void
-initMat (filter_matrix_t *mat)
+initMat (filter_matrix_t *mat, uint32_t maxlevel, uint32_t keep,
+         uint32_t nburied, uint32_t itermax)
 {
-    index_t **R;
+  mat->keep  = keep;
+  mat->mergelevelmax = maxlevel;
+  mat->cwmax = 2 * maxlevel;
+  ASSERT_ALWAYS (mat->cwmax < 255);
+  mat->itermax = itermax;
+  mat->nburied = nburied;
 
-    mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
-    ASSERT_ALWAYS (mat->rows != NULL);
-    mat->wt = (int*) malloc (mat->ncols * sizeof (int));
-    memset (mat->wt, 0, mat->ncols * sizeof (int));
-    R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
-    ASSERT_ALWAYS(R != NULL);
-    mat->R = R;
+  mat->weight = 0;
+  mat->tot_weight = 0;
+  mat->rem_ncols = 0;
 
-    rel_compact = (ideal_merge_t **) malloc (mat->nrows*sizeof(ideal_merge_t*));
-    ideals_weight = (weight_t *) malloc (mat->ncols * sizeof (weight_t));
-    MEMSETZERO(ideals_weight, mat->ncols);
+  mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
+  ASSERT_ALWAYS (mat->rows != NULL);
+  mat->wt = (int32_t *) malloc (mat->ncols * sizeof (int32_t));
+  memset (mat->wt, 0, mat->ncols * sizeof (int32_t));
+  mat->R = (index_t **) malloc (mat->ncols * sizeof(index_t *));
+  ASSERT_ALWAYS(mat->R != NULL);
 }
 
 void
 clearMat (filter_matrix_t *mat)
 {
-  index_t i, j;
+  uint64_t i, j;
 
   for (i = 0; i < mat->nrows; i++)
     free (mat->rows[i]);
   free (mat->rows);
   free (mat->wt);
-  for (j = 0; j < mat->ncols - 0; j++)
+  for (j = 0; j < mat->ncols; j++)
     free (mat->R[j]);
   free (mat->R);
-
-  free(rel_compact);
-  free(ideals_weight);
-}
-
-/* compute the weight mat->wt[j] of each column j, for the set of relations
-   in file purgedfile.
-   Assume mat->wt is initialized to 0 (as done by initMat).
-   Assume we have already read the 1st line of purgedfile (nrows, ncols).
-*/
-/* callback function called by filter_rels */
-static void *
-thread_read_weights (void * context_data, earlyparsed_relation_ptr rel)
-{
-  int *tab_w = (int *) context_data;
-  for(weight_t i = 0; i < rel->nb ; i++)
-  {
-#ifndef FOR_DL
-    // For factorization, they should not be any multiplicity here
-    ASSERT_ALWAYS (rel->primes[i].e == 1);
-#endif
-    // For DL we do not want to count multiplicity here
-    tab_w[rel->primes[i].h]++;
-  }
-
-  return NULL;
-}
-
-void
-filter_matrix_read_weights(filter_matrix_t * mat, const char * purgedfile)
-{
-  char * local_filelist[2] = { (char *) purgedfile, NULL };
-  uint64_t nread = filter_rels (local_filelist,
-                                (filter_rels_callback_t) &thread_read_weights,
-                                mat->wt,
-                                EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
-                                NULL, NULL);
-  ASSERT_ALWAYS (nread == mat->nrows);
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 void
-fillmat (filter_matrix_t *mat)
+InitMatR (filter_matrix_t *mat)
 {
-  index_t j, jmin = 0, jmax = mat->ncols;
-  int wj;
-  index_t *Rj;
+  index_t h;
+  int32_t w;
 
-  for(j = jmin; j < jmax; j++)
+  for(h = 0; h < mat->ncols; h++)
   {
-    wj = mat->wt[j];
-    if (wj <= mat->cwmax)
+    w = mat->wt[h];
+    if (w <= mat->cwmax)
     {
-      Rj = (index_t *) malloc((wj + 1) * sizeof(index_t));
-      if (Rj == NULL)
-        {
-          fprintf (stderr, "Cannot allocate memory in fillmat\n");
-          abort ();
-        }
-      Rj[0] = 0; /* last index used */
-      mat->R[j] = Rj;
+      mat->R[h] = (index_t *) malloc((w + 1) * sizeof(index_t));
+      FATAL_ERROR_CHECK(mat->R[h] == NULL, "Cannot allocate memory");
+      mat->R[h][0] = 0; /* last index used */
     }
     else /* weight is larger than cwmax */
     {
-      mat->wt[j] = -mat->wt[j]; // trick!!!
-      mat->R[j] = NULL;
+      mat->wt[h] = -mat->wt[h]; // trick!!!
+      mat->R[h] = NULL;
     }
   }
 }
 
-void * insert_rel_into_table (info_mat_t * info, earlyparsed_relation_ptr rel)
+/* callback function called by filter_rels */
+void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
-    info->nprimes += insert_rel_in_table_with_e (rel, 0, 0, rel_compact,
-                                                      ideals_weight);
-    info->W += (double) rel->nb;
+  filter_matrix_t *mat = (filter_matrix_t *) context_data;
+  unsigned int next_id = 0;
+  typerow_t buf[REL_MAX_SIZE];
 
-    return NULL;
+  for (unsigned int i = 0; i < rel->nb; i++)
+  {
+    index_t h = rel->primes[i].h;
+    weight_t e = rel->primes[i].e;
+    mat->tot_weight++;
+    /* For factorization, they should not be any multiplicity here.
+       For DL we do not want to count multiplicity in mat->wt */
+#ifndef FOR_DL
+    ASSERT_ALWAYS (e == 1);
+#endif
+	  if (mat->wt[h] == 0)
+    {
+	    mat->wt[h] = 1;
+	    mat->rem_ncols++;
+	  }
+    else if (mat->wt[h] != SMAX(int32_t))
+	    mat->wt[h]++;
+
+	  if (h >= mat->nburied)
+    {
+      mat->weight++;
+      setCell(buf[next_id], h, e);
+      next_id++;
+	  }
+  }
+
+  //FIXME for now can't use my malloc, because it expected an index_t table
+  mat->rows[rel->num] = (typerow_t*) malloc ((next_id + 1) * sizeof (typerow_t));
+  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
+  matLengthRow(mat, rel->num) = next_id;
+  memcpy(mat->rows[rel->num]+1, buf, next_id * sizeof(typerow_t));
+  // sort indices in val to ease row merges
+  qsort(mat->rows[rel->num]+1, next_id, sizeof(typerow_t), cmp);
+
+  return NULL;
 }
 
-/* Callback function called by preempt_scan_relations */
-/* Reads a matrix file.
-
-   mat->wt is already filled:
-   * if mat->wt[j] > 0, it is the weight of column j that we consider
-   * if mat->wt[j] < 0, we don't consider column j
-
-   FIXME mat->weight is correct on exit.
-*/
 
 void
 filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
-    index_t j;
-    info_mat_t info;
-    memset(&info, 0, sizeof(info));
+  uint64_t nread, i, h;
+  char *fic[2] = {(char *) purgedname, NULL};
 
-    fprintf(stderr, "Reading matrix of %" PRIu64 " rows and %" PRIu64 " columns"
-                    ": excess is %" PRIu64 "\n", mat->rem_nrows, mat->rem_ncols,
-                    mat->rem_nrows - mat->rem_ncols);
-    mat->weight = 0;
+  /* read all rels */
+  nread = filter_rels(fic, (filter_rels_callback_t) &insert_rel_into_table, mat,
+                      EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB, NULL, NULL);
+  ASSERT_ALWAYS(nread == mat->nrows);
+  mat->rem_nrows = nread;
+  printf("# Weight of the active part of the matrix: %" PRIu64 "\n# Total "
+         "weight of the matrix: %" PRIu64 "\n", mat->weight, mat->tot_weight);
 
-    char *fic[2] = {(char *) purgedname, NULL};
-    info.nrels = filter_rels(
-            fic,
-            (filter_rels_callback_t) &insert_rel_into_table, &info,
-            EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
-            NULL, NULL);
+  /* print weight count */
+  uint64_t *nbm;
+  nbm = (uint64_t *) malloc ((mat->mergelevelmax + 1) * sizeof (uint64_t));
+  memset (nbm, 0, (mat->mergelevelmax + 1) * sizeof (uint64_t));
+  for (h = 0; h < mat->ncols; h++)
+    if (mat->wt[h] <= mat->mergelevelmax)
+      nbm[mat->wt[h]]++;
+  for (h = 0; h <= (uint64_t) mat->mergelevelmax; h++)
+    printf ("There are %lu column(s) of weight %lu\n", nbm[h], h);
+  ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
+  free (nbm);
 
-    ASSERT_ALWAYS (info.nprimes == (index_t) mat->rem_ncols);
-    ASSERT_ALWAYS (info.nrels == (index_t) mat->rem_nrows);
+  /* Print info on buried columns (columns not take into account during merge).
+    The 'nburied'-first cols are buried, should be the heaviest by construction.
+  */
+  uint64_t weight_buried = 0;
+  if (mat->nburied)
+  {
+    int32_t bmin = mat->nrows, bmax = 0;
 
-    if (mat->nburied)
+    for (h = 0; h < mat->nburied; h++)
     {
-      // Buried the 'nburied'-first cols (should be the heaviest by construction)
-      /* heavy columns already have wt < 0 */
-      int bmin = mat->nrows, bmax = 0;
-
-      for (j = 0; j < mat->nburied; j++)
-      {
-        int wc = -mat->wt[j];
-        // not sure an assert is relevant; maybe just a warning
-        //ASSERT_ALWAYS (wc > 0);
-        if (wc > bmax)
-          bmax = wc;
-        if (wc < bmin)
-          bmin = wc;
+      int32_t w = ABS(mat->wt[h]);
+      weight_buried += w;
+      if (w > bmax)
+        bmax = w;
+      if (w < bmin)
+        bmin = w;
 #if DEBUG >= 1
-        fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
+      fprintf(stderr, "# Burying j=%d (wt=%d)\n", h, w);
 #endif
-      }
-      fprintf(stderr, "# Number of buried columns is %"PRid"", mat->nburied);
-      fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
     }
-    else
-      fprintf(stderr, "# No columns were buried.\n");
+    printf("# Number of buried columns is %" PRid " (min_weight=%" PRId32 ", "
+           "max_weigth=%" PRId32 ")\n", mat->nburied, bmin, bmax);
+  }
+  else
+    printf("# No columns were buried.\n");
+  ASSERT_ALWAYS (mat->weight + weight_buried == mat->tot_weight);
 
-    typerow_t buf[REL_MAX_SIZE];
-    index_t i;
-    for (i = 0; i < mat->nrows; i++)
+  /* Allocate mat->R[h] if necessary */
+  InitMatR (mat);
+
+  /* Re-read all rels (in memory) to fill-in mat->R */
+  printf("# Start to fill-in columns of the matrix.\n");
+  fflush (stdout);
+  for (i = 0; i < mat->nrows; i++)
+  {
+    for(unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
     {
-      weight_t w = 0;
-      weight_t next = 0;
-      ideal_merge_t *p;
-      for (p = rel_compact[i]; p->id != UMAX(p->id); p++)
-        w++;
-      ASSERT_ALWAYS (w != 0);
-
-      for(unsigned int k = 0 ; k < w; k++) 
+      h = matCell(mat, i, k);
+      ASSERT (mat->nburied <= h && h < mat->ncols);
+      if(mat->wt[h] > 0)
       {
-        index_t j = rel_compact[i][k].id;
-        ASSERT_ALWAYS (j < mat->ncols);
-        if (j >= mat->nburied)
-        {
-          mat->weight++;
-#ifndef FOR_DL
-          buf[next] = j;
-          ASSERT(rel_compact[i][k].e == 1);
-#else
-          buf[next].id = rel_compact[i][k].id;
-          buf[next].e = rel_compact[i][k].e;
-#endif
-          next++;
-          if(mat->wt[j] > 0)
-          {
-            mat->R[j][0]++;
-            mat->R[j][mat->R[j][0]] = i;
-          }
-        }
+        mat->R[h][0]++;
+        mat->R[h][mat->R[h][0]] = i;
       }
-      
-      mat->rows[i] = (typerow_t*) malloc ((next+1) * sizeof (typerow_t));
-      if (mat->rows[i] == NULL)
-        {
-          fprintf (stderr, "Cannot allocate memory\n");
-          abort ();
-        }
-      matLengthRow(mat, i) = next;
-      memcpy(mat->rows[i]+1, buf, next * sizeof(typerow_t));
-      // sort indices in val to ease row merges
-      qsort(mat->rows[i]+1, next, sizeof(typerow_t), cmp);
     }
+  }
 }
 
 void
@@ -301,7 +254,7 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
   // be semi-dumb for a while
   unsigned int k;
-    
+
 #if DEBUG >= 2
   fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
@@ -390,7 +343,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
         if(matCell(mat, i1, k1) < matCell(mat, i2, k2))
         {
 #ifdef FOR_DL
-            w += weight_ffs (e2 * mat->rows[i1][k1].e);
+            w += (e2 * mat->rows[i1][k1].e == 0) ? 0 : 1;
 #else
             w++;
 #endif
@@ -399,7 +352,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
         else if(matCell(mat, i1, k1) > matCell(mat, i2, k2))
         {
 #ifdef FOR_DL
-            w += weight_ffs (e1 * mat->rows[i2][k2].e);
+            w += (e1 * mat->rows[i2][k2].e == 0) ? 0 : 1;
 #else
             w++;
 #endif
@@ -408,23 +361,23 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
         else
         {
 #ifdef FOR_DL
-            w += weight_ffs (e2*mat->rows[i1][k1].e + e1*mat->rows[i2][k2].e);
+            w += (e2*mat->rows[i1][k1].e + e1*mat->rows[i2][k2].e == 0) ? 0 : 1;
 #endif
-            k1++; 
+            k1++;
             k2++;
         }
     }
     // finish with k1
     for( ; k1 <= matLengthRow(mat, i1); k1++)
 #ifdef FOR_DL
-            w += weight_ffs (e2 * mat->rows[i1][k1].e);
+            w += (e2 * mat->rows[i1][k1].e == 0) ? 0 : 1;
 #else
             w++;
 #endif
     // finish with k2
     for( ; k2 <= matLengthRow(mat, i2); k2++)
 #ifdef FOR_DL
-            w += weight_ffs (e1 * mat->rows[i2][k2].e);
+            w += (e1 * mat->rows[i2][k2].e == 0) ? 0 : 1;
 #else
             w++;
 #endif

@@ -57,33 +57,25 @@ insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
 
 inline unsigned int
 insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
-			   uint8_t no_storage, ideal_merge_t ** rel_compact,
-			   weight_t * ideals_weight)
+                           ideal_merge_t **rel_compact, int32_t *ideals_weight)
 {
     unsigned int nprimes = 0;
-    unsigned int i, itmp;
+    unsigned int i, itmp, nb_above_min;
     ideal_merge_t *my_tmp;
     index_t h;
 
     itmp = 0;
-    if (no_storage)
-	my_tmp = NULL;
-    else {
-	//FIXME for now can't use my malloc, because it expected an index_t table
-        unsigned int nb_above_min_index = earlyparsed_relation_nb_above_min_index(my_br, min_index);
-
-	my_tmp =
-	    (ideal_merge_t *) malloc((1 + nb_above_min_index) *
-				     sizeof(ideal_merge_t));
-	ASSERT_ALWAYS(my_tmp != NULL);
-    }
+    //FIXME for now can't use my malloc, because it expected an index_t table
+    nb_above_min = earlyparsed_relation_nb_above_min_index(my_br, min_index);
+    my_tmp = (ideal_merge_t *) malloc((1 + nb_above_min)*sizeof(ideal_merge_t));
+    ASSERT_ALWAYS(my_tmp != NULL);
 
     for (i = 0; i < my_br->nb; i++) {
 	h = my_br->primes[i].h;
 	if (ideals_weight[h] == 0) {
 	    ideals_weight[h] = 1;
 	    nprimes++;
-	} else if (ideals_weight[h] != UMAX(weight_t))
+	} else if (ideals_weight[h] != SMAX(int32_t))
 	    ideals_weight[h]++;
 
 	if (my_tmp && h >= min_index) {

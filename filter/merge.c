@@ -189,58 +189,19 @@ main (int argc, char *argv[])
     ASSERT_ALWAYS (ret == 2);
     fclose_maybe_compressed(f_tmp, purgedname);
 
-    mat->keep  = keep;
-    mat->cwmax = 2 * maxlevel;
-    ASSERT_ALWAYS (mat->cwmax < 255);
-    mat->mergelevelmax = maxlevel;
-    mat->itermax = itermax;
-    mat->nburied = skip;
-
-    initMat (mat);
-
-    tt = seconds ();
-    filter_matrix_read_weights (mat, purgedname);
-    printf ("Getting column weights took %2.2lf\n", seconds () - tt);
-    fflush (stdout);
-
-    /* print weight counts */
-    {
-      unsigned long j, *nbm, total_weight = 0;
-      uint32_t w;
-
-      nbm = (unsigned long*) malloc ((maxlevel + 1) * sizeof (unsigned long));
-      memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
-      for (j = 0; j < (unsigned long) mat->ncols; j++)
-        {
-          w = mat->wt[j];
-          total_weight += w;
-          if (w <= maxlevel)
-            nbm[w] ++;
-        }
-
-      mat->rem_nrows = mat->nrows;
-      mat->rem_ncols = mat->ncols - nbm[0];
-
-      printf ("Total matrix weight: %lu\n", total_weight);
-      for (j = 0; j <= (unsigned long) maxlevel; j++)
-        if (nbm[j] != 0)
-          printf ("There are %lu column(s) of weight %lu\n", nbm[j], j);
-      free (nbm);
-    }
-    fflush (stdout);
-
-    fillmat (mat);
-
-    tt = wct_seconds ();
-    filter_matrix_read (mat, purgedname);
-    printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
-
-    /* initialize rep, i.e., mostly opens outname */
+    /* initialize rep (i.e., mostly opens outname) and write matrix dimension */
     rep->type = 0;
     rep->outfile = fopen_maybe_compressed (outname, "w");
     ASSERT_ALWAYS(rep->outfile != NULL);
-    /* output the matrix dimensions in the history file */
     report2 (rep, mat->nrows, mat->ncols, -1);
+
+    /* Init structure containing the matrix and the heap of potential merges */
+    initMat (mat, maxlevel, keep, skip, itermax);
+
+    /* Read all rels and fill-in the mat structure */
+    tt = seconds ();
+    filter_matrix_read (mat, purgedname);
+    printf ("Time for filter_matrix_read: %2.2lfs\n", seconds () - tt);
 
     /* resume from given history file if needed */
     if (resumename != NULL)
@@ -250,7 +211,7 @@ main (int argc, char *argv[])
     mat->mkztype = mkztype;
     tt = seconds();
     MkzInit (mat);
-    printf ("Time for MkzInit: %2.2lf\n", seconds()-tt);
+    printf ("Time for MkzInit: %2.2lfs\n", seconds()-tt);
 
     mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax);
 

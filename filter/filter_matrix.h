@@ -23,26 +23,27 @@ typedef struct {
 typedef struct {
   uint64_t nrows;
   uint64_t ncols;
-  uint64_t rem_nrows;     /* number of remaining rows */
-  uint64_t rem_ncols;     /* number of remaining columns */
-  typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
-                         with 1 <= k <= rows[i][0] */
-                        /* FOR_DL: struct containing also the exponent */
-  int32_t *wt;        /* weight w of column j, if w <= cwmax,
-                        else <= 1 for a deleted column
-                        (trick: we store -w if w > cwmax) */
-                      /* 32 bits is sufficient as we only want precise weight
-                         for column of low weight. If the weight exceed 2^32-1,
-                         we saturate */
+  uint64_t rem_nrows;  /* number of remaining rows */
+  uint64_t rem_ncols;  /* number of remaining columns */
+  typerow_t **rows;    /* rows[i][k] contains indices of an ideal of row[i] 
+                          with 1 <= k <= rows[i][0] */
+                       /* FOR_DL: struct containing also the exponent */
+  int32_t *wt;         /* weight w of column j, if w <= cwmax,
+                          else <= 0 for a deleted column
+                          (trick: we store -w if w > cwmax) */
+                       /* 32 bits is sufficient as we only want precise weight
+                          for column of low weight. If the weight exceed 2^32-1,
+                          we saturate */
   index_t nburied;     /* the number of buried columns */
-  uint64_t weight;
-  int cwmax;         /* bound on weight of j to enter the SWAR structure */
-  int64_t keep;          /* target for nrows-ncols */
-  int mergelevelmax; /* says it */
-  index_t **R;           /* R[j][k] contains the indices of the rows containing
-                            the ideal of index j, 0 <= j < ncols,
-                            1 <= k <= R[j][0], for weight(j) <= cwmax.
-                        R[j][k] = UMAX(index_t) if the corresponding row has
+  uint64_t weight;     /* number of non-zero coefficients in the active part */
+  uint64_t tot_weight; /* Initial total number of non-zero coefficients */
+  int cwmax;           /* bound on weight of j to enter the SWAR structure */
+  int64_t keep;        /* target for nrows-ncols */
+  int mergelevelmax;   /* says it */
+  index_t **R;         /* R[j][k] contains the indices of the rows containing
+                          the ideal of index j, 0 <= j < ncols,
+                          1 <= k <= R[j][0], for weight(j) <= cwmax.
+                          R[j][k] = UMAX(index_t) if the corresponding row has
                                                                   been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
@@ -60,9 +61,8 @@ typedef struct {
 extern "C" {
 #endif
 
-extern void initMat(filter_matrix_t *mat);
+extern void initMat(filter_matrix_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 extern void clearMat (filter_matrix_t *mat);
-extern void filter_matrix_read_weights(filter_matrix_t *mat, const char *file);
 extern void fillmat(filter_matrix_t *mat);
 extern void filter_matrix_read (filter_matrix_t *, const char *);
 
@@ -88,7 +88,6 @@ extern int decrS(int w);
 extern int incrS(int w);
 extern int weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j);
 extern int fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
-extern void checkData(filter_matrix_t *mat);
 extern void destroyRow(filter_matrix_t *mat, int i);
 
 #ifdef __cplusplus

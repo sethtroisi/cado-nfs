@@ -14,7 +14,7 @@
 #define DEBUG 0
 
 static ideal_merge_t **rel_purged;
-static weight_t *ideals_weight;
+static int32_t *ideals_weight;
 mpz_t vlog, invert_coeff;
 
 void
@@ -319,7 +319,7 @@ void *
 insert_rel_into_table(void * foo MAYBE_UNUSED, earlyparsed_relation_ptr rel)
 {
     /* It seems that we don't even need nprimes, do we ? */
-    insert_rel_in_table_with_e (rel, 0, 0, rel_purged, ideals_weight);
+    insert_rel_in_table_with_e (rel, 0, rel_purged, ideals_weight);
     return NULL;
 }
 
@@ -512,9 +512,9 @@ main(int argc, char *argv[])
   rel_purged = (ideal_merge_t **) malloc (nrels_purged * sizeof(ideal_merge_t*));
   ASSERT_ALWAYS (rel_purged != NULL);
 
-  ideals_weight = (weight_t *) malloc (renumber_table->size * sizeof(weight_t));
+  ideals_weight = (int32_t *) malloc (renumber_table->size * sizeof(int32_t));
   ASSERT_ALWAYS (ideals_weight != NULL);
-  memset(ideals_weight, 0, renumber_table->size * sizeof(weight_t));
+  memset(ideals_weight, 0, renumber_table->size * sizeof(int32_t));
 
   /* Reading all relations */
   fprintf (stderr, "Reading relations from %s\n", relspfilename);

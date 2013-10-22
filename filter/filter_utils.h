@@ -34,7 +34,7 @@ typedef struct {
 
 
 unsigned int insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
-unsigned int insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t, uint8_t,
-                                    ideal_merge_t **, weight_t *);
+unsigned int insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t,
+                                         ideal_merge_t **, int32_t *);
 
 #endif /* FILTER_UTILS_H_ */
