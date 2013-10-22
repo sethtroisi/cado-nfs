@@ -26,7 +26,8 @@ config/cxxwrap.pl.in
 config/gas-assembly.cmake
 config/gcc-inline-assembly.cmake
 config/gcc-ubuntu-bug.c
-config/gcc-ubuntu-bug.cmake
+config/gcc-bug-58805.c
+config/gcc-bugs.cmake
 config/gmp.cmake
 config/inline-assembly.c
 config/math.cmake

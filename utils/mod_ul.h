@@ -450,7 +450,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
   {
     unsigned long t = a[0] - m[0], tr = a[0] + b[0];
     
-    __asm__ (
+    __asm__ __VOLATILE (
       "add %2, %1\n\t"   /* t += b */
       "cmovc %1, %0\n\t"  /* if (cy) tr = t */
       : "+r" (tr), "+&r" (t)
@@ -505,7 +505,7 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
 #if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long tr, t = a[0];
-    __asm__ (
+    __asm__ __VOLATILE (
       "sub %2, %1\n\t"  /* t -= b ( = a - b) */
       "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
       "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
@@ -678,23 +678,25 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   {
     unsigned char sb;
-    __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
-	      "setne %1\n\t"     /* if (slow != 0) sb = 1 */
-	      "adcb $0, %1\n"    /* sb += cy */
-	      : "+&r" (slow), "=qm" (sb)
-	      : "rm" (a[0])
-	      : "cc");
+    __asm__ __VOLATILE (
+      "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
+      "setne %1\n\t"     /* if (slow != 0) sb = 1 */
+      "adcb $0, %1\n"    /* sb += cy */
+      : "+&r" (slow), "=qm" (sb)
+      : "rm" (a[0])
+      : "cc");
     shigh = sb;
   }
 #elif defined(__i386__) && defined(__GNUC__)
   {
     unsigned char sb;
-    __asm__ ( "addl %2, %0\n\t"
-	      "setne %1\n\t"
-	      "adcb $0, %1\n"
-	      : "+&r" (slow), "=qm" (sb)
-	      : "rm" (a[0])
-	      : "cc");
+    __asm__ __VOLATILE (
+      "addl %2, %0\n\t"
+      "setne %1\n\t"
+      "adcb $0, %1\n"
+      : "+&r" (slow), "=qm" (sb)
+      : "rm" (a[0])
+      : "cc");
     shigh = sb;
   }
 #else
@@ -818,14 +820,13 @@ modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
   unsigned long s = a[0], t = m[0];
   ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
 
-  __asm__(
-	  "add %1, %0\n\t"
-	  "rcr $1, %0\n\t"
-	  "shr $1, %1\n\t"
-	  "cmovnc %1, %0\n"
-	  : "+&r" (t), "+&r" (s)
-	  : : "cc"
-	  );
+  __asm__ __VOLATILE(
+    "add %1, %0\n\t"
+    "rcr $1, %0\n\t"
+    "shr $1, %1\n\t"
+    "cmovnc %1, %0\n"
+    : "+&r" (t), "+&r" (s)
+    : : "cc");
   r[0] = t;
 #else
   ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);

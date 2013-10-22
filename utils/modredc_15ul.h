@@ -720,7 +720,7 @@ modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a,
   {
     unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
-    __asm__ (
+    __asm__ __VOLATILE (
 	     "subq %4, %0\n\t"
 	     "sbbq %5, %1\n\t"    /* r -= b */
 	     "cmovncq %6, %2\n\t" /* If !carry, s = 0 */
@@ -854,7 +854,7 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
    2^160 - 2^128 - 2^96 - 1. Doesn't really save anything, tho */
 
   unsigned long dummy;
-  __asm__ (
+  __asm__ __VOLATILE (
     /* Product of low words */
 // #define MODREDCUL15_VERBOSE_ASM 1
 #ifdef MODREDCUL15_VERBOSE_ASM
@@ -1017,7 +1017,7 @@ modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a,
 #endif
   
   unsigned long dummy;
-  __asm__ (
+  __asm__ __VOLATILE (
     /* Product of low words */
     "movq %[a0], %%rax\n\t"
     "mulq %%rax\n\t"         /* rdx:rax = a0*a0 */

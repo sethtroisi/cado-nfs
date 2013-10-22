@@ -60,6 +60,7 @@
 #cmakedefine01    __USE_MINGW_ANSI_STDIO
 
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
+#cmakedefine    VOLATILE_IF_GCC_58805_BUG
 
 #cmakedefine    ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
 

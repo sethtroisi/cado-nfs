@@ -1367,7 +1367,8 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 #define RPD "cltd\n idivl %0\n imull %1, %%eax\n movl %%edx, %2\n subl %%eax, %3\n"
 
   int32_t mhI;
-  __asm__ ("xorl %1, %1\n cmpl %2, %5\n movl $0x1, %3\n jg 9f\n"	\
+  __asm__ __volatile__ ( \
+           "xorl %1, %1\n cmpl %2, %5\n movl $0x1, %3\n jg 9f\n"	\
 	   "movl %5, %%eax\n negl %%eax\n movl %%eax, %4\n"		\
 	   "movl %0, %%eax\n cltd\n idivl %2\n subl %%eax, %1\n"	\
 	   "cmpl $0xe6666667, %%edx\n movl %%edx, %0\n jl 0f\n"		\
@@ -3284,7 +3285,7 @@ void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
     z = _mm_setzero_si128();
   while (S1i < EndS1i) {
     __m128i x0, x1, x2, x3;
-    __asm__
+    __asm__ __volatile__
       ("prefetcht0 0x1000(%0)\n"
        "prefetcht0 0x1000(%1)\n"
        "movdqa (%0),%2\n"

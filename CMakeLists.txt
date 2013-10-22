@@ -1,8 +1,8 @@
 
 project(CADO_NFS)
 
-set(CADO_VERSION_MAJOR  1)
-set(CADO_VERSION_MINOR  2)
+set(CADO_VERSION_MAJOR  2)
+set(CADO_VERSION_MINOR  0)
 set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}")
 
 # CADO_DIST_ARCHIVE_NAME may be overridden by environment.
@@ -111,7 +111,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-bugs.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/alloca.cmake")

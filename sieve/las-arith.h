@@ -88,7 +88,7 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
     int64_t t = ((uint64_t)x)*invp;
     uint64_t u;
     /* Need the high part of a 64x64 mul */
-    __asm__ (
+    __asm__ __volatile__ (
             "    mulq    %[p]\n"
             "    addq    %[x], %%rax\n"
             "    adcq    $0, %%rdx\n"
@@ -183,12 +183,12 @@ invmod_redc_32(uint64_t *pa, uint64_t b) {
   uint64_t negp = (uint64_t) -p;
 #define T3 do {								\
     uint64_t addq;							\
-    __asm__ ( "shr $1,%1\n lea (%1,%2),%0\n cmovcq %0, %1\n" :		\
+    __asm__ __volatile__ ( "shr $1,%1\n lea (%1,%2),%0\n cmovcq %0, %1\n" : \
 	      "=r"(addq), "+r"(u) : "r"(fix));				\
   } while (0)
 #define T4 do {								\
     uint64_t nu;							\
-    __asm__ ( "add %1,%1\n lea (%1,%2),%0\n cmp %1,%3 \n cmovbe %0,%1\n" : \
+    __asm__ __volatile__ ( "add %1,%1\n lea (%1,%2),%0\n cmp %1,%3 \n cmovbe %0,%1\n" : \
 	      "=r"(nu), "+r"(u) : "r"(negp), "r"(p));			\
   } while (0)
 #else

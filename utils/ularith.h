@@ -58,16 +58,6 @@
 #define ULARITH_CONSTRAINT_G "rme"
 #endif
 
-/* On 64 bit gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) with -O3, the inline
-   asm in ularith_div_2ul_ul_ul_r() is wrongly optimized (Alex Kruppa
-   finds that gcc optimizes away the whole asm block and simply
-   leaves a constant). */
-#ifdef VOLATILE_IF_GCC_UBUNTU_BUG
-#define __VOLATILE __volatile__
-#else
-#define __VOLATILE
-#endif
-
 /* Increases r if a != 0 */
 static inline void
 ularith_inc_nz (unsigned long *r, const unsigned long a)
@@ -76,14 +66,16 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
   __asm__ ("# ularith_inc_nz (%0, %1)\n" : : "X" (*r), "X" (a));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "cmpq $1, %1\n\t"
-            "sbbq $-1, %0\n\t"
+  __asm__ __VOLATILE (
+    "cmpq $1, %1\n\t"
+    "sbbq $-1, %0\n\t"
     : "+r" (*r)
     : "rm" (a)
     : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "cmpl $1, %1\n\t"
-            "sbbl $-1, %0\n\t"
+  __asm__ __VOLATILE (
+    "cmpl $1, %1\n\t"
+    "sbbl $-1, %0\n\t"
     : "+r" (*r)
     : "rm" (a)
     : "cc");
@@ -105,18 +97,20 @@ ularith_add_ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2) 
-            : "rme" (a)
-            : "cc"); /* TODO: add commutativity and alternative for add to 
-                        memory */
+  __asm__ __VOLATILE (
+    "addq %2, %0\n\t"
+    "adcq $0, %1\n"
+    : "+&r" (*r1), "+r" (*r2) 
+    : "rme" (a)
+    : "cc"); /* TODO: add commutativity and alternative for add to 
+                memory */
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "g" (a)
-            : "cc");
+  __asm__ __VOLATILE (
+    "addl %2, %0\n\t"
+    "adcl $0, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "g" (a)
+    : "cc");
 #else
   *r1 += a;
   if (*r1 < a)
@@ -137,17 +131,19 @@ ularith_add_2ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rme" (a1), "rme" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "addq %2, %0\n\t"
+    "adcq %3, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "rme" (a1), "rme" (a2)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "g" (a1), "g" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "addl %2, %0\n\t"
+    "adcl %3, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "g" (a1), "g" (a2)
+    : "cc");
 #else
   *r1 += a1;
   *r2 += a2 + (*r1 < a1);
@@ -168,19 +164,21 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "addq %3, %0\n\t"
-            "adcq %4, %1\n\t"
-	    "setc %2\n"
-            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
-            : "rme" (a1), "rme" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "addq %3, %0\n\t"
+    "adcq %4, %1\n\t"
+    "setc %2\n"
+    : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+    : "rme" (a1), "rme" (a2)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %3, %0\n\t"
-            "adcl %4, %1\n"
-	    "setc %2\n"
-            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
-            : "g" (a1), "g" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "addl %3, %0\n\t"
+    "adcl %4, %1\n"
+    "setc %2\n"
+    : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+    : "g" (a1), "g" (a2)
+    : "cc");
 #else
   unsigned long u1 = *r1 + a1, u2 = *r2 + a2;
   if (u1 < *r1)
@@ -205,17 +203,19 @@ ularith_sub_ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "subq %2, %0\n\t"
-            "sbbq $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rme" (a)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subq %2, %0\n\t"
+    "sbbq $0, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "rme" (a)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "subl %2, %0\n\t"
-            "sbbl $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "g" (a)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subl %2, %0\n\t"
+    "sbbl $0, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "g" (a)
+    : "cc");
 #else
   unsigned long u = *r1;
   *r1 -= a;
@@ -238,17 +238,19 @@ ularith_sub_2ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "subq %2, %0\n\t"
-            "sbbq %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rme" (a1), "rme" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subq %2, %0\n\t"
+    "sbbq %3, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "rme" (a1), "rme" (a2)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "subl %2, %0\n\t"
-            "sbbl %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "g" (a1), "g" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subl %2, %0\n\t"
+    "sbbl %3, %1\n"
+    : "+&r" (*r1), "+r" (*r2)
+    : "g" (a1), "g" (a2)
+    : "cc");
 #else
   unsigned long u = *r1;
   *r1 -= a1;
@@ -272,19 +274,21 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "subq %3, %0\n\t"
-            "sbbq %4, %1\n\t"
-	    "setc %2\n"
-            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
-            : "rme" (a1), "rme" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subq %3, %0\n\t"
+    "sbbq %4, %1\n\t"
+    "setc %2\n"
+    : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+    : "rme" (a1), "rme" (a2)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "subl %3, %0\n\t"
-            "sbbl %4, %1\n"
-	    "setc %2\n"
-            : "+&r" (*r1), "+r" (*r2), "=q" (cy)
-            : "g" (a1), "g" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subl %3, %0\n\t"
+    "sbbl %4, %1\n"
+    "setc %2\n"
+    : "+&r" (*r1), "+r" (*r2), "=q" (cy)
+    : "g" (a1), "g" (a2)
+    : "cc");
 #else
   unsigned long u1 = *r1 - a1, u2 = *r2 - a2;
   if (u1 > *r1)
@@ -307,17 +311,19 @@ ularith_sub_ul_ul_ge (unsigned long *r, const unsigned long a)
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "subq %2, %0\n\t" /* r -= a */
-	    "cmovc %1, %0\n\t" /* If there's a borrow, restore r from t */
-            : "+&r" (*r)
-            : "r" (t), "rme" (a)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subq %2, %0\n\t" /* r -= a */
+    "cmovc %1, %0\n\t" /* If there's a borrow, restore r from t */
+    : "+&r" (*r)
+    : "r" (t), "rme" (a)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "subl %2, %0\n\t"
-	    "cmovc %1, %0\n\t"
-            : "+&r" (*r)
-            : "r" (t), "g" (a)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subl %2, %0\n\t"
+    "cmovc %1, %0\n\t"
+    : "+&r" (*r)
+    : "r" (t), "g" (a)
+    : "cc");
 #else
   t -= a;
   if (t < *r)
@@ -336,21 +342,22 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "subq %4, %0\n\t" /* r1 -= a1 */
-            "sbbq %5, %1\n\t" /* r2 -= a2 + cy */
-	    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
-	    "cmovc %3, %1\n\t" /* and r2 from t2 */
-            : "+&r" (*r1), "+&r" (*r2)
-            : "r" (t1), "r" (t2), "rme" (a1), "rme" (a2)
-            : "cc");
+  __asm__ __VOLATILE (
+    "subq %4, %0\n\t" /* r1 -= a1 */
+    "sbbq %5, %1\n\t" /* r2 -= a2 + cy */
+    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
+    "cmovc %3, %1\n\t" /* and r2 from t2 */
+    : "+&r" (*r1), "+&r" (*r2)
+    : "r" (t1), "r" (t2), "rme" (a1), "rme" (a2)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "subl %4, %0\n\t"
-            "sbbl %5, %1\n\t"
-	    "cmovc %2, %0\n\t"
-	    "cmovc %3, %1\n\t"
-            : "+&r" (*r1), "+&r" (*r2)
-            : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
-            : "cc");
+  __asm__ __VOLATILE ( "subl %4, %0\n\t"
+    "sbbl %5, %1\n\t"
+    "cmovc %2, %0\n\t"
+    "cmovc %3, %1\n\t"
+    : "+&r" (*r1), "+&r" (*r2)
+    : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
+    : "cc");
 #else
   t1 -= a1;
   t2 -= a2 + (t1 > *r1);
@@ -375,15 +382,17 @@ ularith_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a), "X" (b));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "mulq %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
+  __asm__ __VOLATILE (
+    "mulq %3"
+    : "=a" (*r1), "=d" (*r2)
+    : "%0" (a), "rm" (b)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "mull %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
+  __asm__ __VOLATILE (
+    "mull %3"
+    : "=a" (*r1), "=d" (*r2)
+    : "%0" (a), "rm" (b)
+    : "cc");
 #else
   const int half = LONG_BIT / 2;
   const unsigned long mask = (1UL << half) - 1UL;
@@ -415,15 +424,17 @@ ularith_sqr_ul_2ul (unsigned long *r1, unsigned long *r2,
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ( "mulq %%rax"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "0" (a)
-	    : "cc");
+  __asm__ __VOLATILE (
+    "mulq %%rax"
+    : "=a" (*r1), "=d" (*r2)
+    : "0" (a)
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "mull %%eax"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "0" (a)
-	    : "cc");
+  __asm__ __VOLATILE (
+    "mull %%eax"
+    : "=a" (*r1), "=d" (*r2)
+    : "0" (a)
+    : "cc");
 #else
   const int half = LONG_BIT / 2;
   const unsigned long mask = (1UL << half) - 1UL;
@@ -457,15 +468,17 @@ ularith_div_2ul_ul_ul (unsigned long *q, unsigned long *r,
            "X" (*q), "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-  __asm__ ( "divq %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
+  __asm__ __VOLATILE (
+    "divq %4"
+    : "=a" (*q), "=d" (*r)
+    : "0" (a1), "1" (a2), "rm" (b)
+    : "cc");
 #elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
+  __asm__ __VOLATILE (
+    "divl %4"
+    : "=a" (*q), "=d" (*r)
+    : "0" (a1), "1" (a2), "rm" (b)
+    : "cc");
 #else
   mp_limb_t A[2] = {a1, a2};
   ASSERT(sizeof(unsigned long) == sizeof(mp_limb_t));
@@ -488,15 +501,17 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
            "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-  __asm__ __VOLATILE ( "divq %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
+  __asm__ __VOLATILE (
+    "divq %3"
+    : "+a" (a1), "=d" (*r)
+    : "1" (a2), "rm" (b)
+    : "cc");
 #elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
+  __asm__ __VOLATILE (
+    "divl %3"
+    : "+a" (a1), "=d" (*r)
+    : "1" (a2), "rm" (b)
+    : "cc");
 #else
   mp_limb_t A[2] = {a1, a2};
   ASSERT(sizeof(unsigned long) == sizeof(mp_limb_t));
@@ -517,18 +532,18 @@ ularith_shrd (unsigned long *r, const unsigned long a, const int i)
            "X" (*r), "X" (a), "X" (i));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ("shrdq %b2, %1, %0\n": 
+  __asm__ __VOLATILE (
+    "shrdq %b2, %1, %0\n"
   /* the b modifier makes gcc print the byte part of the register (%cl) */
-           "+rm" (*r) :
-           "r" (a), "cJ" (i) : /* i can be in %cx or a constant < 64 */
-           "cc"
-          );
+    : "+rm" (*r)
+    : "r" (a), "cJ" (i) /* i can be in %cx or a constant < 64 */
+    : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ("shrdl %b2, %1, %0\n": 
-           "+rm" (*r) :
-           "r" (a), "cI" (i) : /* i can be in %cx or a constant < 32 */
-           "cc"
-          );
+  __asm__ __VOLATILE (
+    "shrdl %b2, %1, %0\n"
+    : "+rm" (*r)
+    : "r" (a), "cI" (i) /* i can be in %cx or a constant < 32 */
+    : "cc");
 #else
   if (i > 0) /* shl by LONG_BIT is no-op on x86! */
     *r = (*r >> i) | (a << (LONG_BIT - i));
@@ -547,18 +562,18 @@ ularith_shld (unsigned long *r, const unsigned long a, const int i)
            "X" (*r), "X" (a), "X" (i));
 #endif
 #if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  __asm__ ("shldq %b2, %1, %0\n": 
+  __asm__ __VOLATILE (
+  "shldq %b2, %1, %0\n"
   /* the b modifier makes gcc print the byte part of the register (%cl) */
-           "+rm" (*r) :
-           "r" (a), "cJ" (i) : /* i can be in %cx or a constant < 64 */
-           "cc"
-          );
+  : "+rm" (*r)
+  : "r" (a), "cJ" (i) /* i can be in %cx or a constant < 64 */
+  : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
-  __asm__ ("shldl %b2, %1, %0\n": 
-           "+rm" (*r) :
-           "r" (a), "cI" (i) : /* i can be in %cx or a constant < 32 */
-           "cc"
-          );
+  __asm__ __VOLATILE (
+    "shldl %b2, %1, %0\n"
+    : "+rm" (*r)
+    : "r" (a), "cI" (i) /* i can be in %cx or a constant < 32 */
+    : "cc");
 #else
   if (i > 0) /* shr by LONG_BIT is no-op on x86! */
   *r = (*r << i) | (a >> (LONG_BIT - i));
@@ -693,5 +708,4 @@ ularith_sqrt (const unsigned long n)
   return xs;
 }
 
-#undef __VOLATILE
 #endif /* ifndef UL_ARITH_H__ */
