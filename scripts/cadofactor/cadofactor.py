@@ -56,6 +56,17 @@ if __name__ == '__main__':
                 " ".join(map(shellquote, sys.argv)))
 
     logger.debug("Root parameter dictionary:\n%s", parameters)
+
+    # Write a snapshot of the parameters to a file
+    # Could use an unbouded iterator from itertools but 10^9 should do it
+    for counter in range(10**9):
+        snapshot_filename = "%s%s%s.parameters_snapshot.%d" % \
+                (tasksparams["workdir"], os.sep, tasksparams["name"], counter)
+        if not os.path.isfile(snapshot_filename):
+            break
+    with open(snapshot_filename, "w") as snapshot_file:
+        logger.debug("Writing parameter snapshot to %s", snapshot_filename)
+        snapshot_file.write(str(parameters))
     
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
