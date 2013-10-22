@@ -2,8 +2,8 @@
 # SSE-4.1
 message(STATUS "Testing whether sse-4.1 code can be used")
 try_run(sse41_runs sse41_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/sse41.c)
+            ${PROJECT_BINARY_DIR}/config
+            ${PROJECT_SOURCE_DIR}/config/sse41.c)
 if(sse41_compiles)
     if (sse41_runs MATCHES FAILED_TO_RUN)
         message(STATUS "Testing whether sse-4.1 code can be used -- No")
@@ -14,8 +14,8 @@ if(sse41_compiles)
     endif (sse41_runs MATCHES FAILED_TO_RUN)
 else(sse41_compiles)
     try_run(sse41_runs sse41_compiles
-        ${CADO_NFS_BINARY_DIR}/config
-        ${CADO_NFS_SOURCE_DIR}/config/sse41.c
+        ${PROJECT_BINARY_DIR}/config
+        ${PROJECT_SOURCE_DIR}/config/sse41.c
         COMPILE_DEFINITIONS -msse4.1)
     if(sse41_compiles)
         if (sse41_runs MATCHES FAILED_TO_RUN)

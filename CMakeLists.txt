@@ -198,7 +198,6 @@ set(CMAKE_CXX_LINKER_PREFERENCE "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 # First, create the config file gathering everything we've got so far.
 configure_file(cado_config_h.in cado_config.h ESCAPE_QUOTES @ONLY)
 
-include_directories (${GMP_INCLUDE_PATH})
 include_directories (${CADO_NFS_SOURCE_DIR})
 include_directories (${CADO_NFS_SOURCE_DIR}/utils)
 include_directories (${CADO_NFS_BINARY_DIR})

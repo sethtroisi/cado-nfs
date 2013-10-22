@@ -1,8 +1,8 @@
 # gas-syntax assembly sources.
 message(STATUS "Trying to compile gas-syntax assembly sources")
 try_compile(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES
-    ${CADO_NFS_BINARY_DIR}/config
-    ${CADO_NFS_SOURCE_DIR}/config/asm_sample.c
+    ${PROJECT_BINARY_DIR}/config
+    ${PROJECT_SOURCE_DIR}/config/asm_sample.c
     COMPILE_DEFINITIONS "-x assembler")
 if(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
     message(STATUS "Trying to compile gas-syntax assembly sources -- Success")

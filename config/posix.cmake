@@ -26,7 +26,7 @@ set(CMAKE_REQUIRED_LIBRARIES)
 include(CheckFunctionExists)
 CHECK_FUNCTION_EXISTS(posix_memalign	HAVE_POSIX_MEMALIGN)
 
-include(${CADO_NFS_SOURCE_DIR}/config/search_for_function.cmake)
+include(${PROJECT_SOURCE_DIR}/config/search_for_function.cmake)
 search_for_function(getc_unlocked HAVE_GETC_UNLOCKED)
 search_for_function(nanosleep HAVE_NANOSLEEP)
 search_for_function(usleep HAVE_USLEEP)

@@ -70,5 +70,5 @@ endif(MPIR_LIBDIR)
 # (we could consider doing this only if no gmp.h exists in MPIR_INCDIR)
 
 set(WITH_MPIR 1 CACHE INTERNAL "MPIR is being used")
-file(WRITE ${CADO_NFS_BINARY_DIR}/gmp.h "#include \"mpir.h\"")
+file(WRITE ${PROJECT_BINARY_DIR}/gmp.h "#include \"mpir.h\"")
 set(gmp_libname "mpir")

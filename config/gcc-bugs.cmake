@@ -9,8 +9,8 @@ set(GCC_BUGS_LIST "")
 # Test for Ubuntu bug
 
 try_run(gcc-ubuntu-bug_runs gcc-ubuntu-bug_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.c)
+            ${PROJECT_BINARY_DIR}/config
+            ${PROJECT_SOURCE_DIR}/config/gcc-ubuntu-bug.c)
 
 if(gcc-ubuntu-bug_compiles)
     if (gcc-ubuntu-bug_runs EQUAL 0)
@@ -30,8 +30,8 @@ endif(gcc-ubuntu-bug_compiles)
 # Test for gcc bug 58805
 
 try_run(gcc-bug-58805_runs gcc-bug-58805_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/gcc-bug-58805.c)
+            ${PROJECT_BINARY_DIR}/config
+            ${PROJECT_SOURCE_DIR}/config/gcc-bug-58805.c)
 
 if(gcc-bug-58805_compiles)
     if (gcc-bug-58805_runs EQUAL 0)

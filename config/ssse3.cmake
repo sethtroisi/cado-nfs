@@ -2,8 +2,8 @@
 # SSSE-3
 message(STATUS "Testing whether ssse-3 code can be used")
 try_run(ssse3_runs ssse3_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/ssse3.c)
+            ${PROJECT_BINARY_DIR}/config
+            ${PROJECT_SOURCE_DIR}/config/ssse3.c)
 if(ssse3_compiles)
     if (ssse3_runs MATCHES FAILED_TO_RUN)
         message(STATUS "Testing whether ssse-3 code can be used -- No")
@@ -14,8 +14,8 @@ if(ssse3_compiles)
     endif (ssse3_runs MATCHES FAILED_TO_RUN)
 else(ssse3_compiles)
     try_run(ssse3_runs ssse3_compiles
-        ${CADO_NFS_BINARY_DIR}/config
-        ${CADO_NFS_SOURCE_DIR}/config/ssse3.c
+        ${PROJECT_BINARY_DIR}/config
+        ${PROJECT_SOURCE_DIR}/config/ssse3.c
         COMPILE_DEFINITIONS -mssse3)
     if(ssse3_compiles)
         if (ssse3_runs MATCHES FAILED_TO_RUN)
