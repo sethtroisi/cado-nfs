@@ -1186,15 +1186,15 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def stat_formats(self):
         return (
-            ["potential collisions: {stats_collisions[0]}"],
+            ["potential collisions: {stats_collisions[0]:g}"],
             ["raw lognorm (nr/min/av/max/std): {stats_rawlognorm[0]:d}"] + 
                 ["/{stats_rawlognorm[%d]:.3f}" % i for i in range(1, 5)],
             ["optimized lognorm (nr/min/av/max/std): {stats_optlognorm[0]:d}"] +
                 ["/{stats_optlognorm[%d]:.3f}" % i for i in range(1, 5)],
             ["10 best logmu: {stats_logmu[0]}"] +
                 [" {stats_logmu[%d]}" % i for i in range(1, 10)],
-            ["Total time: {stats_total_time[0]}",
-             ", rootsieve time: {stats_rootsieve_time[0]}"]
+            ["Total time: {stats_total_time[0]:g}",
+             ", rootsieve time: {stats_rootsieve_time[0]:g}"]
             )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
