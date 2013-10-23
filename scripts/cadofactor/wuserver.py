@@ -2,6 +2,7 @@
 
 import http.server
 import socketserver
+from socket import error as socket_error
 import os
 import sys
 import re
@@ -177,7 +178,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         else:
             try:
                 super().do_GET()
-            except socket.error as e:
+            except socket_error as e:
                 self.log_warning("Connection error: %s", str(e))
         sys.stdout.flush()
 
@@ -376,7 +377,15 @@ class ServerLauncher(object):
         if not os.path.isdir(uploaddir):
             os.mkdir(uploaddir)
         
-        self.httpd = ServerClass((address, port), MyHandlerWithParams, )
+        try:
+            self.httpd = ServerClass((address, port), MyHandlerWithParams, )
+        except socket_error as e:
+            if e.errno == errno.EADDRINUSE:
+                self.logger.critical("Address %s:%d is already in use (maybe "
+                        "another cadofactor running?)", address, port)
+                self.logger.critical("You can choose a different port with "
+                        "server.port=<integer>.")
+                sys.exit(1)
         self.httpd.server_name = self.name
     
     def serve(self):
