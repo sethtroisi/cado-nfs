@@ -825,10 +825,11 @@ class WuAccess(object): # {
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
-        if callable(conn_close):
-            conn_close(self.conn)
-        else:
-            self._conn.close()
+        if self._ownconn:
+            if callable(conn_close):
+                conn_close(self.conn)
+            else:
+                self._conn.close()
     
     @staticmethod
     def to_str(wus):
