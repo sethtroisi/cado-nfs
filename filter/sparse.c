@@ -36,16 +36,6 @@ fprintRow(FILE *file, typerow_t *row)
 #endif
 }
 
-// row[0..row[0]] is of lenfth row[0]+1.
-int32_t*
-copyRow(int32_t *row)
-{
-    int32_t *tmp = (int32_t *)malloc((1+row[0]) * sizeof(int32_t));
-    
-    memcpy(tmp, row, (1+row[0]) * sizeof(int32_t));
-    return tmp;
-}
-
 // i1 += i2
 // A row is row[0..max] where row[0] = max and the real components are
 // row[1..max].
@@ -206,15 +196,6 @@ addRowsUpdateIndex(typerow_t **rows, index_data_t index_data, int i1, int i2,
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
     fprintRow(stderr, rows[i1]); fprintf(stderr, "\n");
 #endif
-}
-
-void
-removeWeight(int32_t **rows, int *wt, int i)
-{
-    int32_t k;
-
-    for(k = 1; k <= rows[i][0]; k++)
-	wt[rows[i][k]]--;
 }
 
 int

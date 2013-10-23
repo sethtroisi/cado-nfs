@@ -4,7 +4,6 @@
 #include "portability.h"
 #include "utils.h"
 #include "filter_utils.h"
-#include "merge_opts.h"
 #include "filter_matrix.h"
 #include "sparse.h"
 #include "mst.h"

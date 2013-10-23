@@ -40,8 +40,6 @@ typedef relset_t * index_data_t;
 // Protos.
 
 extern void fprintRow(FILE *file, typerow_t *row);
-extern int32_t * copyRow(int32_t *row);
-extern void removeWeight(int32_t **rows, int *wt, int i);
 extern int hasCol(int32_t **rows, int i, int32_t j);
 
 extern int parse_hisfile_line (int32_t *ind, char *t, int32_t *j);

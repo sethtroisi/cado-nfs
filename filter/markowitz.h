@@ -8,8 +8,6 @@ extern "C" {
 #define MkzIsQueueEmpty(Q) ((Q)[0] == 0)
 #define MkzQueueCardinality(Q) ((Q)[0])
 
-extern void PrintTimings (void);
-
 extern void MkzInit(filter_matrix_t *mat);
 extern void MkzClose(filter_matrix_t *mat);
 

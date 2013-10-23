@@ -26,6 +26,10 @@ typedef struct {
 #define CA_DUP2 271828182845904523UL
 #define CB_DUP2 577215664901532889UL
 
+/* Maximum level for a merge. Such a large value is only useful when not using
+ * BW. */
+#define MERGE_LEVEL_MAX 256
+
 #include <time.h>
 #include <pthread.h>
 

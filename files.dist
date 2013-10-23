@@ -77,7 +77,6 @@ filter/markowitz.h
 filter/merge.c
 filter/merge_mono.c
 filter/merge_mono.h
-filter/merge_opts.h
 filter/mst.c
 filter/mst.h
 filter/purge.c
