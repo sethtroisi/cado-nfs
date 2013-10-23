@@ -105,10 +105,6 @@ It is created by merge, and contains the sequence of operations that must
 be done on the lines to replay the merge and create the matrix given to
 linalg.
 
-The first line gives number of rows (relations) and columns (ideals)
-before the merge (so it must be identical to the first line of
-purged.gz).
-
 From time to time, a diagnostic line starting with BWCOST can be found.
 It gives hints to replay if it wants to replay only some part of the
 merge. (is it still really used ?????)

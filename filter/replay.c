@@ -580,14 +580,10 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     FILE *hisfile;
     int *colweight;
     int small_nrows, small_ncols;
-    char str[STRLENMAX], *rp MAYBE_UNUSED;
     index_data_t index_data = NULL;
 
     hisfile = fopen_maybe_compressed (hisname, "r");
     ASSERT_ALWAYS(hisfile != NULL);
-    /* read first line */
-    rp = fgets (str, STRLENMAX, hisfile);
-
 
     if (indexname != NULL) {
         // At the beginning, the index_data consists of relsets that

@@ -184,7 +184,6 @@ main (int argc, char *argv[])
     rep->type = 0;
     rep->outfile = fopen_maybe_compressed (outname, "w");
     ASSERT_ALWAYS(rep->outfile != NULL);
-    report2 (rep, mat->nrows, mat->ncols, -1);
 
     /* Init structure containing the matrix and the heap of potential merges */
     initMat (mat, maxlevel, keep, skip, itermax);
