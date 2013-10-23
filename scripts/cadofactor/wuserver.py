@@ -248,19 +248,26 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not wu_text:
             # This flag is to downgrade the logging level. Ugly.
             self.no_work_available = True
-            return self.send_error(404, "No work available")
+            try:
+                return self.send_error(404, "No work available")
+            except socket_error as e:
+                self.log_error("Connection error: %s", str(e))
+                return
         
         self.log_message("Sending workunit " + Workunit(wu_text).get_id() + 
                          " to client " + clientid)
         # wu_text = wu.get_wu()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.send_header("Content-Length", len(wu_text))
-        self.send_header("Cache-Control", "no-cache")
-        self.end_headers()
-        # FIXME: is ASCII enough for workunits? Is there any shell syntax
-        # that needs more, or should we allow non-ASCII workunit names?
-        self.send_body(bytes(wu_text, "ascii"))
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", len(wu_text))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            # FIXME: is ASCII enough for workunits? Is there any shell syntax
+            # that needs more, or should we allow non-ASCII workunit names?
+            self.send_body(bytes(wu_text, "ascii"))
+        except socket_error as e:
+            self.log_error("Connection error: %s", str(e))
 
     def send_status(self):
         self.send_query()
