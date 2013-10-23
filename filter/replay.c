@@ -443,6 +443,34 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     }
 }
 
+typedef struct
+{
+  typerow_t **mat;
+  uint64_t ncols;
+} replay_read_data_t;
+
+void * fill_in_rows (void *context_data, earlyparsed_relation_ptr rel)
+{
+  replay_read_data_t *data = (replay_read_data_t *) context_data;
+
+  data->mat[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
+  FATAL_ERROR_CHECK(data->mat[rel->num] == NULL, "Cannot allocate memory");
+
+  rowLength(data->mat, rel->num) = rel->nb;
+  for (unsigned int j = 0; j < rel->nb; j++)
+  {
+    index_t h = rel->primes[j].h;
+    weight_t e = rel->primes[j].e;
+#ifndef FOR_DL
+    ASSERT_ALWAYS (e == 1);
+#endif
+    ASSERT (h < data->ncols);
+    setCell(data->mat[rel->num][j+1], h, e);
+  }
+  qsort(&(data->mat[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
+  return NULL;
+}
+
 /* if for_msieve=1, generate the *.cyc file needed by msieve to construct
    its matrix, which is of the following (binary) format:
       small_nrows
@@ -456,53 +484,34 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
    i1 is the index of the first relation in the first relation-set
    (should correspond to line i1+2 in *.purged.gz), and so on */
 
-// Feed sparsemat with M_purged
 static void
-readPurged (typerow_t **sparsemat, purgedfile_stream ps, int verbose,
-            int for_msieve)
+read_purgedfile (typerow_t **mat, const char* filename, uint64_t nrows,
+                 uint64_t ncols, int for_msieve)
 {
+  uint64_t nread;
   if (for_msieve == 0)
-    {
-      fprintf(stderr, "Reading sparse matrix from purged file\n");
-      for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-        if (verbose && purgedfile_stream_disp_progress_now_p(ps))
-          fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
-                  ps->rrows,ps->dt);
-        if(ps->nc == 0)
-          fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
-      qsort(ps->cols, ps->nc, sizeof(int), cmp_int);
-      sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
-      ASSERT_ALWAYS(sparsemat[i] != NULL);
-      int j = 1;
-      for(int k = 0; k < ps->nc; k++)
-        {
-#ifdef FOR_DL
-          if (j > 1 && (int) sparsemat[i][j-1].id == ps->cols[k])
-            sparsemat[i][j-1].e++;
-          else
-#endif
-          {
-            setCell(sparsemat[i][j], ps->cols[k], 1);
-            j++;
-          }
-        }
-      rowLength(sparsemat, i) = j-1;
-      }
-    }
+  {
+    fprintf(stderr, "Reading sparse matrix from %s\n", filename);
+    char *fic[2] = {(char *) filename, NULL};
+    replay_read_data_t tmp = (replay_read_data_t) {.mat= mat, .ncols = ncols};
+    nread = filter_rels(fic, (filter_rels_callback_t) &fill_in_rows, &tmp,
+                        EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB, NULL, NULL);
+    ASSERT_ALWAYS (nread == nrows);
+  }
   else /* for_msieve */
-    {
-      /* to generate the .cyc file for msieve, we only need to start from the
-         identity matrix with newnrows relation-sets, where relation-set i
-         contains only relation i. Thus we only need to read the first line of
-         the purged file, to get the number of relations-sets. */
+  {
+    /* to generate the .cyc file for msieve, we only need to start from the
+       identity matrix with newnrows relation-sets, where relation-set i
+       contains only relation i. Thus we only need to read the first line of
+       the purged file, to get the number of relations-sets. */
 
-      for (uint64_t i = 0; i < ps->nrows; i++)
-        {
-          sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
-          rowCell(sparsemat, i, 1) = i;
-          rowLength(sparsemat, i) = 1;
-        }
+    for (uint64_t i = 0; i < nrows; i++)
+    {
+      mat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
+      rowCell(mat, i, 1) = i;
+      rowLength(mat, i) = 1;
     }
+  }
 }
 
 static void 
@@ -564,7 +573,7 @@ generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
 
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
-              const char *indexname, const char *hisname, purgedfile_stream ps,
+              const char *indexname, const char *hisname,
               uint64_t bwcostmin, int nrows, uint64_t ncols, int skip, int bin,
               const char *idealsfilename, int for_msieve)
 {
@@ -579,8 +588,6 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     /* read first line */
     rp = fgets (str, STRLENMAX, hisfile);
 
-    // 1st pass: read the relations in *.purged and put them in newrows[][]
-    readPurged(newrows, ps, 1, for_msieve);
 #if DEBUG >= 1
     // [PG]: FIXME: seems to be broken for FFS ?
     for(int i = 0; i < nrows; i++){
@@ -609,9 +616,9 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     build_newrows_from_file(newrows, hisfile, bwcostmin, index_data);
 
     /* compute column weights */
-    colweight = (int*) malloc (ncols * sizeof(int *));
+    colweight = (int*) malloc (ncols * sizeof(int));
     ASSERT_ALWAYS(colweight != NULL);
-    memset (colweight, 0, ncols * sizeof(int *));
+    memset (colweight, 0, ncols * sizeof(int));
     for (int i = 0; i < nrows; i++)
       if (newrows[i] != NULL)
         for(unsigned int k = 1; k <= rowLength(newrows, i); k++)
@@ -722,12 +729,10 @@ int
 main(int argc, char *argv[])
 {
   char * argv0 = argv[0];
-  FILE *hisfile;
   uint64_t bwcostmin = 0;
   uint64_t nrows, ncols;
   typerow_t **newrows;
   int verbose = 0, bin=0, skip = SKIP_DEFAULT, noindex = 0, for_msieve = 0;
-  char *rp, str[STRLENMAX];
   double wct0 = wct_seconds ();
 
 #ifdef HAVE_MINGW
@@ -806,44 +811,28 @@ main(int argc, char *argv[])
       }
 #endif
 
-    purgedfile_stream ps;
-    purgedfile_stream_init(ps);
-    purgedfile_stream_openfile(ps, purgedname);
+  /* Read number of rows and cols on first line of purged file */
+  purgedfile_read_firstline (purgedname, &nrows, &ncols);
 
-    hisfile = fopen_maybe_compressed (hisname, "r");
-    ASSERT_ALWAYS(hisfile != NULL);
-    rp = fgets(str, STRLENMAX, hisfile);
-    ASSERT_ALWAYS(rp);
-    fclose_maybe_compressed (hisfile, hisname);
+  /* Allocate memory for rows of the matrix */
+  newrows = (typerow_t **) malloc (nrows * sizeof(typerow_t *));
+  ASSERT_ALWAYS(newrows != NULL);
 
-    // read parameters that should be the same as in purgedfile!
-    sscanf(str, "%" SCNu64 " %" SCNu64 "", &nrows, &ncols);
-    ASSERT_ALWAYS(nrows == ps->nrows);
-    ASSERT_ALWAYS(ncols == ps->ncols);
-
-    fprintf(stderr, "Original matrix has size %" PRIu64 " x %" PRIu64 "\n",
-                    nrows, ncols);
-
-    newrows = (typerow_t **)malloc(nrows * sizeof(typerow_t *));
-    ASSERT_ALWAYS(newrows != NULL);
-
-    // at the end of the following operations, newrows[i] is either
-    // NULL
-    // or k i_1 ... i_k which means that M_small will contain a row formed
-    // of the addition of the rows of indices i_1 ... i_k in the original
-    // matrix
-
-    fasterVersion (newrows, sparsename, indexname, hisname, ps,
-                   bwcostmin, nrows, ncols, skip, bin, 
-                   idealsfilename, for_msieve);
+  /* Read the matrix from purgedfile */
+  read_purgedfile (newrows, purgedname, nrows, ncols, for_msieve);
+  fprintf(stderr, "Read %" PRIu64 " rows from %s\n", nrows, purgedname);
+#if DEBUG >=1
+  fprintf(stderr, "The biggest index appearing in a relation is %" PRIu64 "\n",
+                  ncols);
+#endif
 
 
-    purgedfile_stream_closefile(ps);
-    purgedfile_stream_clear(ps);
+  fasterVersion (newrows, sparsename, indexname, hisname,
+                 bwcostmin, nrows, ncols, skip, bin,
+                 idealsfilename, for_msieve);
 
-    param_list_clear(pl);
 
-    print_timing_and_memory (wct0);
-
-    return 0;
+  param_list_clear(pl);
+  print_timing_and_memory (wct0);
+  return 0;
 }

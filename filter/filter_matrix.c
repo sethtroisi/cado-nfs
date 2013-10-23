@@ -122,9 +122,9 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   mat->rows[rel->num] = (typerow_t*) malloc ((next_id + 1) * sizeof (typerow_t));
   FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
   matLengthRow(mat, rel->num) = next_id;
-  memcpy(mat->rows[rel->num]+1, buf, next_id * sizeof(typerow_t));
+  memcpy(&(mat->rows[rel->num][1]), buf, next_id * sizeof(typerow_t));
   // sort indices in val to ease row merges
-  qsort(mat->rows[rel->num]+1, next_id, sizeof(typerow_t), cmp_typerow_t);
+  qsort(&(mat->rows[rel->num][1]), next_id, sizeof(typerow_t), cmp_typerow_t);
 
   return NULL;
 }
