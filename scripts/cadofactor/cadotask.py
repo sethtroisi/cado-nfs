@@ -603,7 +603,14 @@ class FilesCreator(MakesTablenames, wudb.HasDbConnection, metaclass=abc.ABCMeta)
         self.output_files.clear(filenames, commit=commit)
 
 
-class HasStatistics(object, metaclass=abc.ABCMeta):
+class BaseStatistics(object):
+    """ Base class for HasStatistics and SimpleStatistics that terminates the
+    print_stats() call chain.
+    """
+    def print_stats(self):
+        pass
+
+class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
     @abc.abstractproperty
     def stat_conversions(self):
         pass
@@ -614,12 +621,68 @@ class HasStatistics(object, metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions, self.stat_formats)
+
     def get_statistics_as_strings(self):
+        """ Return the statistics collected so far as a List of strings.
+        
+        Sub-classes can override to add/remove/change strings.
+        """
         return self.statistics.as_strings()
 
+    def print_stats(self):
+        stat_msgs = self.get_statistics_as_strings()
+        if stat_msgs:
+            self.logger.info("Aggregate statistics:")
+            for msg in stat_msgs:
+                self.logger.info(msg)
+        super().print_stats()
 
-class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
-           DoesLogging, metaclass=abc.ABCMeta):
+class SimpleStatistics(BaseStatistics, HasState, DoesLogging, 
+        metaclass=abc.ABCMeta):
+
+    def print_cpu_real_time(self, cputotal, realtotal, program):
+        """ Print cpu and/or real time to logger """
+        # Uses self only for access to the logger
+        pairs = zip((cputotal, realtotal), ("cpu", "real"))
+        usepairs = [pair for pair in pairs if pair[0]]
+        if usepairs:
+            format = "/".join(["%g"] * len(usepairs))
+            usepairs = tuple(zip(*usepairs))
+            timestr = '/'.join(usepairs[1])
+            self.logger.info("Total %s time for %s: " + format,
+                    timestr, program, *usepairs[0])
+                                                
+    def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
+        """ Add seconds to the statistics of cpu time spent by program,
+        and return the new total.
+        """
+        key = "%s_%s" % ("cputime" if is_cpu else "realtime", program)
+        total = self.state.get(key, 0.) + seconds
+        # Update only if the value changed, i.e., if seconds != 0.
+        if seconds:
+            self.state.update({key: total}, commit=commit)
+        return total
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by all programs of
+        this Task
+        """
+        total = 0.;
+        for program in self.programs:
+            total += self.update_cpu_or_real_time(is_cpu, program.name, 0.,
+                    commit=False)
+        return total
+
+    def print_stats(self):
+        for program in self.programs:
+            cputotal = self.update_cpu_or_real_time(True, program, 0.)
+            realtotal = self.update_cpu_or_real_time(False, program, 0.)
+            self.print_cpu_real_time(cputotal, realtotal, program.name)
+        super().print_stats()
+
+
+class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
+           cadoparams.UseParameters, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed.
     
     Sub-classes must define class variables:
@@ -773,16 +836,6 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
             assert command_nr == 0
             return self.rc
     
-    def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
-        """ Add seconds to the statistics of cpu time spent by program,
-        and return the new total.
-        """
-        key = "%s_%s" % ("cputime" if is_cpu else "realtime", program.name)
-        total = self.state.get(key, 0.) + seconds
-        if total:
-            self.state.update({key: total}, commit=commit)
-        return total
-    
     def submit_command(self, command, identifier, commit=True):
         ''' Run a command.
         Return the result tuple. If the caller is an Observer, also send
@@ -882,26 +935,6 @@ class Task(patterns.Colleague, HasState, cadoparams.UseParameters,
         if not isinstance(self, HasStatistics):
             return
         self.statistics.from_dict(self.state)
-    
-    def print_stats(self):
-        for program in self.programs:
-            cputotal = self.update_cpu_or_real_time(True, program, 0.)
-            realtotal = self.update_cpu_or_real_time(False, program, 0.)
-            pairs = zip((cputotal, realtotal), ("cpu", "real"))
-            usepairs = [pair for pair in pairs if pair[0] > 0]
-            if usepairs:
-                format = "/".join(["%g"] * len(usepairs))
-                usepairs = tuple(zip(*usepairs))
-                timestr = '/'.join(usepairs[1])
-                self.logger.info("Total %s time for %s: " + format,
-                                 timestr, program.name, *usepairs[0])
-        if not isinstance(self, HasStatistics):
-            return
-        stat_msgs =  self.get_statistics_as_strings()
-        if stat_msgs:
-            self.logger.info("Aggregate statistics:")
-            for msg in stat_msgs:
-                self.logger.info(msg)
     
     def parse_stats(self, filename, *, commit):
         if not isinstance(self, HasStatistics):
@@ -1321,6 +1354,10 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
 
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect2l """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
     @property
@@ -1728,6 +1765,14 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.logger.info("New goal for number of relations is %d, but "
                              "already have %d. No need to sieve more",
                              wanted, nrels)
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by las """
+        if is_cpu:
+            return float(self.state.get("stats_total_cpu_time", [0.])[0])
+        else:
+            return float(self.state.get("stats_total_time", [0.])[0])
+
 
 class Duplicates1Task(Task, FilesCreator, HasStatistics):
     """ Removes duplicate relations """
@@ -3015,8 +3060,8 @@ class Request(Message):
     GET_KERNEL_FILENAME = object()
     GET_WU_RESULT = object()
 
-class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
-                            DoesLogging, patterns.Mediator):
+class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
+        DoesLogging, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     @property
     def name(self):
@@ -3140,7 +3185,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
         }
-    
+
     def run(self):
         had_interrupt = False
         self.logger.info("Factoring %s", self.params["N"])
@@ -3155,6 +3200,10 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
             for task in self.tasks:
                 task.print_stats()
             
+            cputotal = self.get_total_cpu_or_real_time(True)
+            realtotal = self.get_total_cpu_or_real_time(False)
+            self.print_cpu_real_time(cputotal, realtotal, "everything");
+        
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
             had_interrupt = True
@@ -3184,6 +3233,10 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters,
                 return task.run()
         return False
     
+    def get_total_cpu_or_real_time(self, is_cpu):
+        return sum([task.get_total_cpu_or_real_time(is_cpu) \
+                for task in self.tasks])
+
     def register_filename(self, d):
         for key in d:
             if not key in self.registered_filenames:
