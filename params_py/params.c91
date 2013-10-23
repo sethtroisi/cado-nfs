@@ -4,8 +4,8 @@
 
 # This file is a sample parameter file for a 91-digit gnfs input
 
-# Anything after a # is a comment, until end of line. Any empty line is
-# ignored. All quotes in the comments in this file are for emphasis and
+# Anything after a # is a comment, until the end of the line. Any empty line
+# is ignored. All quotes in the comments in this file are for emphasis and
 # not part of the parameters.
 
 # Each parameter should be on an individual line.
@@ -35,15 +35,15 @@
 # parameters control the many different tunables of the execution of the
 # algorithm. Such parameters are relevant to only one of the steps of NFS,
 # and are thus listed under the section related to the corresponding
-# binary. Each of the sections corresponding to one step in particular
+# step. Each of the sections corresponding to one step in particular
 # also contains a couple of parameters relative to the execution
 # environment (for that step only).
 
 # The cadofactor.py script may be used as:
 # cadofactor.py <parametersfile> [<additional parameters> [...]]
 # Additional parameters on the command line are specified in the same
-# format as in this file, e.g., "foo.bar=42", and override values found in
-# the parameter file.
+# format as in this file, e.g., "foo.bar.baz=42", and override values found
+# in the parameter file.
 
 ###########################################################################
 # General parameters
@@ -55,8 +55,9 @@
 name = c91
 # All files created by cadofactor will be prefixed by this name.
 
-# N: The number to be factored
-N = 90377629292003121684002147101760858109247336549001090677693
+# N: The number to be factored. This c91 here is given only as an example,
+# replace it in this file or override it on the command line
+N = 7484129778122762762905825615590903357866314150303868023217155766667760580146456538241613273
 
 # Adjust sourcedir to point to the root of your CADO source directory.
 # This parameter is not actually used by cadofactor directly, but it is
@@ -71,6 +72,10 @@ builddir=${HOME}/build/cado-nfs/
 # specified, it is relative to the CWD from which cadofactor is run.
 # All the output files of sieving, filtering, etc., are stored under the
 # working directory.
+# Note that there is no need to have the working directory located under
+# the CADO source or build directory. In fact, it is advisable to keep it
+# separate to facilitate deleting or backing-up the sources, executables,
+# and factorization data individually.
 workdir = /tmp/
 
 
@@ -81,7 +86,7 @@ workdir = /tmp/
 # Tasks are the different steps of an NFS factorization: polynomial
 # selection, generating the factor base, sieving, etc.
 
-# execpath: Specify the search path for binary programs that should be run.
+# execpath: Specifies the search path for binary programs that should be run.
 # Each binary program that is run can be specified with "execpath",
 # "execsubdir", and "execbin" parameters; the script looks for the binary
 # executable as "execpath/execsubdir/execbin" and "execpath/execbin", in this
@@ -90,9 +95,10 @@ workdir = /tmp/
 tasks.execpath=$(builddir)
 
 # verbose: Verbosity of program output. Many programs accept a -v (or
-# similar) command line flag; this parameter specified whether verbose
+# similar) command line flag; this parameter specifies whether verbose
 # output should be enabled. Has no effect on cadofactor itself, just on the
-# sub-programs.
+# sub-programs. Cadofactor's own output is controlled by the --screenlog
+# command line parameter.
 tasks.verbose = 1
 
 # For tasks that use the client/server set-up, currently polynomial selection
@@ -136,17 +142,17 @@ tasks.polyselect.maxnorm = 33.4		# max. lognorm of polynomials (before rootsieve
     # promising. As a rule of thumb, we want at least 10 polynomials
     # in total below this bound.
 
-tasks.polyselect.admin = 0		# min value for lc(f)
+tasks.polyselect.admin = 0		# min value for leading coefficient of f(x)
     # If not set, the default is 0.
 
-tasks.polyselect.admax = 50000		# max value for lc(f)
+tasks.polyselect.admax = 50000		# max value for leading coefficient of f(x)
     # The polynomial selection search time is proportional to the
-    # length of the interval [polsel_admin,polsel_admax]
+    # length of the search interval is [admin, admax]
 
 tasks.polyselect.adrange = 5000		# size of individual tasks
     # Polynomial selection is split into several individual tasks. The
-    # complete range from polsel_admin to polsel_admax has to be covered for
-    # the polynomial selection to complete. The number of individual tasks is
+    # complete range from admin to admax has to be covered for the polynomial
+    # selection to complete. The number of individual tasks is
     # (polsel_admax-polsel_admin)/polsel_adrange. Each such task is issued as
     # a workunit to a slave for computation.
 
@@ -154,7 +160,9 @@ tasks.polyselect.incr = 60		# forced divisor of lc(f)
     # This factor is usually a smooth number, which forces projective roots in
     # the algebraic polynomial. 60 is a good start, 210 is popular as well.
 
-tasks.polyselect.nq = 1000 # FIXME: what does this do?
+tasks.polyselect.nq = 1000
+    # Number of small primes in the leading coefficient of the linear polynomial
+    # Safe to leave at the default value
 
 
 ###########################################################################
@@ -169,9 +177,9 @@ tasks.sieve.mfba = 48
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.2
     # rlambda/alambda is the early-abort ratio: if after sieving, and
-    # subtracting from the base 2 log of the norm the contribution of the
-    # sieved primes, the remaining approximate of the base 2 log of the
-    # norm is larger than lambda times lpb, we reject.
+    # subtracting from the log of the norm the contribution of the
+    # sieved primes, the approximation of the log of the remaining
+    # cofactor is larger than lambda times lpb, we reject.
     # Note that this has in particular the effect that if e.g. rlambda <
     # some integer k+1, then at most k large primes are allowed on the
     # rational side. It is customary, when at most k large primes are
@@ -190,11 +198,12 @@ tasks.sieve.ratq = 0
     # taken on the rational side (ratq=1) or on the algebraic side
     # (ratq=0). ratq should be set on the side where the largest norms are
     # expected. As a very rough rule of thumb, this means ratq=0 for gnfs
-    # runs, and on some occasions ratq=1 for snfs runs.
+    # runs and usually for snfs runs, but ratq=1 for snfs runs where the 
+    # degree of the polynomial is forced to be small by algebraic factors.
 
 tasks.sieve.qmin = 400000		# Start of the special-q range
-    # qmin is usually above the corresponding factor base bound, but this
-    # is not a requirement.
+    # qmin is usually equal to the corresponding factor base bound, but this
+    # is not a requirement - it can be both larger and smaller.
 
 tasks.sieve.qrange = 10000		# The size of an elementary sieving task
     # The sieving process is split into many individual tasks, where each task is
@@ -206,8 +215,6 @@ tasks.sieve.rels_wanted = 1660000		# Start of filtering tries
     # once we have accumulated <rels_wanted> relations (including duplicates).
     # A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or
     # 0.8*2^lpba/log(2^lpba) + 0.8*2^lpbrlog(2^lpbr) when lpba <> lpbr.
-    # The default value is 1, which means that with checkrange=1 filtering
-    # tries are done at the very beginning of the sieving.
     # Make sure to update <rels_wanted> whenever you update lpba or lpbr.
 
 tasks.sieve.threads = 2
@@ -223,12 +230,12 @@ tasks.filter.purge.keep = 160		# maximal excess wanted after purge
 					# (purge shrinks if needed)
 tasks.filter.maxlevel = 15		# perform up to <maxlevel>-way merges
 tasks.filter.ratio = 1.1		# used only when bwstrat=0 (see below)
-tasks.filter.merge.forbw = 3		# bwstrat=0: stops the merge when the weight of
+tasks.filter.merge.forbw = 3		# forbw=0: stops the merge when the weight of
 					#    the matrix multiplied by the number of rows c*N
 					#    exceeds ratio*min(c*N)
-					# bwstrat=1: stops when the product c*N is minimal
+					# forbw=1: stops when the product c*N is minimal
 					#    (more exactly when it increases 20 times in a row)
-					# bwstrat=3: stops when the average number of non-zero
+					# forbw=3: stops when the average number of non-zero
 					#    coefficients c/N exceeds coverNmax (default 100)
 tasks.merge.coverNmax = 100
 
@@ -263,6 +270,8 @@ tasks.linalg.characters.threads = 2
 # server.address = localhost
 
 # port: The server of the client/server set-up will listen at this port
+# If you want to run several cadofactor servers on the same machine, you
+# need to specify a different port for each one.
 server.port = 8001
 
 
@@ -309,6 +318,11 @@ slaves.nrclients = 2
 # scriptpath: The path to the wuclient2.py scripts, on the slave's file
 # system.
 
+# scriptpath must point to the directory in which the wuclient2.py script
+# can be found on the client machines. I.e., with scriptpath as set in this
+# example and if, for example, "sourcedir = /tmp/cado-nfs", then clients will
+# be started through: 
+# "ssh [hostname] /tmp/cado-nfs/scripts/cadofactor/wuclient2.py [client parameters]"
 slaves.scriptpath = $(sourcedir)/scripts/cadofactor
 
 # downloadretry: Number of seconds a client should wait between failed
@@ -332,7 +346,7 @@ slaves.niceness = 10		# nice level for the sieving jobs
 # Since this example runs its slaves on localhost, we use a subdirectory 
 # of the cadofactor.py working directory, so that all files of both master
 # and clients can be cleaned up easily.
-slaves.basepath = $(workdir)/testrun.wuclient
+slaves.basepath = $(workdir)/c91.wuclients
 
 # If you want to launch clients on multiple groups of slave machines, with
 # different parameters per group, you can group them by different parameter
