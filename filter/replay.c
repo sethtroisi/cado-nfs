@@ -588,15 +588,6 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     /* read first line */
     rp = fgets (str, STRLENMAX, hisfile);
 
-#if DEBUG >= 1
-    // [PG]: FIXME: seems to be broken for FFS ?
-    for(int i = 0; i < nrows; i++){
-	printf("row[%d]=", i);
-	for(int k = 1; k <= newrows[i][0]; k++)
-	    printf(" %d", newrows[i][k]);
-	printf("\n");
-    }
-#endif
 
     if (indexname != NULL) {
         // At the beginning, the index_data consists of relsets that
@@ -821,9 +812,15 @@ main(int argc, char *argv[])
   /* Read the matrix from purgedfile */
   read_purgedfile (newrows, purgedname, nrows, ncols, for_msieve);
   fprintf(stderr, "Read %" PRIu64 " rows from %s\n", nrows, purgedname);
-#if DEBUG >=1
   fprintf(stderr, "The biggest index appearing in a relation is %" PRIu64 "\n",
                   ncols);
+#if DEBUG >=1
+  for(uint64_t i = 0; i < nrows; i++)
+  {
+    fprintf(stderr, "row[%" PRIu64 "] :", i);
+    fprintRow(stderr, newrows[i]);
+    fprintf(stderr, "\n");
+  }
 #endif
 
 
