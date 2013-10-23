@@ -228,14 +228,6 @@ hasCol(int32_t **rows, int i, int32_t j)
     return 0;
 }
 
-int 
-cmp (const void *p, const void *q)
-{
-  int x = *((int *)p);
-  int y = *((int *)q);
-  return (x <= y ? -1 : 1);
-}
-
 // A line is "[-]i i1 ... ik [#j]"
 int parse_hisfile_line (int32_t *ind, char *t, int32_t *j)
 {
