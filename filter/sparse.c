@@ -13,10 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "portability.h"
+#include "utils.h"
 #include "macros.h"
+#include "filter_utils.h"
 #include "filter_matrix.h"
 #include "sparse.h"
-#include "utils.h"
 
 #define DEBUG 0
 
