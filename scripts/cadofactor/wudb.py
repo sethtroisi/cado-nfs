@@ -191,7 +191,14 @@ class MyCursor(sqlite3.Cursor):
                 else:
                     self.execute(command, values)
                 break
-            except sqlite3.OperationalError as e:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+                if str(e) == "database disk image is malformed" or \
+                        str(e) == "disk I/O error":
+                    logger.critical("sqlite3 reports error accessing the database.")
+                    logger.critical("Database file may have gotten corrupted, "
+                            "or maybe filesystem does not properly support "
+                            "file locking.")
+                    raise
                 i += 1
                 if i == 10 or str(e) != "database is locked":
                     raise
