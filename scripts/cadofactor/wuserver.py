@@ -179,7 +179,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             try:
                 super().do_GET()
             except socket_error as e:
-                self.log_warning("Connection error: %s", str(e))
+                self.log_error("Connection error: %s", str(e))
         sys.stdout.flush()
 
     def do_POST(self):
