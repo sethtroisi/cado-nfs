@@ -2499,7 +2499,7 @@ sub do_sieve {
         }
 
         # Check relations
-        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
+        my $ret = cmd("$param{'bindir'}/misc/check_rels ".
                       "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
         unlink "$check" unless $full;
 
@@ -2649,7 +2649,7 @@ sub do_sieve_bench {
         }
 
         # Check relations
-        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
+        my $ret = cmd("$param{'bindir'}/misc/check_rels ".
                       "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
         unlink "$check" unless $full;
 

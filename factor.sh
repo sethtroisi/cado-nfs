@@ -86,7 +86,7 @@ python=true
 cores=1
 slaves=1
 verbose=false
-for ((i=1; i<=3; i=i+1)) ; do
+while [ -n "$1" ] ; do
   if [ "$1" = "-t" ]; then
     cores=$2
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then

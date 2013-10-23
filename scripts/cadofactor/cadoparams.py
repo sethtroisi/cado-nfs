@@ -51,6 +51,8 @@ class BoolParam(object):
     def __bool__(self):
         return self.value
 
+    def __str__(self):
+        return str(self.value)
 
 class Parameters(object):
     """ Class that stores parameters for cadofactor in hierarchical dictionaries
