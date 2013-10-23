@@ -4,18 +4,13 @@
 #include "purgedfile.h"
 #include "typedefs.h"
 
-typedef struct {
-  index_t id;
-  int32_t e;
-} ideal_merge_ffs_t;
-
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
 #ifndef FOR_DL
 #define typerow_t index_t
 #else
-#define typerow_t ideal_merge_ffs_t
+#define typerow_t ideal_merge_t
 #endif
 
 
@@ -73,7 +68,7 @@ extern void print_row(filter_matrix_t *mat, int i);
 #ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
-#define setCell(cell, v, c) cell = (ideal_merge_ffs_t) {.id = v, .e = c}
+#define setCell(cell, v, c) cell = (ideal_merge_t) {.id = v, .e = c}
 #else
 #define matLengthRow(mat, i) (mat)->rows[(i)][0]
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)]
