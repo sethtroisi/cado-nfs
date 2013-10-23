@@ -15,8 +15,10 @@
 #include "portability.h"
 #include "utils.h"
 
+#include "filter_utils.h"
 #include "merge_opts.h"
 #include "filter_matrix.h"
+#include "filter_utils.h"
 #include "sparse.h"
 #include "mst.h"
 #include "report.h"
@@ -565,7 +567,7 @@ findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat)
 	    tmp[itmp++] = i;
 	}
     // rows with largest score will be at the end
-    qsort(tmp, itmp>>1, 2 * sizeof(int), cmp);
+    qsort(tmp, itmp>>1, 2 * sizeof(int), cmp_int2);
     return itmp;
 }
 

@@ -13,10 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "portability.h"
+#include "utils.h"
 #include "macros.h"
+#include "filter_utils.h"
 #include "filter_matrix.h"
 #include "sparse.h"
-#include "utils.h"
 
 #define DEBUG 0
 
@@ -225,14 +226,6 @@ hasCol(int32_t **rows, int i, int32_t j)
 	if(rows[i][k] == j)
 	    return 1;
     return 0;
-}
-
-int 
-cmp (const void *p, const void *q)
-{
-  int x = *((int *)p);
-  int y = *((int *)q);
-  return (x <= y ? -1 : 1);
 }
 
 // A line is "[-]i i1 ... ik [#j]"

@@ -124,7 +124,7 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   matLengthRow(mat, rel->num) = next_id;
   memcpy(mat->rows[rel->num]+1, buf, next_id * sizeof(typerow_t));
   // sort indices in val to ease row merges
-  qsort(mat->rows[rel->num]+1, next_id, sizeof(typerow_t), cmp);
+  qsort(mat->rows[rel->num]+1, next_id, sizeof(typerow_t), cmp_typerow_t);
 
   return NULL;
 }
