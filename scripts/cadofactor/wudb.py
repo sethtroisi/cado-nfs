@@ -572,7 +572,13 @@ class DictDbAccess(collections.MutableMapping):
     def __del__(self):
         """ Close the DB connection and delete the in-memory dictionary """
         if self._ownconn:
-            conn_close(self._conn)
+            # When we shut down Python hard, e.g., in an exception, the 
+            # conn_close() function object may have been destroyed already
+            # and trying to call it would raise another exception.
+            if callable(conn_close):
+                conn_close(self._conn)
+            else:
+                self._conn.close()
     
     def __convert_value(self, row):
         valuestr = row["value"]
@@ -812,8 +818,10 @@ class WuAccess(object): # {
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
     def __del__(self):
-        if self._ownconn:
+        if callable(conn_close):
             conn_close(self.conn)
+        else:
+            self._conn.close()
     
     @staticmethod
     def to_str(wus):

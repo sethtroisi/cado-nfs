@@ -154,7 +154,8 @@ tasks.linalg.bwc.threads = 2x2
 
 
 # port: The server of the client/server set-up will listen at this
-# port
+# port. It can be useful to specify a different value (8001, 8002, ...)
+# to be able to run several factorizations on the same machine.
 
 server.port = 8012
 
