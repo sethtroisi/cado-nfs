@@ -577,8 +577,9 @@ class WorkunitClient(object):
                 return urllib_request.urlopen(request, cafile=cafile)
             else:
                 # Python 2 urllib does not implement certificate checks.
-                # We need a work-around
-                raise Exception("HTTPS not implemented for Python 2")
+                # FIXME: We need a work-around.
+                # For the time being, we just use HTTPS without check
+                return urllib_request.urlopen(request)
         else:
             # If we are not using HTTPS, we can just let urllib do it, 
             # and there is no need for a cafile parameter (which Python 2
@@ -638,9 +639,9 @@ class WorkunitClient(object):
         url = self.settings["SERVER"].rstrip("/") + "/" + urlpath.lstrip("/")
         if options:
             url = url + "?" + options
-        logging.info ("Downloading %s to %s", url, dlpath)
-        wait = float(self.settings["DOWNLOADRETRY"])
         cafile = self.settings.get("CERTFILE", None)
+        logging.info ("Downloading %s to %s (cafile = %s)", url, dlpath, cafile)
+        wait = float(self.settings["DOWNLOADRETRY"])
         request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
         try:
@@ -776,7 +777,8 @@ class WorkunitClient(object):
         request = urllib_request.Request(url, data=postdata, 
                                          headers=dict(mimedata.items()))
         wait = float(self.settings["DOWNLOADRETRY"])
-        conn = self._urlopen(request, wait, is_upload=True)
+        cafile = self.settings.get("CERTFILE", None)
+        conn = self._urlopen(request, wait, is_upload=True, cafile=cafile)
         if not conn:
             return False
         response = conn.read()
@@ -840,7 +842,7 @@ class WorkunitClient(object):
 
 def get_ssl_certificate(server, port=443):
     cert = ssl.get_server_certificate((server, int(port)),
-                                      ssl_version=ssl.PROTOCOL_TLSv1,
+                                      ssl_version=ssl.PROTOCOL_SSLv23,
                                       ca_certs=None)
     return cert
 
