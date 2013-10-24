@@ -3,6 +3,7 @@ import logging
 import re
 import cadoprograms
 import cadologger
+from os import environ as os_environ
 
 logger = logging.getLogger("Command")
 
@@ -92,12 +93,20 @@ class Command(object):
         
         return (self.child.returncode, stdout, stderr)
 
+PRINTED_SSHAUTH_WARNING = False
+
 class RemoteCommand(Command):
     def __init__(self, program, host, parameters, *args, **kwargs):
         # We use a make_command_line() instead of make_command_array() so that,
         # e.g., stdio redirection to files specified in program can be added
         # to the command line with and the redirection happens on the remote
         # host
+        global PRINTED_SSHAUTH_WARNING
+        if not PRINTED_SSHAUTH_WARNING and not "SSH_AUTH_SOCK" in os_environ:
+            logger.warn("No SSH_AUTH_SOCK shell environment variable found.")
+            logger.warn("Make sure to set up an ssh key and ssh-agent to "
+                        "avoid ssh asking for a passphrase.")
+            PRINTED_SSHAUTH_WARNING = True
         cmdline = program.make_command_line()
         progparams = parameters.myparams(cadoprograms.SSH.get_accepted_keys(),
                                          cadoprograms.SSH.name)
