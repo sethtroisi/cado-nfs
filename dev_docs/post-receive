@@ -144,6 +144,9 @@ while (defined($_=<STDIN>)) {
         $text_plain .= " $commit $subject\n";
 	push @newbranch_commits, $commit if $old =~ /^0+$/;
         my $link = commit_link($commit);
+        if ($gitweb) {
+            $subject =~ s/commit ([0-9a-f]{7}|[0-9a-f]{40})/"commit " . &commit_link($1)/eg;
+        }
         $text_html .= "<li>$link $subject</li>\n";
         $last_subject = $subject;
         $nc++;
