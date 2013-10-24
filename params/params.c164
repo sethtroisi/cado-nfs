@@ -62,7 +62,7 @@ lpba=31
 mfbr=62
 mfba=93
 rlambda=2.1
-alambda=3.2
+alambda=2.8
 
 I=14                    # Sieving range in lattice siever
 qmin=50000000           # Start of the special-q range
