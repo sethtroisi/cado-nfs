@@ -663,7 +663,7 @@ ularith_invmod (const unsigned long n)
     r' = r - r * k*2^32
     r' = r - ((r * k) % 2^32) * 2^32
   */
-  unsigned int k = r * n >> 32;
+  unsigned int k = (unsigned int)(r * n >> 32);
   k *= (unsigned int) r;
   r = r - ((unsigned long)k << 32);
 #endif
@@ -677,9 +677,10 @@ ularith_invmod (const unsigned long n)
 static inline unsigned long
 ularith_sqrt (const unsigned long n)
 {
-  int i;
+  unsigned int i;
   unsigned long xs, c, d, s2;
-  const unsigned int l = sizeof (unsigned long) * 8 - 1 - __builtin_clzl(n);
+  const unsigned int l = (unsigned int)sizeof (unsigned long) * 8 - 1
+                       - (unsigned int)__builtin_clzl(n);
 
   d = n; /* d = n - x^2 */
   xs = 0UL;
