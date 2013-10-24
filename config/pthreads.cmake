@@ -1,4 +1,4 @@
-include(${CADO_NFS_SOURCE_DIR}/config/search_for_function.cmake)
+include(${PROJECT_SOURCE_DIR}/config/search_for_function.cmake)
 
 set(CMAKE_REQUIRED_LIBRARIES)
 search_for_function(pthread_create HAVE_PTHREAD_CREATE pthread)

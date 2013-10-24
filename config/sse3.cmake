@@ -2,8 +2,8 @@
 # SSE-3
 message(STATUS "Testing whether sse-3 code can be used")
 try_run(sse3_runs sse3_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/sse3.c)
+            ${PROJECT_BINARY_DIR}/config
+            ${PROJECT_SOURCE_DIR}/config/sse3.c)
 if(sse3_compiles)
     if (sse3_runs MATCHES FAILED_TO_RUN)
         message(STATUS "Testing whether sse-3 code can be used -- No")
@@ -14,8 +14,8 @@ if(sse3_compiles)
     endif (sse3_runs MATCHES FAILED_TO_RUN)
 else(sse3_compiles)
     try_run(sse3_runs sse3_compiles
-        ${CADO_NFS_BINARY_DIR}/config
-        ${CADO_NFS_SOURCE_DIR}/config/sse3.c
+        ${PROJECT_BINARY_DIR}/config
+        ${PROJECT_SOURCE_DIR}/config/sse3.c
         COMPILE_DEFINITIONS -msse3)
     if(sse3_compiles)
         if (sse3_runs MATCHES FAILED_TO_RUN)

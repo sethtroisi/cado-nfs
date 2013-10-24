@@ -58,7 +58,7 @@ lpbr=26
 lpba=26
 mfbr=52
 mfba=52
-rlambda=2.2
+rlambda=2.1
 alambda=2.2
 
 I=12                    # Sieving range in lattice siever

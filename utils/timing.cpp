@@ -83,8 +83,8 @@ seconds_user_sys (double * res)
     struct rusage ru[1];
 
     getrusage (RUSAGE_SELF, ru);
-    res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
-    res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
+    res[0] = (double)ru->ru_utime.tv_sec + (double)ru->ru_utime.tv_usec/1.0e6;
+    res[1] = (double)ru->ru_stime.tv_sec + (double)ru->ru_stime.tv_usec/1.0e6;
 #else
     res[0] = res[1] = 0.;
 #endif
@@ -98,7 +98,7 @@ wct_seconds (void)
 {
     struct timeval tv[1];
     gettimeofday (tv, NULL);
-    return (double) tv->tv_sec + 1.0e-6 * tv->tv_usec;
+    return (double)tv->tv_sec + (double)tv->tv_usec*1.0e-6;
 }
 
 void
@@ -119,8 +119,8 @@ void thread_seconds_user_sys(double * res)
 {
     struct rusage ru[1];
     getrusage(RUSAGE_THREAD, ru);
-    res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
-    res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
+    res[0] = (double)ru->ru_utime.tv_sec + (double)ru->ru_utime.tv_usec/1.0e6;
+    res[1] = (double)ru->ru_stime.tv_sec + (double)ru->ru_stime.tv_usec/1.0e6;
 }
 #elif defined(__linux)
 #include <unistd.h>
@@ -237,8 +237,10 @@ void timingstats_dict_disp(timingstats_dict_ptr p)
         double ts = 0;
         int n = 0;
         for(j = i ; j != s.end() && j->first == i->first ; j++, n++) {
-            tu += j->second.ru_utime.tv_sec + (j->second.ru_utime.tv_usec / 1.0e6);
-            ts += j->second.ru_stime.tv_sec + (j->second.ru_stime.tv_usec / 1.0e6);
+            tu += (double)j->second.ru_utime.tv_sec
+                + (double)j->second.ru_utime.tv_usec / 1.0e6;
+            ts += (double)j->second.ru_stime.tv_sec
+                + (double)j->second.ru_stime.tv_usec / 1.0e6;
         }
         printf("%s: %d process%s, total %.2fs+%.2fs on cpu\n",
                 i->first.c_str(), n, n>1 ? "es" : "", tu, ts);
