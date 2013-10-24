@@ -781,6 +781,7 @@ class WuClient(Program):
                  niceness: Parameter(prefix='--') = None,
                  wu_filename: Parameter(prefix='--') = None,
                  arch: Parameter(prefix='--') = None,
+                 certsha1: Parameter(prefix='--') = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
