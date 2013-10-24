@@ -33,7 +33,7 @@ lpba = 30
 tasks.sieve.mfbr = 60
 tasks.sieve.mfba = 90
 tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 3.2
+tasks.sieve.alambda = 2.8
 
 tasks.sieve.I = 13		
 tasks.sieve.qmin = 40000000		
