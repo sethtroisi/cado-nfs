@@ -127,6 +127,11 @@ tasks.polyselect.admax = 10000
 tasks.polyselect.adrange = 5000
 tasks.polyselect.maxnorm = 21.5
 
+# define tasks.sieving.ratq to True if you want special-q's to be taken on
+# the rational side (by default they are on the algebraic side), this can be
+# better in the case of SNFS polynomials
+tasks.sieving.ratq=False
+
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000
 tasks.sieve.I = 11
