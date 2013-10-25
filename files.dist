@@ -411,7 +411,6 @@ macros.h
 misc/CMakeLists.txt
 misc/convert_poly.c
 misc/convert_rels.c
-misc/complete_rels.c
 misc/check_rels.c
 params/mach_desc
 params/params.c100

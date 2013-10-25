@@ -21,13 +21,13 @@ or msieve.
    all prime factors, you will need to complete all relations files that are in
    ggnfs or msieve format using:
 
-   $ build/<hostname>/misc/complete_rels -out rels.out.gz -poly <polyfile> file0 file1 ... filen 
+   $ build/<hostname>/misc/check_rels -complete rels.out.gz -poly <polyfile> file0 file1 ... filen 
         or
-   $ build/<hostname>/misc/complete_rels -out rels.out.gz -poly <polyfile> -filelsit <filelist>
+   $ build/<hostname>/misc/check_rels -complete rels.out.gz -poly <polyfile> -filelsit <filelist>
         where <filelist> is a name of a file containing the list of all
         relations files
 
-    See complete_rels -h for others options.
+    See check_rels -h for others options.
 
 3) Create a parameterfile for the Python script: see, in the scripts/cadofactor
 directory, the files 'parameters' and 'REAMDE'. In the README file, read

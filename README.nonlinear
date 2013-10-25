@@ -51,7 +51,8 @@ $ $CADO/misc/convert_rels -if fk $FILES | gzip --stdout > c59.rels.gz
 You also may have to check that relations are complete and do not contain
 non-prime ideals using:
 
-$ $CADO/misc/complete_rels -out rels.out.gz -poly c59.poly c59.rels.gz
+$ $CADO/misc/check_rels -check_primality -complete rels.out.gz -poly c59.poly c59.rels.gz
+    (if the (a,b)-pair are written is hexa, do not forget to add -abhexa)
 
 3) Finally you can use cadofactor.py to continue the factorization with CADO.
 For more details, see README.msieve (I.3 and I.4)
