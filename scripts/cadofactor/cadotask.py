@@ -656,6 +656,7 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
         """
+        assert isinstance(program, str)
         key = "%s_%s" % ("cputime" if is_cpu else "realtime", program)
         total = self.state.get(key, 0.) + seconds
         # Update only if the value changed, i.e., if seconds != 0.
@@ -675,8 +676,8 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
 
     def print_stats(self):
         for program in self.programs:
-            cputotal = self.update_cpu_or_real_time(True, program, 0.)
-            realtotal = self.update_cpu_or_real_time(False, program, 0.)
+            cputotal = self.update_cpu_or_real_time(True, program.name, 0.)
+            realtotal = self.update_cpu_or_real_time(False, program.name, 0.)
             self.print_cpu_real_time(cputotal, realtotal, program.name)
         super().print_stats()
 
@@ -848,8 +849,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         (rc, stdout, stderr) = process.wait()
         cputime_used = os.times()[2] - cputime_used
         realtime_used = time.time() - realtime_used
-        self.update_cpu_or_real_time(True, command, cputime_used, False)
-        self.update_cpu_or_real_time(False, command, realtime_used, commit)
+        self.update_cpu_or_real_time(True, command.name, cputime_used, False)
+        self.update_cpu_or_real_time(False, command.name, realtime_used, commit)
         message = Task.ResultInfo(wuname, rc, stdout, stderr,
                                   command.get_output_files())
         if isinstance(self, patterns.Observer):
@@ -1769,9 +1770,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def get_total_cpu_or_real_time(self, is_cpu):
         """ Return number of seconds of cpu time spent by las """
         if is_cpu:
-            return float(self.state.get("stats_total_cpu_time", [0.])[0])
+            return float(self.statistics.stats.get("stats_total_cpu_time", [0.])[0])
         else:
-            return float(self.state.get("stats_total_time", [0.])[0])
+            return float(self.statistics.stats.get("stats_total_time", [0.])[0])
 
 
 class Duplicates1Task(Task, FilesCreator, HasStatistics):
@@ -3189,6 +3190,8 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     def run(self):
         had_interrupt = False
         self.logger.info("Factoring %s", self.params["N"])
+        self.start_elapsed_time()
+
         self.server.serve()
         
         try:
@@ -3199,21 +3202,23 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             
             for task in self.tasks:
                 task.print_stats()
-            
-            cputotal = self.get_total_cpu_or_real_time(True)
-            realtotal = self.get_total_cpu_or_real_time(False)
-            self.print_cpu_real_time(cputotal, realtotal, "everything");
         
         except KeyboardInterrupt:
             self.logger.fatal("Received KeyboardInterrupt. Terminating")
             had_interrupt = True
-        
+
         self.stop_all_clients()
-        
         self.server.shutdown()
+
         if had_interrupt:
             return None
         else:
+            elapsed = self.end_elapsed_time()
+            cputotal = self.get_total_cpu_or_real_time(True)
+            # Do we want the sum of real times over all sub-processes for
+            # something?
+            # realtotal = self.get_total_cpu_or_real_time(False)
+            self.print_cpu_real_time(cputotal, elapsed, "everything");
             return self.sqrt.get_factors()
     
     def start_all_clients(self):
@@ -3223,6 +3228,26 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     def stop_all_clients(self):
         for clients in self.clients:
             clients.kill_all_clients()
+
+    def start_elapsed_time(self):
+        if "starttime" in self.state:
+            self.logger.warning("The start time of the last cadofactor.py "
+                                "run was recorded, but not its end time, "
+                                "maybe because it died unexpectedly.")
+            self.logger.warning("Elapsed time of last run is not known and "
+                                "will not be counted towards total.")
+        self.state["starttime"] = time.time()
+        
+    def end_elapsed_time(self):
+        if not "starttime" in self.state:
+            self.logger.error("Missing starttime in end_elapsed_time(). "
+                              "This should not have happened.")
+            return
+        elapsed = time.time() - self.state["starttime"]
+        elapsed += self.state.get("elapsed", 0)
+        self.state.__delitem__("starttime", commit=False)
+        self.state.update({"elapsed": elapsed}, commit=True)
+        return elapsed
     
     def run_next_task(self):
         for task in self.tasks:
@@ -3234,6 +3259,13 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         return False
     
     def get_total_cpu_or_real_time(self, is_cpu):
+        total = 0;
+        for task in self.tasks:
+            task_time = task.get_total_cpu_or_real_time(is_cpu)
+            total += task_time
+            # self.logger.info("Task %s reports %s time of %g, new total: %g",
+            #         task.name, "cpu" if is_cpu else "real", task_time, total)
+        return total
         return sum([task.get_total_cpu_or_real_time(is_cpu) \
                 for task in self.tasks])
 
