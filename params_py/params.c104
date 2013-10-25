@@ -32,7 +32,7 @@ lpbr = 26
 lpba = 26
 tasks.sieve.mfbr = 52
 tasks.sieve.mfba = 52
-tasks.sieve.rlambda = 2.2
+tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.2
 
 tasks.sieve.I = 12		

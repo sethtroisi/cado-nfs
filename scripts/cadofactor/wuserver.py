@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import http.server
+import socket
 import socketserver
 from socket import error as socket_error
 import os
@@ -15,6 +16,13 @@ import wudb
 import upload
 import select
 import errno
+from subprocess import check_output, CalledProcessError, STDOUT
+try:
+    import ssl
+    HAVE_SSL = True
+except ImportError:
+    HAVE_SSL = False
+    
 
 # Import upload to get the shell environment variable name in which we should
 # store the path to the upload directory
@@ -41,6 +49,18 @@ class FixedHTTPServer(http.server.HTTPServer):
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
+
+class HTTPSServer(http.server.HTTPServer):
+    def __init__(self, server_address, HandlerClass, certfile=None, keyfile=None):
+        socketserver.BaseServer.__init__(self, server_address, HandlerClass)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+        self.socket = ctx.wrap_socket(socket.socket(self.address_family, self.socket_type), server_side=True)
+        self.server_bind()
+        self.server_activate()
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPSServer):
+    """Handle requests in a separate thread."""
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
@@ -326,16 +346,19 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.end_headers()
         self.send_body(body.__bytes__())
 
+
 class ServerLauncher(object):
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, *, bg = False,
-                use_db_pool = True, scriptdir = None, only_registered=False):
+                use_db_pool = True, scriptdir = None, only_registered=False,
+                cafile=None):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
         self.address = address
         self.port = port
+        self.cafile = cafile
         upload_scriptname = "upload.py"
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
@@ -345,12 +368,6 @@ class ServerLauncher(object):
         #self.logger.propagate = False
         
         self.bg = bg
-        if threaded:
-            logging.info("Using threaded server")
-            ServerClass = ThreadedHTTPServer
-        else:
-            logging.info("Not using threaded server")
-            ServerClass = FixedHTTPServer
         if use_db_pool:
             self.db_pool = wudb.DbThreadPool(dbfilename, 1)
         else:
@@ -383,9 +400,31 @@ class ServerLauncher(object):
         os.environ[upload.UPLOADDIRKEY] = uploaddir
         if not os.path.isdir(uploaddir):
             os.mkdir(uploaddir)
+
+        # See if we can use HTTPS
+        scheme = "http"
+        self.cert_sha1 = None
+        if self.create_certificate():
+            self.cert_sha1 = self.get_certificate_hash()
+            if not self.cert_sha1 is None:
+                scheme = "https"
+        self.url = "%s://%s:%d" % (scheme, self.address, self.port)
         
         try:
-            self.httpd = ServerClass((address, port), MyHandlerWithParams, )
+            if threaded and scheme == "http":
+                logging.info("Using threaded HTTP server")
+                self.httpd = ThreadedHTTPServer((address, port), MyHandlerWithParams)
+            elif not threaded and scheme == "http":
+                logging.info("Using non-threaded HTTP server")
+                self.httpd = FixedHTTPServer((address, port), MyHandlerWithParams)
+            elif threaded and scheme == "https":
+                logging.info("Using threaded HTTPS server")
+                self.httpd = ThreadedHTTPSServer((address, port), MyHandlerWithParams, self.cafile)
+            elif not threaded and scheme == "https":
+                logging.info("Using non-threaded HTTPS server")
+                self.httpd = HTTPSServer((address, port), MyHandlerWithParams, self.cafile)
+            else:
+                assert False
         except socket_error as e:
             if e.errno == errno.EADDRINUSE:
                 self.logger.critical("Address %s:%d is already in use (maybe "
@@ -394,10 +433,67 @@ class ServerLauncher(object):
                         "server.port=<integer>.")
                 sys.exit(1)
         self.httpd.server_name = self.name
+
+    def get_url(self):
+        return self.url
+
+    def get_cert_sha1(self):
+        return self.cert_sha1
+
+    def create_certificate(self):
+        if self.cafile is None:
+            return False
+        if os.path.isfile(self.cafile):
+            return True
+        if not HAVE_SSL:
+            self.logger.warn("ssl module not available, won't generate certificate")
+            return False
+        subj = [
+            "C=XY",
+            "ST=None",
+            "O=None",
+            "localityName=None",
+            "commonName=%s" % self.address,
+            "organizationalUnitName=None",
+            "emailAddress=None"
+        ]
+        
+        command = ['openssl', 'req', '-new', '-x509', '-batch', '-days', '365',
+                   '-nodes', '-subj', '/%s/' % '/'.join(subj), 
+                   '-out', self.cafile, '-keyout', self.cafile]
+        try:
+            output = check_output(command, stderr=STDOUT)
+        except (OSError, CalledProcessError) as e:
+            self.logger.error("openssl failed: %s", e)
+            return False
+        self.logger.debug("openssl output: %s", output)
+        return True
+
+    def get_certificate_hash(self):
+        if self.cafile is None:
+            return None
+        if not HAVE_SSL:
+            self.logger.warn("ssl module not available, won't generate fingerprint")
+            return None
+        command = ['openssl', 'x509', '-in', self.cafile, '-fingerprint']
+        try:
+            output = check_output(command)
+        except (OSError, CalledProcessError) as e:
+            self.logger.error("openssl failed: %s", e)
+            return None
+        output_text = output.decode("ascii")
+        for line in output_text.splitlines():
+            if line.startswith("SHA1 Fingerprint="):
+                return line.split('=', 1)[1].replace(":", "").lower()
+        return None
     
     def serve(self):
-        logging.info("serving at http://%s:%d (%s)",
-                     self.address, self.port, self.httpd.server_address[0])
+        logging.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
+        if not self.cert_sha1 is None:
+            logging.info("Start clients with parameters: --server=%s --certsha1=%s",
+                         self.url, self.cert_sha1)
+        else:
+            logging.info("Start clients with parameters: --server=%s", self.url)
         
         if self.bg:
             from threading import Thread

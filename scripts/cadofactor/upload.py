@@ -123,6 +123,18 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             diag(1, "output filename = ", filename)
             filestuple = [fileitem.filename, filename]
             
+            # mkstmp() creates files with mode 0o600 (before umask), and does
+            # not allow overriding this with a parameter. We change the mode
+            # to 666 & ~umask.
+
+            # The os.umask() function gets the old umask *and* sets a new one,
+            # so we have to call it twice to avoid changing it :(
+            umask = os.umask(0o022)
+            os.umask(umask)
+            filemode = 0o666 & ~umask
+            diag(1, "Setting %s to mode %o" % (filename, filemode))
+            os.fchmod(filedesc, filemode)
+            
             filetype = fileitem.headers.get("filetype", None)
             if not filetype is None:
                 filestuple.append(filetype)
