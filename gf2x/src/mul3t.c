@@ -77,7 +77,7 @@ void gf2x_mul3(unsigned long *t, unsigned long const *s1,
     __v2di g[16];
     /* sequence update walk */
     g[0] = (__v2di) { 0, };
-    g[1] = (__v2di) (__v4si) { s2[0], s2[1], s2[2], 0 };
+    g[1] = (__v2di) (__v4si) { (long)s2[0], (long)s2[1], (long)s2[2], 0 };
     g[2] = SHL(g[1], 1);
     g[3] = g[2] ^ g[1];
     g[4] = SHL(g[2], 1);
@@ -148,12 +148,12 @@ void gf2x_mul3(unsigned long *t, unsigned long const *s1,
 
     /* repair steps */
     /* repair section 200711-200803 */
-    __v2di v1 = (__v2di) (__v4si) { s1[0], s1[1], s1[0], s1[1], };
+    __v2di v1 = (__v2di) (__v4si) { (long)s1[0], (long)s1[1], (long)s1[0], (long)s1[1], };
     v1 = SHR(v1, 1);
-    __v2di v2 = (__v2di) (__v4si) { s1[2], 0, s1[2], 0, };
+    __v2di v2 = (__v2di) (__v4si) { (long)s1[2], 0, (long)s1[2], 0, };
     v2 = SHR(v2, 1);
     __v2di w;
-    __v2di m = (__v2di) (__v4si) { 0x77777777UL, 0x77777777UL, 0x77777777UL, 0x77777777UL, };
+    __v2di m = (__v2di) (__v4si) { 0x77777777L, 0x77777777L, 0x77777777L, 0x77777777L, };
     w = -SHR(g[1],63);
     v1 = v1 & m;
     t1 ^= v1 & w;

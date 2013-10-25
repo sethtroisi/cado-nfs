@@ -46,8 +46,8 @@
 static inline __v2di
 GF2X_FUNC(mul5clk_c_mul1) (unsigned long a, unsigned long b)
 {   
-    __v2di aa = (__v2di) { a, 0 };
-    __v2di bb = (__v2di) { b, 0 };
+    __v2di aa = (__v2di) { (long long)a, 0 };
+    __v2di bb = (__v2di) { (long long)b, 0 };
     return _mm_clmulepi64_si128(aa, bb, 0);
 }   
 GF2X_STORAGE_CLASS_mul5

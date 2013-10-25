@@ -46,8 +46,8 @@
 GF2X_STORAGE_CLASS_mul1 void
 gf2x_mul1 (unsigned long *c, unsigned long a, unsigned long b)
 {
-    __v2di aa = (__v2di) { a, 0 };
-    __v2di bb = (__v2di) { b, 0 };
+    __v2di aa = (__v2di) { (long long)a, 0 };
+    __v2di bb = (__v2di) { (long long)b, 0 };
     _mm_storeu_si128((__v2di*)c, _mm_clmulepi64_si128(aa, bb, 0));
 }
 
@@ -60,14 +60,14 @@ gf2x_mul_1_n (unsigned long *cp, const unsigned long *bp, long sb, unsigned long
         unsigned long x[2];
     } __v2di_proxy;
 
-    __v2di y = (__v2di) { a, a };
+    __v2di y = (__v2di) { (long long)a, (long long)a };
     __v2di x;
     __v2di_proxy cc;
 
 
     // do two at a time
     for (i = 0; i + 2 < sb; i += 2) { 
-        x = (__v2di) { bp[i], bp[i+1] };
+        x = (__v2di) { (long long)bp[i], (long long)bp[i+1] };
         cc.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             cp[i] = cc.x[0];
@@ -81,7 +81,7 @@ gf2x_mul_1_n (unsigned long *cp, const unsigned long *bp, long sb, unsigned long
     // last is different, to handle carry out
     unsigned long cy;
     if (i == sb - 2) {  // case bp is even
-        x = (__v2di) { bp[i], bp[i+1] }; 
+        x = (__v2di) { (long long)bp[i], (long long)bp[i+1] }; 
         cc.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             cp[i] = cc.x[0];
@@ -92,7 +92,7 @@ gf2x_mul_1_n (unsigned long *cp, const unsigned long *bp, long sb, unsigned long
         cp[i+1] ^= cc.x[0];
         cy = cc.x[1];
     } else { //case bp is odd
-        x = (__v2di) { bp[i], 0 }; 
+        x = (__v2di) { (long long)bp[i], 0 }; 
         cc.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             cp[i] = cc.x[0];
@@ -112,13 +112,13 @@ gf2x_addmul_1_n (unsigned long *dp, const unsigned long *cp, const unsigned long
         unsigned long x[2];
     } __v2di_proxy;
 
-    __v2di y = (__v2di) { a, a };
+    __v2di y = (__v2di) { (long long)a, (long long)a };
     __v2di x;
     __v2di_proxy dd;
 
     // do two at a time
     for (i = 0; i + 2 < sb; i += 2) { 
-        x = (__v2di) { bp[i], bp[i+1] };
+        x = (__v2di) { (long long)bp[i], (long long)bp[i+1] };
         dd.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             dp[i] = cp[i] ^ dd.x[0];
@@ -131,7 +131,7 @@ gf2x_addmul_1_n (unsigned long *dp, const unsigned long *cp, const unsigned long
     }
     unsigned long cy;
     if (i == sb - 2) {  // case bp is even
-        x = (__v2di) { bp[i], bp[i+1] }; 
+        x = (__v2di) { (long long)bp[i], (long long)bp[i+1] }; 
         dd.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             dp[i] = cp[i] ^ dd.x[0];
@@ -142,7 +142,7 @@ gf2x_addmul_1_n (unsigned long *dp, const unsigned long *cp, const unsigned long
         dp[i+1] ^= dd.x[0];
         cy = dd.x[1];
     } else {
-        x = (__v2di) { bp[i], 0 };
+        x = (__v2di) { (long long)bp[i], 0 };
         dd.s = _mm_clmulepi64_si128(x, y, 0);
         if (i == 0) 
             dp[i] = cp[i] ^ dd.x[0];

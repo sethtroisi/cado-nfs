@@ -69,14 +69,14 @@ void gf2x_mul2(unsigned long * t, unsigned long const * s1,
 
     __v2di g[16];
     __v2di w;
-    __v2di m = (__v2di) { 0xeeeeeeeeeeeeeeeeUL, 0xeeeeeeeeeeeeeeeeUL, };
+    __v2di m = (__v2di) { 0xeeeeeeeeeeeeeeeeLL, 0xeeeeeeeeeeeeeeeeLL, };
     /* sequence update walk */
     g[ 0] = (__v2di) { 0, };
     __v2di b0 = _mm_loadu_si128((__v2di*) s2);
     g[ 1] = b0;
-    __v2di v1 = (__v2di) { s1[0], s1[0], };
+    __v2di v1 = (__v2di) { (long long)s1[0], (long long)s1[0], };
     w = -SHR(b0,63);
-    __v2di v2 = (__v2di) { s1[1], s1[1], };
+    __v2di v2 = (__v2di) { (long long)s1[1], (long long)s1[1], };
     v1 = SHR(v1 & m, 1); t1 = v1 & w;
     g[ 2] = SHL(b0, 1); g[ 3] = g[ 2] ^ b0;
     v2 = SHR(v2 & m, 1); t2 = v2 & w;

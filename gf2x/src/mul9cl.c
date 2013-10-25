@@ -44,8 +44,8 @@
 static inline __v2di
 GF2X_FUNC(mul9clk_c_mul1) (unsigned long a, unsigned long b)
 {   
-    __v2di aa = (__v2di) { a, 0 };
-    __v2di bb = (__v2di) { b, 0 };
+    __v2di aa = (__v2di) { (long long)a, 0 };
+    __v2di bb = (__v2di) { (long long)b, 0 };
     return _mm_clmulepi64_si128(aa, bb, 0);
 }
 
@@ -56,15 +56,15 @@ void gf2x_mul9 (unsigned long *c, const unsigned long *a, const unsigned long *b
     /* Taken from Cenk & Ozbudak 2009 */
     /* We reserve one more to follow notations of the paper */
     __v2di ab[9] = {
-        (__v2di) { a[0], b[0] },
-        (__v2di) { a[1], b[1] },
-        (__v2di) { a[2], b[2] },
-        (__v2di) { a[3], b[3] },
-        (__v2di) { a[4], b[4] },
-        (__v2di) { a[5], b[5] },
-        (__v2di) { a[6], b[6] },
-        (__v2di) { a[7], b[7] },
-        (__v2di) { a[8], b[8] },
+        (__v2di) { (long long)a[0], (long long)b[0] },
+        (__v2di) { (long long)a[1], (long long)b[1] },
+        (__v2di) { (long long)a[2], (long long)b[2] },
+        (__v2di) { (long long)a[3], (long long)b[3] },
+        (__v2di) { (long long)a[4], (long long)b[4] },
+        (__v2di) { (long long)a[5], (long long)b[5] },
+        (__v2di) { (long long)a[6], (long long)b[6] },
+        (__v2di) { (long long)a[7], (long long)b[7] },
+        (__v2di) { (long long)a[8], (long long)b[8] },
     };
     __v2di pab[30];
 
