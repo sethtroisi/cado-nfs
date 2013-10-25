@@ -106,6 +106,8 @@ class RemoteCommand(Command):
             logger.warn("No SSH_AUTH_SOCK shell environment variable found.")
             logger.warn("Make sure to set up an ssh key and ssh-agent to "
                         "avoid ssh asking for a passphrase.")
+            logger.warn("See documentation for ssh-keygen and ssh-agent for "
+                        "details.")
             PRINTED_SSHAUTH_WARNING = True
         cmdline = program.make_command_line()
         progparams = parameters.myparams(cadoprograms.SSH.get_accepted_keys(),
