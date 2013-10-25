@@ -15,8 +15,8 @@
 
 # Objects of the Python scripts that take parameters from the parameter file
 # have a path associated with them; for example, the Sieving task uses path
-# "tasks.sieving", and the las siever run in the Sieving task uses
-# "tasks.sieving.las". When looking for a parameter, we start at the object's
+# "tasks.sieve", and the las siever run in the Sieving task uses
+# "tasks.sieve.las". When looking for a parameter, we start at the object's
 # path, then work towards to root of the tree until the key is found.
 # This means that, in principle, all parameters could be specified without a
 # path, so long as no two parameters of the same key with different values
