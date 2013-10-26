@@ -194,7 +194,7 @@ tasks.sieve.I = 11		# Sieving range in lattice siever
     # factor of 4.
 
 tasks.sieve.ratq = 0
-    # The ratq parameters specifies whether or not the special-q is to be
+    # The ratq parameter specifies whether or not the special-q is to be
     # taken on the rational side (ratq=1) or on the algebraic side
     # (ratq=0). ratq should be set on the side where the largest norms are
     # expected. As a very rough rule of thumb, this means ratq=0 for gnfs
