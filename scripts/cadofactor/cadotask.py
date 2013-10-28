@@ -2836,12 +2836,14 @@ class StartClientsTask(Task):
     def param_nodename(self):
         return None
     
-    def __init__(self, address, port, *, mediator, db, parameters, path_prefix):
+    def __init__(self, url, *, mediator, db, parameters, path_prefix, certsha1=None):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"), connection=self.db_connection)
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"), connection=self.db_connection)
+        self.server = url
+        self.certsha1 = certsha1
         assert set(self.pids) == set(self.hosts)
         # Invariants: the keys of self.pids and of self.hosts are the same set.
         # The keys of self.used_ids are a subset of the keys of self.pids.
@@ -2850,7 +2852,6 @@ class StartClientsTask(Task):
         
         if 'scriptpath' in self.params:
             self.progparams[0]['execpath'] = self.params['scriptpath']
-        self.server = "http://%s:%d" % (address, port)
         
         # If hostnames are of the form @file, read host names from file,
         # one host name per line
@@ -2951,6 +2952,7 @@ class StartClientsTask(Task):
         self.logger.info("Starting client id %s on host %s", clientid, host)
         wuclient = cadoprograms.WuClient(server=self.server,
                                          clientid=clientid, daemon=True,
+                                         certsha1=self.certsha1,
                                          **self.progparams[0])
         if host == "localhost":
             process = cadocommand.Command(wuclient)
@@ -3085,21 +3087,30 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         self.wuar.create_tables()
         
         # Set up WU server
-        serverparams = parameters.myparams(["address", "port"], path_prefix + ["server"])
+        serverparams = parameters.myparams(["address", "port", "ssl"], path_prefix + ["server"])
         serveraddress = serverparams.get("address", socket.gethostname())
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
+        # By default, don't enable SSL until work-arounds for the various
+        # bugs are in place
+        if serverparams.get("ssl", False):
+            cafilename = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".server.cert"
+        else:
+            cafilename = None
         self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(),
-            self.registered_filenames, uploaddir, bg=True, only_registered=True)
+            self.registered_filenames, uploaddir, bg=True, only_registered=True, cafile=cafilename)
         
         # Init client lists
         self.clients = []
+        url = self.server.get_url()
+        certsha1 = self.server.get_cert_sha1()
         for (path, key) in self.parameters.get_parameters().find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(serveraddress, serverport,
+            self.clients.append(StartClientsTask(url,
                                                  mediator = self,
                                                  db = db,
                                                  parameters = self.parameters,
+                                                 certsha1=certsha1,
                                                  path_prefix = path))
         
         parampath = self.parameters.get_param_path()
