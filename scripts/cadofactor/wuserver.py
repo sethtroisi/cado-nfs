@@ -356,7 +356,7 @@ class ServerLauncher(object):
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
-        self.address = address
+        self.address = address if address else "0.0.0.0"
         self.port = port
         self.cafile = cafile
         upload_scriptname = "upload.py"
@@ -408,21 +408,23 @@ class ServerLauncher(object):
             self.cert_sha1 = self.get_certificate_hash()
             if not self.cert_sha1 is None:
                 scheme = "https"
-        self.url = "%s://%s:%d" % (scheme, self.address, self.port)
+
+        url_address = address if address else socket.gethostname()
+        self.url = "%s://%s:%d" % (scheme, url_address, self.port)
         
         try:
             if threaded and scheme == "http":
                 logging.info("Using threaded HTTP server")
-                self.httpd = ThreadedHTTPServer((address, port), MyHandlerWithParams)
+                self.httpd = ThreadedHTTPServer((self.address, self.port), MyHandlerWithParams)
             elif not threaded and scheme == "http":
                 logging.info("Using non-threaded HTTP server")
-                self.httpd = FixedHTTPServer((address, port), MyHandlerWithParams)
+                self.httpd = FixedHTTPServer((self.address, self.port), MyHandlerWithParams)
             elif threaded and scheme == "https":
                 logging.info("Using threaded HTTPS server")
-                self.httpd = ThreadedHTTPSServer((address, port), MyHandlerWithParams, self.cafile)
+                self.httpd = ThreadedHTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
             elif not threaded and scheme == "https":
                 logging.info("Using non-threaded HTTPS server")
-                self.httpd = HTTPSServer((address, port), MyHandlerWithParams, self.cafile)
+                self.httpd = HTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
             else:
                 assert False
         except socket_error as e:

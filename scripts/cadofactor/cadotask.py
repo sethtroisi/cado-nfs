@@ -3088,7 +3088,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         
         # Set up WU server
         serverparams = parameters.myparams(["address", "port", "ssl"], path_prefix + ["server"])
-        serveraddress = serverparams.get("address", socket.gethostname())
+        serveraddress = serverparams.get("address", None)
         serverport = serverparams.get("port", 8001)
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         threaded = False
