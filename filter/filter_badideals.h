@@ -85,6 +85,67 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   }
   else
     ASSERT_ALWAYS(0);
+#elif 0
+  /* handle bad ideals for the following polynomial:
+      c0: -24774668987371397084528618164507418928
+      c1: -3489195459822344127350367941464660
+      c2: -5839034183672356481708253628
+      c3: 289642429100355466945
+      c4: 55645402596756
+      c5: 17153280
+    Bad ideals are:
+      2,0:1: 3
+      ## Columns for (2,0): 
+      #   if a/b mod 8 = 0    -> [ 1, 1, 2 ]
+      #                = 2    -> [ e-3, 2, 1 ]
+      #                = 4    -> [ 1, 1, e-2 ]
+      #                = 6    -> [ 2, e-3, 1 ]
+      2,2:1: 2
+      ## Columns for (2,2): 
+      #   if b/a mod 8 = 0    -> [ 2, e-2 ]
+      #                = 2    -> [ 1, 1 ]
+      #                = 4    -> [ e-2, 2 ]
+      #                = 6    -> [ 1, 1 ]
+      Used for a p180 NFS-DL
+  */
+  if (p == 2 && (a&1 == 0))
+  {
+    unsigned long r = findroot (a, b, 8);
+    if (r == 0 || r == 4) {
+      exp_above[0] = 1;
+      exp_above[1] = 1;
+      exp_above[2] = e-2;
+      if (r == 0) 
+          ASSERT_ALWAYS(e == 4);
+    } else if (r == 2) {
+      exp_above[0] = e-3;
+      exp_above[1] = 2;
+      exp_above[2] = 1;
+    } else if (r == 6) {
+      exp_above[0] = 2;
+      exp_above[1] = e-3;
+      exp_above[2] = 1;
+    } else
+      ASSERT_ALWAYS(0);
+  }
+  else if (p == 2 && (b&1U == 0))
+  {
+    unsigned long r = findroot (b, a, 8);
+    if (r == 2 || r == 6) {
+      exp_above[0] = 1;
+      exp_above[1] = 1;
+      ASSERT_ALWAYS(e == 2);
+    } else if (r == 0) {
+      exp_above[0] = 2;
+      exp_above[1] = e-2;
+    } else if (r == 4) {
+      exp_above[0] = e-2;
+      exp_above[1] = 2;
+    } else
+      ASSERT_ALWAYS(0);
+  }
+  else
+    ASSERT_ALWAYS(0);
 
 #elif 0
   /* handle bad ideals for the following polynomial:
