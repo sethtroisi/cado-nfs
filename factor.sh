@@ -260,9 +260,9 @@ cp $file $t/param
 
 # Sets the machine description file
 if [ -z "$CADO_USEHOST" ] && [ "$hostnames" = localhost ]; then
-   host=localhost
+   server_address="server.address=localhost"
 else
-   host=`hostname --short`
+   server_address=""
 fi
 
 mkdir $t/tmp
@@ -276,7 +276,7 @@ if $python; then
   "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
   threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
   slaves.nrclients=$slaves \
-  slaves.scriptpath="$scriptpath" server.address=$host \
+  slaves.scriptpath="$scriptpath" "$server_address" \
   slaves.basepath="$t/client/" "$@"
 else
   cat > $t/mach_desc <<EOF
