@@ -259,7 +259,7 @@ fi
 cp $file $t/param
 
 # Sets the machine description file
-if [ -z "$CADO_USEHOST" ] && echo "$hostnames" | grep -E "^(localhost, *)*localhost$"
+if [ -z "$CADO_USEHOST" ] && echo "$hostnames" | grep -E "^(localhost, *)*localhost$" > /dev/null
 then
    server_address="server.address=localhost"
 else
