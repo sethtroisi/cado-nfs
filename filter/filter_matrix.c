@@ -151,7 +151,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     if (mat->wt[h] <= mat->mergelevelmax)
       nbm[mat->wt[h]]++;
   for (h = 0; h <= (uint64_t) mat->mergelevelmax; h++)
-    printf ("There are %lu column(s) of weight %lu\n", nbm[h], h);
+    printf ("There are %" PRIu64 " column(s) of weight %" PRIu64 "\n", nbm[h], h);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
   free (nbm);
 
