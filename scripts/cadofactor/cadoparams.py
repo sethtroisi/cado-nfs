@@ -161,6 +161,7 @@ class Parameters(object):
         "dryrun": BoolParam,
         "keepoldresult": BoolParam,
         "compression": BoolParam,
+        "ssl": BoolParam,
     }
 
     def __init__(self, *args, **kwargs):
