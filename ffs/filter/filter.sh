@@ -421,11 +421,11 @@ fi
 ###### REPLAY ######
 if [ "${DO_REPLAY}" -eq "1" ] ; then
   if [ "x${NFSDL}" != "x1" ] ; then
-    argsr0="--noindex -purged ${RELSFILE} -his ${HISFILE} "
+    argsr0="-purged ${RELSFILE} -his ${HISFILE} "
   else
     argsr0="-index ${INDEXFILE} -purged ${RELSFILE} -his ${HISFILE} "
   fi
-  argsr1="-out ${PREFIX_MATRIX} -ideals ${INDEX_ID_MERGE} -skip 0"
+  argsr1="-out ${PREFIX_MATRIX} -ideals ${INDEX_ID_MERGE}"
 
   CMD="${BIN_REPLAY} $argsr0 $argsr1 $argsr2"
   run_cmd "${CMD}" "${LOGR}" "${LOGR}" "${VERBOSE}" "${REPLAYDONE}"
