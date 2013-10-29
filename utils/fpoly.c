@@ -35,7 +35,7 @@ fpoly_eval (const double *f, const unsigned int deg, const double x)
    Assumes sa is of same sign as g(a).
 */
 double
-fpoly_dichotomy (double *g, int d, double a, double b, double sa,
+fpoly_dichotomy (const double *g, const unsigned int d, double a, double b, double sa,
                  unsigned int n)
 {
   double s;
@@ -55,7 +55,7 @@ fpoly_dichotomy (double *g, int d, double a, double b, double sa,
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
-fpoly_print (FILE *stream, const double *f, const int deg, char *name)
+fpoly_print (FILE *stream, const double *f, const unsigned int deg, char *name)
 {
   int i;
 
