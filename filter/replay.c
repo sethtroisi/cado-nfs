@@ -35,6 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "sparse.h"
 #include "gzip.h"
 
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
 #define DEBUG 0
 #define STAT_FFS
 
@@ -685,25 +687,41 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     fclose_maybe_compressed (hisfile, hisname);
 }
 
+/*
 static void
 usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: %s [options]\n", argv0);
-  fprintf (stderr, "\nMandatory command line options: \n");
-  fprintf (stderr, "   -purged  xxx   - input (purged) file is xxx\n");
-  fprintf (stderr, "   -his  xxx      - history file (produced by merge)\n");
-  fprintf (stderr, "   -out  xxx      - basename for output matrices\n");
-  fprintf (stderr, "\nOther command line options: \n");
-  fprintf (stderr, "   -skip nnn      - dense matrice contains the nnn heaviest "
-                                       "columns (default %u)\n", SKIP_DEFAULT);
-  fprintf (stderr, "   -v or --verbose\n");
   fprintf (stderr, "   --binary\n");
-  fprintf (stderr, "   --noindex\n");
-  fprintf (stderr, "   -index <file>  - if and only if there is no --noindex\n");
   fprintf (stderr, "   -ideals\n");
   exit (1);
 }
+*/
 
+static void declare_usage(param_list pl)
+{
+  param_list_decl_usage(pl, "purged", "input purged file");
+  param_list_decl_usage(pl, "his", "input history file");
+  param_list_decl_usage(pl, "out", "basename for output matrices");
+#ifndef FOR_DL
+  param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
+                            "dense matrice (default " STR(SKIP_DEFAULT) ")");
+#endif
+  param_list_decl_usage(pl, "index", "file containing description of rows "
+                                     "(relations-sets) of the matrice");
+  param_list_decl_usage(pl, "ideals", "file containing correspondence between "
+                                      "ideals and matrice columns");
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  param_list_decl_usage(pl, "for_msieve", "output matrice in msieve format");
+  param_list_decl_usage(pl, "bwcostmin", "??????");
+}
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+}
 
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
@@ -718,7 +736,7 @@ main(int argc, char *argv[])
   uint64_t bwcostmin = 0;
   uint64_t nrows, ncols;
   typerow_t **newrows;
-  int verbose = 0, bin=0, skip = SKIP_DEFAULT, noindex = 0, for_msieve = 0;
+  int bin, skip = SKIP_DEFAULT, for_msieve = 0;
   double wct0 = wct_seconds ();
 
 #ifdef HAVE_MINGW
@@ -728,74 +746,79 @@ main(int argc, char *argv[])
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
-    // printing the arguments as everybody does these days
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (int i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
-
     param_list pl;
-
     param_list_init(pl);
+    declare_usage(pl);
     argv++,argc--;
-    param_list_configure_switch(pl, "--verbose", &verbose);
-    param_list_configure_switch(pl, "--binary", &bin);
-    param_list_configure_switch(pl, "--noindex", &noindex);
-    param_list_configure_switch(pl, "--for_msieve", &for_msieve);
-    param_list_configure_alias(pl, "--verbose", "-v");
+
+    param_list_configure_switch(pl, "for_msieve", &for_msieve);
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
+
+    if (argc == 0)
+      usage (pl, argv0);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        usage(argv0);
+        usage(pl, argv0);
     }
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
+
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * hisname = param_list_lookup_string(pl, "his");
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
+#ifndef FOR_DL
     param_list_parse_int(pl, "skip", &skip);
+#endif
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+    const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+
+    /* Some checks on command line arguments */
+    if (param_list_warn_unused(pl))
+    {
+      fprintf(stderr, "Error, unused parameters are given\n");
+      usage(pl, argv0);
+    }
 
     if (purgedname == NULL)
     {
-      fprintf (stderr, "Error, missing mandatory -purged option.\n");
-      usage(argv0);
+      fprintf(stderr, "Error, missing -purged command line argument\n");
+      usage(pl, argv0);
     }
-
     if (sparsename == NULL)
     {
-      fprintf (stderr, "Error, missing mandatory -out option.\n");
-      usage(argv0);
+      fprintf(stderr, "Error, missing -out command line argument\n");
+      usage(pl, argv0);
     }
-
-    if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
-        bin=1;
-
-    if (noindex && indexname != NULL) {
-        fprintf (stderr, "Error: --noindex was switched on, but a "
-                "name for the index file was given.\n");
-        exit (1);
+    if (hisname == NULL)
+    {
+      fprintf(stderr, "Error, missing -his command line argument\n");
+      usage(pl, argv0);
     }
-
-    if (noindex == 0 && indexname == NULL) {
-        fprintf (stderr, "Error: --noindex was not given, but no "
-                "index file was given.\n");
-        exit (1);
-    }
-
 #ifdef FOR_DL
-    if (skip != 0)
-      {
-        fprintf (stderr, "Error, for DL -skip should be 0\n");
-        exit (1);
-      }
     if (idealsfilename == NULL)
-      {
-        fprintf (stderr, "Error, for DL -ideals should be non null\n");
-        exit (1);
-      }
+    {
+      fprintf(stderr, "Error, missing -ideals command line argument\n");
+      usage(pl, argv0);
+    }
+    ASSERT_ALWAYS (skip == 0);
 #endif
+    if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
+    {
+      bin = 1;
+      printf ("# Output matrices will be written in binary format\n");
+    }
+    else
+    {
+      bin = 0;
+      printf ("# Output matrices will be written in text format\n");
+    }
+
+    set_antebuffer_path (argv0, path_antebuffer);
 
   /* Read number of rows and cols on first line of purged file */
   purgedfile_read_firstline (purgedname, &nrows, &ncols);

@@ -2444,8 +2444,7 @@ class MergeTask(Task):
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("small.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
-            p = cadoprograms.Replay(binary=True,
-                                    purged=purged_filename,
+            p = cadoprograms.Replay(purged=purged_filename,
                                     history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),

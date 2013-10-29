@@ -689,7 +689,6 @@ class Replay(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 binary: Toggle(prefix = "--") = None,
                  skip: Parameter() = None,
                  purged: Parameter() = None,
                  history: Parameter("his") = None,

@@ -2783,7 +2783,6 @@ sub do_replay {
     }
 
     my $cmd = "$param{'bindir'}/filter/replay ".
-              "--binary " .
               "-skip $param{'skip'} " .
               "-purged $param{'prefix'}.purged.gz ".
               "-his $param{'prefix'}.merge.his ".

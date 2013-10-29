@@ -155,7 +155,6 @@ class Parameters(object):
         "ratq": BoolParam,
         "bzip": BoolParam,
         "raw": BoolParam,
-        "binary": BoolParam,
         "complete": BoolParam,
         "wipeout": BoolParam,
         "dryrun": BoolParam,
