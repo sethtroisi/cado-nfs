@@ -166,24 +166,31 @@ thread_dup1 (void * context_data, earlyparsed_relation_ptr rel)
     return NULL;
 }
 
-static void
-usage(const char *argv0)
+static void declare_usage(param_list pl)
 {
-    fprintf (stderr, "Usage: %s [options] ", argv0);
-    fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
-    fprintf (stderr, "Mandatory command line options:\n");
-    fprintf (stderr, "     -out <dir>  - output directory\n");
-    fprintf (stderr, "     -prefix <s> - prefix for output files\n");
-    fprintf (stderr, "\nOther command line options:\n");
-    fprintf (stderr, "    -lognrelsoutfile n - log of number of rels in output"
-                     " files (default %d)\n", DEFAULT_LOG_MAX_NRELS_PER_FILES);
-    fprintf (stderr, "    -n           - log of number of slices (default 1)\n");
-    fprintf (stderr, "    -only        - do only slice i (default all)\n");
-    fprintf (stderr, "    -ab          - only print a and b in the ouput\n");
-    fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
-    fprintf (stderr, "    -abhexa      - read a and b as hexa no decimal\n");
-    exit (1);
+  param_list_decl_usage(pl, "filelist", "file containing a list of input files");
+  param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
+  param_list_decl_usage(pl, "out", "output directory");
+  param_list_decl_usage(pl, "prefix", "prefix for output files");
+  param_list_decl_usage(pl, "lognrels", "log of number of rels per output file");
+  param_list_decl_usage(pl, "n", "log of number of slices (default: 1)");
+  param_list_decl_usage(pl, "only", "do only slice i (default: all)");
+  param_list_decl_usage(pl, "outfmt",
+                               "format of output file (default same as input");
+  param_list_decl_usage(pl, "ab", "(switch) only print a and b in the output");
+  param_list_decl_usage(pl, "abhexa",
+                                  "(switch) read a and b as hexa not decimal");
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+}
+
 
 int
 main (int argc, char * argv[])
@@ -192,16 +199,20 @@ main (int argc, char * argv[])
 
     param_list pl;
     param_list_init(pl);
+    declare_usage(pl);
     argv++,argc--;
 
     int abhexa = 0;
     param_list_configure_switch(pl, "ab", &only_ab);
     param_list_configure_switch(pl, "abhexa", &abhexa);
-    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
+
+    if (argc == 0)
+      usage (pl, argv0);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -211,9 +222,6 @@ main (int argc, char * argv[])
         // fprintf (stderr, "Unknown option: %s\n", argv[0]);
         // abort();
     }
-
-    /* Update parameter list at least once to register argc/argv pointers. */
-    param_list_update_cmdline (pl, &argc, &argv);
     /* print command-line arguments */
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
@@ -224,31 +232,39 @@ main (int argc, char * argv[])
     int only_slice = -1;
     param_list_parse_int(pl, "only", &only_slice);
     unsigned int log_max_nrels_per_files = DEFAULT_LOG_MAX_NRELS_PER_FILES;
-    param_list_parse_uint(pl, "lognrelsoutfile", &log_max_nrels_per_files);
+    param_list_parse_uint(pl, "lognrels", &log_max_nrels_per_files);
     const char *outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
-    set_antebuffer_path (argv0, path_antebuffer);
     const char *prefix_files = param_list_lookup_string(pl, "prefix");
 
-    if (param_list_warn_unused(pl)) {
-        exit(1);
+    if (param_list_warn_unused(pl))
+    {
+      fprintf(stderr, "Error, unused parameters are given\n");
+      usage(pl, argv0);
     }
 
-    if (basepath && !filelist) {
-        fprintf(stderr, "-basepath only valid with -filelist\n");
-        exit(1);
+    if (basepath && !filelist)
+    {
+      fprintf(stderr, "Error, -basepath only valid with -filelist\n");
+      usage(pl, argv0);
     }
 
     if (!prefix_files)
-        usage(argv0);
+    {
+      fprintf(stderr, "Error, missing -prefix command line argument\n");
+      usage(pl, argv0);
+    }
 
     if (!outdir)
-        usage(argv0);
+    {
+      fprintf(stderr, "Error, missing -out command line argument\n");
+      usage(pl, argv0);
+    }
     if (outfmt && !is_supported_compression_format(outfmt)) {
-        fprintf(stderr, "output compression format unsupported\n");
-        usage(argv0);
+        fprintf(stderr, "Error, output compression format unsupported\n");
+        usage(pl, argv0);
     }
 
     if (only_slice == -1) { /* split all slices */
@@ -260,10 +276,11 @@ main (int argc, char * argv[])
     }
 
     if ((filelist != NULL) + (argc != 0) != 1) {
-        fprintf(stderr, "Provide either -filelist or freeform file names\n");
-        usage(argv0);
+      fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
+      usage(pl, argv0);
     }
 
+    set_antebuffer_path (argv0, path_antebuffer);
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
 
     // If not output suffix is specified, use suffix of first input file

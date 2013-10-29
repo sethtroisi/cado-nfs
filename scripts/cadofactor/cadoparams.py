@@ -141,7 +141,7 @@ class Parameters(object):
         "rlim": int,
         "rels_wanted": int,
         "nslices_log": int,
-        "lognrelsoutfile": int,
+        "lognrels": int,
         "skip": int,
         "N": int,
         "nrclients": int,

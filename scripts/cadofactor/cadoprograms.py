@@ -618,7 +618,7 @@ class Duplicates1(Program):
                  bzip: Toggle("bz") = None,
                  only: Parameter() = None,
                  nslices_log: Parameter("n") = None,
-                 lognrelsoutfile: Parameter() = None,
+                 lognrels: Parameter() = None,
                  filelist: Parameter(is_input_file = True) = None,
                  basepath: Parameter() = None,
                  **kwargs):
