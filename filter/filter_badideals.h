@@ -85,7 +85,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   }
   else
     ASSERT_ALWAYS(0);
-#elif 0
+#elif 1
   /* handle bad ideals for the following polynomial:
       c0: -24774668987371397084528618164507418928
       c1: -3489195459822344127350367941464660
@@ -108,7 +108,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
       #                = 6    -> [ 1, 1 ]
       Used for a p180 NFS-DL
   */
-  if (p == 2 && (a&1 == 0))
+  if (p == 2 && ((a&1) == 0))
   {
     unsigned long r = findroot (a, b, 8);
     if (r == 0 || r == 4) {
@@ -128,7 +128,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
     } else
       ASSERT_ALWAYS(0);
   }
-  else if (p == 2 && (b&1U == 0))
+  else if (p == 2 && ((b&1U) == 0))
   {
     unsigned long r = findroot (b, a, 8);
     if (r == 2 || r == 6) {
