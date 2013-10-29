@@ -42,6 +42,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "merge_mono.h" /* for mergeOneByOne */
 #include "sparse.h"
 
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 160
 #define FORBW_DEFAULT 0
@@ -50,37 +52,46 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define MKZTYPE_DEFAULT 1 /* pure Markowitz */
 #define WMSTMAX_DEFAULT 7 /* relevant only if mkztype == 2 */
 
-static void
-usage (const char *argv0)
+static void declare_usage(param_list pl)
 {
-  fprintf (stderr, "Usage: %s [options]\n", argv0);
-  fprintf (stderr, "\nMandatory command line options: \n");
-  fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
-  fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
-  fprintf (stderr, "\nOther command line options: \n");
-  fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
-	   MAXLEVEL_DEFAULT);
-  fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
-	   KEEP_DEFAULT);
-  fprintf (stderr, "   -skip nnn      - bury the nnn heaviest columns (default %u)\n",
-	   SKIP_DEFAULT);
-  fprintf (stderr, "   -forbw nnn     - controls the optimization function (default %u, see below)\n",
-	   FORBW_DEFAULT);
-  fprintf (stderr, "   -ratio rrr     - maximal ratio cN(final)/cN(min) with forbw=0 (default %1.1f)\n",
-	   RATIO_DEFAULT);
-  fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %1.2f)\n", COVERNMAX_DEFAULT);
-  fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed (cf -resume)\n");
-  fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
-  fprintf (stderr, "   -mkztype nnn   - controls how the weight of a merge is approximated (default %d)\n", MKZTYPE_DEFAULT);
-  fprintf (stderr, "   -wmstmax nnn   - if mkztype = 2, controls until when a mst is used (default %d)\n", WMSTMAX_DEFAULT);
-  fprintf (stderr, "   -path_antebuffer <dir> - where is antebuffer\n");
-  fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
-  fprintf (stderr, "and N the number of rows (relation-sets):\n");
+  param_list_decl_usage(pl, "mat", "input purged file");
+  param_list_decl_usage(pl, "out", "output history file");
+  param_list_decl_usage(pl, "keep", "excess to keep (default " STR(KEEP_DEFAULT)
+                                    ")");
+  param_list_decl_usage(pl, "skip", "number of heavy columns to bury (default "
+                                    STR(SKIP_DEFAULT) ")");
+  param_list_decl_usage(pl, "maxlevel", "maximum number of rows in a merge "
+                            "(default " STR(MAXLEVEL_DEFAULT) ")");
+  param_list_decl_usage(pl, "forbw", "controls the optimization function "
+                            "(see below, default " STR(FORBW_DEFAULT) ")");
+  param_list_decl_usage(pl, "ratio", "maximal ration cN(final)/cN(min) with "
+                            "-forbw 0 (default " STR(RATIO_DEFAULT) ")");
+  param_list_decl_usage(pl, "coverNmax", "stop when c/N exceeds this value with"
+                            " -forbw 3 (default " STR(COVERNMAX_DEFAULT) ")");
+  param_list_decl_usage(pl, "itermax", "maximum number of columns that can be "
+                                       "removed (0 means no maximum)");
+  param_list_decl_usage(pl, "resume", "resume from history file (cf -itermax)");
+  param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
+                            "approximated (default " STR(MKZTYPE_DEFAULT) ")");
+  param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
+                            "-mkztype 2 (default " STR(WMSTMAX_DEFAULT) ")");
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+}
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    fprintf (stderr, "\nThe different optimization functions are, where c is "
+                     "the total matrix weight and N \nthe number of rows "
+                     "(relation-sets):\n");
   fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
   fprintf (stderr, "   -forbw 1 - stop when the product cN is minimal\n");
   fprintf (stderr, "   -forbw 3 - stop when the ratio c/N exceeds coverNmax\n");
-  exit (1);
+    exit(EXIT_FAILURE);
 }
+
 
 int
 main (int argc, char *argv[])
@@ -109,18 +120,23 @@ main (int argc, char *argv[])
     double wct0 = wct_seconds ();
     param_list pl;
     param_list_init (pl);
+    declare_usage(pl);
+    argv++,argc--;
 
-    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
-    argv++, argc--;
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
+
+    if (argc == 0)
+      usage (pl, argv0);
 
     for( ; argc ; ) {
       if (param_list_update_cmdline(pl, &argc, &argv)) continue;
       fprintf (stderr, "Unknown option: %s\n", argv[0]);
-      usage (argv0);
+      usage (pl, argv0);
     }
-
-    /* Update parameter list at least once to register argc/argv pointers. */
-    param_list_update_cmdline (pl, &argc, &argv);
     /* print command-line arguments */
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
@@ -130,10 +146,8 @@ main (int argc, char *argv[])
     /* -resume can be useful to continue a merge stopped due  */
     /* to a too small value of -maxlevel                      */
     const char * resumename = param_list_lookup_string (pl, "resume");
-  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+    const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
-    set_antebuffer_path (argv0, path_antebuffer);
-    
     param_list_parse_uint (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
     param_list_parse_uint (pl, "skip", &skip);
@@ -148,33 +162,40 @@ main (int argc, char *argv[])
     param_list_parse_uint (pl, "itermax", &itermax);
 
     /* Some checks on command line arguments */
-    if (purgedname == NULL || outname == NULL)
+    if (param_list_warn_unused(pl))
     {
-      fprintf (stderr, "Error: -mat and -out are mandatory.\n");
-      usage (argv0);
+      fprintf(stderr, "Error, unused parameters are given\n");
+      usage(pl, argv0);
     }
 
+    if (purgedname == NULL)
+    {
+      fprintf(stderr, "Error, missing -mat command line argument\n");
+      usage (pl, argv0);
+    }
+    if (outname == NULL)
+    {
+      fprintf(stderr, "Error, missing -out command line argument\n");
+      usage (pl, argv0);
+    }
     if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
     {
       fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
                        MERGE_LEVEL_MAX);
-      exit (1);
+      usage (pl, argv0);
     }
-
     if (forbw > 3)
     {
       fprintf (stderr, "Error: -forbw should be 0, 1, 2 or 3.\n");
-      exit (1);
+      usage (pl, argv0);
     }
-
     if (mkztype > 2)
     {
       fprintf (stderr, "Error: -mkztype should be 0, 1, or 2.\n");
-      exit (1);
+      usage (pl, argv0);
     }
 
-    if (param_list_warn_unused (pl))
-      usage (argv0);
+    set_antebuffer_path (argv0, path_antebuffer);
 
     /* Read number of rows and cols on first line of purged file */
     purgedfile_read_firstline (purgedname, &(mat->nrows), &(mat->ncols));
