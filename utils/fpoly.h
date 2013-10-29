@@ -11,8 +11,8 @@ extern "C" {
 
 /* fpoly.c */
 double fpoly_eval (const double *, const unsigned int, const double);
-double fpoly_dichotomy (double *, int, double, double, double, unsigned int);
-void   fpoly_print (FILE *, const double *f, const int deg, char *name);
+double fpoly_dichotomy (const double *, const unsigned int, double, double, double, unsigned int);
+void   fpoly_print (FILE *, const double *f, const unsigned int deg, char *name);
 
 
 #ifdef __cplusplus

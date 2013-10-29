@@ -30,9 +30,7 @@ import cadologger
 import logging
 
 DEBUG = 1
-if DEBUG > 1:
-    import traceback
-    exclusive_transaction = [None, None]
+exclusive_transaction = [None, None]
 
 DEFERRED = object()
 IMMEDIATE = object()
@@ -1383,6 +1381,7 @@ if __name__ == '__main__': # {
     use_pool = False
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('-dbname', help='Name of the database file')
     parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
     parser.add_argument('-add', action="store_true", 
@@ -1404,6 +1403,7 @@ if __name__ == '__main__': # {
                         help = 'Return a result for wu from client')
     parser.add_argument('-test', action="store_true", 
                         help='Run some self tests')
+    parser.add_argument('-debug', help='Set debugging level')
     parser.add_argument('-setdict', nargs = 4,
                         metavar = ("dictname", "keyname", "type", "keyvalue"),
                         help='Set an entry of a DB-backed dictionary')
@@ -1414,8 +1414,8 @@ if __name__ == '__main__': # {
     parser.add_argument('-dump', nargs='?', default = None, const = "all", 
                         metavar = "FIELD", 
                         help='Dump WU contents, optionally a single field')
-    for arg in ("dbname", "debug"):
-        parser.add_argument('-' + arg)
+    parser.add_argument('-sort', metavar = "FIELD", 
+                        help='With -dump, sort output by FIELD')
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # print(args)
@@ -1469,6 +1469,9 @@ if __name__ == '__main__': # {
                 print("None")
                 continue
             print (len(wus))
+            field = args["sort"] 
+            if field:
+                wus.sort(key=lambda wu: str(wu[field]))
             if args["dump"] == "all":
                 print(WuAccess.to_str(wus))
             else:
