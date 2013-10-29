@@ -121,14 +121,14 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
 static void declare_usage(param_list pl)
 {
-  param_list_decl_usage(pl, "poly", "polynomial file");
-  param_list_decl_usage(pl, "renumber", "renumber file");
-  param_list_decl_usage(pl, "out", "output file");
+  param_list_decl_usage(pl, "poly", "input polynomial file");
+  param_list_decl_usage(pl, "renumber", "output file for renumbering table");
+  param_list_decl_usage(pl, "out", "output file for free relations");
   param_list_decl_usage(pl, "lpbr", "rational large prime bound");
   param_list_decl_usage(pl, "lpba", "algebraic large prime bound");
   param_list_decl_usage(pl, "pmin", "do not create freerel below this bound");
   param_list_decl_usage(pl, "pmax", "do not create freerel beyond this bound");
-  param_list_decl_usage(pl, "badideals",   "file describing bad ideals (for DL)");
+  param_list_decl_usage(pl, "badideals", "file describing bad ideals (for DL)");
   param_list_decl_usage(pl, "addfullcol", "(switch) add a column of 1 in the matrix (for DL)");
 }
 
@@ -148,7 +148,6 @@ main (int argc, char *argv[])
     const char *outfilename = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
-    int k;
     unsigned long pmin = 2, pmax = 0, nfree;
     renumber_t renumber_table;
     int add_full_col = 0;
@@ -163,12 +162,10 @@ main (int argc, char *argv[])
     _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
 
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (k = 1; k < argc; k++)
-      fprintf (stderr, " %s", argv[k]);
-    fprintf (stderr, "\n");
-
     argv++, argc--;
+    if (argc == 0)
+      usage (pl, argv0);
+
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv))
             continue;
@@ -182,6 +179,9 @@ main (int argc, char *argv[])
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         usage (pl, argv0);
     }
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
 
     polyfilename = param_list_lookup_string(pl, "poly");
     outfilename = param_list_lookup_string(pl, "out");
@@ -189,9 +189,21 @@ main (int argc, char *argv[])
     renumberfilename = param_list_lookup_string(pl, "renumber");
 
     
-    if (polyfilename == NULL || renumberfilename == NULL ||
-        outfilename == NULL)
+    if (polyfilename == NULL)
+    {
+      fprintf (stderr, "Error, missing -poly command line argument\n");
       usage (pl, argv0);
+    }
+    if (renumberfilename == NULL)
+    {
+      fprintf (stderr, "Error, missing -renumber command line argument\n");
+      usage (pl, argv0);
+    }
+    if (outfilename == NULL)
+    {
+      fprintf (stderr, "Error, missing -out command line argument\n");
+      usage (pl, argv0);
+    }
 
     cado_poly_init(cpoly);
     if (!cado_poly_read (cpoly, polyfilename))
