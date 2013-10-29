@@ -82,6 +82,8 @@
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
+#define STR(s) XSTR(s)
+#define XSTR(s) #s
 #define DEFAULT_NPASS 50
 #define DEFAULT_KEEP 160
 #define DEFAULT_REQUIRED_EXCESS 0.1
@@ -585,34 +587,38 @@ char **filelist_from_file_with_subdirlist(const char *basepath,
     return fic;
 }
 
-static void usage(const char *argv0)
+static void declare_usage(param_list pl)
 {
-    fprintf(stderr, "Usage: %s [options] ", argv0);
-    fprintf(stderr,
-	    "[ -filelist <fl> [-basepath <path>] [-subdirlist <sl>] ");
-    fprintf(stderr, "| file1 ... filen ]\n");
-    fprintf(stderr, "Mandatory command line options: \n");
-    fprintf(stderr,
-	    "    -out outfile  - write remaining relations in outfile\n");
-    fprintf(stderr, "    -nrels nnn    - number of initial relations\n");
-    fprintf(stderr,
-	    "    -nprimes nnn  - number of prime ideals in renumber table\n");
-    fprintf(stderr, "    -minindex nnn - purge primes with index >= nnn\n");
-    fprintf(stderr, "\nOther command line options: \n");
-    fprintf(stderr, "    -outdel file - output file for deleted relations\n");
-    fprintf(stderr,
-	    "    -keep    nnn - prune if excess > nnn (default 160)\n");
-    fprintf(stderr,
-	    "    -npthr   nnn - threads number for suppress singletons\n");
-    fprintf(stderr,
-	    "    -npass   nnn - number of step of clique removal (default %d)\n",
-	    DEFAULT_NPASS);
-    fprintf(stderr,
-	    "    -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
-	    DEFAULT_REQUIRED_EXCESS);
-    fprintf(stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
-    exit(1);
+  param_list_decl_usage(pl, "filelist", "file containing a list of input files");
+  param_list_decl_usage(pl, "subdirlist",
+                               "file containing a list of subdirectories");
+  param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
+  param_list_decl_usage(pl, "out", "outfile for remaining relations");
+  param_list_decl_usage(pl, "nrels", "number of initial relations");
+  param_list_decl_usage(pl, "nprimes",
+                                  "number of prime ideals in renumber table");
+  param_list_decl_usage(pl, "minindex", "index of the first considered prime");
+  param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
+                                    "(default " STR(DEFAULT_KEEP) ")");
+  param_list_decl_usage(pl, "npass", "number of step of clique removal "
+                                     "(default " STR(DEFAULT_NPASS) ")");
+  param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
+                            "end of the 1st singleton removal step (default "
+                            STR(DEFAULT_REQUIRED_EXCESS) ")");
+  param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
+  param_list_decl_usage(pl, "npthr", "number of threads used for singletons "
+                                     "removal (default " STR(DEFAULT_NPT) ")");
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+}
+
 
 /*************************** main ********************************************/
 
@@ -632,28 +638,25 @@ int main(int argc, char **argv)
 
     double wct0 = wct_seconds();
 
-    /* {{{ command-line */
-    fprintf(stderr, "%s.r%s", argv[0], CADO_REV);
-    for (k = 1; k < argc; k++)
-	fprintf(stderr, " %s", argv[k]);
-    fprintf(stderr, "\n");
-
     param_list_init(pl);
+    declare_usage(pl);
+    argv++,argc--;
 
-    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
-    argv++, argc--;
+    if (argc == 0)
+      usage (pl, argv0);
 
     /* read all command-line parameters */
-    for (; argc;) {
-	if (param_list_update_cmdline(pl, &argc, &argv))
-	    continue;
-	/* Since we accept file names freeform, we decide to never abort
-	 * on unrecognized options */
-	if (!strcmp(*argv, "--help"))
-	    usage(argv0);
-	break;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        /* Since we accept file names freeform, we decide to never abort
+         * on unrecognized options */
+        break;
     }
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
 
     /* read command-line parameters */
     param_list_parse_uint64(pl, "nrels", &nrelmax);
@@ -667,8 +670,6 @@ int main(int argc, char **argv)
     param_list_parse_uint(pl, "npthr", &npt);
     param_list_parse_uint(pl, "npass", &npass);
     param_list_parse_double(pl, "required_excess", &required_excess);
-
-    set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));       
 
     /* These three parameters specify the set of input files, of the form
      * <base path>/<one of the possible subdirs>/<one of the possible
@@ -686,74 +687,64 @@ int main(int argc, char **argv)
     const char *purgedname = param_list_lookup_string(pl, "out");
     const char *deletedname = param_list_lookup_string(pl, "outdel");
 
-    if (param_list_warn_unused(pl)) {
-	fprintf(stderr, "Unused options in command-line\n");
-	usage(argv0);
+    if (param_list_warn_unused(pl))
+    {
+      fprintf(stderr, "Error, unused parameters are given\n");
+      usage(pl, argv0);
     }
 
     /* }}} */
 
 
-    /*{{{ build the list of input files from the given args*/
-    if ((basepath || subdirlist) && !filelist) {
-	fprintf(stderr,
-		"-basepath / -subdirlist only valid with -filelist\n");
-	usage(argv0);
-    }
-
-    if ((filelist != NULL) + (argc != 0) != 1) {
-	fprintf(stderr, "Provide either -filelist or freeform file names\n");
-	usage(argv0);
-    }
-
-    if (!filelist)		// If no filelist was given, files are on the command-line
-	input_files = argv;
-    else if (!subdirlist)	//If no subdirlist was given, input_files is easy to construct
-	input_files = filelist_from_file(basepath, filelist, 0);
-    else			//with subdirlist is a little bit trickier
-	input_files =
-	    filelist_from_file_with_subdirlist(basepath, filelist,
-					       subdirlist);
-    /*}}}*/
     /*{{{ argument checking, and some statistics for things related to
      * the hash table. It needs several static parameters on the command
      * line. This is cumbersome, but while it can probably be avoided, it
      * also hard to do so efficiently */
-    if (nrelmax == 0) {
-	fprintf(stderr, "Error, missing -nrels ... option (or nrels=0)\n");
-	usage(argv0);
+    if ((basepath || subdirlist) && !filelist)
+    {
+      fprintf(stderr, "Error, -basepath / -subdirlist only valid with -filelist\n");
+      usage(pl, argv0);
     }
-    if (nprimemax == 0) {
-	fprintf(stderr,
-		"Error, missing -nprimes ... option (or nprimes=0)\n");
-	usage(argv0);
+    if ((filelist != NULL) + (argc != 0) != 1) {
+      fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
+      usage(pl, argv0);
     }
-    if (min_index > nprimemax) {
-	fprintf(stderr,
-		"Error, missing -minindex ... option (or > nprimes)\n");
-	usage(argv0);
+    if (nrelmax == 0)
+    {
+      fprintf(stderr, "Error, missing -nrels command line argument "
+                      "(or nrels = 0)\n");
+      usage(pl, argv0);
+    }
+    if (nprimemax == 0)
+    {
+      fprintf(stderr, "Error, missing -nprimes command line argument "
+                      "(or nprimes = 0)\n");
+      usage(pl, argv0);
+    }
+    if (min_index > nprimemax)
+    {
+      fprintf(stderr, "Error, missing -minindex command line argument "
+                      "or (minindex > nprimes)\n");
+      usage(pl, argv0);
     }
     /* If nrels or nprimes > 2^32, then we need index_t to be 64-bit */
-    if (((nprimemax >> 32) != 0 || (nrelmax >> 32) != 0)
-	&& sizeof(index_t) < 8) {
-	fprintf(stderr,
-		"Error, -nrels or -nprimes is too large for a 32-bit "
-		"program\nSee #define index_size in typedefs.h\n");
-	exit(1);
+    if (((nprimemax >> 32) != 0 || (nrelmax >> 32) != 0) && sizeof(index_t) < 8)
+    {
+      fprintf(stderr, "Error, -nrels or -nprimes is too large for a 32-bit "
+                      "program\nSee #define index_size in typedefs.h\n");
+      exit(EXIT_FAILURE);
     }
-    ASSERT_ALWAYS(min_index <= nprimemax);
 
     /* Printing relevant information */
     fprintf(stderr, "Weight function used during clique removal:\n"
-	    "  0     1     2     3     4     5     6     7\n");
+                    "  0     1     2     3     4     5     6     7\n");
     for (k = 0; k < 8; k++)
-	fprintf(stderr, "%0.3f ", weight_function_clique((weight_t) k));
+      fprintf(stderr, "%0.3f ", weight_function_clique((weight_t) k));
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Number of relations is %" PRIu64 "\n", nrelmax);
-    fprintf(stderr,
-	    "Number of prime ideals below the two large prime bounds: " "%"
-	    PRIu64 "\n", nprimemax);
+    fprintf(stderr, "Number of prime ideals below the two large prime bounds: "
+                    "%" PRIu64 "\n", nprimemax);
     /*}}}*/
 
     /* {{{ Allocating memory. We are keeping track of the total
@@ -792,7 +783,23 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_MALLOC(index_t, sum2_index, nprimemax);
 
 
+    set_antebuffer_path(argv0, param_list_lookup_string(pl, "path_antebuffer"));
     /* }}} */
+
+    /*{{{ build the list of input files from the given args
+     * If no filelist is given, files are on the command-line.
+     * If no subdirlist is given, files are easily construct from basepath and
+     * filelist.
+     * If subdirlist is given, it is a little bit trickier, see
+     * filelist_from_file_with_subdirlist for more details. */
+    if (!filelist)
+      input_files = argv;
+    else if (!subdirlist)
+      input_files = filelist_from_file(basepath, filelist, 0);
+    else
+      input_files = filelist_from_file_with_subdirlist(basepath, filelist, 
+                                                       subdirlist);
+    /*}}}*/
 
     /****************** Begin interesting stuff *************************/
     purge_data pd;
