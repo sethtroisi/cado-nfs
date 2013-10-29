@@ -99,10 +99,10 @@ int ffs_poly_read(cado_poly poly, const char *filename)
 
     file = fopen(filename, "r");
     if (file == NULL) 
-      {
-	      fprintf(stderr, "read_polynomial: could not open %s\n", filename);
-	      exit(1);
-      }
+    {
+	    fprintf(stderr, "read_polynomial: could not open %s\n", filename);
+      return 0;
+    }
     
     param_list_init(pl);
     param_list_read_stream(pl, file);

@@ -433,23 +433,29 @@ int check_whether_file_is_renumbered(const char * filename)
     }
 }
 
-static void
-usage(const char *argv0)
+static void declare_usage(param_list pl)
 {
-    fprintf (stderr, "Usage: %s [options] ", argv0);
-    fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
-    fprintf (stderr, "Mandatory command line options:\n");
-    fprintf (stderr, "     -poly xxx     - polynomial file\n");
-    fprintf (stderr, "     -renumber xxx - file with renumbering table\n");
-    fprintf (stderr, "     -nrels <K>    - number of relations to be found in the slice\n");
-    fprintf (stderr, "\nOther command line options:\n");
-    fprintf (stderr, "    -outdir dir  - by default input files are overwritten\n");
-    fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
-    fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
+  param_list_decl_usage(pl, "filelist", "file containing a list of input files");
+  param_list_decl_usage(pl, "basepath", "path added to all file in filelist");
+  param_list_decl_usage(pl, "poly", "input polynomial file");
+  param_list_decl_usage(pl, "renumber", "input file for renumbering table");
+  param_list_decl_usage(pl, "nrels",
+                              "number of relations to be found in the slice");
+  param_list_decl_usage(pl, "outdir", "be default input files are overwritten");
+  param_list_decl_usage(pl, "outfmt",
+                               "format of output file (default same as input");
 #ifndef FOR_FFS
-    fprintf (stderr, "    -dl          - do not reduce exponents modulo 2\n");
+  param_list_decl_usage(pl, "dl", "(switch) do not reduce exponents modulo 2");
 #endif
-    exit (1);
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
+  param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+}
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
 }
 
 int
@@ -459,16 +465,12 @@ main (int argc, char *argv[])
     //TODO remove useless polynomials
     cado_poly cpoly;
 
-    /* print command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (int k = 1; k < argc; k++)
-      fprintf (stderr, " %s", argv[k]);
-    fprintf (stderr, "\n");
-
     param_list pl;
     param_list_init(pl);
-    param_list_configure_switch(pl, "--force-posix-threads", &filter_rels_force_posix_threads);
+    declare_usage(pl);
     argv++,argc--;
+
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
 #ifndef FOR_FFS
     is_for_dl = 0; /* By default we do dup2 for factorization */
@@ -481,6 +483,9 @@ main (int argc, char *argv[])
     _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
 
+    if (argc == 0)
+      usage (pl, argv0);
+
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         /* Since we accept file names freeform, we decide to never abort
@@ -489,6 +494,9 @@ main (int argc, char *argv[])
         // fprintf (stderr, "Unknown option: %s\n", argv[0]);
         // abort();
     }
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
 
     const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
@@ -497,49 +505,52 @@ main (int argc, char *argv[])
     const char * outdir = param_list_lookup_string(pl, "outdir");
     const char * renumberfilename = param_list_lookup_string(pl, "renumber");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
-
     param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
-    if (param_list_warn_unused(pl) || polyfilename == NULL || nrels_expected == 0)
-      usage(argv0);
+    if (param_list_warn_unused(pl))
+    {
+      fprintf(stderr, "Error, unused parameters are given\n");
+      usage(pl, argv0);
+    }
 
+    if (polyfilename == NULL)
+    {
+      fprintf(stderr, "Error, missing -poly command line argument\n");
+      usage(pl, argv0);
+    }
+    if (renumberfilename == NULL)
+    {
+      fprintf (stderr, "Error, missing -renumber command line argument\n");
+      usage(pl, argv0);
+    }
+    if (nrels_expected == 0)
+    {
+      fprintf(stderr, "Error, missing -nrels command line argument "
+                      "(or nrels = 0)\n");
+      usage(pl, argv0);
+    }
     K = 100 + 1.2 * nrels_expected;
+
+    if (basepath && !filelist)
+    {
+      fprintf(stderr, "Error, -basepath only valid with -filelist\n");
+      usage(pl, argv0);
+    }
+    if (outfmt && !is_supported_compression_format(outfmt)) {
+        fprintf(stderr, "Error, output compression format unsupported\n");
+        usage(pl, argv0);
+    }
 
     cado_poly_init (cpoly);
 #ifndef FOR_FFS
     if (!cado_poly_read (cpoly, polyfilename))
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
-    }
 #else
     if (!ffs_poly_read (cpoly, polyfilename))
+#endif
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
-#endif
-
-    if (basepath && !filelist) {
-        fprintf(stderr, "-basepath only valid with -filelist\n");
-        exit(1);
-    }
-
-    if (K == 0) {
-        fprintf (stderr, "The K parameter is required\n");
-        usage(argv0);
-    }
-
-    if (outfmt && !is_supported_compression_format(outfmt)) {
-        fprintf(stderr, "output compression format unsupported\n");
-        usage(argv0);
-    }
-
-    if (renumberfilename == NULL)
-      {
-        fprintf (stderr, "Missing -renumber option (file created by freerel)\n");
-        exit (1);
-      }
 
     set_antebuffer_path (argv0, path_antebuffer);
 
@@ -580,7 +591,7 @@ main (int argc, char *argv[])
 
   if ((filelist != NULL) + (argc != 0) != 1) {
       fprintf(stderr, "Provide either -filelist or freeform file names\n");
-      usage(argv0);
+      usage(pl, argv0);
   }
 
   /* Construct the two filelists : new files and already renumbered files */
