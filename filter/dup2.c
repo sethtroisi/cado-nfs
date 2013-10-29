@@ -540,6 +540,10 @@ main (int argc, char *argv[])
         fprintf(stderr, "Error, output compression format unsupported\n");
         usage(pl, argv0);
     }
+    if ((filelist != NULL) + (argc != 0) != 1) {
+      fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
+      usage(pl, argv0);
+    }
 
     cado_poly_init (cpoly);
 #ifndef FOR_FFS
@@ -587,12 +591,6 @@ main (int argc, char *argv[])
   memset (H, 0, K * sizeof (uint32_t));
   fprintf (stderr, "Allocated hash table of %lu entries (%luMb)\n", K,
            (K * sizeof (uint32_t)) >> 20);
-
-
-  if ((filelist != NULL) + (argc != 0) != 1) {
-      fprintf(stderr, "Provide either -filelist or freeform file names\n");
-      usage(pl, argv0);
-  }
 
   /* Construct the two filelists : new files and already renumbered files */
   char ** files_already_renumbered, ** files_new;
