@@ -674,7 +674,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   }
 
   /* now i points at the beginning of a decreasing sequence of values of vr */
-  if (side != renumber_info->rat)
+  if (side != renumber_info->rat && tab[i] > tab[i+1])
   {
     while (i < renumber_info->size)
     {
