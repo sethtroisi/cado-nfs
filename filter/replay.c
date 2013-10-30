@@ -704,15 +704,15 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "basename for output matrices");
 #ifndef FOR_DL
   param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
-                            "dense matrice (default " STR(SKIP_DEFAULT) ")");
+                            "dense matrix (default " STR(SKIP_DEFAULT) ")");
 #endif
   param_list_decl_usage(pl, "index", "file containing description of rows "
-                                     "(relations-sets) of the matrice");
+                                     "(relations-sets) of the matrix");
   param_list_decl_usage(pl, "ideals", "file containing correspondence between "
-                                      "ideals and matrice columns");
+                                      "ideals and matrix columns");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
-  param_list_decl_usage(pl, "for_msieve", "output matrice in msieve format");
+  param_list_decl_usage(pl, "for_msieve", "output matrix in msieve format");
   param_list_decl_usage(pl, "bwcostmin", "??????");
 }
 
