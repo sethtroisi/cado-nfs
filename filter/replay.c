@@ -288,13 +288,13 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
     int *tmp;
 
 #ifdef FOR_DL
-    FILE *renumberfile = fopen (idealsfilename, "w+");
+    FILE *renumberfile = fopen_maybe_compressed (idealsfilename, "w");
     if (renumberfile == NULL)
-      {
-        fprintf (stderr, "Error while opening file to save permutation of"
-                         "ideals\n");
-        exit(1);
-      }
+    {
+      fprintf (stderr, "Error while opening file to save permutation of"
+                       "ideals\n");
+      exit(EXIT_FAILURE);
+    }
 #endif
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
@@ -312,6 +312,9 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
       }
     }
     *small_ncols = nb>>1;
+#ifdef FOR_DL
+    fprintf (renumberfile, "# %d\n", *small_ncols);
+#endif
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp_int2);
@@ -326,7 +329,7 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
       }
 
 #ifdef FOR_DL
-    fclose(renumberfile);
+    fclose_maybe_compressed (renumberfile, idealsfilename);
 #endif
     free(tmp);
 }
