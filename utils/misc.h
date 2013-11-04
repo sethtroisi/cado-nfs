@@ -24,18 +24,6 @@ extern "C" {
 #define SMAX(A) (0x7fffffffffffffffLL  >>((8-sizeof(A))<<3))
 #define UMIN(A) (0)
 #define SMIN(A) (1ULL<< ((sizeof(A)<<3)-1))
-#define SFREE(A) if (A) do { free (A); A = NULL; } while (0)
-#define MEMSETZERO(A,T) memset (A, 0, (T) * sizeof(*(A)))
-#define SMALLOC(A,T,M)							\
-  do {									\
-    size_t mysize;							\
-    if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
-      fprintf (stderr, "%s: malloc error (%zu MB): %s\n",		\
-	       M, mysize>>20, strerror(errno));				\
-      abort();								\
-    }									\
-  } while (0)
-
 
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
