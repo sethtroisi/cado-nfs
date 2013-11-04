@@ -280,6 +280,8 @@ char **prepare_grouped_command_lines(char **list_of_files)
         ASSERT_ALWAYS(strlen(cmd) == filenames_total_size + prefix_len + postfix_len);
         new_commands[n_new_commands-1] = cmd;
         free(tmp);
+        free(cmd_prefix);
+        free(cmd_postfix);
         grouphead = grouptail;
     }
     new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
