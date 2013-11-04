@@ -970,7 +970,7 @@ if __name__ == '__main__':
     if not SETTINGS["CERTSHA1"] is None and scheme != "https":
         logging.warn("Option -certsha1 makes sense only with an https URL, ignoring it.")
     elif SETTINGS["CERTSHA1"] is None and scheme == "https":
-        logging.warn("Option -certsha1 given but no https URL, NO SSL VALIDATION WILL BE PERFORMED.")
+        logging.warn("An https URL was given but no -certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
     elif not SETTINGS["CERTSHA1"] is None and scheme == "https":
         certfilename = os.path.join(SETTINGS["DLDIR"], "server.pem")
         certfile_exists = os.path.isfile(certfilename)
