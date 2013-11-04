@@ -540,6 +540,7 @@ if __name__ == '__main__':
     parser.add_argument("-uploaddir", help="Upload directory", 
                         default="upload/")
     parser.add_argument("-dbfile", help="Database file name", required=True)
+    parser.add_argument("-cafile", help="Certificate file name", required=False)
     parser.add_argument("-threaded", help="Use threaded server", 
                         action="store_true", default=False)
     parser.add_argument("-onlyreg", help="Allow access only to registered files", 
@@ -549,6 +550,7 @@ if __name__ == '__main__':
     PORT = int(args.port)
     HTTP = args.address
     dbfilename = args.dbfile
+    cafile = args.cafile
     registered_filenames = {}
 
     logger = logging.getLogger()
@@ -556,7 +558,7 @@ if __name__ == '__main__':
 
     httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, 
                            registered_filenames, args.uploaddir,
-                           only_registered=args.onlyreg)
+                           only_registered=args.onlyreg, cafile=cafile)
     
     try:
         httpd.serve()
