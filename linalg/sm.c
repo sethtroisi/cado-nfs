@@ -45,7 +45,6 @@ typedef relset_struct_t relset_t[1];
 typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
 
-
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 void
 poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
@@ -72,6 +71,25 @@ poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
   }
 }
 
+static inline void
+poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
+{
+  if (b == 0)
+  {
+    /* freerel */
+    poly_alloc(rel, 0);
+    poly_setcoeff_int64(rel, 0, a);
+    rel->deg=0;
+  }
+  else
+  {
+    /* an (a,b)-pair is a degree-1 poly */
+    poly_alloc(rel, 1);
+    poly_setcoeff_int64(rel, 0, a);
+    poly_setcoeff_int64(rel, 1, -b);
+    rel->deg = 1;
+  }
+}
 
 relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			  int * small_nrows, poly_t F, const mpz_t ell2)
@@ -95,19 +113,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   uint64_t npairs;
   for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
     ASSERT_ALWAYS(npairs < ps->nrows);
-    if (ps->b == 0) {
-	/* freerels */
-	poly_alloc(pairs[npairs], 0);
-	poly_setcoeff_int64(pairs[npairs], 0, ps->a);
-	pairs[npairs]->deg=0;
-      }
-    else {
-      /* an (a,b)-pair is a degree-1 poly */
-      poly_alloc(pairs[npairs], 1);
-      poly_setcoeff_int64(pairs[npairs], 0, ps->a);
-      poly_setcoeff_int64(pairs[npairs], 1, -ps->b);
-      pairs[npairs]->deg = 1;
-    }
+    poly_alloc_and_set_from_ab(pairs[npairs], ps->a, ps->b);
   }
 
   /* small_ncols isn't used here: we don't care */
@@ -416,30 +422,14 @@ void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
 /* Computed the Shirokauer maps of a single pair (a,b). 
    SM must be allocated and is viewed as a polynomial of degree F->deg. */
 void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps, 
-			  const mpz_t ell, const mpz_t ell2)
+                   const mpz_t ell, const mpz_t ell2, const mpz_t invl2)
 {
   poly_t rel;
-  mpz_t invl2;
 
-  mpz_init(invl2);
-  barrett_init(invl2, ell2);
-  
   SM->deg = 0;
   poly_setcoeff_si(SM, 0, 1);
   
-  if (b == 0) {
-    /* freerel */
-    poly_alloc(rel, 0);
-    poly_setcoeff_int64(rel, 0, a);
-    rel->deg=0;
-  }
-  else {
-    /* an (a,b)-pair is a degree-1 poly */
-    poly_alloc(rel, 1);
-    poly_setcoeff_int64(rel, 0, a);
-    poly_setcoeff_int64(rel, 1, -b);
-    rel->deg = 1;
-  }
+  poly_alloc_and_set_from_ab(rel, a, b);
   
   poly_power_mod_f_mod_mpz_Barrett(SM, rel, F, eps, ell2, invl2);
   poly_sub_ui(SM, 1);
@@ -449,7 +439,6 @@ void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps,
     mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
     ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
   }
-  mpz_clear(invl2);
 }
 
 
