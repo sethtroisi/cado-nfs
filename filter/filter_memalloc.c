@@ -48,7 +48,6 @@ my_malloc_free_all (void)
   for ( ; relcompact_current >= 0; relcompact_current--)
   {
     SFREE(relcompact_list[relcompact_current]);
-    relcompact_current--;
   }
   SFREE(relcompact_list);
   relcompact_list = NULL;
