@@ -444,7 +444,12 @@ void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps,
   poly_power_mod_f_mod_mpz_Barrett(SM, rel, F, eps, ell2, invl2);
   poly_sub_ui(SM, 1);
 
+<<<<<<< Updated upstream
   for(int j=0; j<F->deg; j++) {
+=======
+  for(int j=0; j<SM->deg; j++) {
+
+>>>>>>> Stashed changes
     ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
     mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
     ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
