@@ -51,17 +51,39 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
 
-class HTTPSServer(http.server.HTTPServer):
-    def __init__(self, server_address, HandlerClass, certfile=None, keyfile=None):
-        socketserver.BaseServer.__init__(self, server_address, HandlerClass)
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-        ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
-        self.socket = ctx.wrap_socket(socket.socket(self.address_family, self.socket_type), server_side=True)
-        self.server_bind()
-        self.server_activate()
+if HAVE_SSL:
+    class HTTPSServer(http.server.HTTPServer):
+        def __init__(self, server_address, HandlerClass, certfile=None, keyfile=None):
+            socketserver.BaseServer.__init__(self, server_address, HandlerClass)
+            ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+            self.socket = ctx.wrap_socket(socket.socket(self.address_family, self.socket_type), server_side=True)
+            self.server_bind()
+            self.server_activate()
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPSServer):
-    """Handle requests in a separate thread."""
+    class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPSServer):
+        """Handle requests in a separate thread."""
+
+    BUGGY_SSLSOCKET_VERSIONS = [
+        (3,2,0), (3,2,1), (3,2,2), (3,2,3),
+        (3,3,0)
+    ]
+    if sys.version_info[0:3] in BUGGY_SSLSOCKET_VERSIONS:
+        class FixedSSLSocket(ssl.SSLSocket):
+            """ Wrapper class that applies the patch for issue 16357
+            
+            See http://bugs.python.org/issue16357
+            """
+            def accept(self):
+                newsock, addr = socket.socket.accept(self)
+                return (ssl.SSLSocket(sock=newsock,
+                                      server_side=True,
+                                      do_handshake_on_connect=
+                                          self.do_handshake_on_connect,
+                                      _context=self.context),
+                        addr)
+        ssl.SSLSocket = FixedSSLSocket
+
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
