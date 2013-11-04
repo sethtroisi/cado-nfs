@@ -10,6 +10,7 @@ import re
 import io
 import logging
 import urllib.parse
+import copy
 from workunit import Workunit
 import datetime
 import wudb
@@ -129,6 +130,11 @@ class HtmlGen(io.BytesIO):
 class MyHandler(http.server.CGIHTTPRequestHandler):
     clientid_pattern = re.compile("^clientid=([\w.-]*)$")
     
+    # Check that urlsplit() does not collapse paths which could prevent
+    # registered_filenames from filtering path traversal attacks
+    # See http://bugs.python.org/issue19435
+    assert urllib.parse.urlsplit("http://foo//a").path == "//a"
+    
     def __init__(self, *args, **kwargs):
         self.no_work_available = False
         super().__init__(*args, **kwargs)
@@ -206,7 +212,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
         if self.is_upload():
-            super().do_POST()
+            self.do_upload()
         else:
             self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
@@ -214,11 +220,105 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def is_upload(self):
         """Test whether request is a file upload."""
+        
         splitpath = urllib.parse.urlsplit(self.path)
         if self.command == 'POST' and self.is_cgi() and \
                 splitpath.path == self.upload_path:
             return True
         return False
+
+    def do_upload(self):
+        if False:
+            # This executes upload.py as a CGI script, however, that does
+            # not work with SSL because the SSL-wrapper around the socket
+            # is missing proper file descriptors for dup(), etc.
+            super().do_POST()
+        else:
+            # This uses the imported do_upload() function directly, without
+            # spawning a subprocess, so that do_upload() can use the file-
+            # like objects provided by the SSL wrapper. I should be faster,
+            # too, by not having to execute a new Python interpreter and
+            # script for each upload.
+            # The CGI parsing code used in upload.py requires some shell
+            # environment variables to be set according to the CGI
+            # specificaton, such as CONTENT_LENGTH.
+            env = self.create_env("upload.py")
+            upload.do_upload(self.dbfilename, self.uploaddir, 
+                    inputfp=self.rfile, output=self.wfile, environ=env)
+
+    def create_env(self, scriptname, source_env=os.environ, query=None):
+        """ Create a set of shell environment variables according to the CGI
+        specification.
+        
+        Copied from the Python 3.2 http/server.py library file.
+        """
+        env = copy.deepcopy(source_env)
+        env['SERVER_SOFTWARE'] = self.version_string()
+        env['SERVER_NAME'] = self.server.server_name
+        env['GATEWAY_INTERFACE'] = 'CGI/1.1'
+        env['SERVER_PROTOCOL'] = self.protocol_version
+        env['SERVER_PORT'] = str(self.server.server_port)
+        env['REQUEST_METHOD'] = self.command
+        uqrest = urllib.parse.unquote(scriptname)
+        env['PATH_INFO'] = uqrest
+        env['PATH_TRANSLATED'] = self.translate_path(uqrest)
+        env['SCRIPT_NAME'] = scriptname
+        if query:
+            env['QUERY_STRING'] = query
+        host = self.address_string()
+        if host != self.client_address[0]:
+            env['REMOTE_HOST'] = host
+        env['REMOTE_ADDR'] = self.client_address[0]
+        authorization = self.headers.get("authorization")
+        if authorization:
+            authorization = authorization.split()
+            if len(authorization) == 2:
+                import base64, binascii
+                env['AUTH_TYPE'] = authorization[0]
+                if authorization[0].lower() == "basic":
+                    try:
+                        authorization = authorization[1].encode('ascii')
+                        authorization = base64.decodebytes(authorization).\
+                                        decode('ascii')
+                    except (binascii.Error, UnicodeError):
+                        pass
+                    else:
+                        authorization = authorization.split(':')
+                        if len(authorization) == 2:
+                            env['REMOTE_USER'] = authorization[0]
+        # XXX REMOTE_IDENT
+        if self.headers.get('content-type') is None:
+            env['CONTENT_TYPE'] = self.headers.get_content_type()
+        else:
+            env['CONTENT_TYPE'] = self.headers['content-type']
+        length = self.headers.get('content-length')
+        if length:
+            env['CONTENT_LENGTH'] = length
+        referer = self.headers.get('referer')
+        if referer:
+            env['HTTP_REFERER'] = referer
+        accept = []
+        for line in self.headers.getallmatchingheaders('accept'):
+            if line[:1] in "\t\n\r ":
+                accept.append(line.strip())
+            else:
+                accept = accept + line[7:].split(',')
+        env['HTTP_ACCEPT'] = ','.join(accept)
+        ua = self.headers.get('user-agent')
+        if ua:
+            env['HTTP_USER_AGENT'] = ua
+        co = filter(None, self.headers.get_all('cookie', []))
+        cookie_str = ', '.join(co)
+        if cookie_str:
+            env['HTTP_COOKIE'] = cookie_str
+        # XXX Other HTTP_* headers
+        # Since we're setting the env in the parent, provide empty
+        # values to override previously set values
+        for k in ('QUERY_STRING', 'REMOTE_HOST', 'CONTENT_LENGTH',
+                  'HTTP_USER_AGENT', 'HTTP_COOKIE', 'HTTP_REFERER'):
+            env.setdefault(k, "")
+        return env
+
 
     def is_getwu(self):
         """Test whether request is for a new WU."""
