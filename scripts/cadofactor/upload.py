@@ -37,7 +37,8 @@ def analyze(level, name, obj):
 UPLOADDIRKEY = "UPLOADDIR"
 DBFILENAMEKEY = "DBFILENAME"
 
-def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
+def do_upload(dbfilename, uploaddir, inputfp=sys.stdin, output=sys.stdout, 
+        environ=os.environ):
     diag(1, "Command line arguments:", sys.argv)
     diag(2, "Environment:", os.environ)
 
@@ -51,7 +52,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         pass
 
     diag(1, "Reading POST data")
-    form = cgi.FieldStorage(fp = inputfp)
+    form = cgi.FieldStorage(fp=inputfp, environ=environ)
     diag(1, "Finished reading POST data")
     diag(2, "form = ", form)
     analyze(3, "form", form)
@@ -65,12 +66,8 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         message = 'No "WUid" key found in POST data'
     if "clientid" not in form:
         message = 'No "clientid" key found in POST data'
-    elif UPLOADDIRKEY not in os.environ:
-        message = 'Script error: Environment variable %s not set' \
-                  % UPLOADDIRKEY
-    elif not os.path.isdir(os.environ[UPLOADDIRKEY]):
-        message = 'Script error: %s is not a directory' \
-                  % os.environ[UPLOADDIRKEY]
+    elif not os.path.isdir(uploaddir):
+        message = 'Script error: %s is not a directory' % uploaddir
     else:
         wuid = form['WUid']
         clientid = form['clientid']
@@ -120,7 +117,7 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
             (basename, suffix) = os.path.splitext(basename)
             # Make a file name which does not exist yet and create the file
             (filedesc, filename) = mkstemp(prefix=basename + '.',
-                suffix=suffix, dir=os.environ[UPLOADDIRKEY])
+                suffix=suffix, dir=uploaddir)
             diag(1, "output filename = ", filename)
             filestuple = [fileitem.filename, filename]
             
@@ -193,10 +190,10 @@ if __name__ == '__main__':
         import cgitb
         cgitb.enable(display=0, logdir="/tmp/cgitb/")
 
-    if DBFILENAMEKEY not in os.environ:
-        print ('Script error: Environment variable %s not set'
-               % DBFILENAMEKEY)
-        sys.exit(1)
+    for key in (DBFILENAMEKEY, UPLOADDIRKEY):
+        if key not in os.environ:
+            print ('Script error: Environment variable %s not set' % key)
+            sys.exit(1)
 
     if DEBUG > 1:
         sys.stderr = open("upload.stderr", "a")
@@ -204,5 +201,7 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG)
 
     DBFILENAME = os.environ[DBFILENAMEKEY]
+    UPLOADDIR = os.environ[UPLOADDIRKEY]
+
     diag(1, "About to call do_upload()")
-    do_upload(DBFILENAME)
+    do_upload(DBFILENAME, UPLOADDIR)
