@@ -413,6 +413,46 @@ void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
 }
 
 
+/* Computed the Shirokauer maps of a single pair (a,b). 
+   SM must be allocated and is viewed as a polynomial of degree F->deg. */
+void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps, 
+			  const mpz_t ell, const mpz_t ell2)
+{
+  poly_t rel;
+  mpz_t invl2;
+
+  mpz_init(invl2);
+  barrett_init(invl2, ell2);
+  
+  SM->deg = 0;
+  poly_setcoeff_si(SM, 0, 1);
+  
+  if (b == 0) {
+    /* freerel */
+    poly_alloc(rel, 0);
+    poly_setcoeff_int64(rel, 0, a);
+    rel->deg=0;
+  }
+  else {
+    /* an (a,b)-pair is a degree-1 poly */
+    poly_alloc(rel, 1);
+    poly_setcoeff_int64(rel, 0, a);
+    poly_setcoeff_int64(rel, 1, -b);
+    rel->deg = 1;
+  }
+  
+  poly_power_mod_f_mod_mpz_Barrett(SM, rel, F, eps, ell2, invl2);
+  poly_sub_ui(SM, 1);
+
+  for(int j=0; j<F->deg; j++) {
+    ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
+    mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
+    ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
+  }
+  mpz_clear(invl2);
+}
+
+
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "(required) poly file");
