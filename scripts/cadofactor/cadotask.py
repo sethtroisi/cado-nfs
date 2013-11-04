@@ -3093,7 +3093,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         threaded = False
         # By default, don't enable SSL until work-arounds for the various
         # bugs are in place
-        if serverparams.get("ssl", False):
+        if serverparams.get("ssl", True):
             cafilename = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".server.cert"
         else:
             cafilename = None
