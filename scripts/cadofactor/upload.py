@@ -53,7 +53,8 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
     diag(1, "Reading POST data")
     form = cgi.FieldStorage(fp = inputfp)
     diag(1, "Finished reading POST data")
-    analyze(2, "form", form)
+    diag(2, "form = ", form)
+    analyze(3, "form", form)
 
     charset = "utf-8"
     header = "Content-Type: text/plain; charset=" + charset + "\r\n\r\n"
@@ -102,13 +103,13 @@ def do_upload(dbfilename, inputfp = sys.stdin, output = sys.stdout):
         else:
             fileitems = []
             diag(1, 'No "results" form found')
-        analyze (2, "fileitems", fileitems)
+        analyze (3, "fileitems", fileitems)
 
         message = ""
         for fileitem in fileitems:
             if not fileitem.file:
                 continue
-            analyze (2, "f", fileitem)
+            analyze (3, "f", fileitem)
             diag(1, "Processing file ", fileitem.filename)
             # strip leading path from file name to avoid directory traversal
             # attacks
