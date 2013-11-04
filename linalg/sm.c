@@ -445,6 +445,10 @@ void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps,
   poly_sub_ui(SM, 1);
 
   for(int j=0; j<F->deg; j++) {
+    if (j > SM->deg) {
+      continue;
+    }
+
     ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
     mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
     ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
