@@ -35,7 +35,7 @@ insert_rel_in_table_no_e(earlyparsed_relation_ptr my_br, index_t min_index,
 
     unsigned int nb_above_min_index = earlyparsed_relation_nb_above_min_index(my_br, min_index);
 
-    my_tmp = my_malloc(1 + nb_above_min_index);
+    my_tmp = index_my_malloc(1 + nb_above_min_index);
 
     for (unsigned int i = 0; i < my_br->nb; i++) {
 	h = my_br->primes[i].h;
@@ -65,10 +65,8 @@ insert_rel_in_table_with_e(earlyparsed_relation_ptr my_br, index_t min_index,
     index_t h;
 
     itmp = 0;
-    //FIXME for now can't use my malloc, because it expected an index_t table
     nb_above_min = earlyparsed_relation_nb_above_min_index(my_br, min_index);
-    my_tmp = (ideal_merge_t *) malloc((1 + nb_above_min)*sizeof(ideal_merge_t));
-    ASSERT_ALWAYS(my_tmp != NULL);
+    my_tmp = idealmerge_my_malloc(1 + nb_above_min);
 
     for (i = 0; i < my_br->nb; i++) {
 	h = my_br->primes[i].h;

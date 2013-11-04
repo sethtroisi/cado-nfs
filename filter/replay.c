@@ -288,13 +288,13 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
     int *tmp;
 
 #ifdef FOR_DL
-    FILE *renumberfile = fopen (idealsfilename, "w+");
+    FILE *renumberfile = fopen_maybe_compressed (idealsfilename, "w");
     if (renumberfile == NULL)
-      {
-        fprintf (stderr, "Error while opening file to save permutation of"
-                         "ideals\n");
-        exit(1);
-      }
+    {
+      fprintf (stderr, "Error while opening file to save permutation of"
+                       "ideals\n");
+      exit(EXIT_FAILURE);
+    }
 #endif
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
@@ -312,6 +312,9 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
       }
     }
     *small_ncols = nb>>1;
+#ifdef FOR_DL
+    fprintf (renumberfile, "# %d\n", *small_ncols);
+#endif
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp_int2);
@@ -326,7 +329,7 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
       }
 
 #ifdef FOR_DL
-    fclose(renumberfile);
+    fclose_maybe_compressed (renumberfile, idealsfilename);
 #endif
     free(tmp);
 }
@@ -704,15 +707,15 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "basename for output matrices");
 #ifndef FOR_DL
   param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
-                            "dense matrice (default " STR(SKIP_DEFAULT) ")");
+                            "dense matrix (default " STR(SKIP_DEFAULT) ")");
 #endif
   param_list_decl_usage(pl, "index", "file containing description of rows "
-                                     "(relations-sets) of the matrice");
+                                     "(relations-sets) of the matrix");
   param_list_decl_usage(pl, "ideals", "file containing correspondence between "
-                                      "ideals and matrice columns");
+                                      "ideals and matrix columns");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
-  param_list_decl_usage(pl, "for_msieve", "output matrice in msieve format");
+  param_list_decl_usage(pl, "for_msieve", "output matrix in msieve format");
   param_list_decl_usage(pl, "bwcostmin", "??????");
 }
 

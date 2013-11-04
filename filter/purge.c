@@ -863,10 +863,10 @@ int main(int argc, char **argv)
     }
 
     /* free rel_compact[i] and rel_compact. We no longer need them */
-    my_malloc_free_all();
     tot_alloc_bytes -= get_my_malloc_bytes();
     fprintf(stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
             get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
+    my_malloc_free_all();
 
     free(rel_compact);
     size_t tmp = (nrelmax * sizeof(index_t *));
