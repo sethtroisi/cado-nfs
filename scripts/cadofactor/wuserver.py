@@ -11,6 +11,7 @@ import io
 import logging
 import urllib.parse
 import copy
+import struct
 from workunit import Workunit
 import datetime
 import wudb
@@ -30,6 +31,53 @@ except ImportError:
 
 class FixedHTTPServer(http.server.HTTPServer):
     """ Work-around class for http.server.HTTPServer that handles EINTR """
+
+    def __init__(self, *args, whitelist=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = logging.getLogger("HTTP server")
+        if whitelist is None:
+            self.whitelist = None
+        else:
+            self.whitelist = []
+            for iprange in whitelist:
+                mask = self.ipmask(iprange)
+                if not mask:
+                    raise ValueError("%s it not a valid IP range" % iprange)
+                self.whitelist.append(mask)
+
+    @staticmethod
+    def ipmask(iprange):
+        """ Convert network mask strings to a network address and and mask
+        
+        Convert text strings in the usual network mask form, e.g.,
+        "192.168.3.0/24" to (netaddr, andmask) pairs which we can use to
+        match IP addresses, i.e., (ip & andmask) == netaddr
+        
+        >>> FixedHTTPServer.ipmask("192.168.3.0/24")
+        (3232236288, 4294967040)
+        >>> FixedHTTPServer.ipmask("192.168.3.1")
+        (3232236289, 4294967295)
+        >>> FixedHTTPServer.ipmask("1.0.0.0/0")
+        (0, 0)
+        >>> FixedHTTPServer.ipmask("1.0.0.0/32")
+        (16777216, 4294967295)
+        >>> FixedHTTPServer.ipmask("1.0.0.256")
+        >>> FixedHTTPServer.ipmask("1.0.0.0/33")
+        """
+        addr = iprange.split('/')
+        if len(addr) < 2:
+            addr.append(32)
+        try:
+            packedIP = socket.inet_aton(addr[0])
+            addr[1] = int(addr[1])
+        except (socket.error, ValueError):
+            return None
+        if addr[1] < 0 or addr[1] > 32:
+            return None
+        netaddr = struct.unpack("!L", packedIP)[0]
+        andmask = 2**32 - 2**(32-addr[1])
+        return (netaddr & andmask, andmask)
+
     def serve_forever(self, *args, **kwargs):
         """ Wrapper around http.server.HTTPServer.serve_forever() that
         restarts in case of EINTR.
@@ -46,18 +94,42 @@ class FixedHTTPServer(http.server.HTTPServer):
                 if e.args[0] != errno.EINTR:
                     raise
 
+    def verify_request(self, request, client_address):
+        """ Tests if the client's IP address is whitelisted
+
+        If no whitelist is defined, always accepts.
+        """
+        if self.whitelist is None:
+            return True
+        # Use ipmask() to convert dotted string form of address to integer
+        addr = self.ipmask(client_address[0])[0]
+        for iprange in self.whitelist:
+            if addr & iprange[1] == iprange[0]:
+                return True
+        self.logger.warning("Connection from IP address %s rejected - "
+                "not in whitelist", client_address[0])
+        return False
+
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
 
 if HAVE_SSL:
-    class HTTPSServer(http.server.HTTPServer):
-        def __init__(self, server_address, HandlerClass, certfile=None, keyfile=None):
-            socketserver.BaseServer.__init__(self, server_address, HandlerClass)
+    class HTTPSServer(FixedHTTPServer):
+        def __init__(self, server_address, HandlerClass, *args, certfile=None,
+                    keyfile=None, **kwargs):
+            # Let TCPServer.__init__() call BaseServer.__init__() and create 
+            # a self.socket attribute, but not bind and activate the socket
+            super().__init__(server_address, HandlerClass, *args, 
+                    bind_and_activate=False, **kwargs)
+            # Create an SSL wrapper around the network socket in self.socket
+            # First init an SSL context with the key
             ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
             ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
-            self.socket = ctx.wrap_socket(socket.socket(self.address_family, self.socket_type), server_side=True)
+            # Now replace our orginal network socket with the SSL wrapper
+            self.socket = ctx.wrap_socket(self.socket, server_side=True)
+            # Finally bind and activate the SSLWrapper socket
             self.server_bind()
             self.server_activate()
 
@@ -473,7 +545,7 @@ class ServerLauncher(object):
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, *, bg = False,
                 use_db_pool = True, scriptdir = None, only_registered=False,
-                cafile=None):
+                cafile=None, whitelist=None):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
@@ -534,19 +606,24 @@ class ServerLauncher(object):
         url_address = address if address else socket.gethostname()
         self.url = "%s://%s:%d" % (scheme, url_address, self.port)
         
+        addr = (self.address, self.port)
         try:
             if threaded and scheme == "http":
                 logging.info("Using threaded HTTP server")
-                self.httpd = ThreadedHTTPServer((self.address, self.port), MyHandlerWithParams)
+                self.httpd = ThreadedHTTPServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist)
             elif not threaded and scheme == "http":
                 logging.info("Using non-threaded HTTP server")
-                self.httpd = FixedHTTPServer((self.address, self.port), MyHandlerWithParams)
+                self.httpd = FixedHTTPServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist)
             elif threaded and scheme == "https":
                 logging.info("Using threaded HTTPS server")
-                self.httpd = ThreadedHTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
+                self.httpd = ThreadedHTTPSServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist, certfile=self.cafile)
             elif not threaded and scheme == "https":
                 logging.info("Using non-threaded HTTPS server")
-                self.httpd = HTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
+                self.httpd = HTTPSServer(addr, MyHandlerWithParams, 
+                        whitelist=whitelist, certfile=self.cafile)
             else:
                 assert False
         except socket_error as e:
