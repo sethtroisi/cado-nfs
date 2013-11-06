@@ -95,7 +95,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
-  FILE * ix = fopen(indexname, "r");
+  FILE * ix = fopen_maybe_compressed(indexname, "r");
 
   /* array of (a,b) pairs from (purgedname) file */
   poly_t *pairs;
@@ -172,7 +172,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   }
   poly_free(tmp);
 
-  fclose(ix);
+  fclose_maybe_compressed(ix, indexname);
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
 
