@@ -91,6 +91,28 @@ poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
   }
 }
 
+
+/*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
+void
+poly_reduce_frac_mod_f_mod_mpz (relset_ptr frac, const poly_t F, const mpz_t m,
+                                mpz_t tmp, poly_t g, poly_t U, poly_t V)
+{
+  if (frac->denom->deg == 0)
+  {
+    mpz_invert(tmp, frac->denom->coeff[0], m);
+    poly_mul_mpz(frac->num, frac->num, tmp);
+    poly_reduce_mod_mpz(frac->num, frac->num, m);
+  }
+  else
+  {
+    poly_xgcd_mpz (g, F, frac->denom, U, V, m);
+    poly_mul (frac->num, frac->num, V);
+    int d = poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
+                                F->deg, m, NULL);
+    cleandeg(frac->num, d);
+  }
+}
+
 relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
@@ -216,20 +238,7 @@ void * thread_start(void *arg) {
 
   for (int i = 0; i < ti->nb; i++) {
 
-    if (rels[offset+i].denom->deg == 0)
-      {
-	mpz_invert(tmp, rels[offset+i].denom->coeff[0], ell2);
-	poly_mul_mpz(rels[offset+i].num, rels[offset+i].num, tmp);
-	poly_reduce_mod_mpz(rels[offset+i].num, rels[offset+i].num, ell2);
-      }
-    else
-      {
-	poly_xgcd_mpz(g, F, rels[offset+i].denom, U, V, ell2);
-	poly_mul(rels[offset+i].num, rels[offset+i].num, V);
-	int d = poly_mod_f_mod_mpz(rels[offset+i].num->coeff, rels[offset+i].num->deg,
-		    F->coeff, F->deg, ell2, NULL);
-	cleandeg(rels[offset+i].num, d);
-      }
+    poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
 
     poly_power_mod_f_mod_mpz_Barrett(sm[i], rels[offset+i].num,
         F, eps, ell2, invl2);
@@ -377,20 +386,7 @@ void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
 
   for (int i=0; i<sr; i++) {
 
-    if (rels[i].denom->deg == 0)
-      {
-        mpz_invert(tmp, rels[i].denom->coeff[0], ell2);
-        poly_mul_mpz(rels[i].num, rels[i].num, tmp);
-        poly_reduce_mod_mpz(rels[i].num, rels[i].num, ell2);
-      }
-    else
-      {
-        poly_xgcd_mpz (g, F, rels[i].denom, U, V, ell2);
-        poly_mul (rels[i].num, rels[i].num, V);
-        int d = poly_mod_f_mod_mpz (rels[i].num->coeff, rels[i].num->deg,
-                                    F->coeff, F->deg, ell2, NULL);
-        cleandeg(rels[i].num, d);
-      }
+    poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
 
     poly_power_mod_f_mod_mpz_Barrett(SM, rels[i].num, F, eps, ell2, invl2);
     poly_sub_ui(SM, 1);
