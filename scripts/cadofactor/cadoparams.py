@@ -161,6 +161,7 @@ class Parameters(object):
         "keepoldresult": BoolParam,
         "compression": BoolParam,
         "ssl": BoolParam,
+        "threaded": BoolParam,
     }
 
     def __init__(self, *args, **kwargs):
