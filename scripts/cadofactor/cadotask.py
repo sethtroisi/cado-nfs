@@ -2835,13 +2835,13 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
     # The whitelist parameter we get from params (i.e., from the parameter file)
     # is a string with comma-separated CIDR strings. The two are concatenated
     # to form the server whitelist.
-    def __init__(self, *, parameters, path_prefix, db, whitelist=None):
+    def __init__(self, *, default_workdir, parameters, path_prefix, db, whitelist=None):
         super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
         # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
         self.params = self.parameters.myparams(self.paramnames)
         serveraddress = self.params.get("address", None)
         serverport = self.params.get("port", 8001)
-        basedir = self.params["workdir"].rstrip(os.sep) + os.sep
+        basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
         threaded = self.params.get("threaded", False)
         if self.params.get("ssl", True):
@@ -3174,8 +3174,9 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 
         whitelist = list(whitelist) if whitelist else None
         # Init server task
-        self.servertask = StartServerTask(parameters=parameters,
-                path_prefix=path_prefix, db=db, whitelist=whitelist)
+        self.servertask = StartServerTask(default_workdir=self.params["workdir"],
+                parameters=parameters, path_prefix=path_prefix, db=db,
+                whitelist=whitelist)
 
         parampath = self.parameters.get_param_path()
         sievepath = parampath + ['sieve']
