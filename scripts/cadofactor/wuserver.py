@@ -38,41 +38,55 @@ class FixedHTTPServer(http.server.HTTPServer):
         if whitelist is None:
             self.whitelist = None
         else:
+            self.logger.info("Using whitelist: %s", ",".join(whitelist))
             self.whitelist = []
             for iprange in whitelist:
                 mask = self.ipmask(iprange)
                 if not mask:
-                    raise ValueError("%s it not a valid IP range" % iprange)
+                    raise ValueError("%s it not a valid IP range (must be "
+                            "CIDR notation)" % iprange)
                 self.whitelist.append(mask)
 
     @staticmethod
     def ipmask(iprange):
-        """ Convert network mask strings to a network address and and mask
-        
+        """ Convert CIDR network range strings to a network address and a
+        bit mask
+
         Convert text strings in the usual network mask form, e.g.,
         "192.168.3.0/24" to (netaddr, andmask) pairs which we can use to
-        match IP addresses, i.e., (ip & andmask) == netaddr
-        
+        match IP addresses, i.e., the IP address is in the range iff
+        (ip & andmask) == netaddr
+
         >>> FixedHTTPServer.ipmask("192.168.3.0/24")
         (3232236288, 4294967040)
         >>> FixedHTTPServer.ipmask("192.168.3.1")
         (3232236289, 4294967295)
         >>> FixedHTTPServer.ipmask("1.0.0.0/0")
         (0, 0)
-        >>> FixedHTTPServer.ipmask("1.0.0.0/32")
-        (16777216, 4294967295)
+        >>> FixedHTTPServer.ipmask("1.0.0.1/32")
+        (16777217, 4294967295)
+        >>> FixedHTTPServer.ipmask("localhost")
+        (2130706433, 4294967295)
         >>> FixedHTTPServer.ipmask("1.0.0.256")
         >>> FixedHTTPServer.ipmask("1.0.0.0/33")
         """
         addr = iprange.split('/')
         if len(addr) < 2:
             addr.append(32)
+        # Maybe it is a hostname. Try to resolve it
+        try:
+            addr[0] = socket.gethostbyname(addr[0])
+        except socket.gaierror:
+            return None
         try:
             packedIP = socket.inet_aton(addr[0])
-            addr[1] = int(addr[1])
-        except (socket.error, ValueError):
+        except socket.error:
             return None
-        if addr[1] < 0 or addr[1] > 32:
+        try:
+            addr[1] = int(addr[1])
+        except ValueError:
+            return None
+        if not 0 <= addr[1] <= 32:
             return None
         netaddr = struct.unpack("!L", packedIP)[0]
         andmask = 2**32 - 2**(32-addr[1])
@@ -107,7 +121,7 @@ class FixedHTTPServer(http.server.HTTPServer):
             if addr & iprange[1] == iprange[0]:
                 return True
         self.logger.warning("Connection from IP address %s rejected - "
-                "not in whitelist", client_address[0])
+                "not in server.whitelist", client_address[0])
         return False
 
 
@@ -133,7 +147,7 @@ if HAVE_SSL:
             self.server_bind()
             self.server_activate()
 
-    class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPSServer):
+    class ThreadedHTTPSServer(socketserver.ThreadingMixIn, HTTPSServer):
         """Handle requests in a separate thread."""
 
     BUGGY_SSLSOCKET_VERSIONS = [
@@ -609,19 +623,19 @@ class ServerLauncher(object):
         addr = (self.address, self.port)
         try:
             if threaded and scheme == "http":
-                logging.info("Using threaded HTTP server")
+                self.logger.info("Using threaded HTTP server")
                 self.httpd = ThreadedHTTPServer(addr, MyHandlerWithParams,
                         whitelist=whitelist)
             elif not threaded and scheme == "http":
-                logging.info("Using non-threaded HTTP server")
+                self.logger.info("Using non-threaded HTTP server")
                 self.httpd = FixedHTTPServer(addr, MyHandlerWithParams,
                         whitelist=whitelist)
             elif threaded and scheme == "https":
-                logging.info("Using threaded HTTPS server")
+                self.logger.info("Using threaded HTTPS server")
                 self.httpd = ThreadedHTTPSServer(addr, MyHandlerWithParams,
                         whitelist=whitelist, certfile=self.cafile)
             elif not threaded and scheme == "https":
-                logging.info("Using non-threaded HTTPS server")
+                self.logger.info("Using non-threaded HTTPS server")
                 self.httpd = HTTPSServer(addr, MyHandlerWithParams, 
                         whitelist=whitelist, certfile=self.cafile)
             else:
@@ -689,12 +703,10 @@ class ServerLauncher(object):
         return None
     
     def serve(self):
-        logging.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
-        if not self.cert_sha1 is None:
-            logging.info("Start clients with parameters: --server=%s --certsha1=%s",
-                         self.url, self.cert_sha1)
-        else:
-            logging.info("Start clients with parameters: --server=%s", self.url)
+        self.logger.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
+        certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
+        self.logger.info("You can start additional clients with parameters: --server=%s%s",
+                         self.url, certstr)
         
         if self.bg:
             from threading import Thread
@@ -706,7 +718,7 @@ class ServerLauncher(object):
             self.httpd.serve_forever()
     
     def shutdown(self):
-        logging.info("Shutting down HTTP server")
+        self.logger.info("Shutting down HTTP server")
         self.httpd.shutdown()
         if self.bg:
             self.thread.join()
