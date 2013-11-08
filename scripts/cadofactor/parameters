@@ -263,3 +263,17 @@ slaves.basepath = /tmp/work/$(name).wuclient
 # Here, "home", "work", "workstation", and "cluster" are arbitrary 
 # alphanumeric strings; their sole purpose is to create different nodes in 
 # the parameter tree. 
+
+# A slightly advanced feature is prefixing the command line that is used on
+# the client machine to run wuclient2.py by a word of your choosing. This
+# could be a shell wrapper that sets up the execution environment, or a
+# particular choice of Python interpreter, etc.
+# For the slave machines specified in "slaves.hostnames", the "runprefix"
+# parameter is searched in "slaves.wuclient.runprefix" (and therefore, if
+# not present there, in "slaves.runprefix", then in "runprefix"). For 
+# slaves specified in slaves.work.desktop.hostname, the search starts in
+# "slaves.work.desktop.wuclient.runprefix".
+
+# This example uses the debugging-enabled Python 3.2 interpreter to run
+# wuclient2.py.
+# slaves.wuclient.runprefix = /usr/bin/python3.2-dbg
