@@ -321,6 +321,11 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
            and call CGI handler to run upload CGI script"""
         if self.is_upload():
             self.send_response(200, "Script output follows")
+            # Python 3.3 needs flush_headers()
+            try:
+                self.flush_headers()
+            except AttributeError:
+                pass
             try:
                 self.do_upload()
             except socket.error as e:
