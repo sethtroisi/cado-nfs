@@ -165,6 +165,33 @@ tasks.linalg.bwc.threads = 2x2
 server.port = 8012
 
 
+# ssl: whether to use SSL for client/server communication.
+# Without SSL authentication and encryption, it is possible for an attacker
+# on the same network to modify workunits sent to clients and so effect
+# execution of malicious code on the client machines. With SSL, clients
+# are started with the server's certificate fingerprint as a command line
+# argument, and verify the certificate when first connecting. The
+# certificate is then used for all subsequent communication.
+# The default is yes.
+
+# server.ssl = yes
+
+
+# whitelist: a comma separated list of IP ranges that should be allowed to
+# contact the server. The IP ranges are given in CIDR format: an IP address,
+# optionally followed by a slash and the number of most significant bits
+# that need to match. For example, 192.168.0.0/24 means that all IP
+# addresses in the range 192.168.0.0, ..., 192.168.0.255 are allowed.
+# Here, hostnames can also be used in place of the IP address, their name
+# will be resolved to an IP address.
+# Note that the hostnames on which cadofactor starts clients, i.e., the
+# hostnames in the slaves[...].hostnames parameters, are always added to the
+# whitelist. You should have to whitelist addresses manually only if you
+# want to start clients manually.
+
+# server.whitelist = 192.168.0.0/24,localhost
+
+
 # Clients which cadofactor should start are specified under "slaves".
 # We look for any path under "slaves" with a "hostnames" key, then for each 
 # hostname specified (comma separated list, with multiplicity), one slave is
