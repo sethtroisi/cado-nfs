@@ -716,6 +716,8 @@ class ServerLauncher(object):
         certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
         self.logger.info("You can start additional clients with parameters: --server=%s%s",
                          self.url, certstr)
+        self.logger.info("If you want to start additional clients, remember "
+                         "to add their hosts to server.whitelist")
         
         if self.bg:
             from threading import Thread
