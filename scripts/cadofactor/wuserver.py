@@ -320,6 +320,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
         if self.is_upload():
+            self.send_response(200, "Script output follows")
             self.do_upload()
         else:
             self.send_error(501, "POST request allowed only for uploads")
