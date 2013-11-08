@@ -566,6 +566,7 @@ class ServerLauncher(object):
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
         self.address = address if address else "0.0.0.0"
+        self.url_address = address if address else socket.gethostname()
         self.port = port
         self.cafile = cafile
         upload_scriptname = "upload.py"
@@ -618,8 +619,7 @@ class ServerLauncher(object):
             if not self.cert_sha1 is None:
                 scheme = "https"
 
-        url_address = address if address else socket.gethostname()
-        self.url = "%s://%s:%d" % (scheme, url_address, self.port)
+        self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
         
         addr = (self.address, self.port)
         try:
@@ -669,7 +669,7 @@ class ServerLauncher(object):
             "ST=None",
             "O=None",
             "localityName=None",
-            "commonName=%s" % self.address,
+            "commonName=%s" % self.url_address,
             "organizationalUnitName=None",
             "emailAddress=None"
         ]
