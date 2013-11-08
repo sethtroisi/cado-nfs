@@ -321,7 +321,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
            and call CGI handler to run upload CGI script"""
         if self.is_upload():
             self.send_response(200, "Script output follows")
-            self.do_upload()
+            try:
+                self.do_upload()
+            except socket.error as e:
+                self.log_error("%s", e)
         else:
             self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
