@@ -237,6 +237,15 @@ class HtmlGen(io.BytesIO):
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     clientid_pattern = re.compile("^clientid=([\w.-]*)$")
+
+    # The instance variable rbufsize is used by StreamRequestHandler to set
+    # the buffer size of the read file object attached to the socket.
+    # CGIHTTPRequestHandler sets this to 0, i.e., unbuffered, as it has to
+    # pass the underlying file descriptor to a subprocess, so any data left
+    # in the buffer would not be passed on to the subprocess.
+    # We don't use subprocesses, thus we restore the original default 
+    # buffering mode to avoid a huge performance hit.
+    rbufsize=-1
     
     # Check that urlsplit() does not collapse paths which could prevent
     # registered_filenames from filtering path traversal attacks
@@ -317,8 +326,6 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         sys.stdout.flush()
 
     def do_POST(self):
-        """Set environment variable telling the upload directory 
-           and call CGI handler to run upload CGI script"""
         if self.is_upload():
             self.send_response(200, "Script output follows")
             # Python 3.3 needs flush_headers()
@@ -349,6 +356,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # This executes upload.py as a CGI script, however, that does
             # not work with SSL because the SSL-wrapper around the socket
             # is missing proper file descriptors for dup(), etc.
+            # This does not work if rbufsize != 0.
             super().do_POST()
         else:
             # This uses the imported do_upload() function directly, without
@@ -359,6 +367,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # The CGI parsing code used in upload.py requires some shell
             # environment variables to be set according to the CGI
             # specificaton, such as CONTENT_LENGTH.
+            # This is really slow if rbufsize == 0.
             env = self.create_env("upload.py")
             upload.do_upload(self.dbfilename, self.uploaddir, 
                     inputfp=self.rfile, output=self.wfile, environ=env)
