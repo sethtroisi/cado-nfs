@@ -723,8 +723,8 @@ class ServerLauncher(object):
     def serve(self):
         self.logger.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
         certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
-        self.logger.info("You can start additional clients with parameters: --server=%s%s",
-                         self.url, certstr)
+        self.logger.info("You can start additional wuclient2.py scripts with "
+                         "parameters: --server=%s%s", self.url, certstr)
         self.logger.info("If you want to start additional clients, remember "
                          "to add their hosts to server.whitelist")
         
