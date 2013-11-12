@@ -76,7 +76,7 @@ builddir=${HOME}/build/cado-nfs/
 # the CADO source or build directory. In fact, it is advisable to keep it
 # separate to facilitate deleting or backing-up the sources, executables,
 # and factorization data individually.
-workdir = /tmp/
+tasks.workdir = /tmp/
 
 
 ###########################################################################
@@ -265,8 +265,8 @@ tasks.linalg.characters.threads = 2
 # address: The server of the client/server set-up will listen at this
 # address. Note that listening on address "localhost" will allow only
 # clients running on the same machine to connect. If not specified, the
-# computer's host name will be used, which usually resolves to a network-
-# visible address so clients on other machines can connect.
+# "*" (a.k.a 0.0.0.0) wild-card address is used, which listens on all
+# network devices so other machines can connect.
 # server.address = localhost
 
 # port: The server of the client/server set-up will listen at this port
@@ -373,7 +373,7 @@ slaves.niceness = 10		# nice level for the sieving jobs
 # Since this example runs its slaves on localhost, we use a subdirectory 
 # of the cadofactor.py working directory, so that all files of both master
 # and clients can be cleaned up easily.
-slaves.basepath = $(workdir)/c91.wuclients
+slaves.basepath = /tmp/c91.wuclients
 
 # If you want to launch clients on multiple groups of slave machines, with
 # different parameters per group, you can group them by different parameter
