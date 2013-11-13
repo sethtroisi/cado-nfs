@@ -15,7 +15,7 @@
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
+Usage: $0 <integer> [options] [arguments passed to cadofactor.py]
     <integer>     - integer to be factored. must be at least 57 digits,
                     and free of small prime factors [parameters are
                     optimized only for 85 digits and above]
