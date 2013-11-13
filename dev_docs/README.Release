@@ -10,6 +10,7 @@ Checklist for making a release of CADO-NFS:
 6. Set version number in CMakeLists.txt if necessary (e.g., for
    snapshots and pre-releases)
 7. Test build and run from (clean) working copy
+7b. Test build and run with CFLAGS=-O3 -DNDEBUG
 8. make dist
 9. If git stashed, remember git stash pop
 10. Check that build from tarball works
