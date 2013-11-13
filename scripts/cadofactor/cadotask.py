@@ -3285,11 +3285,11 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 
         self.stop_all_clients()
         self.servertask.shutdown()
+        elapsed = self.end_elapsed_time()
 
         if had_interrupt:
             return None
         else:
-            elapsed = self.end_elapsed_time()
             cputotal = self.get_total_cpu_or_real_time(True)
             # Do we want the sum of real times over all sub-processes for
             # something?
