@@ -50,15 +50,13 @@ typedef struct {
                             (either too heavy initially or deleted) */
   int wmstmax;
   int mkztype;       /* which type of count */
-  int itermax;       /* used for performing some sampling */
-
 } filter_matrix_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern void initMat(filter_matrix_t *, uint32_t, uint32_t, uint32_t, uint32_t);
+extern void initMat(filter_matrix_t *, uint32_t, uint32_t, uint32_t);
 extern void clearMat (filter_matrix_t *mat);
 extern void fillmat(filter_matrix_t *mat);
 extern void filter_matrix_read (filter_matrix_t *, const char *);

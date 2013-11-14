@@ -681,7 +681,7 @@ print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
 
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
-               int forbw, double ratio, double coverNmax)
+               int forbw, double ratio, double coverNmax, int64_t nbmergemax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
@@ -692,6 +692,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     double REPORT = 20.0; /* threshold of w/N from which reports are done */
                           /* on stdout                                    */
     double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
+    int64_t nbmerge = 0;
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -706,10 +707,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     print_report (rep, mat, forbw, bwcost);
 
     while(1){
-	if(mat->itermax && (njproc >= mat->itermax)){
-	    printf ("itermax=%d reached, stopping!\n", mat->itermax);
-	    break;
-	}
+      if(nbmergemax >= 0 && nbmerge >= nbmergemax)
+      {
+        printf ("nbmergemax=%" PRId64 " reached, stopping!\n", nbmergemax);
+        break;
+      }
 	oldbwcost = bwcost;
 	old_ncols = mat->rem_ncols;
         if (MkzPopQueue(&dj, &mkz, mat) == 0)
@@ -728,6 +730,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         if (nb_merges[m]++ == 0 && m > 1)
           printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
                   MkzQueueCardinality(mat->MKZQ));
+  nbmerge++;
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
@@ -810,7 +813,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
 	else
 	    ncost = 0;
     }
-    if (mat->itermax == 0)
+    if (nbmergemax < 0)
       {
         printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
 	deleteSuperfluousRows(rep, mat,
