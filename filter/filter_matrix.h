@@ -56,6 +56,9 @@ typedef struct {
 extern "C" {
 #endif
 
+#define compute_WN(mat) ((mat)->rem_nrows * (mat)->weight)
+#define compute_WoverN(mat) (((double)(mat)->weight)/((double)(mat)->rem_nrows))
+
 extern void initMat(filter_matrix_t *, uint32_t, uint32_t, uint32_t);
 extern void clearMat (filter_matrix_t *mat);
 extern void fillmat(filter_matrix_t *mat);

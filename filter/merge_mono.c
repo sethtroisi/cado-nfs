@@ -603,21 +603,6 @@ deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
   return nirem;
 }
 
-static double
-my_cost (double N, double w, int forbw)
-{
-  if (forbw == 2)
-    {
-      double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
-      return (K1+K3)*N*w+K2*N*log(N)*log(N);
-    }
-  else if (forbw == 3)
-    return w / N;
-  else if (forbw <= 1)
-    return N * w;
-  return 0.0;
-}
-
 static void
 mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
 		double *totopt, double *totfill, double *totMST,
@@ -659,22 +644,12 @@ number_of_superfluous_rows(filter_matrix_t *mat)
 }
 
 void
-print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
+print_report (report_t *rep, filter_matrix_t *mat, uint64_t WN, double WoverN)
 {
   printf ("N=%" PRIu64 " (%" PRIu64 ") w=%" PRIu64 "", mat->rem_nrows,
           mat->rem_nrows - mat->rem_ncols, mat->weight);
-  if (forbw == 2)
-    printf (" bw=%e", bwcost);
-  else if (forbw == 3)
-    printf (" w*N=%" PRIu64 "", mat->rem_nrows * mat->weight);
-  else if (forbw <= 1)
-    printf (" w*N=%e", bwcost);
-
-  printf (" w/N=%2.2lf\n", ((double)mat->weight)/((double)mat->rem_nrows));
-
-  if((forbw != 0) && (forbw != 3)) // what a trick!!!!
-    fprintf (rep->outfile, "BWCOST: %1.0f\n", bwcost);
-
+  printf (" w*N=%" PRIu64 "", WN);
+  printf (" w/N=%2.2lf\n", WoverN);
   fflush (stdout);
 }
 
@@ -684,8 +659,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax, int64_t nbmergemax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
-    int old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
+    int old_ncols, m = 2, njrem = 0, njproc;
     int ni2rem;
     int *nb_merges;
     int32_t dj, j, mkz;
@@ -693,6 +667,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                           /* on stdout                                    */
     double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
     int64_t nbmerge = 0;
+    uint64_t WN_prev, WN_cur, WN_min;
+    double WoverN;
+    unsigned int ncost = 0, ncostmax = 20; //TODO ncostmax should be a parameter
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -701,10 +678,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     for (m = 0; m <= maxlevel; m++)
       nb_merges[m] = 0;
     printf ("Using mergeOneByOne\n");
-    ncostmax = 20; // was 5
     njproc = 0;
 
-    print_report (rep, mat, forbw, bwcost);
+    WN_min = WN_cur = compute_WN(mat);
+    WoverN = compute_WoverN(mat);
+    print_report (rep, mat, WN_cur, WoverN);
 
     while(1){
       if(nbmergemax >= 0 && nbmerge >= nbmergemax)
@@ -712,7 +690,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         printf ("nbmergemax=%" PRId64 " reached, stopping!\n", nbmergemax);
         break;
       }
-	oldbwcost = bwcost;
 	old_ncols = mat->rem_ncols;
         if (MkzPopQueue(&dj, &mkz, mat) == 0)
           {
@@ -730,89 +707,45 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
         if (nb_merges[m]++ == 0 && m > 1)
           printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
                   MkzQueueCardinality(mat->MKZQ));
+
   nbmerge++;
-	// number of columns removed
+  WoverN = compute_WoverN(mat);
+	WN_prev = WN_cur;
+  WN_cur = compute_WN(mat);
+  if (WN_cur > WN_prev)
+    ncost++;
+  else
+    ncost = 0;
+  if (WN_cur < WN_min)
+    WN_min = WN_cur;
+
+  // number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
-	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
-                          forbw);
-  if ((((double)mat->weight)/((double)mat->rem_nrows)) > REPORT)
+  if (WoverN >= REPORT)
   {
       REPORT += FREQ_REPORT;
 	    njrem = removeSingletons (rep, mat);
 	    ni2rem = number_of_superfluous_rows (mat);
 	    deleteSuperfluousRows (rep, mat, ni2rem, m);
-      print_report (rep, mat, forbw, bwcost);
+      print_report (rep, mat, WN_cur, WoverN);
 	}
-	if((bwcostmin == 0.0) || (bwcost < bwcostmin)){
-	    bwcostmin = bwcost;
-	    if((forbw != 0) && (forbw != 3))
-		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
-	}
-	// to be cleaned one day...
-	if((forbw == 0) || (forbw == 2)){
-          double r = bwcost / bwcostmin;
-	    if(r > ratio){
-		if((int) (mat->rem_nrows-mat->rem_ncols) > mat->keep){
-		    // drop all remaining columns at once
-		    ni2rem = mat->rem_nrows-mat->rem_ncols+mat->keep;
-		    printf ("Dropping %d rows at once\n", ni2rem);
-		    deleteSuperfluousRows(rep, mat, ni2rem, INT_MAX);
-		}
-		else{
-		    if(forbw == 0)
-			printf ("cN too high, stopping [%2.2lf]\n", r);
-		    else
-			printf ("bw too high, stopping [%2.2lf]\n", r);
-		    break;
-		}
-	    }
-	}
-	else if (forbw == 3 && bwcost >= coverNmax)
-          {
-            index_t nrows = mat->rem_nrows;
 
-            /* if the excess is still larger than what is wanted,
-               remove the heaviest rows and loop again */
-            printf ("remains %" PRIu64 " rows\n", mat->rem_nrows);
-            deleteSuperfluousRows (rep, mat,
-                       (mat->rem_nrows - mat->rem_ncols) - mat->keep, INT_MAX);
-            printf ("after deleteSuperfluousRows, remains %" PRIu64 " rows\n",
-                    mat->rem_nrows);
-            removeSingletons (rep, mat);
-            printf ("after removeSingletons, remains %" PRIu64 " rows\n",
-                    mat->rem_nrows);
-            if (mat->rem_nrows == nrows)
-              {
-                printf ("w/N too high (%1.2f), stopping\n", bwcost);
-                break;
-              }
-          }
-	if((forbw == 1) && (oldbwcost != 0.0) && (bwcost > oldbwcost)){
-	    ncost++;
-#if 0
-	    printf ("New cost > old cost (%.16e > %.16e) [%d/%d]\n",
-		    bwcost, oldbwcost, ncost, ncostmax);
-#endif
-	    if(ncost >= ncostmax){
-		int nirem;
-
-		printf ("New cost > old cost %d times in a row:", ncost);
-		nirem = deleteSuperfluousRows(rep, mat, 128, m);
-		if(nirem == 0){
-		    printf (" stopping\n");
-		    break;
-		}
-		else{
-		    printf (" try again after removing %d rows!\n", nirem);
-		    njproc += nirem; // humf: odd name for njproc...!
-		    continue;
-		}
-	    }
-	}
-	else
-	    ncost = 0;
-    }
+	if (forbw == 0 && ((double) WN_cur > ratio * (double) WN_min))
+  {
+    printf ("cN too high, stopping [%.2f]\n", (double)WN_cur / (double)WN_min);
+    break;
+  }
+	else if (forbw == 3 && WoverN >= coverNmax)
+  {
+    printf ("w/N too high (%1.2f), stopping\n", WoverN);
+    break;
+  }
+	else if(forbw == 1 && ncost >= ncostmax)
+  {
+		printf ("WN value increased %u times in a row, stopping.\n", ncost);
+    break;
+  }
+}
     if (nbmergemax < 0)
       {
         printf ("Removing final excess, nrows=%" PRIu64 "\n", mat->rem_nrows);
@@ -827,10 +760,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     checkWeights (mat);
 #endif
 
-    if((forbw != 0) && (forbw != 3)){
-	fprintf(rep->outfile, "BWCOSTMIN: %1.0f\n", bwcostmin);
-	printf ("Minimal bwcost found: %1.0f\n", bwcostmin);
-    }
+  if(forbw == 1)
+    printf ("Minimal WN value: %" PRIu64 "\n", WN_min);
 #if DEBUG >= 1
     printf ("Total number of row additions: %lu\n", row_additions);
 #endif

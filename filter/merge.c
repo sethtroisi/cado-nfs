@@ -87,7 +87,7 @@ usage (param_list pl, char *argv0)
     fprintf (stderr, "\nThe different optimization functions are, where c is "
                      "the total matrix weight and N \nthe number of rows "
                      "(relation-sets):\n");
-  fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
+  fprintf (stderr, "   -forbw 0 - stop when cN exceeds ratio*min(cN)\n");
   fprintf (stderr, "   -forbw 1 - stop when the product cN is minimal\n");
   fprintf (stderr, "   -forbw 3 - stop when the ratio c/N exceeds coverNmax\n");
     exit(EXIT_FAILURE);
@@ -185,9 +185,9 @@ main (int argc, char *argv[])
                        MERGE_LEVEL_MAX);
       usage (pl, argv0);
     }
-    if (forbw > 3)
+    if (forbw > 3 || forbw == 2)
     {
-      fprintf (stderr, "Error: -forbw should be 0, 1, 2 or 3.\n");
+      fprintf (stderr, "Error: -forbw should be 0, 1 or 3.\n");
       usage (pl, argv0);
     }
     if (mkztype > 2)
