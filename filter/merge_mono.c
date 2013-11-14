@@ -364,9 +364,9 @@ useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 
 static void
 findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
-                       int32_t j, double *tfill, double *tMST, int useMST)
+                       int32_t j, double *tfill, double *tMST)
 {
-  if ((m <= 2) || (useMST == 0))
+  if (m <= 2)
     {
       *tfill = *tMST = 0;
       tryAllCombinations (rep, mat, m, ind, j);
@@ -453,7 +453,7 @@ checkWeight(filter_matrix_t *mat, int32_t j)
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
 mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
-                filter_matrix_t *mat, int m, int32_t j, int useMST)
+                filter_matrix_t *mat, int m, int32_t j)
 {
     int32_t ind[MERGE_LEVEL_MAX];
     unsigned int k;
@@ -504,7 +504,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #endif
 
     *tt = seconds();
-    findOptimalCombination (rep, mat, m, ind, j, tfill, tMST, useMST);
+    findOptimalCombination (rep, mat, m, ind, j, tfill, tMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
@@ -621,11 +621,11 @@ my_cost (double N, double w, int forbw)
 static void
 mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
 		double *totopt, double *totfill, double *totMST,
-		double *totdel, int useMST, int32_t j)
+		double *totdel, int32_t j)
 {
     double tt, tfill, tMST;
     
-    mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j, useMST);
+    mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j);
     *totopt += tt;
     *totfill += tfill;
     *totMST += tMST;
@@ -689,7 +689,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     int ni2rem;
     int *nb_merges;
     int32_t dj, j, mkz;
-    int useMST = 1; /* non-zero if we use minimal spanning tree */
     double REPORT = 20.0; /* threshold of w/N from which reports are done */
                           /* on stdout                                    */
     double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
@@ -725,7 +724,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
           removeColDefinitely(rep, mat, j);
 	else if (m > 0) /* m=0 can happen for already merged ideals */
           mergeForColumn2(rep, mat, &njrem,
-                          &totopt, &totfill, &totMST, &totdel, useMST, j);
+                          &totopt, &totfill, &totMST, &totdel, j);
         if (nb_merges[m]++ == 0 && m > 1)
           printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
                   MkzQueueCardinality(mat->MKZQ));
