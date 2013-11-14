@@ -633,19 +633,23 @@ class WorkunitClient(object):
                     encoding = pair[1].strip()
         return encoding
 
-    def wget_file(self, url, dlpath, cafile=None):
+    def wget_file(self, url, wait, dlpath, cafile=None):
         command = ["wget", "-O", dlpath]
         if cafile:
             command.append("--ca-certificate=%s" % cafile)
         command.append(url)
-        logging.info ("Running %s", " ".join(command))
-        child = subprocess.Popen(command,
-                                 stdout=subprocess.PIPE, 
-                                 stderr=subprocess.PIPE, 
-                                 close_fds=True)
-        (stdout, stderr) = child.communicate()
-        if child.returncode != 0:
-            raise Exception("Could not download %s: Stderr:\n%s" % (url, stderr))
+        while True:
+            logging.info ("Running %s", " ".join(command))
+            child = subprocess.Popen(command,
+                                     stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE, 
+                                     close_fds=True)
+            (stdout, stderr) = child.communicate()
+            if child.returncode == 0:
+                return
+            logging.error("Download of %s failed. Stderr:\n%s" % (url, stderr))
+            logging.error("Waiting %s seconds before retrying", wait)
+            time.sleep(wait)
         
     def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
@@ -664,7 +668,7 @@ class WorkunitClient(object):
         # This is a rather ugly hack. It would be nicer to copy the required
         # parts from a fully functional SSL library. TODO.
         if url.startswith("https:") and sys.version_info[0] == 2:
-            return self.wget_file(url, dlpath, cafile)
+            return self.wget_file(url, wait, dlpath, cafile=cafile)
 
         request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
