@@ -13,7 +13,7 @@ for a parameter in a node; parameters late in the path take precedence.
 Hence with:
 
 threads = 2
-tasks.sieving.threads = 1
+tasks.sieve.threads = 1
 
 the sieving task will use the value 1 for the threads parameter, while other 
 tasks use the value 2 (unless they specify a different value in their subtree).
@@ -21,7 +21,7 @@ tasks use the value 2 (unless they specify a different value in their subtree).
 Tasks run programs, and those have their own node in the parameter tree.
 For example, with
 threads = 2
-tasks.sieving.las.threads = 1
+tasks.sieve.las.threads = 1
 the theads=1 parameter would apply only to the las program, but not to any 
 other programs run during the sieving tasks, if there were any. The name of 
 the node of a program is equal to the name of the binary executable.
@@ -161,6 +161,7 @@ class Parameters(object):
         "keepoldresult": BoolParam,
         "compression": BoolParam,
         "ssl": BoolParam,
+        "threaded": BoolParam,
     }
 
     def __init__(self, *args, **kwargs):

@@ -40,6 +40,8 @@ logger = logging.getLogger("Database")
 logger.setLevel(logging.NOTSET)
 
 
+PRINTED_CANCELLED_WARNING = False
+
 def join3(l, pre=None, post=None, sep=", "):
     """ 
     If any parameter is None, it is interpreted as the empty string 
@@ -91,22 +93,20 @@ def conn_close(conn):
         logger.warning("Connection %d being closed while in transaction", id(conn))
     conn.close()
 
-# Dummy class for defining "constants"
-class WuStatus:
-    AVAILABLE = 0
-    ASSIGNED = 1
-    RECEIVED_OK = 2
-    RECEIVED_ERROR = 3
-    VERIFIED_OK = 4
-    VERIFIED_ERROR = 5
-    CANCELLED = 6
+# Dummy class for defining "constants" with reverse lookup
+STATUS_NAMES = ["AVAILABLE", "ASSIGNED", "RECEIVED_OK", "RECEIVED_ERROR",
+        "VERIFIED_OK", "VERIFIED_ERROR", "CANCELLED"]
+STATUS_VALUES = range(len(STATUS_NAMES))
+WuStatusBase = collections.namedtuple("WuStatusBase", STATUS_NAMES)
+class WuStatusClass(WuStatusBase):
+    def check(self, status):
+        assert status in self
+    def get_name(self, status):
+        self.check(status)
+        return STATUS_NAMES[status]
 
-    @classmethod
-    def check(cls, status):
-        """ Check whether status is equal to one of the constants """
-        assert status in (cls.AVAILABLE, cls.ASSIGNED, cls.RECEIVED_OK, 
-            cls.RECEIVED_ERROR, cls.VERIFIED_OK, cls.VERIFIED_ERROR, 
-            cls.CANCELLED)
+WuStatus = WuStatusClass(*STATUS_VALUES)
+
 
 def check_tablename(name):
     """ Test whether name is a valid SQL table name.
@@ -850,10 +850,12 @@ class WuAccess(object): # {
     @staticmethod
     def _checkstatus(wu, status):
         # logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
-        if wu["status"] != status:
-            msg = "Workunit %s has status %s, expected %s" \
-                  % (wu["wuid"], wu["status"], status)
-            logger.error ("WuAccess._checkstatus(): %s" % msg)
+        wu_status = wu["status"]
+        if wu_status != status:
+            msg = "Workunit %s has status %s (%s), expected %s (%s)" % \
+                  (wu["wuid"], wu_status, WuStatus.get_name(wu_status), 
+                   status, WuStatus.get_name(status))
+            logger.error ("WuAccess._checkstatus(): %s", msg)
             raise StatusUpdateError(msg)
 
     @staticmethod
@@ -1003,6 +1005,15 @@ class WuAccess(object): # {
             if commit:
                 conn_commit(self.conn)
             cursor.close()
+            if data["status"] == WuStatus.CANCELLED:
+                global PRINTED_CANCELLED_WARNING
+                if not PRINTED_CANCELLED_WARNING:
+                    logger.warning("If workunits get cancelled due to timeout "
+                            "even though the clients are still processing them, "
+                            "consider increasing the wutimeout parameter or "
+                            "decreasing the range covered in each workunit, "
+                            "i.e., the adrange or qrange parameters.")
+                    PRINTED_CANCELLED_WARNING = True
             raise
         if DEBUG > 0:
             self.check(data)

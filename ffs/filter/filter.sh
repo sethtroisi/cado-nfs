@@ -122,6 +122,12 @@ for i in "$@" ; do
         declare MOD_ELL="$value"
       elif [ "x${p}" = "xsmexp" ] ; then
         declare SM_EXP="$value"
+      elif [ "x${p}" = "xlpba" ] ; then
+        declare LPBA="$value"
+      elif [ "x${p}" = "xlpbr" ] ; then
+        declare LPBR="$value"
+      elif [ "x${p}" = "xsm-mt" ] ; then
+        declare SM_MT="-mt $value"
       else
         echo "Invalid option: $i"
         exit 1
@@ -139,6 +145,10 @@ done
 : ${RELDIR:?Option rels=/path/to/rels is mandatory}
 : ${CADO_BUILD:?Option cadobuild=/path/to/cado/bin is mandatory}
 : ${ORIGINAL_PARAMFILE:?Option param=/path/to/param/file is mandatory}
+if [ "x${NFSDL}" = "x1" ] ; then
+  : ${LPBA:?Option lpba is mandatory for NFS-DL}
+  : ${LPBR:?Option lpbr is mandatory for NFS-DL}
+fi
 
 check_dir_exists "${RELDIR}"
 check_file_exists "${ORIGINAL_PARAMFILE}"
@@ -156,6 +166,7 @@ check_file_exists "${ORIGINAL_PARAMFILE}"
 : ${NFSDL:="0"}
 : ${MOD_ELL:="<modulus>"}
 : ${SM_EXP:="<sm_exp>"}
+: ${SM_MT:=""}
 
 
 # Def variables to continue a filtering step that was stopped ######
@@ -178,8 +189,6 @@ mkdir -p ${DIR}
 if [ "x${NFSDL}" != "x1" ] ; then
   GF=`grep "^gf=" ${ORIGINAL_PARAMFILE} | cut -d = -f 2`
 else
-  LPBA=`grep "^lpba" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
-  LPBR=`grep "^lpbr" ${ORIGINAL_PARAMFILE} | cut -d " " -f 2`
   if [ "x${EXCESS}" = "x0" ] ; then
     EXCESS=`grep -m 1 "^c[0-9]:" ${ORIGINAL_PARAMFILE} | cut -c 2`
   fi
@@ -441,7 +450,7 @@ if [ "x${NFSDL}" = "x1" ] ; then
     echo "${MOD_ELL}" > ${DIR}/${NAME}.q
     argssm0="-poly ${PARAMFILE} -purged ${RELSFILE} -index ${INDEXFILE} "
     argssm1="-out ${SMFILE} -gorder ${MOD_ELL} -smexp ${SM_EXP}"
-    CMD="${BIN_SM} $argssm0 $argssm1 "
+    CMD="${BIN_SM} $argssm0 $argssm1 ${SM_MT}"
     run_cmd "${CMD}" "${LOGSM}" "${LOGSM}" "${VERBOSE}" "${SMDONE}"
   else
     echo "sm already done."

@@ -2816,6 +2816,81 @@ class SqrtTask(Task):
             N += 2     
         return N
 
+class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
+    """ Starts HTTP server """
+    @property
+    def name(self):
+        return "server"
+    @property
+    def title(self):
+        return "Server Launcher"
+    @property
+    def paramnames(self):
+        return ("name", "workdir", "address", "port", "threaded", "ssl", "whitelist")
+    @property
+    def param_nodename(self):
+        return self.name
+
+    # The whitelist parameter here is an iterable of strings in CIDR notation.
+    # The whitelist parameter we get from params (i.e., from the parameter file)
+    # is a string with comma-separated CIDR strings. The two are concatenated
+    # to form the server whitelist.
+    def __init__(self, *, default_workdir, parameters, path_prefix, db, whitelist=None):
+        super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
+        # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
+        self.params = self.parameters.myparams(self.paramnames)
+        serveraddress = self.params.get("address", None)
+        serverport = self.params.get("port", 8001)
+        basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
+        uploaddir = basedir + self.params["name"] + ".upload/"
+        threaded = self.params.get("threaded", False)
+        if self.params.get("ssl", True):
+            cafilename = basedir + self.params["name"] + ".server.cert"
+        else:
+            cafilename = None
+
+        server_whitelist = []
+        if not whitelist is None:
+            server_whitelist += whitelist
+        if "whitelist" in self.params:
+            server_whitelist += [h.strip() for h in self.params["whitelist"].split(",")]
+        if not server_whitelist:
+            server_whitelist = None
+
+        self.registered_filenames = self.make_db_dict('server_registered_filenames')
+
+        self.server = wuserver.ServerLauncher(serveraddress, serverport,
+            threaded, self.get_db_filename(), self.registered_filenames,
+            uploaddir, bg=True, only_registered=True, cafile=cafilename,
+            whitelist=server_whitelist)
+
+    def run(self):
+        self.server.serve()
+
+    def shutdown(self):
+        self.server.shutdown()        
+
+    def get_url(self):
+        return self.server.get_url()
+
+    def get_cert_sha1(self):
+        return self.server.get_cert_sha1()
+
+    def register_filename(self, d):
+        for key in d:
+            if not key in self.registered_filenames:
+                self.logger.debug("Registering file name %s with target %s",
+                                  key, d[key])
+                self.registered_filenames[key] = d[key]
+            elif d[key] != self.registered_filenames[key]:
+                # It was already defined with a different target, error
+                raise Exception("Filename %s, to be registered for target %s, "
+                                "already registered for target %s" %
+                                (key, d[key], self.registered_filenames[key]))
+            else:
+                # Was already registered with the same target. Nothing to do
+                pass
+
 class StartClientsTask(Task):
     """ Starts clients on slave machines """
     @property
@@ -2835,14 +2910,12 @@ class StartClientsTask(Task):
     def param_nodename(self):
         return None
     
-    def __init__(self, url, *, mediator, db, parameters, path_prefix, certsha1=None):
+    def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"), connection=self.db_connection)
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"), connection=self.db_connection)
-        self.server = url
-        self.certsha1 = certsha1
         assert set(self.pids) == set(self.hosts)
         # Invariants: the keys of self.pids and of self.hosts are the same set.
         # The keys of self.used_ids are a subset of the keys of self.pids.
@@ -2883,6 +2956,10 @@ class StartClientsTask(Task):
             result.extend([name] * multi)
         return result
 
+    def get_hosts_to_launch(self):
+        """ Get list host names on which clients should run """
+        return self.hosts_to_launch
+
     def is_alive(self, clientid):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep
@@ -2890,9 +2967,9 @@ class StartClientsTask(Task):
         (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
-    def launch_clients(self):
+    def launch_clients(self, server, certsha1=None):
         for host in self.hosts_to_launch:
-            self.launch_one_client(host.strip())
+            self.launch_one_client(host.strip(), server, certsha1=certsha1)
         running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in
             self.pids.items()]
         s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
@@ -2930,7 +3007,7 @@ class StartClientsTask(Task):
     #   then start and add again
     # Client was started, and does still exists. Nothing to do.
     
-    def launch_one_client(self, host, clientid = None):
+    def launch_one_client(self, host, server, *, clientid=None, certsha1=None):
         if clientid is None:
             clientid = self.make_unique_id(host)
         # Check if client is already running
@@ -2949,9 +3026,9 @@ class StartClientsTask(Task):
                 del(self.hosts[clientid])
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
-        wuclient = cadoprograms.WuClient(server=self.server,
+        wuclient = cadoprograms.WuClient(server=server,
                                          clientid=clientid, daemon=True,
-                                         certsha1=self.certsha1,
+                                         certsha1=certsha1,
                                          **self.progparams[0])
         if host == "localhost":
             process = cadocommand.Command(wuclient)
@@ -3079,39 +3156,28 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
         self.params = self.parameters.myparams(("name", "workdir", "N"))
         self.db_listener = self.make_db_listener()
-        self.registered_filenames = self.make_db_dict('server_registered_filenames')
         
         # Init WU BD
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
-        
-        # Set up WU server
-        serverparams = parameters.myparams(["address", "port", "ssl"], path_prefix + ["server"])
-        serveraddress = serverparams.get("address", None)
-        serverport = serverparams.get("port", 8001)
-        uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
-        threaded = False
-        # By default, don't enable SSL until work-arounds for the various
-        # bugs are in place
-        if serverparams.get("ssl", False):
-            cafilename = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".server.cert"
-        else:
-            cafilename = None
-        self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(),
-            self.registered_filenames, uploaddir, bg=True, only_registered=True, cafile=cafilename)
-        
+
         # Init client lists
         self.clients = []
-        url = self.server.get_url()
-        certsha1 = self.server.get_cert_sha1()
+        whitelist = set()
         for (path, key) in self.parameters.get_parameters().find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(url,
-                                                 mediator = self,
+            self.clients.append(StartClientsTask(mediator = self,
                                                  db = db,
                                                  parameters = self.parameters,
-                                                 certsha1=certsha1,
                                                  path_prefix = path))
-        
+            hostnames = self.clients[-1].get_hosts_to_launch()
+            whitelist |= set(hostnames)
+
+        whitelist = list(whitelist) if whitelist else None
+        # Init server task
+        self.servertask = StartServerTask(default_workdir=self.params["workdir"],
+                parameters=parameters, path_prefix=path_prefix, db=db,
+                whitelist=whitelist)
+
         parampath = self.parameters.get_param_path()
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
@@ -3202,7 +3268,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         self.logger.info("Factoring %s", self.params["N"])
         self.start_elapsed_time()
 
-        self.server.serve()
+        self.servertask.run()
         
         try:
             self.start_all_clients()
@@ -3218,12 +3284,12 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             had_interrupt = True
 
         self.stop_all_clients()
-        self.server.shutdown()
+        self.servertask.shutdown()
+        elapsed = self.end_elapsed_time()
 
         if had_interrupt:
             return None
         else:
-            elapsed = self.end_elapsed_time()
             cputotal = self.get_total_cpu_or_real_time(True)
             # Do we want the sum of real times over all sub-processes for
             # something?
@@ -3232,8 +3298,10 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             return self.sqrt.get_factors()
     
     def start_all_clients(self):
+        url = self.servertask.get_url()
+        certsha1 = self.servertask.get_cert_sha1()
         for clients in self.clients:
-            clients.launch_clients()
+            clients.launch_clients(url, certsha1)
     
     def stop_all_clients(self):
         for clients in self.clients:
@@ -3280,19 +3348,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 for task in self.tasks])
 
     def register_filename(self, d):
-        for key in d:
-            if not key in self.registered_filenames:
-                self.logger.debug("Registering file name %s with target %s",
-                                  key, d[key])
-                self.registered_filenames[key] = d[key]
-            elif d[key] != self.registered_filenames[key]:
-                # It was already defined with a different target, error
-                raise Exception("Filename %s, to be registered for target %s, "
-                                "already registered for target %s" %
-                                (key, d[key], self.registered_filenames[key]))
-            else:
-                # Was already registered with the same target. Nothing to do
-                pass
+        return self.servertask.register_filename(d)
     
     def relay_notification(self, message):
         """ The relay for letting Tasks talk to us and each other """

@@ -179,16 +179,35 @@ Check that your SSH configuration is correct:
 
 The master script uses SSH to connect to available computing resources.
 In order to avoid the script asking your password or passphrase, you must
-have a public-key authentication and an agent.
+have public-key authentication and an agent.
 
-Also, since localhost has an IP and key that varies, you'd better have
+The SSH keys are usually installed in the files ~/.ssh/id_rsa and
+~/.ssh/id_rsa.pub; if you don't have them yet, you can create them with the
+ssh-keygen command. See the man page ssh-keygen(1) for details. The private
+key should be protected with a passphrase, which you can enter when you
+create the keys. Normally ssh will ask for the key's passphrase when you log
+on to a machine, but this can be avoided by using ssh-agent, see the man
+page ssh-agent(1), and providing the passphrase to the agent with ssh-add.
+Public-key authenticaton together with an ssh-agent will allow cadofactor
+to use ssh to run commands on slave machines automatically.
+
+Most of the recent Linux distributions will run an ssh-agent for you. But
+if this is not the case with your distribution, or if you are running
+cadofactor.py inside a ``screen'' in order to logout of your desktop, you
+will need to run the ssh-agent by hand. As a short recipe, you can type:
+   eval `ssh-agent`
+   ssh-add
+
+You should also copy your public key, i.e., the contents of the file 
+~/.ssh/id_rsa.pub, into $HOME/.ssh/authorized_keys on the slave machines, to
+allow logging in with public-key authentication.
+
+Also, since localhost has an IP and key that varies, you should have
 those 3 lines in your $HOME/.ssh/config:
 
 Host    localhost
         StrictHostKeyChecking no
         UserKnownHostsFile /dev/null
-
-You should also put in $HOME/.ssh/authorized_keys your public key.
 
 If everything is correctly configured, when you type
 
@@ -197,13 +216,6 @@ ssh localhost
 you should end up with a new shell on your machine, without having to
 type any password/passphrase.
 
-Most of the recent Linux distributions will run an ssh-agent for you. But
-if this is not the case with your distribution, or if you are running
-cadofactor.py inside a ``screen'' in order to logout of your desktop, you
-will need to run the ssh-agent by hand (see man ssh-agent). As a short
-recipe, you can type:
-   eval `ssh-agent`
-   ssh-add
 
 Restarting an interrupted factorization:
 ========================================

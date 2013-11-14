@@ -11,6 +11,7 @@ import io
 import logging
 import urllib.parse
 import copy
+import struct
 from workunit import Workunit
 import datetime
 import wudb
@@ -30,6 +31,67 @@ except ImportError:
 
 class FixedHTTPServer(http.server.HTTPServer):
     """ Work-around class for http.server.HTTPServer that handles EINTR """
+
+    def __init__(self, *args, whitelist=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = logging.getLogger("HTTP server")
+        if whitelist is None:
+            self.whitelist = None
+        else:
+            self.logger.info("Using whitelist: %s", ",".join(whitelist))
+            self.whitelist = []
+            for iprange in whitelist:
+                mask = self.ipmask(iprange)
+                if not mask:
+                    raise ValueError("%s it not a valid IP range (must be "
+                            "CIDR notation)" % iprange)
+                self.whitelist.append(mask)
+
+    @staticmethod
+    def ipmask(iprange):
+        """ Convert CIDR network range strings to a network address and a
+        bit mask
+
+        Convert text strings in the usual network mask form, e.g.,
+        "192.168.3.0/24" to (netaddr, andmask) pairs which we can use to
+        match IP addresses, i.e., the IP address is in the range iff
+        (ip & andmask) == netaddr
+
+        >>> FixedHTTPServer.ipmask("192.168.3.0/24")
+        (3232236288, 4294967040)
+        >>> FixedHTTPServer.ipmask("192.168.3.1")
+        (3232236289, 4294967295)
+        >>> FixedHTTPServer.ipmask("1.0.0.0/0")
+        (0, 0)
+        >>> FixedHTTPServer.ipmask("1.0.0.1/32")
+        (16777217, 4294967295)
+        >>> FixedHTTPServer.ipmask("localhost")
+        (2130706433, 4294967295)
+        >>> FixedHTTPServer.ipmask("1.0.0.256")
+        >>> FixedHTTPServer.ipmask("1.0.0.0/33")
+        """
+        addr = iprange.split('/')
+        if len(addr) < 2:
+            addr.append(32)
+        # Maybe it is a hostname. Try to resolve it
+        try:
+            addr[0] = socket.gethostbyname(addr[0])
+        except socket.gaierror:
+            return None
+        try:
+            packedIP = socket.inet_aton(addr[0])
+        except socket.error:
+            return None
+        try:
+            addr[1] = int(addr[1])
+        except ValueError:
+            return None
+        if not 0 <= addr[1] <= 32:
+            return None
+        netaddr = struct.unpack("!L", packedIP)[0]
+        andmask = 2**32 - 2**(32-addr[1])
+        return (netaddr & andmask, andmask)
+
     def serve_forever(self, *args, **kwargs):
         """ Wrapper around http.server.HTTPServer.serve_forever() that
         restarts in case of EINTR.
@@ -46,22 +108,68 @@ class FixedHTTPServer(http.server.HTTPServer):
                 if e.args[0] != errno.EINTR:
                     raise
 
+    def verify_request(self, request, client_address):
+        """ Tests if the client's IP address is whitelisted
+
+        If no whitelist is defined, always accepts.
+        """
+        if self.whitelist is None:
+            return True
+        # Use ipmask() to convert dotted string form of address to integer
+        addr = self.ipmask(client_address[0])[0]
+        for iprange in self.whitelist:
+            if addr & iprange[1] == iprange[0]:
+                return True
+        self.logger.warning("Connection from IP address %s rejected - "
+                "not in server.whitelist", client_address[0])
+        return False
+
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, FixedHTTPServer):
     """Handle requests in a separate thread."""
 
 
-class HTTPSServer(http.server.HTTPServer):
-    def __init__(self, server_address, HandlerClass, certfile=None, keyfile=None):
-        socketserver.BaseServer.__init__(self, server_address, HandlerClass)
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-        ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
-        self.socket = ctx.wrap_socket(socket.socket(self.address_family, self.socket_type), server_side=True)
-        self.server_bind()
-        self.server_activate()
+if HAVE_SSL:
+    class HTTPSServer(FixedHTTPServer):
+        def __init__(self, server_address, HandlerClass, *args, certfile=None,
+                    keyfile=None, **kwargs):
+            # Let TCPServer.__init__() call BaseServer.__init__() and create 
+            # a self.socket attribute, but not bind and activate the socket
+            super().__init__(server_address, HandlerClass, *args, 
+                    bind_and_activate=False, **kwargs)
+            # Create an SSL wrapper around the network socket in self.socket
+            # First init an SSL context with the key
+            ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            ctx.load_cert_chain(certfile=certfile, keyfile=keyfile)
+            # Now replace our orginal network socket with the SSL wrapper
+            self.socket = ctx.wrap_socket(self.socket, server_side=True)
+            # Finally bind and activate the SSLWrapper socket
+            self.server_bind()
+            self.server_activate()
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPSServer):
-    """Handle requests in a separate thread."""
+    class ThreadedHTTPSServer(socketserver.ThreadingMixIn, HTTPSServer):
+        """Handle requests in a separate thread."""
+
+    BUGGY_SSLSOCKET_VERSIONS = [
+        (3,2,0), (3,2,1), (3,2,2), (3,2,3),
+        (3,3,0)
+    ]
+    if sys.version_info[0:3] in BUGGY_SSLSOCKET_VERSIONS:
+        class FixedSSLSocket(ssl.SSLSocket):
+            """ Wrapper class that applies the patch for issue 16357
+            
+            See http://bugs.python.org/issue16357
+            """
+            def accept(self):
+                newsock, addr = socket.socket.accept(self)
+                return (ssl.SSLSocket(sock=newsock,
+                                      server_side=True,
+                                      do_handshake_on_connect=
+                                          self.do_handshake_on_connect,
+                                      _context=self.context),
+                        addr)
+        ssl.SSLSocket = FixedSSLSocket
+
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
@@ -129,6 +237,15 @@ class HtmlGen(io.BytesIO):
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     clientid_pattern = re.compile("^clientid=([\w.-]*)$")
+
+    # The instance variable rbufsize is used by StreamRequestHandler to set
+    # the buffer size of the read file object attached to the socket.
+    # CGIHTTPRequestHandler sets this to 0, i.e., unbuffered, as it has to
+    # pass the underlying file descriptor to a subprocess, so any data left
+    # in the buffer would not be passed on to the subprocess.
+    # We don't use subprocesses, thus we restore the original default 
+    # buffering mode to avoid a huge performance hit.
+    rbufsize=-1
     
     # Check that urlsplit() does not collapse paths which could prevent
     # registered_filenames from filtering path traversal attacks
@@ -209,10 +326,17 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         sys.stdout.flush()
 
     def do_POST(self):
-        """Set environment variable telling the upload directory 
-           and call CGI handler to run upload CGI script"""
         if self.is_upload():
-            self.do_upload()
+            self.send_response(200, "Script output follows")
+            # Python 3.3 needs flush_headers()
+            try:
+                self.flush_headers()
+            except AttributeError:
+                pass
+            try:
+                self.do_upload()
+            except socket.error as e:
+                self.log_error("%s", e)
         else:
             self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
@@ -232,6 +356,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # This executes upload.py as a CGI script, however, that does
             # not work with SSL because the SSL-wrapper around the socket
             # is missing proper file descriptors for dup(), etc.
+            # This does not work if rbufsize != 0.
             super().do_POST()
         else:
             # This uses the imported do_upload() function directly, without
@@ -242,6 +367,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # The CGI parsing code used in upload.py requires some shell
             # environment variables to be set according to the CGI
             # specificaton, such as CONTENT_LENGTH.
+            # This is really slow if rbufsize == 0.
             env = self.create_env("upload.py")
             upload.do_upload(self.dbfilename, self.uploaddir, 
                     inputfp=self.rfile, output=self.wfile, environ=env)
@@ -451,12 +577,13 @@ class ServerLauncher(object):
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, *, bg = False,
                 use_db_pool = True, scriptdir = None, only_registered=False,
-                cafile=None):
+                cafile=None, whitelist=None):
         
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.NOTSET)
         self.address = address if address else "0.0.0.0"
+        self.url_address = address if address else socket.gethostname()
         self.port = port
         self.cafile = cafile
         upload_scriptname = "upload.py"
@@ -509,22 +636,26 @@ class ServerLauncher(object):
             if not self.cert_sha1 is None:
                 scheme = "https"
 
-        url_address = address if address else socket.gethostname()
-        self.url = "%s://%s:%d" % (scheme, url_address, self.port)
+        self.url = "%s://%s:%d" % (scheme, self.url_address, self.port)
         
+        addr = (self.address, self.port)
         try:
             if threaded and scheme == "http":
-                logging.info("Using threaded HTTP server")
-                self.httpd = ThreadedHTTPServer((self.address, self.port), MyHandlerWithParams)
+                self.logger.info("Using threaded HTTP server")
+                self.httpd = ThreadedHTTPServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist)
             elif not threaded and scheme == "http":
-                logging.info("Using non-threaded HTTP server")
-                self.httpd = FixedHTTPServer((self.address, self.port), MyHandlerWithParams)
+                self.logger.info("Using non-threaded HTTP server")
+                self.httpd = FixedHTTPServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist)
             elif threaded and scheme == "https":
-                logging.info("Using threaded HTTPS server")
-                self.httpd = ThreadedHTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
+                self.logger.info("Using threaded HTTPS server")
+                self.httpd = ThreadedHTTPSServer(addr, MyHandlerWithParams,
+                        whitelist=whitelist, certfile=self.cafile)
             elif not threaded and scheme == "https":
-                logging.info("Using non-threaded HTTPS server")
-                self.httpd = HTTPSServer((self.address, self.port), MyHandlerWithParams, self.cafile)
+                self.logger.info("Using non-threaded HTTPS server")
+                self.httpd = HTTPSServer(addr, MyHandlerWithParams, 
+                        whitelist=whitelist, certfile=self.cafile)
             else:
                 assert False
         except socket_error as e:
@@ -555,7 +686,7 @@ class ServerLauncher(object):
             "ST=None",
             "O=None",
             "localityName=None",
-            "commonName=%s" % self.address,
+            "commonName=%s" % self.url_address,
             "organizationalUnitName=None",
             "emailAddress=None"
         ]
@@ -590,12 +721,12 @@ class ServerLauncher(object):
         return None
     
     def serve(self):
-        logging.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
-        if not self.cert_sha1 is None:
-            logging.info("Start clients with parameters: --server=%s --certsha1=%s",
-                         self.url, self.cert_sha1)
-        else:
-            logging.info("Start clients with parameters: --server=%s", self.url)
+        self.logger.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
+        certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
+        self.logger.info("You can start additional wuclient2.py scripts with "
+                         "parameters: --server=%s%s", self.url, certstr)
+        self.logger.info("If you want to start additional clients, remember "
+                         "to add their hosts to server.whitelist")
         
         if self.bg:
             from threading import Thread
@@ -607,7 +738,7 @@ class ServerLauncher(object):
             self.httpd.serve_forever()
     
     def shutdown(self):
-        logging.info("Shutting down HTTP server")
+        self.logger.info("Shutting down HTTP server")
         self.httpd.shutdown()
         if self.bg:
             self.thread.join()

@@ -595,14 +595,16 @@ class WorkunitClient(object):
         while conn is None:
             try:
                 conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
-            except (urllib_error.URLError, BadStatusLine) \
-                    as error:
+            except urllib_error.URLError as error:
                 conn = None
-                errorstr = str(error)
+                errorstr = "URL error: %s" % str(error)
+            except BadStatusLine as error:
+                conn = None
+                errorstr = "Bad Status line: %s" % str(error)
             except socket.error as error:
                 if error.errno == errno.ECONNRESET:
                     conn = None
-                    errorstr = str(error)
+                    errorstr = "Error connecting: %s" % str(error)
                 else:
                     raise
             if not conn:
