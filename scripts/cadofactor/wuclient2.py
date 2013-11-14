@@ -633,6 +633,20 @@ class WorkunitClient(object):
                     encoding = pair[1].strip()
         return encoding
 
+    def wget_file(self, url, dlpath, cafile=None):
+        command = ["wget", "-O", dlpath]
+        if cafile:
+            command.append("--ca-certificate=%s" % cafile)
+        command.append(url)
+        logging.info ("Running %s", " ".join(command))
+        child = subprocess.Popen(command,
+                                 stdout=subprocess.PIPE, 
+                                 stderr=subprocess.PIPE, 
+                                 close_fds=True)
+        (stdout, stderr) = child.communicate()
+        if child.returncode != 0:
+            raise Exception("Could not download %s: Stderr:\n%s" % (url, stderr))
+        
     def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
         if dlpath == None:
@@ -644,6 +658,14 @@ class WorkunitClient(object):
         cafile = self.settings.get("CERTFILE", None)
         logging.info ("Downloading %s to %s (cafile = %s)", url, dlpath, cafile)
         wait = float(self.settings["DOWNLOADRETRY"])
+        # If we want HTTPS and are running under Python 2, we use wget to do
+        # the actual download, as the Python 2 urllib does not implement
+        # acutally checking the certificate
+        # This is a rather ugly hack. It would be nicer to copy the required
+        # parts from a fully functional SSL library. TODO.
+        if url.startswith("https:") and sys.version_info[0] == 2:
+            return self.wget_file(url, dlpath, cafile)
+
         request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
         try:
