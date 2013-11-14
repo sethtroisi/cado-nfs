@@ -1,5 +1,9 @@
 cadofactor and OAR HowTo:
 
+OAR is the job scheduler used on various clusters, among them the clusters
+of the Grid5000 research network, and on the Catrel cluster at LORIA.
+
+
 1. Running cadofactor inside the OAR job:
 
 This is arguably the easiest to set up. It allows cadofactor to get the list
@@ -9,14 +13,18 @@ parameter
 slaves.hostnames = @${OAR_NODE_FILE}
 
 which reads the list of host names from the file specified in the shell
-environment variable OAR_NODE_FILE. That file lists each host 32 times, as
-each node has 32 virtual CPUs. It's more sensible to use only 8 or 16
-clients per host, with
+environment variable OAR_NODE_FILE. That file lists each multiple times, 
+as often as there are virtual CPUs. As each process spawned by clients
+usually uses more than one thread (i.e., as many as specified by the
+threads parameter), it is sensible to use fewer clients clients per host
+than the number of cores. For example, to use 8 clients:
 
-slaves.nrclients = 16
+slaves.nrclients = 8
 
-Slaves on catrel nodes need to be contacted via oarsh instead of SSH, which
-is done with
+Slaves on nodes managed by OAR need to be contacted via oarsh instead of ssh,
+as ssh asks for the user's key passphrase whereas oarsh uses an automatically
+generated key that is valid on all the nodes of the same job submission.
+Using oarsh can be effected by
 
 slaves.ssh.execbin = oarsh
 
@@ -26,17 +34,17 @@ As oarsub expects the command to run as a single parameter, a wrapper script
 needs to be used for starting cadofactor.py with the required parameters;
 alternatively an interactive session can be used in which to run cadofactor.
 
-Of course, additional clients can be started on other CATREL nodes manually
-to help with the computation.
-
+Of course, additional clients can be started on other OAR nodes manually
+to help with the computation, assuming the hosts which are to help are
+whitelisted in server.whitelist.
 
 
 2. Running cadofactor outside the OAR job
 
-If cadofactor runs on a machine outside Grid5000/fcatrel, only the slaves
-need to be started via OAR. They need the URL of the server, and the
-server's certificate fingerprint (once HTTPS is implemented). A simple
-example shell script to launch slaves is in start_clients.sh.
+If cadofactor runs on a machine outside the OAR-managed cluster, only the
+slaves need to be started via OAR. They need the URL of the server, and the
+server's certificate fingerprint. A simple example shell script to launch
+slaves is in start_clients.sh.
 
 
 
