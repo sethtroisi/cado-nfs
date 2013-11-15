@@ -8,6 +8,7 @@
 ###########################################################################
 
 name = c136
+tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -39,7 +40,6 @@ tasks.sieve.I = 13
 tasks.sieve.qmin = 16000000		
 tasks.sieve.qrange = 20000		
 slaves.niceness = 10
-tasks.sieve.threads = 2
 tasks.sieve.rels_wanted = 24833287
 
 ###########################################################################
@@ -57,7 +57,6 @@ tasks.merge.coverNmax = 100
 # Linear algebra
 ###########################################################################
 
-tasks.linalg.bwc.threads = 2x2		
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.mn = 64
@@ -68,4 +67,3 @@ tasks.linalg.bwc.shuffled_product = 1
 ###########################################################################
 
 tasks.linalg.characters.nchar = 50		
-tasks.linalg.characters.threads = 2
