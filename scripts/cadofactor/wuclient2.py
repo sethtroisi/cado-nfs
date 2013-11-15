@@ -1023,7 +1023,7 @@ if __name__ == '__main__':
     logfile = None if logfilename is None else open(logfilename, "a")
     logging.basicConfig(level=loglevel)
     if logfile:
-        logging.getLogger().addHandler(logging.StreamHandler(stream=logfile))
+        logging.getLogger().addHandler(logging.StreamHandler(logfile))
     logging.info("Starting client %s", SETTINGS["CLIENTID"])
 
     generator_bug_type = getattr(FixedBytesGenerator, "bug_type", None)
