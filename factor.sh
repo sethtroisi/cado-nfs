@@ -275,7 +275,7 @@ if $python; then
     # one which is named otherwise, or placed in a non-prority location
     # is the path, is preferred. If $PYTHON is empty, this is a no-op
   "${TIMEOUT[@]}" $PYTHON $cadofactor "$t/param" N=$n tasks.execpath="$bindir" \
-  threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
+  tasks.threads=$cores tasks.workdir="$t" slaves.hostnames="$hostnames" \
   slaves.nrclients=$slaves \
   slaves.scriptpath="$scriptpath" "$server_address" \
   slaves.basepath="$t/client/" "$@"

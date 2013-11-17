@@ -56,6 +56,9 @@ BUGGY_MIMEENCODER2 = (
     (3,3,2)
 )
 
+HAVE_WGET = False
+HAVE_CURL = False
+
 if tuple(sys.version_info)[0:3] in BUGGY_MIMEENCODER1:
     class FixedBytesGenerator(email.generator.BytesGenerator):
         bug_type = BUGGY_MIMEENCODER1
@@ -111,7 +114,7 @@ else:
     FixedBytesGenerator = email.generator.BytesGenerator
 
 
-def create_daemon(workdir = None, umask = None):
+def create_daemon(workdir=None, umask=None, keepfd=None):
     """Disk And Execution MONitor (Daemon)
 
     Configurable daemon behaviors:
@@ -144,7 +147,7 @@ def create_daemon(workdir = None, umask = None):
     __revision__ = "$Id$"
     __version__ = "0.2"
     
-    # Use a one-element array to fool Python into not binding a local
+    # Use a one-element array to fool Python 2 into not binding a local
     # name in handler(). Python3 has 'nonlocal' for that
     sigusr1_received = [False]
     def handler(signum, frame):
@@ -307,7 +310,8 @@ def create_daemon(workdir = None, umask = None):
     # Iterate through and close all file descriptors.
     for fd in range(0, maxfd):
         try:
-            os.close(fd)
+            if keepfd is None or not fd in keepfd:
+                os.close(fd)
         except OSError:	# ERROR, fd wasn't open to begin with (ignored)
             pass
 
@@ -408,6 +412,18 @@ def close_exclusive(fileobj):
     """ Close a file, releasing any held lock on it """
     fcntl.flock(fileobj, fcntl.LOCK_UN)
     fileobj.close()
+
+def run_command(command):
+    """ Run command, wait for it to finish, return exit status, stdout 
+    and stderr
+    """
+    child = subprocess.Popen(command,
+                             stdout=subprocess.PIPE, 
+                             stderr=subprocess.PIPE, 
+                             close_fds=True)
+    (stdout, stderr) = child.communicate()
+    return (child.returncode, stdout, stderr)
+
 
 class WorkunitProcessor(object):
     def __init__(self, workunit, settings):
@@ -633,6 +649,44 @@ class WorkunitClient(object):
                     encoding = pair[1].strip()
         return encoding
 
+    def wget_file(self, url, wait, dlpath, cafile=None):
+        """ Download via wget
+        
+        This is used as a fall-back for doing HTTPS downloads when running
+        under Python 2, whose ssl module does not implement SSL certificate
+        checks.
+        """
+        command = ["wget", "-O", dlpath]
+        if cafile:
+            command.append("--ca-certificate=%s" % cafile)
+        command.append(url)
+        while True:
+            logging.info ("Running %s", " ".join(command))
+            (rc, stdout, stderr) = run_command (command)
+            if rc == 0:
+                return True
+            logging.error("Download of %s failed. Stderr:\n%s" % (url, stderr))
+            logging.error("Waiting %s seconds before retrying", wait)
+            time.sleep(wait)
+        
+    def curl_get_file(self, url, wait, dlpath, cafile=None):
+        """ Download via curl
+        
+        Like wget_file(), this is used as a fall-back.
+        """
+        command = ["curl", "--silent", "--show-error", "--fail", "--output", dlpath]
+        if cafile:
+            command += ["--cacert", cafile]
+        command.append(url)
+        while True:
+            logging.info ("Running %s", " ".join(command))
+            (rc, stdout, stderr) = run_command(command)
+            if rc == 0:
+                return True
+            logging.error("Download of %s failed. Stderr:\n%s" % (url, stderr))
+            logging.error("Waiting %s seconds before retrying", wait)
+            time.sleep(wait)
+        
     def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
         if dlpath == None:
@@ -644,6 +698,17 @@ class WorkunitClient(object):
         cafile = self.settings.get("CERTFILE", None)
         logging.info ("Downloading %s to %s (cafile = %s)", url, dlpath, cafile)
         wait = float(self.settings["DOWNLOADRETRY"])
+        # If we want HTTPS and are running under Python 2, we use wget to do
+        # the actual download, as the Python 2 urllib does not implement
+        # acutally checking the certificate
+        # This is a rather ugly hack. It would be nicer to copy the required
+        # parts from a fully functional SSL library. TODO.
+        if url.startswith("https:") and sys.version_info[0] == 2:
+            if HAVE_WGET:
+                return self.wget_file(url, wait, dlpath, cafile=cafile)
+            elif HAVE_CURL:
+                return self.curl_get_file(url, wait, dlpath, cafile=cafile)
+
         request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
         try:
@@ -948,19 +1013,18 @@ if __name__ == '__main__':
 
     # print (str(SETTINGS))
 
-    # Daemonize before we open the log file, or we close the log file's 
-    # file descriptor
-    if options.daemon:
-        create_daemon()
-
     loglevel = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
     if not isinstance(loglevel, int):
         raise ValueError('Invalid log level: ' + SETTINGS["LOGLEVEL"])
-    logfile = SETTINGS["LOGFILE"]
-    if options.daemon and logfile is None:
-        logfile = "%s/%s.log" % (SETTINGS["WORKDIR"], SETTINGS["CLIENTID"])
-        SETTINGS["LOGFILE"] = logfile
-    logging.basicConfig(level=loglevel, filename=logfile)
+    logfilename = SETTINGS["LOGFILE"]
+    if options.daemon and logfilename is None:
+        logfilename = "%s/%s.log" % (SETTINGS["WORKDIR"], SETTINGS["CLIENTID"])
+        SETTINGS["LOGFILE"] = logfilename
+    logfile = None if logfilename is None else open(logfilename, "a")
+    logging.basicConfig(level=loglevel)
+    if logfile:
+        logging.getLogger().addHandler(logging.StreamHandler(logfile))
+    logging.info("Starting client %s", SETTINGS["CLIENTID"])
 
     generator_bug_type = getattr(FixedBytesGenerator, "bug_type", None)
     if generator_bug_type is BUGGY_MIMEENCODER1:
@@ -1000,6 +1064,22 @@ if __name__ == '__main__':
             with open(certfilename, 'w') as certfile:
                 certfile.write(cert)
         SETTINGS["CERTFILE"] = certfilename
+        
+        # Can we download with HTTPS at all?
+        if sys.version_info[0] == 2:
+            HAVE_WGET = run_command(["wget", "-V"])[0] == 0
+            if not HAVE_WGET:
+                HAVE_CURL = run_command(["curl", "-V"])[0] == 0
+            if not HAVE_WGET and not HAVE_CURL:
+                logging.critical("HTTPS requested, but not implemented in "
+                        "Python 2 and can't find wget or curl as fall-back. "
+                        "Aborting.")
+                sys.exit(1)
+
+    # Daemonize before we open the log file, or we close the log file's 
+    # file descriptor
+    if options.daemon:
+        create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
 
     client_ok = True
     while client_ok:

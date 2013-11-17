@@ -6,7 +6,7 @@ TRANSACTION = MESSAGE - 1
 COMMAND = DEBUG + 1
 logging.addLevelName(MESSAGE, "Message")
 logging.addLevelName(TRANSACTION, "Transaction")
-logging.addLevelName(COMMAND, "COMMAND")
+logging.addLevelName(COMMAND, "Command")
 
 
 class ANSI(object):
@@ -131,7 +131,7 @@ class CmdFileHandler(logging.FileHandler):
 
 
 class MyLogger(logging.Logger):
-    def cmd(self, msg, pid, *args, extra = None, **kwargs):
+    def cmd(self, msg, pid, *args, extra=None, **kwargs):
         """ Log a message with a level of cadologger.COMMAND """
         if not extra is None:
             extra = extra.copy()

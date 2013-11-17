@@ -8,6 +8,7 @@
 ###########################################################################
 
 name = c85
+tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
@@ -40,7 +41,6 @@ tasks.sieve.qmin = 400000
 tasks.sieve.qrange = 1000		
 tasks.sieve.rels_wanted = 880000		
 slaves.niceness = 10		
-tasks.sieve.threads = 2
 
 ###########################################################################
 # Filtering
@@ -56,7 +56,6 @@ tasks.merge.coverNmax = 100
 # Linear algebra
 ###########################################################################
 
-tasks.linalg.bwc.threads = 2x2		
 tasks.linalg.bwc.interval = 100		
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.mn = 64
@@ -67,5 +66,4 @@ tasks.linalg.bwc.shuffled_product = 1
 ###########################################################################
 
 tasks.linalg.characters.nchar = 50		
-tasks.linalg.characters.threads = 2
 

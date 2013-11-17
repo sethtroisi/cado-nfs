@@ -111,15 +111,14 @@ class FixedHTTPServer(http.server.HTTPServer):
     def verify_request(self, request, client_address):
         """ Tests if the client's IP address is whitelisted
 
-        If no whitelist is defined, always accepts.
+        If no whitelist is defined, always denies.
         """
-        if self.whitelist is None:
-            return True
-        # Use ipmask() to convert dotted string form of address to integer
-        addr = self.ipmask(client_address[0])[0]
-        for iprange in self.whitelist:
-            if addr & iprange[1] == iprange[0]:
-                return True
+        if not self.whitelist is None:
+            # Use ipmask() to convert dotted string form of address to integer
+            addr = self.ipmask(client_address[0])[0]
+            for iprange in self.whitelist:
+                if addr & iprange[1] == iprange[0]:
+                    return True
         self.logger.warning("Connection from IP address %s rejected - "
                 "not in server.whitelist", client_address[0])
         return False

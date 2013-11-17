@@ -655,7 +655,7 @@ class Purge(Program):
                  minindex: Parameter() = None,
                  nprimes: Parameter() = None,
                  raw: Toggle() = None,
-                 npthr: Parameter() = None,
+                 threads: Parameter("npthr") = None,
                  inprel: Parameter(is_input_file = True) = None,
                  outrel: Parameter(is_output_file = True) = None,
                  npass: Parameter() = None,

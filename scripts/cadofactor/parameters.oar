@@ -43,4 +43,6 @@ slaves.catrel.hostnames = @${OAR_NODE_FILE}
 slaves.catrel.nrclients = 8
 slaves.catrel.scriptpath = ${HOME}/git/cado-nfs/scripts/cadofactor
 slaves.catrel.downloadretry = 10
+# This causes cadofactor to startclient by using "oarsh" for remote login
+# instead of the default "ssh"
 slaves.catrel.ssh.execbin = oarsh
