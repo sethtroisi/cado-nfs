@@ -2692,7 +2692,8 @@ class SqrtTask(Task):
                 message = self.submit_command(p, "dep%d" % dep)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
-                stdout = stdoutpath.open("r").read()
+                with stdoutpath.open("r") as stdoutfile:
+                    stdout = stdoutfile.read()
                 lines = stdout.splitlines()
                 # Skip last factor which cannot produce a new split on top
                 # of what the smaller factors did
