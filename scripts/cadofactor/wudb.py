@@ -827,7 +827,7 @@ class WuAccess(object): # {
             if callable(conn_close):
                 conn_close(self.conn)
             else:
-                self._conn.close()
+                self.conn.close()
     
     @staticmethod
     def to_str(wus):
