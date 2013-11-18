@@ -22,8 +22,8 @@ library.
 
 The binary sqlite3 library is installed by default on most systems, but it
 is worthwhile to check that it is. Use your distribution's package manager,
-and look for a package called "sqlite" or "sqlite3", which should contain a
-file "libsqlite3.so.*"
+and look for a package called "sqlite", "sqlite3", or "libsqlite3", which
+should contain a file "libsqlite3.so.*"
 
 The Python sqlite3 module unfortunately is not installed by default by some
 distributions, known culprits include Gentoo.
