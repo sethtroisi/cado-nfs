@@ -582,7 +582,13 @@ class WorkunitClient(object):
         on Python 2 or Python 3.
         """
         if isinstance(request, urllib_request.Request):
-            scheme = request.get_type().lower()
+            if sys.version_info[0:2] < (3,3):
+                # In Python 2, get_type() must be used to get the scheme
+                scheme = request.get_type().lower()
+            else:
+                # The .get_Type() method was deprecated in 3.3 and removed
+                # in 3.4, now the scheme is stored in the .type attribute
+                scheme = request.type.lower()
         else:
             # Assume it's a URL string
             scheme = request.split(":")[0].lower()
