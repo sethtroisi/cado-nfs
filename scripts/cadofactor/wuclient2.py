@@ -593,8 +593,10 @@ class WorkunitClient(object):
                 return urllib_request.urlopen(request, cafile=cafile)
             else:
                 # Python 2 urllib does not implement certificate checks.
-                # FIXME: We need a work-around.
-                # For the time being, we just use HTTPS without check
+                # For the time being, we just use HTTPS without check.
+                # We should never get here, as we use wget or curl as
+                # fall-backs under Python 2, and if neither is available,
+                # wuclient2.py aborts in the initialisation phase.
                 return urllib_request.urlopen(request)
         else:
             # If we are not using HTTPS, we can just let urllib do it, 
@@ -624,7 +626,7 @@ class WorkunitClient(object):
                 else:
                     raise
             if not conn:
-                logging.error("%s of result failed, %s", 
+                logging.error("%s failed, %s", 
                               'Upload' if is_upload else 'Download', 
                               errorstr)
                 logging.error("Waiting %s seconds before retrying", wait)
@@ -1067,9 +1069,15 @@ if __name__ == '__main__':
         
         # Can we download with HTTPS at all?
         if sys.version_info[0] == 2:
-            HAVE_WGET = run_command(["wget", "-V"])[0] == 0
+            try:
+                HAVE_WGET = run_command(["wget", "-V"])[0] == 0
+            except OSError:
+                pass
             if not HAVE_WGET:
-                HAVE_CURL = run_command(["curl", "-V"])[0] == 0
+                try:
+                    HAVE_CURL = run_command(["curl", "-V"])[0] == 0
+                except OSError:
+                    pass
             if not HAVE_WGET and not HAVE_CURL:
                 logging.critical("HTTPS requested, but not implemented in "
                         "Python 2 and can't find wget or curl as fall-back. "
