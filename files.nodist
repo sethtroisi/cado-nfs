@@ -22,6 +22,7 @@ filter/print_table.c
 scripts/nightly-test
 scripts/polsel_effort
 scripts/plot_params.sh
+scripts/typecast.py
 scripts/cadofactor/parameters
 scripts/cadofactor/parameters.oar
 scripts/cadofactor/parameters.rsa512.oar
