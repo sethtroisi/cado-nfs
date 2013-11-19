@@ -45,10 +45,6 @@ static inline uint64_t cputicks()
         return r;
 }
 
-#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
-                                        nearest. This is enough to uniquely
-                                        identify the corresponding IEEE 754
-                                        double precision number */
 // #define HILIGHT_START   "\e[01;31m"
 // #define HILIGHT_END   "\e[00;30m"
 
@@ -244,8 +240,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
-                              sis->scale * LOG_SCALE, si->bucket_thresh,
-                              las->nb_threads, las->verbose, lim, apow_lim);
+                              si->bucket_thresh, las->nb_threads, las->verbose,
+                              lim, apow_lim);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
@@ -264,8 +260,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->f, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
-                                     rpow_lim, sis->scale * LOG_SCALE,
-                                     las->verbose, 1, las->output);
+                                     rpow_lim, las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             tfb = seconds () - tfb;
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",

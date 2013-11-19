@@ -40,6 +40,11 @@ typedef uint64_t redc_invp_t;
 typedef uint32_t redc_invp_t;
 #endif
 
+#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
+                                        nearest. This is enough to uniquely
+                                        identify the corresponding IEEE 754
+                                        double precision number */
+
 /* The following format takes 16+4k bytes per prime with k roots. Since
  * the expected number of roots for primes with at least one root is
  * 1.58 (for generic Galois group), we are slightly above 14 bytes per
@@ -50,15 +55,12 @@ typedef uint32_t redc_invp_t;
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
   unsigned char nr_roots; /* how many roots there are for this prime */
-  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
+  unsigned char exp;      /* FIXME: what does this mean now? */
+  unsigned char oldexp;
   unsigned char size;     /* The length of the struct in bytes */
-  unsigned char dummy[1]; /* For dword aligning the roots. In fact uneeded, C99
-                             guarantees proper alignment of roots[]. It's only a
-                             precaution against -fpack-struct or other
-                             ABI-breaking behaviours */
   redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
   /* Note that invp may have a stronger alignment constraint than p, thus must
-   * not appear before the tiny fields plog and nr_roots which can easily
+   * not appear before the tiny fields exp and nr_roots which can easily
    * fit inbetween the two */
   fbroot_t roots[0];      /* the actual length of this array is determined
                              by nr_roots */
@@ -70,12 +72,13 @@ void		fb_fprint_entry (FILE *, const factorbase_degn_t *);
 void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
-fbprime_t       fb_is_power (fbprime_t);
+fbprime_t       fb_pow (fbprime_t, unsigned long);
+fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
                                 const mpz_t *, fbprime_t, fbprime_t, size_t, 
-                                fbprime_t, double, int, int, FILE *);
+                                fbprime_t, int, int, FILE *);
 int             fb_read (factorbase_degn_t **, factorbase_degn_t ***, 
-                         const char *, double, fbprime_t, size_t, int, 
+                         const char *, fbprime_t, size_t, int, 
                          fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);

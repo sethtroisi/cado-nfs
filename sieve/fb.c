@@ -42,8 +42,8 @@ void
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
 {
   int i;
-  fprintf (fd, "Prime " FBPRIME_FORMAT " with rounded log %d and roots ",
-	   fb->p, (int) fb->plog);
+  fprintf (fd, "Prime " FBPRIME_FORMAT " with exponent %d, old exponent %d, and roots ",
+	   fb->p, (int) fb->exp, (int) fb->oldexp);
   for (i = 0; i < fb->nr_roots; i++)
     {
       fprintf (fd, FBROOT_FORMAT, fb->roots[i]);
@@ -271,7 +271,7 @@ fb_log_2 (fbprime_t n)
 }
 
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */
-static fbprime_t
+fbprime_t
 fb_pow (const fbprime_t p, const unsigned long e)
 {
     fbprime_t r = 1;
@@ -284,9 +284,9 @@ fb_pow (const fbprime_t p, const unsigned long e)
 /* Let k be the largest integer with q = p^k, return p if k > 1,
    and 0 otherwise */
 fbprime_t
-fb_is_power (fbprime_t q)
+fb_is_power (fbprime_t q, unsigned long *final_k)
 {
-  unsigned int maxk, k;
+  unsigned long maxk, k;
   uint32_t p;
 
   maxk = fb_log_2(q);
@@ -298,6 +298,8 @@ fb_is_power (fbprime_t q)
         p = (uint32_t) rdp ;
         if (q % p == 0) {
           ASSERT (fb_pow (p, k) == q);
+          if (final_k != NULL)
+            *final_k = k;
           return p;
         }
       }
@@ -316,8 +318,8 @@ fb_is_power (fbprime_t q)
 
 static int
 fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
-		 const fbprime_t p, const unsigned char logp,
-		 const int do_projective)
+		 const fbprime_t p, const unsigned char newexp,
+		 const unsigned char oldexp, const int do_projective)
 {
   modulusul_t m;
   residueul_t r0, r1;
@@ -325,7 +327,8 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   int is_projective, rc;
 
   fb_entry->p = p;
-  fb_entry->plog = logp;
+  fb_entry->exp = newexp;
+  fb_entry->oldexp = oldexp;
 
   modul_initmod_ul (m, p);
   modul_init_noset0 (r0, m);
@@ -378,15 +381,15 @@ int
 fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                 const mpz_t *poly, const fbprime_t bound, 
                 const fbprime_t smalllim, const size_t nr_pieces, 
-		const fbprime_t powbound, const double log_scale,
-		const int verbose, const int projective, FILE *output)
+		const fbprime_t powbound, const int verbose, 
+		const int projective, FILE *output)
 {
   fb_split_t split;
   fbprime_t p;
   factorbase_degn_t *fb_cur;
   size_t pow_len = 0;
   const size_t allocblocksize = 1 << 20;
-  unsigned char logp;
+  unsigned char newexp, oldexp;
   int had_proj_root = 0, error = 0;
   fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
 					    need to be included, and the
@@ -419,15 +422,19 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       if (pow_len > 0 && min_pow < p)
 	{
 	  size_t i;
+	  unsigned long k;
 	  /* Find this p^k in the list of prime powers and replace it
 	     by p^(k+1) if p^(k+1) does not exceed powbound, otherwise
 	     remove p^k from the list */
 	  for (i = 0; i < pow_len && powers[i] != min_pow; i++);
 	  ASSERT_ALWAYS (i < pow_len);
-	  q = fb_is_power (min_pow);
+	  q = fb_is_power (min_pow, &k);
+	  ASSERT_ALWAYS(q > 0);
+	  ASSERT_ALWAYS(k > 1);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
-	  logp = cast_int_uchar(fb_log (min_pow, log_scale, 0.) -
-	                        fb_log (min_pow / q, log_scale, 0.));
+	  
+	  newexp = k;
+	  oldexp = k - 1U;
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
 	  else
@@ -447,7 +454,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       else
 	{
 	  q = p;
-	  logp = fb_log (q, log_scale, 0.);
+	  newexp = 1;
+	  oldexp = 0;
 	  /* Do we need to add this prime to the prime powers list? */
 	  if (q <= powbound / q)
 	    {
@@ -464,7 +472,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  p = getprime (p);
 	}
 
-      if (!fb_make_linear1 (fb_cur, poly, q, logp, projective))
+      if (!fb_make_linear1 (fb_cur, poly, q, newexp, oldexp, projective))
 	continue; /* If root is projective and we don't want those,
 		     skip to next prime */
 
@@ -568,7 +576,7 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
     for (fb_ptr = fb; fb_ptr->p != FB_END; fb_ptr = fb_next (fb_ptr)) {
       /* Prime powers p^k are neither added to the array of extracted primes, 
          nor do they stop the loop if p^k > plim */
-      if (fb_is_power(fb_ptr->p))
+      if (fb_is_power(fb_ptr->p, NULL))
         continue;
       if (fb_ptr->p > plim)
         break;
@@ -666,8 +674,7 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
    Otherwise return 0. */
 static int
 fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
-               const double log_scale, const unsigned long linenr,
-               const fbprime_t powlim)
+               const unsigned long linenr, const fbprime_t powlim)
 {
     unsigned long nlogp, oldlogp = 0;
     fbprime_t p, q; /* q is factor base entry q = p^k */
@@ -694,7 +701,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     /* we assume q is a prime or a prime power */
     /* NB: a short version is not possible for a prime power, so we
      * do the test only for !longversion */
-    p = (longversion) ? fb_is_power (q) : 0;
+    p = (longversion) ? fb_is_power (q, NULL) : 0;
     ASSERT(isprime(p != 0 ? p : q));
     fb_cur->p = q;
     if (p != 0) {
@@ -735,16 +742,14 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     }
     ASSERT (nlogp > oldlogp);
 
-    if (nlogp == 1) /* typical case: this is the first occurrence of p */
-        fb_cur->plog = fb_log (p, log_scale, 0.);
-    else
-      /* p already occurred before, and was taken into account to the power
-         'oldlogp', with bias 'ol' since it was rounded to an integer.
-         We now want to take into account the extra contribution from
-         p^oldlogp to p^nlogp. */
-      {
-        double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
-        fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
+    if (nlogp == 1) { /* typical case: this is the first occurrence of p */
+        fb_cur->exp = 1;
+        fb_cur->oldexp = 0;
+    } else {
+        /* p already occurred before, and was taken into account to the power
+           'oldlogp'. */
+        fb_cur->exp = nlogp;
+        fb_cur->oldexp = oldlogp;
       }
 
     /* Read roots */
@@ -771,9 +776,9 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 
 int 
 fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
-         const char * const filename, const double log_scale, 
-         const fbprime_t smalllim, const size_t nr_pieces, 
-         const int verbose, const fbprime_t lim, const fbprime_t powlim)
+         const char * const filename, const fbprime_t smalllim, 
+         const size_t nr_pieces, const int verbose, const fbprime_t lim,
+         const fbprime_t powlim)
 {
     fb_split_t split;
     factorbase_degn_t *fb_cur;
@@ -817,7 +822,7 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
             continue;
         }
 
-        if (fb_parse_line (fb_cur, line, log_scale, linenr, powlim) == 0)
+        if (fb_parse_line (fb_cur, line, linenr, powlim) == 0)
             continue;
         if (lim && fb_cur->p >= lim)
             break;
@@ -879,11 +884,11 @@ fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
     unsigned char i;
     const double base = exp(1. / scale);
 
-    fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
+    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
     const unsigned char max = fb_log(fbb, scale, 0.);
     for (i = 0; i <= max; i++) {
         steps[i] = ceil(pow(base, i + 0.5)) - 1;
-        fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
+        // fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
         /* fb_log(n, scale) = floor (log (n) * scale + 0.5) 
                             = floor (log (floor(pow(base, i + 0.5))) * scale + 0.5) 
                             = floor (log (ceil(pow(e^(1. / scale), i + 0.5)-1)) * scale + 0.5) 
