@@ -12,9 +12,12 @@
 #define rdtscll(x)
 #include "fb.h"
 #include "portability.h"
+#include "typecast.h"
 #include "utils.h"
 #include "ularith.h"
 
+/* A factor base buffer that allows appending entries. It reallocates memory
+   (in blocksize chunks) if necessary. */
 typedef struct {
   factorbase_degn_t *fb;
   size_t size, alloc, blocksize;
@@ -79,7 +82,8 @@ fb_buffer_clear (fb_buffer_t *fb_buf)
 }
 
 /* Extend a factor base buffer, if necessary, to have room for at least
-   addsize additional bytes at the end */
+   addsize additional bytes at the end.
+   Return 1 on success, 0 if realloc failed. */
 static int
 fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
 {
@@ -119,14 +123,16 @@ fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
   /* Append the new entry at the end of the factor base */
   factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
   memcpy (fb_end_ptr, fb_add, fb_addsize);
-  fb_end_ptr->size = fb_addsize;
+  fb_end_ptr->size = cast_size_uchar(fb_addsize);
 
   fb_buf->size += fb_addsize;
 
   return 1;
 }
 
-/* Add the end-of-factor-base marker to a factor base buffer */
+/* Add the end-of-factor-base marker to a factor base buffer
+   Return 1 on success, 0 if realloc failed.
+*/
 static int
 fb_buffer_finish (fb_buffer_t *fb_buf)
 {
@@ -142,6 +148,7 @@ fb_buffer_finish (fb_buffer_t *fb_buf)
 }
 
 
+/* A struct for building a factor base in several disjoint pieces. */
 typedef struct {
   fb_buffer_t *fb_bufs; /* fb_bufs[0] is for primes <= smalllim, rest is for 
                            larger primes. If smalllim == 0, then fb_bufs[0] 
@@ -264,11 +271,11 @@ fb_log_2 (fbprime_t n)
 
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */
 static fbprime_t
-fb_pow (const fbprime_t p, const unsigned int e)
+fb_pow (const fbprime_t p, const unsigned long e)
 {
     fbprime_t r = 1;
 
-    for (unsigned int i = 0; i < e; i++)
+    for (unsigned long i = 0; i < e; i++)
       r *= p;
     return r;
 }
@@ -350,7 +357,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
   if (p % 2 != 0) {
     ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-    fb_entry->invp = - ularith_invmod (modul_getmod_ul (m));
+    fb_entry->invp = (redc_invp_t) (- ularith_invmod (modul_getmod_ul (m)));
   }
 
   modul_clear (r0, m);
@@ -369,7 +376,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 int
 fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                 const mpz_t *poly, const fbprime_t bound, 
-                const fbprime_t smalllim, const int nr_pieces, 
+                const fbprime_t smalllim, const size_t nr_pieces, 
 		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
@@ -378,7 +385,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   factorbase_degn_t *fb_cur;
   size_t pow_len = 0;
   const size_t allocblocksize = 1 << 20;
-  unsigned long logp;
+  unsigned char logp;
   int had_proj_root = 0, error = 0;
   fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
 					    need to be included, and the
@@ -389,7 +396,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   ASSERT (fb_cur != NULL);
 
   fb_cur->nr_roots = 1;
-  fb_cur->size = fb_entrysize_uc (1);
+  fb_cur->size = cast_size_uchar (fb_entrysize_uc (1));
   if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
     free (fb_cur);
     return 0;
@@ -418,8 +425,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  ASSERT_ALWAYS (i < pow_len);
 	  q = fb_is_power (min_pow);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
-	  logp = fb_log (min_pow, log_scale, 0.) -
-	         fb_log (min_pow / q, log_scale, 0.);
+	  logp = cast_int_uchar(fb_log (min_pow, log_scale, 0.) -
+	                        fb_log (min_pow / q, log_scale, 0.));
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
 	  else
@@ -661,7 +668,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
                const double log_scale, const unsigned long linenr,
                const fbprime_t powlim)
 {
-    long nlogp, oldlogp = 0;
+    unsigned long nlogp, oldlogp = 0;
     fbprime_t p, q; /* q is factor base entry q = p^k */
 
     q = strtoul_const (lineptr, &lineptr, 10);
@@ -764,7 +771,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 int 
 fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                const char * const filename, const double log_scale, 
-               const fbprime_t smalllim, const int nr_pieces, 
+               const fbprime_t smalllim, const size_t nr_pieces, 
                const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
     fb_split_t split;
@@ -800,7 +807,8 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     }
 
     while (!feof(fbfile)) {
-        if (fgets (line, linesize, fbfile) == NULL)
+        /* Sadly, the size parameter of fgets() is of type int */
+        if (fgets (line, cast_size_int(linesize), fbfile) == NULL)
             break;
         linenr++;
         if (fb_read_strip_comment(line) == (size_t) 0) {
@@ -816,7 +824,8 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
             ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-            fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
+            fb_cur->invp = 
+                (redc_invp_t) (- ularith_invmod ((unsigned long) fb_cur->p));
         }
 
         if (!fb_split_add (&split, fb_cur)) {

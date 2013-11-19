@@ -72,10 +72,10 @@ void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
 fbprime_t       fb_is_power (fbprime_t);
 int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
-                                const mpz_t *, fbprime_t, fbprime_t, int, 
+                                const mpz_t *, fbprime_t, fbprime_t, size_t, 
                                 fbprime_t, double, int, int, FILE *);
 int             fb_read_split (factorbase_degn_t **, factorbase_degn_t ***, 
-                               const char *, double, fbprime_t, int, int, 
+                               const char *, double, fbprime_t, size_t, int, 
                                fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
@@ -132,7 +132,7 @@ fb_write_end_marker (factorbase_degn_t *fb)
 
 struct fb_iterator_s {
     factorbase_degn_t * fb;
-    int i;
+    unsigned char i;
 };
 
 typedef struct fb_iterator_s fb_iterator[1];
@@ -163,19 +163,6 @@ static inline void fb_iterator_next(fb_iterator_ptr t)
     t->i = 0;
 }
 
-static inline void fb_iterator_add_n(fb_iterator_ptr t, int n)
-{
-    if (t->i) {
-        n += t->i;
-        t->i = 0;
-    }
-    for( ; t->fb->nr_roots <= n ; ) {
-        n -= t->fb->nr_roots;
-        t->fb = fb_next(t->fb);
-    }
-    t->i = n;
-}
-
 static inline fbprime_t fb_iterator_get_r(fb_iterator_srcptr t)
 {
     return t->fb->roots[t->i];
@@ -188,7 +175,7 @@ static inline int fb_iterator_lessthan_fb(fb_iterator_srcptr t, const factorbase
 
 static inline int fb_iterator_lessthan(fb_iterator_srcptr t, fb_iterator_srcptr u)
 {
-    int r = (char*)(u->fb) - (char*)(t->fb);
+    ptrdiff_t r = (char*)(u->fb) - (char*)(t->fb);
     if (r > 0) return 1;
     if (r < 0) return 0;
     return t->i < u->i;
@@ -233,43 +220,7 @@ static inline int fb_diff(factorbase_degn_t * t, factorbase_degn_t * u)
     fb_iterator_clear(qu);
     return n;
 }
-static inline ptrdiff_t fb_iterator_diff_bytes(fb_iterator_srcptr t, fb_iterator_srcptr u)
-{
-    fb_iterator q;
-    if (fb_iterator_lessthan(t, u)) {
-        return -fb_iterator_diff_bytes(u, t);
-    }
-    fb_iterator_init_set(q, u);
-    ptrdiff_t n = -q->i * sizeof(fbprime_t);
-    q->i = 0;
-    for( ; fb_iterator_lessthan_fb(q, t->fb) ; ) {
-        n += fb_entrysize(q->fb);
-        q->fb = fb_next(q->fb);
-    }
-    n += t->i;
-    fb_iterator_clear(q);
-    return n;
-}
-static inline ptrdiff_t fb_iterator_diff_bytes_fb(fb_iterator_srcptr t, factorbase_degn_t * u)
-{
-    fb_iterator qu;
-    fb_iterator_init_set_fb(qu, u);
-    ptrdiff_t n = fb_iterator_diff_bytes(t, qu);
-    fb_iterator_clear(qu);
-    return n;
-}
 
-static inline ptrdiff_t fb_diff_bytes(factorbase_degn_t * t, factorbase_degn_t * u)
-{
-    fb_iterator qu;
-    fb_iterator_init_set_fb(qu, u);
-    fb_iterator qt;
-    fb_iterator_init_set_fb(qt, t);
-    ptrdiff_t n = fb_iterator_diff_bytes(qt, qu);
-    fb_iterator_clear(qt);
-    fb_iterator_clear(qu);
-    return n;
-}
 static inline int fb_iterator_over(fb_iterator_srcptr t)
 {
     return t->fb->p == FB_END;
