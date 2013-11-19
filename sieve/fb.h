@@ -163,19 +163,6 @@ static inline void fb_iterator_next(fb_iterator_ptr t)
     t->i = 0;
 }
 
-static inline void fb_iterator_add_n(fb_iterator_ptr t, int n)
-{
-    if (t->i) {
-        n += t->i;
-        t->i = 0;
-    }
-    for( ; t->fb->nr_roots <= n ; ) {
-        n -= t->fb->nr_roots;
-        t->fb = fb_next(t->fb);
-    }
-    t->i = n;
-}
-
 static inline fbprime_t fb_iterator_get_r(fb_iterator_srcptr t)
 {
     return t->fb->roots[t->i];
