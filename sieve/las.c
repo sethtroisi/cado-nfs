@@ -243,9 +243,9 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (apow_lim == 0) 
                 apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            int ok = fb_read_split (&sis->fb, &sis->fb_bucket_threads, fbfilename,
-                                    sis->scale * LOG_SCALE, si->bucket_thresh,
-                                    las->nb_threads, las->verbose, lim, apow_lim);
+            int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
+                              sis->scale * LOG_SCALE, si->bucket_thresh,
+                              las->nb_threads, las->verbose, lim, apow_lim);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;

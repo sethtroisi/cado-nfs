@@ -769,10 +769,10 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 */
 
 int 
-fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
-               const char * const filename, const double log_scale, 
-               const fbprime_t smalllim, const size_t nr_pieces, 
-               const int verbose, const fbprime_t lim, const fbprime_t powlim)
+fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
+         const char * const filename, const double log_scale, 
+         const fbprime_t smalllim, const size_t nr_pieces, 
+         const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
     fb_split_t split;
     factorbase_degn_t *fb_cur;

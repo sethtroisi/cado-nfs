@@ -74,9 +74,9 @@ fbprime_t       fb_is_power (fbprime_t);
 int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
                                 const mpz_t *, fbprime_t, fbprime_t, size_t, 
                                 fbprime_t, double, int, int, FILE *);
-int             fb_read_split (factorbase_degn_t **, factorbase_degn_t ***, 
-                               const char *, double, fbprime_t, size_t, int, 
-                               fbprime_t, fbprime_t);
+int             fb_read (factorbase_degn_t **, factorbase_degn_t ***, 
+                         const char *, double, fbprime_t, size_t, int, 
+                         fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
