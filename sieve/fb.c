@@ -257,7 +257,8 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 unsigned char
 fb_log (double n, double log_scale, double offset)
 {
-  return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
+  const long l = floor (log (n) * log_scale + offset + 0.5);
+  return cast_long_uchar(l); 
 }
 
 /* Returns floor(log_2(n)) for n > 0, and 0 for n == 0 */
@@ -869,6 +870,35 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     free (fb_cur);
 
     return error ? 0 : 1;
+}
+
+
+unsigned char
+fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
+{
+    unsigned char i;
+    const double base = exp(1. / scale);
+
+    fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
+    const unsigned char max = fb_log(fbb, scale, 0.);
+    for (i = 0; i <= max; i++) {
+        steps[i] = ceil(pow(base, i + 0.5)) - 1;
+        fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
+        /* fb_log(n, scale) = floor (log (n) * scale + 0.5) 
+                            = floor (log (floor(pow(base, i + 0.5))) * scale + 0.5) 
+                            = floor (log (ceil(pow(e^(1. / scale), i + 0.5)-1)) * scale + 0.5) 
+                            < floor (log (pow(e^(1. / scale), i + 0.5)) * scale + 0.5) 
+                            = floor (log (e^((i+0.5) / scale)) * scale + 0.5) 
+                            = floor (((i+0.5) / scale) * scale + 0.5) 
+                            = floor (i + 1)
+           Thus, fb_log(n, scale) < floor (i + 1) <= i
+        */
+        /* We have to use <= in the first assert, as for very small i, multiple
+           steps[i] can have the same value */
+        ASSERT(fb_log(steps[i], scale, 0.) <= i);
+        ASSERT(fb_log(steps[i] + 1, scale, 0.) > i);
+    }
+    return max;
 }
 
 

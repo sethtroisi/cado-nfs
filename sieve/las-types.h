@@ -94,7 +94,6 @@ struct sieve_side_info_s {
     unsigned char bound;
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
-    factorbase_degn_t * fb;
     struct {
         factorbase_degn_t * pow2[2];
         factorbase_degn_t * pow3[2];
@@ -113,7 +112,16 @@ struct sieve_side_info_s {
      * fb field into several fields, by reallocation. All fields are
      * still owned by the sieve_info struct in the end, and stored here
      */
+    factorbase_degn_t * fb;
     factorbase_degn_t ** fb_bucket_threads;
+    /* log_steps[i] contains the largest integer x such that 
+       fb_log(x, scale, 0.) == i, i.e., the integer after which the 
+       rounded logarithm increases, i.o.w., x = floor(scale^(i+0.5)),
+       for 0 <= i <= log_steps_max, where log_steps_max = fb_log(fbb, scale)
+       For i > log_steps_max, log_steps[i] is undefined.
+    */
+    fbprime_t log_steps[256];
+    unsigned char log_steps_max;
     /* When threads pick up this sieve_info structure, they should check
      * their bucket allocation */
     double max_bucket_fill_ratio;

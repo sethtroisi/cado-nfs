@@ -271,6 +271,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
         }
+        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
     }
 }
 /*}}}*/
@@ -1592,6 +1593,8 @@ struct thread_side_data_s {
   bucket_array_t BA;    /* Always used */
   factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
   // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+  const fbprime_t *log_steps;
+  unsigned char log_steps_max;
   
   /* For small sieve */
   int * ssdpos;
@@ -1653,6 +1656,19 @@ typedef const struct thread_data_s * thread_data_srcptr;
   } while (0)
 /************************************************************************/
 
+static inline
+unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
+{
+    unsigned char logp = 0;
+    for (unsigned char i = th->sides[side]->log_steps_max; i > 0; i--)
+        if (th->sides[side]->log_steps[i - 1] < p) {
+            logp = i;
+            break;
+        }
+    ASSERT_ALWAYS(logp != 0);
+    return logp;
+}
+
 /* {{{ */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
@@ -1672,8 +1688,9 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
+    unsigned char logp = find_logp(th, side, p);
     ASSERT_ALWAYS (p & 1);
+
     WHERE_AM_I_UPDATE(w, p, p);
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
@@ -1798,7 +1815,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
+    unsigned char logp = find_logp(th, side, p);
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
     
@@ -2020,10 +2037,11 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
     
+    unsigned char logp = find_logp(th, side, p);
+
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
       aligned_medium_memcpy((uint8_t *)mBA.logp_idx + mBA.size_b_align * BA.nr_logp, mBA.bucket_write, mBA.size_b_align);
@@ -3501,6 +3519,8 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
         thrs[i]->si = si;
         for(int s = 0 ; s < 2 ; s++) {
             thrs[i]->sides[s]->fb_bucket = si->sides[s]->fb_bucket_threads[i];
+            thrs[i]->sides[s]->log_steps = si->sides[s]->log_steps;
+            thrs[i]->sides[s]->log_steps_max = si->sides[s]->log_steps_max;
         }
     }
 }/*}}}*/
