@@ -187,6 +187,31 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     int rpow_lim = 0, apow_lim = 0;
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
+    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_side_info_ptr sis = si->sides[side];
+        unsigned long lim = si->conf->sides[side]->lim;
+        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+    }
+
+    if (fbcfilename != NULL) {
+        /* Try to read the factor base cache file. If that fails, because
+           the file does not exist or is not compatible with our parameters,
+           it will be written after we generate the factor bases. */
+        printf("# Mapping memory image of factor base from file %s\n", 
+               fbcfilename);
+        if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
+                        &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
+                        fbcfilename, las->nb_threads, las->verbose)) {
+            si->sides[0]->fb_is_mmapped = 1;
+            si->sides[1]->fb_is_mmapped = 1;
+            printf("# Finished mapping memory image of factor base\n");
+            return;
+        } else {
+            printf("# Could not map memory image of factor base\n");
+        }
+    }
 
     for(int side = 0 ; side < 2 ; side++) {
         cado_poly_side_ptr pol = las->cpoly->pols[side];
@@ -212,6 +237,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                               lim, apow_lim);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
+            sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
             fprintf (las->output, 
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
@@ -229,11 +255,18 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                                      si->bucket_thresh, las->nb_threads,
                                      rpow_lim, las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
+            sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
         }
-        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+    }
+    if (fbcfilename != NULL) {
+        printf("# Writing memory image of factor base to file %s\n", fbcfilename);
+        fb_dump_fbc(si->sides[0]->fb, si->sides[0]->fb_bucket_threads,
+                    si->sides[1]->fb, si->sides[1]->fb_bucket_threads,
+                    fbcfilename, las->nb_threads, las->verbose);
+        printf("# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/
@@ -3625,6 +3658,7 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "fbc",  "factor base cache file");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");

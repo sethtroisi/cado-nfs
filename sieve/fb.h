@@ -88,6 +88,9 @@ unsigned char   fb_make_steps(fbprime_t *, fbprime_t, double);
 int             fb_dump_fbc (const factorbase_degn_t *, const factorbase_degn_t **,
                              const factorbase_degn_t *, const factorbase_degn_t **, 
                              const char *, size_t, int);
+int             fb_mmap_fbc(factorbase_degn_t **, factorbase_degn_t ***,
+                            factorbase_degn_t **, factorbase_degn_t ***,
+                            const char *, size_t, int);
 factorbase_degn_t *	fb_mmap(const char *);
 
 /* Some inlined functions which need to be fast */
