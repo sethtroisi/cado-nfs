@@ -85,7 +85,9 @@ fbprime_t	*fb_extract_bycost (const factorbase_degn_t *,
 size_t          fb_size (const factorbase_degn_t *);                   
 size_t          fb_nroots_total (const factorbase_degn_t *fb);
 unsigned char   fb_make_steps(fbprime_t *, fbprime_t, double);
-void            fb_dump_degn (const factorbase_degn_t *, const char *);
+int             fb_dump_fbc (const factorbase_degn_t *, const factorbase_degn_t **,
+                             const factorbase_degn_t *, const factorbase_degn_t **, 
+                             const char *, size_t, int);
 factorbase_degn_t *	fb_mmap(const char *);
 
 /* Some inlined functions which need to be fast */

@@ -887,7 +887,7 @@ fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
     // fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
     const unsigned char max = fb_log(fbb, scale, 0.);
     for (i = 0; i <= max; i++) {
-        steps[i] = ceil(pow(base, i + 0.5)) - 1;
+        steps[i] = ceil(pow(base, i + 0.5)) - 1.;
         // fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
         /* fb_log(n, scale) = floor (log (n) * scale + 0.5) 
                             = floor (log (floor(pow(base, i + 0.5))) * scale + 0.5) 
@@ -906,25 +906,124 @@ fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
     return max;
 }
 
+typedef struct {
+    size_t offset, size;
+} fb_filerange_t;
 
-void 
-fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
+typedef struct {
+    uint64_t magic;
+    size_t nr_pieces;
+    fb_filerange_t ranges[0];
+} fb_file_header_t;
+
+#define FB_MAGIC 0xcad0facba5ef17e
+
+static size_t
+fb_header_size(size_t nr_pieces)
 {
+  /* Each of the two factor bases has the small-prime factor base plus
+     nr_pieces for the larger primes */
+  return sizeof(fb_file_header_t) + 
+         2 * sizeof(fb_filerange_t) * (nr_pieces + 1);
+}
+
+static size_t
+round_up(size_t a, size_t b)
+{
+    return ((a + b - 1) / b) * b;
+}
+
+static int
+fb_dump_data(const size_t offset, const size_t size, FILE *f, const void *fb)
+{
+    if (fseek(f, cast_size_long(offset), SEEK_SET) != 0) {
+        fprintf (stderr, "Could not seek to position %zu: %s\n",
+                 offset, strerror(errno));
+        return 0;
+    }
+    size_t written = fwrite (fb, 1, size, f);
+    if (written != size) {
+        fprintf (stderr, "Could not write %zu bytes: %s\n",
+                 size, strerror(errno));
+        return 0;
+    }
+    return 1;
+}
+
+static int
+fb_dump_piece(fb_file_header_t *header, const size_t i, const size_t offset,
+              const size_t size, FILE *f, const factorbase_degn_t *fb)
+{
+    header->ranges[i].offset = offset;
+    header->ranges[i].size = size;
+    return fb_dump_data (offset, size, f, fb);
+}
+
+/* Returns 1 if success, 0 if failure */
+int
+fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pieces_1,
+            const factorbase_degn_t *fb_small_2, const factorbase_degn_t **fb_pieces_2,
+            const char * const filename, const size_t nr_pieces, const int verbose)
+{
+    fb_file_header_t *header;
+    size_t offset, size, headersize;
+    const size_t psize = pagesize();
+    const factorbase_degn_t *fb_small[2] = {fb_small_1, fb_small_2};
+    const factorbase_degn_t **fb_pieces[2] = {fb_pieces_1, fb_pieces_2};
+
+    if (verbose)
+        printf ("Writing memory image of factor base to file %s\n", filename);
+
+    headersize = fb_header_size(nr_pieces);
+    header = malloc(headersize);
+    if (header == NULL) {
+        return 0;
+    }
+
     FILE *f = fopen(filename, "wb");
     if (f == NULL) {
         fprintf (stderr, "Could not open %s for writing: %s\n",
                  filename, strerror(errno));
         exit(EXIT_FAILURE);
     }
-    size_t size = fb_size (fb);
-    size_t written = fwrite (fb, 1, size, f);
-    if (written != size) {
-        fprintf (stderr, "Could not write %zu bytes to %s: %s\n",
-                 size, filename, strerror(errno));
-        exit(EXIT_FAILURE);
+
+    header->magic = FB_MAGIC;
+    header->nr_pieces = nr_pieces;
+    offset = 0;
+    size = headersize;
+
+    for (int side = 0; side < 2; side++) {
+        offset = round_up(size + offset, psize);
+        size = fb_size (fb_small[side]);
+        if (verbose)
+            printf ("Writing small-primes FB of side %d\n", side);
+            
+        fb_dump_piece(header, 0, offset, size, f, fb_small[side]);
+
+        for (size_t i = 0; i < nr_pieces; i++) {
+            offset = round_up (size + offset, psize);
+            size = fb_size (fb_pieces[side][i]);
+            if (verbose)
+                printf ("Writing large-primes FB of side %d, part %zu\n", side, i);
+            fb_dump_piece(header, i + 1, offset, size, f, fb_pieces[side][i]);
+        }
     }
-    fclose(f);
+
+    if (verbose)
+        printf ("Writing header\n");
+    fb_dump_data(0, headersize, f, header);
+
+    if (fclose(f) != 0) {
+        fprintf (stderr, "Could not close file %s: %s\n",
+                 filename, strerror(errno));
+    }
+
+    if (verbose)
+        printf ("Finished writing memory image of factor base\n");
+    
+    return 0;
 }
+
 
 /* Returns NULL iff the file could not be opened, and MAP_FAILED in case of
    an error (incl. when mmap() is not available) */
