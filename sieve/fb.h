@@ -55,15 +55,15 @@ typedef uint32_t redc_invp_t;
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
   unsigned char nr_roots; /* how many roots there are for this prime */
-  unsigned char exp;      /* FIXME: what does this mean now? */
-  unsigned char oldexp;
+  unsigned char exp;      /* Let p=P^k, then P^exp || norm where a=br (mod p) */
+  unsigned char oldexp;   /* P^oldexp || norm where a=br (mod p/P) */
   unsigned char size;     /* The length of the struct in bytes */
   redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
   /* Note that invp may have a stronger alignment constraint than p, thus must
    * not appear before the tiny fields exp and nr_roots which can easily
    * fit inbetween the two */
-  fbroot_t roots[0];      /* the actual length of this array is determined
-                             by nr_roots */
+  fbroot_t roots[0];      /* The roots r_0, ..., r_{nr_roots}. The actual
+                             length of this array is determined by nr_roots */
 } factorbase_degn_t;
 
 #define FB_END ((fbprime_t) 1)

@@ -282,7 +282,7 @@ fb_pow (const fbprime_t p, const unsigned long e)
 }
 
 /* Let k be the largest integer with q = p^k, return p if k > 1,
-   and 0 otherwise */
+   and 0 otherwise. If final_k is not NULL, write k there. */
 fbprime_t
 fb_is_power (fbprime_t q, unsigned long *final_k)
 {
@@ -433,8 +433,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  ASSERT_ALWAYS(k > 1);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
 	  
-	  newexp = k;
-	  oldexp = k - 1U;
+	  newexp = cast_ulong_uchar(k);
+	  oldexp = cast_ulong_uchar(k - 1U);
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
 	  else
