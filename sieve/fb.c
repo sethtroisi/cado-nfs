@@ -1042,9 +1042,13 @@ freemem:
 
 /* Returns 1 if success, 0 if failure */
 int
-fb_mmap_fbc(factorbase_degn_t **fb_small_1, factorbase_degn_t ***fb_pieces_1,
-            factorbase_degn_t **fb_small_2, factorbase_degn_t ***fb_pieces_2,
-            const char * const filename, const size_t nr_pieces, const int verbose)
+fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
+            factorbase_degn_t ***fb_pieces_1 MAYBE_UNUSED,
+            factorbase_degn_t **fb_small_2 MAYBE_UNUSED,
+            factorbase_degn_t ***fb_pieces_2 MAYBE_UNUSED,
+            const char * const filename MAYBE_UNUSED, 
+            const size_t nr_pieces MAYBE_UNUSED,
+            const int verbose MAYBE_UNUSED)
 {
 #ifdef HAVE_MMAP
     fb_file_header_t *header;
