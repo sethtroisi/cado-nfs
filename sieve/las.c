@@ -179,35 +179,6 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 }/*}}}*/
 
 /* {{{ Factor base handling */
-/* {{{ silly code to factor small numbers. Should go to utils/ */
-/* Finds prime factors p < lim of n and returns a pointer to a zero-terminated
-   list of those factors. Repeated factors are stored only once. */
-static fbprime_t *
-factor_small (mpz_t n, fbprime_t lim)
-{
-  unsigned long p;
-  unsigned long l; /* number of prime factors */
-  fbprime_t *f;
-
-  l = 0;
-  f = (fbprime_t*) malloc (sizeof (fbprime_t));
-  FATAL_ERROR_CHECK(f == NULL, "malloc failed");
-  for (p = 2; p <= lim; p = getprime (p))
-    {
-      if (mpz_divisible_ui_p (n, p))
-        {
-          l ++;
-          f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
-          FATAL_ERROR_CHECK(f == NULL, "realloc failed");
-          f[l - 1] = p;
-        }
-    }
-  f[l] = 0; /* end of list marker */
-  getprime (0);
-  return f;
-}
-/*}}}*/
-
 /* {{{ Initialize the factor bases */
 void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_list pl)
 {
@@ -216,16 +187,13 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     int rpow_lim = 0, apow_lim = 0;
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
- 
+
     for(int side = 0 ; side < 2 ; side++) {
         cado_poly_side_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
         unsigned long lim = si->conf->sides[side]->lim;
         if (pol->degree > 1) {
-            fbprime_t *leading_div;
             tfb = seconds ();
-            /* Do we actually use leading_div anywhere? */
-            leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
              */
@@ -249,7 +217,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
                     fb_size (sis->fb) >> 20, tfb);
-            free (leading_div);
         } else {
             tfb = seconds ();
             if (rpow_lim >= si->bucket_thresh)
