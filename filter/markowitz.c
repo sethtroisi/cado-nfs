@@ -250,8 +250,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
   unsigned int k;
     int w = mat->wt[j];
 
-    if (w == 1)
-      return -4; /* ensures that singletons are removed earlier */
+    if (w <= 1)
+      return -4; /* ensures that empty columns and singletons are removed earlier */
     else if (w == 2)
       return -2;
     else
