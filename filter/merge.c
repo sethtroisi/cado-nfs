@@ -102,7 +102,7 @@ main (int argc, char *argv[])
     filter_matrix_t mat[1];
     report_t rep[1];
 
-    uint32_t maxlevel = MAXLEVEL_DEFAULT;
+    int maxlevel = MAXLEVEL_DEFAULT;
     uint32_t keep = KEEP_DEFAULT;
     uint32_t skip = SKIP_DEFAULT;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
@@ -149,7 +149,7 @@ main (int argc, char *argv[])
     const char * resumename = param_list_lookup_string (pl, "resume");
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
-    param_list_parse_uint (pl, "maxlevel", &maxlevel);
+    param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
     param_list_parse_uint (pl, "skip", &skip);
     param_list_parse_uint (pl, "forbw", &forbw);
@@ -179,7 +179,7 @@ main (int argc, char *argv[])
       fprintf(stderr, "Error, missing -out command line argument\n");
       usage (pl, argv0);
     }
-    if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
+    if (maxlevel <= 0 || maxlevel > MERGE_LEVEL_MAX)
     {
       fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
                        MERGE_LEVEL_MAX);

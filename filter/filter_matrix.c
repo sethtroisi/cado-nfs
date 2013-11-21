@@ -24,7 +24,7 @@ incrS (int w)
 
 /* initialize the sparse matrix mat */
 void
-initMat (filter_matrix_t *mat, uint32_t maxlevel, uint32_t keep,
+initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
          uint32_t nburied)
 {
   mat->keep  = keep;
