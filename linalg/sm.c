@@ -93,7 +93,7 @@ poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
 
 
 /*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
-void
+static inline void
 poly_reduce_frac_mod_f_mod_mpz (relset_ptr frac, const poly_t F, const mpz_t m,
                                 mpz_t tmp, poly_t g, poly_t U, poly_t V)
 {
@@ -111,6 +111,35 @@ poly_reduce_frac_mod_f_mod_mpz (relset_ptr frac, const poly_t F, const mpz_t m,
                                 F->deg, m, NULL);
     cleandeg(frac->num, d);
   }
+}
+
+/* compute the SM */
+static inline void
+compute_sm (poly_t SM, poly_t num, const poly_t F, const mpz_t ell,
+            const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
+{
+  poly_power_mod_f_mod_mpz_Barrett(SM, num, F, smexp, ell2, invl2);
+  poly_sub_ui(SM, 1);
+
+  for(int j = 0; j <= SM->deg; j++)
+  {
+    ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
+    mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
+    ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
+  }
+}
+
+static inline void
+print_sm (FILE *f, poly_t SM, int Fdeg)
+{
+  for(int j=0; j<Fdeg; j++)
+  {
+    if (j > SM->deg)
+      fprintf(f, "0 ");
+    else
+      gmp_fprintf(f, "%Zu ", SM->coeff[j]);
+  }
+  fprintf(f, "\n");
 }
 
 relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
@@ -212,6 +241,7 @@ struct thread_info {
   relset_ptr rels;
   poly_srcptr F;
   mpz_srcptr eps;
+  mpz_srcptr ell;
   mpz_srcptr ell2;
   mpz_srcptr invl2;
   poly_t *sm;
@@ -222,6 +252,7 @@ void * thread_start(void *arg) {
   relset_ptr rels = ti->rels;
   poly_srcptr F = ti->F;
   mpz_srcptr eps = ti->eps;
+  mpz_srcptr ell = ti->ell;
   mpz_srcptr ell2 = ti->ell2;
   mpz_srcptr invl2 = ti->invl2;
   poly_t *sm = ti->sm;
@@ -237,12 +268,8 @@ void * thread_start(void *arg) {
 
 
   for (int i = 0; i < ti->nb; i++) {
-
     poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
-
-    poly_power_mod_f_mod_mpz_Barrett(sm[i], rels[offset+i].num,
-        F, eps, ell2, invl2);
-    poly_sub_ui(sm[i], 1);
+    compute_sm (sm[i], rels[offset+i].num, F, ell, eps, ell2, invl2);
   }
 
   mpz_clear(tmp);
@@ -288,6 +315,7 @@ void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
     tis[i].rels = rels;
     tis[i].F = F;
     tis[i].eps = eps;
+    tis[i].ell = ell;
     tis[i].ell2 = ell2;
     tis[i].invl2 = invl2;
     tis[i].sm = SM[i];
@@ -312,25 +340,9 @@ void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
     // Wait for the next thread to finish in order to print result.
     pthread_join(threads[threads_head], NULL);
     active_threads--;
-    for (int k = 0; k < SM_BLOCK; ++k) {
-      if (out_cpt >= sr)
-        break;
-      poly_ptr sm = SM[threads_head][k];
-      for(int j=0; j<F->deg; j++) {
-        if (j > sm->deg) {
-          fprintf(out, "0 ");
-          continue;
-        }
-        ASSERT_ALWAYS(mpz_divisible_p(sm->coeff[j], ell));
-        mpz_divexact(sm->coeff[j], sm->coeff[j], ell);
-        ASSERT_ALWAYS(mpz_cmp(ell, sm->coeff[j])>0);
+    for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt)
+      print_sm (out, SM[threads_head][k], F->deg);
 
-        mpz_out_str(out, 10, sm->coeff[j]);
-        fprintf(out, " ");
-      }
-      fprintf(out, "\n");
-      out_cpt++;
-    }
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
     if (i >= sr) { 
@@ -385,25 +397,9 @@ void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
   fprintf(out, "%d\n", sr);
 
   for (int i=0; i<sr; i++) {
-
     poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
-
-    poly_power_mod_f_mod_mpz_Barrett(SM, rels[i].num, F, eps, ell2, invl2);
-    poly_sub_ui(SM, 1);
-
-    for(int j=0; j<F->deg; j++) {
-      if (j > SM->deg) {
-          fprintf(out, "0 ");
-          continue;
-      }
-      ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
-      mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
-      ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
-
-      mpz_out_str(out, 10, SM->coeff[j]);
-      fprintf(out, " ");
-    }
-    fprintf(out, "\n");
+    compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
+    print_sm (out, SM, F->deg);
   }
 
   poly_free(SM);
@@ -426,15 +422,7 @@ void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps,
   poly_setcoeff_si(SM, 0, 1);
   
   poly_alloc_and_set_from_ab(rel, a, b);
-  
-  poly_power_mod_f_mod_mpz_Barrett(SM, rel, F, eps, ell2, invl2);
-  poly_sub_ui(SM, 1);
-
-  for(int j=0; j<=SM->deg; j++) {
-    ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
-    mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
-    ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
-  }
+  compute_sm (SM, rel, F, ell, eps, ell2, invl2);
 }
 
 
