@@ -676,7 +676,7 @@ class Merge(Program):
                  forbw: Parameter() = None,
                  ratio: Parameter() = None,
                  coverNmax: Parameter() = None,
-                 itermax: Parameter() = None,
+                 nbmergemax: Parameter() = None,
                  resume: Parameter() = None,
                  mkztype: Parameter() = None,
                  wmstmax: Parameter() = None,

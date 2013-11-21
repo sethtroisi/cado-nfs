@@ -182,3 +182,12 @@
 # for Python 3 and sqlite in the CMake configuration
 #
 # NO_PYTHON_CHECK="foo"
+
+############################################################
+# For big factorizations, increase the size of variable.
+# If you want to use large prime bound > 32, uncomment the following line
+# FLAGS_SIZE="-Dp_r_values_size=64"
+# If you want to be able to handle more than 2^32 ideals in you factor base or
+# have more than 2^32 relations (for large prime bound > 35 or 36), uncomment
+# the following line
+# FLAGS_SIZE="-Dp_r_values_size=64 -Dindex_size=64"

@@ -1034,11 +1034,13 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   mod_init (p, m);
   
   i = n - 1;
-  if (i < n1)
+  if (i < n1) /* <==>  n2 == 0 */
     mod_mul (x1[i], x1[i], t[n - 2], m);
   else
     mod_mul (x2[i - n1], x2[i - n1], t[n - 2], m);
   
+  /* Init the accumulator p, either to the last element of z2 if z2 is 
+     non-empty, or to the last element of z1 if z2 is empty */
   if (n2 > 0)
     mod_set (p, z2[n2 - 1], m);
   else

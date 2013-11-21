@@ -220,11 +220,26 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
 
         int nr;
         fbprime_t r;
+        const double log_scale = si->sides[side]->scale * LOG_SCALE;
 
         for (nr = 0; nr < fb->nr_roots; nr++, index++) {
             unsigned int event = 0;
             if ((fb->p&1)==0) event |= SSP_POW2;
-            ssd->logp[index] = fb->plog;
+
+            /* p may already have occurred before, and was taken into account
+               to the power 'oldexp', with a log contribution of 'ol'. We now
+               want to take into account the extra contribution of going from
+               p^oldexp to p^exp. */
+            fbprime_t pp = p;
+            double ol = 0.;
+            if (fb->oldexp > 0) {
+                /* p a prime power. Find out the prime, pp */
+                pp = fb_is_power(p, NULL);
+                ASSERT_ALWAYS(pp != 0);
+                ol = fb_log (fb_pow (pp, fb->oldexp), log_scale, 0.);
+            }
+            ssd->logp[index] = fb_log (fb_pow (pp, fb->exp), log_scale, - ol);
+            
             WHERE_AM_I_UPDATE(w, r, fb->roots[nr]);
             r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
             /* If this root is somehow interesting (projective in (a,b) or
