@@ -9,7 +9,7 @@ include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
 #link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 
 add_executable(sm sm.c)
-target_link_libraries(sm utils pthread)
+target_link_libraries(sm filterutils)
 
 add_library (ffs-f2 EXCLUDE_FROM_ALL ${sources})
 target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a)
