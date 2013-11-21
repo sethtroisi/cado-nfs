@@ -18,6 +18,7 @@ cado_mpi_config_h.in
 cadofactor.pl
 cadofct.pm
 portability.h
+typecast.h
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
@@ -89,6 +90,9 @@ filter/sparse.c
 filter/sparse.h
 filter/utils_ffs.c
 filter/utils_ffs.h
+filter/sm.c
+filter/filter_sm.c
+filter/filter_sm.h
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
@@ -403,7 +407,6 @@ linalg/gauss.c
 linalg/gauss.h
 linalg/rowset_heap.cpp
 linalg/rowset_heap.h
-linalg/sm.c
 local.sh.example
 local.sh.macosx-10.5
 local.sh.macosx-10.8
@@ -723,6 +726,7 @@ scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
 scripts/cadofactor/CMakeLists.txt
+scripts/cadofactor/start_clients.sh
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format

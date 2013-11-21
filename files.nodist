@@ -10,7 +10,6 @@ dev_docs/
 files.dist
 files.nodist
 files.unknown
-linalg/CMakeLists-nodist.txt
 linalg/bwc/bind_threads.sh
 linalg/bwc/bwc.sty
 linalg/bwc/convert_magma.pl
