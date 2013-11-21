@@ -1,8 +1,16 @@
 #ifndef LAS_UNSIEVE_H_
 #define LAS_UNSIEVE_H_
 
+typedef struct {
+    unsigned int lpf, cof, start;
+} unsieve_entry_t;
+
 struct unsieve_aux_data_s {
-    unsigned int *lpf; /* lpf[i] is largest prime factor of i, for i < I */
+    /* entry[i].lpf is largest prime factor of i, for i < I,
+       cof is the cofactor i/lpf^k s.t. lfp^k || i,
+       start is (I/2) % lpf */
+    unsieve_entry_t *entries;
+    unsigned long pattern3[3];
 };
 typedef struct unsieve_aux_data_s unsieve_aux_data[1];
 typedef struct unsieve_aux_data_s * unsieve_aux_data_ptr;
