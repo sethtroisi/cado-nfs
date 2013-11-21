@@ -658,9 +658,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax, int64_t nbmergemax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    int m = 2, njrem = 0, njproc;
+    int njrem = 0;
     int ni2rem;
-    int *nb_merges;
     int32_t j, mkz;
   double REPORT = 20.0; /* threshold of w/N from which reports are done */
                         /* on stdout                                    */
@@ -669,20 +668,21 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   uint64_t WN_prev, WN_cur, WN_min;
   double WoverN;
   unsigned int ncost = 0, ncostmax = 20; //TODO ncostmax should be a parameter
-  uint64_t old_ncols;
+  int m;
+  uint64_t *nb_merges;
+
+  printf ("# Using %s to compute the merges\n", __func__);
 
     // clean things
     njrem = removeSingletons(rep, mat);
 
-    nb_merges = (int*) malloc ((maxlevel + 1) * sizeof (int));
-    for (m = 0; m <= maxlevel; m++)
-      nb_merges[m] = 0;
-    printf ("Using mergeOneByOne\n");
-    njproc = 0;
+  nb_merges = (uint64_t *) malloc ((maxlevel + 1) * sizeof (uint64_t));
+  ASSERT_ALWAYS (nb_merges != NULL);
+  memset(nb_merges, 0, (maxlevel + 1) * sizeof(uint64_t));
 
-    WN_min = WN_cur = compute_WN(mat);
-    WoverN = compute_WoverN(mat);
-    print_report (mat);
+  WN_min = WN_cur = compute_WN(mat);
+  WoverN = compute_WoverN(mat);
+  print_report (mat);
 
   while(1)
   {
@@ -709,7 +709,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     }
 
     /* Do one merge */
-    old_ncols = mat->rem_ncols;
     if (MkzPopQueue(&j, &mkz, mat) == 0)
     {
       printf ("Heap is empty, stopping. Rerun with larger maxlevel if more "
@@ -747,8 +746,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
     if (WN_cur < WN_min)
       WN_min = WN_cur;
 
-    // number of columns removed
-	  njproc += old_ncols - mat->rem_ncols;
     if (WoverN >= REPORT)
     {
       REPORT += FREQ_REPORT;
@@ -776,10 +773,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
   printf ("Total number of row additions: %lu\n", row_additions);
 #endif
 
-    for (m = 1; m <= maxlevel; m++)
-      if (nb_merges[m] > 0)
-        printf ("Number of %d-merges: %d\n", m, nb_merges[m]);
-    free (nb_merges);
+  for (m = 1; m <= maxlevel; m++)
+    printf ("Number of %d-merges: %" PRIu64 "\n", m, nb_merges[m]);
+  free (nb_merges);
 }
 
 //////////////////////////////////////////////////////////////////////
