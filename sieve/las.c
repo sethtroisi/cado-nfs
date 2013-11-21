@@ -646,8 +646,10 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         si->sides[s]->strategy = NULL;
         sieve_info_clear_trialdiv(si, s);
         free(si->sides[s]->fb);
-        for(int i = 0 ; i < las->nb_threads ; i++) {
-            free(si->sides[s]->fb_bucket_threads[i]);
+        if (! si->sides[s]->fb_is_mmapped) {
+            for(int i = 0 ; i < las->nb_threads ; i++) {
+                free(si->sides[s]->fb_bucket_threads[i]);
+            }
         }
         free(si->sides[s]->fb_bucket_threads);
 
