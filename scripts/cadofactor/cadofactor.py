@@ -67,6 +67,7 @@ if __name__ == '__main__':
     with open(snapshot_filename, "w") as snapshot_file:
         logger.debug("Writing parameter snapshot to %s", snapshot_filename)
         snapshot_file.write(str(parameters))
+        snapshot_file.write("\n")
     
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
     factorjob = cadotask.CompleteFactorization(db=wudb_file,
