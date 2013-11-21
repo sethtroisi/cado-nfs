@@ -11,6 +11,7 @@ struct unsieve_aux_data_s {
        start is (I/2) % lpf */
     unsieve_entry_t *entries;
     unsigned long pattern3[3];
+    unsigned long pattern5[5];
 };
 typedef struct unsieve_aux_data_s unsieve_aux_data[1];
 typedef struct unsieve_aux_data_s * unsieve_aux_data_ptr;
