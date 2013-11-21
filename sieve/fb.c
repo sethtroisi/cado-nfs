@@ -12,9 +12,12 @@
 #define rdtscll(x)
 #include "fb.h"
 #include "portability.h"
+#include "typecast.h"
 #include "utils.h"
 #include "ularith.h"
 
+/* A factor base buffer that allows appending entries. It reallocates memory
+   (in blocksize chunks) if necessary. */
 typedef struct {
   factorbase_degn_t *fb;
   size_t size, alloc, blocksize;
@@ -39,8 +42,8 @@ void
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
 {
   int i;
-  fprintf (fd, "Prime " FBPRIME_FORMAT " with rounded log %d and roots ",
-	   fb->p, (int) fb->plog);
+  fprintf (fd, "Prime " FBPRIME_FORMAT " with exponent %d, old exponent %d, and roots ",
+	   fb->p, (int) fb->exp, (int) fb->oldexp);
   for (i = 0; i < fb->nr_roots; i++)
     {
       fprintf (fd, FBROOT_FORMAT, fb->roots[i]);
@@ -79,7 +82,8 @@ fb_buffer_clear (fb_buffer_t *fb_buf)
 }
 
 /* Extend a factor base buffer, if necessary, to have room for at least
-   addsize additional bytes at the end */
+   addsize additional bytes at the end.
+   Return 1 on success, 0 if realloc failed. */
 static int
 fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
 {
@@ -119,14 +123,16 @@ fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
   /* Append the new entry at the end of the factor base */
   factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
   memcpy (fb_end_ptr, fb_add, fb_addsize);
-  fb_end_ptr->size = fb_addsize;
+  fb_end_ptr->size = cast_size_uchar(fb_addsize);
 
   fb_buf->size += fb_addsize;
 
   return 1;
 }
 
-/* Add the end-of-factor-base marker to a factor base buffer */
+/* Add the end-of-factor-base marker to a factor base buffer
+   Return 1 on success, 0 if realloc failed.
+*/
 static int
 fb_buffer_finish (fb_buffer_t *fb_buf)
 {
@@ -142,6 +148,7 @@ fb_buffer_finish (fb_buffer_t *fb_buf)
 }
 
 
+/* A struct for building a factor base in several disjoint pieces. */
 typedef struct {
   fb_buffer_t *fb_bufs; /* fb_bufs[0] is for primes <= smalllim, rest is for 
                            larger primes. If smalllim == 0, then fb_bufs[0] 
@@ -250,7 +257,8 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 unsigned char
 fb_log (double n, double log_scale, double offset)
 {
-  return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
+  const long l = floor (log (n) * log_scale + offset + 0.5);
+  return cast_long_uchar(l); 
 }
 
 /* Returns floor(log_2(n)) for n > 0, and 0 for n == 0 */
@@ -263,22 +271,22 @@ fb_log_2 (fbprime_t n)
 }
 
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */
-static fbprime_t
-fb_pow (const fbprime_t p, const unsigned int e)
+fbprime_t
+fb_pow (const fbprime_t p, const unsigned long e)
 {
     fbprime_t r = 1;
 
-    for (unsigned int i = 0; i < e; i++)
+    for (unsigned long i = 0; i < e; i++)
       r *= p;
     return r;
 }
 
 /* Let k be the largest integer with q = p^k, return p if k > 1,
-   and 0 otherwise */
+   and 0 otherwise. If final_k is not NULL, write k there. */
 fbprime_t
-fb_is_power (fbprime_t q)
+fb_is_power (fbprime_t q, unsigned long *final_k)
 {
-  unsigned int maxk, k;
+  unsigned long maxk, k;
   uint32_t p;
 
   maxk = fb_log_2(q);
@@ -290,6 +298,8 @@ fb_is_power (fbprime_t q)
         p = (uint32_t) rdp ;
         if (q % p == 0) {
           ASSERT (fb_pow (p, k) == q);
+          if (final_k != NULL)
+            *final_k = k;
           return p;
         }
       }
@@ -308,8 +318,8 @@ fb_is_power (fbprime_t q)
 
 static int
 fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
-		 const fbprime_t p, const unsigned char logp,
-		 const int do_projective)
+		 const fbprime_t p, const unsigned char newexp,
+		 const unsigned char oldexp, const int do_projective)
 {
   modulusul_t m;
   residueul_t r0, r1;
@@ -317,7 +327,8 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   int is_projective, rc;
 
   fb_entry->p = p;
-  fb_entry->plog = logp;
+  fb_entry->exp = newexp;
+  fb_entry->oldexp = oldexp;
 
   modul_initmod_ul (m, p);
   modul_init_noset0 (r0, m);
@@ -350,7 +361,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
   if (p % 2 != 0) {
     ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-    fb_entry->invp = - ularith_invmod (modul_getmod_ul (m));
+    fb_entry->invp = (redc_invp_t) (- ularith_invmod (modul_getmod_ul (m)));
   }
 
   modul_clear (r0, m);
@@ -369,16 +380,16 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 int
 fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                 const mpz_t *poly, const fbprime_t bound, 
-                const fbprime_t smalllim, const int nr_pieces, 
-		const fbprime_t powbound, const double log_scale,
-		const int verbose, const int projective, FILE *output)
+                const fbprime_t smalllim, const size_t nr_pieces, 
+		const fbprime_t powbound, const int verbose, 
+		const int projective, FILE *output)
 {
   fb_split_t split;
   fbprime_t p;
   factorbase_degn_t *fb_cur;
   size_t pow_len = 0;
   const size_t allocblocksize = 1 << 20;
-  unsigned long logp;
+  unsigned char newexp, oldexp;
   int had_proj_root = 0, error = 0;
   fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
 					    need to be included, and the
@@ -389,7 +400,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   ASSERT (fb_cur != NULL);
 
   fb_cur->nr_roots = 1;
-  fb_cur->size = fb_entrysize_uc (1);
+  fb_cur->size = cast_size_uchar (fb_entrysize_uc (1));
   if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
     free (fb_cur);
     return 0;
@@ -411,15 +422,19 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       if (pow_len > 0 && min_pow < p)
 	{
 	  size_t i;
+	  unsigned long k;
 	  /* Find this p^k in the list of prime powers and replace it
 	     by p^(k+1) if p^(k+1) does not exceed powbound, otherwise
 	     remove p^k from the list */
 	  for (i = 0; i < pow_len && powers[i] != min_pow; i++);
 	  ASSERT_ALWAYS (i < pow_len);
-	  q = fb_is_power (min_pow);
+	  q = fb_is_power (min_pow, &k);
+	  ASSERT_ALWAYS(q > 0);
+	  ASSERT_ALWAYS(k > 1);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
-	  logp = fb_log (min_pow, log_scale, 0.) -
-	         fb_log (min_pow / q, log_scale, 0.);
+	  
+	  newexp = cast_ulong_uchar(k);
+	  oldexp = cast_ulong_uchar(k - 1U);
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
 	  else
@@ -439,7 +454,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       else
 	{
 	  q = p;
-	  logp = fb_log (q, log_scale, 0.);
+	  newexp = 1;
+	  oldexp = 0;
 	  /* Do we need to add this prime to the prime powers list? */
 	  if (q <= powbound / q)
 	    {
@@ -456,7 +472,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  p = getprime (p);
 	}
 
-      if (!fb_make_linear1 (fb_cur, poly, q, logp, projective))
+      if (!fb_make_linear1 (fb_cur, poly, q, newexp, oldexp, projective))
 	continue; /* If root is projective and we don't want those,
 		     skip to next prime */
 
@@ -560,7 +576,7 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
     for (fb_ptr = fb; fb_ptr->p != FB_END; fb_ptr = fb_next (fb_ptr)) {
       /* Prime powers p^k are neither added to the array of extracted primes, 
          nor do they stop the loop if p^k > plim */
-      if (fb_is_power(fb_ptr->p))
+      if (fb_is_power(fb_ptr->p, NULL))
         continue;
       if (fb_ptr->p > plim)
         break;
@@ -658,10 +674,9 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
    Otherwise return 0. */
 static int
 fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
-               const double log_scale, const unsigned long linenr,
-               const fbprime_t powlim)
+               const unsigned long linenr, const fbprime_t powlim)
 {
-    long nlogp, oldlogp = 0;
+    unsigned long nlogp, oldlogp = 0;
     fbprime_t p, q; /* q is factor base entry q = p^k */
 
     q = strtoul_const (lineptr, &lineptr, 10);
@@ -686,7 +701,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     /* we assume q is a prime or a prime power */
     /* NB: a short version is not possible for a prime power, so we
      * do the test only for !longversion */
-    p = (longversion) ? fb_is_power (q) : 0;
+    p = (longversion) ? fb_is_power (q, NULL) : 0;
     ASSERT(isprime(p != 0 ? p : q));
     fb_cur->p = q;
     if (p != 0) {
@@ -727,16 +742,14 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     }
     ASSERT (nlogp > oldlogp);
 
-    if (nlogp == 1) /* typical case: this is the first occurrence of p */
-        fb_cur->plog = fb_log (p, log_scale, 0.);
-    else
-      /* p already occurred before, and was taken into account to the power
-         'oldlogp', with bias 'ol' since it was rounded to an integer.
-         We now want to take into account the extra contribution from
-         p^oldlogp to p^nlogp. */
-      {
-        double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
-        fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
+    if (nlogp == 1) { /* typical case: this is the first occurrence of p */
+        fb_cur->exp = 1;
+        fb_cur->oldexp = 0;
+    } else {
+        /* p already occurred before, and was taken into account to the power
+           'oldlogp'. */
+        fb_cur->exp = nlogp;
+        fb_cur->oldexp = oldlogp;
       }
 
     /* Read roots */
@@ -762,10 +775,10 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 */
 
 int 
-fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
-               const char * const filename, const double log_scale, 
-               const fbprime_t smalllim, const int nr_pieces, 
-               const int verbose, const fbprime_t lim, const fbprime_t powlim)
+fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
+         const char * const filename, const fbprime_t smalllim, 
+         const size_t nr_pieces, const int verbose, const fbprime_t lim,
+         const fbprime_t powlim)
 {
     fb_split_t split;
     factorbase_degn_t *fb_cur;
@@ -800,7 +813,8 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     }
 
     while (!feof(fbfile)) {
-        if (fgets (line, linesize, fbfile) == NULL)
+        /* Sadly, the size parameter of fgets() is of type int */
+        if (fgets (line, cast_size_int(linesize), fbfile) == NULL)
             break;
         linenr++;
         if (fb_read_strip_comment(line) == (size_t) 0) {
@@ -808,7 +822,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
             continue;
         }
 
-        if (fb_parse_line (fb_cur, line, log_scale, linenr, powlim) == 0)
+        if (fb_parse_line (fb_cur, line, linenr, powlim) == 0)
             continue;
         if (lim && fb_cur->p >= lim)
             break;
@@ -816,7 +830,8 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
             ASSERT(sizeof(unsigned long) >= sizeof(redc_invp_t));
-            fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
+            fb_cur->invp = 
+                (redc_invp_t) (- ularith_invmod ((unsigned long) fb_cur->p));
         }
 
         if (!fb_split_add (&split, fb_cur)) {
@@ -863,50 +878,319 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 }
 
 
-void 
-fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
+unsigned char
+fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
 {
-    FILE *f = fopen(filename, "wb");
-    if (f == NULL) {
-        fprintf (stderr, "Could not open %s for writing: %s\n",
-                 filename, strerror(errno));
-        exit(EXIT_FAILURE);
+    unsigned char i;
+    const double base = exp(1. / scale);
+
+    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
+    const unsigned char max = fb_log(fbb, scale, 0.);
+    for (i = 0; i <= max; i++) {
+        steps[i] = ceil(pow(base, i + 0.5)) - 1.;
+        // fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
+        /* fb_log(n, scale) = floor (log (n) * scale + 0.5) 
+                            = floor (log (floor(pow(base, i + 0.5))) * scale + 0.5) 
+                            = floor (log (ceil(pow(e^(1. / scale), i + 0.5)-1)) * scale + 0.5) 
+                            < floor (log (pow(e^(1. / scale), i + 0.5)) * scale + 0.5) 
+                            = floor (log (e^((i+0.5) / scale)) * scale + 0.5) 
+                            = floor (((i+0.5) / scale) * scale + 0.5) 
+                            = floor (i + 1)
+           Thus, fb_log(n, scale) < floor (i + 1) <= i
+        */
+        /* We have to use <= in the first assert, as for very small i, multiple
+           steps[i] can have the same value */
+        ASSERT(fb_log(steps[i], scale, 0.) <= i);
+        ASSERT(fb_log(steps[i] + 1, scale, 0.) > i);
     }
-    size_t size = fb_size (fb);
-    size_t written = fwrite (fb, 1, size, f);
-    if (written != size) {
-        fprintf (stderr, "Could not write %zu bytes to %s: %s\n",
-                 size, filename, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    fclose(f);
+    return max;
 }
 
-/* Returns NULL iff the file could not be opened, and MAP_FAILED in case of
-   an error (incl. when mmap() is not available) */
-factorbase_degn_t *
-fb_mmap(const char *fbcache MAYBE_UNUSED)
+typedef struct {
+    size_t offset, size;
+} fb_filerange_t;
+
+typedef struct {
+    uint64_t magic;
+    size_t nr_pieces;
+    fb_filerange_t ranges[0];
+} fb_file_header_t;
+
+#define FB_MAGIC 0xcad0facba5ef17e
+
+static size_t
+fb_header_size(size_t nr_pieces)
+{
+  /* Each of the two factor bases has the small-prime factor base plus
+     nr_pieces for the larger primes */
+  return sizeof(fb_file_header_t) + 
+         2 * sizeof(fb_filerange_t) * (nr_pieces + 1);
+}
+
+static size_t
+round_up(size_t a, size_t b)
+{
+    return ((a + b - 1) / b) * b;
+}
+
+static int
+fb_dump_data(const size_t offset, const size_t size, FILE *f, const void *fb)
+{
+    if (fseek(f, cast_size_long(offset), SEEK_SET) != 0) {
+        fprintf (stderr, "Could not seek to position %zu: %s\n",
+                 offset, strerror(errno));
+        return 0;
+    }
+    size_t written = fwrite (fb, 1, size, f);
+    if (written != size) {
+        fprintf (stderr, "Could not write %zu bytes: %s\n",
+                 size, strerror(errno));
+        return 0;
+    }
+    return 1;
+}
+
+static int
+fb_dump_piece(fb_file_header_t *header, const size_t idx, const size_t offset,
+              const size_t size, FILE *f, const factorbase_degn_t *fb)
+{
+    header->ranges[idx].offset = offset;
+    header->ranges[idx].size = size;
+    return fb_dump_data (offset, size, f, fb);
+}
+
+/* Returns 1 if success, 0 if failure */
+int
+fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pieces_1,
+            const factorbase_degn_t *fb_small_2, const factorbase_degn_t **fb_pieces_2,
+            const char * const filename, const size_t nr_pieces, const int verbose)
+{
+    fb_file_header_t *header;
+    size_t offset, size, headersize;
+    const size_t psize = pagesize();
+    const factorbase_degn_t *fb_small[2] = {fb_small_1, fb_small_2};
+    const factorbase_degn_t **fb_pieces[2] = {fb_pieces_1, fb_pieces_2};
+    int returncode = 1;
+
+    /* Allocate memory */
+    headersize = fb_header_size(nr_pieces);
+    header = malloc(headersize);
+    if (header == NULL) {
+        fprintf(stderr, "Could not allocate memory\n");
+        returncode = 0;
+        goto freemem;
+    }
+
+    FILE *f = fopen(filename, "wb");
+    if (f == NULL) {
+        fprintf(stderr, "Could not open %s for writing: %s\n",
+                 filename, strerror(errno));
+        returncode = 0;
+        goto freemem;
+    }
+
+    header->magic = FB_MAGIC;
+    header->nr_pieces = nr_pieces;
+    offset = 0;
+    size = headersize;
+
+    size_t idx = 0;
+    for (int side = 0; side < 2; side++) {
+        offset = round_up(size + offset, psize);
+        size = fb_size (fb_small[side]);
+        if (verbose)
+            printf("# Writing small-primes FB of side %d to file offset %zu\n",
+                    side, offset);
+
+        if (fb_dump_piece(header, idx++, offset, size, f, fb_small[side]) == 0) {
+            returncode = 0;
+            goto closefile;
+        }
+
+        for (size_t i = 0; i < nr_pieces; i++) {
+            offset = round_up (size + offset, psize);
+            size = fb_size (fb_pieces[side][i]);
+            if (verbose)
+                printf("# Writing large-primes FB of side %d, part %zu, to file offset %zu\n",
+                        side, i, offset);
+            if (fb_dump_piece(header, idx++, offset, size, f, fb_pieces[side][i]) == 0) {
+                returncode = 0;
+                goto closefile;
+            }
+        }
+    }
+
+    if (verbose)
+        printf("# Writing header\n");
+    if (fb_dump_data(0, headersize, f, header) == 0) {
+        returncode = 0;
+        goto closefile;
+    }
+
+closefile:
+    if (fclose(f) != 0) {
+        fprintf(stderr, "Could not close file %s: %s\n",
+                 filename, strerror(errno));
+    }
+
+freemem:
+    free(header);
+    
+    return returncode;
+}
+
+
+/* Returns 1 if success, 0 if failure */
+int
+fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
+            factorbase_degn_t ***fb_pieces_1 MAYBE_UNUSED,
+            factorbase_degn_t **fb_small_2 MAYBE_UNUSED,
+            factorbase_degn_t ***fb_pieces_2 MAYBE_UNUSED,
+            const char * const filename MAYBE_UNUSED, 
+            const size_t nr_pieces MAYBE_UNUSED,
+            const int verbose MAYBE_UNUSED)
 {
 #ifdef HAVE_MMAP
-    FILE *f = fopen(fbcache, "rb");
-    if (f == NULL)
-        return NULL;
+    fb_file_header_t *header;
+    size_t headersize;
+    int returncode = 1;
+    factorbase_degn_t *fb_small[2];
+    factorbase_degn_t **fb_pieces[2];
+
+    headersize = fb_header_size(nr_pieces);
+    header = malloc(headersize);
+    fb_pieces[0] = (factorbase_degn_t **)
+        malloc(nr_pieces * sizeof(factorbase_degn_t *));
+    fb_pieces[1] = (factorbase_degn_t **)
+        malloc(nr_pieces * sizeof(factorbase_degn_t *));
+    if (header == NULL || fb_pieces[0] == NULL || fb_pieces[1] == NULL) {
+        fprintf(stderr, "Could not allocate memory\n");
+        returncode = 0;
+        goto freemem;
+    }
+
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "Could not open %s for reading: %s\n",
+                 filename, strerror(errno));
+        returncode = 0;
+        goto freemem;
+    }
+
+    if (verbose)
+        printf("# Reading header\n");
+    size_t items_read = fread(header, headersize, 1, f);
+    if (items_read != 1) {
+        fprintf(stderr, "Could not read header from %s: %s\n", 
+                filename, strerror(errno));
+        returncode = 0;
+        goto closefile;
+    }
+
+    if (header->magic != FB_MAGIC) {
+        fprintf(stderr, "File %s has wrong magic number\n", filename);
+        returncode = 0;
+        goto closefile;
+    }
+
+    if (header->nr_pieces != nr_pieces) {
+        fprintf(stderr, "File %s has wrong number of pieces (has %zu, I use %zu)\n",
+                filename, header->nr_pieces, nr_pieces);
+        returncode = 0;
+        goto closefile;
+    }
+
+    /* Get file size */
     if (fseek (f, 0, SEEK_END) != 0) {
-        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
-        return MAP_FAILED;
+        fprintf(stderr, "fseek on %s failed: %s", filename, strerror(errno));
+        returncode = 0;
+        goto closefile;
     }
     int64_t size = ftell (f);
-    ASSERT_ALWAYS(size >= 0);
-    if (fseek (f, 0, SEEK_SET) != 0) {
-        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
-        return MAP_FAILED;
+    if (size < 0) {
+        fprintf(stderr, "ftell on %s failed: %s", filename, strerror(errno));
+        returncode = 0;
+        goto closefile;
     }
+
     int fd = fileno (f);
-    factorbase_degn_t *fb = mmap (NULL, (size_t) size, PROT_READ,
-                                  MAP_PRIVATE, fd, 0);
-    return fb;
+    void *fb = mmap (NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (fb == MAP_FAILED) {
+        fprintf(stderr, "mmap on %s failed: %s", filename, strerror(errno));
+        returncode = 0;
+        goto closefile;
+    }
+
+    size_t idx = 0;
+    for (int side = 0; side < 2; side++) {
+        /* The small-primes part gets rewritten in las, so we read that into
+           allocated memory */
+        const size_t offset = header->ranges[idx].offset;
+        const size_t small_size = header->ranges[idx++].size;
+        if (verbose)
+            printf("# Reading small-primes FB of side %d from file offset %zu\n",
+                    side, offset);
+        factorbase_degn_t *fb_small_mem = (factorbase_degn_t *) malloc(small_size);
+        if (fb_small_mem == NULL) {
+          printf("# Could not allocate memory for small factor base\n");
+          returncode = 0;
+          goto unmap;
+        }
+        if (fseek(f, offset, SEEK_SET) != 0) {
+            fprintf(stderr, "fseek on %s failed: %s", filename, strerror(errno));
+            returncode = 0;
+            goto unmap;
+        }
+        if (fread(fb_small_mem, 1, small_size, f) != small_size) {
+            fprintf(stderr, "ftell on %s failed: %s", filename, strerror(errno));
+            returncode = 0;
+            goto unmap;
+        }
+        fb_small[side] = fb_small_mem;
+
+        for (size_t i = 0; i < nr_pieces; i++) {
+            const size_t offset = header->ranges[idx++].offset;
+            if (verbose)
+                printf("# Mapping large-primes FB of side %d, part %zu at file offset %zu\n",
+                        side, i, offset);
+            fb_pieces[side][i] = (factorbase_degn_t *) ((char *)fb + offset);
+        }
+    }
+
+   if (returncode == 0) {
+       if (munmap(fb, size) != 0) {
+            fprintf(stderr, "munmap on %s failed: %s", filename, strerror(errno));
+       }
+   }
+
+unmap:
+    if (returncode == 0) {
+        munmap(fb, size);
+    }
+
+closefile:
+    if (returncode == 0) {
+        if (fclose(f) != 0) {
+            fprintf(stderr, "Could not close file %s: %s\n",
+                     filename, strerror(errno));
+        }
+    }
+
+freemem:
+    free (header);
+    if (returncode == 0) {
+        free(fb_pieces[0]);
+        free(fb_pieces[1]);
+    } else {
+        *fb_small_1 = fb_small[0];
+        *fb_pieces_1 = fb_pieces[0];
+        *fb_small_2 = fb_small[1];
+        *fb_pieces_2 = fb_pieces[1];
+    }
+
+    return returncode;
 #else
-    return MAP_FAILED;
+    return 1;
 #endif
 }
 

@@ -126,7 +126,7 @@ int test_divisible(where_am_I_ptr w)
     unsigned long j = X >> logI;
     fbprime_t q;
 
-    q = fb_is_power (p);
+    q = fb_is_power (p, NULL);
     if (q == 0)
         q = p;
 

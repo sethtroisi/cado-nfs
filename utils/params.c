@@ -929,7 +929,28 @@ void print_command_line(FILE * stream, int argc, char * argv[])
     fprintf (stream, "\n");
 #ifdef  __GNUC__
     fprintf (stream, "# Compiled with gcc " __VERSION__ "\n");
-#if GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)
+
+    /* Apple Clang (based on llvm) identifies itself as a flavour of GNUC 4.2.1
+       but seems to compile CADO-NFS properly 
+       $ echo | clang -dD -E -pipe -
+       # 1 "<stdin>"
+       # 1 "<stdin>" 1
+       # 1 "<built-in>" 1
+       # 1 "<built-in>" 3
+       #define __llvm__ 1
+       #define __clang__ 1
+       #define __clang_major__ 4
+       #define __clang_minor__ 1
+       #define __clang_patchlevel__ 0
+       #define __clang_version__ "4.1 ((tags/Apple/clang-421.11.66))"
+       #define __GNUC_MINOR__ 2
+       #define __GNUC_PATCHLEVEL__ 1
+       #define __GNUC__ 4
+       ...
+    */
+    
+#if (GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)) \
+  && ! (__llvm__ || __clang__)
     fprintf (stream, "# WARNING: this version of GCC is known to miscompile CADO-NFS. See https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490\n");
 #endif
 #endif

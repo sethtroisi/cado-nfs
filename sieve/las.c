@@ -45,10 +45,6 @@ static inline uint64_t cputicks()
         return r;
 }
 
-#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
-                                        nearest. This is enough to uniquely
-                                        identify the corresponding IEEE 754
-                                        double precision number */
 // #define HILIGHT_START   "\e[01;31m"
 // #define HILIGHT_END   "\e[00;30m"
 
@@ -183,35 +179,6 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 }/*}}}*/
 
 /* {{{ Factor base handling */
-/* {{{ silly code to factor small numbers. Should go to utils/ */
-/* Finds prime factors p < lim of n and returns a pointer to a zero-terminated
-   list of those factors. Repeated factors are stored only once. */
-static fbprime_t *
-factor_small (mpz_t n, fbprime_t lim)
-{
-  unsigned long p;
-  unsigned long l; /* number of prime factors */
-  fbprime_t *f;
-
-  l = 0;
-  f = (fbprime_t*) malloc (sizeof (fbprime_t));
-  FATAL_ERROR_CHECK(f == NULL, "malloc failed");
-  for (p = 2; p <= lim; p = getprime (p))
-    {
-      if (mpz_divisible_ui_p (n, p))
-        {
-          l ++;
-          f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
-          FATAL_ERROR_CHECK(f == NULL, "realloc failed");
-          f[l - 1] = p;
-        }
-    }
-  f[l] = 0; /* end of list marker */
-  getprime (0);
-  return f;
-}
-/*}}}*/
-
 /* {{{ Initialize the factor bases */
 void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_list pl)
 {
@@ -220,16 +187,38 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     int rpow_lim = 0, apow_lim = 0;
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
- 
+    const char * fbcfilename = param_list_lookup_string(pl, "fbc");
+
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_side_info_ptr sis = si->sides[side];
+        unsigned long lim = si->conf->sides[side]->lim;
+        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+    }
+
+    if (fbcfilename != NULL) {
+        /* Try to read the factor base cache file. If that fails, because
+           the file does not exist or is not compatible with our parameters,
+           it will be written after we generate the factor bases. */
+        printf("# Mapping memory image of factor base from file %s\n", 
+               fbcfilename);
+        if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
+                        &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
+                        fbcfilename, las->nb_threads, las->verbose)) {
+            si->sides[0]->fb_is_mmapped = 1;
+            si->sides[1]->fb_is_mmapped = 1;
+            printf("# Finished mapping memory image of factor base\n");
+            return;
+        } else {
+            printf("# Could not map memory image of factor base\n");
+        }
+    }
+
     for(int side = 0 ; side < 2 ; side++) {
         cado_poly_side_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
         unsigned long lim = si->conf->sides[side]->lim;
         if (pol->degree > 1) {
-            fbprime_t *leading_div;
             tfb = seconds ();
-            /* Do we actually use leading_div anywhere? */
-            leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
              */
@@ -243,17 +232,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (apow_lim == 0) 
                 apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            int ok = fb_read_split (&sis->fb, &sis->fb_bucket_threads, fbfilename,
-                                    sis->scale * LOG_SCALE, si->bucket_thresh,
-                                    las->nb_threads, las->verbose, lim, apow_lim);
+            int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
+                              si->bucket_thresh, las->nb_threads, las->verbose,
+                              lim, apow_lim);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
+            sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
             fprintf (las->output, 
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
                     fb_size (sis->fb) >> 20, tfb);
-            free (leading_div);
         } else {
             tfb = seconds ();
             if (rpow_lim >= si->bucket_thresh)
@@ -264,13 +253,20 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->f, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
-                                     rpow_lim, sis->scale * LOG_SCALE,
-                                     las->verbose, 1, las->output);
+                                     rpow_lim, las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
+            sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
             fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
         }
+    }
+    if (fbcfilename != NULL) {
+        printf("# Writing memory image of factor base to file %s\n", fbcfilename);
+        fb_dump_fbc(si->sides[0]->fb, si->sides[0]->fb_bucket_threads,
+                    si->sides[1]->fb, si->sides[1]->fb_bucket_threads,
+                    fbcfilename, las->nb_threads, las->verbose);
+        printf("# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/
@@ -1592,6 +1588,8 @@ struct thread_side_data_s {
   bucket_array_t BA;    /* Always used */
   factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
   // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+  const fbprime_t *log_steps;
+  unsigned char log_steps_max;
   
   /* For small sieve */
   int * ssdpos;
@@ -1653,6 +1651,19 @@ typedef const struct thread_data_s * thread_data_srcptr;
   } while (0)
 /************************************************************************/
 
+static inline
+unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
+{
+    unsigned char logp = 0;
+    for (unsigned char i = th->sides[side]->log_steps_max; i > 0; i--)
+        if (th->sides[side]->log_steps[i - 1] < p) {
+            logp = i;
+            break;
+        }
+    ASSERT_ALWAYS(logp != 0);
+    return logp;
+}
+
 /* {{{ */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
@@ -1672,8 +1683,9 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
+    unsigned char logp = find_logp(th, side, p);
     ASSERT_ALWAYS (p & 1);
+
     WHERE_AM_I_UPDATE(w, p, p);
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
@@ -1798,7 +1810,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
+    unsigned char logp = find_logp(th, side, p);
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
     
@@ -2020,10 +2032,11 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   unsigned char last_logp = 0;
   for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
     fbprime_t p = t->fb->p;
-    unsigned char logp = t->fb->plog;
     ASSERT_ALWAYS (p & 1);
     WHERE_AM_I_UPDATE(w, p, p);
     
+    unsigned char logp = find_logp(th, side, p);
+
     /* Write new set of pointers if the logp value changed */
     if (UNLIKELY(last_logp != logp)) {
       aligned_medium_memcpy((uint8_t *)mBA.logp_idx + mBA.size_b_align * BA.nr_logp, mBA.bucket_write, mBA.size_b_align);
@@ -3501,6 +3514,8 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
         thrs[i]->si = si;
         for(int s = 0 ; s < 2 ; s++) {
             thrs[i]->sides[s]->fb_bucket = si->sides[s]->fb_bucket_threads[i];
+            thrs[i]->sides[s]->log_steps = si->sides[s]->log_steps;
+            thrs[i]->sides[s]->log_steps_max = si->sides[s]->log_steps_max;
         }
     }
 }/*}}}*/
@@ -3643,6 +3658,7 @@ static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "fbc",  "factor base cache file");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");

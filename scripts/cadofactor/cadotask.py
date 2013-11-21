@@ -2692,7 +2692,8 @@ class SqrtTask(Task):
                 message = self.submit_command(p, "dep%d" % dep)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
-                stdout = stdoutpath.open("r").read()
+                with stdoutpath.open("r") as stdoutfile:
+                    stdout = stdoutfile.read()
                 lines = stdout.splitlines()
                 # Skip last factor which cannot produce a new split on top
                 # of what the smaller factors did
@@ -3040,7 +3041,7 @@ class StartClientsTask(Task):
             if stdout:
                 self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
             if stderr:
-                self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
             return
         match = None
         if not stdout is None:
@@ -3050,7 +3051,7 @@ class StartClientsTask(Task):
             if not stdout is None:
                 self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
             if not stderr is None:
-                self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
             return
         self.used_ids[clientid] = True
         self.pids[clientid] = int(match.group(1))
@@ -3071,7 +3072,7 @@ class StartClientsTask(Task):
                 if stdout:
                     self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
                 if stderr:
-                    self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+                    self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
                 # Assume that the client is already dead and remove it from
                 # the list of running clients
                 del(self.pids[clientid])

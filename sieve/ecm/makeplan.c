@@ -38,6 +38,8 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   unsigned int p;
   size_t tmp_E_nrwords;
   
+  if (verbose)
+    printf("Making plan for P-1 with B1=%u, B2=%u\n", B1, B2);
   /* Generate the exponent for stage 1 */
   plan->exp2 = 0;
   for (p = 1; p <= B1 / 2; p *= 2)
@@ -99,6 +101,9 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   const unsigned int compress = 1;
   bc_state_t *bc_state;
   
+  if (verbose)
+    printf("Making plan for P+1 with B1=%u, B2=%u\n", B1, B2);
+
   /* Make bytecode for stage 1 */
   plan->exp2 = 0;
   for (p = 1; p <= B1 / 2; p *= 2)
@@ -188,6 +193,11 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   bc_state_t *bc_state;
   double totalcost = 0.;
   
+  if (verbose)
+    printf("Making plan for ECM with B1=%u, B2=%u, parameterization = %d, "
+            "sigma=%lu, extra primes = %d\n", 
+            B1, B2, parameterization, sigma, extra_primes);
+
   /* If group order is divisible by 12 or 16, add two or four 2s to stage 1 */
   if (extra_primes)
     plan->exp2 = (parameterization == MONTY16) ? 4 : 2;

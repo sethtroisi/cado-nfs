@@ -40,6 +40,11 @@ typedef uint64_t redc_invp_t;
 typedef uint32_t redc_invp_t;
 #endif
 
+#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
+                                        nearest. This is enough to uniquely
+                                        identify the corresponding IEEE 754
+                                        double precision number */
+
 /* The following format takes 16+4k bytes per prime with k roots. Since
  * the expected number of roots for primes with at least one root is
  * 1.58 (for generic Galois group), we are slightly above 14 bytes per
@@ -50,18 +55,15 @@ typedef uint32_t redc_invp_t;
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
   unsigned char nr_roots; /* how many roots there are for this prime */
-  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
+  unsigned char exp;      /* Let p=P^k, then P^exp || norm where a=br (mod p) */
+  unsigned char oldexp;   /* P^oldexp || norm where a=br (mod p/P) */
   unsigned char size;     /* The length of the struct in bytes */
-  unsigned char dummy[1]; /* For dword aligning the roots. In fact uneeded, C99
-                             guarantees proper alignment of roots[]. It's only a
-                             precaution against -fpack-struct or other
-                             ABI-breaking behaviours */
   redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
   /* Note that invp may have a stronger alignment constraint than p, thus must
-   * not appear before the tiny fields plog and nr_roots which can easily
+   * not appear before the tiny fields exp and nr_roots which can easily
    * fit inbetween the two */
-  fbroot_t roots[0];      /* the actual length of this array is determined
-                             by nr_roots */
+  fbroot_t roots[0];      /* The roots r_0, ..., r_{nr_roots}. The actual
+                             length of this array is determined by nr_roots */
 } factorbase_degn_t;
 
 #define FB_END ((fbprime_t) 1)
@@ -70,18 +72,25 @@ void		fb_fprint_entry (FILE *, const factorbase_degn_t *);
 void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
-fbprime_t       fb_is_power (fbprime_t);
+fbprime_t       fb_pow (fbprime_t, unsigned long);
+fbprime_t       fb_is_power (fbprime_t, unsigned long *);
 int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***, 
-                                const mpz_t *, fbprime_t, fbprime_t, int, 
-                                fbprime_t, double, int, int, FILE *);
-int             fb_read_split (factorbase_degn_t **, factorbase_degn_t ***, 
-                               const char *, double, fbprime_t, int, int, 
-                               fbprime_t, fbprime_t);
+                                const mpz_t *, fbprime_t, fbprime_t, size_t, 
+                                fbprime_t, int, int, FILE *);
+int             fb_read (factorbase_degn_t **, factorbase_degn_t ***, 
+                         const char *, fbprime_t, size_t, int, 
+                         fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
 size_t          fb_nroots_total (const factorbase_degn_t *fb);
-void            fb_dump_degn (const factorbase_degn_t *, const char *);
+unsigned char   fb_make_steps(fbprime_t *, fbprime_t, double);
+int             fb_dump_fbc (const factorbase_degn_t *, const factorbase_degn_t **,
+                             const factorbase_degn_t *, const factorbase_degn_t **, 
+                             const char *, size_t, int);
+int             fb_mmap_fbc(factorbase_degn_t **, factorbase_degn_t ***,
+                            factorbase_degn_t **, factorbase_degn_t ***,
+                            const char *, size_t, int);
 factorbase_degn_t *	fb_mmap(const char *);
 
 /* Some inlined functions which need to be fast */
@@ -132,7 +141,7 @@ fb_write_end_marker (factorbase_degn_t *fb)
 
 struct fb_iterator_s {
     factorbase_degn_t * fb;
-    int i;
+    unsigned char i;
 };
 
 typedef struct fb_iterator_s fb_iterator[1];
@@ -163,19 +172,6 @@ static inline void fb_iterator_next(fb_iterator_ptr t)
     t->i = 0;
 }
 
-static inline void fb_iterator_add_n(fb_iterator_ptr t, int n)
-{
-    if (t->i) {
-        n += t->i;
-        t->i = 0;
-    }
-    for( ; t->fb->nr_roots <= n ; ) {
-        n -= t->fb->nr_roots;
-        t->fb = fb_next(t->fb);
-    }
-    t->i = n;
-}
-
 static inline fbprime_t fb_iterator_get_r(fb_iterator_srcptr t)
 {
     return t->fb->roots[t->i];
@@ -188,7 +184,7 @@ static inline int fb_iterator_lessthan_fb(fb_iterator_srcptr t, const factorbase
 
 static inline int fb_iterator_lessthan(fb_iterator_srcptr t, fb_iterator_srcptr u)
 {
-    int r = (char*)(u->fb) - (char*)(t->fb);
+    ptrdiff_t r = (char*)(u->fb) - (char*)(t->fb);
     if (r > 0) return 1;
     if (r < 0) return 0;
     return t->i < u->i;
@@ -233,43 +229,7 @@ static inline int fb_diff(factorbase_degn_t * t, factorbase_degn_t * u)
     fb_iterator_clear(qu);
     return n;
 }
-static inline ptrdiff_t fb_iterator_diff_bytes(fb_iterator_srcptr t, fb_iterator_srcptr u)
-{
-    fb_iterator q;
-    if (fb_iterator_lessthan(t, u)) {
-        return -fb_iterator_diff_bytes(u, t);
-    }
-    fb_iterator_init_set(q, u);
-    ptrdiff_t n = -q->i * sizeof(fbprime_t);
-    q->i = 0;
-    for( ; fb_iterator_lessthan_fb(q, t->fb) ; ) {
-        n += fb_entrysize(q->fb);
-        q->fb = fb_next(q->fb);
-    }
-    n += t->i;
-    fb_iterator_clear(q);
-    return n;
-}
-static inline ptrdiff_t fb_iterator_diff_bytes_fb(fb_iterator_srcptr t, factorbase_degn_t * u)
-{
-    fb_iterator qu;
-    fb_iterator_init_set_fb(qu, u);
-    ptrdiff_t n = fb_iterator_diff_bytes(t, qu);
-    fb_iterator_clear(qu);
-    return n;
-}
 
-static inline ptrdiff_t fb_diff_bytes(factorbase_degn_t * t, factorbase_degn_t * u)
-{
-    fb_iterator qu;
-    fb_iterator_init_set_fb(qu, u);
-    fb_iterator qt;
-    fb_iterator_init_set_fb(qt, t);
-    ptrdiff_t n = fb_iterator_diff_bytes(qt, qu);
-    fb_iterator_clear(qt);
-    fb_iterator_clear(qu);
-    return n;
-}
 static inline int fb_iterator_over(fb_iterator_srcptr t)
 {
     return t->fb->p == FB_END;

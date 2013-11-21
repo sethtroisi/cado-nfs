@@ -156,8 +156,8 @@ class Sha1Cache(object):
         if not realpath in self._sha1:
             logger = logging.getLogger("Sha1Cache")
             logger.debug("Computing SHA1 for file %s", realpath)
+            sha1 = hashlib.sha1()
             with open(realpath, "rb") as inputfile:
-                sha1 = hashlib.sha1()
                 for data in self._read_file_in_blocks(inputfile):
                     sha1.update(data)
             self._sha1[realpath] = (sha1.hexdigest(), file_id)
@@ -184,14 +184,14 @@ class Program(object, metaclass=InspectType):
     name: a name used internally in the Python scripts for this program, must
       start with a letter and contain only letters and digits; if the binary
       file name is of this form, then that can be used
-    params: a mapping that tell how to translate configuration parameters to
+    params: a mapping that tells how to translate configuration parameters to
       command line options. The keys of the mapping are the keys as in the
       configuration file, e.g., "verbose" in a configuartion file line
       tasks.polyselect.verbose = 1
       The values of the mapping are instances of subclasses of Option,
       initialised with the command line parameter they should map to, e.g.,
-      "verbose" should map to an instance Toggle("-v"), and "threads" should
-      map to an instance Parameter("-t")
+      "verbose" should map to an instance Toggle("v"), and "threads" should
+      map to an instance Parameter("t")
 
     >>> p = Ls()
     >>> p.make_command_line()
@@ -655,7 +655,7 @@ class Purge(Program):
                  minindex: Parameter() = None,
                  nprimes: Parameter() = None,
                  raw: Toggle() = None,
-                 npthr: Parameter() = None,
+                 threads: Parameter("npthr") = None,
                  inprel: Parameter(is_input_file = True) = None,
                  outrel: Parameter(is_output_file = True) = None,
                  npass: Parameter() = None,

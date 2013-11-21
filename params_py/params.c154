@@ -8,6 +8,7 @@
 ###########################################################################
 
 name = c154
+tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
@@ -40,7 +41,6 @@ tasks.sieve.qmin = 32000000
 tasks.sieve.qrange = 10000		
 tasks.sieve.rels_wanted = 90000000
 slaves.niceness = 10
-tasks.sieve.threads = 2
 
 ###########################################################################
 # Filtering
@@ -56,7 +56,6 @@ tasks.merge.coverNmax = 100
 # Linear algebra
 ###########################################################################
 
-tasks.linalg.bwc.threads = 2x2		
 tasks.linalg.bwc.interval = 1000
 tasks.linalg.bwc.interleaving = 0
 tasks.linalg.bwc.mn = 64
@@ -67,4 +66,3 @@ tasks.linalg.bwc.shuffled_product = 1
 ###########################################################################
 
 tasks.linalg.characters.nchar = 50		
-tasks.linalg.characters.threads = 2
