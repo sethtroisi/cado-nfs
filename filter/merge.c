@@ -68,9 +68,10 @@ static void declare_usage(param_list pl)
                             "-forbw 0 (default " STR(RATIO_DEFAULT) ")");
   param_list_decl_usage(pl, "coverNmax", "stop when c/N exceeds this value with"
                             " -forbw 3 (default " STR(COVERNMAX_DEFAULT) ")");
-  param_list_decl_usage(pl, "itermax", "maximum number of columns that can be "
-                                       "removed (0 means no maximum)");
-  param_list_decl_usage(pl, "resume", "resume from history file (cf -itermax)");
+  param_list_decl_usage(pl, "nbmergemax", "maximum number of merges that can "
+                                       "be performed (default no maximum)");
+  param_list_decl_usage(pl, "resume", "resume from history file (cf "
+                                      "-nbmergemax)");
   param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
                             "approximated (default " STR(MKZTYPE_DEFAULT) ")");
   param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
@@ -86,7 +87,7 @@ usage (param_list pl, char *argv0)
     fprintf (stderr, "\nThe different optimization functions are, where c is "
                      "the total matrix weight and N \nthe number of rows "
                      "(relation-sets):\n");
-  fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
+  fprintf (stderr, "   -forbw 0 - stop when cN exceeds ratio*min(cN)\n");
   fprintf (stderr, "   -forbw 1 - stop when the product cN is minimal\n");
   fprintf (stderr, "   -forbw 3 - stop when the ratio c/N exceeds coverNmax\n");
     exit(EXIT_FAILURE);
@@ -101,7 +102,7 @@ main (int argc, char *argv[])
     filter_matrix_t mat[1];
     report_t rep[1];
 
-    uint32_t maxlevel = MAXLEVEL_DEFAULT;
+    int maxlevel = MAXLEVEL_DEFAULT;
     uint32_t keep = KEEP_DEFAULT;
     uint32_t skip = SKIP_DEFAULT;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
@@ -110,7 +111,7 @@ main (int argc, char *argv[])
     uint32_t mkztype = MKZTYPE_DEFAULT;
     uint32_t wmstmax = WMSTMAX_DEFAULT;
                                /* use real MST minimum for wt[j] <= wmstmax*/
-    uint32_t itermax = 0;
+    int64_t nbmergemax = -1; /* Negative value means no maximum */
 
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
@@ -148,7 +149,7 @@ main (int argc, char *argv[])
     const char * resumename = param_list_lookup_string (pl, "resume");
     const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
-    param_list_parse_uint (pl, "maxlevel", &maxlevel);
+    param_list_parse_int (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
     param_list_parse_uint (pl, "skip", &skip);
     param_list_parse_uint (pl, "forbw", &forbw);
@@ -159,7 +160,7 @@ main (int argc, char *argv[])
     param_list_parse_uint (pl, "mkztype", &mkztype);
     param_list_parse_uint (pl, "wmstmax", &wmstmax);
 
-    param_list_parse_uint (pl, "itermax", &itermax);
+    param_list_parse_int64 (pl, "nbmergemax", &nbmergemax);
 
     /* Some checks on command line arguments */
     if (param_list_warn_unused(pl))
@@ -178,15 +179,15 @@ main (int argc, char *argv[])
       fprintf(stderr, "Error, missing -out command line argument\n");
       usage (pl, argv0);
     }
-    if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
+    if (maxlevel <= 0 || maxlevel > MERGE_LEVEL_MAX)
     {
       fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
                        MERGE_LEVEL_MAX);
       usage (pl, argv0);
     }
-    if (forbw > 3)
+    if (forbw > 3 || forbw == 2)
     {
-      fprintf (stderr, "Error: -forbw should be 0, 1, 2 or 3.\n");
+      fprintf (stderr, "Error: -forbw should be 0, 1 or 3.\n");
       usage (pl, argv0);
     }
     if (mkztype > 2)
@@ -206,7 +207,7 @@ main (int argc, char *argv[])
     ASSERT_ALWAYS(rep->outfile != NULL);
 
     /* Init structure containing the matrix and the heap of potential merges */
-    initMat (mat, maxlevel, keep, skip, itermax);
+    initMat (mat, maxlevel, keep, skip);
 
     /* Read all rels and fill-in the mat structure */
     tt = seconds ();
@@ -223,7 +224,7 @@ main (int argc, char *argv[])
     MkzInit (mat);
     printf ("Time for MkzInit: %2.2lfs\n", seconds()-tt);
 
-    mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax);
+    mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax, nbmergemax);
 
     fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%" PRIu64 " nc=%" PRIu64 " (%" PRIu64 ") "

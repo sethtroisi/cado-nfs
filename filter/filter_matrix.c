@@ -24,14 +24,13 @@ incrS (int w)
 
 /* initialize the sparse matrix mat */
 void
-initMat (filter_matrix_t *mat, uint32_t maxlevel, uint32_t keep,
-         uint32_t nburied, uint32_t itermax)
+initMat (filter_matrix_t *mat, int maxlevel, uint32_t keep,
+         uint32_t nburied)
 {
   mat->keep  = keep;
   mat->mergelevelmax = maxlevel;
   mat->cwmax = 2 * maxlevel;
   ASSERT_ALWAYS (mat->cwmax < 255);
-  mat->itermax = itermax;
   mat->nburied = nburied;
 
   mat->weight = 0;
@@ -117,7 +116,7 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 	  }
   }
 
-  //FIXME for now can't use my malloc, because it expected an index_t table
+  //FIXME for now can't use my malloc, because rows is realloc later
   mat->rows[rel->num] = (typerow_t*) malloc ((next_id + 1) * sizeof (typerow_t));
   FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
   matLengthRow(mat, rel->num) = next_id;

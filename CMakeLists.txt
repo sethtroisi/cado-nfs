@@ -55,6 +55,7 @@ get_override(CADO_DIST_ARCHIVE_NAME         CADO_DIST_ARCHIVE_NAME)
 get_override(MPI                  MPI)
 get_override(LDFLAGS              CMAKE_EXE_LINKER_FLAGS)
 get_override(LDFLAGS              CMAKE_SHARED_LINKER_FLAGS)
+get_override(FLAGS_SIZE           CMAKE_FLAGS_SIZE)
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD )
@@ -66,6 +67,8 @@ endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 # Add the CFLAGS that are needed in all cases.
 # Append them at the *end* of the parameter list so as to allow tweaking
 # of e.g. warnings by the user-defined overrides.
+set (CMAKE_C_FLAGS      "${CMAKE_C_FLAGS} ${CMAKE_FLAGS_SIZE}")
+set (CMAKE_CXX_FLAGS    "${CMAKE_CXX_FLAGS} ${CMAKE_FLAGS_SIZE}")
 
 if(CMAKE_COMPILER_IS_GNUCC)
     # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
