@@ -602,7 +602,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
                                                 renumber_info->lpba ;
     if (p >> lpb)
     {
-      fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%" PRpr "\n",
+      fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%lu\n",
                        __func__, __LINE__, p, lpb);
       exit(EXIT_FAILURE);
     }
