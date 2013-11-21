@@ -239,6 +239,16 @@ that could possibly occur with SNFS polynomials (a degree 4 polynomial
 with Galois group Z/2 x Z/2 is the only reasonable example, next case is
 for degree 8). The CRT approach is a workaround. See crtaglsqrt.c .
 
+Big factorization (more than 200 digits):
+=========================================
+By default, to decrease memory usage, it is assumed than less than 2^32 (~ four
+billion) relations or ideals are needed and that the ideals will be less than
+2^32 (i.e. the lpba/lpbr parameters are less or equal to 32). In the case of
+factorizations of number of more than 200 digits, these assumptions may not
+hold. In this case, you have to set some variables in your local.sh script
+(see Configure section above for more information on local.sh and section on big
+factorization in local.sh.example).
+
 Factoring with two non-linear polynomials:
 ==========================================
 

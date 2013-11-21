@@ -65,6 +65,7 @@ export CC
 export CXX
 export CFLAGS
 export CXXFLAGS
+export FLAGS_SIZE
 export LDFLAGS
 export PREFIX
 export CADO_DIST_ARCHIVE_NAME
@@ -101,6 +102,7 @@ if [ "$1" = "show" ] ; then
     echo "CXX=\"$CXX\""
     echo "CFLAGS=\"$CFLAGS\""
     echo "CXXFLAGS=\"$CXXFLAGS\""
+    echo "FLAGS_SIZE=\"$FLAGS_SIZE\""
     echo "LDFLAGS=\"$CFLAGS\""
     echo "PREFIX=\"$PREFIX\""
     echo "CADO_DIST_ARCHIVE_NAME=\"$CADO_DIST_ARCHIVE_NAME\""
