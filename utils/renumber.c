@@ -598,11 +598,11 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
 #ifdef DEBUG_RENUMB
     /* assert that p is below the large prime bound */
-    p_r_values_t lpb = 1UL << ((side == RATIONAL_SIDE) ? renumber_info->lpbr :
-                                                         renumber_info->lpba);
-    if (UNLIKELY(p >= lpb))
+    unsigned long lpb = (side==RATIONAL_SIDE) ? renumber_info->lpbr :
+                                                renumber_info->lpba ;
+    if (p >> lpb)
     {
-      fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " > lpb=%" PRpr "\n",
+      fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%" PRpr "\n",
                        __func__, __LINE__, p, lpb);
       exit(EXIT_FAILURE);
     }
