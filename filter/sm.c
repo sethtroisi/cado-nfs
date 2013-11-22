@@ -342,8 +342,6 @@ int main (int argc, char **argv)
   param_list pl;
   cado_poly pol;
   poly_t F;
-  int deg;
-  mpz_t *f;
   sm_relset_ptr rels = NULL;
   int sr;
   mpz_t ell, ell2, eps;
@@ -412,13 +410,7 @@ int main (int argc, char **argv)
   param_list_print_command_line (stdout, pl);
 
   /* Construct poly_t F from cado_poly pol (algebraic side) */
-  deg = pol->pols[ALGEBRAIC_SIDE]->degree;
-  f = pol->pols[ALGEBRAIC_SIDE]->f;
-  ASSERT_ALWAYS(deg > 1);
-  poly_alloc (F, deg);
-  for (int i = deg; i >= 0; --i)
-    poly_setcoeff (F, i, f[i]);
-
+  poly_t_from_cado_poly_alg(F, pol);
   fprintf(stderr, "F = ");
   poly_print(F);
 

@@ -21,4 +21,5 @@ void compute_sm (poly_t, poly_t, const poly_t, const mpz_t, const mpz_t,
 void print_sm (FILE *, poly_t, int);
 void sm_single_rel(poly_t, int64_t, uint64_t, poly_t, const mpz_t, const mpz_t,
                    const mpz_t, const mpz_t);
+void poly_t_from_cado_poly_alg (poly_t, cado_poly);
 #endif /* FILTER_SM_H_ */

@@ -114,3 +114,16 @@ void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps,
   poly_alloc_and_set_from_ab(rel, a, b);
   compute_sm (SM, rel, F, ell, eps, ell2, invl2);
 }
+
+
+/* Construct poly_t F from cado_poly pol (algebraic side) */
+/* XXX Temporary until utils/poly* mess is fixed */
+void poly_t_from_cado_poly_alg (poly_t F, cado_poly pol)
+{
+  int deg = pol->pols[ALGEBRAIC_SIDE]->degree;
+  mpz_t *f = pol->pols[ALGEBRAIC_SIDE]->f;
+  ASSERT_ALWAYS(deg > 1);
+  poly_alloc (F, deg);
+  for (int i = deg; i >= 0; --i)
+    poly_setcoeff (F, i, f[i]);
+}
