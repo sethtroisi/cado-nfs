@@ -2736,8 +2736,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
-        unsigned int X;
-        unsigned int i, j;
 
         if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
         {
@@ -2747,10 +2745,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
+#ifndef UNSIEVE_NOT_COPRIME
+        unsigned int X;
+        unsigned int i, j;
         X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
-#ifndef UNSIEVE_NOT_COPRIME
         if (bin_gcd_int64_safe (i, j) != 1)
         {
 #ifdef TRACE_K
