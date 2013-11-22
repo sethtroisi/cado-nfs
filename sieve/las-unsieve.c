@@ -152,11 +152,9 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
   if (i + 1 < I_ul)
     ul_line_start[i + 1] |= p1;
   if (i + 2 < I_ul)
-    ul_line_start[i + 2] |= p1;
+    ul_line_start[i + 2] |= p2;
   if (i + 3 < I_ul)
-    ul_line_start[i + 3] |= p1;
-  if (i + 4 < I_ul)
-    ul_line_start[i + 4] |= p1;
+    ul_line_start[i + 3] |= p3;
 }
 
 /* Set locations where gcd(i,j) != 1 to 255 */
