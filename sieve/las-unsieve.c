@@ -3,6 +3,8 @@
 
 #include "las-unsieve.h"
 
+/* Set every stride-th byte, starting at index 0, to 255 in an array of
+   stride unsigned longs */
 static void
 minisieve(unsigned long *array, size_t stride)
 {
@@ -22,7 +24,7 @@ void sieve_info_init_unsieve_data(sieve_info_ptr si)
   si->us->entries[0].start = 0U;
   si->us->entries[1].lpf = 1U;
   si->us->entries[1].cof = 1U;
-  si->us->entries[1].start = 1U;
+  si->us->entries[1].start = 0U;
   for (unsigned int k = 2U; k < si->I; k++)
     {
       unsigned int p, c = k;
@@ -71,6 +73,92 @@ unsieve_one_prime (unsigned char *line_start, const unsigned int p,
 }
 
 
+static inline void
+unsieve_3(unsigned char *line_start, const unsigned int start_idx,
+          sieve_info_srcptr si)
+{
+  const unsigned int I_ul  = si->I / sizeof (unsigned long);
+  unsigned int i, pattern_idx;
+  unsigned long p0, p1, p2;
+  unsigned long * restrict ul_line_start = (unsigned long *) line_start;
+
+  if (sizeof(unsigned long) == 4)
+    /* -4^(-1) == 2 (mod 3) */
+    pattern_idx = (2 * start_idx) % 3;
+  else if (sizeof(unsigned long) == 8)
+    /* -8^(-1) == 1 (mod 3) */
+    pattern_idx = start_idx;
+  else
+    abort();
+  
+  p0 = si->us->pattern3[pattern_idx];
+  p1 = si->us->pattern3[(pattern_idx + 1) % 3];
+  p2 = si->us->pattern3[(pattern_idx + 2) % 3];
+
+  ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
+  
+  /* Apply pattern to array */
+  for (i = 0U; i < I_ul - 2U; i += 3U)
+    {
+      ul_line_start[i] |= p0;
+      ul_line_start[i + 1] |= p1;
+      ul_line_start[i + 2] |= p2;
+    }
+  if (i < I_ul)
+    ul_line_start[i] |= p0;
+  if (i + 1 < I_ul)
+    ul_line_start[i + 1] |= p1;
+}
+
+
+static inline void
+unsieve_5(unsigned char *line_start, const unsigned int start_idx,
+          sieve_info_srcptr si)
+{
+  const unsigned int I_ul  = si->I / sizeof (unsigned long);
+  unsigned int i;
+  unsigned long p0, p1, p2, p3, p4;
+  unsigned long * restrict ul_line_start = (unsigned long *) line_start;
+  size_t pattern_idx;
+
+  if (sizeof(unsigned long) == 4)
+    /* -4^(-1) == 1 (mod 5) */
+    pattern_idx = start_idx;
+  else if (sizeof(unsigned long) == 8)
+    /* -8^(-1) == 3 (mod 5) */
+    pattern_idx = (3 * start_idx) % 5;
+  else
+    abort();
+  
+  p0 = si->us->pattern5[pattern_idx];
+  p1 = si->us->pattern5[(pattern_idx + 1) % 5];
+  p2 = si->us->pattern5[(pattern_idx + 2) % 5];
+  p3 = si->us->pattern5[(pattern_idx + 3) % 5];
+  p4 = si->us->pattern5[(pattern_idx + 4) % 5];
+
+  ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
+  
+  /* Apply pattern to array */
+  for (i = 0U; i < I_ul - 4U; i += 5U)
+    {
+      ul_line_start[i] |= p0;
+      ul_line_start[i + 1] |= p1;
+      ul_line_start[i + 2] |= p2;
+      ul_line_start[i + 3] |= p3;
+      ul_line_start[i + 4] |= p4;
+    }
+  if (i < I_ul)
+    ul_line_start[i] |= p0;
+  if (i + 1 < I_ul)
+    ul_line_start[i + 1] |= p1;
+  if (i + 2 < I_ul)
+    ul_line_start[i + 2] |= p1;
+  if (i + 3 < I_ul)
+    ul_line_start[i + 3] |= p1;
+  if (i + 4 < I_ul)
+    ul_line_start[i + 4] |= p1;
+}
+
 /* Set locations where gcd(i,j) != 1 to 255 */
 void 
 unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
@@ -98,48 +186,7 @@ unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
       
       if (p == 5U)
         {
-          const unsigned int I_ul  = si->I / sizeof (unsigned long);
-          unsigned int i;
-          unsigned long p0, p1, p2, p3, p4;
-          unsigned long * restrict ul_line_start = (unsigned long *) line_start;
-          size_t pattern_idx;
-
-          if (sizeof(unsigned long) == 4)
-            pattern_idx = start_idx;
-          else if (sizeof(unsigned long) == 8)
-            /* -8^(-1) == 3 (mod 5) */
-            pattern_idx = (3 * start_idx) % 5;
-          else
-            abort();
-          
-          p0 = si->us->pattern5[pattern_idx];
-          p1 = si->us->pattern5[(pattern_idx + 1) % 5];
-          p2 = si->us->pattern5[(pattern_idx + 2) % 5];
-          p3 = si->us->pattern5[(pattern_idx + 3) % 5];
-          p4 = si->us->pattern5[(pattern_idx + 4) % 5];
-
-          ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
-          
-          /* Apply pattern to array */
-          for (i = 0U; i < I_ul - 4U; i += 5U)
-            {
-              ul_line_start[i] |= p0;
-              ul_line_start[i + 1] |= p1;
-              ul_line_start[i + 2] |= p2;
-              ul_line_start[i + 3] |= p3;
-              ul_line_start[i + 4] |= p4;
-            }
-          if (i < I_ul)
-            ul_line_start[i] |= p0;
-          if (i + 1 < I_ul)
-            ul_line_start[i + 1] |= p1;
-          if (i + 2 < I_ul)
-            ul_line_start[i + 2] |= p1;
-          if (i + 3 < I_ul)
-            ul_line_start[i + 3] |= p1;
-          if (i + 4 < I_ul)
-            ul_line_start[i + 4] |= p1;
-
+          unsieve_5(line_start, start_idx, si);
           p = si->us->entries[c].lpf;
           start_idx = si->us->entries[c].start;
           c = si->us->entries[c].cof;
@@ -147,35 +194,7 @@ unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
 
       if (p == 3U)
         {
-          const unsigned int I_ul  = si->I / sizeof (unsigned long);
-          unsigned int i;
-          unsigned long p0, p1, p2;
-          unsigned long * restrict ul_line_start = (unsigned long *) line_start;
-
-          /* If start_idx == 0, we want p0 to contain the pattern which has a
-             hit at index 0, which is pattern3[0].
-             If start_idx == 1, we want p0 to contain the pattern which has a
-             hit at index 1, which is pattern3[1], because 2^k == 1 (mod 3)
-             for k > 1.
-             If start_idx == 2, we want the sole remaining case p0 = pattern3[2]. */
-          
-          p0 = si->us->pattern3[start_idx];
-          p1 = si->us->pattern3[(start_idx + 1) % 3];
-          p2 = si->us->pattern3[(start_idx + 2) % 3];
-
-          ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
-          
-          /* Apply pattern to array */
-          for (i = 0U; i < I_ul - 2U; i += 3U)
-            {
-              ul_line_start[i] |= p0;
-              ul_line_start[i + 1] |= p1;
-              ul_line_start[i + 2] |= p2;
-            }
-          if (i < I_ul)
-            ul_line_start[i] |= p0;
-          if (i + 1 < I_ul)
-            ul_line_start[i + 1] |= p1;
+          unsieve_3(line_start, start_idx, si);
         }
       ASSERT_ALWAYS(c <= 1);
     }
