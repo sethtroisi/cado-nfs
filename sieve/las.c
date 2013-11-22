@@ -264,9 +264,9 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     if (fbcfilename != NULL) {
         printf("# Writing memory image of factor base to file %s\n", fbcfilename);
         fb_dump_fbc(si->sides[0]->fb,
-                    (const struct factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
+                    (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
                     si->sides[1]->fb,
-                    (const struct factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
+                    (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
                     fbcfilename, las->nb_threads, las->verbose);
         printf("# Finished writing memory image of factor base\n");
     }
