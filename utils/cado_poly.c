@@ -6,6 +6,8 @@
 #include "cado_poly.h"
 #include "portability.h"
 
+struct cado_poly_s cado_poly_struct;
+
 const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
