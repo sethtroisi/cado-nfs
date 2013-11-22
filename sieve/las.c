@@ -2764,6 +2764,14 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             SS[x] = 255;
             continue;
         }
+#elif 0
+        /* Very strict but very slow test of unsieving correctness */
+        unsigned int X;
+        unsigned int i, j;
+        X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
+        i = abs ((int) (X & (si->I - 1)) - si->I / 2);
+        j = X >> si->conf->logI;
+        ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
 #endif
     }
 
