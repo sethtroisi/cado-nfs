@@ -33,116 +33,10 @@ Output
 
 #include "utils.h"
 #include "timing.h"
+#include "filter_utils.h"
 
 
-typedef struct {
-  poly_t num;
-  poly_t denom;
-} relset_struct_t;
-
-
-typedef relset_struct_t relset_t[1];
-typedef relset_struct_t * relset_ptr;
-typedef const relset_struct_t * relset_srcptr;
-
-/* Q = P^a mod f, mod p. Note, p is mpz_t */
-void
-poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
-				  const mpz_t a, const mpz_t p,
-                                  MAYBE_UNUSED const mpz_t invp)
-{
-  int k = mpz_sizeinbase(a, 2);
-
-  if (mpz_cmp_ui(a, 0) == 0) {
-    Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
-    return;
-  }
-  
-  // Initialize Q to P
-  poly_copy(Q, P);
-
-  // Horner
-  for (k -= 2; k >= 0; k--)
-  {
-    poly_sqr_mod_f_mod_mpz(Q, Q, f, p, NULL);  // R <- R^2
-    if (mpz_tstbit(a, k))
-      poly_mul_mod_f_mod_mpz(Q, Q, P, f, p, NULL);  // R <- R*P
-  }
-}
-
-static inline void
-poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
-{
-  if (b == 0)
-  {
-    /* freerel */
-    poly_alloc(rel, 0);
-    poly_setcoeff_int64(rel, 0, a);
-    rel->deg=0;
-  }
-  else
-  {
-    /* an (a,b)-pair is a degree-1 poly */
-    poly_alloc(rel, 1);
-    poly_setcoeff_int64(rel, 0, a);
-    poly_setcoeff_int64(rel, 1, -b);
-    rel->deg = 1;
-  }
-}
-
-
-/*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
-static inline void
-poly_reduce_frac_mod_f_mod_mpz (relset_ptr frac, const poly_t F, const mpz_t m,
-                                mpz_t tmp, poly_t g, poly_t U, poly_t V)
-{
-  if (frac->denom->deg == 0)
-  {
-    mpz_invert(tmp, frac->denom->coeff[0], m);
-    poly_mul_mpz(frac->num, frac->num, tmp);
-    poly_reduce_mod_mpz(frac->num, frac->num, m);
-  }
-  else
-  {
-    poly_xgcd_mpz (g, F, frac->denom, U, V, m);
-    poly_mul (frac->num, frac->num, V);
-    int d = poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
-                                F->deg, m, NULL);
-    cleandeg(frac->num, d);
-  }
-}
-
-/* compute the SM */
-static inline void
-compute_sm (poly_t SM, poly_t num, const poly_t F, const mpz_t ell,
-            const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
-{
-  poly_power_mod_f_mod_mpz_Barrett(SM, num, F, smexp, ell2, invl2);
-  poly_sub_ui(SM, 1);
-
-  for(int j = 0; j <= SM->deg; j++)
-  {
-    ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
-    mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
-    ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
-  }
-}
-
-static inline void
-print_sm (FILE *f, poly_t SM, int Fdeg)
-{
-  for(int j=0; j<Fdeg; j++)
-  {
-    if (j > SM->deg)
-      fprintf(f, "0 ");
-    else
-      gmp_fprintf(f, "%Zu ", SM->coeff[j]);
-  }
-  fprintf(f, "\n");
-}
-
-relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
+sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
@@ -152,7 +46,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   poly_t *pairs;
   
   /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file  */
-  relset_ptr rels;
+  sm_relset_ptr rels;
 
   purgedfile_stream_init(ps);
   purgedfile_stream_openfile(ps, purgedname);
@@ -172,7 +66,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   int ret = fscanf(ix, "%d %d", small_nrows, &small_ncols);
   ASSERT(ret == 2);
 
-  rels = malloc(*small_nrows * sizeof(relset_t));
+  rels = malloc(*small_nrows * sizeof(sm_relset_t));
 
   for (int k = 0 ; k < *small_nrows ; k++) {
     poly_alloc(rels[k].num, F->deg);
@@ -238,7 +132,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 struct thread_info {
   int offset;
   int nb;
-  relset_ptr rels;
+  sm_relset_ptr rels;
   poly_srcptr F;
   mpz_srcptr eps;
   mpz_srcptr ell;
@@ -249,7 +143,7 @@ struct thread_info {
 
 void * thread_start(void *arg) {
   struct thread_info *ti = (struct thread_info *) arg;
-  relset_ptr rels = ti->rels;
+  sm_relset_ptr rels = ti->rels;
   poly_srcptr F = ti->F;
   mpz_srcptr eps = ti->eps;
   mpz_srcptr ell = ti->ell;
@@ -281,7 +175,7 @@ void * thread_start(void *arg) {
 
 #define SM_BLOCK 500
 
-void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
+void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
     const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   // allocate space for results of threads
@@ -366,7 +260,7 @@ void mt_sm(int nt, const char * outname, relset_ptr rels, int sr, poly_t F,
 }
 
 
-void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
+void sm(const char * outname, sm_relset_ptr rels, int sr, poly_t F,
 	const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
@@ -410,22 +304,6 @@ void sm(const char * outname, relset_ptr rels, int sr, poly_t F,
   fclose(out);
 }
 
-
-/* Computed the Shirokauer maps of a single pair (a,b). 
-   SM must be allocated and is viewed as a polynomial of degree F->deg. */
-void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps, 
-                   const mpz_t ell, const mpz_t ell2, const mpz_t invl2)
-{
-  poly_t rel;
-
-  SM->deg = 0;
-  poly_setcoeff_si(SM, 0, 1);
-  
-  poly_alloc_and_set_from_ab(rel, a, b);
-  compute_sm (SM, rel, F, ell, eps, ell2, invl2);
-}
-
-
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "(required) poly file");
@@ -464,9 +342,7 @@ int main (int argc, char **argv)
   param_list pl;
   cado_poly pol;
   poly_t F;
-  int deg;
-  mpz_t *f;
-  relset_ptr rels = NULL;
+  sm_relset_ptr rels = NULL;
   int sr;
   mpz_t ell, ell2, eps;
   int mt = 1;
@@ -534,13 +410,7 @@ int main (int argc, char **argv)
   param_list_print_command_line (stdout, pl);
 
   /* Construct poly_t F from cado_poly pol (algebraic side) */
-  deg = pol->pols[ALGEBRAIC_SIDE]->degree;
-  f = pol->pols[ALGEBRAIC_SIDE]->f;
-  ASSERT_ALWAYS(deg > 1);
-  poly_alloc (F, deg);
-  for (int i = deg; i >= 0; --i)
-    poly_setcoeff (F, i, f[i]);
-
+  poly_t_from_cado_poly_alg(F, pol);
   fprintf(stderr, "F = ");
   poly_print(F);
 
