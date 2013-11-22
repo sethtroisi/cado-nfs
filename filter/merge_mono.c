@@ -34,19 +34,25 @@
 static unsigned long row_additions = 0;
 #endif
 
-// not mallocing to speed up(?).
+/* Given an ideal of weight m, returns the best index i, 0 <= i < m,
+   such that merging the i-th relation containing the ideal with all
+   others (m-1) gives the smallest total weight.
+   Note: for m >= 4 this might not be the best possible merge. For example
+   for m=4 the best possible merge might be: 0-1, 1-2, 2-3 which is not
+   of this shape (but for m <= 3 all possible merges are of this shape). */
 static int
 findBestIndex(filter_matrix_t *mat, int m, int32_t *ind, int32_t ideal)
 {
+    /* not mallocing A[][] to speed up things */
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
     ASSERT(m <= MERGE_LEVEL_MAX);
-    if(m == 2)
-	return 0;
+    if (m == 2)
+      return 0;
     fillRowAddMatrix(A, mat, m, ind, ideal);
     // iterate over all vertices
     imin = -1;
-    wmin = 0;
+    wmin = SMAX(int);
     for(i = 0; i < m; i++){
 	// compute the new total weight if i is used as pivot
 	w = 0;
@@ -56,10 +62,11 @@ findBestIndex(filter_matrix_t *mat, int m, int32_t *ind, int32_t ideal)
 #if DEBUG >= 1
 	printf ("W[%d]=%d\n", i, w);
 #endif
-	if((imin == -1) || (w < wmin)){
+	if (w < wmin)
+          {
 	    imin = i;
 	    wmin = w;
-	}
+          }
     }
     return imin;
 }
@@ -240,7 +247,9 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
     mat->rem_nrows--;
 }
 
-// try all combinations to find the smaller one; resists to m==1
+/* Try all combinations of merging one row with all others (m-1) ones
+   to find the smaller one; resists to m==1.
+ */
 static void
 tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
                    int32_t j)
@@ -366,6 +375,12 @@ static void
 findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
                        int32_t j, double *tfill, double *tMST)
 {
+  /* we can use here two algorithms:
+     (a) tryAllCombinations tries to merge row i with all other (m-1) rows,
+         for each i, 0 <= i < m, and keeps the best i
+     (b) useMinimalSpanningTree computes a minimal spanning tree
+     Both have complexity O(m^2), and useMinimalSpanningTree is always better
+     or equal. */
   if (m <= 2)
     {
       *tfill = *tMST = 0;

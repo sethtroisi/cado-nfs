@@ -252,8 +252,10 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 
     if (w <= 1)
       return -4; /* ensures that empty columns and singletons are removed earlier */
+#ifndef COUNT_CANCELLED_IDEALS
     else if (w == 2)
       return -2;
+#endif
     else
       {
 #ifdef COUNT_CANCELLED_IDEALS
@@ -489,8 +491,8 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
     // old_count = min (r_ii-1)*(w-2) = mu * (w-2)
     // new_count = min(mu, r_i-1)*(w-1)
     mkz = MkzGet(mat->MKZQ, adr, 1)/(mat->wt[j]-2); // mu
-    if(mat->rows[i][0] < mkz+1)
-	mkz = mat->rows[i][0]-1;
+    if(matLengthRow(mat,i) < mkz+1)
+      mkz = matLengthRow(mat,i)-1;
     mkz *= (mat->wt[j]-1);
 #endif
 #if MKZ_DEBUG >= 1

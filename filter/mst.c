@@ -239,6 +239,9 @@ minimalSpanningTreeWithPrim(int *w, int *father, int *height,
     return hmax;
 }
 
+/* given an ideal of weight m, fills the m x m matrix A so that
+   A[i,j] is the weight of the sum of the i-th and j-th rows
+   containing the ideal, for 0 <= i, j < m */
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
                  int m, int32_t *ind, int32_t ideal)
@@ -247,14 +250,10 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
 
     for(i = 0; i < m; i++)
 	A[i][i] = 0;
-    // A[i][j] <- estimated weight(R[ind[i]]+R[ind[j]]);
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
 	    A[i][j] = weightSum(mat, ind[i], ind[j], ideal);
 	    A[j][i] = A[i][j];
-#if DEBUG >= 1
-	    fprintf(stderr, "A[%d][%d] = A[%d][%d] = %d\n",i,j,j,i,A[i][j]);
-#endif
 	}
 }
 

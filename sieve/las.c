@@ -263,8 +263,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     }
     if (fbcfilename != NULL) {
         printf("# Writing memory image of factor base to file %s\n", fbcfilename);
-        fb_dump_fbc(si->sides[0]->fb, si->sides[0]->fb_bucket_threads,
-                    si->sides[1]->fb, si->sides[1]->fb_bucket_threads,
+        fb_dump_fbc(si->sides[0]->fb,
+                    (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
+                    si->sides[1]->fb,
+                    (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
                     fbcfilename, las->nb_threads, las->verbose);
         printf("# Finished writing memory image of factor base\n");
     }
@@ -2736,8 +2738,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
-        unsigned int X;
-        unsigned int i, j;
 
         if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
         {
@@ -2747,10 +2747,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
+#ifndef UNSIEVE_NOT_COPRIME
+        unsigned int X;
+        unsigned int i, j;
         X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
-#ifndef UNSIEVE_NOT_COPRIME
         if (bin_gcd_int64_safe (i, j) != 1)
         {
 #ifdef TRACE_K

@@ -308,6 +308,8 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
 #endif
 }
 
+/* return the weight of the relation obtained when adding relations i2 and i2
+*/
 int
 weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 {
@@ -315,8 +317,10 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 
     len1 = (isRowNull(mat, i1) ? 0 : matLengthRow(mat, i1));
     len2 = (isRowNull(mat, i2) ? 0 : matLengthRow(mat, i2));
+#if DEBUG >= 1
     if((len1 == 0) || (len2 == 0))
         fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
+#endif
 #ifdef FOR_DL /* look for the exponents of j in i1 i2*/
     int e1 = 0, e2 = 0;
     int d;
