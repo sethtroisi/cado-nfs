@@ -6,12 +6,13 @@
 #include <pthread.h>
 #include "bwc_config.h"
 #include "matmul.h"
-#include "matmul-threaded.h"
 #include "matmul-common.h"
 #include "abase.h"
 #include "worker-threads.h"
 #include "portability.h"
 #include "utils.h"
+
+#include "matmul_facade.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -75,11 +76,12 @@ struct matmul_threaded_data_s {
     int d;
 };
 
-extern void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
-extern void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
+static void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
+static void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
 
-void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
+void MATMUL_NAME(clear)(matmul_ptr mm0)
 {
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     matmul_common_clear(mm->public_);
 
     worker_threads_clear(mm->tg);
@@ -91,7 +93,7 @@ void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
     free(mm);
 }
 
-struct matmul_threaded_data_s * matmul_threaded_init(void * xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+matmul_ptr MATMUL_NAME(init)(void * xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_threaded_data_s * mm;
     mm = malloc(sizeof(struct matmul_threaded_data_s));
@@ -130,10 +132,10 @@ struct matmul_threaded_data_s * matmul_threaded_init(void * xx MAYBE_UNUSED, par
 
     mm->blocksize /= sizeof(abelt);
     
-    return mm;
+    return (matmul_ptr) mm;
 }
 
-void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
+static void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
 {
     printf("// %u dense blocks of %d %ss\n",
             mm->dense->n, MM_DGRP_SIZE, rowcol[mm->store_transposed]);
@@ -146,8 +148,9 @@ void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
             (100.0 * padding / sparse_coeffs));
 }
 
-void matmul_threaded_build_cache(struct matmul_threaded_data_s * mm, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
 {
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     ASSERT_ALWAYS(data);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
@@ -282,10 +285,11 @@ void matmul_threaded_build_cache(struct matmul_threaded_data_s * mm, uint32_t * 
     pthread_cond_init(&mm->dense->recheck_please, NULL);
 }
 
-int matmul_threaded_reload_cache(struct matmul_threaded_data_s * mm)
+int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 {
     FILE * f;
 
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) return 0;
 
@@ -325,10 +329,11 @@ int matmul_threaded_reload_cache(struct matmul_threaded_data_s * mm)
     return 1;
 }
 
-void matmul_threaded_save_cache(struct matmul_threaded_data_s * mm)
+void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 {
     FILE * f;
 
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     MATMUL_COMMON_WRITE_ONE32(mm->dense->weight, f);
@@ -348,7 +353,7 @@ void matmul_threaded_save_cache(struct matmul_threaded_data_s * mm)
     fclose(f);
 }
 
-void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
+static void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
 {
     if (mm->dense->n == 0) {
         /* We have nothing to do. In this special case, the task of
@@ -484,7 +489,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * xd
     ASM_COMMENT("end of dense multiplication code");
 }
 
-void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
+static void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
 {
     ASM_COMMENT("sparse multiplication code");
     abdst_field x = mm->xab;
@@ -627,15 +632,16 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * x
     ASM_COMMENT("end of sparse multiplication code");
 }
 
-void matmul_thread_worker_routine(struct worker_threads_group * tg MAYBE_UNUSED, int i, struct matmul_threaded_data_s * mm)
+static void matmul_thread_worker_routine(struct worker_threads_group * tg MAYBE_UNUSED, int i, struct matmul_threaded_data_s * mm)
 {
     /* Do our job with mutexes released */
     matmul_threaded_mul_sub_dense(mm, mm->dst, mm->src, mm->d, i);
     matmul_threaded_mul_sub_sparse(mm, mm->dst, mm->src, mm->d, i);
 }
 
-void matmul_threaded_mul(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d)
+void MATMUL_NAME(mul)(matmul_ptr mm0, void * dst, void const * src, int d)
 {
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     mm->dense->processed = 0;
     mm->dst = dst;
     mm->src = (absrc_vec) src;
@@ -647,11 +653,12 @@ void matmul_threaded_mul(struct matmul_threaded_data_s * mm, void * dst, void co
     mm->public_->iteration[d]++;
 }
 
-void matmul_threaded_report(struct matmul_threaded_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
+void MATMUL_NAME(report)(matmul_ptr mm0 MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 }
 
-void matmul_threaded_auxv(struct matmul_threaded_data_s * mm, int op, va_list ap)
+void MATMUL_NAME(auxv)(matmul_ptr mm0, int op, va_list ap)
 {
+    struct matmul_threaded_data_s * mm = (struct matmul_threaded_data_s *) mm0;
     if (op == MATMUL_AUX_GET_READAHEAD) {
         unsigned int * res = va_arg(ap, unsigned int *);
         // First, we allow at least one extra.
@@ -671,11 +678,11 @@ void matmul_threaded_auxv(struct matmul_threaded_data_s * mm, int op, va_list ap
     }
 }
 
-void matmul_threaded_aux(struct matmul_threaded_data_s * mm, int op, ...)
+void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    matmul_threaded_auxv (mm, op, ap);
+    MATMUL_NAME(auxv) (mm0, op, ap);
     va_end(ap);
 }
 /* vim: set sw=4: */

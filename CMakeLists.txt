@@ -132,19 +132,26 @@ IF (NOT DEFINED ENV{NO_PYTHON_CHECK})
   include("${CADO_NFS_SOURCE_DIR}/config/python.cmake")
 endif()
 
-string(COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "" DISABLE_SHARED)
+string(COMPARE NOTEQUAL "$ENV{ENABLE_SHARED}" "" ENABLE_SHARED)
 
-set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
+unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
+set(CADO_SHARED)
 
-if(DISABLE_SHARED OR MINGW)
-    unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
-endif (DISABLE_SHARED OR MINGW)
-
-if(BUILD_DYNAMICALLY_LINKABLE_BWC)
+if(ENABLE_SHARED)
+    if(MINGW)
+        message(FATAL_ERROR "ENABLE_SHARED is not supported with MINGW")
+    endif(MINGW)
+    # Dynamically linkable bwc needs shared libs.
+    set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
+    # having both shared and static is possible but messy. One needs two
+    # add_library calls, and then I'm not sure whether
+    # target_link_libraries picks the static or shared ones...
     set(CADO_SHARED SHARED)
-else(BUILD_DYNAMICALLY_LINKABLE_BWC)
-    set(CADO_SHARED)
-endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
+    message(STATUS "Building with dynamic libraries (ENABLE_SHARED)")
+else(ENABLE_SHARED)
+    message(STATUS "Building with static libraries")
+endif(ENABLE_SHARED)
+
 
 
 

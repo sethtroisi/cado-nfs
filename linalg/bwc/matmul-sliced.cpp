@@ -20,12 +20,12 @@
 #include "bwc_config.h"
 using namespace std;
 
-#include "matmul-sliced.h"
-
 #include "cado_config.h"
 
 #include "abase.h"
 #include "matmul-common.h"
+
+#include "matmul_facade.h"
 
 // assembly is now disabled for this code because the semantics of the
 // asm code have changed.
@@ -122,15 +122,16 @@ struct matmul_sliced_data_s {
     }
 };
 
-void matmul_sliced_clear(struct matmul_sliced_data_s * mm)
+void MATMUL_NAME(clear)(matmul_ptr mm0)
 {
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     matmul_common_clear(mm->public_);
     mm->dslices_info.clear();
     mm->data.clear();
     delete mm;
 }
 
-struct matmul_sliced_data_s * matmul_sliced_init(abdst_field xx, param_list pl, int optimized_direction)
+matmul_ptr MATMUL_NAME(init)(abdst_field xx, param_list pl, int optimized_direction)
 {
     struct matmul_sliced_data_s * mm;
     mm = new matmul_sliced_data_s;
@@ -154,12 +155,13 @@ struct matmul_sliced_data_s * matmul_sliced_init(abdst_field xx, param_list pl, 
     }   
 
 
-    return mm;
+    return (matmul_ptr) mm;
 }
 
 
-void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
 {
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     ASSERT_ALWAYS(data);
 
     uint32_t i0 = 0;
@@ -308,10 +310,11 @@ void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm, uint32_t * data
     std::cout << std::flush;
 }
 
-int matmul_sliced_reload_cache(struct matmul_sliced_data_s * mm)
+int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 {
     FILE * f;
 
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) return 0;
 
@@ -328,10 +331,11 @@ int matmul_sliced_reload_cache(struct matmul_sliced_data_s * mm)
     return 1;
 }
 
-void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm)
+void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 {
     FILE * f;
 
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     size_t n = mm->data.size();
@@ -341,8 +345,9 @@ void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm)
     fclose(f);
 }
 
-void matmul_sliced_mul(struct matmul_sliced_data_s * mm, void * xdst, void const * xsrc, int d)
+void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
 {
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     ASM_COMMENT("multiplication code");
     const uint16_t * q = &(mm->data.front());
 
@@ -411,8 +416,9 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, void * xdst, void const
     mm->public_->iteration[d]++;
 }
 
-void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
+void MATMUL_NAME(report)(matmul_ptr mm0 MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 #ifdef  SLICE_STATS
+    struct matmul_sliced_data_s * mm = (struct matmul_sliced_data_s *) mm0;
     if (mm->dslices_info.empty())
         return;
     std::ofstream o("dj.stats");
@@ -437,15 +443,15 @@ void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED, double 
 #endif
 }
 
-void matmul_sliced_auxv(struct matmul_sliced_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+void MATMUL_NAME(auxv)(matmul_ptr mm0 MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
 }
 
-void matmul_sliced_aux(struct matmul_sliced_data_s * mm, int op, ...)
+void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    matmul_sliced_auxv (mm, op, ap);
+    MATMUL_NAME(auxv) (mm0, op, ap);
     va_end(ap);
 }
 /* vim: set sw=4: */

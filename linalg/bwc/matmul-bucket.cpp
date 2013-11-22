@@ -29,7 +29,6 @@
 #include "bwc_config.h"
 using namespace std;
 
-#include "matmul-bucket.h"
 #include "abase.h"
 
 /* Make sure that the assembly function is only called if it matches
@@ -50,6 +49,8 @@ using namespace std;
 #endif
 
 #include "matmul-common.h"
+
+#include "matmul_facade.h"
 
 /* {{{ Documentation
  *
@@ -437,8 +438,9 @@ struct matmul_bucket_data_s {
     matmul_bucket_methods methods;
 };
 
-void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
+void MATMUL_NAME(clear)(matmul_ptr mm0)
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     if (mm->scratch1) abvec_clear(mm->xab, &mm->scratch1, mm->scratch1size);
     if (mm->scratch2) abvec_clear(mm->xab, &mm->scratch2, mm->scratch2size);
     if (mm->scratch3) abvec_clear(mm->xab, &mm->scratch3, mm->scratch3size);
@@ -450,7 +452,7 @@ void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
 
 static void mm_finish_init(struct matmul_bucket_data_s * mm);
 
-struct matmul_bucket_data_s * matmul_bucket_init(abdst_field xx, param_list pl, int optimized_direction)
+matmul_ptr MATMUL_NAME(init)(abdst_field xx, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
     mm = new matmul_bucket_data_s;
@@ -499,7 +501,7 @@ struct matmul_bucket_data_s * matmul_bucket_init(abdst_field xx, param_list pl, 
 
     mm->methods = matmul_bucket_methods(tmp);
 
-    return mm;
+    return (matmul_ptr)(mm);
 }
 
 /* This moves an element at the tail of a list with no copy, transferring
@@ -525,7 +527,7 @@ struct builder {
     struct matmul_bucket_data_s * mm;
 };
 
-void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * data)
+static void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * data)
 {
     memset(mb, 0, sizeof(struct builder));
     ASSERT_ALWAYS(data);
@@ -541,7 +543,7 @@ void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * dat
     mb->mm = mm;
 }
 
-void builder_clear(builder * mb)
+static void builder_clear(builder * mb)
 {
     free(mb->data[0]);
     memset(mb, 0, sizeof(struct builder));
@@ -578,7 +580,7 @@ struct small_slice_t {
     Lu_t Lu;
 };
 
-int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, uint32_t i1)
+static int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, uint32_t i1)
 {
     S->i0 = i0;
     S->i1 = i1;
@@ -675,7 +677,7 @@ struct large_slice_raw_t {
     vector<uint32_t> pad_sizes;
 };
 
-void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_raw_t * R, unsigned int scratch1size)
+static void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_raw_t * R, unsigned int scratch1size)
 {
     /* Now split into vslices */
     uint8_t * mp = ptrbegin(R->main);
@@ -835,7 +837,7 @@ static uint32_t * do_partial_transpose(builder * mb, vector<uint32_t> & cs, uint
     return cols;
 }/*}}}*/
 
-int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, uint32_t imax, unsigned int scratch1size)
+static int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, uint32_t imax, unsigned int scratch1size)
 {
     memset(L->hdr, 0, sizeof(slice_header_t));
     L->hdr->t = SLICE_TYPE_LARGE_ENVELOPE;
@@ -958,7 +960,7 @@ struct huge_slice_raw_t {
     vector<uint32_t> pad_sizes;
 };
 
-void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_t * R, unsigned int scratch2size)/*{{{*/
+static void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_t * R, unsigned int scratch2size)/*{{{*/
 {
     /* Now split into vslices */
     // unsigned int lsize = iceildiv(H->hdr->i1 - H->hdr->i0, H->nlarge);
@@ -1122,7 +1124,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
     printf(" %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
 }/*}}}*/
 
-int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, uint32_t i1, unsigned int scratch2size)
+static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, uint32_t i1, unsigned int scratch2size)
 {
     memset(H->hdr, 0, sizeof(slice_header_t));
     H->hdr->t = SLICE_TYPE_HUGE_ENVELOPE;
@@ -1475,7 +1477,7 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
 }
 /*}}}*/
 
-int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0, uint32_t imax)
+static int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0, uint32_t imax)
 {
     memset(V->hdr, 0, sizeof(slice_header_t));
     V->hdr->t = SLICE_TYPE_DEFER_ENVELOPE;
@@ -1534,7 +1536,7 @@ int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0
 /* Pushing slices to mm ; all these routines clear the given slice stack */
 
 /* {{{ small slices */
-void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S)
+static void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S)
 {
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
     if (S->is_small2) {
@@ -1621,7 +1623,7 @@ void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * 
 /* }}} */
 
 /* {{{ large slices */
-void builder_push_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * L)
+static void builder_push_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * L)
 {
     mm->headers.push_back(*L->hdr);
     for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
@@ -1640,7 +1642,7 @@ void builder_push_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * 
 
 /* {{{ huge slices */
 
-void builder_push_huge_slice(struct matmul_bucket_data_s * mm, huge_slice_t * H)
+static void builder_push_huge_slice(struct matmul_bucket_data_s * mm, huge_slice_t * H)
 {
     mm->headers.push_back(*H->hdr);
     mm->aux.push_back(H->nlarge);
@@ -1659,7 +1661,7 @@ void builder_push_huge_slice(struct matmul_bucket_data_s * mm, huge_slice_t * H)
 /* Iteratively call the building routines */
 
 /* {{{ small slices */
-void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, unsigned int npack)
+static void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, unsigned int npack)
 {
     /* npack is a guess for the expected size of small slices ; they are
      * arranged later to all have approximately equal size.
@@ -1697,7 +1699,7 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, u
 /* }}} */
 
 /* {{{ large slices */
-void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch1size)
+static void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch1size)
 {
     unsigned int rem_nrows = imax - *p_i0;
     unsigned int nlarge_slices = iceildiv(rem_nrows, LSL_NBUCKETS_MAX * 256);
@@ -1726,7 +1728,7 @@ void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int ima
 /* }}} */
 
 /* {{{ huge slices */
-void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch2size)
+static void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch2size)
 {
     unsigned int rem_nrows = imax - *p_i0;
     unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * LSL_NBUCKETS_MAX * 256);
@@ -1763,7 +1765,7 @@ void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int imax
 
 
 /* {{{ staircase */
-unsigned long compressed_size(unsigned long s, unsigned int defer MAYBE_UNUSED)
+static unsigned long compressed_size(unsigned long s, unsigned int defer MAYBE_UNUSED)
 {
     if (0) {
 #ifdef COMPRESS_COMBINERS_1
@@ -1783,7 +1785,7 @@ unsigned long compressed_size(unsigned long s, unsigned int defer MAYBE_UNUSED)
     }
 }
 
-void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, unsigned int defer MAYBE_UNUSED)
+static void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, unsigned int defer MAYBE_UNUSED)
 {
     if (0) {
 #ifdef  COMPRESS_COMBINERS_1
@@ -1830,7 +1832,7 @@ void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, unsigned i
     }
 }
 
-void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
+static void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
 {
     printf("Flushing staircase slices\n");
 
@@ -1967,8 +1969,9 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
 }
 /* }}} */
 
-void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     builder mb[1];
     builder_init(mb, mm, data);
 
@@ -2006,8 +2009,9 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
     mm_finish_init(mm);
 }
 
-int matmul_bucket_reload_cache(struct matmul_bucket_data_s * mm)/* {{{ */
+int MATMUL_NAME(reload_cache)(matmul_ptr mm0)/* {{{ */
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     FILE * f;
 
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
@@ -2050,8 +2054,9 @@ int matmul_bucket_reload_cache(struct matmul_bucket_data_s * mm)/* {{{ */
     return 1;
 }/*}}}*/
 
-void matmul_bucket_save_cache(struct matmul_bucket_data_s * mm)/*{{{*/
+void MATMUL_NAME(save_cache)(matmul_ptr mm0)/*{{{*/
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     FILE * f;
 
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
@@ -3032,7 +3037,7 @@ static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
     mm->slice_timings.resize(mm->headers.size());
 }
 
-void matmul_bucket_zero_stats(struct matmul_bucket_data_s * mm)
+static void matmul_bucket_zero_stats(struct matmul_bucket_data_s * mm)
 {
     vector<slice_header_t>::iterator hdr;
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
@@ -3100,8 +3105,9 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abel
     }
 }
 
-void matmul_bucket_mul(struct matmul_bucket_data_s * mm, void * xdst, void const * xsrc, int d)
+void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     struct pos_desc pos[1];
 
     abdst_vec dst = (abdst_vec) xdst;
@@ -3132,7 +3138,7 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, void * xdst, void const
     mm->public_->iteration[d]++;
 }
 
-void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr, double * p_t_total)
+static void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr, double * p_t_total)
 {
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
@@ -3203,8 +3209,9 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
 }
 
 
-void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
+void MATMUL_NAME(report)(matmul_ptr mm0, double scale)
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
 
@@ -3250,8 +3257,9 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
     }
 }
 
-void matmul_bucket_auxv(struct matmul_bucket_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+void MATMUL_NAME(auxv)(matmul_ptr mm0, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
+    struct matmul_bucket_data_s * mm = (struct matmul_bucket_data_s *)mm0;
     if (op == MATMUL_AUX_ZERO_STATS) {
         matmul_bucket_zero_stats(mm);
         mm->public_->iteration[0] = 0;
@@ -3266,11 +3274,11 @@ void matmul_bucket_auxv(struct matmul_bucket_data_s * mm MAYBE_UNUSED, int op MA
 }
 
 
-void matmul_bucket_aux(struct matmul_bucket_data_s * mm, int op, ...)
+void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    matmul_bucket_auxv (mm, op, ap);
+    MATMUL_NAME(auxv) (mm0, op, ap);
     va_end(ap);
 }
 /* vim: set sw=4: */
