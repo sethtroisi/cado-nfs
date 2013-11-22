@@ -60,8 +60,8 @@ int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
   aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0,
   var_opt_lognorm = 0.0, var_raw_lognorm = 0.0;
-double min_raw_lognorm = DBL_MAX, max_raw_lognorm = 0.0;
-double min_opt_lognorm = DBL_MAX, max_opt_lognorm = 0.0;
+double min_raw_lognorm = 999.99, max_raw_lognorm = 0.0;
+double min_opt_lognorm = 999.99, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
