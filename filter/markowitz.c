@@ -241,59 +241,40 @@ Cavallar(filter_matrix_t *mat, int32_t j)
     return abs(mat->wt[j]);
 }
 
-/* #define COUNT_CANCELLED_IDEALS */
-
+/* Note: we could also take into account the "cancelled ideals", i.e., the
+   ideals apart the pivot j that got cancelled "by chance". However some
+   experiments show that this does not improve (if any) the result of merge.
+   A possible explanation is that the contribution of cancelled ideals follows
+   a normal distribution, and that on the long run we mainly see the average.
+*/
 static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
-    int mkz, i;
-  unsigned int k;
+    int i;
+    unsigned int k;
     int w = mat->wt[j];
 
     if (w <= 1)
       return -4; /* ensures that empty columns and singletons are removed earlier */
-#ifndef COUNT_CANCELLED_IDEALS
     else if (w == 2)
       return -2;
-#endif
     else
       {
-#ifdef COUNT_CANCELLED_IDEALS
-	int i0 = 0;
-#endif
-    index_t w0;
+        index_t w0;
 
         /* approximate traditional Markowitz count: we assume we add the
 	   lightest row to all other rows */
-        w0 = mat->nrows;
+        w0 = mat->ncols;
         for(k = 1; k <= mat->R[j][0]; k++)
           if((i = mat->R[j][k]) != -1){
 	    // this should be the weight of row i
             if(matLengthRow(mat, i) < w0)
-              {
-                w0 = matLengthRow(mat, i);
-#ifdef COUNT_CANCELLED_IDEALS
-                i0 = i;
-#endif
-              }
+              w0 = matLengthRow(mat, i);
           }
-#ifndef COUNT_CANCELLED_IDEALS
         /* here we assume there is no cancellation other than for ideal j:
 	   the lightest row has weight w0, we add wt-1 times w0-1,
 	   remove once w0-1, and remove wt entries in the jth column */
-        mkz = (w0 - 2) * (mat->wt[j] - 2) - 2;
-#else   /* we compute the real weight obtained when adding the lightest row.
-	   This is more expensive but gives a slightly sparser matrix. */
-	mkz = 0;
-	for (k = 1; k <= mat->R[j][0]; k++)
-          if ((i = mat->R[j][k]) != -1)
-	    {
-	      if (i != i0)
-                mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
-	      mkz -= matLengthRow(mat, i);          /* remove row i */
-	    }
-#endif
-	return mkz;
+	return (w0 - 2) * (mat->wt[j] - 2) - 2;
       }
 }
 
