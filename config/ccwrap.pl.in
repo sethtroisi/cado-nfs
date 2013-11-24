@@ -5,6 +5,8 @@ use strict;
 
 my $default_cc = '@CMAKE_C_COMPILER@';
 my $mpi_cc = '@MPI_C_COMPILER@';
+my $default_cxx = '@CMAKE_CXX_COMPILER@';
+my $mpi_cxx = '@MPI_CXX_COMPILER@';
 
 sub usage {
     print STDERR <<EOF;
@@ -22,19 +24,27 @@ EOF
 }
 
 my $cc = $default_cc;
+my $cxx = $default_cxx;
 
 my @a = ();
 
+my $compile = 0;
 while (defined($_=shift @ARGV)) {
     /^--mpi$/ && do {
         $cc = $mpi_cc;
+        $cxx = $mpi_cxx;
         # print STDERR "Using $cc instead of $default_cc\n";
         next;
     };
+    $compile=1 if /^-c$/;
     push @a, $_;
 }
 
 usage unless scalar @a;
+
+# if we have no -c, then we're linking, in which case we _want_ a c++ linker
+# because there might be c++ object files in some of the linked libs.
+$cc = $cxx unless $compile;
 
 # print "$cc ", join(" ", @a), "\n";
 

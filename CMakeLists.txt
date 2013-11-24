@@ -199,6 +199,9 @@ set(CMAKE_C_COMPILER "${CADO_NFS_BINARY_DIR}/ccwrap.pl")
 configure_file(config/cxxwrap.pl.in cxxwrap.pl ESCAPE_QUOTES @ONLY)
 set(CMAKE_CXX_COMPILER "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 
+# It's weird. This thing does not seem to apply, or at least not always. I've
+# cured the problem by tweaking ccwrap, and let it decide whether it's linking
+# or not. If yes, then it uses g++ rather than gcc (or mpic++ vs mpicc)
 set(CMAKE_C_LINKER_PREFERENCE "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 set(CMAKE_CXX_LINKER_PREFERENCE "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 
