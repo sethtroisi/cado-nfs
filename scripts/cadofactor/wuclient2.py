@@ -1065,6 +1065,8 @@ if __name__ == '__main__':
             logging.critical("Server certificate's SHA1 hash (%s) differs "
                              "from hash specified on command line (%s). "
                              "Aborting.", cert_sha1, SETTINGS["CERTSHA1"])
+            logging.critical("Possible reason: several factorizations with "
+                             "same download directory")
             sys.exit(1)
         logging.info("Certificate SHA1 hash matches")
         if not certfile_exists:
