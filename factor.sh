@@ -261,8 +261,10 @@ cp $file $t/param
 # Sets the machine description file
 if [ -z "$CADO_USEHOST" ] && echo "$hostnames" | grep -E "^(localhost, *)*localhost$" > /dev/null
 then
-   server_address="server.address=localhost"
+   host=localhost # For the Perl script
+   server_address="server.address=localhost" # For the Python script
 else
+   host=`hostname --short`
    server_address=""
 fi
 
