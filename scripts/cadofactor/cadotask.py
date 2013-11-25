@@ -1671,8 +1671,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def add_file(self, filename, stats_filename=None, commit=True):
         use_stats_filename = stats_filename
         if stats_filename is None:
-            self.logger.warn("No statistics output received for file '%s', "
-                              "have to scan file", filename)
+            self.logger.info("No statistics output received for file '%s', "
+                             "have to scan file", filename)
             use_stats_filename = filename
         rels = self.parse_rel_count(use_stats_filename)
         if rels is None:
