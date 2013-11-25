@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>   /* for _O_BINARY */
 
 #include "utils.h"
 #include "filter_utils.h"
