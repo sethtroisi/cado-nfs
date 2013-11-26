@@ -58,8 +58,8 @@ sieve_info_test_lognorm (const unsigned char C1,
 
 #ifdef HAVE_SSE2
 static inline int 
-sieve_info_test_lognorm_sse2(__m128i *S0, const __m128i pattern0,
-                             __m128i *S1, const __m128i pattern1)
+sieve_info_test_lognorm_sse2(__m128i * restrict S0, const __m128i pattern0,
+                             const __m128i *restrict S1, const __m128i pattern1)
 {
     const __m128i zero = _mm_set1_epi8(0);
     const __m128i ff = _mm_set1_epi8(0xff);
@@ -96,7 +96,7 @@ sieve_info_test_lognorm_sse2(__m128i *S0, const __m128i pattern0,
     m2 = _mm_xor_si128(m1, ff);
     *S0 = _mm_or_si128(a, m2);
     /* Do we want to update this one? */
-    *S1 = _mm_or_si128(r, m2);
+    // *S1 = _mm_or_si128(r, m2);
 
     /* Compute number of non-zero bytes. We want 1 is those bytes that
     survived, and 0 in the others. m1 has 0xFF in those bytes that
