@@ -2698,7 +2698,7 @@ search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[
 #endif
         for (int x = x_start; x < x_start + x_step; x++) {
 #ifndef HAVE_SSE2
-            if (!sieve_info_test_lognorm(bounds[0], bounds[1], SS[0][x], SS[1][x]))
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
             {
                 SS[0][x] = 255;
                 continue;
@@ -2777,7 +2777,7 @@ search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound
 #endif
         for (int x = x_start; x < x_start + x_step; x++) {
 #ifndef HAVE_SSE2
-            if (!sieve_info_test_lognorm(bounds[0], bounds[1], SS[0][x], SS[1][x]))
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
             {
                 SS[0][x] = 255;
                 continue;
@@ -2792,7 +2792,10 @@ search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound
             i = abs (x - (1 << (log_I - 1)));
             if (bin_gcd_int64_safe (i, j) != 1)
             {
+#ifdef HAVE_SSE2
+                /* Non-SSE code currently does not skip multiples of 3 */
                 ASSERT (i % 3 != 0);
+#endif
 #ifdef TRACE_K
                 if (trace_on_spot_Nx(N, x)) {
                     fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
