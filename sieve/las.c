@@ -2677,10 +2677,10 @@ search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
     const __m128i patterns[2] = {
-        _mm_xor_si128(_mm_set1_epi8(bound[0]), sse2_sign_conversion),
-        _mm_xor_si128(_mm_set1_epi8(bound[1]), sse2_sign_conversion)
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
     };
-    const int x_step = 16;
+    const int x_step = sizeof(__m128i);
 #else
     const int x_step = 1;
 #endif
@@ -2710,6 +2710,89 @@ search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[
             i = abs (x - (1 << (log_I - 1)));
             if (bin_gcd_int64_safe (i, j) != 1)
             {
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+                continue;
+            }
+#elif 0
+            /* Very strict but very slow test of unsieving correctness */
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
+#endif
+        }
+    }
+    return survivors;
+}
+
+static int
+search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound[2], 
+        const unsigned int log_I, const unsigned int j)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i patterns[2][3];
+    const int x_step = sizeof(__m128i);
+    int next_pattern = 0;
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+#ifdef HAVE_SSE2
+    /* The reason for the bound+1 here is documented in 
+       sieve_info_test_lognorm_sse2() */
+    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 3 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 3), or d == I/2 (mod 3). With
+       I = 2^log_I and 2 == -1 (mod 3), we have d == -1^(log_I-1) (mod 3),
+       or d = 2 if log_I is even and d = 1 if log_I is odd.
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    size_t d = 2 - log_I % 2;
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[3*i + d] = 0x80;
+#endif
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == 3)
+            next_pattern = 0;
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bounds[0], bounds[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#else
+            if (SS[0][x] == 255)
+                continue;
+#endif
+#ifndef UNSIEVE_NOT_COPRIME
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            if (bin_gcd_int64_safe (i, j) != 1)
+            {
+                ASSERT (i % 3 != 0);
 #ifdef TRACE_K
                 if (trace_on_spot_Nx(N, x)) {
                     fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
@@ -2808,8 +2891,13 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
-        surv += search_survivors_in_line(both_S, both_bounds, 
-                                         si->conf->logI, j + first_j);
+        if ((j + first_j) % 3 == 0) {
+            surv += search_survivors_in_line3(both_S, both_bounds, 
+                                              si->conf->logI, j + first_j);
+        } else {
+            surv += search_survivors_in_line(both_S, both_bounds, 
+                                             si->conf->logI, j + first_j);
+        }
     }
 
     /* Copy those bucket entries that belong to sieving survivors and
