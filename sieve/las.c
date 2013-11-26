@@ -2779,11 +2779,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 #endif  /* }}} */
 
-    /* XXX: Don't believe that resieve_start is easily changeable... */
-    const int resieve_start = RATIONAL_SIDE;
-
     /* This is the one which gets the merged information in the end */
-    unsigned char * SS = S[resieve_start];
+    unsigned char * SS = S[0];
 
 #ifdef UNSIEVE_NOT_COPRIME
     unsieve_not_coprime (SS, N, si);
@@ -2804,12 +2801,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     for (unsigned int j = 0; j < nr_lines; j++)
     {
         unsigned char * const both_S[2] = {
-            S[resieve_start] + (j << si->conf->logI), 
-            S[1 - resieve_start] + (j << si->conf->logI)
+            S[0] + (j << si->conf->logI), 
+            S[1] + (j << si->conf->logI)
         };
         const unsigned char both_bounds[2] = {
-            si->sides[resieve_start]->bound,
-            si->sides[1 - resieve_start]->bound,
+            si->sides[0]->bound,
+            si->sides[1]->bound,
         };
         surv += search_survivors_in_line(both_S, both_bounds, 
                                          si->conf->logI, j + first_j);
@@ -2819,8 +2816,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
        store them with the complete prime */
     /* FIXME: choose a sensible size here */
 
-    for(int z = 0 ; z < 2 ; z++) {
-        int side = resieve_start ^ z;
+    for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
         primes[side] = init_bucket_primes (BUCKET_REGION);
 
