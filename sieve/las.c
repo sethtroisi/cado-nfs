@@ -2670,6 +2670,66 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
   return 1;
 }
 
+static int
+search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[2], 
+        const unsigned int log_I, const unsigned int j)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    const __m128i patterns[2] = {
+        _mm_xor_si128(_mm_set1_epi8(bound[0]), sse2_sign_conversion),
+        _mm_xor_si128(_mm_set1_epi8(bound[1]), sse2_sign_conversion)
+    };
+    const int x_step = 16;
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0],
+                                         (__m128i*) (SS[1] + x_start), patterns[1]);
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bounds[0], bounds[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#endif
+#ifndef UNSIEVE_NOT_COPRIME
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            if (bin_gcd_int64_safe (i, j) != 1)
+            {
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+                continue;
+            }
+#elif 0
+            /* Very strict but very slow test of unsieving correctness */
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
+#endif
+        }
+    }
+    return survivors;
+}
+
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
@@ -2679,8 +2739,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     las_info_ptr las = th->las;
     sieve_info_ptr si = th->si;
     cado_poly_ptr cpoly = si->cpoly;
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2];
@@ -2696,6 +2754,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
+    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
+    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
@@ -2729,73 +2789,30 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     unsieve_not_coprime (SS, N, si);
 #endif
 
-#ifdef HAVE_SSE2
-    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
-    __m128i alg_pattern = _mm_xor_si128(_mm_set1_epi8(alg->bound), sse2_sign_conversion);
-    __m128i rat_pattern = _mm_xor_si128(_mm_set1_epi8(rat->bound), sse2_sign_conversion);
-    const int x_step = 16;
-#else
-    const int x_step = 1;
-#endif
-    for (int x_start = 0; x_start < BUCKET_REGION; x_start += x_step)
-    {
 #ifdef TRACE_K /* {{{ */
-        for (int x = x_start; x < x_start + x_step; x++) {
-            if (trace_on_spot_Nx(N, x)) {
-                fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                        alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
-                        rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
-            }
+    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
+    for (int x = 0; x < 1 << BUCKET_REGION; x++) {
+        if (trace_on_spot_Nx(N, x)) {
+            fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
+    }
 #endif /* }}} */
 
-#ifdef HAVE_SSE2
-        int new_surv = 
-            sieve_info_test_lognorm_sse2((__m128i*) (alg_S + x_start), alg_pattern,
-                                         (__m128i*) (rat_S + x_start), rat_pattern);
-        if (new_surv == 0)
-            continue;
-        surv += new_surv;
-#endif
-        for (int x = x_start; x < x_start + x_step; x++) {
-#ifndef HAVE_SSE2
-            if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
-            {
-                SS[x] = 255;
-                continue;
-            }
-            surv++;
-#endif
-        
-            th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
-
-#ifndef UNSIEVE_NOT_COPRIME
-            unsigned int X;
-            unsigned int i, j;
-            X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
-            i = abs ((int) (X & (si->I - 1)) - si->I / 2);
-            j = X >> si->conf->logI;
-            if (bin_gcd_int64_safe (i, j) != 1)
-            {
-#ifdef TRACE_K
-                if (trace_on_spot_Nx(N, x)) {
-                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                            trace_Nx.x, trace_Nx.N, i, j);
-                }
-#endif
-                SS[x] = 255;
-                continue;
-            }
-#elif 0
-            /* Very strict but very slow test of unsieving correctness */
-            unsigned int X;
-            unsigned int i, j;
-            X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
-            i = abs ((int) (X & (si->I - 1)) - si->I / 2);
-            j = X >> si->conf->logI;
-            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
-#endif
-        }
+    for (unsigned int j = 0; j < nr_lines; j++)
+    {
+        unsigned char * const both_S[2] = {
+            S[resieve_start] + (j << si->conf->logI), 
+            S[1 - resieve_start] + (j << si->conf->logI)
+        };
+        const unsigned char both_bounds[2] = {
+            si->sides[resieve_start]->bound,
+            si->sides[1 - resieve_start]->bound,
+        };
+        surv += search_survivors_in_line(both_S, both_bounds, 
+                                         si->conf->logI, j + first_j);
     }
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -2849,6 +2866,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         for (int x = xul; x < xul + (int) together; ++x) {
             if (SS[x] == 255) continue;
 
+            th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
+            
             /* For factor_leftover_norm, we need to pass the information of the
              * sieve bound. If a cofactor is less than the square of the sieve
              * bound, it is necessarily prime. we implement this by keeping the
