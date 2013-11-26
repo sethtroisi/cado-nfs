@@ -2729,50 +2729,73 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     unsieve_not_coprime (SS, N, si);
 #endif
 
-    for (int x = 0; x < BUCKET_REGION; ++x)
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i alg_pattern = _mm_xor_si128(_mm_set1_epi8(alg->bound), sse2_sign_conversion);
+    __m128i rat_pattern = _mm_xor_si128(_mm_set1_epi8(rat->bound), sse2_sign_conversion);
+    const int x_step = 16;
+#else
+    const int x_step = 1;
+#endif
+    for (int x_start = 0; x_start < BUCKET_REGION; x_start += x_step)
     {
 #ifdef TRACE_K /* {{{ */
-        if (trace_on_spot_Nx(N, x)) {
-            fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
-                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
+        for (int x = x_start; x < x_start + x_step; x++) {
+            if (trace_on_spot_Nx(N, x)) {
+                fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
+                        alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                        rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
+            }
         }
 #endif /* }}} */
 
-        if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
-        {
-            SS[x] = 255;
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (alg_S + x_start), alg_pattern,
+                                         (__m128i*) (rat_S + x_start), rat_pattern);
+        if (new_surv == 0)
             continue;
-        }
-        th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
-        surv++;
+        surv += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
+            {
+                SS[x] = 255;
+                continue;
+            }
+            surv++;
+#endif
+        
+            th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
 
 #ifndef UNSIEVE_NOT_COPRIME
-        unsigned int X;
-        unsigned int i, j;
-        X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
-        i = abs ((int) (X & (si->I - 1)) - si->I / 2);
-        j = X >> si->conf->logI;
-        if (bin_gcd_int64_safe (i, j) != 1)
-        {
+            unsigned int X;
+            unsigned int i, j;
+            X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
+            i = abs ((int) (X & (si->I - 1)) - si->I / 2);
+            j = X >> si->conf->logI;
+            if (bin_gcd_int64_safe (i, j) != 1)
+            {
 #ifdef TRACE_K
-            if (trace_on_spot_Nx(N, x)) {
-                fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                        trace_Nx.x, trace_Nx.N, i, j);
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[x] = 255;
+                continue;
             }
-#endif
-            SS[x] = 255;
-            continue;
-        }
 #elif 0
-        /* Very strict but very slow test of unsieving correctness */
-        unsigned int X;
-        unsigned int i, j;
-        X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
-        i = abs ((int) (X & (si->I - 1)) - si->I / 2);
-        j = X >> si->conf->logI;
-        ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
+            /* Very strict but very slow test of unsieving correctness */
+            unsigned int X;
+            unsigned int i, j;
+            X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
+            i = abs ((int) (X & (si->I - 1)) - si->I / 2);
+            j = X >> si->conf->logI;
+            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
 #endif
+        }
     }
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -3706,7 +3729,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 {
     las_info las;
     double t0, tts;
-    unsigned long sq = 0;
+    unsigned long nr_sq_processed = 0;
     int allow_largesq = 0;
     double totJ = 0.0;
     int argc = argc0;
@@ -3921,7 +3944,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             fprintf(las->output, " # within descent, currently at depth %d", si->doing->depth);
         }
         fprintf(las->output, "\n");
-        sq ++;
+        nr_sq_processed ++;
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
@@ -4032,7 +4055,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds () - t0;
     print_stats (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-            totJ / (double) sq, sq, max_full);
+            totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
     tts = t0;
     tts -= report->tn[0];
     tts -= report->tn[1];
@@ -4062,7 +4085,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
-            (double) report->reports / (double) sq);
+            (double) report->reports / (double) nr_sq_processed);
     
     /*}}}*/
 
