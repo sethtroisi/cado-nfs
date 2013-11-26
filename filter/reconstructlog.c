@@ -264,179 +264,6 @@ read_log (index_t *mat_renum, const char *filename, mpz_t q, unsigned int nbsm,
   return log;
 }
 
-/* Return non-zero if there is 0 or 1 unknown logarithm in the relation.
- * rels[i].nb_unknown may not be up-to-date (can only be greater than the actual
- * value) */
-static int
-usable (read_data_t *data, uint64_t i)
-{
-  weight_t len = data->rels[i].nb_unknown;
-  if (len <= 1)
-    return 1;
-
-  weight_t j, k;
-  ideal_merge_t *p = data->rels[i].unknown;
-
-  for (j = 0, k = 0; k < len; k++)
-  {
-	  if (mpz_sgn(data->log[p[k].id]) < 0) // we do not know the log if this ideal
-    {
-      if (j != k)
-        p[j] = p[k];
-      j++;
-    }
-    else // We know this log, add it to log_know_part
-      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log[p[k].id],
-                          p[k].e, data->q);
-  }
-
-  data->rels[i].nb_unknown = j;
-  return (j <= 1);
-}
-
-/* In a relation with 1 missing logarithm, compute its values. If all logarithms
- * are known, check that the sum is 0. Else there is an error.
- * return the number of computed log (0 or 1) */
-static unsigned int
-#ifndef FOR_FFS
-compute_log (read_data_t *data, sm_data_t *sm, uint64_t i)
-#else
-compute_log (read_data_t *data, uint64_t i)
-#endif
-{
-  mpz_ptr vlog = data->rels[i].log_known_part;
-  weight_t nb = data->rels[i].nb_unknown;
-
-#ifndef FOR_FFS
-  add_sm_contribution(vlog, sm, data->rels[i].a, data->rels[i].b);
-#endif
-
-  if (nb > 1)
-  {
-    fprintf (stderr, "Error, too much unknown ideals in relation %" PRIu64 "\n",
-                      i);
-    exit (EXIT_FAILURE);
-  }
-  else if (nb == 0)
-  {
-    if (mpz_cmp_ui (vlog, 0) != 0)
-    {
-      gmp_fprintf (stderr, "Error, no unknow log in rel %" PRIu64 " and sum of "
-                           "log is not zero (sum is %Zd), error!\n", i, vlog);
-      exit (EXIT_FAILURE);
-    }
-    return 0;
-  }
-  else /* nb = 1 */
-  {
-    ideal_merge_t ideal = data->rels[i].unknown[0];
-    mpz_t invert_coeff;
-    mpz_init_set_si (invert_coeff, ideal.e);
-    mpz_invert (invert_coeff, invert_coeff, data->q);
-    mpz_neg (vlog, vlog);
-    mpz_mul (vlog, vlog, invert_coeff);
-    mpz_mod (data->log[ideal.id], vlog, data->q);
-    return 1;
-  }
-}
-
-/* Debug function. List all unused relations.*/
-#if DEBUG == 1
-static void
-check_unused_rel (bit_vector not_used, log_rel_t *rels, uint64_t nrels)
-{
-  for (uint64_t i = 0; i < nrels; i++)
-  {
-    if (bit_vector_getbit(not_used, (size_t) i))
-    {
-      fprintf (stderr, "DEBUG: rel i=%" PRIu64 ": %u unknown logarithms: ",
-                       i, rels[i].nb_unknown);
-      for (weight_t k = 0; k < rels[i].nb_unknown; k++)
-        fprintf (stderr, "%" PRxid " ", rels[i].unknown[k].id);
-      fprintf (stderr, "\n");
-    }
-  }
-}
-#endif
-
-static inline unsigned int
-count_bits (uint64_t n)
-{
-  unsigned int c = 0;
-  for (; n ; c++)
-    n &= (n-1);
-
-  return c;
-}
-
-/* Compute all missing logarithms possible. Run through all the relations. Loop
- * until at least one logarithm was computed in the last iteration.
- * Return the number of computed logarithms */
-static uint64_t
-#ifndef FOR_FFS
-compute_missing_log (read_data_t *data, sm_data_t *sm, uint64_t nrels)
-#else
-compute_missing_log (read_data_t *data, uint64_t nrels)
-#endif
-
-{
-  uint64_t i, change, computed = 0, total_computed = 0, iter = 0;
-  double tt;
-  bit_vector not_used;
-
-  bit_vector_init(not_used, nrels);
-  FATAL_ERROR_CHECK (not_used->p == NULL, "Cannot allocate memory");
-  bit_vector_set(not_used, 1);
-  if (nrels & (BV_BITS - 1))
-    not_used->p[nrels>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrels & (BV_BITS - 1))) - 1;
-
-  do
-  {
-    computed = 0;
-    change = 0;
-    tt = seconds();
-    printf ("# Iteration %" PRIu64 ": begin\n", iter);
-    fflush(stdout);
-    for (i = 0; i < nrels; i++)
-    {
-      if (bit_vector_getbit(not_used, (size_t) i) && usable(data, i))
-      {
-#ifndef FOR_FFS
-        computed += compute_log(data, sm, i);
-#else
-        computed += compute_log(data, i);
-#endif
-        bit_vector_clearbit(not_used, (size_t) i);
-      }
-      if (i >> 18 != change >> 18)
-      {
-        printf("# Iteration %" PRIu64 ": %" PRIu64 " lines read, %" PRIu64 " "
-               "new logarithms computed\n", iter, i, computed);
-        fflush(stdout);
-        change = i;
-      }
-    }
-    total_computed += computed;
-    printf ("# Iteration %" PRIu64 ": end with %" PRIu64 " new "
-            "logarithms computed in %.1fs.\n", iter, computed, seconds()-tt);
-    iter++;
-  } while (computed);
-
-  uint64_t c = 0;
-  size_t j;
-  for (j = 0; j < iceildiv(not_used->n, BV_BITS); j++)
-    c += count_bits(not_used->p[j]);
-  if (c != 0)
-    fprintf(stderr, "Warning, %" PRIu64 " relations were not used\n", c);
-#if DEBUG == 1
-  if (c != 0)
-    check_unused_rel(not_used, data->rels, nrels);
-#endif
-
-  bit_vector_clear(not_used);
-  return total_computed;
-}
-
 /* Write values of the known logarithms. Return the number of missing values */
 static uint64_t
 write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
@@ -485,28 +312,6 @@ write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
   return missing;
 }
 
-/* Debug function: If an ideal had a non zero weight, it logarithm should be
- * known at the end of compute_log_from_relfile */
-#if DEBUG >= 1
-// if weight[k] != 0 => k appear in a rel => log should be known
-static void
-check_unknown_log (read_data_t *data, uint64_t nprimes)
-{
-  uint64_t c = 0;
-  int32_t *weight = data->w;
-  mpz_t *log = data->log;
-  for (index_t k = 0; k < nprimes; k++)
-    if (weight[k])
-	    if (mpz_sgn(log[k]) < 0)
-      {
-        c++;
-        fprintf (stderr, "DEBUG: ideal %" PRxid " had weight %u but its "
-                         "logarithm is unknown\n", k, weight[k]);
-      }
-  fprintf (stderr, "DEBUG: %" PRIu64 " more logarithms should be known\n", c);
-}
-#endif
-
 /* Callback function called by filter_rels in compute_log_from_relfile */
 void *
 insert_rel_into_table(void * context_data, earlyparsed_relation_ptr rel)
@@ -545,18 +350,142 @@ insert_rel_into_table(void * context_data, earlyparsed_relation_ptr rel)
   return NULL;
 }
 
-/* Given a filename, compute all the possible logarithms of ideals appearing in
- * the file */
+/* Debug functions */
+#if DEBUG == 1
+/* Debug functions */ /* List all unused relations.*/
 static void
+check_unused_rel (bit_vector not_used, log_rel_t *rels, uint64_t nrels)
+{
+  for (uint64_t i = 0; i < nrels; i++)
+  {
+    if (bit_vector_getbit(not_used, (size_t) i))
+    {
+      fprintf (stderr, "DEBUG: rel i=%" PRIu64 ": %u unknown logarithms: ",
+                       i, rels[i].nb_unknown);
+      for (weight_t k = 0; k < rels[i].nb_unknown; k++)
+        fprintf (stderr, "%" PRxid " ", rels[i].unknown[k].id);
+      fprintf (stderr, "\n");
+    }
+  }
+}
+
+/* If an ideal had a non zero weight, it logarithm should be known at the end of
+ * compute_log_from_relfile */
+static void
+check_unknown_log (read_data_t *data, uint64_t nprimes)
+{
+  uint64_t c = 0;
+  int32_t *weight = data->w;
+  mpz_t *log = data->log;
+  for (index_t k = 0; k < nprimes; k++)
+    if (weight[k])
+	    if (mpz_sgn(log[k]) < 0)
+      {
+        c++;
+        fprintf (stderr, "DEBUG: ideal %" PRxid " had weight %u but its "
+                         "logarithm is unknown\n", k, weight[k]);
+      }
+  fprintf (stderr, "DEBUG: %" PRIu64 " more logarithms should be known\n", c);
+}
+#endif
+
+/* Return the number of unknown logarithms in the relation.
+ * rels[i].nb_unknown may not be up-to-date (can only be greater than the actual
+ * value) */
+static inline weight_t
+nb_unknown_log (read_data_t *data, uint64_t i)
+{
+  weight_t j, k, len = data->rels[i].nb_unknown;
+  ideal_merge_t *p = data->rels[i].unknown;
+
+  for (j = 0, k = 0; k < len; k++)
+  {
+	  if (mpz_sgn(data->log[p[k].id]) < 0) // we do not know the log if this ideal
+    {
+      if (j != k)
+        p[j] = p[k];
+      j++;
+    }
+    else // We know this log, add it to log_know_part
+      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log[p[k].id],
+                          p[k].e, data->q);
+  }
+
+  data->rels[i].nb_unknown = j;
+  return j;
+}
+
+/* In a relation with 1 missing logarithm of exponent e, compute its values,
+ * i.e. compute   dest <- (-vlog / e) mod q */
+static inline void
+compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
+{
+  mpz_t invert_coeff;
+  mpz_init_set_si (invert_coeff, e);
+  mpz_invert (invert_coeff, invert_coeff, q);
+  mpz_neg (vlog, vlog);
+  mpz_mul (vlog, vlog, invert_coeff);
+  mpz_mod (dest, vlog, q);
+}
+
+/* Compute all missing logarithms possible. Run through all the relations once.
+ * Mono thread version
+ * Return the number of computed logarithms */
+static uint64_t
 #ifndef FOR_FFS
-compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
-                          mpz_t *log, uint64_t nprimes, uint64_t *known_log,
-                          unsigned long nbsm, mpz_t smexp, poly_t F)
+do_one_iter_mono (read_data_t *data, sm_data_t *sm, bit_vector not_used,
+                     uint64_t nrels)
 #else
-compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
-                          mpz_t *log, uint64_t nprimes, uint64_t *known_log)
+do_one_iter_mono (read_data_t *data, bit_vector not_used, uint64_t nrels)
 #endif
 {
+  uint64_t i, computed = 0;
+
+  for (i = 0; i < nrels; i++)
+  {
+    if (bit_vector_getbit(not_used, (size_t) i))
+    {
+      weight_t nb = nb_unknown_log(data, i);
+      if (nb <= 1)
+      {
+        bit_vector_clearbit(not_used, (size_t) i);
+        mpz_ptr vlog = data->rels[i].log_known_part;
+#ifndef FOR_FFS
+        add_sm_contribution(vlog, sm, data->rels[i].a, data->rels[i].b);
+#endif
+        if (nb == 0 && mpz_cmp_ui (vlog, 0) != 0)
+        {
+          gmp_fprintf (stderr, "Error, no unknow log in rel %" PRIu64 " and sum"
+                       " of log is not zero (sum is %Zd), error!\n", i, vlog);
+          exit (EXIT_FAILURE);
+        }
+        else if (nb == 1)
+        {
+          ideal_merge_t ideal = data->rels[i].unknown[0];
+          compute_missing_log(data->log[ideal.id], vlog, ideal.e, data->q);
+          computed++;
+        }
+      }
+    }
+  }
+
+  return computed;
+}
+
+/* Given a filename, compute all the possible logarithms of ideals appearing in
+ * the file. Return the number of computed logarithms. */
+static uint64_t
+#ifndef FOR_FFS
+compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
+                          mpz_t *log, uint64_t nprimes, unsigned long nbsm,
+                          mpz_t smexp, poly_t F)
+#else
+compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
+                          mpz_t *log, uint64_t nprimes)
+#endif
+{
+  double tt0, tt;
+  uint64_t total_computed = 0, iter = 0, computed;
   read_data_t data;
   read_data_init(&data, log, q, nprimes, nrels);
 
@@ -573,20 +502,41 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   sm_data_init(&sm, nbsm, F, q, smexp, log, nprimes);
 #endif
 
+  /* Init bit_vector to remember which relations were already used */
+  bit_vector not_used;
+  bit_vector_init(not_used, nrels);
+  FATAL_ERROR_CHECK (not_used->p == NULL, "Cannot allocate memory");
+  bit_vector_set(not_used, 1);
+  if (nrels & (BV_BITS - 1))
+    not_used->p[nrels>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrels & (BV_BITS - 1))) - 1;
+
   /* computing missing log */
   printf ("# Starting to computing missing logarithms from rels\n");
-  double tt = seconds();
+  tt0 = seconds();
+  do
+  {
+    printf ("# Iteration %" PRIu64 ": begin\n", iter);
+    fflush(stdout);
+    tt = seconds();
 #ifndef FOR_FFS
-  uint64_t ncomputed = compute_missing_log (&data, &sm, nrels);
+    computed = do_one_iter_mono (&data, &sm, not_used, nrels);
 #else
-  uint64_t ncomputed = compute_missing_log (&data, nrels);
+    computed = do_one_iter_mono (&data, not_used, nrels);
 #endif
-  *known_log += ncomputed;
-  printf ("# Computing %" PRIu64 " new logarithms took %.1fs (%" PRIu64 " known"
-          " logarithms so far)\n", ncomputed, seconds() - tt, *known_log);
-  fflush(stdout);
+    total_computed += computed;
+    printf ("# Iteration %" PRIu64 ": end with %" PRIu64 " new "
+            "logarithms computed in %.1fs.\n", iter, computed, seconds()-tt);
+    iter++;
+  } while (computed);
+  printf ("# Computing %" PRIu64 " new logarithms took %.1fs\n", total_computed,
+          seconds() - tt0);
 
-#if DEBUG >= 1
+  size_t c = bit_vector_popcount(not_used);
+  if (c != 0)
+    fprintf(stderr, "Warning, %" PRIu64 " relations were not used\n", c);
+#if DEBUG == 1
+  if (c != 0)
+    check_unused_rel(not_used, data->rels, nrels);
   check_unknown_log (&data, nprimes);
 #endif
 
@@ -594,6 +544,8 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
 #ifndef FOR_FFS
   sm_data_free(&sm);
 #endif
+  bit_vector_clear(not_used);
+  return total_computed;
 }
 
 
@@ -781,22 +733,26 @@ main(int argc, char *argv[])
   free (matrix_indexing);
 
   /* Computing log using rels in purged file */
+  known_log +=
 #ifndef FOR_FFS
-  compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
-                            &known_log, nbsm, smexp, F);
+    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
+                              nbsm, smexp, F);
 #else
-  compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
-                            &known_log);
+    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes);
 #endif
+  printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
+  fflush(stdout);
 
   /* Computing log using rels in del file */
+  known_log +=
 #ifndef FOR_FFS
-  compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
-                            &known_log, nbsm, smexp, F);
+    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
+                              nbsm, smexp, F);
 #else
-  compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
-                            &known_log);
+    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes);
 #endif
+  printf ("# %" PRIu64 " known logarithms.\n", known_log);
+  fflush(stdout);
 
   /* Writing all the logs in outfile */
   write_log (outfilename, log, q, renumber_table, poly, known_log);
