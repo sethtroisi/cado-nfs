@@ -66,11 +66,9 @@ static void
 log_rel_free (log_rel_t *rels, uint64_t nrels)
 {
   uint64_t i;
+  my_malloc_free_all();
   for (i = 0; i < nrels; i++)
-  {
-    free(rels[i].unknown);
     mpz_clear (rels[i].log_known_part);
-  }
   free(rels);
 }
 
@@ -306,7 +304,7 @@ write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
 
   ASSERT_ALWAYS (known_log + missing == tab->size);
   printf ("# Writing logarithms took %.1fs\n", seconds()-tt);
-  printf ("#  %" PRIu64 " logarithms are known, %" PRIu64 " are missing\n",
+  printf ("# %" PRIu64 " logarithms are known, %" PRIu64 " are missing\n",
           known_log, missing);
   fclose_maybe_compressed (f, filename);
   return missing;
@@ -428,20 +426,20 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
   mpz_mod (dest, vlog, q);
 }
 
-/* Compute all missing logarithms possible. Run through all the relations once.
- * Mono thread version
+/* Compute all missing logarithms for relations in [start,end[.
  * Return the number of computed logarithms */
 static uint64_t
 #ifndef FOR_FFS
-do_one_iter_mono (read_data_t *data, sm_data_t *sm, bit_vector not_used,
-                     uint64_t nrels)
+do_one_part_of_iter (read_data_t *data, sm_data_t *sm, bit_vector not_used,
+                     uint64_t start, uint64_t end)
 #else
-do_one_iter_mono (read_data_t *data, bit_vector not_used, uint64_t nrels)
+do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
+                     uint64_t end)
 #endif
 {
   uint64_t i, computed = 0;
 
-  for (i = 0; i < nrels; i++)
+  for (i = start; i < end; i++)
   {
     if (bit_vector_getbit(not_used, (size_t) i))
     {
@@ -472,16 +470,144 @@ do_one_iter_mono (read_data_t *data, bit_vector not_used, uint64_t nrels)
   return computed;
 }
 
+/* Compute all missing logarithms possible. Run through all the relations once.
+ * Mono thread version
+ * Return the number of computed logarithms */
+static uint64_t
+#ifndef FOR_FFS
+do_one_iter_mono (read_data_t *data, sm_data_t *sm, bit_vector not_used,
+                  uint64_t nrels)
+{
+  return do_one_part_of_iter (data, sm, not_used, 0, nrels);
+}
+#else
+do_one_iter_mono (read_data_t *data, bit_vector not_used, uint64_t nrels)
+{
+  return do_one_part_of_iter (data, not_used, 0, nrels);
+}
+#endif
+
+/* Code for multi thread version */
+#define SIZE_BLOCK 1024
+
+typedef struct {
+  read_data_t *data;
+  bit_vector_ptr not_used;
+#ifndef FOR_FFS
+  sm_data_t *sm;
+#endif
+  uint64_t offset;
+  uint64_t nb;
+  uint64_t computed;
+} thread_info;
+
+void * thread_start(void *arg)
+{
+  thread_info *ti = (thread_info *) arg;
+  read_data_t *data = ti->data;
+  bit_vector_ptr not_used = ti->not_used;
+  uint64_t start = ti->offset;
+  uint64_t end = start + ti->nb;
+  
+#ifndef FOR_FFS
+  sm_data_t *sm = ti->sm;
+  ti->computed = do_one_part_of_iter (data, sm, not_used, start, end);
+#else
+  ti->computed = do_one_part_of_iter (data, not_used, start, end);
+#endif
+
+  return NULL;
+}
+
+/* Compute all missing logarithms possible. Run through all the relations once.
+ * Multi thread version
+ * Return the number of computed logarithms */
+static uint64_t
+#ifndef FOR_FFS
+do_one_iter_mt (read_data_t *data, sm_data_t *sm, bit_vector not_used, int nt,
+                  uint64_t nrels)
+#else
+do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
+#endif
+{
+  /* adjust the number of threads based on the number of relations */
+  double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
+  if (nt > ntm)
+    nt = (int) ntm;
+  printf("# Using multi thread version with %d threads\n", nt);
+
+  // We'll use a rotating buffer of thread id.
+  pthread_t *threads;
+  threads = (pthread_t *) malloc( nt * sizeof(pthread_t));
+  int active_threads = 0;  // number of running threads
+  int threads_head = 0;    // next thread to wait / restart.
+  
+  // Prepare the main loop
+  uint64_t i = 0; // counter of relation.
+  uint64_t computed = 0;
+
+  // Arguments for threads
+  thread_info *tis;
+  tis = (thread_info *) malloc( nt * sizeof(thread_info));
+  for (int i = 0; i < nt; ++i)
+  {
+    tis[i].data = data;
+    tis[i].not_used = not_used;
+#ifndef FOR_FFS
+    tis[i].sm = sm;
+#endif
+    // offset and nb must be adjusted.
+  }
+
+  // Main loop
+  while ((i < nrels) || (active_threads > 0))
+  {
+    // Start / restart as many threads as allowed
+    if ((active_threads < nt) && (i < nrels))
+    {
+      tis[threads_head].offset = i;
+      tis[threads_head].nb = MIN(SIZE_BLOCK, nrels-i);
+      pthread_create(&threads[threads_head], NULL, 
+          &thread_start, (void *)(&tis[threads_head]));
+      i += SIZE_BLOCK;
+      active_threads++;
+      threads_head++; 
+      if (threads_head == nt) 
+        threads_head = 0;
+      continue;
+    }
+    // Wait for the next thread to finish in order to print result.
+    pthread_join(threads[threads_head], NULL);
+    active_threads--;
+    computed += tis[threads_head].computed;
+
+    // If we are at the end, no job will be restarted, but head still
+    // must be incremented.
+    if (i >= nrels)
+    { 
+      threads_head++;
+      if (threads_head == nt) 
+        threads_head = 0;
+    }
+  }
+
+  free(tis);
+  free(threads);
+  return computed;
+}
+
+
+
 /* Given a filename, compute all the possible logarithms of ideals appearing in
  * the file. Return the number of computed logarithms. */
 static uint64_t
 #ifndef FOR_FFS
 compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
                           mpz_t *log, uint64_t nprimes, unsigned long nbsm,
-                          mpz_t smexp, poly_t F)
+                          mpz_t smexp, poly_t F, int nt)
 #else
 compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
-                          mpz_t *log, uint64_t nprimes)
+                          mpz_t *log, uint64_t nprimes, int nt)
 #endif
 {
   double tt0, tt;
@@ -519,9 +645,15 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
     fflush(stdout);
     tt = seconds();
 #ifndef FOR_FFS
-    computed = do_one_iter_mono (&data, &sm, not_used, nrels);
+    if (nt > 1)
+      computed = do_one_iter_mt (&data, &sm, not_used, nt, nrels);
+    else
+      computed = do_one_iter_mono (&data, &sm, not_used, nrels);
 #else
-    computed = do_one_iter_mono (&data, not_used, nrels);
+    if (nt > 1)
+      computed = do_one_iter_mt (&data, not_used, nt, nrels);
+    else
+      computed = do_one_iter_mono (&data, not_used, nrels);
 #endif
     total_computed += computed;
     printf ("# Iteration %" PRIu64 ": end with %" PRIu64 " new "
@@ -568,6 +700,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "sm", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp parameter)");
 #endif
+  param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
@@ -589,6 +722,7 @@ main(int argc, char *argv[])
   uint64_t ncols_matrix, nrels_tot = 0, nrels_purged, nideals_purged, nrels_del;
   uint64_t nprimes, i, known_log;
   index_t *matrix_indexing = NULL;
+  int mt = 1;
 
   unsigned int nbsm = 0;
   mpz_t q, smexp, *log = NULL;
@@ -633,6 +767,7 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm", &nbsm);
   param_list_parse_mpz(pl, "smexp", smexp);
 #endif
+  param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
   /* Some checks on command line arguments */
@@ -695,6 +830,11 @@ main(int argc, char *argv[])
     fprintf(stderr, "Error, missing -poly command line argument\n");
     usage (pl, argv0);
   }
+  if (mt < 1)
+  {
+    fprintf(stderr, "Error: parameter mt must be at least 1\n");
+    usage (pl, argv0);
+  }
 
   cado_poly_init (poly);
 #ifndef FOR_FFS
@@ -736,9 +876,9 @@ main(int argc, char *argv[])
   known_log +=
 #ifndef FOR_FFS
     compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
-                              nbsm, smexp, F);
+                              nbsm, smexp, F, mt);
 #else
-    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes);
+    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes, mt);
 #endif
   printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
   fflush(stdout);
@@ -747,9 +887,9 @@ main(int argc, char *argv[])
   known_log +=
 #ifndef FOR_FFS
     compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
-                              nbsm, smexp, F);
+                              nbsm, smexp, F, mt);
 #else
-    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes);
+    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes, mt);
 #endif
   printf ("# %" PRIu64 " known logarithms.\n", known_log);
   fflush(stdout);
@@ -763,7 +903,9 @@ main(int argc, char *argv[])
   free(log);
   mpz_clear(q);
   mpz_clear(smexp);
+#ifndef FOR_FFS
   poly_free(F);
+#endif
 
   renumber_free (renumber_table);
   cado_poly_clear (poly);
