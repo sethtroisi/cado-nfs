@@ -25,6 +25,8 @@
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
 #
 # TODO: addfullcol should be 1 by default for NFS-DL, 0 for FFS
+#       multi thread for sm (NFS-DL)
+#       multi thread for reconstructlog
 
 check_error () {
   if [ $1 -ne 0 ] ; then
@@ -462,12 +464,20 @@ fi
 # Help: output the command line needed to recontruct all logarithms from the
 # ones computed by linear algebra
 
-BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
 OUTLOG="${DIR}/${NAME}.logarithms.values"
-argsre0="-ideals ${INDEX_ID_MERGE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
-argsre1="-relspurged ${RELSFILE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
-argsre2="-out ${OUTLOG} -log <file> -q ${MOD_ELL}"
-echo "${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2 "
+if [ "x${NFSDL}" != "x1" ] ; then # For FFS
+  BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
+  argsre2="-out ${OUTLOG} -log <file> -gorder ${MOD_ELL}"
+else # for NFS-DL
+  BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-dl";
+  argsre2="-out ${OUTLOG} -smexp ${SM_EXP} -log <file> -gorder ${MOD_ELL}"
+fi
+
+argsre0="-purged ${RELSFILE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
+argsre1="-ideals ${INDEX_ID_MERGE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
+
+
+echo "${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2"
 
 ###### If tidy is asked ######
 
