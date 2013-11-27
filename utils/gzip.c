@@ -281,7 +281,8 @@ char **prepare_grouped_command_lines(char **list_of_files)
         new_commands[n_new_commands-1] = cmd;
         free(tmp);
         free(cmd_prefix);
-        free(cmd_postfix);
+        if (strcmp(cmd_postfix, ""))
+          free(cmd_postfix);
         grouphead = grouptail;
     }
     new_commands = realloc(new_commands, ++n_new_commands * sizeof(char*));
