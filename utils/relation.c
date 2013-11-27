@@ -209,13 +209,16 @@ d64toa16 (char *p, int64_t m)
 /*}}}*/
 
 void
-fprint_relation (FILE *file, relation_t * rel)
+fprint_relation (FILE *file, relation_t * rel, const char *prefix)
 {
-  char buf[1<<10], *p, *op;
+  char buf[1<<10], *p = buf, *op;
   size_t lg;
   int i, j;
   
-  p = d64toa10(buf, rel->a);
+  strncpy(p, prefix, sizeof(buf) / sizeof(char));
+  p += strnlen(prefix, sizeof(buf) / sizeof(char));
+
+  p = d64toa10(p, rel->a);
   *p++ = ',';
   p = u64toa10(p, rel->b);
   *p++ = ':';

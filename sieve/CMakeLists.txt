@@ -11,7 +11,7 @@ add_executable (makefb makefb.c)
 target_link_libraries (makefb utils)
 
 add_executable (las las.c fb.c trialdiv.c
-    las-coordinates.c las-debug.c las-report-stats.c
+    las-coordinates.c las-debug.c las-report-stats.c las-duplicate.c
     las-config.c las-norms.c bucket.c las-smallsieve.c las-unsieve.c las-arith.c
     las-qlattice.c las-descent-helpers.cpp)
 target_link_libraries (las facul utils ${pthread_libs})

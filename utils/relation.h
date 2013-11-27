@@ -81,7 +81,7 @@ extern char * d64toa10 (char *p, int64_t m);
 extern char * d64toa16 (char *p, int64_t m);
 
 
-extern void fprint_relation(FILE *file, relation_t * rel);
+extern void fprint_relation(FILE *file, relation_t * rel, const char *);
 extern void fprint_relation_raw (FILE *file, relation_t * rel);
 extern void reduce_exponents_mod2 (relation_t *rel);
 

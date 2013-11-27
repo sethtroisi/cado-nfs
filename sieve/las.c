@@ -20,6 +20,7 @@
 #include "las-types.h"
 #include "las-coordinates.h"
 #include "las-debug.h"
+#include "las-duplicate.h"
 #include "las-report-stats.h"
 #include "las-norms.h"
 #include "las-unsieve.h"
@@ -928,6 +929,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Allocate room for only one sieve_info */
     las->sievers = malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
+
+    las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
 }/*}}}*/
 
 void las_info_clear(las_info_ptr las)/*{{{*/
@@ -2901,6 +2904,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             surv += search_survivors_in_line(both_S, both_bounds, 
                                              si->conf->logI, j + first_j);
         }
+        /* Make survivor search create a list of x-coordinates that survived
+           instead of changing sieve array? More localized accesses in
+           purge_bucket() that way */
     }
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -3007,6 +3013,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             /* Since the q-lattice is exactly those (a, b) with
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+            /* FIXME: fast divisibility test here! */
             if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
                 continue;
 
@@ -3153,11 +3160,15 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (1)
 #endif
             {
+                const double skew = las->cpoly->skew;
+                int do_check = th->las->suppress_duplicates;
+                int is_dup = do_check && relation_is_duplicate(rel, skew, si);
+                const char *comment = is_dup ? "# " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
-                fprint_relation(las->output, rel);
+                fprint_relation(las->output, rel, comment);
                 pthread_mutex_unlock(&io_mutex);
             }
 
@@ -3829,6 +3840,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
+  param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -3859,6 +3871,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
+    param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;
