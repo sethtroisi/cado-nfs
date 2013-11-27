@@ -125,6 +125,9 @@ check_one_prime(const unsigned long sq,
   const unsigned long p = mpz_get_ui(si->doing->p);
   const uint32_t I = si->I, J = si->J;
 
+  if (p == sq) /* Dummy to get rid of "unused" warning */
+    return 0;
+
   /* Compute i,j-coordinates of this relation in the special-q lattice when
      p was used as the special-q value. */
 
