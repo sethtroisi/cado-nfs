@@ -774,6 +774,8 @@ sieve/las-coordinates.c
 sieve/las-coordinates.h
 sieve/las-debug.c
 sieve/las-debug.h
+sieve/las-duplicate.c
+sieve/las-duplicate.h
 sieve/las-norms.c
 sieve/las-norms.h
 sieve/las-qlattice.c
