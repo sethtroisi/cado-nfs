@@ -18,7 +18,7 @@ normstats_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o \
 
 checkrels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o norm.o 
 
-freerels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
+freerels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o fqpol.o \
 	       polyfactor.o
 
 testirred_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
@@ -43,14 +43,12 @@ CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0 -I../utils -I..
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
-LDLIBS      = -lm
+LDLIBS      = -lm -lpthread
 
 #begin for freerels
 #BIN += freerels
 #LDFLAGS  += -L$(BUILDDIR)/../utils #for freerels
-#LDLIBS   += -rdynamic $(BUILDDIR)/../utils/libutils.so #for freerels
-#RPATH     = $(shell readlink -f $(BUILDDIR)/../utils) #for freerels
-#LDLIBS   += -Wl,-rpath,${RPATH} #for freerels
+#LDLIBS   += -lutils -lm -lgmp #for freerels
 #end for freerels
 
 # Override variables in here!
