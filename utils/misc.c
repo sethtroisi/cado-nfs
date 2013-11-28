@@ -28,6 +28,7 @@
 #include "macros.h"
 #include "portability.h"
 #include "misc.h"
+#include "typecast.h"
 
 void
 *malloc_check (const size_t x)
@@ -61,7 +62,7 @@ void
 #else
       *(unsigned char *) i = 0;
 #endif
-      i += (size_t) pagesize ();
+      i += cast_long_size(pagesize ());
     }
   }
   return p;
