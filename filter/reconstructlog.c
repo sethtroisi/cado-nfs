@@ -665,7 +665,7 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
 
   size_t c = bit_vector_popcount(not_used);
   if (c != 0)
-    fprintf(stderr, "Warning, %" PRIu64 " relations were not used\n", c);
+    fprintf(stderr, "Warning, %zu relations were not used\n", c);
 #if DEBUG == 1
   if (c != 0)
     check_unused_rel(not_used, data->rels, nrels);
