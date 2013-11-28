@@ -594,6 +594,11 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
+    if (0) {
+        printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+               "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
+               si->a0, si->b0, si->a1, si->b1, skewness, nb_threads);
+    }
     double maxab1, maxab0;
     maxab1 = si->b1 * skewness;
     maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
@@ -2641,8 +2646,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
-static int
-check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
+int
+check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 {
   size_t s = mpz_sizeinbase (n, 2);
   unsigned int lpb = si->conf->sides[side]->lpb;
