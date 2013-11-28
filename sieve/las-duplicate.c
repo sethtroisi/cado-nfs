@@ -188,7 +188,7 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
    when sieving the sq described by si. Return 0 if it is probably not a
    duplicate */
 int
-check_one_prime(const unsigned long sq, const int64_t a, const uint64_t b, 
+check_one_prime(const unsigned long sq MAYBE_UNUSED, const int64_t a, const uint64_t b, 
                 const double skewness,
                 const int nb_threads, const mpz_t cof,
                 int side, sieve_info_ptr si)
