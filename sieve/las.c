@@ -2675,7 +2675,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
 
 static int
 search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[2], 
-        const unsigned int log_I, const unsigned int j)
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
 {
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
@@ -2735,7 +2735,7 @@ search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[
 
 static int
 search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound[2], 
-        const unsigned int log_I, const unsigned int j)
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
 {
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
@@ -2878,7 +2878,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-    for (int x = 0; x < 1 << BUCKET_REGION; x++) {
+    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
                     alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
@@ -2899,10 +2899,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         };
         if ((j + first_j) % 3 == 0) {
             surv += search_survivors_in_line3(both_S, both_bounds, 
-                                              si->conf->logI, j + first_j);
+                                              si->conf->logI, j + first_j, N);
         } else {
             surv += search_survivors_in_line(both_S, both_bounds, 
-                                             si->conf->logI, j + first_j);
+                                             si->conf->logI, j + first_j, N);
         }
         /* Make survivor search create a list of x-coordinates that survived
            instead of changing sieve array? More localized accesses in
