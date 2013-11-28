@@ -90,11 +90,19 @@ Thus the function to check for duplicates needs the following information:
 
 #include "cado.h"
 #include <gmp.h>
+#include <stdio.h>
 #include "las-duplicate.h"
 #include "las-qlattice.h"
 #include "las-coordinates.h"
 #include "gmp_aux.h"
 
+
+static int intlog2(uint32_t n)
+{
+  int l = 0;
+  while (n > 1) {n >>= 1; l++;}
+  return l;
+}
 
 static void
 fill_in_sieve_info(sieve_info_ptr si, const uint32_t I, const uint32_t J, 
@@ -102,6 +110,7 @@ fill_in_sieve_info(sieve_info_ptr si, const uint32_t I, const uint32_t J,
 {
   si->I = I;
   si->J = J;
+  si->conf->logI = intlog2(I);
 
   /* First compute the root a/b (mod p) */
   mpz_init(si->doing->p);
@@ -119,11 +128,10 @@ fill_in_sieve_info(sieve_info_ptr si, const uint32_t I, const uint32_t J,
    duplicate */
 static int
 check_one_prime(const unsigned long sq, 
-                const int64_t a, const uint64_t b, 
-                const double skewness, sieve_info_ptr si)
+                const int64_t a, const uint64_t b, const double skewness,
+                const int nb_threads, sieve_info_ptr si)
 {
   const unsigned long p = mpz_get_ui(si->doing->p);
-  const uint32_t I = si->I, J = si->J;
 
   if (p == sq) /* Dummy to get rid of "unused" warning */
     return 0;
@@ -132,9 +140,23 @@ check_one_prime(const unsigned long sq,
      p was used as the special-q value. */
 
   SkewGauss(si, skewness);  
+
+  const uint32_t oldI = si->I, oldJ = si->J;
+  /* If resulting optimal J is so small that it's not worth sieving,
+     this special-q gets skipped, so relation is not a duplicate */
+  if (sieve_info_adjust_IJ(si, skewness, nb_threads) == 0) {
+    // fprintf(stderr, "sq = %lu, p = %lu discarded\n", sq, p);
+    return 0;
+  }
+  
+  const uint32_t I = si->I, J = si->J;
   int i;
   unsigned int j;
 
+  if (oldI != I || oldJ != J) {
+    // fprintf (stderr, "oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
+  }
+  
   int ok = ABToIJ(&i, &j, a, b, si);
 
   if (!ok)
@@ -151,7 +173,8 @@ check_one_prime(const unsigned long sq,
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_srcptr si)
+relation_is_duplicate(relation_t *relation, const double skewness, 
+                      const int nb_threads, sieve_info_srcptr si)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
@@ -202,7 +225,7 @@ relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_sr
        the lattice-reduction and coordinate-conversion functions */
     sieve_info new_si;
     fill_in_sieve_info (new_si, I, J, p, a, b);
-    if (check_one_prime(sq, a, b, skewness, new_si))
+    if (check_one_prime(sq, a, b, skewness, nb_threads, new_si))
       return 1;
 
     mpz_clear(new_si->doing->r);
