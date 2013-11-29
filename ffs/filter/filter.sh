@@ -25,6 +25,7 @@
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
 #
 # TODO: addfullcol should be 1 by default for NFS-DL, 0 for FFS
+#       multi thread for freerels for FFS
 #       multi thread for sm (NFS-DL)
 #       multi thread for reconstructlog
 
@@ -239,7 +240,7 @@ BIN_DUP1="${CADO_BUILD}/filter/dup1";
 BIN_PURGE="${CADO_BUILD}/filter/purge";
 BIN_MERGE="${CADO_BUILD}/filter/merge-dl";
 BIN_REPLAY="${CADO_BUILD}/filter/replay-dl";
-BIN_SM="${CADO_BUILD}/linalg/sm";
+BIN_SM="${CADO_BUILD}/filter/sm";
 check_file_exists "${BIN_FREE}"
 check_file_exists "${BIN_DUP1}"
 check_file_exists "${BIN_DUP2}"
