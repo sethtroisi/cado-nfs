@@ -89,7 +89,7 @@ static inline void dotprod_64K_128(
         unsigned int K)
 {
     memset(w, 0, 64 * K * sizeof(__v2di));
-    /* okay, we've casted the v2di* to u64* for interchange, and now
+    /* okay, we've cast the v2di* to u64* for interchange, and now
      * we're casting it back...  */
     __v2di * vv = (__v2di*) v;
     for(unsigned int i = 0 ; i < n ; i++) {
