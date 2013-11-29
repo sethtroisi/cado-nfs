@@ -302,7 +302,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
-    fprintf(stderr, "  q1   *           lower bound for special-q range\n");
+    fprintf(stderr, "  q1   *           upper bound for special-q range\n");
     fprintf(stderr, "  sqt  [3]         skip special-q whose defect is sqt or more\n");
     fprintf(stderr, "  bench            bench-mode. Takes parameter of the form deg0-deg1\n");
     fprintf(stderr, "                   and estimates the time and number of rels for corresping sq.\n");
