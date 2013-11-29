@@ -1709,13 +1709,11 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1731,7 +1729,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime (p);
       /*****************************************************************/
 #define FILL_BUCKET_HEART() do {					\
@@ -1766,7 +1764,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
@@ -1837,13 +1835,11 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1859,7 +1855,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime(p);
       /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
 	 is need because the last byte of x (always 0 because x <<= 8) must
@@ -1917,7 +1913,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
