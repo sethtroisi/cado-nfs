@@ -232,7 +232,7 @@ check_one_prime(const unsigned long sq MAYBE_UNUSED, const int64_t a, const uint
 
   /* If the coordinate is outside the i,j-region used when sieving
      the special-q described in si, then it's not a duplicate */
-  if ((i < 0 && (uint32_t)(-i) > I) || (i > 0 && (uint32_t)i > I-1) || (j >= J)) {
+  if ((i < 0 && (uint32_t)(-i) > I/2) || (i > 0 && (uint32_t)i > I/2-1) || (j >= J)) {
     if (verbose) {
       printf("# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
     }
