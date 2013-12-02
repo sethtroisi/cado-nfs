@@ -585,6 +585,7 @@ class ServerLauncher(object):
         self.url_address = address if address else socket.gethostname()
         self.port = port
         self.cafile = cafile
+        self.only_registered = only_registered
         upload_scriptname = "upload.py"
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
@@ -721,6 +722,10 @@ class ServerLauncher(object):
     
     def serve(self):
         self.logger.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
+        if self.only_registered:
+            self.logger.info("For debugging purposes, the URL above can be accessed if the server.only_registered=False parameter is added" )
+        else:
+            self.logger.info("For debugging purposes, the URL above may be accessed")
         certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
         self.logger.info("You can start additional wuclient2.py scripts with "
                          "parameters: --server=%s%s", self.url, certstr)

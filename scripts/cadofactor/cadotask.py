@@ -2866,7 +2866,6 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
             server_whitelist = None
 
         self.registered_filenames = self.make_db_dict('server_registered_filenames')
-
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
             uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
