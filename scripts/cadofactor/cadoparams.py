@@ -162,6 +162,7 @@ class Parameters(object):
         "compression": BoolParam,
         "ssl": BoolParam,
         "threaded": BoolParam,
+        "only_registered": BoolParam
     }
 
     def __init__(self, *args, **kwargs):

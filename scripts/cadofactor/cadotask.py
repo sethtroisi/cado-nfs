@@ -2828,7 +2828,8 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         return "Server Launcher"
     @property
     def paramnames(self):
-        return ("name", "workdir", "address", "port", "threaded", "ssl", "whitelist")
+        return ("name", "workdir", "address", "port", "threaded", "ssl", "whitelist", 
+                "only_registered")
     @property
     def param_nodename(self):
         return self.name
@@ -2846,6 +2847,11 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
         threaded = self.params.get("threaded", False)
+        # By default, allow access only to files explicitly registered by tasks,
+        # i.e., those files required by clients when downloading input files for
+        # their workunits. By setting only_registered=False, access to all files
+        # under the server working directory is allowed.
+        only_registered = self.params.get("only_registered", True)
         if self.params.get("ssl", True):
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
@@ -2863,7 +2869,7 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
 
         self.server = wuserver.ServerLauncher(serveraddress, serverport,
             threaded, self.get_db_filename(), self.registered_filenames,
-            uploaddir, bg=True, only_registered=True, cafile=cafilename,
+            uploaddir, bg=True, only_registered=only_registered, cafile=cafilename,
             whitelist=server_whitelist)
 
     def run(self):
