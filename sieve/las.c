@@ -3895,7 +3895,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
 
-    memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
     /*
@@ -3909,7 +3908,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      * q0 -> q0d (double) -> si->sides[*]->{scale,logmax}
      * q0 -> (I, lpb, lambda) for the descent
      * 
-     * scales -> logp's in factor base.
+     * scale -> logp's in factor base.
      *
      * I -> splittings of the factor base among threads.
      *
