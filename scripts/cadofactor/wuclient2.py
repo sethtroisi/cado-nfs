@@ -998,6 +998,25 @@ if __name__ == '__main__':
                                 % arg.lower())
         return options
 
+    def makedirs(path, mode=None, exist_ok=False):
+        # Python 3.2 os.makedirs() has exist_ok, but older Python do not
+        if sys.version_info[0:2] >= (3,2):
+            if mode is None:
+                os.makedirs(path, exist_ok=exist_ok)
+            else:
+                os.makedirs(path, mode=mode, exist_ok=exist_ok)
+        else:
+            try:
+                if mode is None:
+                    os.makedirs(path)
+                else:
+                    os.makedirs(path, mode=mode)
+            except OSError as e:
+                if e.errno == errno.EEXIST and exist_ok:
+                    pass
+                else:
+                    raise
+
     options = parse_cmdline()
     # If no client id is given, we use <hostname>.<randomstr>
     if SETTINGS["CLIENTID"] is None:
@@ -1023,9 +1042,9 @@ if __name__ == '__main__':
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
-        os.makedirs(SETTINGS["DLDIR"])
+        makedirs(SETTINGS["DLDIR"], exist_ok=True)
     if not os.path.isdir(SETTINGS["WORKDIR"]):
-        os.makedirs(SETTINGS["WORKDIR"])
+        makedirs(SETTINGS["WORKDIR"], exist_ok=True)
 
     # print (str(SETTINGS))
 
