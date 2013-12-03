@@ -11,8 +11,6 @@
 
 #ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
 #include <dlfcn.h>
-#else
-extern void matmul_solib_do_rebinding(void * mm);
 #endif
 
 
@@ -24,12 +22,55 @@ extern void matmul_solib_do_rebinding(void * mm);
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 
+#ifndef  BUILD_DYNAMICALLY_LINKABLE_BWC
+#define MATMUL_NAME_INNER(abase, impl, func) matmul_ ## abase ## _ ## impl ## _ ## func
+#define MATMUL_NAME_INNER0(abase, impl, func) MATMUL_NAME_INNER(abase, impl, func)
+#define CONFIGURE_MATMUL_LIB(d_, i_)				\
+    } else if (strcmp(impl, #i_) == 0 && strcmp(dimpl, #d_) == 0) {		\
+        extern void MATMUL_NAME_INNER0(d_, i_, rebind)(matmul_ptr mm);	\
+        return MATMUL_NAME_INNER0(d_, i_, rebind);
+
+
+/* this is a function taking two strings, and returning a pointer to a
+ * function taking a matmul_ptr and returning void */
+void (*get_rebinder(const char * impl, const char * dimpl))(matmul_ptr mm)
+{
+    if (0) {
+        return NULL;
+    /* This list MUST be in sync with the corresponding one in
+     * linalg/bwc/CMakeLists.txt, or at the bare minimum be a subset. */
+    CONFIGURE_MATMUL_LIB(u64k1     , bucket)
+    CONFIGURE_MATMUL_LIB(u64k2     , bucket)
+    CONFIGURE_MATMUL_LIB(u64k1     , basic)
+    CONFIGURE_MATMUL_LIB(u64k2     , basic)
+    CONFIGURE_MATMUL_LIB(u64k1     , sliced)
+    CONFIGURE_MATMUL_LIB(u64k2     , sliced)
+    CONFIGURE_MATMUL_LIB(u64k1     , threaded)
+    CONFIGURE_MATMUL_LIB(u64k2     , threaded)
+#ifdef ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
+    CONFIGURE_MATMUL_LIB(p_1       , basicp)
+    CONFIGURE_MATMUL_LIB(p_2       , basicp)
+    CONFIGURE_MATMUL_LIB(p_3       , basicp)
+    CONFIGURE_MATMUL_LIB(p_4       , basicp)
+    CONFIGURE_MATMUL_LIB(p_8       , basicp)
+#endif
+    } else {
+        fprintf(stderr, "Cannot find the proper rebinder for data backend = %s and matmul backend = %s ; are the corresponding configuration lines present both in " __FILE__ " and linalg/bwc/CMakeLists.txt ?\n", dimpl, impl);
+        return NULL;
+    }
+}
+#endif
+
 matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
 
     if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
+
+    typedef void (*rebinder_t)(matmul_ptr mm);
+    rebinder_t rebinder;
+
 
 #ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     char solib[256];
@@ -42,31 +83,22 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
         fprintf(stderr, "loading %s: %s\n", solib, dlerror());
         abort();
     }
-    typedef void (*rebinder_t)(matmul_ptr mm);
-    rebinder_t sym = dlsym(handle, "matmul_solib_do_rebinding");
-    if (sym == NULL) {
+    rebinder = dlsym(handle, "matmul_solib_do_rebinding");
+    if (rebinder == NULL) {
         fprintf(stderr, "loading %s: %s\n", solib, dlerror());
         abort();
     }
-    (*sym)(fake);
 #else   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
-    ASSERT_ALWAYS (strcmp(impl, MATMUL_DEFAULT_IMPL) == 0);
-    /* The compile process should arrange so that only _ONE_ choice is
-     * compiled in, so that in effect we have static, not shared
-     * libraries.
-     */
-    matmul_solib_do_rebinding(fake);
+    rebinder = get_rebinder(impl, x->oo_impl_name(x));
 #endif   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
 
-    // be careful, we really want ->obj here !
+    (*rebinder)(fake);
     matmul_ptr mm = fake->bind->init(x->obj, pl, optimized_direction);
     if (mm == NULL) return NULL;
 #ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     mm->solib_handle = handle;
-    (*sym)(mm);
-#else
-    matmul_solib_do_rebinding(mm);
 #endif
+    (*rebinder)(mm);
 
     mm->dim[0] = nr;
     mm->dim[1] = nc;

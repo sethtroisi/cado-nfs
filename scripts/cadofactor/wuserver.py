@@ -291,12 +291,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """
         # Path in url always starts with '/'
         # print("translate_path(%s)" % path)
-        relpath = self.path.lstrip('/')
+        relpath = path.lstrip('/')
         if relpath in self.registered_filenames:
-            self.log(logging.DEBUG, "Translated path %s to %s", self.path, 
+            self.log(logging.DEBUG, "Translated path %s to %s", path, 
                      self.registered_filenames[relpath])
             return self.registered_filenames[relpath]
-        self.log(logging.DEBUG, "Not translating path %s ", self.path)
+        self.log(logging.DEBUG, "Not translating path %s ", path)
         if self.only_registered:
             return None
         else:
@@ -367,7 +367,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # environment variables to be set according to the CGI
             # specificaton, such as CONTENT_LENGTH.
             # This is really slow if rbufsize == 0.
-            env = self.create_env("upload.py")
+            env = self.create_env("cgi-bin/upload.py")
             upload.do_upload(self.dbfilename, self.uploaddir, 
                     inputfp=self.rfile, output=self.wfile, environ=env)
 
@@ -585,6 +585,7 @@ class ServerLauncher(object):
         self.url_address = address if address else socket.gethostname()
         self.port = port
         self.cafile = cafile
+        self.only_registered = only_registered
         upload_scriptname = "upload.py"
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
@@ -721,6 +722,10 @@ class ServerLauncher(object):
     
     def serve(self):
         self.logger.info("serving at %s (%s)", self.url, self.httpd.server_address[0])
+        if self.only_registered:
+            self.logger.info("For debugging purposes, the URL above can be accessed if the server.only_registered=False parameter is added" )
+        else:
+            self.logger.info("For debugging purposes, the URL above may be accessed")
         certstr = "" if self.cert_sha1 is None else " --certsha1=%s" % self.cert_sha1
         self.logger.info("You can start additional wuclient2.py scripts with "
                          "parameters: --server=%s%s", self.url, certstr)

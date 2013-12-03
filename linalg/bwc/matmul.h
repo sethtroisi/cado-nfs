@@ -5,8 +5,6 @@
 #include <stdint.h>
 
 /* This header is common to the different matrix product implementations
- * So the matrix product codes are meant to be used as interchangeable .o
- * files.
  */
 #include "params.h"
 #include "mpfq/abase_vbase.h"
@@ -24,8 +22,8 @@ typedef void (*matmul_save_cache_t)(matmul_ptr);
 typedef void (*matmul_mul_t)(matmul_ptr, void *, const void *, int);
 typedef void (*matmul_report_t)(matmul_ptr, double scale);
 typedef void (*matmul_clear_t)(matmul_ptr mm);
-typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, ...);
-typedef void (*matmul_aux_t)(matmul_ptr mm, int op, va_list ap);
+typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, va_list ap);
+typedef void (*matmul_aux_t)(matmul_ptr mm, int op, ...);
 
 struct matmul_bindings_s {
 	matmul_build_cache_t	build_cache;

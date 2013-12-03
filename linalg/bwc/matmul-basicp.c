@@ -7,10 +7,11 @@
 #include <string.h>
 #include "bwc_config.h"
 #include "matmul.h"
-#include "matmul-basicp.h"
 #include "matmul-common.h"
 #include "abase.h"
 #include "portability.h"
+
+#include "matmul_facade.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -40,14 +41,15 @@ struct matmul_basicp_data_s {
     uint32_t * q;
 };
 
-void matmul_basicp_clear(struct matmul_basicp_data_s * mm)
+void MATMUL_NAME(clear)(matmul_ptr mm0)
 {
+    struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     matmul_common_clear(mm->public_);
     free(mm->q);
     free(mm);
 }
 
-struct matmul_basicp_data_s * matmul_basicp_init(void* xx, param_list pl, int optimized_direction)
+matmul_ptr MATMUL_NAME(init)(void* xx, param_list pl, int optimized_direction)
 {
     struct matmul_basicp_data_s * mm;
     mm = malloc(sizeof(struct matmul_basicp_data_s));
@@ -65,13 +67,14 @@ struct matmul_basicp_data_s * matmul_basicp_init(void* xx, param_list pl, int op
         }           
     }   
 
-    return mm;
+    return (matmul_ptr) mm;
 }
 
-void matmul_basicp_build_cache(struct matmul_basicp_data_s * mm, uint32_t * data)
+void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
 {
     ASSERT_ALWAYS(data);
 
+    struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     
     uint32_t * ptr = data;
@@ -95,9 +98,10 @@ void matmul_basicp_build_cache(struct matmul_basicp_data_s * mm, uint32_t * data
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) mm->datasize);
 }
 
-int matmul_basicp_reload_cache(struct matmul_basicp_data_s * mm)
+int MATMUL_NAME(reload_cache)(matmul_ptr mm0)
 {
     FILE * f;
+    struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) { return 0; }
 
@@ -109,10 +113,11 @@ int matmul_basicp_reload_cache(struct matmul_basicp_data_s * mm)
     return 1;
 }
 
-void matmul_basicp_save_cache(struct matmul_basicp_data_s * mm)
+void MATMUL_NAME(save_cache)(matmul_ptr mm0)
 {
     FILE * f;
 
+    struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     MATMUL_COMMON_WRITE_ONE32(mm->datasize, f);
@@ -121,8 +126,9 @@ void matmul_basicp_save_cache(struct matmul_basicp_data_s * mm)
     fclose(f);
 }
 
-void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const * xsrc, int d)
+void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
 {
+    struct matmul_basicp_data_s * mm = (struct matmul_basicp_data_s *) mm0;
     ASM_COMMENT("multiplication code");
     uint32_t * q = mm->q;
     abdst_field x = mm->xab;
@@ -186,18 +192,18 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
     mm->public_->iteration[d]++;
 }
 
-void matmul_basicp_report(struct matmul_basicp_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
+void MATMUL_NAME(report)(matmul_ptr mm0 MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 }
 
-void matmul_basicp_auxv(struct matmul_basicp_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+void MATMUL_NAME(auxv)(matmul_ptr mm0 MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
 }
 
-void matmul_basicp_aux(struct matmul_basicp_data_s * mm, int op, ...)
+void MATMUL_NAME(aux)(matmul_ptr mm0, int op, ...)
 {
     va_list ap;
     va_start(ap, op);
-    matmul_basicp_auxv (mm, op, ap);
+    MATMUL_NAME(auxv) (mm0, op, ap);
     va_end(ap);
 }
 

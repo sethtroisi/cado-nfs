@@ -178,7 +178,8 @@ getprime (unsigned long pp)
   }
 
   current = -1;
-  while ((++current < len) && (sieve[current] == 0));
+  while ((++current < len) && (sieve[current] == 0))
+    ;
 
   ASSERT(current < len); /* otherwise we found a prime gap >= sqrt(x) around x */
   return offset + 2 * current;

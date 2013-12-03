@@ -18,6 +18,7 @@ cado_mpi_config_h.in
 cadofactor.pl
 cadofct.pm
 portability.h
+typecast.h
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
@@ -89,6 +90,9 @@ filter/sparse.c
 filter/sparse.h
 filter/utils_ffs.c
 filter/utils_ffs.h
+filter/sm.c
+filter/filter_sm.c
+filter/filter_sm.h
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
@@ -297,18 +301,14 @@ linalg/bwc/krylov.c
 linalg/bwc/lingen_binary.cpp
 linalg/bwc/lingen_mat_types.hpp
 linalg/bwc/matmul-basic.c
-linalg/bwc/matmul-basic.h
 linalg/bwc/matmul-basicp.c
-linalg/bwc/matmul-basicp.h
 linalg/bwc/matmul-bucket.cpp
-linalg/bwc/matmul-bucket.h
 linalg/bwc/matmul-common.c
 linalg/bwc/matmul-common.h
 linalg/bwc/matmul-libnames.h.in
 linalg/bwc/matmul-mf.c
 linalg/bwc/matmul-mf.h
 linalg/bwc/matmul-sliced.cpp
-linalg/bwc/matmul-sliced.h
 linalg/bwc/matmul-sub-large-fbd.S
 linalg/bwc/matmul-sub-large-fbd.h
 linalg/bwc/matmul-sub-large-fbi.S
@@ -322,10 +322,10 @@ linalg/bwc/matmul-sub-vsc-combine.h
 linalg/bwc/matmul-sub-vsc-dispatch.S
 linalg/bwc/matmul-sub-vsc-dispatch.h
 linalg/bwc/matmul-threaded.c
-linalg/bwc/matmul-threaded.h
 linalg/bwc/matmul.c
 linalg/bwc/matmul.h
 linalg/bwc/matmul_facade.c
+linalg/bwc/matmul_facade.h
 linalg/bwc/matmul_top.c
 linalg/bwc/matmul_top.h
 linalg/bwc/matops.cpp
@@ -403,7 +403,6 @@ linalg/gauss.c
 linalg/gauss.h
 linalg/rowset_heap.cpp
 linalg/rowset_heap.h
-linalg/sm.c
 local.sh.example
 local.sh.macosx-10.5
 local.sh.macosx-10.8
@@ -492,6 +491,7 @@ params/params.c180
 params/params.c186
 params/params.c190
 params/params.c204
+params/params.c220
 params/params.c59
 params/params.c60
 params/params.c61
@@ -723,6 +723,7 @@ scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
 scripts/cadofactor/CMakeLists.txt
+scripts/cadofactor/start_clients.sh
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format
@@ -773,6 +774,8 @@ sieve/las-coordinates.c
 sieve/las-coordinates.h
 sieve/las-debug.c
 sieve/las-debug.h
+sieve/las-duplicate.c
+sieve/las-duplicate.h
 sieve/las-norms.c
 sieve/las-norms.h
 sieve/las-qlattice.c

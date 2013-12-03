@@ -882,6 +882,10 @@ int main(int argc, char **argv)
 		    deletedname);
 	    exit(1);
 	}
+      else
+      {
+	      fprintf(pd->fd[1], "# %" PRIu64 "\n", nrelmax - nrels);
+      }
     }
 
     /* Write the header line for the file of remaining relations:
@@ -901,7 +905,7 @@ int main(int argc, char **argv)
             input_files,
             (filter_rels_callback_t) &thread_print, pd,
             EARLYPARSE_NEED_LINE | EARLYPARSE_NEED_NB,
-            rel_used, NULL);
+            NULL, NULL);
 
     /* write final values to stdout */
     fprintf(stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "

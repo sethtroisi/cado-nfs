@@ -27,9 +27,13 @@ struct cado_poly_s {
 
   cado_poly_side_ptr rat, alg;
   cado_poly_side pols[2];
-} cado_poly_struct;
+};
 typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;
+
+/* we used to have a true global variable declared here (not extern).
+ * This is horrible. */
+extern struct cado_poly_s cado_poly_struct;
 
 extern const char * sidenames[2];
 

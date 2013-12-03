@@ -57,6 +57,7 @@ typedef struct {
 
 #include "filter_io.h"
 #include "filter_memalloc.h"
+#include "filter_sm.h"
 
 
 unsigned int insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);

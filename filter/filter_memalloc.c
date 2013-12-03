@@ -69,7 +69,7 @@ idealmerge_my_malloc (unsigned int n)
       my_malloc_bytes += tmp_size;
     }
     idealmerge_plist[idealmerge_pcurrent] =
-                                    (ideal_merge_t*) malloc (BLOCK_INDEX_BYTES);
+                              (ideal_merge_t*) malloc (BLOCK_IDEALMERGE_BYTES);
     FATAL_ERROR_CHECK((idealmerge_plist[idealmerge_pcurrent] == NULL),
                                                                 "malloc error");
     idealmerge_p = idealmerge_plist[idealmerge_pcurrent];

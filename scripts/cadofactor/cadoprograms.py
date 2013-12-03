@@ -602,6 +602,10 @@ class Las(Program):
                  threads: Parameter("mt") = None,
                  ratq: Toggle() = None,
                  stats_stderr: Toggle("stats-stderr") = None,
+                 # Let's make fbcache neither input nor output file. It should
+                 # not be distributed to clients, nor sent back to the server.
+                 # It's a local temp file, but re-used between different runs.
+                 fbcache: Parameter("fbc") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

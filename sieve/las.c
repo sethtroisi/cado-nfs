@@ -20,6 +20,7 @@
 #include "las-types.h"
 #include "las-coordinates.h"
 #include "las-debug.h"
+#include "las-duplicate.h"
 #include "las-report-stats.h"
 #include "las-norms.h"
 #include "las-unsieve.h"
@@ -263,8 +264,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     }
     if (fbcfilename != NULL) {
         printf("# Writing memory image of factor base to file %s\n", fbcfilename);
-        fb_dump_fbc(si->sides[0]->fb, si->sides[0]->fb_bucket_threads,
-                    si->sides[1]->fb, si->sides[1]->fb_bucket_threads,
+        fb_dump_fbc(si->sides[0]->fb,
+                    (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
+                    si->sides[1]->fb,
+                    (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
                     fbcfilename, las->nb_threads, las->verbose);
         printf("# Finished writing memory image of factor base\n");
     }
@@ -591,6 +594,11 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
+    if (0) {
+        printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+               "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
+               si->a0, si->b0, si->a1, si->b1, skewness, nb_threads);
+    }
     double maxab1, maxab0;
     maxab1 = si->b1 * skewness;
     maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
@@ -926,6 +934,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Allocate room for only one sieve_info */
     las->sievers = malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
+
+    las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
 }/*}}}*/
 
 void las_info_clear(las_info_ptr las)/*{{{*/
@@ -1699,13 +1709,11 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1721,7 +1729,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime (p);
       /*****************************************************************/
 #define FILL_BUCKET_HEART() do {					\
@@ -1756,7 +1764,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
@@ -1827,13 +1835,11 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1849,7 +1855,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime(p);
       /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
 	 is need because the last byte of x (always 0 because x <<= 8) must
@@ -1907,7 +1913,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
@@ -2636,8 +2642,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
-static int
-check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
+int
+check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 {
   size_t s = mpz_sizeinbase (n, 2);
   unsigned int lpb = si->conf->sides[side]->lpb;
@@ -2668,6 +2674,152 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
   return 1;
 }
 
+static int
+search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[2], 
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    const __m128i patterns[2] = {
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
+    };
+    const int x_step = sizeof(__m128i);
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0],
+                                         (__m128i*) (SS[1] + x_start), patterns[1]);
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#endif
+#ifndef UNSIEVE_NOT_COPRIME
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            if (bin_gcd_int64_safe (i, j) != 1)
+            {
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+                continue;
+            }
+#elif 0
+            /* Very strict but very slow test of unsieving correctness */
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
+#endif
+        }
+    }
+    return survivors;
+}
+
+static int
+search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound[2], 
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i patterns[2][3];
+    const int x_step = sizeof(__m128i);
+    int next_pattern = 0;
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+#ifdef HAVE_SSE2
+    /* The reason for the bound+1 here is documented in 
+       sieve_info_test_lognorm_sse2() */
+    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 3 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 3), or d == I/2 (mod 3). With
+       I = 2^log_I and 2 == -1 (mod 3), we have d == -1^(log_I-1) (mod 3),
+       or d = 2 if log_I is even and d = 1 if log_I is odd.
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    size_t d = 2 - log_I % 2;
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[3*i + d] = 0x80;
+#endif
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == 3)
+            next_pattern = 0;
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#else
+            if (SS[0][x] == 255)
+                continue;
+#endif
+#ifndef UNSIEVE_NOT_COPRIME
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            if (bin_gcd_int64_safe (i, j) != 1)
+            {
+#ifdef HAVE_SSE2
+                /* Non-SSE code currently does not skip multiples of 3 */
+                ASSERT (i % 3 != 0);
+#endif
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+                continue;
+            }
+#elif 0
+            /* Very strict but very slow test of unsieving correctness */
+            unsigned int i;
+            i = abs (x - (1 << (log_I - 1)));
+            ASSERT_ALWAYS (bin_gcd_int64_safe (i, j) == 1);
+#endif
+        }
+    }
+    return survivors;
+}
+
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
@@ -2677,8 +2829,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     las_info_ptr las = th->las;
     sieve_info_ptr si = th->si;
     cado_poly_ptr cpoly = si->cpoly;
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2];
@@ -2694,6 +2844,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
+    const unsigned int first_j = N << (LOG_BUCKET_REGION - si->conf->logI);
+    const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
@@ -2717,60 +2869,52 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 #endif  /* }}} */
 
-    /* XXX: Don't believe that resieve_start is easily changeable... */
-    const int resieve_start = RATIONAL_SIDE;
-
     /* This is the one which gets the merged information in the end */
-    unsigned char * SS = S[resieve_start];
+    unsigned char * SS = S[0];
 
 #ifdef UNSIEVE_NOT_COPRIME
     unsieve_not_coprime (SS, N, si);
 #endif
 
-    for (int x = 0; x < BUCKET_REGION; ++x)
-    {
 #ifdef TRACE_K /* {{{ */
+    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
+    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
                     alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
                     rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
+    }
 #endif /* }}} */
-        unsigned int X;
-        unsigned int i, j;
 
-        if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
-        {
-            SS[x] = 255;
-            continue;
+    for (unsigned int j = 0; j < nr_lines; j++)
+    {
+        unsigned char * const both_S[2] = {
+            S[0] + (j << si->conf->logI), 
+            S[1] + (j << si->conf->logI)
+        };
+        const unsigned char both_bounds[2] = {
+            si->sides[0]->bound,
+            si->sides[1]->bound,
+        };
+        if ((j + first_j) % 3 == 0) {
+            surv += search_survivors_in_line3(both_S, both_bounds, 
+                                              si->conf->logI, j + first_j, N);
+        } else {
+            surv += search_survivors_in_line(both_S, both_bounds, 
+                                             si->conf->logI, j + first_j, N);
         }
-        th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
-        surv++;
-
-        X = x + (((uint64_t) N) << LOG_BUCKET_REGION);
-        i = abs ((int) (X & (si->I - 1)) - si->I / 2);
-        j = X >> si->conf->logI;
-#ifndef UNSIEVE_NOT_COPRIME
-        if (bin_gcd_int64_safe (i, j) != 1)
-        {
-#ifdef TRACE_K
-            if (trace_on_spot_Nx(N, x)) {
-                fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                        trace_Nx.x, trace_Nx.N, i, j);
-            }
-#endif
-            SS[x] = 255;
-            continue;
-        }
-#endif
+        /* Make survivor search create a list of x-coordinates that survived
+           instead of changing sieve array? More localized accesses in
+           purge_bucket() that way */
     }
 
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
     /* FIXME: choose a sensible size here */
 
-    for(int z = 0 ; z < 2 ; z++) {
-        int side = resieve_start ^ z;
+    for(int side = 0 ; side < 2 ; side++) {
         WHERE_AM_I_UPDATE(w, side, side);
         primes[side] = init_bucket_primes (BUCKET_REGION);
 
@@ -2816,6 +2960,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         for (int x = xul; x < xul + (int) together; ++x) {
             if (SS[x] == 255) continue;
 
+            th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
+            
             /* For factor_leftover_norm, we need to pass the information of the
              * sieve bound. If a cofactor is less than the square of the sieve
              * bound, it is necessarily prime. we implement this by keeping the
@@ -2868,6 +3014,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             /* Since the q-lattice is exactly those (a, b) with
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+            /* FIXME: fast divisibility test here! */
             if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
                 continue;
 
@@ -3014,11 +3161,15 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (1)
 #endif
             {
+                const double skew = las->cpoly->skew;
+                int do_check = th->las->suppress_duplicates;
+                int is_dup = do_check && relation_is_duplicate(rel, skew, las->nb_threads, si);
+                const char *comment = is_dup ? "# " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
-                fprint_relation(las->output, rel);
+                fprint_relation(las->output, rel, comment);
                 pthread_mutex_unlock(&io_mutex);
             }
 
@@ -3690,13 +3841,14 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
+  param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
 {
     las_info las;
     double t0, tts;
-    unsigned long sq = 0;
+    unsigned long nr_sq_processed = 0;
     int allow_largesq = 0;
     double totJ = 0.0;
     int argc = argc0;
@@ -3720,6 +3872,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
+    param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;
@@ -3742,7 +3895,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
 
-    memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
     /*
@@ -3756,7 +3908,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      * q0 -> q0d (double) -> si->sides[*]->{scale,logmax}
      * q0 -> (I, lpb, lambda) for the descent
      * 
-     * scales -> logp's in factor base.
+     * scale -> logp's in factor base.
      *
      * I -> splittings of the factor base among threads.
      *
@@ -3911,7 +4063,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             fprintf(las->output, " # within descent, currently at depth %d", si->doing->depth);
         }
         fprintf(las->output, "\n");
-        sq ++;
+        nr_sq_processed ++;
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
@@ -4022,7 +4174,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds () - t0;
     print_stats (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-            totJ / (double) sq, sq, max_full);
+            totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
     tts = t0;
     tts -= report->tn[0];
     tts -= report->tn[1];
@@ -4052,7 +4204,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
-            (double) report->reports / (double) sq);
+            (double) report->reports / (double) nr_sq_processed);
     
     /*}}}*/
 
