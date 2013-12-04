@@ -135,13 +135,6 @@ tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
 
-tasks.polyselect.maxnorm = 33.4		# max. lognorm of polynomials (before rootsieve)
-    # If not set, a default value of 1e9 (in practice infinity) is used.
-    # Setting this value right might speed up a lot the polynomial
-    # selection, by discarding right away polynomials which are not
-    # promising. As a rule of thumb, we want at least 10 polynomials
-    # in total below this bound.
-
 tasks.polyselect.admin = 0		# min value for leading coefficient of f(x)
     # If not set, the default is 0.
 

@@ -20,7 +20,6 @@ tasks.polyselect.admax = 26000
 tasks.polyselect.adrange = 13000		
 tasks.polyselect.incr = 60		
 tasks.polyselect.P = 1000		
-tasks.polyselect.maxnorm = 25.3		
 tasks.polyselect.nq = 1000
 
 ###########################################################################

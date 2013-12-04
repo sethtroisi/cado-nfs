@@ -109,7 +109,6 @@ class Parameters(object):
         "polsel_adrange": "tasks.polyselect.adrange",
         "polsel_delay": None,
         "polsel_incr": "tasks.polyselect.incr",
-        "polsel_maxnorm": "tasks.polyselect.maxnorm",
         "polsel_nice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
         "polsel_nq": "tasks.polyselect.nq",
         "polsel_P": "tasks.polyselect.P",
@@ -525,7 +524,6 @@ DEFAULTS_OLD = (
     'polsel_adrange = 1e7',
     'polsel_delay   = 120',
     #'polsel_P       = undef',
-    'polsel_maxnorm = 1e9',
     'polsel_nice    = 10',
 
     # sieve
