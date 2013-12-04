@@ -209,7 +209,6 @@ my @default_param = (
     polsel_adrange => 1e7,
     polsel_delay   => 120,
     polsel_P       => undef,
-    polsel_maxnorm => 1e9,
     polsel_nice    => 10,
 
     # sieve
@@ -1938,7 +1937,7 @@ my $polysel_check = sub {
         s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         if (/^# No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-	     "please increase [polsel_]adrange or [polsel_]maxnorm.\n"
+	     "please increase [polsel_]adrange.\n"
                if ($ENV{'CADO_DEBUG'});
             close FILE;
             return;
@@ -1970,7 +1969,6 @@ my $polysel_cmd = sub {
            "-admin $a ".
            "-admax $b ".
            "-degree $param{'degree'} ".
-           "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
            "-P $param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
@@ -2055,7 +2053,7 @@ sub do_polysel {
     }
 
     die "No polynomial was found in the given range!\n".
-        "Please increase the range or [polsel_]maxnorm.\n"
+        "Please increase the range.\n"
       unless defined $Emax;
 
     # Copy the best polynomial
