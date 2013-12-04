@@ -34,6 +34,14 @@ re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 cap_fp = "(%s)" % re_fp
 
 class Polynomial(list):
+    """
+    >>> p = Polynomial()
+    >>> p.degree < 0
+    True
+    >>> p[0] = 1
+    >>> p.degree == 0
+    True
+    """
     @property
     def degree(self):
         return len(self) - 1 if len(self) > 0 else float("-inf")
@@ -65,11 +73,11 @@ class PolynomialParseException(Exception):
     pass
 
 class Polynomials(object):
-    # Keys that can occur in a polynomial file in their preferred ordering,
-    # and whether the key is mandatory or not. The preferred ordering is used
-    # when turning a polynomial back into a string.
     r""" A class that represents a polynomial
     
+    >>> Polynomials([""])
+    Traceback (most recent call last):
+    cadotask.PolynomialParseException: No polynomials found
     >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nm: 4\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
@@ -84,6 +92,9 @@ class Polynomials(object):
     re_pol_g = re.compile("Y(\d+)\s*:\s*(-?\d+)")
     re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=(.*)$")
     
+    # Keys that can occur in a polynomial file in their preferred ordering,
+    # and whether the key is mandatory or not. The preferred ordering is used
+    # when turning a polynomial back into a string.
     keys = OrderedDict(
         (
             ("n", (int, True)),
@@ -143,6 +154,13 @@ class Polynomials(object):
                                                "before" % (key, line))
             (_type, isrequired) = self.keys[key]
             self.params[key] = _type(value)
+
+        # If no polynomial was found at all (not even partial data), assume
+        # that polyselect simply did not find anything in this search range
+        if polyf.degree < 0 and polyg.degree < 0 and self.params == {} and \
+                self.MurphyE == 0.:
+            raise PolynomialParseException("No polynomials found")
+
         # Test that all required keys are there
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
@@ -1296,9 +1314,10 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             else:
                 raise
         except PolynomialParseException as e:
-            self.logger.warn("Invalid polyselect file '%s': %s",
-                              filename, e)
-            return None
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
         except UnicodeDecodeError as e:
             self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
             return None

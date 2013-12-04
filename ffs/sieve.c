@@ -312,8 +312,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  reliablenrels    the same, but criterion is rels per sq.\n");
     fprintf(stderr, "  reliablerange    set the 3%% to another percentage in reliable estimates.\n");
     fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
-    fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
-    fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
+    fprintf(stderr, "  sqside [%d]       side (0 or 1) of the special-q\n", SQSIDE_DEFAULT);
+    fprintf(stderr, "  firstsieve [%d]   side (0 or 1) to sieve first\n", FIRSTSIEVE_DEFAULT);
     fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
     fprintf(stderr, "  gf               indicate the base field for sanity check\n");

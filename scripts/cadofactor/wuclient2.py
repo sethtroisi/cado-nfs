@@ -733,15 +733,7 @@ class WorkunitClient(object):
                 # bytes and return
                 logging.warning("Looks like another process already created "
                                 "file %s", dlpath)
-                slept = 0
-                timeout = 60
-                while slept < timeout and os.path.getsize(dlpath) == 0:
-                    logging.warning("Sleeping until %s contains data", dlpath)
-                    time.sleep(1)
-                    slept += 1
-                if slept == timeout:
-                    logging.warning("Slept %d seconds, %s still has no data", 
-                                    timeout, dlpath)
+                self.wait_until_positive_filesize(dlpath)
                 return
             else:
                 raise
@@ -868,12 +860,28 @@ class WorkunitClient(object):
         return True
 
     @staticmethod
+    def wait_until_positive_filesize(filename, timeout = 60):
+        slept = 0
+        while slept < timeout and os.path.getsize(filename) == 0:
+            logging.warning("Sleeping until %s contains data", filename)
+            time.sleep(1)
+            slept += 1
+        if slept == timeout:
+            logging.warning("Slept %d seconds, %s still has no data", 
+                            timeout, filename)
+        return
+
+    @staticmethod
     def do_checksum(filename, checksum = None):
         """ Computes the SHA1 checksum for a file. If checksum is None, returns 
             the computed checksum. If checksum is not None, return whether the
             computed SHA1 sum and checksum agree """
         blocksize = 65536
         sha1hash = hashlib.sha1() # pylint: disable=E1101
+        # Like when downloading, we wait until the file has positive size, to
+        # avoid getting the shared lock right after the other process created
+        # the file but before it gets the exclusive lock
+        WorkunitClient.wait_until_positive_filesize(filename)
         infile = open(filename, "rb")
         fcntl.flock(infile, fcntl.LOCK_SH)
         
@@ -990,6 +998,25 @@ if __name__ == '__main__':
                                 % arg.lower())
         return options
 
+    def makedirs(path, mode=None, exist_ok=False):
+        # Python 3.2 os.makedirs() has exist_ok, but older Python do not
+        if sys.version_info[0:2] >= (3,2):
+            if mode is None:
+                os.makedirs(path, exist_ok=exist_ok)
+            else:
+                os.makedirs(path, mode=mode, exist_ok=exist_ok)
+        else:
+            try:
+                if mode is None:
+                    os.makedirs(path)
+                else:
+                    os.makedirs(path, mode=mode)
+            except OSError as e:
+                if e.errno == errno.EEXIST and exist_ok:
+                    pass
+                else:
+                    raise
+
     options = parse_cmdline()
     # If no client id is given, we use <hostname>.<randomstr>
     if SETTINGS["CLIENTID"] is None:
@@ -1015,9 +1042,9 @@ if __name__ == '__main__':
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
-        os.makedirs(SETTINGS["DLDIR"])
+        makedirs(SETTINGS["DLDIR"], exist_ok=True)
     if not os.path.isdir(SETTINGS["WORKDIR"]):
-        os.makedirs(SETTINGS["WORKDIR"])
+        makedirs(SETTINGS["WORKDIR"], exist_ok=True)
 
     # print (str(SETTINGS))
 
