@@ -91,7 +91,7 @@ main (int argc, char *argv[])
     filter_matrix_t mat[1];
     report_t rep[1];
 
-    uint32_t maxlevel = DEFAULT_MERGE_MAXLEVEL;
+    int maxlevel = DEFAULT_MERGE_MAXLEVEL;
     uint32_t keep = DEFAULT_FILTER_EXCESS;
     uint32_t skip = DEFAULT_MERGE_SKIP;
     double ratio = DEFAULT_MERGE_RATIO; /* bound on cN_new/cN to stop the merge */
