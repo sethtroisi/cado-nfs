@@ -923,11 +923,71 @@ class WorkunitClient(object):
         return upload_ok
 
 
-def get_ssl_certificate(server, port=443):
-    cert = ssl.get_server_certificate((server, int(port)),
-                                      ssl_version=ssl.PROTOCOL_SSLv23,
-                                      ca_certs=None)
-    return cert
+def get_ssl_certificate(server, port=443, retry=False, retrytime=0):
+    """ Download the SSL certificate from the server.
+    
+    In case of connection refused error, if retry is True, retry
+    indefinitely waiting retrytime seconds between tries, and if
+    retry is False, return None.
+    """
+    while True:
+        try:
+            cert = ssl.get_server_certificate((server, int(port)),
+                                              ssl_version=ssl.PROTOCOL_SSLv23,
+                                              ca_certs=None)
+            return cert
+        except socket.error as err:
+            if err.errno != errno.ECONNREFUSED:
+                raise
+            if not retry:
+                return None
+        wait = float(retrytime)
+        logging.error("Waiting %f seconds before retrying", wait)
+        time.sleep(wait)
+
+
+def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
+        retrytime=0):
+    """ Download the certificate if it is missing and check its fingerprint
+    
+    If the file 'certfilename' already exists, the certificate does not
+    get downloaded. 
+    If the certificate existed or could be downloaded and the fingerprint
+    matches, returns True. If the fingerprint check fails, exits with error.
+    If the server refuses connections and retry is False, returns False;
+    if retry is True, it keeps trying indefinitely.
+    """
+    certfile_exists = os.path.isfile(certfilename)
+    if certfile_exists:
+        logging.info("Using certificate stored in file %s", certfilename)
+        with open(certfilename, 'r') as certfile:
+            cert = certfile.read()
+    else:
+        logging.info("Downloading certificate from %s", netloc)
+        address_port = netloc.split(":")
+        cert = get_ssl_certificate(*address_port, retry=retry,
+                retrytime=retrytime)
+        if cert is None:
+            return False
+    bin_cert = ssl.PEM_cert_to_DER_cert(cert)
+    sha1hash = hashlib.sha1()
+    sha1hash.update(bin_cert)
+    cert_sha1 = sha1hash.hexdigest()
+    logging.debug("Certificate has SHA1 fingerprint %s", cert_sha1)
+    if not cert_sha1.lower() == fingerprint.lower():
+        logging.critical("Server certificate's SHA1 fingerprint (%s) differs "
+                         "from fingerprint specified on command line (%s). "
+                         "Aborting.", cert_sha1, fingerprint)
+        logging.critical("Possible reason: several factorizations with "
+                         "same download directory.")
+        sys.exit(1)
+    logging.info("Certificate SHA1 hash matches")
+    if not certfile_exists:
+        logging.info("Writing certificate to file %s", certfilename)
+        # FIXME: Set umask first?
+        with open(certfilename, 'w') as certfile:
+            certfile.write(cert)
+    return True
 
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
@@ -1068,40 +1128,22 @@ if __name__ == '__main__':
         logging.info("Using work-around #2 for buggy BytesGenerator")
 
     (scheme, netloc) = urlparse(SETTINGS["SERVER"])[0:2]
+    still_need_cert = False # This will be set to True if we need the certi-
+                            # ficate, but could not download it right away
     if not SETTINGS["CERTSHA1"] is None and scheme != "https":
-        logging.warn("Option -certsha1 makes sense only with an https URL, ignoring it.")
+        logging.warn("Option --certsha1 makes sense only with an https URL, ignoring it.")
     elif SETTINGS["CERTSHA1"] is None and scheme == "https":
-        logging.warn("An https URL was given but no -certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
+        logging.warn("An https URL was given but no --certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
     elif not SETTINGS["CERTSHA1"] is None and scheme == "https":
         certfilename = os.path.join(SETTINGS["DLDIR"], "server.%s.pem" % SETTINGS["CERTSHA1"][0:8])
-        certfile_exists = os.path.isfile(certfilename)
-        if certfile_exists:
-            logging.info("Using certificate file stored in %s", certfilename)
-            with open(certfilename, 'r') as certfile:
-                cert = certfile.read()
-        else:
-            logging.info("Downloading certificate from %s", netloc)
-            address_port = netloc.split(":")
-            cert = get_ssl_certificate(*address_port)
-        bin_cert = ssl.PEM_cert_to_DER_cert(cert)
-        sha1hash = hashlib.sha1()
-        sha1hash.update(bin_cert)
-        cert_sha1 = sha1hash.hexdigest()
-        logging.debug("Certificate has SHA1 %s", cert_sha1)
-        if not cert_sha1.lower() == SETTINGS["CERTSHA1"].lower():
-            logging.critical("Server certificate's SHA1 hash (%s) differs "
-                             "from hash specified on command line (%s). "
-                             "Aborting.", cert_sha1, SETTINGS["CERTSHA1"])
-            logging.critical("Possible reason: several factorizations with "
-                             "same download directory")
-            sys.exit(1)
-        logging.info("Certificate SHA1 hash matches")
-        if not certfile_exists:
-            logging.info("Writing certificate to file %s", certfilename)
-            # FIXME: Set umask first?
-            with open(certfilename, 'w') as certfile:
-                certfile.write(cert)
         SETTINGS["CERTFILE"] = certfilename
+        # Try downloading the certificate once. If connection is refused,
+        # proceed to daemonizing - hopefully server will come up later
+        if not get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"]):
+            still_need_cert = True
+            logging.info("Could not download SSL certificate from %s: The connection was refused.")
+            logging.info("Assuming the server will come up later. Will keep trying%s.",
+                         " after daemonizing" if options.daemon else "")
         
         # Can we download with HTTPS at all?
         if sys.version_info[0] == 2:
@@ -1120,10 +1162,12 @@ if __name__ == '__main__':
                         "Aborting.")
                 sys.exit(1)
 
-    # Daemonize before we open the log file, or we close the log file's 
-    # file descriptor
     if options.daemon:
         create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
+
+    if still_need_cert:
+        get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"],
+                retry=True, retrytime=SETTINGS["DOWNLOADRETRY"])
 
     client_ok = True
     while client_ok:

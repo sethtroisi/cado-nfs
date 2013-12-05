@@ -3,7 +3,7 @@
 SCRIPTNAME="$0"
 
 function usage() {
-  echo "Usage: $SCRIPTNAME [-s <n>] [-p <path>] <parameters for wuclient2.py>"
+  echo "Usage: $SCRIPTNAME [-s <n>] [-p <path>] [-py <interpreter>] <parameters for wuclient2.py>"
   echo "Mandatory parameters for wuclient2.py: --server=<URL>"
   echo "If the server is configured to use SSL (which is the default), the parameters"
   echo "for wuclient2.py must also include the SSL certificate fingerprint, specified"

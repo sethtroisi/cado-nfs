@@ -35,7 +35,6 @@ polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
 polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=36.4          # max. lognorm of polynomials (before rootsieve)
 polsel_admax=1e6             # max value for lc(f)
 polsel_adrange=1e4           # individual tasks
 polsel_incr=60               # forced divisor of lc(f)

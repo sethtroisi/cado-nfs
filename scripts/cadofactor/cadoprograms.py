@@ -521,7 +521,6 @@ class Polyselect2l(Program):
                  nq : Parameter() = None,
                  save : Parameter(is_output_file = True) = None,
                  resume : Parameter(is_input_file = True) = None,
-                 maxnorm : Parameter() = None,
                  maxtime : Parameter() = None,
                  out : Parameter() = None,
                  printdelay : Parameter("s") = None,
