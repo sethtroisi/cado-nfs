@@ -31,9 +31,6 @@ add_executable(dup2-ffs-f3 EXCLUDE_FROM_ALL dup2.c)
 target_link_libraries(dup2-ffs-f3 ffs-f3)
 set_target_properties(dup2-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
-add_executable(refresh-purged refresh-purged.c)
-target_link_libraries(refresh-purged utils)
-
 add_executable(explain explain.c)
 target_link_libraries(explain utils)
 
