@@ -94,8 +94,12 @@
 # Therefore if some flag is relevant to both, you have to set both.
 
 ############################################################
-# DISABLE_SHARED: Disable shared libraries
-# DISABLE_SHARED=1
+# ENABLE_SHARED: Disable shared libraries
+# Setting this to 1 causes CADO to use shared libraries for CADO convenience
+# libraries and for the BWC arithmetic functions. This decreases build time
+# and binary file size, but the resulting binaries are less portable.
+# Mostly meant for development purposes.
+# ENABLE_SHARED=0
 
 ############################################################
 # PREFIX: Installation path
