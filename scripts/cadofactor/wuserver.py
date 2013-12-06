@@ -667,6 +667,10 @@ class ServerLauncher(object):
                 sys.exit(1)
         self.httpd.server_name = self.name
 
+        if self.address == "localhost" or self.address.startswith("127."):
+            self.logger.warn("Server is listening on the loopback device. "
+                    "Clients on other hosts will not be able to connect.")
+
     def get_url(self):
         return self.url
 
