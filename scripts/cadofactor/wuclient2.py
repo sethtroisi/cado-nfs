@@ -1141,7 +1141,7 @@ if __name__ == '__main__':
         # proceed to daemonizing - hopefully server will come up later
         if not get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"]):
             still_need_cert = True
-            logging.info("Could not download SSL certificate from %s: The connection was refused.")
+            logging.info("Could not download SSL certificate: The connection was refused.")
             logging.info("Assuming the server will come up later. Will keep trying%s.",
                          " after daemonizing" if options.daemon else "")
         
