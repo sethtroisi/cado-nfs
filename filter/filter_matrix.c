@@ -175,7 +175,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 #endif
     }
     printf("# Number of buried columns is %" PRid " (min_weight=%" PRId32 ", "
-           "max_weigth=%" PRId32 ")\n", mat->nburied, bmin, bmax);
+           "max_weight=%" PRId32 ")\n", mat->nburied, bmin, bmax);
   }
   else
     printf("# No columns were buried.\n");
