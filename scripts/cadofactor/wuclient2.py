@@ -535,6 +535,10 @@ class WorkunitProcessor(object):
             logging.info ("Removing file %s", filepath)
             os.remove(filepath)
 
+class WorkunitParseError(ValueError):
+    """ Parsing the workunit failed """
+    pass
+
 class WorkunitClient(object):
     def __init__(self, settings):
         self.settings = settings
@@ -558,7 +562,12 @@ class WorkunitClient(object):
         wu_text = self.wu_file.read()
         # WU file stays open so we keep the lock
 
-        self.workunit = Workunit(wu_text)
+        try:
+            self.workunit = Workunit(wu_text)
+        except Exception as err:
+            logging.error("Invalid workunit file: %s", err)
+            self.cleanup()
+            raise WorkunitParseError()
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
     
     def download_wu(self):
@@ -1025,6 +1034,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
 SETTINGS = dict([(a, b) for (a, (b, c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
 
+BAD_WU_MAX = 3 # Maximum allowed number of bad WUs
+
 if __name__ == '__main__':
 
     def parse_cmdline():
@@ -1170,10 +1181,18 @@ if __name__ == '__main__':
                 retry=True, retrytime=SETTINGS["DOWNLOADRETRY"])
 
     client_ok = True
+    bad_wu_counter = 0
     while client_ok:
         try:
-            client = WorkunitClient(settings = SETTINGS)
+            try:
+                client = WorkunitClient(settings = SETTINGS)
+            except WorkunitParseError:
+                bad_wu_counter += 1
+                if bad_wu_counter > BAD_WU_MAX:
+                    logging.critical("Had %d bad workunit files. Aborting.", bad_wu_counter)
+                    break
+                continue
             client_ok = client.process()
-        except BaseException:
+        except Exception:
             logging.exception("Exception occurred")
             break
