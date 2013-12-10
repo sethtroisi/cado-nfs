@@ -18,6 +18,10 @@ typedef __fq_info * fq_info_ptr;
 typedef const __fq_info * fq_info_srcptr;
 
 ///////////////////////////////////
+// The type sq2_t is supposed to be enough to contain a polynomial
+// of degree twice as large as sq. For the moment we stick to sq_t and
+// sq2_t to 64 bits, but this means that fq_t will work only q of degrees
+// at most 32.
 
 typedef sq_t sq2_t;
 typedef sq_ptr sq2_ptr;
@@ -35,6 +39,10 @@ static inline void sq2_add(sq2_ptr r, sq2_srcptr p, sq2_srcptr q)
 static inline 
 void fq_info_init(fq_info_ptr Fq, sq_srcptr q)
 {
+    if (1+2*(sq_deg(q)-1) > __sq_SIZE) {
+        fprintf(stderr, "Error: the sq2_t is not large enough to allow this size of q\n");
+        abort();
+    }
     sq_set(Fq->q, q);
     Fq->degq = sq_deg(q);
     Fq->order = 1;

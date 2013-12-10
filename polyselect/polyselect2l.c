@@ -1,15 +1,12 @@
 /*
-  polyselect2l.c is a variant of Paul Zimmermann's polyselect2.c
+  Polynomial selection using Kleinjung's algorithm (cf slides presented
+  at the CADO Workshop in October 2008, Nancy, France).
 
   [1. Run and parameters]
 
   The parameters are similar to those in polyselect2.c, except the following,
 
   "-nq xxx" denotes the number of special-q's trials for each ad;
-
-  "-maxnorm xxx" only optimize raw polynomials with size <= xxx.
-  If the raw polynomial is not good enough, we will still stream
-  it to STDERR for further reference.
 
   Please report bugs to the Bug Tracking System on:
   https://gforge.inria.fr/tracker/?atid=7442&group_id=2065&func=browse
@@ -39,12 +36,12 @@ char *phash = "";
 #endif
 
 #define BATCH_SIZE 20 /* number of special (q, r) per batch */
+#define KEEP 10       /* number of best raw polynomials kept */
 
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
-double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
@@ -56,7 +53,8 @@ double best_E = 0.0; /* Murphy's E (the larger the better) */
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
 int tot_found = 0; /* total number of polynomials */
-int found = 0; /* number of polynomials below maxnorm */
+int opt_found = 0; /* number of size-optimized polynomials */
+int ros_found = 0; /* number of rootsieved polynomials */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
   aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0,
   var_opt_lognorm = 0.0, var_raw_lognorm = 0.0;
@@ -65,7 +63,7 @@ double min_opt_lognorm = 999.99, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
-double best_logmu[11];
+double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP];
 double rootsieve_time = 0.0;
 int raw = 0;
 
@@ -388,15 +386,29 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   pthread_mutex_unlock (&lock);
 #endif
 
-  /* if the polynomial has norm < "-maxnorm", we optimize it */
-  if (logmu <= max_norm)
+  /* if the polynomial has small norm, we optimize it */
+  if (logmu < best_raw_logmu[KEEP - 1])
   {
+    for (j = KEEP - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
+      best_raw_logmu[j] = best_raw_logmu[j-1];
+    best_raw_logmu[j] = logmu;
 
     /* optimize size */
+    opt_found ++;
     optimize (f, d, g, 0, 1);
 
-    if (!raw) {
+    skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+    if (logmu >= best_opt_logmu[KEEP - 1])
+      goto skip;
+
+    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+      best_opt_logmu[j] = best_opt_logmu[j-1];
+    best_opt_logmu[j] = logmu;
+
+    if (!raw) {
+      ros_found ++;
 /* root sieve */
 #ifndef NEW_ROOTSIEVE
       unsigned long alim = 2000;
@@ -453,9 +465,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
+    if (i < KEEP)
+      best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -482,7 +495,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     if (out != NULL) /* msieve output */
     {
       FILE *fp;
-      fp = fopen (out, (found == 0) ? "w" : "a");
+      fp = fopen (out, (ros_found == 0) ? "w" : "a");
       if (fp == NULL)
       {
         fprintf (stderr, "Error, cannot open file %s\n", out);
@@ -495,7 +508,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-    found ++;
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
 #endif
@@ -762,14 +774,30 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   pthread_mutex_unlock (&lock);
 #endif
 
-  /* if the polynomial has norm < "-maxnorm", we optimize it */
-  if (logmu <= max_norm)
+  /* if the polynomial has small norm, we optimize it */
+  if (logmu < best_raw_logmu[KEEP - 1])
   {
+    int k;
+    for (k = KEEP - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
+      best_raw_logmu[k] = best_raw_logmu[k-1];
+    best_raw_logmu[k] = logmu;
+
     /* optimize size */
+    opt_found ++;
     optimize (f, d, g, 0, 1);
 
-    if (!raw) {
+    skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+    if (logmu >= best_opt_logmu[KEEP - 1])
+      goto skip;
+
+    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+      best_opt_logmu[j] = best_opt_logmu[j-1];
+    best_opt_logmu[j] = logmu;
+
+    if (!raw) {
+      ros_found ++;
 /* root sieve */
 #ifndef NEW_ROOTSIEVE
       unsigned long alim = 2000;
@@ -821,9 +849,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
+    if (i < KEEP)
+      best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -850,7 +879,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     if (out != NULL) /* msieve output */
     {
       FILE *fp;
-      fp = fopen (out, (found == 0) ? "w" : "a");
+      fp = fopen (out, (ros_found == 0) ? "w" : "a");
       if (fp == NULL)
       {
         fprintf (stderr, "Error, cannot open file %s\n", out);
@@ -863,7 +892,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-    found ++;
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
 #endif
@@ -892,6 +920,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       }
   }
   else {
+  skip:
     if (verbose >= 1) {
 #ifdef MAX_THREADS
 		  pthread_mutex_lock (&lock);
@@ -1131,7 +1160,7 @@ collision_on_each_sq ( header_t header,
     do {
       v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = *++pc; 
+      nv = *++pc;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
       v1 += ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
@@ -1149,7 +1178,7 @@ collision_on_each_sq ( header_t header,
       else INSERT_I(v1);
     } while (pc != epc);
   } while (1);
-  
+
   do {
     do {
       vpnr = *pnr++;
@@ -1198,7 +1227,7 @@ collision_on_each_sq ( header_t header,
     do {
       v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = *++pc; 
+      nv = *++pc;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
       v1 += ppl; v2 -= ppl;
@@ -1429,7 +1458,7 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *idx_q,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
-                          int *curr_nq, 
+                          int *curr_nq,
                           unsigned long lq )
 {
   int count;
@@ -1475,7 +1504,7 @@ collision_on_batch_sq_r ( header_t header,
         if (!re)
           break;
     }
-    
+
     /* core function for a fixed qq and several rqqz[] */
     collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, num_rq);
   }
@@ -2009,7 +2038,6 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "admax", "max value for ad");
   param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
   param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
-  param_list_decl_usage(pl, "maxnorm", "only optimize polynomials with norm <= maxnorm");
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
   char str[200];
@@ -2117,7 +2145,6 @@ main (int argc, char *argv[])
   else
     admax = (unsigned long) admax_d;
   param_list_parse_ulong (pl, "incr", &incr);
-  param_list_parse_double (pl, "maxnorm", &max_norm);
   param_list_parse_double (pl, "maxtime", &maxtime);
   save = param_list_lookup_string (pl, "save");
   resume = param_list_lookup_string (pl, "resume");
@@ -2176,8 +2203,13 @@ main (int argc, char *argv[])
     fclose (fp);
   }
 
-  for (i = 0; i <= 10; i++)
-    best_logmu[i] = 999.9;
+  /* initialize best norms */
+  for (i = 0; i < KEEP; i++)
+    {
+      best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
+      best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
+      best_logmu[i] = 999.99;       /* best logmu after rootsieve */
+    }
 
   /* init primes */
   double Pd;
@@ -2326,14 +2358,22 @@ main (int argc, char *argv[])
         }
     }
 
-  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
-          tries, tot_found, found);
+  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
+          tries, tot_found, opt_found, ros_found);
 
-  /* print best 10 values of logmu */
+  /* print best KEEP values of logmu */
   if (collisions_good > 0)
     {
+      printf ("# Stat: best raw logmu:");
+      for (i = 0; i < KEEP; i++)
+        printf (" %1.2f", best_raw_logmu[i]);
+      printf ("\n");
+      printf ("# Stat: best opt logmu:");
+      for (i = 0; i < KEEP; i++)
+        printf (" %1.2f", best_opt_logmu[i]);
+      printf ("\n");
       printf ("# Stat: best logmu:");
-      for (i = 0; i < 10; i++)
+      for (i = 0; i < KEEP; i++)
         printf (" %1.2f", best_logmu[i]);
       printf ("\n");
     }

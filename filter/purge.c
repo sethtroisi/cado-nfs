@@ -82,13 +82,6 @@
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
-#define STR(s) XSTR(s)
-#define XSTR(s) #s
-#define DEFAULT_NPASS 50
-#define DEFAULT_KEEP 160
-#define DEFAULT_REQUIRED_EXCESS 0.1
-#define DEFAULT_NPT 4
-
 /* Main variables */
 
 /* This one is passed to all functions, so it's morally a global */
@@ -115,10 +108,10 @@ static bit_vector rel_used, Tbv;
 static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
 
 static uint64_t nrelmax = 0, nprimemax = 0;
-static int64_t keep = DEFAULT_KEEP;	/* maximun final excess */
-static unsigned int npass = DEFAULT_NPASS;
-static double required_excess = DEFAULT_REQUIRED_EXCESS;
-static unsigned int npt = DEFAULT_NPT;
+static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
+static unsigned int npass = DEFAULT_PURGE_NPASS;
+static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
+static unsigned int npt = DEFAULT_PURGE_NPT;
 
 static float w_ccc;
 
@@ -599,15 +592,15 @@ static void declare_usage(param_list pl)
                                   "number of prime ideals in renumber table");
   param_list_decl_usage(pl, "minindex", "index of the first considered prime");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
-                                    "(default " STR(DEFAULT_KEEP) ")");
+                                    "(default " STR(DEFAULT_FILTER_EXCESS) ")");
   param_list_decl_usage(pl, "npass", "number of step of clique removal "
-                                     "(default " STR(DEFAULT_NPASS) ")");
+                                     "(default " STR(DEFAULT_PURGE_NPASS) ")");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
-                            STR(DEFAULT_REQUIRED_EXCESS) ")");
+                            STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
   param_list_decl_usage(pl, "npthr", "number of threads used for singletons "
-                                     "removal (default " STR(DEFAULT_NPT) ")");
+                                     "removal (default " STR(DEFAULT_PURGE_NPT) ")");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }

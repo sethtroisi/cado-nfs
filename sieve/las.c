@@ -594,6 +594,11 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
+    if (0) {
+        printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+               "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
+               si->a0, si->b0, si->a1, si->b1, skewness, nb_threads);
+    }
     double maxab1, maxab0;
     maxab1 = si->b1 * skewness;
     maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
@@ -1704,13 +1709,11 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1726,7 +1729,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime (p);
       /*****************************************************************/
 #define FILL_BUCKET_HEART() do {					\
@@ -1761,7 +1764,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
@@ -1832,13 +1835,11 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
     fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
-#ifdef SKIP_GCD3
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
-#endif
-    const uint32_t maskI = si->I-1;
-    const uint64_t even_mask = (1ULL << si->conf->logI) | 1ULL;
-    const uint64_t IJ = ((uint64_t) si->J) << si->conf->logI;
+    const uint32_t maskI = I-1;
+    const uint64_t even_mask = (1ULL << logI) | 1ULL;
+    const uint64_t IJ = ((uint64_t) si->J) << logI;
 
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
@@ -1854,7 +1855,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	 this implies j = 0 or j > J. This means we sieve only (i,j) = (1,0) here.
 	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0) but which of these two
 	 (if any) do we sieve? */
-      uint64_t x = (r ? 1 : si->I) + (si->I >> 1);
+      uint64_t x = (r ? 1 : I) + (I >> 1);
       prime_hint_t prime = bucket_encode_prime(p);
       /* 1. pkbut must be volatile in BIG_ENDIAN: the write order of prime & x
 	 is need because the last byte of x (always 0 because x <<= 8) must
@@ -1912,7 +1913,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t bound0 = plattice_bound0(&pli, si), bound1 = plattice_bound1(&pli, si);
 #if !MOD2_CLASSES_BS
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
-    uint64_t x = 1ULL << (si->conf->logI-1);
+    uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
@@ -2641,8 +2642,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
    (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
    (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
-static int
-check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
+int
+check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
 {
   size_t s = mpz_sizeinbase (n, 2);
   unsigned int lpb = si->conf->sides[side]->lpb;
@@ -2675,7 +2676,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
 
 static int
 search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[2], 
-        const unsigned int log_I, const unsigned int j)
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
 {
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
@@ -2735,7 +2736,7 @@ search_survivors_in_line(unsigned char * const SS[2], const unsigned char bound[
 
 static int
 search_survivors_in_line3(unsigned char * const SS[2], const unsigned char bound[2], 
-        const unsigned int log_I, const unsigned int j)
+        const unsigned int log_I, const unsigned int j, int N MAYBE_UNUSED)
 {
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
@@ -2878,7 +2879,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-    for (int x = 0; x < 1 << BUCKET_REGION; x++) {
+    for (int x = 0; x < 1 << LOG_BUCKET_REGION; x++) {
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
                     alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
@@ -2899,10 +2900,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         };
         if ((j + first_j) % 3 == 0) {
             surv += search_survivors_in_line3(both_S, both_bounds, 
-                                              si->conf->logI, j + first_j);
+                                              si->conf->logI, j + first_j, N);
         } else {
             surv += search_survivors_in_line(both_S, both_bounds, 
-                                             si->conf->logI, j + first_j);
+                                             si->conf->logI, j + first_j, N);
         }
         /* Make survivor search create a list of x-coordinates that survived
            instead of changing sieve array? More localized accesses in
@@ -3162,7 +3163,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             {
                 const double skew = las->cpoly->skew;
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel, skew, si);
+                int is_dup = do_check && relation_is_duplicate(rel, skew, las->nb_threads, si);
                 const char *comment = is_dup ? "# " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
@@ -3894,7 +3895,6 @@ int main (int argc0, char *argv0[])/*{{{*/
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
 
-    memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
     /*
@@ -3908,7 +3908,7 @@ int main (int argc0, char *argv0[])/*{{{*/
      * q0 -> q0d (double) -> si->sides[*]->{scale,logmax}
      * q0 -> (I, lpb, lambda) for the descent
      * 
-     * scales -> logp's in factor base.
+     * scale -> logp's in factor base.
      *
      * I -> splittings of the factor base among threads.
      *

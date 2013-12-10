@@ -418,9 +418,15 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
         } else if (event & SSP_POW2) {
             ssp_t * ssp = &(ssd->ssp[i]);
             ssdpos[i] += ssp->offset;
-            /* Pay attention to the fact that the moment, ssdpos
+            // If there is only one line per bucket region, we should
+            // skip the even lines. So we add I to ensure that we start
+            // at the next odd line.
+            const unsigned long nj = bucket_region >> si->conf->logI;
+            if (nj == 1)
+                ssdpos[i] += bucket_region;
+            /* Pay attention to the fact that at the moment, ssdpos
              * may still point to the _second line_ in the area. So we
-             * must not cancel the high bits
+             * must not cancel the high bits.
              */
             // ssdpos[i] &= ssp->p - 1;
         }
@@ -509,7 +515,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 /* In this loop, ssdpos gets updated to the first 
                    index to sieve relative to the start of the next line, 
                    but after all lines of this bucket region are processed, 
-                   it will point the the first position to sieve relative  
+                   it will point to the first position to sieve relative
                    to the start of the next bucket region, as required */
                 ssdpos[n] = i0 - I;
             } else {
@@ -1047,7 +1053,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             }
             while (i0 < (unsigned int) bucket_region) {
                 unsigned char *S_ptr = S + i0;
-                if ((i0 >> si->conf->logI) % 2 == 0) { /* Even j coordinate? */
+                if (((i0 & I) == 0) ^ row0_is_oddj) { /* Even j coordinate? */
                     /* Yes, test only odd ii-coordinates */
                     for (ii = 1; ii < I; ii += 2) {
                         if (S_ptr[ii] != 255) {

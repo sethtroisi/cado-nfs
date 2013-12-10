@@ -11,12 +11,6 @@
 #define rowCell(rows, i, k) rows[(i)][(k)].id
 #endif
 
-#ifndef FOR_DL
-#define SKIP_DEFAULT 32
-#else
-#define SKIP_DEFAULT 0
-#endif
-
 // Structures for the data to create the index file.
 // This is an array of relation-sets.
 // One relation-set is an array of pairs (relation,multiplicity).

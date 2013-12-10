@@ -1393,6 +1393,7 @@ if __name__ == '__main__': # {
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-dbname', help='Name of the database file')
+    parser.add_argument('-dbfile', help='Name of the database file')
     parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
     parser.add_argument('-add', action="store_true", 
@@ -1434,6 +1435,8 @@ if __name__ == '__main__': # {
     dbname = "wudb"
     if args["dbname"]:
         dbname = args["dbname"]
+    if args["dbfile"]:
+        dbname = args["dbfile"]
 
     if args["test"]:
         import doctest

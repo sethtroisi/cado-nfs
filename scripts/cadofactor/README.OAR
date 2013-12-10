@@ -16,8 +16,8 @@ which reads the list of host names from the file specified in the shell
 environment variable OAR_NODE_FILE. That file lists each multiple times, 
 as often as there are virtual CPUs. As each process spawned by clients
 usually uses more than one thread (i.e., as many as specified by the
-threads parameter), it is sensible to use fewer clients clients per host
-than the number of cores. For example, to use 8 clients:
+threads parameter), it is sensible to use fewer clients per host than
+the number of cores. For example, to use 8 clients per host:
 
 slaves.nrclients = 8
 
@@ -42,9 +42,10 @@ whitelisted in server.whitelist.
 2. Running cadofactor outside the OAR job
 
 If cadofactor runs on a machine outside the OAR-managed cluster, only the
-slaves need to be started via OAR. They need the URL of the server, and the
-server's certificate fingerprint. A simple example shell script to launch
-slaves is in start_clients.sh.
+slaves need to be started via OAR. They need the URL of the server, and if
+the server uses SSL (which is the default), the server's certificate
+fingerprint. A simple example shell script to launch slaves is in
+start_clients.sh.
 
 
 

@@ -89,52 +89,142 @@ Thus the function to check for duplicates needs the following information:
 
 
 #include "cado.h"
+#include <stdio.h>
 #include <gmp.h>
+#include <string.h>
 #include "las-duplicate.h"
 #include "las-qlattice.h"
 #include "las-coordinates.h"
+#include "las-norms.h"
 #include "gmp_aux.h"
 
 
 static void
-fill_in_sieve_info(sieve_info_ptr si, const uint32_t I, const uint32_t J, 
-                   const unsigned long p, const int64_t a, const uint64_t b)
+fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
+                   const int64_t a, const uint64_t b, const double skewness,
+                   sieve_info_srcptr old_si)
 {
-  si->I = I;
-  si->J = J;
+  // memset(new_si, 0, sizeof(sieve_info));
+  new_si->I = old_si->I;
+  new_si->J = old_si->J;
 
-  /* First compute the root a/b (mod p) */
-  mpz_init(si->doing->p);
-  mpz_init(si->doing->r);
-  mpz_set_uint64(si->doing->r, b);
-  mpz_set_uint64(si->doing->p, p);
-  mpz_invert(si->doing->r, si->doing->r, si->doing->p);
-  mpz_mul_int64(si->doing->r, si->doing->r, a);
-  mpz_mod(si->doing->r, si->doing->r, si->doing->p);
+  new_si->cpoly = old_si->cpoly; /* A pointer, and polynomial not get modified */
 
+  new_si->conf->side = old_si->conf->side;
+  new_si->conf->logI = old_si->conf->logI;
+  for(int side = 0; side < 2; side++) {
+    new_si->conf->sides[side]->lim = old_si->conf->sides[side]->lim;
+    new_si->conf->sides[side]->lpb = old_si->conf->sides[side]->lpb;
+    new_si->conf->sides[side]->mfb = old_si->conf->sides[side]->mfb;
+    new_si->conf->sides[side]->lambda = old_si->conf->sides[side]->lambda;
+    
+    new_si->sides[side]->logmax = old_si->sides[side]->logmax;
+    int d = new_si->cpoly->pols[side]->degree;
+    new_si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
+    for (int k = 0; k <= d; k++)
+      mpz_init (new_si->sides[side]->fij[k]);
+    new_si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
+  }
+
+  /* Compute the root a/b (mod p) */
+  mpz_init(new_si->doing->p);
+  mpz_init(new_si->doing->r);
+  mpz_set_uint64(new_si->doing->r, b);
+  mpz_set_uint64(new_si->doing->p, p);
+  mpz_invert(new_si->doing->r, new_si->doing->r, new_si->doing->p);
+  mpz_mul_int64(new_si->doing->r, new_si->doing->r, a);
+  mpz_mod(new_si->doing->r, new_si->doing->r, new_si->doing->p);
+
+  for (int side = 0; side < 2; side++) {
+    mpz_init_set(new_si->BB[side], old_si->BB[side]);
+    mpz_init_set(new_si->BBB[side], old_si->BBB[side]);
+    mpz_init_set(new_si->BBBB[side], old_si->BBBB[side]);
+  }
+  SkewGauss(new_si, skewness);  
 }
+
+static void
+clear_sieve_info(sieve_info_ptr new_si)
+{
+  for(int side = 0; side < 2; side++) {
+    int d = new_si->cpoly->pols[side]->degree;
+    for (int k = 0; k <= d; k++)
+      mpz_clear (new_si->sides[side]->fij[k]);
+    free(new_si->sides[side]->fij);
+  }
+  for (int side = 0; side < 2; side++) {
+    mpz_clear(new_si->BB[side]);
+    mpz_clear(new_si->BBB[side]);
+    mpz_clear(new_si->BBBB[side]);
+    free(new_si->sides[side]->fijd);
+  }
+  mpz_clear(new_si->doing->r);
+  mpz_clear(new_si->doing->p);
+}
+
+/* Compute the product of the nr_lp large primes in large_primes,
+   skipping sq. If sq occurs multiple times in large_primes, it is
+   skipped only once. */
+static void
+compute_cofactor(mpz_t cof, const unsigned long sq, 
+                 const unsigned long *large_primes, const int nr_lp)
+{
+  mpz_set_ui (cof, 1UL);
+  int saw_sq = 0;
+  for (int i = 0; i < nr_lp; i++) {
+    const unsigned long p = large_primes[i];
+    if (!saw_sq && p == sq) {
+      saw_sq = 1;
+      continue;
+    }
+    mpz_mul_ui(cof, cof, p);
+  }
+  ASSERT_ALWAYS(saw_sq);
+}
+
+#define WRAP(x) x
 
 /* Return 1 if the relation is probably a duplicate of an relation found
    when sieving the sq described by si. Return 0 if it is probably not a
    duplicate */
-static int
-check_one_prime(const unsigned long sq, 
-                const int64_t a, const uint64_t b, 
-                const double skewness, sieve_info_ptr si)
+int
+check_one_prime(const unsigned long sq MAYBE_UNUSED, const int64_t a, const uint64_t b, 
+                const double skewness,
+                const int nb_threads, const mpz_t cof,
+                int side, sieve_info_ptr si)
 {
+  const int verbose = 0;
   const unsigned long p = mpz_get_ui(si->doing->p);
-  const uint32_t I = si->I, J = si->J;
-
-  if (p == sq) /* Dummy to get rid of "unused" warning */
-    return 0;
+  const unsigned long r = mpz_get_ui(si->doing->r);
 
   /* Compute i,j-coordinates of this relation in the special-q lattice when
      p was used as the special-q value. */
 
-  SkewGauss(si, skewness);  
+  if (verbose) {
+    printf("# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q q=%lu; rho=%lu\n", a, b, p, r);
+    printf("# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
+  }
+
+  const uint32_t oldI = si->I, oldJ = si->J;
+  /* If resulting optimal J is so small that it's not worth sieving,
+     this special-q gets skipped, so relation is not a duplicate */
+  if (sieve_info_adjust_IJ(si, skewness, nb_threads) == 0) {
+    if (verbose) {
+      printf("# DUPECHECK J too small\n");
+    }
+    return 0;
+  }
+
+  sieve_info_update_norm_data(si, nb_threads);
+
+  const uint32_t I = si->I, J = si->J;
   int i;
   unsigned int j;
 
+  if (verbose && (oldI != I || oldJ != J)) {
+    printf ("# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
+  }
+  
   int ok = ABToIJ(&i, &j, a, b, si);
 
   if (!ok)
@@ -142,8 +232,20 @@ check_one_prime(const unsigned long sq,
 
   /* If the coordinate is outside the i,j-region used when sieving
      the special-q described in si, then it's not a duplicate */
-  if ((i < 0 && (uint32_t)(-i) > I) || (i > 0 && (uint32_t)i > I-1) || (j >= J))
+  if ((i < 0 && (uint32_t)(-i) > I/2) || (i > 0 && (uint32_t)i > I/2-1) || (j >= J)) {
+    if (verbose) {
+      printf("# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
+    }
     return 0;
+  }
+
+  /* Check that the cofactor is within the mfb bound */
+  if (!check_leftover_norm (cof, si, side)) {
+    if (verbose) {
+      gmp_printf("# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+    }
+    return 0;
+  }
 
   return 1;
 }
@@ -151,8 +253,10 @@ check_one_prime(const unsigned long sq,
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_srcptr si)
+relation_is_duplicate(relation_t *relation, const double skewness, 
+                      const int nb_threads, sieve_info_srcptr si)
 {
+  int is_dupe = 0;
   /* If the special-q does not fit in an unsigned long, we assume it's not a
      duplicate and just move on */
   if (!mpz_fits_ulong_p(si->doing->p)) {
@@ -164,8 +268,6 @@ relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_sr
   unsigned long large_primes[10];
   unsigned int nr_lp = 0;
   
-  const unsigned int I = si->I;
-  const unsigned int J = si->J;
   /* fbb is the factor base bound on the special-q side */
   const unsigned long fbb = si->conf->sides[sq_side]->lim;
   const int64_t a = relation->a;
@@ -188,7 +290,9 @@ relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_sr
   } else
     abort();
 
-  for (unsigned int i = 0; i < nr_lp; i++) {
+  mpz_t cof;
+  mpz_init(cof);
+  for (unsigned int i = 0; i < nr_lp && !is_dupe; i++) {
     const unsigned long p = large_primes[i];
 
     /* Test the ordering of the relations. If the current special-q is sieved
@@ -196,18 +300,17 @@ relation_is_duplicate(relation_t *relation, const double skewness, sieve_info_sr
        of what might be found when sieving p */
     /* TODO: handle cases where we sieve both sides */
     if (p >= sq)
-      return 0;
+      continue;
 
     /* Create a dummy sieve_info struct with just enough info to let us use
        the lattice-reduction and coordinate-conversion functions */
     sieve_info new_si;
-    fill_in_sieve_info (new_si, I, J, p, a, b);
-    if (check_one_prime(sq, a, b, skewness, new_si))
-      return 1;
-
-    mpz_clear(new_si->doing->r);
-    mpz_clear(new_si->doing->p);
+    fill_in_sieve_info (new_si, p, a, b, skewness, si);
+    compute_cofactor(cof, p, large_primes, nr_lp);
+    is_dupe = check_one_prime(sq, a, b, skewness, nb_threads, cof, sq_side, new_si);
+    clear_sieve_info(new_si);
   }
+  mpz_clear(cof);
 
-  return 0;
+  return is_dupe;
 }

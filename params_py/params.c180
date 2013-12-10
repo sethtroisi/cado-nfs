@@ -17,7 +17,6 @@ tasks.threads = 2
 tasks.polyselect.degree = 5		
 
 tasks.polyselect.P = 5000000		
-tasks.polyselect.maxnorm = 62		
 tasks.polyselect.admax = 2e7		
 tasks.polyselect.adrange = 2e5		
 tasks.polyselect.incr = 60		

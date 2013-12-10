@@ -35,8 +35,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "sparse.h"
 #include "gzip.h"
 
-#define STR(s) XSTR(s)
-#define XSTR(s) #s
 #define DEBUG 0
 #define STAT_FFS
 
@@ -707,7 +705,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "basename for output matrices");
 #ifndef FOR_DL
   param_list_decl_usage(pl, "skip", "number of heaviest columns that go to the "
-                            "dense matrix (default " STR(SKIP_DEFAULT) ")");
+                            "dense matrix (default " STR(DEFAULT_MERGE_SKIP) ")");
 #endif
   param_list_decl_usage(pl, "index", "file containing description of rows "
                                      "(relations-sets) of the matrix");
@@ -739,7 +737,7 @@ main(int argc, char *argv[])
   uint64_t bwcostmin = 0;
   uint64_t nrows, ncols;
   typerow_t **newrows;
-  int bin, skip = SKIP_DEFAULT, for_msieve = 0;
+  int bin, skip = DEFAULT_MERGE_SKIP, for_msieve = 0;
   double wct0 = wct_seconds ();
 
 #ifdef HAVE_MINGW

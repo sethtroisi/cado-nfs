@@ -1,7 +1,7 @@
 #include "macros.h"
 
-/* Typecasting inline functions that assert that casted values are within 
-   range of the casted-to type.
+/* Typecasting inline functions that assert that cast values are within 
+   range of the cast-to type.
    Format is cast_<source type>_<target type>()
    where each of <source type> and <target type> are one of
    ulong	for unsigned long int

@@ -109,7 +109,6 @@ class Parameters(object):
         "polsel_adrange": "tasks.polyselect.adrange",
         "polsel_delay": None,
         "polsel_incr": "tasks.polyselect.incr",
-        "polsel_maxnorm": "tasks.polyselect.maxnorm",
         "polsel_nice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
         "polsel_nq": "tasks.polyselect.nq",
         "polsel_P": "tasks.polyselect.P",
@@ -162,6 +161,7 @@ class Parameters(object):
         "compression": BoolParam,
         "ssl": BoolParam,
         "threaded": BoolParam,
+        "only_registered": BoolParam
     }
 
     def __init__(self, *args, **kwargs):
@@ -293,7 +293,8 @@ class Parameters(object):
             (prefix, varname, postfix) = match.groups()
             if not varname in os.environ:
                 raise KeyError('Shell environment variable ${%s} referenced '
-                               'in key %s is not defined' % (varname, fqn))
+                               'in key %s is not defined (maybe not exported?)'
+                               % (varname, fqn))
             value = prefix + os.environ[varname] + postfix
         return value
     
@@ -523,7 +524,6 @@ DEFAULTS_OLD = (
     'polsel_adrange = 1e7',
     'polsel_delay   = 120',
     #'polsel_P       = undef',
-    'polsel_maxnorm = 1e9',
     'polsel_nice    = 10',
 
     # sieve

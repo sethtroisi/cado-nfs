@@ -53,7 +53,7 @@ BUGGY_MIMEENCODER1 = (
 # These Python version have bug type #2
 BUGGY_MIMEENCODER2 = (
     (3,2,4), (3,2,5),
-    (3,3,2)
+    (3,3,2), (3,3,3)
 )
 
 HAVE_WGET = False
@@ -535,6 +535,10 @@ class WorkunitProcessor(object):
             logging.info ("Removing file %s", filepath)
             os.remove(filepath)
 
+class WorkunitParseError(ValueError):
+    """ Parsing the workunit failed """
+    pass
+
 class WorkunitClient(object):
     def __init__(self, settings):
         self.settings = settings
@@ -558,7 +562,12 @@ class WorkunitClient(object):
         wu_text = self.wu_file.read()
         # WU file stays open so we keep the lock
 
-        self.workunit = Workunit(wu_text)
+        try:
+            self.workunit = Workunit(wu_text)
+        except Exception as err:
+            logging.error("Invalid workunit file: %s", err)
+            self.cleanup()
+            raise WorkunitParseError()
         logging.debug ("Workunit ID is %s", self.workunit.get_id())
     
     def download_wu(self):
@@ -733,15 +742,7 @@ class WorkunitClient(object):
                 # bytes and return
                 logging.warning("Looks like another process already created "
                                 "file %s", dlpath)
-                slept = 0
-                timeout = 60
-                while slept < timeout and os.path.getsize(dlpath) == 0:
-                    logging.warning("Sleeping until %s contains data", dlpath)
-                    time.sleep(1)
-                    slept += 1
-                if slept == timeout:
-                    logging.warning("Slept %d seconds, %s still has no data", 
-                                    timeout, dlpath)
+                self.wait_until_positive_filesize(dlpath)
                 return
             else:
                 raise
@@ -868,12 +869,28 @@ class WorkunitClient(object):
         return True
 
     @staticmethod
+    def wait_until_positive_filesize(filename, timeout = 60):
+        slept = 0
+        while slept < timeout and os.path.getsize(filename) == 0:
+            logging.warning("Sleeping until %s contains data", filename)
+            time.sleep(1)
+            slept += 1
+        if slept == timeout:
+            logging.warning("Slept %d seconds, %s still has no data", 
+                            timeout, filename)
+        return
+
+    @staticmethod
     def do_checksum(filename, checksum = None):
         """ Computes the SHA1 checksum for a file. If checksum is None, returns 
             the computed checksum. If checksum is not None, return whether the
             computed SHA1 sum and checksum agree """
         blocksize = 65536
         sha1hash = hashlib.sha1() # pylint: disable=E1101
+        # Like when downloading, we wait until the file has positive size, to
+        # avoid getting the shared lock right after the other process created
+        # the file but before it gets the exclusive lock
+        WorkunitClient.wait_until_positive_filesize(filename)
         infile = open(filename, "rb")
         fcntl.flock(infile, fcntl.LOCK_SH)
         
@@ -915,11 +932,71 @@ class WorkunitClient(object):
         return upload_ok
 
 
-def get_ssl_certificate(server, port=443):
-    cert = ssl.get_server_certificate((server, int(port)),
-                                      ssl_version=ssl.PROTOCOL_SSLv23,
-                                      ca_certs=None)
-    return cert
+def get_ssl_certificate(server, port=443, retry=False, retrytime=0):
+    """ Download the SSL certificate from the server.
+    
+    In case of connection refused error, if retry is True, retry
+    indefinitely waiting retrytime seconds between tries, and if
+    retry is False, return None.
+    """
+    while True:
+        try:
+            cert = ssl.get_server_certificate((server, int(port)),
+                                              ssl_version=ssl.PROTOCOL_SSLv23,
+                                              ca_certs=None)
+            return cert
+        except socket.error as err:
+            if err.errno != errno.ECONNREFUSED:
+                raise
+            if not retry:
+                return None
+        wait = float(retrytime)
+        logging.error("Waiting %f seconds before retrying", wait)
+        time.sleep(wait)
+
+
+def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
+        retrytime=0):
+    """ Download the certificate if it is missing and check its fingerprint
+    
+    If the file 'certfilename' already exists, the certificate does not
+    get downloaded. 
+    If the certificate existed or could be downloaded and the fingerprint
+    matches, returns True. If the fingerprint check fails, exits with error.
+    If the server refuses connections and retry is False, returns False;
+    if retry is True, it keeps trying indefinitely.
+    """
+    certfile_exists = os.path.isfile(certfilename)
+    if certfile_exists:
+        logging.info("Using certificate stored in file %s", certfilename)
+        with open(certfilename, 'r') as certfile:
+            cert = certfile.read()
+    else:
+        logging.info("Downloading certificate from %s", netloc)
+        address_port = netloc.split(":")
+        cert = get_ssl_certificate(*address_port, retry=retry,
+                retrytime=retrytime)
+        if cert is None:
+            return False
+    bin_cert = ssl.PEM_cert_to_DER_cert(cert)
+    sha1hash = hashlib.sha1()
+    sha1hash.update(bin_cert)
+    cert_sha1 = sha1hash.hexdigest()
+    logging.debug("Certificate has SHA1 fingerprint %s", cert_sha1)
+    if not cert_sha1.lower() == fingerprint.lower():
+        logging.critical("Server certificate's SHA1 fingerprint (%s) differs "
+                         "from fingerprint specified on command line (%s). "
+                         "Aborting.", cert_sha1, fingerprint)
+        logging.critical("Possible reason: several factorizations with "
+                         "same download directory.")
+        sys.exit(1)
+    logging.info("Certificate SHA1 hash matches")
+    if not certfile_exists:
+        logging.info("Writing certificate to file %s", certfilename)
+        # FIXME: Set umask first?
+        with open(certfilename, 'w') as certfile:
+            certfile.write(cert)
+    return True
 
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
@@ -957,6 +1034,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
 SETTINGS = dict([(a, b) for (a, (b, c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
 
+BAD_WU_MAX = 3 # Maximum allowed number of bad WUs
+
 if __name__ == '__main__':
 
     def parse_cmdline():
@@ -990,6 +1069,25 @@ if __name__ == '__main__':
                                 % arg.lower())
         return options
 
+    def makedirs(path, mode=None, exist_ok=False):
+        # Python 3.2 os.makedirs() has exist_ok, but older Python do not
+        if sys.version_info[0:2] >= (3,2):
+            if mode is None:
+                os.makedirs(path, exist_ok=exist_ok)
+            else:
+                os.makedirs(path, mode=mode, exist_ok=exist_ok)
+        else:
+            try:
+                if mode is None:
+                    os.makedirs(path)
+                else:
+                    os.makedirs(path, mode=mode)
+            except OSError as e:
+                if e.errno == errno.EEXIST and exist_ok:
+                    pass
+                else:
+                    raise
+
     options = parse_cmdline()
     # If no client id is given, we use <hostname>.<randomstr>
     if SETTINGS["CLIENTID"] is None:
@@ -1015,9 +1113,9 @@ if __name__ == '__main__':
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
-        os.makedirs(SETTINGS["DLDIR"])
+        makedirs(SETTINGS["DLDIR"], exist_ok=True)
     if not os.path.isdir(SETTINGS["WORKDIR"]):
-        os.makedirs(SETTINGS["WORKDIR"])
+        makedirs(SETTINGS["WORKDIR"], exist_ok=True)
 
     # print (str(SETTINGS))
 
@@ -1041,39 +1139,22 @@ if __name__ == '__main__':
         logging.info("Using work-around #2 for buggy BytesGenerator")
 
     (scheme, netloc) = urlparse(SETTINGS["SERVER"])[0:2]
+    still_need_cert = False # This will be set to True if we need the certi-
+                            # ficate, but could not download it right away
     if not SETTINGS["CERTSHA1"] is None and scheme != "https":
-        logging.warn("Option -certsha1 makes sense only with an https URL, ignoring it.")
+        logging.warn("Option --certsha1 makes sense only with an https URL, ignoring it.")
     elif SETTINGS["CERTSHA1"] is None and scheme == "https":
-        logging.warn("An https URL was given but no -certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
+        logging.warn("An https URL was given but no --certsha1 option, NO SSL VALIDATION WILL BE PERFORMED.")
     elif not SETTINGS["CERTSHA1"] is None and scheme == "https":
-        certfilename = os.path.join(SETTINGS["DLDIR"], "server.pem")
-        certfile_exists = os.path.isfile(certfilename)
-        if certfile_exists:
-            logging.info("Using certificate file stored in %s", certfilename)
-            with open(certfilename, 'r') as certfile:
-                cert = certfile.read()
-        else:
-            logging.info("Downloading certificate from %s", netloc)
-            address_port = netloc.split(":")
-            cert = get_ssl_certificate(*address_port)
-        bin_cert = ssl.PEM_cert_to_DER_cert(cert)
-        sha1hash = hashlib.sha1()
-        sha1hash.update(bin_cert)
-        cert_sha1 = sha1hash.hexdigest()
-        logging.debug("Certificate has SHA1 %s", cert_sha1)
-        if not cert_sha1.lower() == SETTINGS["CERTSHA1"].lower():
-            logging.critical("Server certificate's SHA1 hash (%s) differs "
-                             "from hash specified on command line (%s). "
-                             "Aborting.", cert_sha1, SETTINGS["CERTSHA1"])
-            logging.critical("Possible reason: several factorizations with "
-                             "same download directory")
-            sys.exit(1)
-        logging.info("Certificate SHA1 hash matches")
-        if not certfile_exists:
-            # FIXME: Set umask first?
-            with open(certfilename, 'w') as certfile:
-                certfile.write(cert)
+        certfilename = os.path.join(SETTINGS["DLDIR"], "server.%s.pem" % SETTINGS["CERTSHA1"][0:8])
         SETTINGS["CERTFILE"] = certfilename
+        # Try downloading the certificate once. If connection is refused,
+        # proceed to daemonizing - hopefully server will come up later
+        if not get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"]):
+            still_need_cert = True
+            logging.info("Could not download SSL certificate: The connection was refused.")
+            logging.info("Assuming the server will come up later. Will keep trying%s.",
+                         " after daemonizing" if options.daemon else "")
         
         # Can we download with HTTPS at all?
         if sys.version_info[0] == 2:
@@ -1092,16 +1173,26 @@ if __name__ == '__main__':
                         "Aborting.")
                 sys.exit(1)
 
-    # Daemonize before we open the log file, or we close the log file's 
-    # file descriptor
     if options.daemon:
         create_daemon(keepfd=None if logfile is None else [logfile.fileno()])
 
+    if still_need_cert:
+        get_missing_certificate(certfilename, netloc, SETTINGS["CERTSHA1"],
+                retry=True, retrytime=SETTINGS["DOWNLOADRETRY"])
+
     client_ok = True
+    bad_wu_counter = 0
     while client_ok:
         try:
-            client = WorkunitClient(settings = SETTINGS)
+            try:
+                client = WorkunitClient(settings = SETTINGS)
+            except WorkunitParseError:
+                bad_wu_counter += 1
+                if bad_wu_counter > BAD_WU_MAX:
+                    logging.critical("Had %d bad workunit files. Aborting.", bad_wu_counter)
+                    break
+                continue
             client_ok = client.process()
-        except BaseException:
+        except Exception:
             logging.exception("Exception occurred")
             break

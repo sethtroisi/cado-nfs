@@ -42,40 +42,29 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "merge_mono.h" /* for mergeOneByOne */
 #include "sparse.h"
 
-#define STR(s) XSTR(s)
-#define XSTR(s) #s
-#define MAXLEVEL_DEFAULT 10
-#define KEEP_DEFAULT 160
-#define FORBW_DEFAULT 0
-#define RATIO_DEFAULT 1.1
-#define COVERNMAX_DEFAULT 100.0
-#define MKZTYPE_DEFAULT 1 /* pure Markowitz */
-#define WMSTMAX_DEFAULT 7 /* relevant only if mkztype == 2 */
-
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "mat", "input purged file");
   param_list_decl_usage(pl, "out", "output history file");
-  param_list_decl_usage(pl, "keep", "excess to keep (default " STR(KEEP_DEFAULT)
-                                    ")");
+  param_list_decl_usage(pl, "keep", "excess to keep (default "
+                                    STR(DEFAULT_FILTER_EXCESS) ")");
   param_list_decl_usage(pl, "skip", "number of heavy columns to bury (default "
-                                    STR(SKIP_DEFAULT) ")");
+                                    STR(DEFAULT_MERGE_SKIP) ")");
   param_list_decl_usage(pl, "maxlevel", "maximum number of rows in a merge "
-                            "(default " STR(MAXLEVEL_DEFAULT) ")");
+                            "(default " STR(DEFAULT_MERGE_MAXLEVEL) ")");
   param_list_decl_usage(pl, "forbw", "controls the optimization function "
-                            "(see below, default " STR(FORBW_DEFAULT) ")");
+                            "(see below, default " STR(DEFAULT_MERGE_FORBW) ")");
   param_list_decl_usage(pl, "ratio", "maximal ration cN(final)/cN(min) with "
-                            "-forbw 0 (default " STR(RATIO_DEFAULT) ")");
+                            "-forbw 0 (default " STR(DEFAULT_MERGE_RATIO) ")");
   param_list_decl_usage(pl, "coverNmax", "stop when c/N exceeds this value with"
-                            " -forbw 3 (default " STR(COVERNMAX_DEFAULT) ")");
-  param_list_decl_usage(pl, "nbmergemax", "maximum number of merges that can "
-                                       "be performed (default no maximum)");
-  param_list_decl_usage(pl, "resume", "resume from history file (cf "
-                                      "-nbmergemax)");
+                            " -forbw 3 (default " STR(DEFAULT_MERGE_COVERNMAX) ")");
+  param_list_decl_usage(pl, "itermax", "maximum number of columns that can be "
+                                       "removed (0 means no maximum)");
+  param_list_decl_usage(pl, "resume", "resume from history file (cf -itermax)");
   param_list_decl_usage(pl, "mkztype", "controls how the weight of a merge is "
-                            "approximated (default " STR(MKZTYPE_DEFAULT) ")");
+                            "approximated (default " STR(DEFAULT_MERGE_MKZTYPE) ")");
   param_list_decl_usage(pl, "wmstmax", "controls until when a mst is used with "
-                            "-mkztype 2 (default " STR(WMSTMAX_DEFAULT) ")");
+                            "-mkztype 2 (default " STR(DEFAULT_MERGE_WMSTMAX) ")");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
@@ -102,14 +91,14 @@ main (int argc, char *argv[])
     filter_matrix_t mat[1];
     report_t rep[1];
 
-    int maxlevel = MAXLEVEL_DEFAULT;
-    uint32_t keep = KEEP_DEFAULT;
-    uint32_t skip = SKIP_DEFAULT;
-    double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
-    uint32_t forbw = FORBW_DEFAULT;
-    double coverNmax = COVERNMAX_DEFAULT;
-    uint32_t mkztype = MKZTYPE_DEFAULT;
-    uint32_t wmstmax = WMSTMAX_DEFAULT;
+    int maxlevel = DEFAULT_MERGE_MAXLEVEL;
+    uint32_t keep = DEFAULT_FILTER_EXCESS;
+    uint32_t skip = DEFAULT_MERGE_SKIP;
+    double ratio = DEFAULT_MERGE_RATIO; /* bound on cN_new/cN to stop the merge */
+    uint32_t forbw = DEFAULT_MERGE_FORBW;
+    double coverNmax = DEFAULT_MERGE_COVERNMAX;
+    uint32_t mkztype = DEFAULT_MERGE_MKZTYPE;
+    uint32_t wmstmax = DEFAULT_MERGE_WMSTMAX;
                                /* use real MST minimum for wt[j] <= wmstmax*/
     int64_t nbmergemax = -1; /* Negative value means no maximum */
 
