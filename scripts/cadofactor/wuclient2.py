@@ -1008,6 +1008,37 @@ def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
             certfile.write(cert)
     return True
 
+def try_wget():
+    try:
+        return run_command(["wget", "-V"], print_error=True)[0] == 0
+    except OSError:
+        return False
+
+def try_curl():
+    try:
+        (rc, stdout, stderr) = run_command(["curl", "-V"], print_error=True)
+    except OSError:
+        return False
+    if rc != 0:
+        return False
+    match = False
+    version_lines = stdout.splitlines()
+    if version_lines:
+        match = re.match("curl (?:\d+.\d+)", version_lines[0])
+    if not match:
+        logging.error("curl did not print its version with -V")
+        logging.error("Stdout: %s", stdout)
+        return False
+
+    if re.search("SecureTransport", version_lines[0]):
+        logging.error("Found Apple version of curl with SecureTransport SSL "
+                      "backend") 
+        logging.error("SecureTransport doesn't allow self-signed certificates "
+                      "provided in files. Please see the SSL section in "
+                      "README.Python for details.")
+        return False
+    return True
+
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"SERVER" : (None, "Base URL for WU server")}
 
@@ -1168,19 +1199,13 @@ if __name__ == '__main__':
         
         # Can we download with HTTPS at all?
         if sys.version_info[0] == 2:
-            try:
-                HAVE_WGET = run_command(["wget", "-V"])[0] == 0
-            except OSError:
-                pass
+            HAVE_WGET = try_wget()
             if not HAVE_WGET:
-                try:
-                    HAVE_CURL = run_command(["curl", "-V"])[0] == 0
-                except OSError:
-                    pass
+                HAVE_CURL = try_curl()
             if not HAVE_WGET and not HAVE_CURL:
                 logging.critical("HTTPS requested, but not implemented in "
-                        "Python 2 and can't find wget or curl as fall-back. "
-                        "Aborting.")
+                        "Python 2 and can't find working wget or curl as "
+                        "fall-back. Aborting.")
                 sys.exit(1)
 
     if options.daemon:
