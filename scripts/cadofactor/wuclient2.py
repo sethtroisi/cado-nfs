@@ -413,15 +413,27 @@ def close_exclusive(fileobj):
     fcntl.flock(fileobj, fcntl.LOCK_UN)
     fileobj.close()
 
-def run_command(command):
-    """ Run command, wait for it to finish, return exit status, stdout 
+def run_command(command, print_error=False):
+    """ Run command, wait for it to finish, return exit status, stdout
     and stderr
+
+    If print_error is True and the command exits with an non-zero exit code,
+    print stdout and stderr to the log.
     """
+    logging.info ("Running %s",
+            command if isinstance(command, str) else " ".join(command))
     child = subprocess.Popen(command,
-                             stdout=subprocess.PIPE, 
-                             stderr=subprocess.PIPE, 
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
                              close_fds=True)
     (stdout, stderr) = child.communicate()
+
+    if print_error and child.returncode != 0:
+        logging.error("Command resulted in exit code %d", child.returncode)
+        if stdout:
+            logging.error("Stdout: %s", stdout.rstrip())
+        if stderr:
+            logging.error("Stderr: %s", stderr.rstrip())
     return (child.returncode, stdout, stderr)
 
 
@@ -666,6 +678,18 @@ class WorkunitClient(object):
                     encoding = pair[1].strip()
         return encoding
 
+    def external_get_file(self, command, url, wait):
+        """ Runs a command to download a file, retrying indefinitely in case
+        of error
+        """
+        while True:
+            (rc, stdout, stderr) = run_command (command, print_error=True)
+            if rc == 0:
+                return True
+            logging.error("Download of %s failed. Waiting %s seconds before "
+                          "retrying,", url, wait)
+            time.sleep(wait)
+
     def wget_file(self, url, wait, dlpath, cafile=None):
         """ Download via wget
         
@@ -677,14 +701,7 @@ class WorkunitClient(object):
         if cafile:
             command.append("--ca-certificate=%s" % cafile)
         command.append(url)
-        while True:
-            logging.info ("Running %s", " ".join(command))
-            (rc, stdout, stderr) = run_command (command)
-            if rc == 0:
-                return True
-            logging.error("Download of %s failed. Stderr:\n%s" % (url, stderr))
-            logging.error("Waiting %s seconds before retrying", wait)
-            time.sleep(wait)
+        return self.external_get_file(command, url, wait)
         
     def curl_get_file(self, url, wait, dlpath, cafile=None):
         """ Download via curl
@@ -695,14 +712,7 @@ class WorkunitClient(object):
         if cafile:
             command += ["--cacert", cafile]
         command.append(url)
-        while True:
-            logging.info ("Running %s", " ".join(command))
-            (rc, stdout, stderr) = run_command(command)
-            if rc == 0:
-                return True
-            logging.error("Download of %s failed. Stderr:\n%s" % (url, stderr))
-            logging.error("Waiting %s seconds before retrying", wait)
-            time.sleep(wait)
+        return self.external_get_file(command, url, wait)
         
     def get_file(self, urlpath, dlpath=None, options=None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
@@ -951,7 +961,7 @@ def get_ssl_certificate(server, port=443, retry=False, retrytime=0):
             if not retry:
                 return None
         wait = float(retrytime)
-        logging.error("Waiting %f seconds before retrying", wait)
+        logging.error("Waiting %s seconds before retrying", wait)
         time.sleep(wait)
 
 
