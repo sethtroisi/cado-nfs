@@ -55,31 +55,30 @@ void sieve_info_clear_unsieve_data(sieve_info_ptr si)
   free (si->us->entries);
 }
 
-#ifdef UNSIEVE_NOT_COPRIME
 static inline void
 unsieve_one_prime (unsigned char *line_start, const unsigned int p, 
-                   const unsigned int y, const unsigned int start_idx,
-                   sieve_info_srcptr si)
+                   const unsigned int j, const unsigned int start_idx,
+                   const unsigned int I)
 {
-  unsigned int x, np = p; /* if 2|y, np=2p, else np=p */
+  unsigned int x, np = p; /* if 2|j, np=2p, else np=p */
 
   x = start_idx;
-  if (y % 2U == 0U)
+  if (j % 2U == 0U)
     {
       np += p;
       if (x % 2U == 0U)
         x += p;
     }
-  for ( ; x < si->I; x += np)
+  for ( ; x < I; x += np)
     line_start[x] = 255;
 }
 
 
 static inline void
 unsieve_3(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i, pattern_idx;
   unsieve_pattern_t p0, p1, p2;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
@@ -96,9 +95,9 @@ unsieve_3(unsigned char *line_start, const unsigned int start_idx,
   else
     abort();
   
-  p0 = si->us->pattern3[pattern_idx];
-  p1 = si->us->pattern3[(pattern_idx + 1) % 3];
-  p2 = si->us->pattern3[(pattern_idx + 2) % 3];
+  p0 = us->pattern3[pattern_idx];
+  p1 = us->pattern3[(pattern_idx + 1) % 3];
+  p2 = us->pattern3[(pattern_idx + 2) % 3];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -118,9 +117,9 @@ unsieve_3(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_5(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
@@ -138,11 +137,11 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
   } else
     abort();
   
-  p0 = si->us->pattern5[pattern_idx];
-  p1 = si->us->pattern5[(pattern_idx + 1) % 5];
-  p2 = si->us->pattern5[(pattern_idx + 2) % 5];
-  p3 = si->us->pattern5[(pattern_idx + 3) % 5];
-  p4 = si->us->pattern5[(pattern_idx + 4) % 5];
+  p0 = us->pattern5[pattern_idx];
+  p1 = us->pattern5[(pattern_idx + 1) % 5];
+  p2 = us->pattern5[(pattern_idx + 2) % 5];
+  p3 = us->pattern5[(pattern_idx + 3) % 5];
+  p4 = us->pattern5[(pattern_idx + 4) % 5];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -167,9 +166,9 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_7(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4, p5, p6;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
@@ -187,13 +186,13 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
   } else
     abort();
   
-  p0 = si->us->pattern7[pattern_idx];
-  p1 = si->us->pattern7[(pattern_idx + 1) % 7];
-  p2 = si->us->pattern7[(pattern_idx + 2) % 7];
-  p3 = si->us->pattern7[(pattern_idx + 3) % 7];
-  p4 = si->us->pattern7[(pattern_idx + 4) % 7];
-  p5 = si->us->pattern7[(pattern_idx + 5) % 7];
-  p6 = si->us->pattern7[(pattern_idx + 6) % 7];
+  p0 = us->pattern7[pattern_idx];
+  p1 = us->pattern7[(pattern_idx + 1) % 7];
+  p2 = us->pattern7[(pattern_idx + 2) % 7];
+  p3 = us->pattern7[(pattern_idx + 3) % 7];
+  p4 = us->pattern7[(pattern_idx + 4) % 7];
+  p5 = us->pattern7[(pattern_idx + 5) % 7];
+  p6 = us->pattern7[(pattern_idx + 6) % 7];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -222,6 +221,62 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
     UNSIEVE_OR(ul_line_start[i + 5], p5);
 }
 
+
+void
+unsieve_not_coprime_line(unsigned char * restrict line_start,
+                         const unsigned int j, const unsigned int min_p,
+                         const unsigned int I, unsieve_aux_data_srcptr us)
+{
+  unsigned int p, start_idx, c = j;
+
+  if (j == 0)
+    return;
+
+  while (c % 2U == 0U) 
+    c >>= 1;
+
+  while (1)
+    {
+      p = us->entries[c].lpf; /* set p to largest prime factor of c */
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+      if (p < min_p)
+        return;
+      if (p <= 7)
+        break;
+      unsieve_one_prime (line_start, p, j, start_idx, I);
+    }
+  
+  if (p == 7U)
+    {
+      unsieve_7(line_start, start_idx, I, us);
+      p = us->entries[c].lpf;
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+    }
+
+  if (p < min_p)
+    return;
+  
+  if (p == 5U)
+    {
+      unsieve_5(line_start, start_idx, I, us);
+      p = us->entries[c].lpf;
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+    }
+
+  if (p < min_p)
+    return;
+  
+  if (p == 3U)
+    {
+      unsieve_3(line_start, start_idx, I, us);
+    }
+  ASSERT_ALWAYS(c <= 1);
+}
+
+
 /* Set locations where gcd(i,j) != 1 to 255 */
 void 
 unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
@@ -230,44 +285,9 @@ unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
   unsigned int y; /* Line coordinate within bucket region */
   for (y = (N == 0U ? 1U : 0U); y < lines_per_region; y++)
     {
-      unsigned int c = y + N * lines_per_region;
-      unsigned int p, start_idx;
+      const unsigned int j = y + N * lines_per_region;
       unsigned char *line_start = S + (y << si->conf->logI);
 
-      while (c % 2U == 0U) 
-        c >>= 1;
-
-      while (1)
-        {
-          p = si->us->entries[c].lpf; /* set p to largest prime factor of c */
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-          if (p <= 7)
-            break;
-          unsieve_one_prime (line_start, p, y, start_idx, si);
-        }
-      
-      if (p == 7U)
-        {
-          unsieve_7(line_start, start_idx, si);
-          p = si->us->entries[c].lpf;
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-        }
-
-      if (p == 5U)
-        {
-          unsieve_5(line_start, start_idx, si);
-          p = si->us->entries[c].lpf;
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-        }
-
-      if (p == 3U)
-        {
-          unsieve_3(line_start, start_idx, si);
-        }
-      ASSERT_ALWAYS(c <= 1);
+      unsieve_not_coprime_line(line_start, j, 1, si->I, si->us);
     }
 }
-#endif /* ifdef UNSIEVE_NOT_COPRIME */

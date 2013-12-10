@@ -25,6 +25,7 @@ struct unsieve_aux_data_s {
 };
 typedef struct unsieve_aux_data_s unsieve_aux_data[1];
 typedef struct unsieve_aux_data_s * unsieve_aux_data_ptr;
+typedef const struct unsieve_aux_data_s * unsieve_aux_data_srcptr;
 
 #include "las-types.h"
 
@@ -34,6 +35,8 @@ extern "C" {
 
 void sieve_info_init_unsieve_data(sieve_info_ptr si);
 void sieve_info_clear_unsieve_data(sieve_info_ptr si);
+void unsieve_not_coprime_line(unsigned char *, unsigned int, unsigned int,
+                              unsigned int, unsieve_aux_data_srcptr);
 void unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si);
 
 #ifdef __cplusplus
