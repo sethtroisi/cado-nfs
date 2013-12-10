@@ -176,7 +176,7 @@ void * thread_start(void *arg) {
 #define SM_BLOCK 500
 
 void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
-    const mpz_t eps, const mpz_t ell, const mpz_t ell2)
+    const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   // allocate space for results of threads
   poly_t **SM;
@@ -235,7 +235,7 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
     pthread_join(threads[threads_head], NULL);
     active_threads--;
     for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt)
-      print_sm (out, SM[threads_head][k], F->deg);
+      print_sm (out, SM[threads_head][k], nsm);
 
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
@@ -261,7 +261,7 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
 
 
 void sm(const char * outname, sm_relset_ptr rels, int sr, poly_t F,
-	const mpz_t eps, const mpz_t ell, const mpz_t ell2)
+	const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   FILE * out = fopen(outname, "w");
   poly_t SM;
@@ -293,7 +293,7 @@ void sm(const char * outname, sm_relset_ptr rels, int sr, poly_t F,
   for (int i=0; i<sr; i++) {
     poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
-    print_sm (out, SM, F->deg);
+    print_sm (out, SM, nsm);
   }
 
   poly_free(SM);
@@ -313,6 +313,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "gorder", "(required) group order");
   param_list_decl_usage(pl, "smexp", "(required) sm-exponent");
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
+  param_list_decl_usage(pl, "nsm", "number of SM (default deg(alg polynomial))");
 }
 
 static void usage (const char *argv, const char * missing, param_list pl)
@@ -404,6 +405,16 @@ int main (int argc, char **argv)
 
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
+
+  int nsm = pol->alg->degree;
+  param_list_parse_int(pl, "nsm", &nsm);
+  if (nsm < 1 || nsm > pol->alg->degree)
+  {
+    fprintf(stderr, "Error: parameter nsm must be at least 1 and at most"
+                    "the degree of the rational polynomial\n");
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
+  }
   
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
@@ -443,9 +454,9 @@ int main (int argc, char **argv)
   fprintf(stderr, "using %d threads\n", mt);
 
   if (mt == 1)
-    sm(outfile, rels, sr, F, eps, ell, ell2);
+    sm(outfile, rels, sr, F, eps, ell, ell2, nsm);
   else
-    mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2);
+    mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2, nsm);
 
   fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
 

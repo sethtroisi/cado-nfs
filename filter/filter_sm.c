@@ -89,9 +89,9 @@ compute_sm (poly_t SM, poly_t num, const poly_t F, const mpz_t ell,
 }
 
 inline void
-print_sm (FILE *f, poly_t SM, int Fdeg)
+print_sm (FILE *f, poly_t SM, int nSM)
 {
-  for(int j=0; j<Fdeg; j++)
+  for(int j=0; j<nSM; j++)
   {
     if (j > SM->deg)
       fprintf(f, "0 ");
