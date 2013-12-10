@@ -111,7 +111,6 @@ read_data_free (read_data_t *data, uint64_t nrels)
 typedef struct
 {
   unsigned int nbsm;
-  poly_t SM;
   poly_ptr F;
   mpz_t *smlog;
   mpz_ptr smexp; /* exponent for SM */
@@ -131,10 +130,6 @@ sm_data_init (sm_data_t *d, unsigned int nbsm, poly_t F, mpz_t q, mpz_t smexp,
   d->q = q;
   d->smexp = smexp;
 
-  poly_alloc(d->SM, F->deg);
-  d->SM->deg = 0;
-  poly_setcoeff_si(d->SM, 0, 1);
-
   mpz_init(d->q2);
   mpz_mul(d->q2, q, q);
 
@@ -147,7 +142,6 @@ sm_data_init (sm_data_t *d, unsigned int nbsm, poly_t F, mpz_t q, mpz_t smexp,
 static void
 sm_data_free (sm_data_t *d)
 {
-  poly_free(d->SM);
   mpz_clear(d->q2);
   mpz_clear(d->invq2);
 }
@@ -156,10 +150,15 @@ sm_data_free (sm_data_t *d)
 static inline void
 add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
 {
-  sm_single_rel(sm->SM, a, b, sm->F, sm->smexp, sm->q, sm->q2, sm->invq2);
+  poly_t SMres;
+  poly_alloc(SMres, sm->F->deg);
+  SMres->deg = 0;
+  poly_setcoeff_si(SMres, 0, 1);
+  sm_single_rel(SMres, a, b, sm->F, sm->smexp, sm->q, sm->q2, sm->invq2);
   unsigned int i;
-  for (i = 0; i < sm->nbsm && i <= (unsigned int) sm->SM->deg; i++)
-    mpz_add_log_mod_mpz (l, sm->smlog[i], sm->SM->coeff[i], sm->q);
+  for (i = 0; i < sm->nbsm && i <= (unsigned int) SMres->deg; i++)
+    mpz_add_log_mod_mpz (l, sm->smlog[i], SMres->coeff[i], sm->q);
+  poly_free(SMres);
 }
 #endif /* ifndef FOR_FFS */
 
@@ -302,11 +301,11 @@ write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
     }
   }
 
-  ASSERT_ALWAYS (known_log + missing == tab->size);
   printf ("# Writing logarithms took %.1fs\n", seconds()-tt);
   printf ("# %" PRIu64 " logarithms are known, %" PRIu64 " are missing\n",
           known_log, missing);
   fclose_maybe_compressed (f, filename);
+  ASSERT_ALWAYS (known_log + missing == tab->size);
   return missing;
 }
 
@@ -530,12 +529,6 @@ do_one_iter_mt (read_data_t *data, sm_data_t *sm, bit_vector not_used, int nt,
 do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
 #endif
 {
-  /* adjust the number of threads based on the number of relations */
-  double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
-  if (nt > ntm)
-    nt = (int) ntm;
-  printf("# Using multi thread version with %d threads\n", nt);
-
   // We'll use a rotating buffer of thread id.
   pthread_t *threads;
   threads = (pthread_t *) malloc( nt * sizeof(pthread_t));
@@ -636,6 +629,12 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   if (nrels & (BV_BITS - 1))
     not_used->p[nrels>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrels & (BV_BITS - 1))) - 1;
 
+  /* adjust the number of threads based on the number of relations */
+  double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
+  if (nt > ntm)
+    nt = (int) ntm;
+  printf("# Using multi thread version with %d threads\n", nt);
+
   /* computing missing log */
   printf ("# Starting to computing missing logarithms from rels\n");
   tt0 = seconds();
@@ -727,7 +726,6 @@ main(int argc, char *argv[])
   unsigned int nbsm = 0;
   mpz_t q, smexp, *log = NULL;
   cado_poly poly;
-  poly_t F;
 
   param_list pl;
   param_list_init(pl);
@@ -848,6 +846,7 @@ main(int argc, char *argv[])
   }
   /* Construct poly_t F from cado_poly pol (algebraic side) */
 #ifndef FOR_FFS
+  poly_t F;
   poly_t_from_cado_poly_alg(F, poly);
   FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->degree, "Too many SM");
 #endif
