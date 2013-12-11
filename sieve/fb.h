@@ -79,7 +79,7 @@ int             fb_make_linear (factorbase_degn_t **, factorbase_degn_t ***,
                                 fbprime_t, int, int, FILE *);
 int             fb_read (factorbase_degn_t **, factorbase_degn_t ***, 
                          const char *, fbprime_t, size_t, int, 
-                         fbprime_t, fbprime_t);
+                         fbprime_t, fbprime_t, FILE *);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
@@ -87,10 +87,10 @@ size_t          fb_nroots_total (const factorbase_degn_t *fb);
 unsigned char   fb_make_steps(fbprime_t *, fbprime_t, double);
 int             fb_dump_fbc (const factorbase_degn_t *, const factorbase_degn_t **,
                              const factorbase_degn_t *, const factorbase_degn_t **, 
-                             const char *, size_t, int);
+                             const char *, size_t, int, FILE *);
 int             fb_mmap_fbc(factorbase_degn_t **, factorbase_degn_t ***,
                             factorbase_degn_t **, factorbase_degn_t ***,
-                            const char *, size_t, int);
+                            const char *, size_t, int, FILE *);
 factorbase_degn_t *	fb_mmap(const char *);
 
 /* Some inlined functions which need to be fast */
