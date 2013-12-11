@@ -19,6 +19,7 @@ cadofactor.pl
 cadofct.pm
 portability.h
 typecast.h
+list_modified_files.sh
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
