@@ -866,8 +866,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         def get_exitcode(self, command_nr):
             assert command_nr == 0
             return self.rc
-    
-    def submit_command(self, command, identifier, commit=True):
+
+    def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
         Return the result tuple. If the caller is an Observer, also send
         result to updateObserver().
@@ -882,6 +882,18 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.update_cpu_or_real_time(True, command.name, cputime_used, False)
         self.update_cpu_or_real_time(False, command.name, realtime_used, commit)
         message = Task.ResultInfo(wuname, rc, stdout, stderr, command)
+        if rc != 0 and log_errors:
+            self.logger.error("Program failed with exit code %d", rc)
+            self.logger.error("Command line was: %s", command.make_command_line())
+            stderr = message.read_stderr(0).decode('ascii')
+            stderrfilename = message.get_stderrfile(0)
+            if stderrfilename:
+                stderrmsg = " (stored in file %s)" % stderrfilename
+            else:
+                stderrmsg = ""
+            if stderr:
+                self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+
         if isinstance(self, patterns.Observer):
             # pylint: disable=E1101
             self.updateObserver(message)
@@ -1014,7 +1026,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.update({key: self.state[key] + 1}, commit=False)
         self.wuar.cancel(wuid, commit=commit)
     
-    def submit_command(self, command, identifier, commit=True):
+    def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Submit a workunit to the database. '''
         
         while self.get_number_available_wus() >= self.params["maxwu"]:
@@ -1449,7 +1461,7 @@ class FactorBaseTask(Task):
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
                                     **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
@@ -1531,7 +1543,7 @@ class FreeRelTask(Task):
                                      renumber=renumberfilename,
                                      out=str(freerelfilename),
                                      **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             stderr = message.read_stderr(0).decode("ascii")
@@ -1945,7 +1957,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stdout=str(stdoutpath),
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
-                message = self.submit_command(p, "")
+                message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
                     # Check that the output files exist now
@@ -2114,7 +2126,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             with stderrpath.open("r") as stderrfile:
@@ -2462,7 +2474,7 @@ class MergeTask(Task):
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
@@ -2474,7 +2486,7 @@ class MergeTask(Task):
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.progparams[1])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
@@ -2585,7 +2597,7 @@ class LinAlgTask(Task, HasStatistics):
                                  stdout=str(stdoutpath),
                                  stderr=str(stderrpath),
                                  **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             dependencyfilename = self.workdir.make_filename("W", use_subdir = True)
@@ -2646,7 +2658,7 @@ class CharactersTask(Task):
                     heavyblock=densefilename, stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not kernelfilename.isfile():
@@ -2699,7 +2711,7 @@ class SqrtTask(Task):
                     index=indexfilename, kernel=kernelfilename,
                     prefix=prefix, stdout=str(stdoutpath),
                     stderr=str(stderrpath), **self.progparams[0])
-            message = self.submit_command(p, "")
+            message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
@@ -2714,7 +2726,7 @@ class SqrtTask(Task):
                         kernel=kernelfilename, prefix=prefix,
                         stdout=str(stdoutpath), stderr=str(stderrpath), 
                         **self.progparams[0])
-                message = self.submit_command(p, "dep%d" % dep)
+                message = self.submit_command(p, "dep%d" % dep, log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
                 with stdoutpath.open("r") as stdoutfile:
