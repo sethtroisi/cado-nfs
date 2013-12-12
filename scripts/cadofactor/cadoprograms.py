@@ -354,6 +354,12 @@ class Program(object, metaclass=InspectType):
                                                 cls.init_signature.kwonlyargs)
         return parameters + list(Program.paramnames)
 
+    def get_stdout(self):
+        return self.stdout
+
+    def get_stderr(self):
+        return self.stderr
+
     def get_stdio(self):
         """ Returns a 3-tuple with information on the stdin, stdout, and stderr
         streams for this program.
@@ -398,8 +404,17 @@ class Program(object, metaclass=InspectType):
             input_files.append(self.stdin)
         return input_files
 
+    def get_regular_output_files(self):
+        """ Returns a list of output files, excluding files for stdout/stderr
+        redirection.
+        """
+        return self._get_files(is_output = True)
+
     def get_output_files(self):
-        output_files = self._get_files(is_output = True)
+        """ Returns a list of output files, including files for stdout/stderr
+        redirection if such redirection is used
+        """
+        output_files = self.get_regular_output_files()
         for filename in (self.stdout, self.stderr):
             if isinstance(filename, str):
                 output_files.append(filename)
