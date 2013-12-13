@@ -432,13 +432,6 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
   }
 }
 
-static inline void fpoly_scale (double * u, const double * t, unsigned int d, double h)
-{
-  double hpow;
-  u[d] = t[d];
-  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
-}
-
 /**************************************************************************
        8 algorithms for the initialization of the algebraics:
                  init_alg_norms_bucket_region.
@@ -650,7 +643,7 @@ static inline void fpoly_scale (double * u, const double * t, unsigned int d, do
 
 #define INITALGD(A) do {					\
     double du[d+1];						\
-    fpoly_scale(du, alg->fijd, d, (double) (A));		\
+    double_poly_scale(du, alg->fijd, d, (double) (A));		\
     for (uint32_t k=0; k<=d; k++) u[k] = _mm_set1_pd(du[k]);	\
   } while (0)
 
@@ -1825,7 +1818,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   } while(0)
  
 #define INITALGD(A)				\
-  fpoly_scale(u, alg->fijd, d, (double) (A))
+  double_poly_scale(u, alg->fijd, d, (double) (A))
  
 #define ABSG1 g=fabs(u0+h*u1)
  
