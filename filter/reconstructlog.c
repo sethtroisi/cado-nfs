@@ -323,7 +323,7 @@ insert_rel_into_table(void * context_data, earlyparsed_relation_ptr rel)
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
-    index_t h = rel->primes[i].p;
+    index_t h = rel->primes[i].h;
     weight_t e = rel->primes[i].e;
 
     if (data->w[h] == 0)
@@ -613,7 +613,7 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   fflush(stdout);
   char *fic[2] = {(char *) filename, NULL};
   filter_rels (fic, (filter_rels_callback_t) insert_rel_into_table, &data,
-          EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_PRIMES, NULL, NULL);
+          EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX, NULL, NULL);
 
   /* Init data needed to compute SM */
 #ifndef FOR_FFS
