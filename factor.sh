@@ -38,6 +38,9 @@ options:
     If the shell environment variable CADO_DEBUG is set to any non-empty
     string, the working directory is not deleted even if the factorization
     succeeds.
+
+    If CADO_USEHOST is set to any non-empty string, the Python script will
+    listen on "*" even if all clients given with -h are on localhost.
 EOF
 }
 
