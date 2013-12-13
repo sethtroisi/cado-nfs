@@ -13,70 +13,66 @@
 #include "utils_ffs.h"
 #endif
 
-static void
-usage (char *argv0)
+static void declare_usage(param_list pl)
 {
-  fprintf (stderr, "Usage: %s [-check] -poly xxx.poly -renumberfile outfile "
-                   "-lpb0 nnn -lpb1 nnn\n", argv0);
-  exit (1);
+  param_list_decl_usage(pl, "poly", "input polynomial file");
+  param_list_decl_usage(pl, "renumber", "input file for renumbering table");
+  param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
+  param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
+  param_list_decl_usage(pl, "check", "(switch) check the renumbering table");
+}
+
+static void
+usage (param_list pl, char *argv0)
+{
+    param_list_print_usage(pl, argv0, stderr);
+    exit(EXIT_FAILURE);
 }
 
 int
 main (int argc, char *argv[])
 {
-    char *polyfilename = NULL;
-    int k, check = 0;
-    char *renumberfilename = NULL;
+    int check = 0;
     char *argv0 = argv[0];
     cado_poly cpoly;
     renumber_t tab;
     unsigned long lpb[2] = {0, 0};
 
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (k = 1; k < argc; k++)
-      fprintf (stderr, " %s", argv[k]);
-    fprintf (stderr, "\n");
+    param_list pl;
+    param_list_init(pl);
+    declare_usage(pl);
+    param_list_configure_switch(pl, "check", &check);
 
-    while (argc > 1 && argv[1][0] == '-')
-      {
-        if (argc > 2 && strcmp (argv[1], "-poly") == 0)
-          {
-            polyfilename = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-renumber") == 0)
-          {
-            renumberfilename = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-lpb0") == 0)
-          {
-            lpb[0] = atoi(argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-lpb1") == 0)
-          {
-            lpb[1] = atoi(argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 1 && strcmp (argv[1], "-check") == 0)
-          {
-            check = 1;
-            argc -= 1;
-            argv += 1;
-          }
-        else
-          usage (argv0);
-      }
+    argv++, argc--;
+    if (argc == 0)
+      usage (pl, argv0);
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv))
+            continue;
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        usage (pl, argv0);
+    }
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
+
+    const char *polyfilename = param_list_lookup_string(pl, "poly");
+    const char *renumberfilename = param_list_lookup_string(pl, "renumber");
+
+    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
+    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
 
     if (polyfilename == NULL)
-      usage (argv0);
+    {
+      fprintf (stderr, "Error, missing -poly command line argument\n");
+      usage (pl, argv0);
+    }
     if (renumberfilename == NULL)
-      usage (argv0);
+    {
+      fprintf (stderr, "Error, missing -renumber command line argument\n");
+      usage (pl, argv0);
+    }
 
     cado_poly_init(cpoly);
 #ifndef FOR_FFS
@@ -109,9 +105,10 @@ main (int argc, char *argv[])
         renumber_get_p_r_from_index(tab, &p, &r, &side, i, cpoly);
         j = renumber_get_index_from_p_r (tab, p, r, side);
         if (i == j)
-          fprintf (stderr, "## %"PRid":Ok\n", i);
+          fprintf (stderr, "## %" PRxid ": Ok\n", i);
         else
-          fprintf (stderr, "#### %"PRid":Error:%"PRid"\n", i, j);
+          fprintf (stderr, "#### %" PRxid ": Error, p = %" PRpr " r=%" PRpr " "
+                           "give index j = %" PRxid "\n", i, p, r, j);
       }
     }
 
@@ -119,5 +116,6 @@ main (int argc, char *argv[])
   }
 
     cado_poly_clear (cpoly);
+    param_list_clear(pl);
     return 0;
 }
