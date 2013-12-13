@@ -17,7 +17,6 @@ linalg/bwc/sketch.tex
 linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
-filter/print_table.c
 scripts/nightly-test
 scripts/polsel_effort
 scripts/plot_params.sh
@@ -86,7 +85,6 @@ polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
 filter/debug-tools.sh
-filter/refresh-purged.c
 params/params.rsa100
 params/rsa155.poly
 params/rsa155.poly2
