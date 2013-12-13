@@ -10,8 +10,7 @@ extern "C" {
 
 /* This is the entry point for the root finding routines.
  *
- * It relies on either the mod_ul inline assembly layer, or the plain C
- * layer in plain_poly.
+ * It relies on either the mod_ul inline assembly layer
  */
 
 /* Structure to hold factorization of an unsigned long, and to iterate through
