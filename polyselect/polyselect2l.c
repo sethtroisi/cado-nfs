@@ -63,7 +63,7 @@ double min_opt_lognorm = 999.99, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
-double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP];
+double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP + 1];
 double rootsieve_time = 0.0;
 int raw = 0;
 

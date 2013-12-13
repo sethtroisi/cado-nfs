@@ -200,17 +200,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         /* Try to read the factor base cache file. If that fails, because
            the file does not exist or is not compatible with our parameters,
            it will be written after we generate the factor bases. */
-        printf("# Mapping memory image of factor base from file %s\n", 
+        fprintf(las->output, "# Mapping memory image of factor base from file %s\n", 
                fbcfilename);
         if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
                         &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
-                        fbcfilename, las->nb_threads, las->verbose)) {
+                        fbcfilename, las->nb_threads, las->verbose, las->output)) {
             si->sides[0]->fb_is_mmapped = 1;
             si->sides[1]->fb_is_mmapped = 1;
-            printf("# Finished mapping memory image of factor base\n");
+            fprintf(las->output, "# Finished mapping memory image of factor base\n");
             return;
         } else {
-            printf("# Could not map memory image of factor base\n");
+            fprintf(las->output, "# Could not map memory image of factor base\n");
         }
     }
 
@@ -235,7 +235,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->bucket_thresh, las->nb_threads, las->verbose,
-                              lim, apow_lim);
+                              lim, apow_lim, las->output);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             sis->fb_is_mmapped = 0;
@@ -263,13 +263,13 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         }
     }
     if (fbcfilename != NULL) {
-        printf("# Writing memory image of factor base to file %s\n", fbcfilename);
+        fprintf(las->output, "# Writing memory image of factor base to file %s\n", fbcfilename);
         fb_dump_fbc(si->sides[0]->fb,
                     (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
                     si->sides[1]->fb,
                     (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
-                    fbcfilename, las->nb_threads, las->verbose);
-        printf("# Finished writing memory image of factor base\n");
+                    fbcfilename, las->nb_threads, las->verbose, las->output);
+        fprintf(las->output, "# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/

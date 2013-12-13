@@ -1116,11 +1116,34 @@ class WuResultMessage(metaclass=abc.ABCMeta):
     def get_stdout(self, command_nr):
         pass
     @abc.abstractmethod
+    def get_stdoutfile(self, command_nr):
+        pass
+    @abc.abstractmethod
     def get_stderr(self, command_nr):
+        pass
+    @abc.abstractmethod
+    def get_stderrfile(self, command_nr):
         pass
     @abc.abstractmethod
     def get_exitcode(self, command_nr):
         pass
+    def _read(self, filename, data):
+        if not filename is None:
+            with open(filename, "rb") as inputfile:
+                data = inputfile.read()
+        return bytes() if data is None else data
+    def read_stdout(self, command_nr):
+        """ Returns the contents of stdout of command_nr as a byte string.
+        
+        If no stdout was captured, returns the empty byte string.
+        """
+        return self._read(self.get_stdoutfile(command_nr), 
+                          self.get_stdout(command_nr))
+    def read_stderr(self, command_nr):
+        """ Like read_stdout() but for stderr """
+        return self._read(self.get_stderrfile(command_nr), 
+                          self.get_stderr(command_nr))
+
 
 class ResultInfo(WuResultMessage):
     def __init__(self, record):
@@ -1157,17 +1180,25 @@ class ResultInfo(WuResultMessage):
         return None
 
     def get_stdout(self, command_nr):
+        # stdout is always captured into a file, not made available directly
+        return None
+
+    def get_stdoutfile(self, command_nr):
         """ Return the path to the file that captured stdout of the 
         command_nr-th COMMAND in the workunit, or None if there was no stdout 
         output. Note that explicitly redirected stdout that was uploaded via 
         RESULT does not appear here, but in get_files()
         """
         return self._get_stdio("stdout", command_nr)
-    
+
     def get_stderr(self, command_nr):
-        """ Like get_stdout(), but for stderr """
+        # stderr is always captured into a file, not made available directly
+        return None
+
+    def get_stderrfile(self, command_nr):
+        """ Like get_stdoutfile(), but for stderr """
         return self._get_stdio("stderr", command_nr)
-    
+
     def get_exitcode(self, command_nr):
         """ Return the exit code of the command_nr-th command """
         if not self.record["failedcommand"] is None \
