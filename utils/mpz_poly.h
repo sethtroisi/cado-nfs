@@ -63,6 +63,9 @@ void mpz_poly_get(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f);
 void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
 
+/* Comparison functions */
+int mpz_poly_cmp(mpz_poly_t, mpz_poly_t);
+
 /* Polynomial arithmetic */
 void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
 void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);

@@ -406,6 +406,26 @@ void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f) {
     mpz_poly_setcoeff(g, i, f->coeff[i]);
 }
 
+/* -------------------------------------------------------------------------- */
+/* return 0 if f and g are equal, non-zero otherwise */
+int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
+{
+  int i;
+
+  if (f->deg != g->deg)
+    return 1;
+
+  if (f->deg == -1)
+    return 0;
+
+  for (i = 0; i <= f->deg; i++)
+    if (mpz_cmp (f->coeff[i], g->coeff[i]))
+      return 1; /* f and g differ */
+  return 0;
+}
+/* -------------------------------------------------------------------------- */
+
+
 /* Set f=g+h, which is used in fast_rootsieve.
    Note: f can be the same as g or h;
          g can be the same as h. */
