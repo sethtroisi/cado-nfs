@@ -154,6 +154,19 @@ typedef const struct sieve_side_info_s * sieve_side_info_srcptr;
 typedef struct sieve_side_info_s sieve_side_info[1];
 /* }}} */
 
+/* {{{ j_div
+ * A structure for factoring the line-coordinate j into distinct odd primes
+ * and performing fast divisibility tests of i by those primes.
+ */
+struct j_div_s {
+  unsigned int p,     /* The odd prime that divides this entry */
+               cof,   /* The cofactor after dividing out p as often as possible */
+               inv,   /* p^(-1) (mod 2^32) */
+               bound; /* (2^32-1) / p */
+};
+typedef struct j_div_s * j_div_ptr;
+typedef const struct j_div_s * j_div_srcptr;
+
 /* {{{ sieve_info
  *
  * General information about the siever, based on some input-dependent
@@ -187,6 +200,7 @@ struct sieve_info_s {
 
     /* I think that by default, unsieving is not done */
     unsieve_aux_data us;
+    j_div_ptr j_div;
 
     /* used in check_leftover_norm */
     mpz_t BB[2], BBB[2], BBBB[2];
