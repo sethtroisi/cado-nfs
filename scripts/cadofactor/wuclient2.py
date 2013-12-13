@@ -689,11 +689,12 @@ class WorkunitClient(object):
             return urllib_request.urlopen(request)
     
     @staticmethod
-    def _urlopen(request, wait, is_upload=False, cafile=None):
+    def _urlopen(request, wait, silent_wait=False, is_upload=False, cafile=None):
         """ Wrapper around urllib2.urlopen() that retries in case of
         connection failure.
         """
         conn = None
+        waiting_since = 0
         while conn is None:
             try:
                 conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
@@ -710,11 +711,18 @@ class WorkunitClient(object):
                 else:
                     raise
             if not conn:
-                logging.error("%s failed, %s", 
-                              'Upload' if is_upload else 'Download', 
-                              errorstr)
-                logging.error("Waiting %s seconds before retrying", wait)
+                if waiting_since == 0 or not silent_wait:
+                    logging.error("%s failed, %s", 
+                                  'Upload' if is_upload else 'Download', 
+                                  errorstr)
+                    if waiting_since > 0:
+                        logging.error("Waiting %s seconds before retrying (I have been waiting since %s seconds)", wait, waiting_since)
+                    else:
+                        logging.error("Waiting %s seconds before retrying", wait)
                 time.sleep(wait)
+                waiting_since+=wait
+        if waiting_since > 0:
+            logging.info ("Got work after %s seconds wait", waiting_since)
         return conn
 
     @staticmethod
@@ -793,7 +801,7 @@ class WorkunitClient(object):
             elif HAVE_CURL:
                 return self.curl_get_file(url, wait, dlpath, cafile=cafile)
 
-        request = self._urlopen(url, wait, cafile=cafile)
+        request = self._urlopen(url, wait, silent_wait=self.settings["SILENT_WAIT"], cafile=cafile)
         # Try to open the file exclusively
         try:
             fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
@@ -1121,6 +1129,7 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                      "DOWNLOADRETRY" : 
                      ("10", "Time to wait before download retries"),
                      "CERTSHA1" : (None, "SHA1 of server SSL certificate"),
+                     "SILENT_WAIT": (None, "Discard repeated messages about client waiting for work (does not affect uploads)"),
                      "NICENESS" : 
                      ("0", "Run subprocesses under this niceness"),
                      "LOGLEVEL" : ("INFO", "Verbosity of logging"),
