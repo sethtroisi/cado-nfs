@@ -40,4 +40,21 @@
 #define exponent_t uint8_t
 #define REL_MAX_SIZE 255
 
+typedef struct {
+  index_t h;
+  p_r_values_t p;
+  exponent_t e;
+} prime_t;
+
+typedef struct {
+  index_t id;
+  int32_t e;
+} ideal_merge_t;
+
+typedef struct {
+  uint64_t nrels;
+  uint64_t nprimes;
+  double W; /* weight of the active part of the matrix */
+} info_mat_t;
+
 #endif	/* CADO_TYPEDEFS_H_ */

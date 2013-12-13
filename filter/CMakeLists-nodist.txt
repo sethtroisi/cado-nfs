@@ -1,5 +1,5 @@
 set (sources
-        filter_utils.c filter_io.cpp filter_memalloc.c
+        filter_utils.c
         utils_ffs.c
 )
 
@@ -9,7 +9,7 @@ include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
 #link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 
 add_executable(sm sm.c)
-target_link_libraries(sm filterutils)
+target_link_libraries(sm filter_with_io)
 
 add_library (ffs-f2 EXCLUDE_FROM_ALL ${sources})
 target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a)

@@ -39,5 +39,7 @@
 #include "bit_vector.h"
 #include "renumber.h"
 #include "cado_popen.h"
+#include "sm_utils.h"
+#include "memalloc.h"
 
 #endif	/* CADO_UTILS_H_ */

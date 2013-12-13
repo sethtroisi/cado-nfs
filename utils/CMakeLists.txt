@@ -7,17 +7,26 @@ set (sources
         mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c
+        ringbuf.c sm_utils.c memalloc.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
 endif (NOT MINGW)
+
+set (sources_io
+        filter_io.cpp
+)
 
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils ${CADO_SHARED} ${sources})
 target_link_libraries(utils pthread ${gmp_libname} m)
 install(TARGETS utils DESTINATION lib/${package_basename})
+
+add_library (filter_with_io ${CADO_SHARED} ${sources_io})
+target_link_libraries(filter_with_io utils)
+install(TARGETS filter_with_io DESTINATION lib/${package_basename})
+add_dependencies(filter_with_io antebuffer)
 
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)

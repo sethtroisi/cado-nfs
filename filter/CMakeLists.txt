@@ -1,38 +1,29 @@
-set (sources
-        filter_utils.c filter_io.cpp filter_memalloc.c filter_sm.c
-)
-
-add_library (filterutils ${CADO_SHARED} ${sources})
-target_link_libraries(filterutils utils pthread m)
-install(TARGETS filterutils DESTINATION lib/${package_basename})
-add_dependencies(filterutils antebuffer)
-
 # the utils library is already linked with -lgmp and -lm
 add_executable(dup1 dup1.c)
-target_link_libraries(dup1 filterutils)
+target_link_libraries(dup1 filter_with_io)
 
 add_executable(dup2 dup2.c)
-target_link_libraries(dup2 filterutils)
+target_link_libraries(dup2 filter_with_io)
 
-add_executable(purge purge.c)
-target_link_libraries(purge filterutils)
+add_executable(purge filter_utils.c purge.c)
+target_link_libraries(purge filter_with_io)
 
-add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
-target_link_libraries(merge filterutils)
+add_executable(merge merge.c filter_utils.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
+target_link_libraries(merge filter_with_io)
 
-add_executable(merge-dl merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
-target_link_libraries(merge-dl filterutils)
+add_executable(merge-dl merge.c filter_utils.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
+target_link_libraries(merge-dl filter_with_io)
 set_target_properties(merge-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
-add_executable(replay replay.c sparse.c)
-target_link_libraries(replay filterutils)
+add_executable(replay filter_utils.c replay.c sparse.c)
+target_link_libraries(replay filter_with_io)
 
-add_executable(replay-dl replay.c sparse.c)
-target_link_libraries(replay-dl filterutils)
+add_executable(replay-dl filter_utils.c replay.c sparse.c)
+target_link_libraries(replay-dl filter_with_io)
 set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
 add_executable(reconstructlog-dl reconstructlog.c)
-target_link_libraries(reconstructlog-dl filterutils)
+target_link_libraries(reconstructlog-dl filter_with_io)
 
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 

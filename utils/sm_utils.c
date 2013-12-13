@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include "portability.h"
 #include "utils.h"
-#include "filter_utils.h"
-#include "filter_sm.h"
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 void

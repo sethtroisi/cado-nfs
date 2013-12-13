@@ -4,7 +4,7 @@ add_definitions(-DWITH_MPI)
 endif (${WITH_MPI})
 
 add_executable(sqrt sqrt.c)
-target_link_libraries(sqrt filterutils)
+target_link_libraries(sqrt filter_with_io)
 
 install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
 

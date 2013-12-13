@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include "portability.h"
 #include "utils.h"
-#include "filter_utils.h"
-#include "filter_memalloc.h"
 
 /* index_plist is a list of blocks, each one of BLOCK_SIZE index_ts */
 static index_t **index_plist = NULL;

@@ -23,6 +23,14 @@
 /* for reading index (i.e. renumber ideal) */
 #define EARLYPARSE_NEED_INDEX                  16
 
+
+/* Initial size of primes_data array in earlyparsed_relation_s,
+   If more than NB_PRIMES_OPT is needed (should be rare), *primes is
+   allocated
+*/
+#define NB_PRIMES_OPT 31
+
+
 /* This field does not contain a proper relation, but only something
  * which has undergone quite limited parsing within a thread whose job is
  * to read data fast, and not to bother about the fine points of the
