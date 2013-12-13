@@ -111,8 +111,8 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 	  mpz_poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
       }
     }
-    cleandeg(rels[i].num, F->deg);
-    cleandeg(rels[i].denom, F->deg);
+    mpz_poly_cleandeg(rels[i].num, F->deg);
+    mpz_poly_cleandeg(rels[i].denom, F->deg);
 
   }
   mpz_poly_free(tmp);

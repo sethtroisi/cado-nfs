@@ -538,7 +538,7 @@ void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t
         }
         // could be off-loaded to a working queue.
         if (me == receiver) {
-            cleandeg(Q, F->deg - 1);
+            mpz_poly_cleandeg(Q, F->deg - 1);
             polymodF_mul_monic(P, P, Q, F);
         }
     }
@@ -554,7 +554,7 @@ static void broadcast_poly(mpz_poly_t P, int maxdeg, int root, MPI_Comm comm) /*
             mpz_set_ui(z,0);
         broadcast_mpz(z, root, comm);
     }
-    cleandeg(P, maxdeg);
+    mpz_poly_cleandeg(P, maxdeg);
 }/*}}}*/
 void allreduce_polymodF_mul_monic(mpz_poly_t P, MPI_Comm comm, mpz_poly_t F)/*{{{*/
 {
@@ -1083,7 +1083,7 @@ mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
         for (int i = 0; i < d; ++i) 
             mpz_submul (p->coeff[k-d+i], p->coeff[k], F->coeff[i]);
 
-        cleandeg (p, k-1);
+        mpz_poly_cleandeg (p, k-1);
     }
 
     mpz_poly_copy(P, p);
@@ -2301,7 +2301,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
             rc = gmp_fscanf(c->f, "%Zx", info->P->coeff[i]);
             ASSERT_ALWAYS(rc == 1);
         }
-        cleandeg(info->P, glob.n - 1);
+        mpz_poly_cleandeg(info->P, glob.n - 1);
         cachefile_close(c);
         return NULL;
     }
@@ -2353,7 +2353,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
             rc = gmp_fscanf(c->f, "%Zx", P->coeff[i]);
             ASSERT_ALWAYS(rc == 1);
         }
-        cleandeg(P, glob.n - 1);
+        mpz_poly_cleandeg(P, glob.n - 1);
         cachefile_close(c);
         return nab_loc;
     }
@@ -2709,8 +2709,8 @@ void reduce_poly_mod_rat_ptree(mpz_poly_ptr P, rat_ptree_t * T)/*{{{*/
         WRAP_mpz_mod(temp->coeff[i], P->coeff[i], T->t0->zx);
         WRAP_mpz_mod(P->coeff[i], P->coeff[i], T->t1->zx);
     }
-    cleandeg(temp, glob.n - 1);
-    cleandeg(P, glob.n - 1);
+    mpz_poly_cleandeg(temp, glob.n - 1);
+    mpz_poly_cleandeg(P, glob.n - 1);
     reduce_poly_mod_rat_ptree(temp, T->t0);
     reduce_poly_mod_rat_ptree(P, T->t1);
     mpz_poly_free(temp);
@@ -2737,7 +2737,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             for(int i = 0 ; i < glob.n ; i++) {
                 WRAP_mpz_mod(ptree->p->A->coeff[i], info->P->coeff[i], ptree->zx);
             }
-            cleandeg(ptree->p->A, glob.n-1);
+            mpz_poly_cleandeg(ptree->p->A, glob.n-1);
         }
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             mpz_poly_t foo;
@@ -2753,7 +2753,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
         for(int i = 0 ; i < glob.n ; i++) {
             WRAP_mpz_mod(temp->coeff[i], info->P->coeff[i], ptree->zx);
         }
-        cleandeg(temp, glob.n-1);
+        mpz_poly_cleandeg(temp, glob.n-1);
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             mpz_poly_t foo;
             mpz_poly_init(foo, glob.n);

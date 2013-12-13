@@ -68,7 +68,7 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const mpz_poly_t F,
     mpz_poly_mul (frac->num, frac->num, V);
     int d = mpz_poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
                                 F->deg, m, NULL);
-    cleandeg(frac->num, d);
+    mpz_poly_cleandeg(frac->num, d);
   }
 }
 

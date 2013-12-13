@@ -402,7 +402,7 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
       // pick a random delta
       for (i = 0; i < d; ++i)
     mpz_urandomm(delta->coeff[i], state, myp);
-      cleandeg(delta, d-1);
+      mpz_poly_cleandeg(delta, d-1);
       // raise it to power (q-1)/2
       mpz_poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
     } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));

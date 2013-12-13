@@ -221,7 +221,7 @@ mpz_poly_reducemodF(polymodF_t P, mpz_poly_t p, const mpz_poly_t F) {
     for (i = 0; i < d; ++i)
       mpz_submul (p->coeff[k-d+i], p->coeff[k], F->coeff[i]);
 
-    cleandeg (p, k-1);
+    mpz_poly_cleandeg (p, k-1);
   }
 
   mpz_poly_copy(P->p, p);
@@ -289,7 +289,7 @@ void mpz_poly_print(const mpz_poly_t f) {
 }
 
 /* Find polynomial degree. */
-void cleandeg(mpz_poly_t f, int deg) {
+void mpz_poly_cleandeg(mpz_poly_t f, int deg) {
   ASSERT(deg >= -1);
   while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
     deg--;
@@ -302,7 +302,7 @@ void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d) {
   int i;
   for (i=d; i>=0; --i)
     mpz_poly_setcoeff(f,i,coeffs[i]);
-  cleandeg(f,d);
+  mpz_poly_cleandeg(f,d);
 }
 
 /* Set a zero polynomial. */
@@ -322,7 +322,7 @@ void mpz_poly_setcoeff(mpz_poly_t f, int i, const mpz_t z) {
   }
   mpz_set(f->coeff[i], z);
   if (i >= f->deg)
-    cleandeg(f, i);
+    mpz_poly_cleandeg(f, i);
 }
 
 /* Set uint64 coefficient for the i-th term. */
@@ -337,7 +337,7 @@ void mpz_poly_setcoeff_uint64(mpz_poly_t f, int i, uint64_t z) {
   }
   mpz_set_uint64(f->coeff[i], z);
   if (i >= f->deg)
-    cleandeg(f, i);
+    mpz_poly_cleandeg(f, i);
 }
 
 
@@ -353,7 +353,7 @@ void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z) {
   }
   mpz_set_int64(f->coeff[i], z);
   if (i >= f->deg)
-    cleandeg(f, i);
+    mpz_poly_cleandeg(f, i);
 }
 
 
@@ -369,7 +369,7 @@ void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z) {
   }
   mpz_set_si(f->coeff[i], z);
   if (i >= f->deg)
-    cleandeg(f, i);
+    mpz_poly_cleandeg(f, i);
 }
 
 /* Set coefficient for the i-th term with string input. */
@@ -437,7 +437,7 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
-  cleandeg(f, maxdeg);
+  mpz_poly_cleandeg(f, maxdeg);
 }
 
 /* Set f=g-h, which is used in fast_rootsieve.
@@ -458,7 +458,7 @@ void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
-  cleandeg(f, maxdeg);
+  mpz_poly_cleandeg(f, maxdeg);
 }
 
 /* Set f=f-a where a is unsigned long. */
@@ -493,11 +493,11 @@ mpz_poly_sub_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h, cons
     mpz_poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
-  cleandeg(f, maxdeg);
+  mpz_poly_cleandeg(f, maxdeg);
   for (i = 0; i <= f->deg; ++i) {
     mpz_mod(f->coeff[i], f->coeff[i], m);
   }
-  cleandeg(f, f->deg);
+  mpz_poly_cleandeg(f, f->deg);
 }
 
 /* Set f=g*h. Note: f differs from g and h. */
@@ -620,7 +620,7 @@ void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
 
   for (i = maxdeg; i >= 0; --i)
     mpz_poly_setcoeff(f, i, prd->coeff[i]);
-  cleandeg(f, maxdeg);
+  mpz_poly_cleandeg(f, maxdeg);
   ASSERT_ALWAYS(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
 
   mpz_poly_free(prd);
@@ -631,7 +631,7 @@ void mpz_poly_mul_ui(mpz_poly_t f, const mpz_poly_t g, unsigned long a) {
   int i;
   mpz_t aux;
   mpz_init(aux);
-  cleandeg(f,g->deg);
+  mpz_poly_cleandeg(f,g->deg);
   for (i = g->deg; i >= 0; --i) {
     mpz_mul_ui(aux, g->coeff[i], a);
     mpz_poly_setcoeff(f, i, aux);
@@ -729,7 +729,7 @@ void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_
       mpz_mod(r->coeff[j], r->coeff[j], p);
     }
   }
-  cleandeg(r, r->deg);
+  mpz_poly_cleandeg(r, r->deg);
 
   mpz_clear(invlg);
   mpz_clear(lg);
@@ -893,7 +893,7 @@ void mpz_poly_reduce_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
     mpz_poly_setcoeff(Q, i, aux);
   }
   mpz_clear(aux);
-  cleandeg(Q,Q->deg);
+  mpz_poly_cleandeg(Q,Q->deg);
 }
 
 /* Set Q = P/lc(P) (mod m). Q and P might be identical. */
@@ -1009,7 +1009,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
   // reduce mod f
   d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
 
-  cleandeg(R, d);
+  mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
   mpz_poly_free(R);
 }
@@ -1051,7 +1051,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
   // reduce mod f
   d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
 
-  cleandeg(R, d);
+  mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
   mpz_poly_free(R);
 }
@@ -1237,7 +1237,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
   /* initialize P[k], and put remainder in P[k-1] */
   for (k = l, i = 0; i <= P0->deg; i++)
     mpz_tdiv_qr (P[k]->coeff[i], P[k-1]->coeff[i], P0->coeff[i], pk[k-1]);
-  cleandeg (P[k], P0->deg);
+  mpz_poly_cleandeg (P[k], P0->deg);
 
   /* now go down */
   for (j = l-1; j >= 1; j--)
@@ -1246,9 +1246,9 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
     for (i = 0; i <= P0->deg; i++)
       mpz_tdiv_qr (P[j]->coeff[i], P[j-1]->coeff[i], P[j]->coeff[i],
                    pk[j-1]);
-    cleandeg (P[j], P0->deg);
+    mpz_poly_cleandeg (P[j], P0->deg);
   }
-  cleandeg (P[0], P0->deg);
+  mpz_poly_cleandeg (P[0], P0->deg);
 
   for (i = 0; i < l; i++)
     mpz_clear (pk[i]);
@@ -1271,7 +1271,7 @@ mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk)
   for (i = 0; i <= P[k]->deg; i++)
     mpz_addmul (a->coeff[i], P[k]->coeff[i], pk);
 
-  cleandeg (a, (a->deg >= P[k]->deg) ? a->deg : P[k]->deg);
+  mpz_poly_cleandeg (a, (a->deg >= P[k]->deg) ? a->deg : P[k]->deg);
 }
 
 void

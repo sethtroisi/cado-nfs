@@ -1163,7 +1163,7 @@ unsigned long modular_inverse( unsigned long r,  unsigned long N ) {
 void mpz_poly_set_identity(mpz_poly_t f) {
   mpz_set_ui(f->coeff[0],0);
   mpz_set_ui(f->coeff[1],1);
-  cleandeg(f,1);
+  mpz_poly_cleandeg(f,1);
 }
 
 // psi(x) = l + p*x
