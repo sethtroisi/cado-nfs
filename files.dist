@@ -411,6 +411,7 @@ misc/CMakeLists.txt
 misc/convert_poly.c
 misc/convert_rels.c
 misc/check_rels.c
+misc/debug_renumber.c
 params/mach_desc
 params/params.c100
 params/params.c101
