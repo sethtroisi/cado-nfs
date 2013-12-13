@@ -548,7 +548,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
 {
     mpz_poly_t f;
-    mpz_poly_alloc(f, si->cpoly->pols[(*todo)->side]->degree);
+    mpz_poly_init(f, si->cpoly->pols[(*todo)->side]->degree);
     mpz_poly_set(f,  si->cpoly->pols[(*todo)->side]->f, si->cpoly->pols[(*todo)->side]->degree);
     mpz_t x;
     mpz_init(x);

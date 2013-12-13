@@ -58,7 +58,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   uint64_t npairs;
   for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
     ASSERT_ALWAYS(npairs < ps->nrows);
-    mpz_poly_alloc_and_set_from_ab(pairs[npairs], ps->a, ps->b);
+    mpz_poly_init_set_ab(pairs[npairs], ps->a, ps->b);
   }
 
   /* small_ncols isn't used here: we don't care */
@@ -69,8 +69,8 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   rels = malloc(*small_nrows * sizeof(sm_relset_t));
 
   for (int k = 0 ; k < *small_nrows ; k++) {
-    mpz_poly_alloc(rels[k].num, F->deg);
-    mpz_poly_alloc(rels[k].denom, F->deg);
+    mpz_poly_init(rels[k].num, F->deg);
+    mpz_poly_init(rels[k].denom, F->deg);
   }
     
   unsigned int ridx;
@@ -80,7 +80,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   mpz_t ee;
   mpz_init(ee);  
 
-  mpz_poly_alloc(tmp, F->deg);
+  mpz_poly_init(tmp, F->deg);
 
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
@@ -156,9 +156,9 @@ void * thread_start(void *arg) {
   mpz_init(tmp);
 
   mpz_poly_t g, U, V;
-  mpz_poly_alloc(g, 0);
-  mpz_poly_alloc (U,0);
-  mpz_poly_alloc (V,0);
+  mpz_poly_init(g, 0);
+  mpz_poly_init (U,0);
+  mpz_poly_init (V,0);
 
 
   for (int i = 0; i < ti->nb; i++) {
@@ -184,7 +184,7 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t 
   for (int i = 0; i < nt; ++i) {
     SM[i] = (mpz_poly_t *) malloc(SM_BLOCK*sizeof(mpz_poly_t));
     for (int j = 0; j < SM_BLOCK; ++j)
-      mpz_poly_alloc(SM[i][j], F->deg);
+      mpz_poly_init(SM[i][j], F->deg);
   }
 
   // We'll use a rotating buffer of thread id.
@@ -279,14 +279,14 @@ void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
   mpz_out_str(stderr, 10, ell2);
   fprintf(stderr, "\n");
 
-  mpz_poly_alloc(SM, F->deg);
+  mpz_poly_init(SM, F->deg);
   SM->deg = 0;
   mpz_poly_setcoeff_si(SM, 0, 1);
 
   mpz_poly_t g, U, V;
-  mpz_poly_alloc(g, 0);
-  mpz_poly_alloc (U,0);
-  mpz_poly_alloc (V,0);
+  mpz_poly_init(g, 0);
+  mpz_poly_init (U,0);
+  mpz_poly_init (V,0);
   
   fprintf(out, "%d\n", sr);
 

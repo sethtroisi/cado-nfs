@@ -1,9 +1,3 @@
-/**
-   FIXME [ET]: Someday, this should me moved to utils/ ; other polynomial
-   libraries are there (admittedly different, since geared towards tiny
-   moduli), and we could perhaps fint it useful to adapt the interface
-   here for rootfinding code above ULONG_MAX
-*/
 
 #ifndef MPZ_POLY_H_
 #define MPZ_POLY_H_
@@ -16,6 +10,7 @@ extern "C" {
 
 /* Note, deg = -1 means P=0; otherwise, one should have coeff[deg] != 0.
    Warning: a polynomial of degree d needs d+1 allocation. */
+
 typedef struct {
   int alloc;
   int deg;
@@ -53,7 +48,8 @@ typedef poly_base_struct_t poly_base_t[1];
 
 
 /* Management of the structure, set and print coefficients. */
-void mpz_poly_alloc(mpz_poly_t f, int d);
+void mpz_poly_init(mpz_poly_t, int d);
+void mpz_poly_alloc(mpz_poly_t f, int nbcoeff);
 void mpz_poly_free(mpz_poly_t f);
 void mpz_poly_print(const mpz_poly_t f);
 void cleandeg(mpz_poly_t f, int deg);

@@ -151,7 +151,7 @@ static inline void
 add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
 {
   mpz_poly_t SMres;
-  mpz_poly_alloc(SMres, sm->F->deg);
+  mpz_poly_init(SMres, sm->F->deg);
   SMres->deg = 0;
   mpz_poly_setcoeff_si(SMres, 0, 1);
   sm_single_rel(SMres, a, b, sm->F, sm->smexp, sm->q, sm->q2, sm->invq2);

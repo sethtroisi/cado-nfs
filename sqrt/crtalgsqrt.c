@@ -519,7 +519,7 @@ void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t
     MPI_Comm_size(comm, &s);
     ASSERT_ALWAYS(recv == 0);
     mpz_poly_t Q;
-    mpz_poly_alloc(Q, F->deg-1);
+    mpz_poly_init(Q, F->deg-1);
     ASSERT_ALWAYS(P->deg < F->deg);
     for(int done_size = 1 ; done_size < s ; done_size <<= 1) {
         // XXX try to release the barrier, I think it's unnecessary.
@@ -1094,7 +1094,7 @@ polymodF_mul_monic (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
         mpz_poly_srcptr F)
 {
     mpz_poly_t prd;
-    mpz_poly_alloc(prd, P1->deg+P2->deg);
+    mpz_poly_init(prd, P1->deg+P2->deg);
     ASSERT_ALWAYS(mpz_poly_normalized_p (P1));
     ASSERT_ALWAYS(mpz_poly_normalized_p (P2));
     mpz_poly_mul(prd, P1, P2);
@@ -1436,7 +1436,7 @@ alg_ptree_t * alg_ptree_build(struct prime_data * p, int i0, int i1)
     ASSERT_ALWAYS(i0 < i1);
     alg_ptree_t * res = malloc(sizeof(alg_ptree_t));
     memset(res, 0, sizeof(alg_ptree_t));
-    mpz_poly_alloc(res->s, i1-i0);
+    mpz_poly_init(res->s, i1-i0);
     if (i1-i0 == 1) {
         res->s->deg = 1;
         mpz_set_ui(res->s->coeff[1], 1);
@@ -1834,10 +1834,10 @@ void prime_initialization(struct prime_data * p)/* {{{ */
     p->powers = power_lookup_table_init(p->p);
     mpz_init(p->iHx);
 
-    mpz_poly_alloc(p->A, glob.n-1);
-    mpz_poly_alloc(p->evals, glob.n-1);
-    mpz_poly_alloc(p->lroots, glob.n-1);
-    mpz_poly_alloc(p->sqrts, glob.n-1);
+    mpz_poly_init(p->A, glob.n-1);
+    mpz_poly_init(p->evals, glob.n-1);
+    mpz_poly_init(p->lroots, glob.n-1);
+    mpz_poly_init(p->sqrts, glob.n-1);
 }
 /* }}} */
 
@@ -2272,8 +2272,8 @@ size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t 
     }
     size_t d = (off1 - off0) / 2;
     mpz_poly_t Pl, Pr;
-    mpz_poly_alloc(Pl, glob.n);
-    mpz_poly_alloc(Pr, glob.n);
+    mpz_poly_init(Pl, glob.n);
+    mpz_poly_init(Pr, glob.n);
     res += accumulate_ab_poly(Pl, ab, off0, off0 + d, tmp);
     res += accumulate_ab_poly(Pr, ab, off0 + d, off1, tmp);
     polymodF_mul_monic(P, Pl, Pr, glob.F);
@@ -2309,7 +2309,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
     ab_source ab;
     ab_source_init_set(ab, glob.ab);
     mpz_poly_t tmp;
-    mpz_poly_alloc(tmp, 1);
+    mpz_poly_init(tmp, 1);
     info->nab_loc = accumulate_ab_poly(P, ab, off0, off1, tmp);
     mpz_poly_free(tmp);
     ab_source_clear(ab);
@@ -2367,7 +2367,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
     int j1 = j0 + glob.ncores;
 
     mpz_poly_t * pols = malloc((j1-j0) * sizeof(mpz_poly_t));
-    for(int j = j0 ; j < j1 ; j++) mpz_poly_alloc(pols[j-j0], glob.n);
+    for(int j = j0 ; j < j1 ; j++) mpz_poly_init(pols[j-j0], glob.n);
 
     for(int j = j0 ; j < j1 ; j++) {
         struct subtask_info_t * task = a_tasks + (j-j0);
@@ -2703,7 +2703,7 @@ void reduce_poly_mod_rat_ptree(mpz_poly_ptr P, rat_ptree_t * T)/*{{{*/
         return;
     }
     mpz_poly_t temp;
-    mpz_poly_alloc(temp, glob.n);
+    mpz_poly_init(temp, glob.n);
     temp->deg = glob.n - 1;
     for(int i = 0 ; i < glob.n ; i++) {
         WRAP_mpz_mod(temp->coeff[i], P->coeff[i], T->t0->zx);
@@ -2741,7 +2741,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
         }
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             mpz_poly_t foo;
-            mpz_poly_alloc(foo, glob.n);
+            mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
             mpz_poly_free(foo);
         }
@@ -2749,14 +2749,14 @@ void * rational_reduction_child(struct subtask_info_t * info)
         ASSERT_ALWAYS(ptree != NULL);
 
         mpz_poly_t temp;
-        mpz_poly_alloc(temp, glob.n);
+        mpz_poly_init(temp, glob.n);
         for(int i = 0 ; i < glob.n ; i++) {
             WRAP_mpz_mod(temp->coeff[i], info->P->coeff[i], ptree->zx);
         }
         cleandeg(temp, glob.n-1);
         if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             mpz_poly_t foo;
-            mpz_poly_alloc(foo, glob.n);
+            mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
             mpz_poly_free(foo);
         }
@@ -3623,7 +3623,7 @@ int main(int argc, char **argv)
 
     // FIXME: merge these two instances of the algebraic polynomial in
     // one type only.
-    mpz_poly_alloc(glob.F, glob.n);
+    mpz_poly_init(glob.F, glob.n);
     for (int i = glob.pol->alg->degree; i >= 0; --i)
         mpz_poly_setcoeff(glob.F, i, glob.f_hat[i]);
 
@@ -3736,7 +3736,7 @@ int main(int argc, char **argv)
     size_t nab = 0;
 
     mpz_poly_t P;
-    mpz_poly_alloc(P, glob.n);
+    mpz_poly_init(P, glob.n);
 
     int next = 0;
     if (sqrt_caches) {
@@ -3894,18 +3894,18 @@ int main(int argc, char **argv)
 #if 0/*{{{*/
 
 // Init F to be the algebraic polynomial
-mpz_poly_alloc(F, degree);
+mpz_poly_init(F, degree);
 for (i = pol->alg->degree; i >= 0; --i)
 mpz_poly_setcoeff(F, i, pol->alg->f[i]);
 
 // Init prd to 1.
-mpz_poly_alloc(prd->p, pol->alg->degree);
+mpz_poly_init(prd->p, pol->alg->degree);
 mpz_set_ui(prd->p->coeff[0], 1);
 prd->p->deg = 0;
 prd->v = 0;
 
 // Allocate tmp
-mpz_poly_alloc(tmp->p, 1);
+mpz_poly_init(tmp->p, 1);
 
 // Accumulate product
 int nab = 0, nfree = 0;
@@ -3928,7 +3928,7 @@ int nab = 0, nfree = 0;
     unsigned long lprd = 1;	/* number of elements in prd_tab[] */
     unsigned long nprd = 0;	/* number of accumulated products in prd_tab[] */
     prd_tab = (polymodF_t *) malloc(lprd * sizeof(polymodF_t));
-    mpz_poly_alloc(prd_tab[0]->p, F->deg);
+    mpz_poly_init(prd_tab[0]->p, F->deg);
     mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
     prd_tab[0]->p->deg = 0;
     prd_tab[0]->v = 0;

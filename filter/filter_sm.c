@@ -31,19 +31,19 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P, const mp
 }
 
 inline void
-mpz_poly_alloc_and_set_from_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
+mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
   if (b == 0)
   {
     /* freerel */
-    mpz_poly_alloc(rel, 0);
+    mpz_poly_init(rel, 0);
     mpz_poly_setcoeff_int64(rel, 0, a);
     rel->deg=0;
   }
   else
   {
     /* an (a,b)-pair is a degree-1 poly */
-    mpz_poly_alloc(rel, 1);
+    mpz_poly_init(rel, 1);
     mpz_poly_setcoeff_int64(rel, 0, a);
     mpz_poly_setcoeff_int64(rel, 1, -b);
     rel->deg = 1;
@@ -111,7 +111,7 @@ void sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F, const mpz
   SM->deg = 0;
   mpz_poly_setcoeff_si(SM, 0, 1);
   
-  mpz_poly_alloc_and_set_from_ab(rel, a, b);
+  mpz_poly_init_set_ab(rel, a, b);
   compute_sm (SM, rel, F, ell, eps, ell2, invl2);
 }
 
@@ -123,7 +123,7 @@ void mpz_poly_t_from_cado_poly_alg (mpz_poly_t F, cado_poly pol)
   int deg = pol->pols[ALGEBRAIC_SIDE]->degree;
   mpz_t *f = pol->pols[ALGEBRAIC_SIDE]->f;
   ASSERT_ALWAYS(deg > 1);
-  mpz_poly_alloc (F, deg);
+  mpz_poly_init (F, deg);
   for (int i = deg; i >= 0; --i)
     mpz_poly_setcoeff (F, i, f[i]);
 }

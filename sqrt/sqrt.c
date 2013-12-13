@@ -379,7 +379,7 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
 
   mpz_init(aux);
   mpz_init(q);
-  mpz_poly_alloc(auxpol, d);
+  mpz_poly_init(auxpol, d);
   mpz_ui_pow_ui(q, p, (unsigned long)d);
 
   // compute aux = (q-1)/2
@@ -394,7 +394,7 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
   }
   // find a non quadratic residue delta
   {
-    mpz_poly_alloc(delta, d);
+    mpz_poly_init(delta, d);
     gmp_randstate_t state;
     gmp_randinit_default(state);
     do {
@@ -414,8 +414,8 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
     mpz_poly_t A, D;
     mpz_t m;
     int i;
-    mpz_poly_alloc(A, d);
-    mpz_poly_alloc(D, d);
+    mpz_poly_init(A, d);
+    mpz_poly_init(D, d);
     mpz_init_set_ui(m, 0);
     mpz_poly_power_mod_f_mod_ui(A, a, F, t, p);
     mpz_poly_power_mod_f_mod_ui(D, delta, F, t, p);
@@ -471,7 +471,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   target_size += target_size / 10;
   fprintf (stderr, "target_size=%lu\n", (unsigned long int) target_size);
 
-  mpz_poly_alloc(A, d-1);
+  mpz_poly_init(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
   // then multiply num and denom by fd to make it even.
   if (((AA->v)&1) == 0) {
@@ -489,8 +489,8 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_t invsqrtA;
   // variables for A and F modulo pk
   mpz_poly_t a;
-  mpz_poly_alloc(invsqrtA, d-1);
-  mpz_poly_alloc(a, d-1);
+  mpz_poly_init(invsqrtA, d-1);
+  mpz_poly_init(a, d-1);
   // variable for the current pk
   mpz_t pk, invpk;
   mpz_init (pk);
@@ -553,8 +553,8 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   // of A computed modulo pk.
 
   mpz_poly_t tmp, tmp2;
-  mpz_poly_alloc(tmp, 2*d-1);
-  mpz_poly_alloc(tmp2, 2*d-1);
+  mpz_poly_init(tmp, 2*d-1);
+  mpz_poly_init(tmp2, 2*d-1);
   do {
     double st;
 
@@ -697,7 +697,7 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly_t F,
         {
           lprd[0] ++;
           prd = (polymodF_t*) realloc (prd, *lprd * sizeof (polymodF_t));
-      mpz_poly_alloc(prd[i+1]->p, F->deg);
+      mpz_poly_init(prd[i+1]->p, F->deg);
           mpz_set_ui(prd[i + 1]->p->coeff[0], 1);
       prd[i+1]->p->deg = 0;
       prd[i+1]->v = 0;
@@ -758,18 +758,18 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   ASSERT_ALWAYS(deg > 1);
   
   // Init F to be the corresponding polynomial
-  mpz_poly_alloc (F, deg);
+  mpz_poly_init (F, deg);
   for (i = deg; i >= 0; --i)
     mpz_poly_setcoeff (F, i, f[i]);
   
   // Init prd to 1.
-  mpz_poly_alloc (prd->p, deg);
+  mpz_poly_init (prd->p, deg);
   mpz_set_ui (prd->p->coeff[0], 1);
   prd->p->deg = 0;
   prd->v = 0;
   
   // Allocate tmp
-  mpz_poly_alloc (tmp->p, 1);
+  mpz_poly_init (tmp->p, 1);
   
   // Accumulate product
   #if 0
@@ -790,7 +790,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       unsigned long lprd = 1; /* number of elements in prd_tab[] */
       unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
       prd_tab = (polymodF_t*) malloc (lprd * sizeof (polymodF_t));
-      mpz_poly_alloc (prd_tab[0]->p, F->deg);
+      mpz_poly_init (prd_tab[0]->p, F->deg);
       mpz_set_ui (prd_tab[0]->p->coeff[0], 1);
       prd_tab[0]->p->deg = 0;
       prd_tab[0]->v = 0;

@@ -57,8 +57,8 @@ int main() {
   // This main function just runs an example.
   mpz_poly_t f,g;
 
-  mpz_poly_alloc(f,5);
-  mpz_poly_alloc(g,1);
+  mpz_poly_init(f,5);
+  mpz_poly_init(g,1);
 
   mpz_poly_setcoeff_str(f,5,"1008593880",10);
   mpz_poly_setcoeff_str(f,4,"115824918113473",10);
@@ -81,10 +81,10 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
   
   mpz_poly_t f,g;
 
-  mpz_poly_alloc(f,degf);
+  mpz_poly_init(f,degf);
   mpz_poly_set(f,f_coeffs,degf);
 
-  mpz_poly_alloc(g,1);
+  mpz_poly_init(g,1);
   mpz_poly_setcoeff(g,0,g_coeff0);
   mpz_poly_setcoeff(g,1,g_coeff1);
   mpz_neg(g->coeff[0],g->coeff[0]);
@@ -122,10 +122,10 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
 
   // This gives the exceptional values for u (once divided by g(l)^2)
   mpz_poly_t dg,df,aux;  
-  mpz_poly_alloc(dg,g->deg-1);
-  mpz_poly_alloc(df,f->deg-1);  
-  mpz_poly_alloc(aux,-1);
-  mpz_poly_alloc(rdict->fdg_gdf,-1);
+  mpz_poly_init(dg,g->deg-1);
+  mpz_poly_init(df,f->deg-1);  
+  mpz_poly_init(aux,-1);
+  mpz_poly_init(rdict->fdg_gdf,-1);
   mpz_poly_derivative(dg,g);
   mpz_poly_derivative(df,f);
 
@@ -149,9 +149,9 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
   mpz_poly_free(dg);
   mpz_poly_free(df);
   
-  mpz_poly_alloc(rdict->f,f->deg);
+  mpz_poly_init(rdict->f,f->deg);
   mpz_poly_copy(rdict->f,f);
-  mpz_poly_alloc(rdict->g,g->deg);
+  mpz_poly_init(rdict->g,g->deg);
   mpz_poly_copy(rdict->g,g);
 
   if(VERBOSE) {
@@ -200,14 +200,14 @@ long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
   if(DEBUG) {    
     printf("Creating polynomials ff and gg ...\n");
   }
-  mpz_poly_alloc(ff,rdict->f->deg);
+  mpz_poly_init(ff,rdict->f->deg);
   mpz_poly_copy(ff,rdict->f);
   
   if(DEBUG) {    
     printf("Polynomial ff ...\n");
     mpz_poly_print(ff);
   }
-  mpz_poly_alloc(gg,rdict->g->deg);
+  mpz_poly_init(gg,rdict->g->deg);
   mpz_poly_copy(gg,rdict->g);
 
   if(DEBUG) {    
@@ -215,7 +215,7 @@ long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
     mpz_poly_print(gg);
   }  
 
-  mpz_poly_alloc(fdg_gdf,rdict->fdg_gdf->deg);  
+  mpz_poly_init(fdg_gdf,rdict->fdg_gdf->deg);  
   scale = log(p)*(double)p/(double)(p+1);
 
   if(DEBUG) {
@@ -263,7 +263,7 @@ long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
     printf("Initialized powers of %lu ...\n",p);
   }
   
-  mpz_poly_alloc(rdict->gmodp,rdict->g->deg);
+  mpz_poly_init(rdict->gmodp,rdict->g->deg);
   mpz_poly_reduce_mod_mpz(rdict->gmodp,rdict->g,rdict->ppow[1]);
   
   if(DEBUG) {    
@@ -303,7 +303,7 @@ long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
   }
 
   mpz_poly_t id;
-  mpz_poly_alloc(id,1);
+  mpz_poly_init(id,1);
   mpz_poly_set_identity(id);  
   
   if(DEBUG) {    
@@ -418,7 +418,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
     printf("Scales 1,2,3 are %f, %f, %f.\n",scale1,scale2,scale3);
   }
   
-  mpz_poly_alloc(minus_f_over_g_modp, ff->deg);
+  mpz_poly_init(minus_f_over_g_modp, ff->deg);
   mpz_poly_reduce_mod_mpz(minus_f_over_g_modp, ff,rdict->ppow[1]);  
 
   if(DEBUG) {
@@ -493,12 +493,12 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
   mpz_poly_t nfdg_gdf,nff,ngg,ndphi,twist_f,tmp_poly;
   mpz_t rhs;
   
-  mpz_poly_alloc(nfdg_gdf,fdg_gdf->deg);
-  mpz_poly_alloc(nff,ff->deg);
-  mpz_poly_alloc(ngg,gg->deg);
-  mpz_poly_alloc(ndphi,1);
-  mpz_poly_alloc(twist_f,0);
-  mpz_poly_alloc(tmp_poly,0);
+  mpz_poly_init(nfdg_gdf,fdg_gdf->deg);
+  mpz_poly_init(nff,ff->deg);
+  mpz_poly_init(ngg,gg->deg);
+  mpz_poly_init(ndphi,1);
+  mpz_poly_init(twist_f,0);
+  mpz_poly_init(tmp_poly,0);
   mpz_init(rhs);
 
   if (look_many_roots) {
@@ -860,7 +860,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
     if(DEBUG) {
       printf("Entering simple root section...\n");
       mpz_poly_t auxpoly;
-      mpz_poly_alloc(auxpoly,0);
+      mpz_poly_init(auxpoly,0);
       mpz_poly_reduce_mod_mpz(auxpoly,ff,rdict->ppow[1]);
       ASSERT_ALWAYS(mpz_poly_is_constant(auxpoly));
       //printf("f mod %lu is supposed to be constant, and the test gives %s \n",p,(mpz_poly_is_constant(auxpoly))?"constant":"not constant");
@@ -1190,7 +1190,7 @@ void compose_psi(mpz_poly_t f, const mpz_poly_t g, unsigned long l, mpz_t * ppow
   unsigned long i,k;
   mpz_t tmpsum,tmpterm,tmplpow;
   mpz_poly_t aux;
-  mpz_poly_alloc(aux,d);
+  mpz_poly_init(aux,d);
 
 
   mpz_init(tmpsum);
@@ -1245,7 +1245,7 @@ void compose_psi(mpz_poly_t f, const mpz_poly_t g, unsigned long l, mpz_t * ppow
 /* We assume (rdict->delta) > 0. No problem when f and g are the same. */
 void compose_reduce(mpz_poly_t f, const mpz_poly_t g,unsigned long l,mpz_t * ppow, int maxpow, mpz_t m) {
   mpz_poly_t aux;
-  mpz_poly_alloc(aux,g->deg);
+  mpz_poly_init(aux,g->deg);
   compose_psi(aux,g,l,ppow,maxpow);
   mpz_poly_reduce_mod_mpz(f,aux,m);
   //printf("(Compose reduce) The original and reduced polynomials are\n");

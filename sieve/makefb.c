@@ -15,10 +15,10 @@ void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
     // lazy: use the mpz_poly_t interface of utils/mpz_poly.h 
     mpz_poly_t aXpb, aXpbi, G, Aux;
-    mpz_poly_alloc(aXpb, 1);  // alloc sets to zero
-    mpz_poly_alloc(aXpbi, d);  
-    mpz_poly_alloc(G, d);
-    mpz_poly_alloc(Aux, d);
+    mpz_poly_init(aXpb, 1);  // alloc sets to zero
+    mpz_poly_init(aXpbi, d);  
+    mpz_poly_init(G, d);
+    mpz_poly_init(Aux, d);
     { 
         mpz_t aux;
         mpz_init(aux);
