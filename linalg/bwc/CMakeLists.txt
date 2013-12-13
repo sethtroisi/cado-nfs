@@ -124,7 +124,9 @@ set_target_properties(bwc_mpfq PROPERTIES
         LINK_FLAGS "--mpi")
 
 add_library(matmul_common ${CADO_SHARED} matmul-common.c)
-set_target_properties(matmul_common PROPERTIES LINK_FLAGS "--mpi")
+set_target_properties(matmul_common PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
 
 set(matmul_basic_sources    matmul-basic.c)
 set(matmul_basicp_sources   matmul-basicp.c)
