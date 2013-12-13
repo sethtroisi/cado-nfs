@@ -26,6 +26,13 @@ double double_poly_dichotomy (double_poly_srcptr, double, double, double,
                               unsigned int);
 void double_poly_print (FILE *, double_poly_srcptr, char *name);
 
+static inline void
+double_poly_scale (double *u, const double *t, unsigned int d, double h)
+{
+  double hpow;
+  u[d] = t[d];
+  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
+}
 
 #ifdef __cplusplus
 }
