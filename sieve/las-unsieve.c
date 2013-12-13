@@ -541,6 +541,82 @@ search_survivors_in_line3(unsigned char * const SS[2],
 }
 
 
+/* This function assumed j % 3 != 0 and j % 5 == 0. It uses an SSE bound 
+   pattern where i-coordinates with i % 5 == 0 are set to a bound of 0. */
+static int
+search_survivors_in_line5(unsigned char * const SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int td_max)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    const int nr_patterns = 5;
+    __m128i patterns[2][nr_patterns];
+    const int x_step = sizeof(__m128i);
+    const int pmin = 7;
+    int next_pattern = 0;
+#else
+    const int x_step = 1;
+    const int pmin = 3;
+#endif
+    int survivors = 0;
+
+    /* We know that 3 and 5 do not divide j in the code of this function, and
+       we don't store 2. Allowing 5 distinct odd prime factors >5 thus handles
+       all j < 7436429 */
+    unsigned int div[5][2];
+    unsigned int nr_div;
+
+    nr_div = extract_j_div(div, j, j_div, pmin, td_max);
+    ASSERT(nr_div <= 5);
+
+#ifdef HAVE_SSE2
+    for (int i = 1; i < nr_patterns; i++) {
+        patterns[0][i] = _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+        patterns[1][i] = _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+    }
+
+    if (j % 2 == 0)
+        for (size_t i = 0; i < nr_patterns * sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0][0])[i] = 0x80;
+
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 5 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 5), or d == I/2 (mod 5). With
+       I = 2^log_I and ord_5(2) == 4 (mod 5), we have d == 2^((log_I-1)%4)
+       (mod 5), so we want a function: 0->3, 1->1, 2->2, 3->4.
+       We can use (log_I&2)/2 | (log_I % 4 != 1) * 2
+       
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    size_t d = ;
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[nr_patterns*i + d] = 0x80;
+#endif
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int sse_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == 3)
+            next_pattern = 0;
+        if (sse_surv == 0)
+            continue;
+#endif
+        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
+            x_step, nr_div, div);
+#ifdef HAVE_SSE2
+        ASSERT(sse_surv == surv);
+#endif
+        survivors += surv;
+    }
+    return survivors;
+}
+
+
 int
 search_survivors_in_line(unsigned char * const SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
