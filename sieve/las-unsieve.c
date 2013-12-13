@@ -7,7 +7,6 @@
 #include "las-norms.h"
 #include "gcd.h"
 
-
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
 /* Set every stride-th byte, starting at index 0, to 255 in an array of
@@ -353,7 +352,7 @@ extract_j_div(unsigned int (*div)[2], const unsigned int j, j_div_srcptr j_div,
    divisibility of the resulting i value by the trial-divided primes.
    Return the number of survivors found. */
 static inline int
-search_single_survivors(unsigned char * const SS[2],
+search_single_survivors(unsigned char * const restrict SS[2],
         const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED,
         const int x_start, const int x_step, const unsigned int nr_div,
@@ -416,7 +415,7 @@ search_single_survivors(unsigned char * const SS[2],
 
 /* This function works for all j */
 static int
-search_survivors_in_line1(unsigned char * const SS[2],
+search_survivors_in_line1(unsigned char * const restrict SS[2],
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -468,10 +467,10 @@ search_survivors_in_line1(unsigned char * const SS[2],
 }
 
 
-/* This function assumed j % 3 == 0 . It uses an SSE bound pattern where 
+/* This function assumes j % 3 == 0. It uses an SSE bound pattern where 
    i-coordinates with i % 3 == 0 are set to a bound of 0. */
-static int
-search_survivors_in_line3(unsigned char * const SS[2], 
+int
+search_survivors_in_line3(unsigned char * const restrict SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
         const unsigned int td_max)
@@ -541,13 +540,14 @@ search_survivors_in_line3(unsigned char * const SS[2],
 }
 
 
-/* This function assumed j % 3 != 0 and j % 5 == 0. It uses an SSE bound 
-   pattern where i-coordinates with i % 5 == 0 are set to a bound of 0. */
-static int
-search_survivors_in_line5(unsigned char * const SS[2], 
+/* This function assumes j % 3 != 0 and j % 5 == 0. It uses an SSE bound 
+   pattern where i-coordinates with i % 5 == 0 are set to a bound of 0,
+   and trial divies only by primes > 5. */
+int
+search_survivors_in_line5(unsigned char * const restrict SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
-        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
-        const unsigned int td_max)
+        const unsigned int j, const int N MAYBE_UNUSED, 
+        j_div_srcptr restrict j_div, const unsigned int td_max)
 {
 #ifdef HAVE_SSE2
     const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
@@ -586,11 +586,10 @@ search_survivors_in_line5(unsigned char * const SS[2],
        We want d s.t. -I/2 + d == 0 (mod 5), or d == I/2 (mod 5). With
        I = 2^log_I and ord_5(2) == 4 (mod 5), we have d == 2^((log_I-1)%4)
        (mod 5), so we want a function: 0->3, 1->1, 2->2, 3->4.
-       We can use (log_I&2)/2 | (log_I % 4 != 1) * 2
-       
        We use the sign conversion trick (i.e., XOR 0x80), so to get an
        effective bound of unsigned 0, we need to set the byte to 0x80. */
-    size_t d = ;
+    static const unsigned char d_lut[] = {3,1,2,4};
+    size_t d = d_lut[log_I % 4];
     for (size_t i = 0; i < sizeof(__m128i); i++)
         ((unsigned char *)&patterns[0][0])[nr_patterns*i + d] = 0x80;
 #endif
@@ -601,7 +600,7 @@ search_survivors_in_line5(unsigned char * const SS[2],
         int sse_surv = 
             sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
                                          (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
-        if (++next_pattern == 3)
+        if (++next_pattern == nr_patterns)
             next_pattern = 0;
         if (sse_surv == 0)
             continue;
@@ -618,15 +617,21 @@ search_survivors_in_line5(unsigned char * const SS[2],
 
 
 int
-search_survivors_in_line(unsigned char * const SS[2], 
+search_survivors_in_line(unsigned char * const restrict SS[2], 
         const unsigned char bound[2], const unsigned int log_I,
         const unsigned int j, const int N, j_div_srcptr j_div,
         const unsigned int td_max, unsieve_aux_data_srcptr us)
 {
     unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
 
+#if 1 
     if (j % 3 == 0)
       return search_survivors_in_line3(SS, bound, log_I, j, N, j_div, td_max);
+#if 1
+    else if (j % 5 == 0)
+      return search_survivors_in_line5(SS, bound, log_I, j, N, j_div, td_max);
+#endif
     else
+#endif
       return search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max);
 }
