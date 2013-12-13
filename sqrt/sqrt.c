@@ -21,11 +21,6 @@
 
 static int verbose = 0;
 
-/* Although the functions in plain_poly are not readily available in the
- * publicized interface of utils.h, it's ok to use them if we explicitly
- * include the corresponding header.
- */
-#include "plain_poly.h"
 
 /********** RATSQRT **********/
 
@@ -651,9 +646,9 @@ FindSuitableModP (poly_t F, mpz_t N)
   int dF = F->deg;
   int ntries = 0;
 
-  plain_poly_t fp;
+  modul_poly_t fp;
 
-  plain_poly_init (fp, dF);
+  modul_poly_init (fp, dF);
   while (1)
     {
     int d;
@@ -662,20 +657,24 @@ FindSuitableModP (poly_t F, mpz_t N)
     ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
-    if (! plain_poly_fits (dF, p) || ntries > 100)
-      {
-        fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
-        plain_poly_clear (fp);
-        getprime (0);
-        exit (1);
-      }
-    d = plain_poly_set_mod (fp, F->coeff, dF, p);
+
+    /* Not needed anymore with modul_poly */
+
+    /* if (! plain_poly_fits (dF, p) || ntries > 100) */
+    /*   { */
+    /*     fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n"); */
+    /*     plain_poly_clear (fp); */
+    /*     getprime (0); */
+    /*     exit (1); */
+    /*   } */
+
+    d = modul_poly_set_mod (fp, F->coeff, dF, &p);
     if (d != dF)
       continue;
-    if (plain_poly_is_irreducible (fp, p))
+    if (modul_poly_is_irreducible (fp, &p))
       break;
     }
-  plain_poly_clear (fp);
+  modul_poly_clear (fp);
   getprime (0);
 
   return p;

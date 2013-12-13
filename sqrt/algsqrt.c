@@ -34,13 +34,6 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Although the functions in plain_poly are not readily available in the
- * publicized interface of utils.h, it's ok to use them if we explicitly
- * include the corresponding header.
- */
-#include "plain_poly.h"
-
-//#include "poly.h"
 
 // #define VERBOSE
 
@@ -380,21 +373,21 @@ unsigned long FindSuitableModP(poly_t F) {
   unsigned long p = 2;
   int dF = F->deg;
 
-  plain_poly_t fp;
-  plain_poly_init(fp, dF);
+  modul_poly_t fp;
+  modul_poly_init(fp, dF);
   while (1) {
     int d;
     // select prime congruent to 3 mod 4 to have easy sqrt.
   //  do {
       p = getprime(p);
   //  } while ((p%4)!= 3);
-    d = plain_poly_set_mod (fp, F->coeff, dF, p);
+    d = modul_poly_set_mod (fp, F->coeff, dF, &p);
     if (d!=dF)
       continue;
-    if (plain_poly_is_irreducible(fp, p))
+    if (modul_poly_is_irreducible(fp, &p))
       break;
   }
-  plain_poly_clear(fp);
+  modul_poly_clear(fp);
   getprime (0);
 
   return p;
