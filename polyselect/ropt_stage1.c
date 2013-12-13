@@ -859,6 +859,7 @@ ropt_stage1 ( ropt_poly_t poly,
   int st = 0, i, re;
   double alpha_lat;
   mpz_t *fuv;
+  mpz_poly_t Fuv;
   sublattice_pq *pqueue;
 
   /* size-cutoff of top sublattices */
@@ -884,13 +885,11 @@ ropt_stage1 ( ropt_poly_t poly,
                   milliseconds () - st );
 
   /* fuv is f+(u*x+v)*g */
-  fuv = (mpz_t*) malloc ((poly->d + 1) * sizeof (mpz_t));
-  if (fuv == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in ropt_stage1().\n");
-    exit (1);
-  }
+  mpz_poly_init (Fuv, poly->d);
+  Fuv->deg = poly->d;
+  fuv = Fuv->coeff;
   for (i = 0; i <= poly->d; i++)
-    mpz_init_set (fuv[i], poly->f[i]);
+    mpz_set (fuv[i], poly->f[i]);
 
   if (param->verbose >= 2)
     st = milliseconds ();
@@ -904,19 +903,17 @@ ropt_stage1 ( ropt_poly_t poly,
 
 #if RANK_SUBLATTICE_BY_E
     /* use exp_E as benchmark instead of alpha. */
-    double skew = L2_skewness (fuv, poly->d, SKEWNESS_DEFAULT_PREC, 
-                               DEFAULT_L2_METHOD);
-    alpha_lat = L2_lognorm (fuv, poly->d, skew, DEFAULT_L2_METHOD);
-    alpha_lat += get_alpha (fuv, poly->d, 2000);
+    double skew = L2_skewness (Fuv, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    alpha_lat = L2_lognorm (Fuv, skew, DEFAULT_L2_METHOD);
+    alpha_lat += get_alpha (Fuv, 2000);
 #else
     //alpha_lat = get_alpha (fuv, poly->d, primes[s1param->tlen_e_sl-1]);
-    alpha_lat = get_alpha (fuv, poly->d, 2000);
+    alpha_lat = get_alpha (Fuv, 2000);
 #endif
 
 #if DEBUG_ROPT_STAGE1
-     skew = L2_skewness ( fuv, poly->d, SKEWNESS_DEFAULT_PREC,
-                                DEFAULT_L2_METHOD );
-    double logmu = L2_lognorm (fuv, poly->d, skew, DEFAULT_L2_METHOD);
+     skew = L2_skewness (Fuv, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+    double logmu = L2_lognorm (Fuv, skew, DEFAULT_L2_METHOD);
     gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): "
                   "(%d, %Zd, %Zd) (mod %Zd), partial_alpha: %.2f,"
                   "lognorm: %.2f\n",
@@ -944,10 +941,7 @@ ropt_stage1 ( ropt_poly_t poly,
 
   /* free priority queue */
   free_sublattice_pq (&pqueue);
-  for (i = 0; i <= poly->d; i++) {
-    mpz_clear (fuv[i]);
-  }
-  free (fuv);
+  mpz_poly_free (Fuv);
 
   return 0;
 }

@@ -50,13 +50,17 @@ ropt_common ( ropt_poly_t poly,
   ropt_bestpoly_setup (bestpoly, poly->f, poly->g, poly->d);
 
   /* print f, g */
-  print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
+  mpz_poly_t F;
+  F->coeff = poly->f;
+  F->deg = poly->d;
+  print_poly_fg (F, poly->g, poly->n, 1);
 
   /* call ropt */
   ropt (poly, bestpoly, param, info);
 
   fprintf (stderr, "\n# Info: Best E is:\n");
-  print_poly_fg (bestpoly->f, bestpoly->g, poly->d, poly->n, 1);
+  F->coeff = bestpoly->f;
+  print_poly_fg (F, bestpoly->g, poly->n, 1);
 
   ropt_info_free (info);
   ropt_bestpoly_free (bestpoly, poly->d);
@@ -317,8 +321,11 @@ ropt_on_msievepoly ( FILE *file,
     mpz_neg (poly->g[0], m);
     fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
 
-    print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
-    optimize (poly->f, poly->d, poly->g, 0, 1);
+    mpz_poly_t F;
+    F->coeff = poly->f;
+    F->deg = poly->d;
+    print_poly_fg (F, poly->g, poly->n, 1);
+    optimize (F, poly->g, 0, 1);
 
 #if SKIP_ROPT
     /* print optimized poly in CADO format */

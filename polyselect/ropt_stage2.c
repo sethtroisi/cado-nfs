@@ -869,6 +869,10 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   sievescore_pq *sievescore;
   sievearray_t sa;
 
+  mpz_poly_t F;
+  F->coeff = s2param->f;
+  F->deg = poly->d;
+
   /* sieving length */
   len_A = (unsigned long) (s2param->Amax - s2param->Amin + 1);
   len_B = (unsigned long) (s2param->Bmax - s2param->Bmin + 1);
@@ -964,9 +968,9 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
       mpz_set (s2param->g[0], poly->g[0]);
       mpz_set (s2param->g[1], poly->g[1]);
 
-      optimize_aux (s2param->f, poly->d, s2param->g, 0, 0, CIRCULAR);
+      optimize_aux (F, s2param->g, 0, 0, CIRCULAR);
 
-      MurphyE = print_poly_fg (s2param->f, s2param->g, poly->d, poly->n, 0);
+      MurphyE = print_poly_fg (F, s2param->g, poly->n, 0);
 
       insert_MurphyE_pq (local_E_pqueue, info->w, tmpu, tmpv,
                          s2param->MOD, MurphyE);
@@ -1016,7 +1020,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
         compute_fuv_mp (s2param->f, poly->f, poly->g, poly->d,
                         local_E_pqueue->u[i], local_E_pqueue->v[i]);
 
-        print_poly_fg (s2param->f, s2param->g, poly->d, poly->n, 1);
+        print_poly_fg (F, s2param->g, poly->n, 1);
 
         fprintf (stderr, "\n");
       }

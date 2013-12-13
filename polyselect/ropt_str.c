@@ -47,11 +47,14 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
   int i, j;
   double skewness, lognorm;
   mpz_t *f, *g, b, m, tmpv, V;
+  mpz_poly_t F;
 
-  f = (mpz_t *) malloc ( (poly->d + 1)* sizeof (mpz_t));
+  mpz_poly_init (F, poly->d);
+  F->deg = poly->d;
+  f = F->coeff;
   g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
   for (j = 0; j <= poly->d; j ++)
-    mpz_init_set (f[j], poly->f[j]);
+    mpz_set (f[j], poly->f[j]);
   for (j = 0; j < 2; j ++)
     mpz_init_set (g[j], poly->g[j]);
   mpz_init_set (b, poly->g[1]);
@@ -72,12 +75,11 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, DEFAULT_L2_METHOD);
+    optimize_aux (F, g, 0, 0, DEFAULT_L2_METHOD);
 
-    skewness = L2_skewness ( f, poly->d, SKEWNESS_DEFAULT_PREC,
-                             DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -102,13 +104,12 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, DEFAULT_L2_METHOD);
+    optimize_aux (F, g, 0, 0, DEFAULT_L2_METHOD);
 
     /* get lognorm */
-    skewness = L2_skewness ( f, poly->d, SKEWNESS_DEFAULT_PREC,
-                             DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -120,11 +121,9 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
   mpz_set_ui (V, 0);
   rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
 
-  for (j = 0; j <= poly->d; j ++)
-    mpz_clear (f[j]);
+  mpz_poly_free (F);
   for (j = 0; j < 2; j ++)
     mpz_clear (g[j]);
-  free (f);
   free (g);
   mpz_clear (b);
   mpz_clear (m);
@@ -144,10 +143,14 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
   int j;
   double skewness, lognorm;
   mpz_t *f, *g, b, m;
-  f = (mpz_t *) malloc ( (poly->d + 1)* sizeof (mpz_t));
+  mpz_poly_t F;
+  
+  mpz_poly_init (F, poly->d);
+  F->deg = poly->d;
+  f = F->coeff;
   g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
   for (j = 0; j <= poly->d; j ++)
-    mpz_init_set (f[j], poly->f[j]);
+    mpz_set (f[j], poly->f[j]);
   for (j = 0; j < 2; j ++)
     mpz_init_set (g[j], poly->g[j]);
   mpz_init_set (b, poly->g[1]);
@@ -168,12 +171,11 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0, CIRCULAR);
 
-    skewness = L2_skewness ( f, poly->d, SKEWNESS_DEFAULT_PREC,
-                             DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
       "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
@@ -202,12 +204,11 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0, CIRCULAR);
 
-    skewness = L2_skewness ( f, poly->d, SKEWNESS_DEFAULT_PREC,
-                             DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
       "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
@@ -221,11 +222,9 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
   /* go back to w=0 */
   rotate_aux (poly->f, b, m, w0, 0, 1);
 
-  for (j = 0; j <= poly->d; j ++)
-    mpz_clear (f[j]);
+  mpz_poly_free (F);
   for (j = 0; j < 2; j ++)
     mpz_clear (g[j]);
-  free (f);
   free (g);
   mpz_clear (b);
   mpz_clear (m);
@@ -242,10 +241,14 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
   int i, j;
   double skewness, lognorm;
   mpz_t *f, *g, b, m;
-  f = (mpz_t *) malloc ( (poly->d + 1)* sizeof (mpz_t));
+  mpz_poly_t F;
+
+  mpz_poly_init (F, poly->d);
+  F->deg = poly->d;
+  f = F->coeff;
   g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
   for (i = 0; i <= poly->d; i ++)
-    mpz_init_set (f[i], poly->f[i]);
+    mpz_set (f[i], poly->f[i]);
   for (i = 0; i < 2; i ++)
     mpz_init_set (g[i], poly->g[i]);
   mpz_init_set (b, poly->g[1]);
@@ -265,12 +268,11 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0, CIRCULAR);
 
-    skewness = L2_skewness (f, poly->d, SKEWNESS_DEFAULT_PREC,
-                            DEFAULT_L2_METHOD);
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
 
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, "
@@ -299,12 +301,11 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (f, poly->d, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0, CIRCULAR);
 
-    skewness = L2_skewness (f, poly->d, SKEWNESS_DEFAULT_PREC,
-                            DEFAULT_L2_METHOD);
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 
-    lognorm = L2_lognorm (f, poly->d, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
 
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f,
@@ -319,11 +320,9 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
   /* go back to w=0 */
   rotate_aux (poly->f, b, m, w0, 0, 2);
 
-  for (i = 0; i <= poly->d; i ++)
-    mpz_clear (f[i]);
+  mpz_poly_free (F);
   for (i = 0; i < 2; i ++)
     mpz_clear (g[i]);
-  free (f);
   free (g);
   mpz_clear (b);
   mpz_clear (m);
@@ -415,8 +414,9 @@ ropt_poly_setup ( ropt_poly_t poly )
 {
   int i;
   mpz_t t;
-  mpz_init (t);
+  mpz_poly_t F;
 
+  mpz_init (t);
   /* degree */
   for ( (poly->d) = MAX_DEGREE; 
         (poly->d) > 0 && mpz_cmp_ui ((poly->f[poly->d]), 0) == 0;
@@ -440,7 +440,7 @@ ropt_poly_setup ( ropt_poly_t poly )
   if (mpz_cmp_ui (t, 0) != 0) {
     fprintf (stderr, "ERROR: The following polynomial have no common"
              " root. \n");
-    print_cadopoly_fg (stderr, poly->f, poly->g, poly->d, poly->n);
+    print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, poly->n);
     exit (1);
   }
 
@@ -449,7 +449,9 @@ ropt_poly_setup ( ropt_poly_t poly )
                          poly->numerator, primes, poly->d );
 
   /* projective alpha */
-  poly->alpha_proj = get_biased_alpha_projective (poly->f, poly->d, 2000);
+  F->coeff = poly->f;
+  F->deg = poly->d;
+  poly->alpha_proj = get_biased_alpha_projective (F, 2000);
 
   mpz_clear (t);
 }
@@ -512,10 +514,14 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
                              ropt_bound_t bound,
                              ropt_param_t param )
 {
-  double skewness = L2_skewness ( poly->f, poly->d, SKEWNESS_DEFAULT_PREC,
-                                  DEFAULT_L2_METHOD );
-  bound->init_lognorm = L2_lognorm ( poly->f, poly->d, skewness,
-                                     DEFAULT_L2_METHOD );
+  mpz_poly_t F;
+  double skewness;
+
+  F->coeff = poly->f;
+  F->deg = poly->d;
+
+  skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+  bound->init_lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD );
 
   /* setup lognorm bound, either from input or by default. */
   if (param->bound_lognorm > 0) {
@@ -748,9 +754,11 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   }
   else 
     sublattice = bound_by_u / 16;
-
-  double skew = L2_skewness (poly->f, poly->d, SKEWNESS_DEFAULT_PREC, 
-                             DEFAULT_L2_METHOD);
+  
+  mpz_poly_t F;
+  F->coeff = poly->f;
+  F->deg = poly->d;
+  double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 
   /* fix for small skewness but large bound */
   if ( (double) sublattice > (skew / 16.0) )

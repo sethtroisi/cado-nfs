@@ -54,7 +54,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 unsigned flag = 0UL, skip = 0UL, count = 0;
 	 char str[MAX_LINE_LENGTH];
 	 mpz_t g[2];
-	 mpz_t f[deg];
+	 mpz_t *f;
+         mpz_poly_t F;
 	 mpz_t t, M;
 	 double skew = 0.0, alpha = 0.0, logmu = 0.0;
 	 double ave_logmu = 0.0, ave_alpha = 0.0;
@@ -63,8 +64,9 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 mpz_init (g[1]);
 	 mpz_init (g[0]);
 
-	 for (i = 0; i <= deg; i ++ )
-		  mpz_init (f[i]);
+         mpz_poly_init (F, deg);
+         F->deg = deg;
+         f = F->coeff;
 	 while (1) {
 		  if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
 			   break; /* wrong line or EOF */
@@ -148,20 +150,20 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
 			   // need to output raw, since we may re-optimize this using updated optimize.c
                            nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-			   skew = L2_skewness (f, deg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-			   logmu = L2_lognorm (f, deg, skew, DEFAULT_L2_METHOD);
-			   alpha = get_alpha (f, deg, ALPHA_BOUND);
+			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+			   logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+			   alpha = get_alpha (F, ALPHA_BOUND);
 			   fprintf (stderr, "\n# Raw polynomial (#%6d):", count + 1);
 			   polyprint (f, g, deg, N);
 			   printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %f\n",
 					   logmu, alpha, logmu + alpha, nroots, skew);
 			   // optimize
-			   optimize (f, deg, g, 0, 1); // no verbose
+			   optimize (F, g, 0, 1); // no verbose
 			   // optimized polynomial
 			   nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-			   skew = L2_skewness (f, deg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-			   logmu = L2_lognorm (f, deg, skew, DEFAULT_L2_METHOD);
-			   alpha = get_alpha (f, deg, ALPHA_BOUND);
+			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+			   logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+			   alpha = get_alpha (F, ALPHA_BOUND);
 			   fprintf (stderr, "# Optimized polynomial (#%10d): ", count + 1);
 			   polyprint (f, g, deg, N);
 			   printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
@@ -193,8 +195,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 mpz_clear (g[1]);
 	 mpz_clear (t);
 	 mpz_clear (M);
-	 for (i = 0; i <= deg; i ++ )
-		  mpz_clear (f[i]);
+         mpz_poly_free (F);
 	 return 0;
 }
 
