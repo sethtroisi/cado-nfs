@@ -707,7 +707,7 @@ class WorkunitClient(object):
                 else:
                     raise
             if not conn:
-                if waiting_since == 0 or not silent_wait:
+                if is_upload or not silent_wait or waiting_since == 0:
                     logging.error("%s failed, %s", 
                                   'Upload' if is_upload else 'Download', 
                                   errorstr)
@@ -718,7 +718,7 @@ class WorkunitClient(object):
                 time.sleep(wait)
                 waiting_since+=wait
         if waiting_since > 0:
-            logging.info ("Got work after %s seconds wait", waiting_since)
+            logging.info ("Opened URL %s after %s seconds wait", request, waiting_since)
         return conn
 
     @staticmethod
@@ -743,12 +743,16 @@ class WorkunitClient(object):
         """ Runs a command to download a file, retrying indefinitely in case
         of error
         """
+        silent_wait=self.settings["SILENT_WAIT"]
+        waiting_since = 0
         while True:
             (rc, stdout, stderr) = run_command (command, print_error=True)
             if rc == 0:
                 return True
-            logging.error("Download of %s failed. Waiting %s seconds before "
-                          "retrying,", url, wait)
+            if waiting_since == 0 or not silent_wait:
+                logging.error("Download of %s failed. Waiting %s seconds before "
+                              "retrying,", url, wait)
+            waiting_since+=wait
             time.sleep(wait)
 
     def wget_file(self, url, wait, dlpath, cafile=None):
