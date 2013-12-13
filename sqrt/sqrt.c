@@ -13,7 +13,7 @@
 #include <errno.h>
 
 #include "utils.h"
-#include "purgedfile.h"
+#include "filter_utils.h"
 #include "portability.h"
 
 #define DEBUG 0
@@ -1013,6 +1013,30 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     return 0;
 }
 
+typedef struct
+{
+  uint64_t *abs;
+  uint64_t *dep_masks;
+  unsigned int *dep_counts;
+  unsigned int nonzero_deps;
+  FILE **dep_files;  
+} sqrt_data_t;
+
+void *
+thread_sqrt (void * context_data, earlyparsed_relation_ptr rel)
+{
+  sqrt_data_t *data = (sqrt_data_t *) context_data;
+  for(unsigned int j = 0 ; j < data->nonzero_deps ; j++)
+  {
+    if (data->abs[rel->num] & data->dep_masks[j])
+    {
+      fprintf(data->dep_files[j], "%" PRId64 " %" PRIu64 "\n", rel->a, rel->b);
+      data->dep_counts[j]++;
+    }
+  }
+  return NULL;
+}
+
 void create_dependencies(const char * prefix, const char * indexname, const char * purgedname, const char * kername)
 {
     FILE * ix = fopen_maybe_compressed(indexname, "r");
@@ -1045,12 +1069,11 @@ void create_dependencies(const char * prefix, const char * indexname, const char
      * number of (a,b) pairs -- and we need to allocate a structure of
      * that size early on
      */
-    purgedfile_stream ps;
-    purgedfile_stream_init(ps);
-    purgedfile_stream_openfile(ps, purgedname);
+    uint64_t nrows, ncols;
+    purgedfile_read_firstline (purgedname, &nrows, &ncols);
     
-    uint64_t * abs = malloc(ps->nrows * sizeof(uint64_t));
-    memset(abs, 0, ps->nrows * sizeof(uint64_t));
+    uint64_t * abs = malloc(nrows * sizeof(uint64_t));
+    memset(abs, 0, nrows * sizeof(uint64_t));
 
     for(int i = 0 ; i < small_nrows ; i++) {
         uint64_t v;
@@ -1061,9 +1084,9 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         int nc;
         ret = fscanf(ix, "%d", &nc); ASSERT_ALWAYS(ret == 1);
         for(int k = 0 ; k < nc ; k++) {
-            unsigned int col;
-            ret = fscanf(ix, "%x", &col); ASSERT_ALWAYS(ret == 1);
-            ASSERT_ALWAYS(col < (unsigned int) ps->nrows);
+            uint64_t col;
+            ret = fscanf(ix, "%" SCNx64 "", &col); ASSERT_ALWAYS(ret == 1);
+            ASSERT_ALWAYS(col < nrows);
             abs[col] ^= v;
         }
     }
@@ -1072,7 +1095,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
 
     unsigned int nonzero_deps = 0;
     uint64_t sanity = 0;
-    for(uint64_t i = 0 ; i < ps->nrows ; i++) {
+    for(uint64_t i = 0 ; i < nrows ; i++) {
         sanity |= abs[i];
     }
     uint64_t dep_masks[64]={0,};
@@ -1091,7 +1114,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         dep_files[i] = fopen_maybe_compressed (dep_names[i], "wb");
         ASSERT_ALWAYS(dep_files[i] != NULL);
     }
-    ps->parse_only_ab = 1;
+    /*
     for(uint64_t i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
         ASSERT_ALWAYS(i < ps->nrows);
         for(unsigned int j = 0 ; j < nonzero_deps ; j++) {
@@ -1104,13 +1127,14 @@ void create_dependencies(const char * prefix, const char * indexname, const char
             fprintf(stderr, "read (a,b) pair # %d / %" PRIu64 " at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
                     ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
         }
-    }
-    purgedfile_stream_trigger_disp_progress(ps);
-    fprintf(stderr, "read (a,b) pair # %d / %" PRIu64 " at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
-            ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
+    }*/
+    sqrt_data_t data = {.abs = abs, .dep_masks = dep_masks,
+                        .dep_counts = dep_counts, .nonzero_deps = nonzero_deps,
+                        .dep_files = dep_files};
+    char *fic[2] = {(char *) purgedname, NULL};
+    filter_rels (fic, (filter_rels_callback_t) thread_sqrt, &data,
+          EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
 
-    purgedfile_stream_closefile(ps);
-    purgedfile_stream_clear(ps);
 
     fprintf(stderr, "Written %u dependencies files\n", nonzero_deps);
     for(unsigned int i = 0 ; i < nonzero_deps ; i++) {
