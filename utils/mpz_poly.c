@@ -252,24 +252,6 @@ void mpz_poly_init(mpz_poly_t f, int d) {
 }
 
 
-/* Allocate a polynomial that can contain 'nc' coefficients and set to zero.
-   We allow nbcoeff=0.
- */
-/* void mpz_poly_alloc(mpz_poly_t f, int nc) { */
-/*   int i; */
-/*   f->alloc = nc; */
-/*   f->deg = -1; */
-/*   if (nc == 0) */
-/*     f->coeff = (mpz_t *) NULL; */
-/*   else */
-/*     { */
-/*       f->coeff = (mpz_t *) malloc (nc*sizeof(mpz_t)); */
-/*       ASSERT (f->coeff != NULL); */
-/*     } */
-/*   for (i = 0; i < nc; ++i) */
-/*     mpz_init(f->coeff[i]); */
-/* } */
-
 /* realloc f to (at least) nc coefficients */
 void mpz_poly_realloc (mpz_poly_t f, int nc) {
   if (f->alloc < nc) {
