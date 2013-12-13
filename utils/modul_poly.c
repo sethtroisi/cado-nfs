@@ -656,6 +656,9 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
   modul_poly_t g, gmx, h;
   int d, i;
 
+  residueul_t zero;
+  modul_intinit(zero);
+
   modul_poly_make_monic (fp, p);
   d = fp->degree;
 
@@ -675,7 +678,7 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
 
     if (i == 1) {
       /* g <- x^p mod fp */
-      modul_poly_powmod_ui (g, fp, h, 0, p[0], p);
+      modul_poly_powmod_ui (g, fp, h, zero, p[0], p);
     } else {
       /* g <- g^p mod fp */
       modul_poly_general_powmod_ui (g, fp, h, p[0], p);
@@ -692,6 +695,7 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
       return 0;
   }
 
+  modul_clear(zero,p);
   modul_poly_clear (g);
   modul_poly_clear (gmx);
   modul_poly_clear (h);

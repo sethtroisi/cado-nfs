@@ -48,9 +48,11 @@ int MAX_k = 16;
    with the 'circular' method.
  */
 static double
-L2_lognorm_d (double *a, unsigned long d, double s, int method)
+L2_lognorm_d (double_poly_srcptr p, double s, int method)
 {
   double n;
+  double *a = p->coeff;
+  unsigned int d = p->deg;
 
   /* coefficients for degree 2 to 10:
     sage: [[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]] for d in [2..10]]
@@ -77,7 +79,7 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
     a1 = a[1] * s;
     a0 = a[0];
     if (method == RECTANGULAR) {
-      fprintf (stderr, "L2norm not yet implemented for degree %lu\n", d);
+      fprintf (stderr, "L2norm not yet implemented for degree %u\n", d);
       exit (1);
     }
     else
@@ -220,7 +222,7 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
     }
   else
     {
-      fprintf (stderr, "L2norm not yet implemented for degree %lu\n", d);
+      fprintf (stderr, "L2norm not yet implemented for degree %u\n", d);
       exit (1);
     }
 }
@@ -235,14 +237,18 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
    If method=CIRCULAR: integrate over the unit circle.
 */
 double
-L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
+L2_lognorm (mpz_t *f, unsigned int d, double s, int method)
 {
-  double a[MAX_DEGREE + 1];
+  double res;
+  double_poly_t a;
   unsigned long i;
 
+  double_poly_init (a, d);
   for (i = 0; i <= d; i++)
-    a[i] = mpz_get_d (f[i]);
-  return L2_lognorm_d (a, d, s, method);
+    a->coeff[i] = mpz_get_d (f[i]);
+  res = L2_lognorm_d (a, s, method);
+  double_poly_clear (a);
+  return res;
 }
 
 
@@ -338,18 +344,20 @@ L2_skewness (mpz_t *f, int d, int prec, int method)
 double
 L2_skewness_old (mpz_t *f, int deg, int prec, int method)
 {
-  double s, n0, n1, a, b, c, d, nc, nd, fd[MAX_DEGREE + 1];
+  double s, n0, n1, a, b, c, d, nc, nd;
   int i;
+  double_poly_t fd;
 
   /* convert once for all to double's to avoid expensive mpz_get_d() */
+  double_poly_init (fd, deg);
   for (i = 0; i <= deg; i++)
-    fd[i] = mpz_get_d (f[i]);
+    fd->coeff[i] = mpz_get_d (f[i]);
 
   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
 
   s = 1.0;
-  n0 = L2_lognorm_d (fd, deg, s, method);
-  while ((n1 = L2_lognorm_d (fd, deg, 2 * s, method)) < n0)
+  n0 = L2_lognorm_d (fd, s, method);
+  while ((n1 = L2_lognorm_d (fd, 2 * s, method)) < n0)
     {
       s = 2.0 * s;
       n0 = n1;
@@ -370,8 +378,8 @@ L2_skewness_old (mpz_t *f, int deg, int prec, int method)
     {
       c = (2.0 * a + b) / 3.0;
       d = (a + 2.0 * b) / 3.0;
-      nc = L2_lognorm_d (fd, deg, c, method);
-      nd = L2_lognorm_d (fd, deg, d, method);
+      nc = L2_lognorm_d (fd, c, method);
+      nd = L2_lognorm_d (fd, d, method);
       if (nc < nd) /* the minimum should be in [a,d] */
         b = d;
       else /* L2(c) > L2(d): the minimum should be in [c, b] */
@@ -379,6 +387,7 @@ L2_skewness_old (mpz_t *f, int deg, int prec, int method)
     }
 
   s = (a + b) * 0.5;
+  double_poly_clear (fd);
 
   return s;
 }
@@ -685,7 +694,8 @@ L2_skewness_Newton (mpz_t *f, int d, int prec, int method) {
 double
 L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
 {
-  double s = 0.0, a = 0.0, b = 0.0, c, nc, fd[d+1], dfd[d+1],
+  double_poly_t ff, df;
+  double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
     s1, s2, s3, s4, s5, s6;
   int i;
 #ifdef DEBUG_SKEW
@@ -697,6 +707,11 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
       fprintf (stderr, "Error in L2_skewness_derivative, rectangular method not implemented\n");
       exit (1);
     }
+
+  double_poly_init (ff, d);
+  double_poly_init (df, d);
+  fd = ff->coeff;
+  dfd = df->coeff;
 
   /* convert once for all to double's to avoid expensive mpz_get_d() */
   for (i = 0; i <= d; i++)
@@ -973,6 +988,10 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
   printf ("evaluation derivative test: %d", count);
 #endif
   s = (a + b) * 0.5;
+
+  double_poly_clear (ff);
+  double_poly_clear (df);
+
   return s;
 }
 

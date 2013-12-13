@@ -432,13 +432,12 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
   }
 }
 
-static inline void fpoly_scale(double * u, const double * t, unsigned int d, double h)
+static inline void fpoly_scale (double * u, const double * t, unsigned int d, double h)
 {
   double hpow;
   u[d] = t[d];
   for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
 }
-
 
 /**************************************************************************
        8 algorithms for the initialization of the algebraics:
@@ -2649,30 +2648,30 @@ static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
   unsigned int k, l, sign_change, new_sign_change;
-  double **dg;    /* derivatives of g */
+  double_poly_t *dg;    /* derivatives of g */
   double a, va, b, vb;
   double *roots, gmax;
 
-  dg = (double**) malloc (d * sizeof (double*));
+  dg = (double_poly_t*) malloc (d * sizeof (double_poly_t));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
-  dg[0] = g;
-  for (k = 1; k < d; k++) { /* dg[k] is the k-th derivative, thus has
+  /* make dg[0] point directly to g, to avoid copy */
+  dg[0]->coeff = g;
+  dg[0]->deg = d;
+  for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
                              degree d-k, i.e., d-k+1 coefficients */
-    dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
-    FATAL_ERROR_CHECK(dg[k] == NULL, "malloc failed");
-  }
+    double_poly_init (dg[k], d - k);
   roots = (double*) malloc (d * sizeof (double));
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
   for (k = 1; k < d; k++)
     for (l = 0; l <= d - k; l++)
-      dg[k][l] = (l + 1) * dg[k - 1][l + 1];
+      dg[k]->coeff[l] = (l + 1) * dg[k - 1]->coeff[l + 1];
   /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
      most one sign change in (0, s), this happens iff dg[d-1][0] and
      dg[d-1][0]+s*dg[d-1][1] have different signs */
-  if (dg[d-1][0] * (dg[d-1][0] + s * dg[d-1][1]) < 0)
+  if (dg[d-1]->coeff[0] * (dg[d-1]->coeff[0] + s * dg[d-1]->coeff[1]) < 0)
     {
       sign_change = 1;
-      roots[0] = - dg[d-1][0] / dg[d-1][1]; /* root of (d-1)-th derivative */
+      roots[0] = - dg[d-1]->coeff[0] / dg[d-1]->coeff[1]; /* root of (d-1)-th derivative */
     }
   else
     sign_change = 0;
@@ -2683,15 +2682,15 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
          (k+1)-th derivative, with corresponding roots in roots[0]...
          roots[sign_change-1], and roots[sign_change] = s. */
       a = 0.0;
-      va = dg[k][0]; /* value of dg[k] at x=0 */
+      va = dg[k]->coeff[0]; /* value of dg[k] at x=0 */
       new_sign_change = 0;
       for (l = 0; l <= sign_change; l++)
         {
           b = roots[l]; /* root of dg[k+1], or end of interval */
-          vb = fpoly_eval (dg[k], d - k, b);
+          vb = double_poly_eval (dg[k], b);
           if (va * vb < 0) /* root in interval */
-            roots[new_sign_change++] = fpoly_dichotomy (dg[k], d - k,
-                                                        a, b, va, 20);
+            roots[new_sign_change++] = double_poly_dichotomy (dg[k], a, b,
+                                                              va, 20);
           a = b;
           va = vb;
         }
@@ -2702,18 +2701,17 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   gmax = fabs (g[0]);
   for (k = 0; k <= sign_change; k++)
     {
-      va = fabs (fpoly_eval (g, d, roots[k]));
+      va = fabs (double_poly_eval (dg[0], roots[k]));
       if (va > gmax)
         gmax = va;
     }
   free (roots);
   for (k = 1; k < d; k++)
-    free (dg[k]);
+    double_poly_clear (dg[k]);
   free (dg);
   return gmax;
 }
 
-#if 1
 /* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
    for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
@@ -2791,35 +2789,6 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
       tmp /= q0d;
   return log2(tmp);
 }
-#else
-/* simpler but less accurate version */
-static double
-get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
-{
-  unsigned int d = cpoly->alg->degree, k;
-  double *fd, maxnorm;
-
-  /* if F(a,b) = f[d]*a^d + f[d-1]*a^(d-1)*b + ... + f[0]*b^d,
-     then |F(a,b)| <= |f[d]|*|a|^d + |f[d-1]|*|a|^(d-1)*b + ... + f[0]*b^d
-     and the maximum is attained for a=s and b=1 (see above) */
-
-  fd = (double*) malloc ((d + 1) * sizeof (double));
-  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
-  for (k = 0; k <= d; k++)
-    {
-      fd[k] = fabs (mpz_get_d (cpoly->alg->f[k]));
-      fprintf (stderr, "f[%d]=%e\n", k, fd[k]);
-    }
-  maxnorm = fpoly_eval (fd, d, cpoly->skew);
-  fprintf (stderr, "s=%f maxnorm=%e\n", cpoly->skew, maxnorm);
-  free (fd);
-  for (k = 0; k < d; k++)
-    maxnorm *= si->B * (double) si->I;
-  if (!si->ratq)
-    maxnorm /= (double) q0;
-  return log2 (maxnorm);
-}
-#endif
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
@@ -2968,19 +2937,22 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
   double Iover2 = (double) (si->I >> 1);
   double Jmax = Iover2;
-  double F[MAXDEGREE + 1];
+
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
       cado_poly_side_ptr ps = si->cpoly->pols[side];
       double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
+      double_poly_t F;
+
+      double_poly_init (F, ps->degree);
       for (int k = 0; k <= ps->degree; k++)
         {
           /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
-          F[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
+          F->coeff[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
           powIover2 *= Iover2;
         }
-      v = fpoly_eval (F, ps->degree, Jmax);
+      v = double_poly_eval (F, Jmax);
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
           double a, b, c;
@@ -2989,7 +2961,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = fpoly_eval (F, ps->degree, c);
+              v = double_poly_eval (F, c);
               if (v < maxnorm)
                 a = c;
               else
@@ -2997,7 +2969,9 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
             }
           Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
         }
+      double_poly_clear (F);
     }
+
   return (unsigned int) Jmax;
 }
 

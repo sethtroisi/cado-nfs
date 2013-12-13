@@ -21,11 +21,6 @@
 
 static int verbose = 0;
 
-/* Although the functions in plain_poly are not readily available in the
- * publicized interface of utils.h, it's ok to use them if we explicitly
- * include the corresponding header.
- */
-#include "plain_poly.h"
 
 /********** RATSQRT **********/
 
@@ -651,9 +646,9 @@ FindSuitableModP (poly_t F, mpz_t N)
   int dF = F->deg;
   int ntries = 0;
 
-  plain_poly_t fp;
+  modul_poly_t fp;
 
-  plain_poly_init (fp, dF);
+  modul_poly_init (fp, dF);
   while (1)
     {
     int d;
@@ -662,20 +657,24 @@ FindSuitableModP (poly_t F, mpz_t N)
     ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
-    if (! plain_poly_fits (dF, p) || ntries > 100)
-      {
-        fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
-        plain_poly_clear (fp);
-        getprime (0);
-        exit (1);
-      }
-    d = plain_poly_set_mod (fp, F->coeff, dF, p);
+
+    /* Not needed anymore with modul_poly */
+
+    /* if (! plain_poly_fits (dF, p) || ntries > 100) */
+    /*   { */
+    /*     fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n"); */
+    /*     plain_poly_clear (fp); */
+    /*     getprime (0); */
+    /*     exit (1); */
+    /*   } */
+
+    d = modul_poly_set_mod (fp, F->coeff, dF, &p);
     if (d != dF)
       continue;
-    if (plain_poly_is_irreducible (fp, p))
+    if (modul_poly_is_irreducible (fp, &p))
       break;
     }
-  plain_poly_clear (fp);
+  modul_poly_clear (fp);
   getprime (0);
 
   return p;
@@ -1187,24 +1186,33 @@ int main(int argc, char *argv[])
         }
     }
     const char * tmp;
-    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+    if((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
+        fprintf(stderr, "Parameter -poly is missing\n");
+        usage(pl, me, stderr);
+        exit(1);
+    }
     cado_poly_init(pol);
     ret = cado_poly_read(pol, tmp);
-    ASSERT (ret);
+    if (ret == 0) {
+        fprintf(stderr, "Could not read polynomial file\n");
+        exit(1);
+    }
 
     param_list_parse_int (pl, "dep", &numdep);
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * kername = param_list_lookup_string(pl, "ker");
     const char * prefix = param_list_lookup_string(pl, "prefix");
+    if (prefix == NULL) {
+        fprintf(stderr, "Parameter -prefix is missing\n");
+        exit(1);
+    }
     if (param_list_warn_unused(pl))
         exit(1);
 
     /* if no options then -ab -rat -alg -gcd */
     if (!(opt_ab || opt_rat || opt_alg || opt_gcd))
         opt_ab = opt_rat = opt_alg = opt_gcd = 1;
-
-    ASSERT_ALWAYS(prefix);
 
     /*
      * In the case where the number N to factor has a prime factor that
@@ -1270,9 +1278,18 @@ int main(int argc, char *argv[])
          * together -- should be enough for our purposes, even if we do
          * have more dependencies !
          */
-        ASSERT_ALWAYS(indexname != NULL);
-        ASSERT_ALWAYS(purgedname != NULL);
-        ASSERT_ALWAYS(kername != NULL);
+        if (indexname == NULL) {
+            fprintf(stderr, "Parameter -index is missing\n");
+            exit(1);
+        }
+        if (purgedname == NULL) {
+            fprintf(stderr, "Parameter -purged is missing\n");
+            exit(1);
+        }
+        if (kername == NULL) {
+            fprintf(stderr, "Parameter -ker is missing\n");
+            exit(1);
+        }
         create_dependencies(prefix, indexname, purgedname, kername);
     }
 

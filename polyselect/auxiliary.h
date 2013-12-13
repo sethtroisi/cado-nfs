@@ -62,7 +62,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 extern "C" {
 #endif
 
-double L2_lognorm (mpz_t*, unsigned long, double, int);
+double L2_lognorm (mpz_t*, unsigned int, double, int);
 double L2_skewness (mpz_t*, int, int, int);
 double L2_skewness_old (mpz_t*, int, int, int);
 double L2_skewness_Newton (mpz_t*, int, int, int);

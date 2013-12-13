@@ -51,21 +51,21 @@ double
 MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
 {
   double E = 0, x, y, ti;
-  double *f, *g, alpha_f, alpha_g, xi, yi, vf, vg;
+  double alpha_f, alpha_g, xi, yi, vf, vg;
   double one_over_logBf, one_over_logBg;
+  double_poly_t f, g;
+  unsigned int i;
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);
-  int deg_f = cpoly->alg->degree;
-  int deg_g = 1;
-  f = malloc ((cpoly->alg->degree + 1) * sizeof (double));
-  g = malloc ((deg_g + 1) * sizeof (double));
-  for (int i = 0; i <= deg_f; i++)
-    f[i] = mpz_get_d (cpoly->alg->f[i]);
-  for (int i = 0; i <= deg_g; i++)
-    g[i] = mpz_get_d (cpoly->rat->f[i]);
-  alpha_f = get_alpha (cpoly->alg->f, deg_f, ALPHA_BOUND);
-  alpha_g = get_alpha (cpoly->rat->f, deg_g, ALPHA_BOUND);
+  double_poly_init (f, cpoly->alg->degree);
+  double_poly_init (g, 1);
+  for (i = 0; i <= f->deg; i++)
+    f->coeff[i] = mpz_get_d (cpoly->alg->f[i]);
+  for (i = 0; i <= g->deg; i++)
+    g->coeff[i] = mpz_get_d (cpoly->rat->f[i]);
+  alpha_f = get_alpha (cpoly->alg->f, f->deg, ALPHA_BOUND);
+  alpha_g = get_alpha (cpoly->rat->f, g->deg, ALPHA_BOUND);
   one_over_logBf = 1.0 / log (Bf);
   one_over_logBg = 1.0 / log (Bg);
   for (int i = 0; i < K; i++)
@@ -74,8 +74,8 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
       xi = x * cos (ti);
       yi = y * sin (ti);
 
-      vf = fpoly_eval (f, deg_f, xi / yi) * pow (yi, deg_f);
-      vg = fpoly_eval (g, deg_g, xi / yi) * pow (yi, deg_g);
+      vf = double_poly_eval (f, xi / yi) * pow (yi, f->deg);
+      vg = double_poly_eval (g, xi / yi) * pow (yi, g->deg);
 
       vf = log (fabs (vf)) + alpha_f;
       vg = log (fabs (vg)) + alpha_g;
@@ -85,7 +85,8 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
 
       E += dickman_rho (vf) * dickman_rho (vg);
     }
-  free (f);
-  free (g);
+  double_poly_clear (f);
+  double_poly_clear (g);
+
   return E / (double) K;
 }

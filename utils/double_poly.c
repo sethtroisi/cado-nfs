@@ -6,25 +6,45 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
-#include "fpoly.h"
+#include "macros.h"
+#include "double_poly.h"
 #include "portability.h"
 
-/* Evaluate the poynomial f of degree deg at point x */
+/* Initialize a polynomial of degree d */
+void
+double_poly_init (double_poly_ptr p, unsigned int d)
+{
+  p->coeff = malloc ((d + 1) * sizeof (double));
+  FATAL_ERROR_CHECK(p->coeff == NULL, "malloc failed");
+  p->deg = d;
+}
+
+/* Clear a polynomial */
+void
+double_poly_clear (double_poly_ptr p)
+{
+  free (p->coeff);
+}
+
+/* Evaluate the polynomial p at point x */
 double
-fpoly_eval (const double *f, const unsigned int deg, const double x)
+double_poly_eval (double_poly_srcptr p, const double x)
 {
   double r;
   unsigned int k;
+  const double *f = p->coeff;
+  const unsigned int deg = p->deg;
+
   switch (deg) {
   case 0: return f[0];
-  case 1: return f[0]+x* f[1];
-  case 2: return f[0]+x*(f[1]+x* f[2]);
-  case 3: return f[0]+x*(f[1]+x*(f[2]+x* f[3]));
-  case 4: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x* f[4])));
-  case 5: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x* f[5]))));
-  case 6: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x* f[6])))));
-  case 7: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x* f[7]))))));
-  case 8: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x* f[8])))))));
+  case 1: return f[0]+x*f[1];
+  case 2: return f[0]+x*(f[1]+x*f[2]);
+  case 3: return f[0]+x*(f[1]+x*(f[2]+x*f[3]));
+  case 4: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*f[4])));
+  case 5: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*f[5]))));
+  case 6: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*f[6])))));
+  case 7: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*f[7]))))));
+  case 8: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*f[8])))))));
   case 9: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*(f[8]+x*f[9]))))))));
   default: for (r = f[deg], k = deg - 1; k != UINT_MAX; r = r * x + f[k--]); return r;
   }
@@ -35,15 +55,15 @@ fpoly_eval (const double *f, const unsigned int deg, const double x)
    Assumes sa is of same sign as g(a).
 */
 double
-fpoly_dichotomy (const double *g, const unsigned int d, double a, double b, double sa,
-                 unsigned int n)
+double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
+                       unsigned int n)
 {
   double s;
 
   do
     {
       s = (a + b) * 0.5;
-      if (fpoly_eval (g, d, s) * sa > 0)
+      if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
@@ -55,9 +75,11 @@ fpoly_dichotomy (const double *g, const unsigned int d, double a, double b, doub
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
-fpoly_print (FILE *stream, const double *f, const unsigned int deg, char *name)
+double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
 {
   int i;
+  const double *f = p->coeff;
+  const unsigned int deg = p->deg;
 
   fprintf (stream, "%s", name);
 
@@ -84,4 +106,3 @@ fpoly_print (FILE *stream, const double *f, const unsigned int deg, char *name)
 
   fprintf (stream, "\n");
 }
-

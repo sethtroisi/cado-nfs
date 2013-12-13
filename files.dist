@@ -830,8 +830,8 @@ utils/fakempi.h
 utils/fakepthread.h
 utils/fix-endianness.c
 utils/fix-endianness.h
-utils/fpoly.c
-utils/fpoly.h
+utils/double_poly.c
+utils/double_poly.h
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
