@@ -29,7 +29,7 @@
 #include "mpz_array.h"
 #include "gzip.h"
 #include "misc.h"
-#include "poly.h"
+#include "mpz_poly.h"
 #include "crc.h"
 #include "usp.h"
 #include "purgedfile.h"

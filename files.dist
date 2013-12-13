@@ -876,8 +876,8 @@ utils/implicit_mpz_poly.c
 utils/implicit_mpz_poly.h
 utils/params.c
 utils/params.h
-utils/poly.c
-utils/poly.h
+utils/mpz_poly.c
+utils/mpz_poly.h
 utils/purgedfile.c
 utils/purgedfile.h
 utils/random_integer.c

@@ -13,7 +13,7 @@
  */
 void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
-    // lazy: use the poly_t interface of utils/poly.h 
+    // lazy: use the poly_t interface of utils/mpz_poly.h 
     poly_t aXpb, aXpbi, G, Aux;
     poly_alloc(aXpb, 1);  // alloc sets to zero
     poly_alloc(aXpbi, d);  

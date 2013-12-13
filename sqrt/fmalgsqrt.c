@@ -4,7 +4,6 @@
 #include <gmp.h>
 #include "utils.h"
 #include "portability.h"
-//#include "poly.h"
 
 #error "dead code"
 
