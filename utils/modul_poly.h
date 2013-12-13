@@ -39,6 +39,11 @@ int modul_poly_set_mod_raw (modul_poly_t, mpz_t*, int, modulusul_t);
 void modul_poly_eval (residueul_t, modul_poly_t, residueul_t, modulusul_t);
 void modul_poly_clear (modul_poly_t);
 
+/* used in sqrt/algsqrt.c and sqrt/sqrt.c */
+int modul_poly_set_mod (modul_poly_t, mpz_t *, int, modulusul_t);
+int modul_poly_is_irreducible(modul_poly_t, modulusul_t);
+
+
 #ifdef __cplusplus
 }
 #endif
