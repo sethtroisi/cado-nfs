@@ -17,7 +17,7 @@
 
 #include "fpoly.h"
 // #include "plain_poly.h"
-// #include "modul_poly.h"
+#include "modul_poly.h"
 #include "getprime.h"
 #include "timing.h"
 #include "relation.h"
