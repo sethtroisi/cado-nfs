@@ -23,7 +23,7 @@ typedef struct {
   long lattice_alloc;
   long L;
   long U0,U1,V0,V1;  
-  poly_t f,g,fdg_gdf,gmodp;
+  mpz_poly_t f,g,fdg_gdf,gmodp;
   int m_max;
   int maxpow;
   mpz_t * ppow;

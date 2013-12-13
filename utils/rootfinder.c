@@ -6,7 +6,7 @@
 
 #include "macros.h"
 #include "rootfinder.h"
-#include "poly.h"
+#include "mpz_poly.h"
 #include "modul_poly.h"
 
 /* put in r[0], ..., r[n-1] the roots of f (of degree d) modulo p,
@@ -101,7 +101,7 @@ int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p)
         return n;
     } else {
       int n;
-      n = poly_roots_mpz (r, f, d, p);
+      n = mpz_poly_roots_mpz (r, f, d, p);
       return n;
     }
 }

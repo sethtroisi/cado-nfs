@@ -485,7 +485,14 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid_match:
             return self.send_error(400, "No or malformed client id specified")
         clientid = clientid_match.group(1)
-        
+
+        if not self.serving_wus[0]:
+            try:
+                return self.send_error(410, "Distributed computation finished")
+            except socket_error as e:
+                self.log_error("Connection error: %s", str(e))
+                return
+
         if self.db_pool:
             wu_text = self.db_pool.assign(clientid)
         else:
@@ -587,6 +594,7 @@ class ServerLauncher(object):
         self.cafile = cafile
         self.only_registered = only_registered
         upload_scriptname = "upload.py"
+        self.serving_wus = [True]
         # formatter = logging.Formatter(
         #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
@@ -609,7 +617,8 @@ class ServerLauncher(object):
             "uploaddir": uploaddir,
             "cgi_directories" : ['/cgi-bin'],
             "upload_path": upload_url_path,
-            "only_registered": only_registered
+            "only_registered": only_registered,
+            "serving_wus": self.serving_wus
         }
         MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
         
@@ -744,6 +753,10 @@ class ServerLauncher(object):
             self.thread.start()
         else:
             self.httpd.serve_forever()
+    
+    def stop_serving_wus(self):
+        self.logger.info("Got notification to stop serving Workunits")
+        self.serving_wus[0] = False
     
     def shutdown(self):
         self.logger.info("Shutting down HTTP server")

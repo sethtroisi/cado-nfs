@@ -2,8 +2,8 @@
 #define FILTER_SM_H_
 
 typedef struct {
-  poly_t num;
-  poly_t denom;
+  mpz_poly_t num;
+  mpz_poly_t denom;
 } sm_relset_struct_t;
 
 typedef sm_relset_struct_t sm_relset_t[1];
@@ -11,15 +11,16 @@ typedef sm_relset_struct_t * sm_relset_ptr;
 typedef const sm_relset_struct_t * sm_relset_srcptr;
 
 
-void poly_power_mod_f_mod_mpz_Barrett (poly_t, const poly_t, const poly_t,
+void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t, const mpz_poly_t, const mpz_poly_t,
                                        const mpz_t, const mpz_t, const mpz_t);
-void poly_alloc_and_set_from_ab (poly_ptr, int64_t, uint64_t);
-void poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr, const poly_t, const mpz_t,
-                                     mpz_t, poly_t, poly_t, poly_t);
-void compute_sm (poly_t, poly_t, const poly_t, const mpz_t, const mpz_t,
+void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
+void mpz_poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr, const mpz_poly_t, const mpz_t,
+                                     mpz_t, mpz_poly_t, mpz_poly_t, mpz_poly_t);
+void compute_sm (mpz_poly_t, mpz_poly_t, const mpz_poly_t, const mpz_t, const mpz_t,
                  const mpz_t, const mpz_t);
-void print_sm (FILE *, poly_t, int);
-void sm_single_rel(poly_t, int64_t, uint64_t, poly_t, const mpz_t, const mpz_t,
+void print_sm (FILE *, mpz_poly_t, int);
+void sm_single_rel(mpz_poly_t, int64_t, uint64_t, mpz_poly_t, const mpz_t, const mpz_t,
                    const mpz_t, const mpz_t);
-void poly_t_from_cado_poly_alg (poly_t, cado_poly);
+void mpz_poly_t_from_cado_poly_alg (mpz_poly_t, cado_poly);
+
 #endif /* FILTER_SM_H_ */

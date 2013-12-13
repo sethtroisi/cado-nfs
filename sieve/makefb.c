@@ -13,35 +13,35 @@
  */
 void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
-    // lazy: use the poly_t interface of utils/poly.h 
-    poly_t aXpb, aXpbi, G, Aux;
-    poly_alloc(aXpb, 1);  // alloc sets to zero
-    poly_alloc(aXpbi, d);  
-    poly_alloc(G, d);
-    poly_alloc(Aux, d);
+    // lazy: use the mpz_poly_t interface of utils/mpz_poly.h 
+    mpz_poly_t aXpb, aXpbi, G, Aux;
+    mpz_poly_init(aXpb, 1);  // alloc sets to zero
+    mpz_poly_init(aXpbi, d);  
+    mpz_poly_init(G, d);
+    mpz_poly_init(Aux, d);
     { 
         mpz_t aux;
         mpz_init(aux);
         mpz_set_si(aux, a);
-        poly_setcoeff(aXpb, 1, aux);
+        mpz_poly_setcoeff(aXpb, 1, aux);
         mpz_set_si(aux, b);
-        poly_setcoeff(aXpb, 0, aux);
+        mpz_poly_setcoeff(aXpb, 0, aux);
         mpz_clear(aux);
     }
-    poly_copy(aXpbi, aXpb);
-    poly_setcoeff(G, 0, f[0]);
+    mpz_poly_copy(aXpbi, aXpb);
+    mpz_poly_setcoeff(G, 0, f[0]);
     for (int i = 1; i <= d; ++i) {
-        poly_mul_mpz(Aux, aXpbi, f[i]);
-        poly_add(G, G, Aux);
+        mpz_poly_mul_mpz(Aux, aXpbi, f[i]);
+        mpz_poly_add(G, G, Aux);
         if (i < d)
-            poly_mul(aXpbi, aXpbi, aXpb);
+            mpz_poly_mul(aXpbi, aXpbi, aXpb);
     }
     for (int i = 0; i <= d; ++i)
-        poly_getcoeff(g[i], i, G);
-    poly_free(aXpb);
-    poly_free(aXpbi);
-    poly_free(G);
-    poly_free(Aux);
+        mpz_poly_getcoeff(g[i], i, G);
+    mpz_poly_free(aXpb);
+    mpz_poly_free(aXpbi);
+    mpz_poly_free(G);
+    mpz_poly_free(Aux);
 }
 
 int mpz_p_val(mpz_t z, unsigned long p) {

@@ -15,7 +15,7 @@
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
-#include "mpz_poly.h"
+#include "implicit_mpz_poly.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -547,15 +547,15 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
  * the todo list is pruned */
 void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
 {
-    poly_t f;
-    poly_alloc(f, si->cpoly->pols[(*todo)->side]->degree);
-    poly_set(f,  si->cpoly->pols[(*todo)->side]->f, si->cpoly->pols[(*todo)->side]->degree);
+    mpz_poly_t f;
+    mpz_poly_init(f, si->cpoly->pols[(*todo)->side]->degree);
+    mpz_poly_set(f,  si->cpoly->pols[(*todo)->side]->f, si->cpoly->pols[(*todo)->side]->degree);
     mpz_t x;
     mpz_init(x);
-    poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
+    mpz_poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
     ASSERT_ALWAYS(mpz_cmp_ui(x, 0) == 0);
     mpz_clear(x);
-    poly_free(f);
+    mpz_poly_free(f);
     mpz_clear(si->doing->p);
     mpz_clear(si->doing->r);
     memcpy(si->doing, *todo, sizeof(las_todo));
