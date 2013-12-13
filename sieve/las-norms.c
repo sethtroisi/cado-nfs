@@ -2648,11 +2648,11 @@ static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
   unsigned int k, l, sign_change, new_sign_change;
-  double_poly_ptr *dg;    /* derivatives of g */
+  double_poly_t *dg;    /* derivatives of g */
   double a, va, b, vb;
   double *roots, gmax;
 
-  dg = (double_poly_ptr*) malloc (d * sizeof (double_poly_ptr));
+  dg = (double_poly_t*) malloc (d * sizeof (double_poly_t));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
   /* make dg[0] point directly to g, to avoid copy */
   dg[0]->coeff = g;
