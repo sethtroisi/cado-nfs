@@ -608,6 +608,10 @@ class WorkunitParseError(ValueError):
     """ Parsing the workunit failed """
     pass
 
+class WorkunitClientToFinish(Exception):
+    """ we received a 410 (probably while attempting to download a WU) """
+    pass
+
 class WorkunitClient(object):
     def __init__(self, settings):
         self.settings = settings
@@ -694,6 +698,15 @@ class WorkunitClient(object):
         while conn is None:
             try:
                 conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
+            except urllib_error.HTTPError as error:
+                if error.code == 410:
+                    # We interpret error code 410 as the work unit server
+                    # being gone for good. This instructs us to terminate
+                    # the workunit client, which we do by letting an
+                    # exception pop up a few levels up (eeek)
+                    raise WorkunitClientToFinish()
+                conn = None
+                errorstr = "URL error: %s" % str(error)
             except urllib_error.URLError as error:
                 conn = None
                 errorstr = "URL error: %s" % str(error)
@@ -857,11 +870,8 @@ class WorkunitClient(object):
         # workunit do not agree
         last_filesum = None
         while True:
-            try:
-                self.get_file(urlpath, filename, options)
-            except urllib_error.HTTPError as error:
-                logging.error (str(error))
-                return False
+            # we were catching HTTPError here previously. Useless now ?
+            self.get_file(urlpath, filename, options)
             if checksum is None:
                 return True
             filesum = self.do_checksum(filename)
@@ -1302,6 +1312,9 @@ if __name__ == '__main__':
                     logging.critical("Had %d bad workunit files. Aborting.", bad_wu_counter)
                     break
                 continue
+            except WorkunitClientToFinish:
+                logging.info("Client received termination message from server. Bye.")
+                break
             client_ok = client.process()
         except Exception:
             logging.exception("Exception occurred")
