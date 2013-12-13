@@ -2920,6 +2920,9 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
     def shutdown(self):
         self.server.shutdown()        
 
+    def stop_serving_wus(self):
+        self.server.stop_serving_wus()
+
     def get_url(self):
         return self.server.get_url()
 
@@ -3310,7 +3313,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
-            Request.GET_WU_RESULT: self.db_listener.send_result,
+            Request.GET_WU_RESULT: self.db_listener.send_result
         }
 
     def run(self):
@@ -3419,6 +3422,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 raise Exception("Got WANT_MORE_RELATIONS from unknown sender")
         elif key is Notification.HAVE_ENOUGH_RELATIONS:
             if sender is self.purge:
+                self.servertask.stop_serving_wus()
                 self.sieving.cancel_available_wus()
                 self.stop_all_clients()
             else:
