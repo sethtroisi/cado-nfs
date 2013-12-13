@@ -720,7 +720,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # Sub-classes need to define a property 'paramnames' which returns a
         # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
-        return ("name", "workdir")
+        return ("name", "workdir", "run")
     @property
     def param_nodename(self):
         return self.name
@@ -754,6 +754,10 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
         self.init_stats()
+        # Request mediator to run this task, unless "run" parameter is set
+        # to false
+        if self.params.get("run", True):
+            self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
@@ -2589,6 +2593,9 @@ class LinAlgTask(Task, HasStatistics):
             workdir = self.workdir.make_dirname()
             workdir.mkdir(parent=True)
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+            if mergedfile is None:
+                self.logger.critical("No merged file received.")
+                return False
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
             matrix = mergedfile.realpath()
             wdir = workdir.realpath()
@@ -3204,6 +3211,10 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
 
+        # Start with an empty list of tasks that want to run. Tasks will add
+        # themselves during __init__().
+        self.tasks_that_want_to_run = list()
+
         # Init client lists
         self.clients = []
         whitelist = set()
@@ -3276,10 +3287,6 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
-        
-        # Assume that all tasks want to run. If they are finished already,
-        # they will just return immediately
-        self.tasks_that_want_to_run = list(self.tasks)
         
         self.request_map = {
             Request.GET_POLYNOMIAL: self.polysel.get_poly,
