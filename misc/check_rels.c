@@ -25,7 +25,9 @@
 #include "filter_utils.h"
 
 static index_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
+static index_t nrels_toolarge;
 cado_poly cpoly;
+unsigned long lpb[2] = {0, 0};
 int verbose = 0;
 int abhexa = 0;
 int check_primality = 0; /* By default no primality check */
@@ -97,16 +99,15 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
 /* return 0 if everything is ok (factorization, primality, and complete)
  * return -1 if a ideal does not divide the norm (primality and completeness
  * are not checked)
- * return r > 0 if all ideals divides the norm but:
- *   r = 1: a ideal was not prime and the factorization was complete
- *   r = 2: all ideals were primes and the factorization of a norm was not
- *          complete
- *   r = 3: a ideal was not prime and the factorizations of a norm was not
-            complete
+ * return r = r2*2^2 + r1*2 + r0 > 0 if all ideals divides the norm but:
+ *   r0 = 1 means that an ideal was not prime
+ *   r1 = 1 means that the factorization of a norm was not complete
+ *   r2 = 1 means that an ideal was larger that a lpb
  * If check_primality = 0, primality checks are not done and all ideals are
- * supposed prime.
+ * supposed prime (so r0 is always 0).
  * If complete_rels != 0, at the end, if r > 0, the relation is correct
- * (it is completed and all non-prime are factored if check_primality != 0)
+ * (it is completed, all ideals are below the lpbs and all non-prime are
+ * factored if check_primality != 0)
  */
 int
 process_one_relation (earlyparsed_relation_ptr rel)
@@ -114,7 +115,9 @@ process_one_relation (earlyparsed_relation_ptr rel)
   mpz_t norm[2];
   mpz_init (norm[0]);
   mpz_init (norm[1]);
-  unsigned int fac_error = 0, need_completion = 0, nonprime = 0;
+  unsigned int fac_error = 0, need_completion = 0, nonprime = 0, toolarge = 0;
+  /* If we complete relations, do not print error msg but warning. */
+  int err = (complete_rels) ? 0 : 1;
 
   /* compute the norm on alg and rat sides */
   for(unsigned int side = 0 ; side < 2 ; side++)
@@ -166,10 +169,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
       {
         if (verbose != 0)
         {
-          if (complete_rels)
-            print_error_line (rel->num, rel->a, rel->b, 0, nonprime);
-          else
-            print_error_line (rel->num, rel->a, rel->b, 1, nonprime);
+          print_error_line (rel->num, rel->a, rel->b, err, nonprime);
           fprintf (stderr, "    given factor %" PRpr " is not prime on side "
                            "%u\n", p, rel->primes[i].h);
         }
@@ -179,7 +179,6 @@ process_one_relation (earlyparsed_relation_ptr rel)
       }
     }
   }
-
 
   /* complete relation if it is asked and necessary */
   if (complete_rels)
@@ -200,8 +199,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
           rel_add_prime (rel, side, p, e);
           if (verbose != 0)
           {
-            print_error_line (rel->num, rel->a, rel->b, 0,
-                                                  need_completion | nonprime);
+            print_error_line (rel->num, rel->a, rel->b, err,
+                                                   need_completion | nonprime);
             gmp_fprintf (stderr, "    factorization of the norm on side %u is "
                                  "not complete, need to add %" PRpr "^%u\n",
                                  side, p, e);
@@ -221,7 +220,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
       {
         if (verbose != 0)
         {
-          print_error_line (rel->num, rel->a, rel->b, 1,
+          print_error_line (rel->num, rel->a, rel->b, err,
                                                  need_completion | nonprime);
           gmp_fprintf (stderr, "    factorization of the norm on side %u is not "
                                "complete (%Zu is missing)\n", side, norm[side]);
@@ -231,9 +230,31 @@ process_one_relation (earlyparsed_relation_ptr rel)
     }
   }
 
+  /* check that ideals appearing in the relations are below the lpb */
+  if (lpb[0] != 0 || lpb[1] != 0)
+  {
+    for(weight_t i = 0; i < rel->nb ; i++)
+    {
+      p_r_values_t p = rel->primes[i].p;
+      unsigned int side = rel->primes[i].h;
+      if (lpb[side] != 0 && p > lpb[side])
+      {
+        if (verbose != 0)
+        {
+          print_error_line (rel->num, rel->a, rel->b, err,
+                            nonprime | need_completion | toolarge);
+          fprintf (stderr, "    given factor %" PRpr " is greater than lpb "
+                           "(=%lu) on side %u\n", p, lpb[side], side);
+        }
+        toolarge = 1;
+      }
+    }
+  }
+
+
   mpz_clear(norm[0]);
   mpz_clear(norm[1]);
-  return nonprime + 2*need_completion;
+  return nonprime + 2*need_completion + 4*toolarge;
 }
 
 static inline void
@@ -292,9 +313,15 @@ thread_callback (void * context_data, earlyparsed_relation_ptr rel)
 
   if (complete_rels)
   {
-    /* if complete_rels != 0, the only case where a rel is wrong is ret = -1 */
+    /* if complete_rels != 0, the only two cases where a rel is wrong are
+       when ret=-1 or ret >= 4 */
     if (ret == -1)
       nrels_err++;
+    else if (ret >= 4)
+    {
+      nrels_err++;
+      nrels_toolarge++;
+    }
     else
     {
       nrels_ok++;
@@ -314,10 +341,17 @@ thread_callback (void * context_data, earlyparsed_relation_ptr rel)
     else
     {
       nrels_err++;
-      if (ret > 0 && ret % 2) // rel contain a non prime ideal
-        nrels_noprime++;
-      if (ret >= 2) // factorization of a norm of rel is no complete
-        nrels_completed++;
+      if (ret > 0)
+      {
+        if (ret % 2) // rel contain a non prime ideal
+          nrels_noprime++;
+        ret /= 2;
+        if (ret % 2) // factorization of a norm of rel is no complete
+          nrels_completed++;
+        ret /= 2;
+        if (ret % 2) // an ideal was larger than a lpb
+          nrels_toolarge++;
+      }
     }
   }
 
@@ -338,6 +372,10 @@ usage(const char *argv0)
                                              "(by default no checking)\n");
     fprintf (stderr, "    -complete <file> - write rels in file. If possible "
                                              "incorrect rels are corrected\n");
+    fprintf (stderr, "    -lpb0 <l>        - chech that ideals on side 0 are "
+                                             "below 2^l\n");
+    fprintf (stderr, "    -lpb1 <l>        - chech that ideals on side 1 are "
+                                             "below 2^l\n");
     fprintf (stderr, "    -v               - more verbose output\n");
     exit (1);
 }
@@ -372,6 +410,11 @@ main (int argc, char * argv[])
     /* print command-line arguments */
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
+
+    param_list_parse_ulong(pl, "lpb0", &lpb[0]);
+    param_list_parse_ulong(pl, "lpb1", &lpb[1]);
+    lpb[0] = (lpb[0] == 0) ? 0 : 1UL << lpb[0];
+    lpb[1] = (lpb[1] == 0) ? 0 : 1UL << lpb[1];
 
     const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char *outfilename = param_list_lookup_string(pl, "complete");
@@ -411,6 +454,7 @@ main (int argc, char * argv[])
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
 
     nrels_read = nrels_err = nrels_ok = nrels_completed = nrels_noprime = 0;
+    nrels_toolarge = 0;
     if (complete_rels)
     {
       outfile = fopen_maybe_compressed (outfilename, "w");
@@ -432,6 +476,8 @@ main (int argc, char * argv[])
     if (complete_rels)
     {
       printf("Number of deleted relations: %" PRid "\n", nrels_err);
+      printf("    among which %" PRid " contained an ideal larger than a lpb\n",
+             nrels_toolarge);
       printf("Number of keeped relations: %" PRid "\n", nrels_ok);
       printf("    among which %" PRid " were completed\n"
              "            and %" PRid " contained at least one "
@@ -442,8 +488,10 @@ main (int argc, char * argv[])
       printf("Number of correct relations: %" PRid "\n", nrels_ok);
       printf("Number of wrong relations: %" PRid "\n", nrels_err);
       printf("    among which %" PRid " were not complete\n"
-             "            and %" PRid " contain at least one "
-             "non-primes ideal\n", nrels_completed, nrels_noprime);
+             "            and %" PRid " contained an ideal larger than a lpb\n"
+             "            and %" PRid " contained at least one "
+             "non-primes ideal\n", nrels_completed, nrels_toolarge,
+             nrels_noprime);
     }
 
     if (filelist)

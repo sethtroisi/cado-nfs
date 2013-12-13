@@ -392,6 +392,63 @@ class WuMIMEMultipart(MIMEMultipart):
         return postdata
 
 
+class SharedFile(object):
+    def __init__(filename, mode=0o777):
+        # Try to create and open the file exclusively
+        self.filename = filename
+        flags = os.O_CREAT | os.O_RDWR | os.O_EXCL
+        try:
+            self.fd = os.open(filename, flags, mode)
+        except OSError as err:
+            if err.errno == errno.EEXIST: # If the file already existed
+                self.existed = True
+                self.wait_until_positive_filesize(filename)
+                self.file = open(filename, "r+b")
+                self.fd = self.file.fileno()
+                fcntl.flock(self.fd, fcntl.LOCK_SH)
+                return
+            else:
+                raise
+        self.existed = False
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        self.file = os.fdopen(fd, "r+b")
+
+    def close():
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        self.file.close() # This should also close the fd
+
+    def delete():
+        if self.existed:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            os.remove(self.filename)
+        except OSError as err:
+            if err.errno == errno.ENOENT:
+                pass
+            else:
+                raise
+        self.close()
+
+    def wait_until_positive_filesize(self, timeout = 60):
+        # There is a possible race condition here. If process A creates 
+        # the file, then process B tries and finds that the file exists
+        # and immediately get a shared lock for reading, then process A 
+        # can never get an exclusive lock for writing.
+        # To avoid this, we let process B wait until the file has 
+        # positive size, which implies that process A must have the 
+        # lock already. After 60 seconds, assume the file really has 0 
+        # bytes and return
+        slept = 0
+        while slept < timeout and os.path.getsize(self.filename) == 0:
+            logging.warning("Sleeping until %s contains data", self.filename)
+            time.sleep(1)
+            slept += 1
+        if slept == timeout:
+            logging.warning("Slept %d seconds, %s still has no data", 
+                            timeout, self.filename)
+        return
+
 class FileLockedException(IOError):
     """ Locking a file for exclusive access failed """
     pass

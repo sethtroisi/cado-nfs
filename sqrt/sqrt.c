@@ -1186,24 +1186,33 @@ int main(int argc, char *argv[])
         }
     }
     const char * tmp;
-    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+    if((tmp = param_list_lookup_string(pl, "poly")) == NULL) {
+        fprintf(stderr, "Parameter -poly is missing\n");
+        usage(pl, me, stderr);
+        exit(1);
+    }
     cado_poly_init(pol);
     ret = cado_poly_read(pol, tmp);
-    ASSERT (ret);
+    if (ret == 0) {
+        fprintf(stderr, "Could not read polynomial file\n");
+        exit(1);
+    }
 
     param_list_parse_int (pl, "dep", &numdep);
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * kername = param_list_lookup_string(pl, "ker");
     const char * prefix = param_list_lookup_string(pl, "prefix");
+    if (prefix == NULL) {
+        fprintf(stderr, "Parameter -prefix is missing\n");
+        exit(1);
+    }
     if (param_list_warn_unused(pl))
         exit(1);
 
     /* if no options then -ab -rat -alg -gcd */
     if (!(opt_ab || opt_rat || opt_alg || opt_gcd))
         opt_ab = opt_rat = opt_alg = opt_gcd = 1;
-
-    ASSERT_ALWAYS(prefix);
 
     /*
      * In the case where the number N to factor has a prime factor that
@@ -1269,9 +1278,18 @@ int main(int argc, char *argv[])
          * together -- should be enough for our purposes, even if we do
          * have more dependencies !
          */
-        ASSERT_ALWAYS(indexname != NULL);
-        ASSERT_ALWAYS(purgedname != NULL);
-        ASSERT_ALWAYS(kername != NULL);
+        if (indexname == NULL) {
+            fprintf(stderr, "Parameter -index is missing\n");
+            exit(1);
+        }
+        if (purgedname == NULL) {
+            fprintf(stderr, "Parameter -purged is missing\n");
+            exit(1);
+        }
+        if (kername == NULL) {
+            fprintf(stderr, "Parameter -ker is missing\n");
+            exit(1);
+        }
         create_dependencies(prefix, indexname, purgedname, kername);
     }
 
