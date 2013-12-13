@@ -572,7 +572,7 @@ search_survivors_in_line5(unsigned char * const SS[2],
     ASSERT(nr_div <= 5);
 
 #ifdef HAVE_SSE2
-    for (int i = 1; i < nr_patterns; i++) {
+    for (int i = 0; i < nr_patterns; i++) {
         patterns[0][i] = _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
         patterns[1][i] = _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
     }
