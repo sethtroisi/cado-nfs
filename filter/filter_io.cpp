@@ -410,7 +410,7 @@ void realloc_buffer_primes(earlyparsed_relation_ptr buf)
         }
     }
 #if DEBUG >= 2
-    fprintf(stderr, "realloc_buffer_primes: num=%" PRid " nb_alloc=%u\n",
+    fprintf(stderr, "realloc_buffer_primes: num=%" PRIu64 " nb_alloc=%u\n",
 	    buf->num, buf->nb_alloc);
 #endif
 }
@@ -554,8 +554,8 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
             rel->primes[n-1].e++;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            // rel->primes[n++] = (prime_t) { .h = (uint32_t) side,.p = (p_r_values_t) pr,.e = 1};
-            rel->primes[n].h = (uint32_t) side;
+            // rel->primes[n++] = (prime_t) { .h = (index_t) side,.p = (p_r_values_t) pr,.e = 1};
+            rel->primes[n].h = (index_t) side;
             rel->primes[n].p = (p_r_values_t) pr;
             rel->primes[n].e = 1;
             n++;
@@ -584,49 +584,6 @@ static inline int earlyparser_abp_withbase(earlyparsed_relation_ptr rel, ringbuf
 
     return 1;
 }
-
-#if 0
-/* sh*t, is this used or not ??? */
-static int
-earlyparser_abh(earlyparsed_relation_ptr rel, ringbuf_ptr r)
-{
-    const char * p = r->rhead;
-    int c = earlyparser_inner_read_ab_hexa(r, &p, rel);
-
-    unsigned int n = 0;
-
-    uint64_t last_prime = -1;
-    // int sorted = 1;
-    int side = -1;
-
-    for( ; ; ) {
-        uint64_t pr;
-        if (c == '\n') break;
-        else if (c == ':') { last_prime = -1; side++; }
-        else ASSERT_ALWAYS(c==',');
-        c = earlyparser_inner_read_prime(r, &p, &pr);
-        ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
-        // sorted = sorted && pr < last_prime;
-        /* FIXME: .h = pr ??? */
-        if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
-        } else {
-            if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            // rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
-            rel->primes[n].h = (index_t) pr;
-            rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
-            n++;
-        }
-        last_prime = pr;
-    }
-    // if (!sorted) { /* sort the primes ? */ }
-    rel->nb = n;
-
-    return 1;
-}
-#endif
-
 
 static int
 earlyparser_ab(earlyparsed_relation_ptr rel, ringbuf_ptr r)
@@ -669,10 +626,7 @@ earlyparser_line(earlyparsed_relation_ptr rel, ringbuf_ptr r)
     return 1;
 }
 
-/* XXX this abline uses earlyparser_inner_read_ab_hexa, thus the one
- * which reads a,b in hexadecimal format ; it is not clear whether dup1
- * wants a,b in decimal or hex...
- */
+/* e.g. for dup1 for FFS with -abhexa command-line flag */
 static int
 earlyparser_abline_hexa(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
@@ -681,6 +635,7 @@ earlyparser_abline_hexa(earlyparsed_relation_ptr rel, ringbuf_ptr r)
     return earlyparser_line(rel, r);
 }
 
+/* e.g. for dup1 */
 static int
 earlyparser_abline_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
@@ -690,16 +645,12 @@ earlyparser_abline_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 }
 
 
-/* Note: contrary to what used to be done in previous versions, we do not
- * count here the number of relations above min_index. This count has to
- * be done by the callback function down the line.
- *
- * for this routine, the sorting of the primes is not considered, and at
+/* Note: for these routine, the sorting of the primes is not considered, and at
  * least for the 1st pass of purge, so far we've been using this code on
  * unsorted relations.
  */
 static int
-earlyparser_hmin(earlyparsed_relation_ptr rel, ringbuf_ptr r)
+earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
     const char *p = r->rhead;
 
@@ -719,7 +670,6 @@ earlyparser_hmin(earlyparsed_relation_ptr rel, ringbuf_ptr r)
         c = earlyparser_inner_read_prime(r, &p, &pr);
         // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
         // sorted = sorted && pr < last_prime;
-        /* FIXME: .h = pr ??? */
         if (n && pr == rel->primes[n-1].h) {
             rel->primes[n-1].e++;
         } else {
@@ -733,6 +683,35 @@ earlyparser_hmin(earlyparsed_relation_ptr rel, ringbuf_ptr r)
         // last_prime = pr;
     }
     // if (!sorted) { /* sort the primes ? */ }
+    rel->nb = n;
+
+    return 1;
+}
+
+static int
+earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
+{
+    const char *p = r->rhead;
+
+    /* c is always the first-after-parsed-data byte */
+    int c = earlyparser_inner_read_ab_hexa(r, &p, rel);
+    
+    unsigned int n = 0;
+
+    for( ; ; ) {
+        uint64_t pr;
+        if (c == '\n') break;
+        c = earlyparser_inner_read_prime(r, &p, &pr);
+        if (n && pr == rel->primes[n-1].h) {
+            rel->primes[n-1].e++;
+        } else {
+            if (rel->nb_alloc == n) realloc_buffer_primes(rel);
+            rel->primes[n].h = (index_t) pr;
+            rel->primes[n].p = 0;
+            rel->primes[n].e = 1;
+            n++;
+        }
+    }
     rel->nb = n;
 
     return 1;
@@ -890,27 +869,25 @@ uint64_t filter_rels2_inner(char ** input_files,
         /* dup2/pass2 decides between the two settings here by
          * differenciation of the binaries (dup2-ffs versus dup2)
          */
-        case _(AB_DECIMAL)|_(PRIMES)|_(NB):
-        case _(AB_DECIMAL)|_(PRIMES):   /* anyway we do read nb */
+        case _(AB_DECIMAL)|_(PRIMES):
             /* dup2/pass2 */
             earlyparser = earlyparser_abp_decimal;
             break;
-        case _(AB_HEXA)|_(PRIMES)|_(NB):
-        case _(AB_HEXA)|_(PRIMES):      /* anyway we do read nb */
+        case _(AB_HEXA)|_(PRIMES):
             /* dup2/pass2 */
             earlyparser = earlyparser_abp_hexa;
             break;
 
-        case _(PRIMES)|_(NB):
-            /* purge/1 and merge */
-            earlyparser = earlyparser_hmin;
+        case _(INDEX):
+            /* all binary after dup2 which did not need a,b*/
+            earlyparser = earlyparser_index;
             break;
-        case _(LINE)|_(NB):
+        case _(INDEX) | _(AB_HEXA):
+            /* e.g. reconstructlog */
+            earlyparser = earlyparser_abindex_hexa;
+            break;
+        case _(LINE):
             /* e.g. for purge/2 */
-            /* FIXME: what happens here ? relation_get_fast_line does not
-             * seem to parse a,b, it's quite odd. The nb count returned
-             * thus seems to _also_ count a and b as entries within the
-             * matrix. This must be examined. */
             earlyparser = earlyparser_line;
             break;
         default:
@@ -936,7 +913,7 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* {{{ complement the inflight rels allocation depending on our
      * parsing needs */
 #define _(X) EARLYPARSE_NEED_ ## X      /* convenience */
-    if (earlyparse_needed_data & _(PRIMES)) {
+    if (earlyparse_needed_data & (_(PRIMES) | _(INDEX))) {
         for (int i = 0 ; i < SIZE_BUF_REL; i++) {
             inflight->rels[i]->primes = inflight->rels[i]->primes_data;
             inflight->rels[i]->nb_alloc = NB_PRIMES_OPT;

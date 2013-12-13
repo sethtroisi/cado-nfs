@@ -814,7 +814,7 @@ int main(int argc, char **argv)
     pd->info.nrels = filter_rels(
             input_files,
             (filter_rels_callback_t) &insert_rel_into_table, pd,
-            EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB,
+            EARLYPARSE_NEED_INDEX,
             NULL, NULL);
 
     if (pd->info.nrels != nrels) {
@@ -904,7 +904,7 @@ int main(int argc, char **argv)
     filter_rels(
             input_files,
             (filter_rels_callback_t) &thread_print, pd,
-            EARLYPARSE_NEED_LINE | EARLYPARSE_NEED_NB,
+            EARLYPARSE_NEED_LINE,
             NULL, NULL);
 
     /* write final values to stdout */

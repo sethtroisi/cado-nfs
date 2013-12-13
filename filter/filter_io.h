@@ -18,8 +18,10 @@
 #define EARLYPARSE_NEED_AB_DECIMAL              1
 #define EARLYPARSE_NEED_AB_HEXA                 2
 #define EARLYPARSE_NEED_LINE                    4
+/* for reading ideals (e.g. output of las) */
 #define EARLYPARSE_NEED_PRIMES                  8
-#define EARLYPARSE_NEED_NB                     16
+/* for reading index (i.e. renumber ideal) */
+#define EARLYPARSE_NEED_INDEX                  16
 
 /* This field does not contain a proper relation, but only something
  * which has undergone quite limited parsing within a thread whose job is

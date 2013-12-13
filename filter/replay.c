@@ -497,7 +497,7 @@ read_purgedfile (typerow_t **mat, const char* filename, uint64_t nrows,
     char *fic[2] = {(char *) filename, NULL};
     replay_read_data_t tmp = (replay_read_data_t) {.mat= mat, .ncols = ncols};
     nread = filter_rels(fic, (filter_rels_callback_t) &fill_in_rows, &tmp,
-                        EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB, NULL, NULL);
+                        EARLYPARSE_NEED_INDEX, NULL, NULL);
     ASSERT_ALWAYS (nread == nrows);
   }
   else /* for_msieve */

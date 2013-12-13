@@ -136,7 +136,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 
   /* read all rels */
   nread = filter_rels(fic, (filter_rels_callback_t) &insert_rel_into_table, mat,
-                      EARLYPARSE_NEED_PRIMES | EARLYPARSE_NEED_NB, NULL, NULL);
+                      EARLYPARSE_NEED_INDEX, NULL, NULL);
   ASSERT_ALWAYS(nread == mat->nrows);
   mat->rem_nrows = nread;
   printf("# Weight of the active part of the matrix: %" PRIu64 "\n# Total "
