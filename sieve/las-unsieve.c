@@ -3,11 +3,13 @@
 #include <string.h>
 
 #include "las-unsieve.h"
+#include "ularith.h"
+#include "las-norms.h"
 
 /* Set every stride-th byte, starting at index 0, to 255 in an array of
    stride unsieve_pattern_t's */
 static void
-minisieve(unsieve_pattern_t *array, size_t stride)
+minisieve(unsieve_pattern_t * const array, const size_t stride)
 {
     memset (array, 0, stride * sizeof(unsieve_pattern_t));
     for (size_t i = 0; i < stride * sizeof(unsieve_pattern_t); i += stride)
@@ -222,7 +224,7 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
 }
 
 
-void
+static void
 unsieve_not_coprime_line(unsigned char * restrict line_start,
                          const unsigned int j, const unsigned int min_p,
                          const unsigned int I, unsieve_aux_data_srcptr us)
@@ -275,6 +277,259 @@ unsieve_not_coprime_line(unsigned char * restrict line_start,
     }
   ASSERT_ALWAYS(c <= 1);
 }
+
+
+void
+sieve_info_init_j_div(sieve_info_ptr si)
+{
+  /* Store largest prime factor of k in si->j_div[k].p, for 1 < k < J,
+     and store 0 for k=0, 1 for k=1 */
+  si->j_div = (j_div_ptr) malloc (sizeof (struct j_div_s) * si->J);
+  FATAL_ERROR_CHECK(si->j_div == NULL, "malloc failed");
+  si->j_div[0].p   = 0U;
+  si->j_div[0].cof = 0U;
+  si->j_div[0].inv = 0U;
+  si->j_div[0].bound = 0U;
+  si->j_div[1].p   = 1U;
+  si->j_div[1].cof = 1U;
+  si->j_div[1].inv = 1U;
+  si->j_div[1].inv = UINT_MAX;
+  for (unsigned int k = 2U; k < si->J; k++) {
+    /* Find largest prime factor of k */
+    unsigned int p, c = k;
+    for (p = 2U; p * p <= c; p += 1U + p % 2U)
+      {
+        while (c % p == 0U)
+          c /= p;
+        if (c == 1U)
+          break;
+      }
+    p = (c == 1U) ? p : c;
+    c = k; do {c /= p;} while (c % p == 0);
+    si->j_div[k].p = p;
+    si->j_div[k].cof = c;
+    si->j_div[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
+    si->j_div[k].bound = UINT_MAX / p;
+  }
+}
+
+void
+sieve_info_clear_j_div(sieve_info_ptr si)
+{
+  free(si->j_div);
+  si->j_div = NULL;
+}
+
+static inline unsigned int 
+extract_j_div(unsigned int (*div)[2], const unsigned int j, j_div_srcptr j_div, 
+              const unsigned int pmin, const unsigned int pmax)
+{
+    unsigned int c, nr_d = 0;
+    /* For each distict odd prime factor p of j, if pmin <= p <= pmax,
+       store the inverse and bound in array */
+    c = j;
+    c >>= ularith_ctz(c);
+    while (c > 1) {
+      unsigned int p = j_div[c].p;
+      if (p < pmin)
+          break;
+      if (p <= pmax) {
+          div[nr_d][0] = j_div[c].inv;
+          div[nr_d++][1] = j_div[c].bound;
+      }
+      c = j_div[c].cof;
+    }
+    return nr_d;
+}
+
+static int
+search_survivors_in_line3(unsigned char * const SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int td_max)
+{
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i patterns[2][3];
+    const int x_step = sizeof(__m128i);
+    const int pmin = 5;
+    int next_pattern = 0;
+#else
+    const int x_step = 1;
+    const int pmin = 3;
+#endif
+    int survivors = 0;
+
+    unsigned int div[6][2];
+    unsigned int nr_d;
+
+    nr_d = extract_j_div(div, j, j_div, pmin, td_max);
+    ASSERT(nr_d <= 6);
+
+#ifdef HAVE_SSE2
+    /* The reason for the bound+1 here is documented in 
+       sieve_info_test_lognorm_sse2() */
+    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+
+    if (j % 2 == 0)
+        for (size_t i = 0; i < 3 * sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0][0])[i] = 0x80;
+
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 3 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 3), or d == I/2 (mod 3). With
+       I = 2^log_I and 2 == -1 (mod 3), we have d == -1^(log_I-1) (mod 3),
+       or d = 2 if log_I is even and d = 1 if log_I is odd.
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    size_t d = 2 - log_I % 2;
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[3*i + d] = 0x80;
+#endif
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == 3)
+            next_pattern = 0;
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#else
+            if (SS[0][x] == 255)
+                continue;
+#endif
+            const unsigned int i = abs (x - (1 << (log_I - 1)));
+            int divides = 0;
+            switch (nr_d) {
+                case 6: divides |= (i * div[5][0] <= div[5][1]);
+                case 5: divides |= (i * div[4][0] <= div[4][1]);
+                case 4: divides |= (i * div[3][0] <= div[3][1]);
+                case 3: divides |= (i * div[2][0] <= div[2][1]);
+                case 2: divides |= (i * div[1][0] <= div[1][1]);
+                case 1: divides |= (i * div[0][0] <= div[0][1]);
+                case 0: while(0){};
+            }
+
+            if (divides)
+            {
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+            } else {
+                // ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
+            }
+        }
+    }
+    return survivors;
+}
+
+
+int
+search_survivors_in_line(unsigned char * const SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N, j_div_srcptr j_div,
+        const unsigned int td_max, unsieve_aux_data_srcptr us)
+{
+    /* We know that 3 does not divide j in the code of this function, and we
+       don't store 2. Allowing 5 distinct odd prime factors >3 thus handles
+       all j < 1616615 */
+    unsigned int div[5][2];
+    unsigned int nr_d;
+
+    unsieve_not_coprime_line(SS[0], j, td_max, 1U<<log_I, us);
+
+    if (j % 3 == 0)
+      return search_survivors_in_line3(SS, bound, log_I, j, N, j_div, td_max);
+
+    nr_d = extract_j_div(div, j, j_div, 3, td_max);
+    ASSERT(nr_d <= 5);
+
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i patterns[2] = {
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
+    };
+    const int x_step = sizeof(__m128i);
+
+    if (j % 2 == 0)
+        for (size_t i = 0; i < sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0])[i] = 0x80;
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        int new_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0],
+                                         (__m128i*) (SS[1] + x_start), patterns[1]);
+        if (new_surv == 0)
+            continue;
+        survivors += new_surv;
+#endif
+        for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+            if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+            {
+                SS[0][x] = 255;
+                continue;
+            }
+            survivors++;
+#else
+            if (SS[0][x] == 255)
+                continue;
+#endif
+            const unsigned int i = abs (x - (1 << (log_I - 1)));
+            int divides = 0;
+            switch (nr_d) {
+                case 5: divides |= (i * div[4][0] <= div[4][1]);
+                case 4: divides |= (i * div[3][0] <= div[3][1]);
+                case 3: divides |= (i * div[2][0] <= div[2][1]);
+                case 2: divides |= (i * div[1][0] <= div[1][1]);
+                case 1: divides |= (i * div[0][0] <= div[0][1]);
+                case 0: while(0){};
+            }
+            
+            if (divides)
+            {
+#ifdef TRACE_K
+                if (trace_on_spot_Nx(N, x)) {
+                    fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                            trace_Nx.x, trace_Nx.N, i, j);
+                }
+#endif
+                SS[0][x] = 255;
+            } else {
+                // ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
+            }
+        }
+    }
+    return survivors;
+}
+
 
 
 /* Set locations where gcd(i,j) != 1 to 255 */
