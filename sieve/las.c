@@ -228,10 +228,12 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
              * its maximum allowed value */
             if (apow_lim >= si->bucket_thresh) {
                 apow_lim = si->bucket_thresh - 1;
-                printf ("# apow_lim reduced to %d\n", apow_lim);
+                fprintf (las->output, "# apow_lim reduced to %d\n", apow_lim);
             }
-            if (apow_lim == 0) 
+            if (apow_lim == 0) {
                 apow_lim = si->bucket_thresh - 1;
+                fprintf (las->output, "# Using default value of %d for apow_lim\n", apow_lim);
+            }
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->bucket_thresh, las->nb_threads, las->verbose,
@@ -251,6 +253,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 rpow_lim = si->bucket_thresh - 1;
                 printf ("# rpow_lim reduced to %d\n", rpow_lim);
               }
+            if (rpow_lim == 0) {
+                rpow_lim = si->bucket_thresh - 1;
+                fprintf (las->output, "# Using default value of %d for rpow_lim\n", rpow_lim);
+            }
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->f, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
