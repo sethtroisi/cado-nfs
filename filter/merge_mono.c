@@ -13,11 +13,9 @@
 #include <unistd.h>
 
 #include "portability.h"
-#include "utils.h"
 
-#include "filter_utils.h"
+#include "filter_common.h"
 #include "filter_matrix.h"
-#include "filter_utils.h"
 #include "sparse.h"
 #include "mst.h"
 #include "report.h"

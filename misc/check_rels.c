@@ -18,11 +18,10 @@
 
 #include "portability.h"
 #include "macros.h"
-#include "utils.h"
+#include "utils_with_io.h"
 #include "relation.h"
 
 #include "implicit_mpz_poly.h"
-#include "filter_utils.h"
 
 static index_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
 static index_t nrels_toolarge;

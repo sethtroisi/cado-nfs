@@ -70,12 +70,9 @@
 #include <libgen.h>
 #endif
 
-#include "mod_ul.c"
 #include "portability.h"
-#include "utils.h"
-#include "typedefs.h"
 
-#include "filter_utils.h"
+#include "filter_common.h"
 
 //#define STAT
 //#define STAT_VALUES_COEFF //STAT must be defined. Interesting only DL

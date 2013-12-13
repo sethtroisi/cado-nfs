@@ -31,9 +31,7 @@ Output
 #include <sys/stat.h>
 #include <pthread.h>
 
-#include "utils.h"
-#include "timing.h"
-#include "filter_utils.h"
+#include "filter_common.h"
 
 typedef struct
 {

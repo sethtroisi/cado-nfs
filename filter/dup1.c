@@ -31,10 +31,7 @@
 
 #include "portability.h"
 #include "macros.h"
-#include "utils.h"
-#include "relation.h"
-
-#include "filter_utils.h"
+#include "filter_common.h"
 
 #define DEFAULT_LOG_MAX_NRELS_PER_FILES 25
 

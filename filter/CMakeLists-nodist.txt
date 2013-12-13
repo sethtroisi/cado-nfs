@@ -1,5 +1,5 @@
 set (sources
-        filter_utils.c
+        filter_common.c
         utils_ffs.c
 )
 

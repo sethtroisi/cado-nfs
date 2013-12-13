@@ -33,9 +33,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h> /* for strcmp */
 
 #include "portability.h"
-#include "utils.h" /* for fopen_maybe_compressed */
 
-#include "filter_utils.h"
+#include "filter_common.h"
 #include "filter_matrix.h" /* for filter_matrix_t */
 #include "report.h"     /* for report_t */
 #include "markowitz.h" /* for MkzInit */

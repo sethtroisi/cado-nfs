@@ -33,11 +33,7 @@
 #endif
 
 
-#include <time.h>
-#include <pthread.h>
-
-#include "filter_io.h"
-
+#include "utils_with_io.h"
 
 unsigned int insert_rel_in_table_no_e (earlyparsed_relation_ptr, index_t, index_t **, weight_t *);
 unsigned int insert_rel_in_table_with_e (earlyparsed_relation_ptr, index_t,

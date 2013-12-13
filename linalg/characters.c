@@ -89,8 +89,7 @@
 
 #include "cado-endian.h"
 #include "portability.h"
-#include "utils.h"
-#include "filter_utils.h"
+#include "utils_with_io.h"
 #include "blockmatrix.h"
 #include "gauss.h"
 #include "worker-threads.h"

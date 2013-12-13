@@ -10,8 +10,7 @@
 #endif
           
 #include "portability.h"
-#include "utils.h"
-#include "filter_utils.h"
+#include "utils_with_io.h"
 #include "ringbuf.h"
 #include "barrier.h"
 

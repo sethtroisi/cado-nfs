@@ -4,7 +4,7 @@
 
 #include "portability.h"
 #include "utils.h"
-#include "filter_utils.h"
+#include "filter_common.h"
 
 static inline unsigned int earlyparsed_relation_nb_above_min_index(earlyparsed_relation_srcptr rel, index_t min_index)
 {

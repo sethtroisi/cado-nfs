@@ -12,8 +12,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#include "utils.h"
-#include "filter_utils.h"
+#include "utils_with_io.h"
 #include "portability.h"
 
 #define DEBUG 0
