@@ -90,6 +90,7 @@
 #include "cado-endian.h"
 #include "portability.h"
 #include "utils.h"
+#include "filter_utils.h"
 #include "blockmatrix.h"
 #include "gauss.h"
 #include "worker-threads.h"
@@ -280,32 +281,56 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     return chars;
 }
 
+typedef struct
+{
+  int64_t *a;
+  uint64_t *b;
+} chars_data_t;
+
+void *
+thread_chars (void * context_data, earlyparsed_relation_ptr rel)
+{
+  chars_data_t *data = (chars_data_t *) context_data;
+  data->a[rel->num] = rel->a;
+  data->b[rel->num] = rel->b;
+  return NULL;
+}
+
 // The big character matrix has (number of purged rels) rows, and (number of
 // characters) cols
 
 static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars2, const char * purgedname, cado_poly_ptr pol, struct worker_threads_group * g)
 {
-    purgedfile_stream ps;
-    purgedfile_stream_init(ps);
-    purgedfile_stream_openfile(ps, purgedname);
+    uint64_t nrows, ncols;
+    purgedfile_read_firstline (purgedname, &nrows, &ncols);
 
-    blockmatrix res = blockmatrix_alloc(ps->nrows, nchars2);
-
+    int64_t  *all_A = (int64_t *)  malloc (nrows * sizeof(int64_t));
+    uint64_t *all_B = (uint64_t *) malloc (nrows * sizeof(uint64_t));
+    ASSERT_ALWAYS(all_A != NULL && all_B != NULL);
+    blockmatrix res = blockmatrix_alloc(nrows, nchars2);
     blockmatrix_set_zero(res);
 
-    fprintf(stderr, "Computing %u characters for %" PRIu64 " (a,b) pairs\n",
-            nchars2, ps->nrows);
-    ps->parse_only_ab = 1;
+    /* For each rel, read the a,b-pair and init the corresponding poly pairs[] */
+    fprintf(stderr, "Reading %" PRIu64 " (a,b) pairs from %s\n", nrows,
+                     purgedname);
+    chars_data_t data = {.a = all_A, .b=all_B};
+    char *fic[2] = {(char *) purgedname, NULL};
+    filter_rels (fic, (filter_rels_callback_t) thread_chars, &data,
+          EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
 
-    for(int i = 0 ; ; ) {
+    fprintf(stderr, "Computing %u characters for %" PRIu64 " (a,b) pairs\n",
+            nchars2, nrows);
+
+    for(uint64_t i = 0 ; i < nrows; ) {
         static const int batchsize = 16384;
         int64_t A[batchsize];
         uint64_t B[batchsize];
         uint64_t W[batchsize];
         int bs = 0;
-        for( ; bs < batchsize && purgedfile_stream_get(ps, NULL) >= 0  ; bs++) {
-            A[bs] = ps->a;
-            B[bs] = ps->b;
+        while (bs < batchsize && i+bs < nrows) {
+            A[bs] = all_A[i+bs];
+            B[bs] = all_B[i+bs];
+            bs++;
         }
         struct charbatch ss = { .W=W,.A=A,.B=B,.pol=pol,.n=bs };
         for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {
@@ -316,15 +341,11 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
             }
         }
         i += bs;
-        if (purgedfile_stream_disp_progress_now_p(ps)) {
-            fprintf(stderr, "Read %d/%" PRIu64 " (a,b) pairs -- %.1f MB/s -- %.1f pairs/s\n",
-                    ps->rrows, ps->nrows, ps->mb_s, ps->rows_s);
-        }
-        if (bs < batchsize)
-            break;
     }
-    purgedfile_stream_closefile(ps);
-    purgedfile_stream_clear(ps);
+    free(all_A);
+    fprintf (stderr, "all_A freed\n");
+    free(all_B);
+    fprintf (stderr, "all_B freed\n");
 
     return res;
 }
