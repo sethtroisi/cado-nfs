@@ -529,12 +529,12 @@ writeIndex(const char *indexname, index_data_t index_data,
         fprintf(indexfile, "%d", index_data[i].n);
         for (unsigned int j = 0; j < index_data[i].n; ++j) {
 #ifdef FOR_DL
-            fprintf(indexfile, " " PURGE_INT_FORMAT ":%d",
+            fprintf(indexfile, " %" PRxid ":%d",
                     index_data[i].rels[j].ind_row,
                     index_data[i].rels[j].e);
 #else
             ASSERT (index_data[i].rels[j].e == 1);
-            fprintf(indexfile, " " PURGE_INT_FORMAT,
+            fprintf(indexfile, " %" PRxid "",
                     index_data[i].rels[j].ind_row);
 #endif
         }
