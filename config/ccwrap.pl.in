@@ -37,6 +37,7 @@ while (defined($_=shift @ARGV)) {
         next;
     };
     $compile=1 if /^-c$/;
+    $compile=1 if /^-S$/; # Also set if we compile to assembly output
     push @a, $_;
 }
 
