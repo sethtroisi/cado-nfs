@@ -37,13 +37,13 @@ Output
 
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
-			  int * small_nrows, poly_t F, const mpz_t ell2)
+			  int * small_nrows, mpz_poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
   FILE * ix = fopen_maybe_compressed(indexname, "r");
 
   /* array of (a,b) pairs from (purgedname) file */
-  poly_t *pairs;
+  mpz_poly_t *pairs;
   
   /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file  */
   sm_relset_ptr rels;
@@ -51,14 +51,14 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   purgedfile_stream_init(ps);
   purgedfile_stream_openfile(ps, purgedname);
 
-  pairs = (poly_t *) malloc(ps->nrows * sizeof(poly_t));
+  pairs = (mpz_poly_t *) malloc(ps->nrows * sizeof(mpz_poly_t));
 
   /* Parse purgedfile (a,b)-pairs only */
   ps->parse_only_ab = 1;
   uint64_t npairs;
   for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
     ASSERT_ALWAYS(npairs < ps->nrows);
-    poly_alloc_and_set_from_ab(pairs[npairs], ps->a, ps->b);
+    mpz_poly_alloc_and_set_from_ab(pairs[npairs], ps->a, ps->b);
   }
 
   /* small_ncols isn't used here: we don't care */
@@ -69,18 +69,18 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   rels = malloc(*small_nrows * sizeof(sm_relset_t));
 
   for (int k = 0 ; k < *small_nrows ; k++) {
-    poly_alloc(rels[k].num, F->deg);
-    poly_alloc(rels[k].denom, F->deg);
+    mpz_poly_alloc(rels[k].num, F->deg);
+    mpz_poly_alloc(rels[k].denom, F->deg);
   }
     
   unsigned int ridx;
   long e, nc;
-  poly_t tmp;
+  mpz_poly_t tmp;
   
   mpz_t ee;
   mpz_init(ee);  
 
-  poly_alloc(tmp, F->deg);
+  mpz_poly_alloc(tmp, F->deg);
 
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
@@ -88,8 +88,8 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
     (rels[i].num)->deg = 0;
     (rels[i].denom)->deg = 0;
-    poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
-    poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
+    mpz_poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
+    mpz_poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
 
     for(int k = 0 ; k < nc ; k++) {
       ret = fscanf(ix, "%x:%ld", &ridx, &e); 
@@ -100,29 +100,29 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
       if (e > 0) {
 	  mpz_set_si(ee, e);
-	  /* TODO: poly_long_power_mod_f_mod_mpz */
-	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+	  /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
+	  mpz_poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  mpz_poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
       }
       else {
 	  mpz_set_si(ee, -e);
-	  /* TODO: poly_long_power_mod_f_mod_mpz */
-	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	  poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
+	  /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
+	  mpz_poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  mpz_poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
       }
     }
     cleandeg(rels[i].num, F->deg);
     cleandeg(rels[i].denom, F->deg);
 
   }
-  poly_free(tmp);
+  mpz_poly_free(tmp);
 
   fclose_maybe_compressed(ix, indexname);
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
 
   while (npairs > 0)
-    poly_free (pairs[--npairs]);
+    mpz_poly_free (pairs[--npairs]);
   free (pairs);
   mpz_clear (ee);
   
@@ -133,58 +133,58 @@ struct thread_info {
   int offset;
   int nb;
   sm_relset_ptr rels;
-  poly_srcptr F;
+  mpz_poly_srcptr F;
   mpz_srcptr eps;
   mpz_srcptr ell;
   mpz_srcptr ell2;
   mpz_srcptr invl2;
-  poly_t *sm;
+  mpz_poly_t *sm;
 };
 
 void * thread_start(void *arg) {
   struct thread_info *ti = (struct thread_info *) arg;
   sm_relset_ptr rels = ti->rels;
-  poly_srcptr F = ti->F;
+  mpz_poly_srcptr F = ti->F;
   mpz_srcptr eps = ti->eps;
   mpz_srcptr ell = ti->ell;
   mpz_srcptr ell2 = ti->ell2;
   mpz_srcptr invl2 = ti->invl2;
-  poly_t *sm = ti->sm;
+  mpz_poly_t *sm = ti->sm;
   int offset = ti->offset;
   mpz_t tmp;
 
   mpz_init(tmp);
 
-  poly_t g, U, V;
-  poly_alloc(g, 0);
-  poly_alloc (U,0);
-  poly_alloc (V,0);
+  mpz_poly_t g, U, V;
+  mpz_poly_alloc(g, 0);
+  mpz_poly_alloc (U,0);
+  mpz_poly_alloc (V,0);
 
 
   for (int i = 0; i < ti->nb; i++) {
-    poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
+    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
     compute_sm (sm[i], rels[offset+i].num, F, ell, eps, ell2, invl2);
   }
 
   mpz_clear(tmp);
-  poly_free(g);
-  poly_free(U);
-  poly_free(V);
+  mpz_poly_free(g);
+  mpz_poly_free(U);
+  mpz_poly_free(V);
   return NULL;
 }
 
 #define SM_BLOCK 500
 
-void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
+void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
     const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   // allocate space for results of threads
-  poly_t **SM;
-  SM = (poly_t **) malloc(nt*sizeof(poly_t *));
+  mpz_poly_t **SM;
+  SM = (mpz_poly_t **) malloc(nt*sizeof(mpz_poly_t *));
   for (int i = 0; i < nt; ++i) {
-    SM[i] = (poly_t *) malloc(SM_BLOCK*sizeof(poly_t));
+    SM[i] = (mpz_poly_t *) malloc(SM_BLOCK*sizeof(mpz_poly_t));
     for (int j = 0; j < SM_BLOCK; ++j)
-      poly_alloc(SM[i][j], F->deg);
+      mpz_poly_alloc(SM[i][j], F->deg);
   }
 
   // We'll use a rotating buffer of thread id.
@@ -252,7 +252,7 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
   free(threads);
   for (int i = 0; i < nt; ++i) {
     for (int j = 0; j < SM_BLOCK; ++j) {
-      poly_free(SM[i][j]);
+      mpz_poly_free(SM[i][j]);
     }
     free(SM[i]);
   }
@@ -260,11 +260,11 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, poly_t F,
 }
 
 
-void sm(const char * outname, sm_relset_ptr rels, int sr, poly_t F,
+void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
 	const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   FILE * out = fopen(outname, "w");
-  poly_t SM;
+  mpz_poly_t SM;
   mpz_t invl2;
   mpz_t tmp;
   
@@ -279,26 +279,26 @@ void sm(const char * outname, sm_relset_ptr rels, int sr, poly_t F,
   mpz_out_str(stderr, 10, ell2);
   fprintf(stderr, "\n");
 
-  poly_alloc(SM, F->deg);
+  mpz_poly_alloc(SM, F->deg);
   SM->deg = 0;
-  poly_setcoeff_si(SM, 0, 1);
+  mpz_poly_setcoeff_si(SM, 0, 1);
 
-  poly_t g, U, V;
-  poly_alloc(g, 0);
-  poly_alloc (U,0);
-  poly_alloc (V,0);
+  mpz_poly_t g, U, V;
+  mpz_poly_alloc(g, 0);
+  mpz_poly_alloc (U,0);
+  mpz_poly_alloc (V,0);
   
   fprintf(out, "%d\n", sr);
 
   for (int i=0; i<sr; i++) {
-    poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
+    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm);
   }
 
-  poly_free(SM);
-  poly_free(U);
-  poly_free(V);
+  mpz_poly_free(SM);
+  mpz_poly_free(U);
+  mpz_poly_free(V);
   mpz_clear(invl2);
   mpz_clear(tmp);
   fclose(out);
@@ -342,7 +342,7 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  poly_t F;
+  mpz_poly_t F;
   sm_relset_ptr rels = NULL;
   int sr;
   mpz_t ell, ell2, eps;
@@ -420,10 +420,10 @@ int main (int argc, char **argv)
     usage (argv0, NULL, pl);
   param_list_print_command_line (stdout, pl);
 
-  /* Construct poly_t F from cado_poly pol (algebraic side) */
-  poly_t_from_cado_poly_alg(F, pol);
+  /* Construct mpz_poly_t F from cado_poly pol (algebraic side) */
+  mpz_poly_t_from_cado_poly_alg(F, pol);
   fprintf(stderr, "F = ");
-  poly_print(F);
+  mpz_poly_print(F);
 
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
@@ -463,7 +463,7 @@ int main (int argc, char **argv)
   mpz_clear(eps);
   mpz_clear(ell);
   mpz_clear(ell2);
-  poly_free(F);
+  mpz_poly_free(F);
   cado_poly_clear(pol);
   param_list_clear(pl);
 

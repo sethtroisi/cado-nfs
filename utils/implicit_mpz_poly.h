@@ -1,5 +1,5 @@
-#ifndef MPZ_POLY_H_
-#define MPZ_POLY_H_
+#ifndef IMPLICIT_MPZ_POLY_H_
+#define IMPLICIT_MPZ_POLY_H_
 
 #include <stdint.h>
 #include <gmp.h>
@@ -19,4 +19,4 @@ void mp_poly_content (mpz_t c, mpz_t *f, const int d);
 }
 #endif
 
-#endif	/* MPZ_POLY_H_ */
+#endif	/* IMPLICIT_MPZ_POLY_H_ */

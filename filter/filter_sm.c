@@ -7,7 +7,7 @@
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 void
-poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
+mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
                     const mpz_t a, const mpz_t p, MAYBE_UNUSED const mpz_t invp)
 {
   int k = mpz_sizeinbase(a, 2);
@@ -19,33 +19,33 @@ poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
   }
   
   // Initialize Q to P
-  poly_copy(Q, P);
+  mpz_poly_copy(Q, P);
 
   // Horner
   for (k -= 2; k >= 0; k--)
   {
-    poly_sqr_mod_f_mod_mpz(Q, Q, f, p, NULL);  // R <- R^2
+    mpz_poly_sqr_mod_f_mod_mpz(Q, Q, f, p, NULL);  // R <- R^2
     if (mpz_tstbit(a, k))
-      poly_mul_mod_f_mod_mpz(Q, Q, P, f, p, NULL);  // R <- R*P
+      mpz_poly_mul_mod_f_mod_mpz(Q, Q, P, f, p, NULL);  // R <- R*P
   }
 }
 
 inline void
-poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
+mpz_poly_alloc_and_set_from_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
   if (b == 0)
   {
     /* freerel */
-    poly_alloc(rel, 0);
-    poly_setcoeff_int64(rel, 0, a);
+    mpz_poly_alloc(rel, 0);
+    mpz_poly_setcoeff_int64(rel, 0, a);
     rel->deg=0;
   }
   else
   {
     /* an (a,b)-pair is a degree-1 poly */
-    poly_alloc(rel, 1);
-    poly_setcoeff_int64(rel, 0, a);
-    poly_setcoeff_int64(rel, 1, -b);
+    mpz_poly_alloc(rel, 1);
+    mpz_poly_setcoeff_int64(rel, 0, a);
+    mpz_poly_setcoeff_int64(rel, 1, -b);
     rel->deg = 1;
   }
 }
@@ -53,20 +53,20 @@ poly_alloc_and_set_from_ab (poly_ptr rel, int64_t a, uint64_t b)
 
 /*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
 inline void
-poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const poly_t F,
-                        const mpz_t m, mpz_t tmp, poly_t g, poly_t U, poly_t V)
+mpz_poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const mpz_poly_t F,
+                        const mpz_t m, mpz_t tmp, mpz_poly_t g, mpz_poly_t U, mpz_poly_t V)
 {
   if (frac->denom->deg == 0)
   {
     mpz_invert(tmp, frac->denom->coeff[0], m);
-    poly_mul_mpz(frac->num, frac->num, tmp);
-    poly_reduce_mod_mpz(frac->num, frac->num, m);
+    mpz_poly_mul_mpz(frac->num, frac->num, tmp);
+    mpz_poly_reduce_mod_mpz(frac->num, frac->num, m);
   }
   else
   {
-    poly_xgcd_mpz (g, F, frac->denom, U, V, m);
-    poly_mul (frac->num, frac->num, V);
-    int d = poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
+    mpz_poly_xgcd_mpz (g, F, frac->denom, U, V, m);
+    mpz_poly_mul (frac->num, frac->num, V);
+    int d = mpz_poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
                                 F->deg, m, NULL);
     cleandeg(frac->num, d);
   }
@@ -74,11 +74,11 @@ poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const poly_t F,
 
 /* compute the SM */
 inline void
-compute_sm (poly_t SM, poly_t num, const poly_t F, const mpz_t ell,
+compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
-  poly_power_mod_f_mod_mpz_Barrett(SM, num, F, smexp, ell2, invl2);
-  poly_sub_ui(SM, 1);
+  mpz_poly_power_mod_f_mod_mpz_Barrett(SM, num, F, smexp, ell2, invl2);
+  mpz_poly_sub_ui(SM, 1);
 
   for(int j = 0; j <= SM->deg; j++)
   {
@@ -89,7 +89,7 @@ compute_sm (poly_t SM, poly_t num, const poly_t F, const mpz_t ell,
 }
 
 inline void
-print_sm (FILE *f, poly_t SM, int nSM)
+print_sm (FILE *f, mpz_poly_t SM, int nSM)
 {
   for(int j=0; j<nSM; j++)
   {
@@ -103,27 +103,27 @@ print_sm (FILE *f, poly_t SM, int nSM)
 
 /* Computed the Shirokauer maps of a single pair (a,b). 
    SM must be allocated and is viewed as a polynomial of degree F->deg. */
-void sm_single_rel(poly_t SM, int64_t a, uint64_t b, poly_t F, const mpz_t eps, 
+void sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F, const mpz_t eps, 
                    const mpz_t ell, const mpz_t ell2, const mpz_t invl2)
 {
-  poly_t rel;
+  mpz_poly_t rel;
 
   SM->deg = 0;
-  poly_setcoeff_si(SM, 0, 1);
+  mpz_poly_setcoeff_si(SM, 0, 1);
   
-  poly_alloc_and_set_from_ab(rel, a, b);
+  mpz_poly_alloc_and_set_from_ab(rel, a, b);
   compute_sm (SM, rel, F, ell, eps, ell2, invl2);
 }
 
 
-/* Construct poly_t F from cado_poly pol (algebraic side) */
+/* Construct mpz_poly_t F from cado_poly pol (algebraic side) */
 /* XXX Temporary until utils/poly* mess is fixed */
-void poly_t_from_cado_poly_alg (poly_t F, cado_poly pol)
+void mpz_poly_t_from_cado_poly_alg (mpz_poly_t F, cado_poly pol)
 {
   int deg = pol->pols[ALGEBRAIC_SIDE]->degree;
   mpz_t *f = pol->pols[ALGEBRAIC_SIDE]->f;
   ASSERT_ALWAYS(deg > 1);
-  poly_alloc (F, deg);
+  mpz_poly_alloc (F, deg);
   for (int i = deg; i >= 0; --i)
-    poly_setcoeff (F, i, f[i]);
+    mpz_poly_setcoeff (F, i, f[i]);
 }

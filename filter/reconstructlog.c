@@ -111,7 +111,7 @@ read_data_free (read_data_t *data, uint64_t nrels)
 typedef struct
 {
   unsigned int nbsm;
-  poly_ptr F;
+  mpz_poly_ptr F;
   mpz_t *smlog;
   mpz_ptr smexp; /* exponent for SM */
   mpz_ptr q;
@@ -122,7 +122,7 @@ typedef struct
 /* Init the sm_data_t structure, given the polynomial, the group order and the
  * exponent */
 static void
-sm_data_init (sm_data_t *d, unsigned int nbsm, poly_t F, mpz_t q, mpz_t smexp,
+sm_data_init (sm_data_t *d, unsigned int nbsm, mpz_poly_t F, mpz_t q, mpz_t smexp,
               mpz_t *log, uint64_t nprimes)
 {
   d->nbsm = nbsm;
@@ -150,15 +150,15 @@ sm_data_free (sm_data_t *d)
 static inline void
 add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
 {
-  poly_t SMres;
-  poly_alloc(SMres, sm->F->deg);
+  mpz_poly_t SMres;
+  mpz_poly_alloc(SMres, sm->F->deg);
   SMres->deg = 0;
-  poly_setcoeff_si(SMres, 0, 1);
+  mpz_poly_setcoeff_si(SMres, 0, 1);
   sm_single_rel(SMres, a, b, sm->F, sm->smexp, sm->q, sm->q2, sm->invq2);
   unsigned int i;
   for (i = 0; i < sm->nbsm && i <= (unsigned int) SMres->deg; i++)
     mpz_add_log_mod_mpz (l, sm->smlog[i], SMres->coeff[i], sm->q);
-  poly_free(SMres);
+  mpz_poly_free(SMres);
 }
 #endif /* ifndef FOR_FFS */
 
@@ -597,7 +597,7 @@ static uint64_t
 #ifndef FOR_FFS
 compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
                           mpz_t *log, uint64_t nprimes, unsigned long nbsm,
-                          mpz_t smexp, poly_t F, int nt)
+                          mpz_t smexp, mpz_poly_t F, int nt)
 #else
 compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
                           mpz_t *log, uint64_t nprimes, int nt)
@@ -844,10 +844,10 @@ main(int argc, char *argv[])
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
-  /* Construct poly_t F from cado_poly pol (algebraic side) */
+  /* Construct mpz_poly_t F from cado_poly pol (algebraic side) */
 #ifndef FOR_FFS
-  poly_t F;
-  poly_t_from_cado_poly_alg(F, poly);
+  mpz_poly_t F;
+  mpz_poly_t_from_cado_poly_alg(F, poly);
   FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->degree, "Too many SM");
 #endif
 
@@ -903,7 +903,7 @@ main(int argc, char *argv[])
   mpz_clear(q);
   mpz_clear(smexp);
 #ifndef FOR_FFS
-  poly_free(F);
+  mpz_poly_free(F);
 #endif
 
   renumber_free (renumber_table);

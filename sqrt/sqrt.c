@@ -317,7 +317,7 @@ polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
 
 /* Reduce the coefficients of R in [-m/2, m/2], which are assumed in [0, m[ */
 static void
-poly_mod_center (poly_t R, const mpz_t m)
+mpz_poly_mod_center (mpz_poly_t R, const mpz_t m)
 {
   int i;
   mpz_t m_over_2;
@@ -342,7 +342,7 @@ poly_mod_center (poly_t R, const mpz_t m)
    Assumes the coefficients x satisfy 0 <= x < m.
 */
 static int
-poly_integer_reconstruction (poly_t R, const mpz_t m)
+mpz_poly_integer_reconstruction (mpz_poly_t R, const mpz_t m)
 {
   int i;
   size_t sizem = mpz_sizeinbase (m, 2), sizer;
@@ -364,12 +364,12 @@ poly_integer_reconstruction (poly_t R, const mpz_t m)
 
 // compute res := sqrt(a) in Fp[x]/f(x)
 static void
-TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
+TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned long p)
 {
   int d = F->deg;
   mpz_t q;
-  poly_t delta;  // a non quadratic residue
-  poly_t auxpol;
+  mpz_poly_t delta;  // a non quadratic residue
+  mpz_poly_t auxpol;
   mpz_t aux;
   mpz_t t;
   int s;
@@ -379,7 +379,7 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
 
   mpz_init(aux);
   mpz_init(q);
-  poly_alloc(auxpol, d);
+  mpz_poly_alloc(auxpol, d);
   mpz_ui_pow_ui(q, p, (unsigned long)d);
 
   // compute aux = (q-1)/2
@@ -394,7 +394,7 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
   }
   // find a non quadratic residue delta
   {
-    poly_alloc(delta, d);
+    mpz_poly_alloc(delta, d);
     gmp_randstate_t state;
     gmp_randinit_default(state);
     do {
@@ -404,43 +404,43 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
     mpz_urandomm(delta->coeff[i], state, myp);
       cleandeg(delta, d-1);
       // raise it to power (q-1)/2
-      poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
+      mpz_poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
     } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
     gmp_randclear (state);
   }
 
   // follow the description of Crandall-Pomerance, page 94
   {
-    poly_t A, D;
+    mpz_poly_t A, D;
     mpz_t m;
     int i;
-    poly_alloc(A, d);
-    poly_alloc(D, d);
+    mpz_poly_alloc(A, d);
+    mpz_poly_alloc(D, d);
     mpz_init_set_ui(m, 0);
-    poly_power_mod_f_mod_ui(A, a, F, t, p);
-    poly_power_mod_f_mod_ui(D, delta, F, t, p);
+    mpz_poly_power_mod_f_mod_ui(A, a, F, t, p);
+    mpz_poly_power_mod_f_mod_ui(D, delta, F, t, p);
     for (i = 0; i <= s-1; ++i) {
-      poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
-      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL);
+      mpz_poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
+      mpz_poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL);
       mpz_ui_pow_ui(aux, 2, (s-1-i));
-      poly_power_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
+      mpz_poly_power_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
     mpz_add_ui(m, m, 1UL<<i);
     }
     mpz_add_ui(t, t, 1);
     mpz_divexact_ui(t, t, 2);
-    poly_power_mod_f_mod_ui(res, a, F, t, p);
+    mpz_poly_power_mod_f_mod_ui(res, a, F, t, p);
     mpz_divexact_ui(m, m, 2);
-    poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
+    mpz_poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
 
-    poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
-    poly_free(D);
-    poly_free(A);
+    mpz_poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
+    mpz_poly_free(D);
+    mpz_poly_free(A);
     mpz_clear(m);
   }
 
-  poly_free(auxpol);
-  poly_free(delta);
+  mpz_poly_free(auxpol);
+  mpz_poly_free(delta);
   mpz_clear(q);
   mpz_clear(aux);
   mpz_clear(myp);
@@ -449,9 +449,9 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
 
 // res <- Sqrt(AA) mod F, using p-adic lifting, at prime p.
 void
-polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
+polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
 {
-  poly_t A, *P;
+  mpz_poly_t A, *P;
   int v;
   int d = F->deg;
   int k, lk, target_k, logk, K[32];
@@ -466,31 +466,31 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
      twice as large, before reduction by f(x). The reduction modulo f(x)
      produces A(x), however that reduction should not decrease the size of
      the coefficients. */
-  target_size = poly_sizeinbase (AA->p, AA->p->deg, 2);
+  target_size = mpz_poly_sizeinbase (AA->p, AA->p->deg, 2);
   target_size = target_size / 2;
   target_size += target_size / 10;
   fprintf (stderr, "target_size=%lu\n", (unsigned long int) target_size);
 
-  poly_alloc(A, d-1);
+  mpz_poly_alloc(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
   // then multiply num and denom by fd to make it even.
   if (((AA->v)&1) == 0) {
     v = AA->v / 2;
-    poly_copy(A, AA->p);
+    mpz_poly_copy(A, AA->p);
   } else {
     v = (1+AA->v) / 2;
-    poly_mul_mpz(A, AA->p, F->coeff[d]);
+    mpz_poly_mul_mpz(A, AA->p, F->coeff[d]);
   }
 
   // Now, we just have to take the square root of A (without denom) and
   // divide by fd^v.
 
   // Variables for the lifted values
-  poly_t invsqrtA;
+  mpz_poly_t invsqrtA;
   // variables for A and F modulo pk
-  poly_t a;
-  poly_alloc(invsqrtA, d-1);
-  poly_alloc(a, d-1);
+  mpz_poly_t a;
+  mpz_poly_alloc(invsqrtA, d-1);
+  mpz_poly_alloc(a, d-1);
   // variable for the current pk
   mpz_t pk, invpk;
   mpz_init (pk);
@@ -506,7 +506,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
       mpz_mul_ui (pk, pk, p);
       target_k ++;
     }
-  poly_reduce_mod_mpz (A, A, pk);
+  mpz_poly_reduce_mod_mpz (A, A, pk);
   for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
     K[logk] = k;
   K[logk] = 1;
@@ -518,10 +518,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   k = 1; /* invariant: pk = p^k */
   lk = 0; /* k = 2^lk */
   st = seconds ();
-  P = poly_base_modp_init (A, p, K, logk);
-  fprintf (stderr, "poly_base_modp_init took %2.2lf\n", seconds () - st);
+  P = mpz_poly_base_modp_init (A, p, K, logk);
+  fprintf (stderr, "mpz_poly_base_modp_init took %2.2lf\n", seconds () - st);
 
-  poly_copy (a, P[0]);
+  mpz_poly_copy (a, P[0]);
 
   // First compute the inverse square root modulo p
   {
@@ -537,11 +537,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     mpz_mul_ui(aux, q, 3);
     mpz_sub_ui(aux, aux, 5);
     mpz_divexact_ui(aux, aux, 4);               // aux := (3q-5)/4
-    poly_power_mod_f_mod_ui(invsqrtA, a, F, aux, p);
+    mpz_poly_power_mod_f_mod_ui(invsqrtA, a, F, aux, p);
 #else
     TonelliShanks(invsqrtA, a, F, p);
     mpz_sub_ui(aux, q, 2);
-    poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, F, aux, p);
+    mpz_poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, F, aux, p);
 #endif
 
     mpz_clear(aux);
@@ -552,9 +552,9 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   // When entering the loop, invsqrtA contains the inverse square root
   // of A computed modulo pk.
 
-  poly_t tmp, tmp2;
-  poly_alloc(tmp, 2*d-1);
-  poly_alloc(tmp2, 2*d-1);
+  mpz_poly_t tmp, tmp2;
+  mpz_poly_alloc(tmp, 2*d-1);
+  mpz_poly_alloc(tmp2, 2*d-1);
   do {
     double st;
 
@@ -568,7 +568,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     /* invariant: invsqrtA = 1/sqrt(A) bmod p^k */
 
     st = seconds ();
-    poly_base_modp_lift (a, P, ++lk, pk);
+    mpz_poly_base_modp_lift (a, P, ++lk, pk);
     st = seconds () - st;
 
     /* invariant: k = K[logk] */
@@ -587,60 +587,60 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     fprintf (stderr, "start lifting mod p^%d (%lu bits) at %2.2lf\n",
              k, (unsigned long int) mpz_sizeinbase (pk, 2), seconds ());
 #ifdef VERBOSE
-    fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
+    fprintf (stderr, "   mpz_poly_base_modp_lift took %2.2lf\n", st);
 #endif
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
-    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
+    mpz_poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
 #ifdef VERBOSE
-    fprintf (stderr, "   poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+    fprintf (stderr, "   mpz_poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
 
     /* Faster version which computes x <- x + x/2*(1-a*x^2).
        However I don't see how to use the fact that the coefficients
        if 1-a*x^2 are divisible by p^(k/2). */
     st = seconds ();
-    poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
+    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
 #ifdef VERBOSE
-    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+    fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-    poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
-    poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
+    mpz_poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
+    mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
-    poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
+    mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
 #ifdef VERBOSE
-    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+    fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
     /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
-    poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
+    mpz_poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
 
   } while (k < target_k);
 
   /* multiply by a to get an approximation of the square root */
-  poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
-  poly_mod_center (tmp, pk);
+  mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
+  mpz_poly_mod_center (tmp, pk);
 
-  poly_base_modp_clear (P);
+  mpz_poly_base_modp_clear (P);
 
-  poly_copy(res->p, tmp);
+  mpz_poly_copy(res->p, tmp);
   res->v = v;
 
   mpz_clear (pk);
   mpz_clear (invpk);
-  poly_free(tmp);
-  poly_free(tmp2);
-  poly_free (A);
-  poly_free (invsqrtA);
-  poly_free (a);
+  mpz_poly_free(tmp);
+  mpz_poly_free(tmp2);
+  mpz_poly_free (A);
+  mpz_poly_free (invsqrtA);
+  mpz_poly_free (a);
 
-  size_t sqrt_size = poly_sizeinbase (res->p, F->deg - 1, 2);
+  size_t sqrt_size = mpz_poly_sizeinbase (res->p, F->deg - 1, 2);
   fprintf (stderr, "maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
           sqrt_size, 100.0 * (double) sqrt_size / target_size);
 }
 
 static unsigned long
-FindSuitableModP (poly_t F, mpz_t N)
+FindSuitableModP (mpz_poly_t F, mpz_t N)
 {
   unsigned long p = 2;
   int dF = F->deg;
@@ -682,7 +682,7 @@ FindSuitableModP (poly_t F, mpz_t N)
 
 // Products are computed modulo the polynomial F.
 polymodF_t*
-accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const poly_t F,
+accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const mpz_poly_t F,
                  unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
@@ -697,7 +697,7 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const poly_t F,
         {
           lprd[0] ++;
           prd = (polymodF_t*) realloc (prd, *lprd * sizeof (polymodF_t));
-      poly_alloc(prd[i+1]->p, F->deg);
+      mpz_poly_alloc(prd[i+1]->p, F->deg);
           mpz_set_ui(prd[i + 1]->p->coeff[0], 1);
       prd[i+1]->p->deg = 0;
       prd[i+1]->v = 0;
@@ -713,7 +713,7 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const poly_t F,
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
 void
-accumulate_fast_F_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
+accumulate_fast_F_end (polymodF_t *prd, const mpz_poly_t F, unsigned long lprd)
 {
   unsigned long i;
 
@@ -731,7 +731,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   char *depname, *algname;
   FILE *depfile = NULL;
   FILE *algfile;
-  poly_t F;
+  mpz_poly_t F;
   polymodF_t prd, tmp;
   long a;
   unsigned long b;
@@ -758,18 +758,18 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   ASSERT_ALWAYS(deg > 1);
   
   // Init F to be the corresponding polynomial
-  poly_alloc (F, deg);
+  mpz_poly_alloc (F, deg);
   for (i = deg; i >= 0; --i)
-    poly_setcoeff (F, i, f[i]);
+    mpz_poly_setcoeff (F, i, f[i]);
   
   // Init prd to 1.
-  poly_alloc (prd->p, deg);
+  mpz_poly_alloc (prd->p, deg);
   mpz_set_ui (prd->p->coeff[0], 1);
   prd->p->deg = 0;
   prd->v = 0;
   
   // Allocate tmp
-  poly_alloc (tmp->p, 1);
+  mpz_poly_alloc (tmp->p, 1);
   
   // Accumulate product
   #if 0
@@ -790,7 +790,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       unsigned long lprd = 1; /* number of elements in prd_tab[] */
       unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
       prd_tab = (polymodF_t*) malloc (lprd * sizeof (polymodF_t));
-      poly_alloc (prd_tab[0]->p, F->deg);
+      mpz_poly_alloc (prd_tab[0]->p, F->deg);
       mpz_set_ui (prd_tab[0]->p->coeff[0], 1);
       prd_tab[0]->p->deg = 0;
       prd_tab[0]->v = 0;
@@ -832,10 +832,10 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       fclose_maybe_compressed (depfile, depname);
       free (depname);
   
-      poly_copy(prd->p, prd_tab[0]->p);
+      mpz_poly_copy(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
       for (i = 0; i < (long)lprd; ++i)
-        poly_free(prd_tab[i]->p);
+        mpz_poly_free(prd_tab[i]->p);
       free(prd_tab);
     }
   #endif
@@ -843,7 +843,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     fprintf(stderr, "Finished accumulating the product at %2.2lf\n", seconds());
     fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
     fprintf (stderr, "maximal polynomial bit-size = %lu\n",
-             (unsigned long) poly_sizeinbase (prd->p, deg - 1, 2));
+             (unsigned long) mpz_poly_sizeinbase (prd->p, deg - 1, 2));
   
     p = FindSuitableModP(F, Np);
     fprintf(stderr, "Using p=%lu for lifting\n", p);
@@ -854,7 +854,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   
     mpz_init(algsqrt);
     mpz_init(aux);
-    poly_eval_mod_mpz(algsqrt, prd->p, pol->m, Np);
+    mpz_poly_eval_mod_mpz(algsqrt, prd->p, pol->m, Np);
     mpz_invert(aux, F->coeff[F->deg], Np);  // 1/fd mod n
     mpz_powm_ui(aux, aux, prd->v, Np);      // 1/fd^v mod n
     mpz_mul(algsqrt, algsqrt, aux);
@@ -869,9 +869,9 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
     mpz_clear(aux);
     mpz_clear(algsqrt);
-    poly_free(prd->p);
-    poly_free(tmp->p);
-    poly_free(F);
+    mpz_poly_free(prd->p);
+    mpz_poly_free(tmp->p);
+    mpz_poly_free(F);
     return 0;
 }
 
