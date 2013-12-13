@@ -37,14 +37,14 @@ Output
 
 typedef struct
 {
-  poly_t *pairs;
+  mpz_poly_t *pairs;
 } read_sm_data_t;
 
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
   read_sm_data_t *data = (read_sm_data_t *) context_data;
-  poly_alloc_and_set_from_ab(data->pairs[rel->num], rel->a, rel->b);
+  mpz_poly_init_set_ab(data->pairs[rel->num], rel->a, rel->b);
 
   return NULL;
 }
