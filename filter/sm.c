@@ -35,11 +35,23 @@ Output
 #include "timing.h"
 #include "filter_utils.h"
 
+typedef struct
+{
+  poly_t *pairs;
+} read_sm_data_t;
+
+void *
+thread_sm (void * context_data, earlyparsed_relation_ptr rel)
+{
+  read_sm_data_t *data = (read_sm_data_t *) context_data;
+  poly_alloc_and_set_from_ab(data->pairs[rel->num], rel->a, rel->b);
+
+  return NULL;
+}
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
-  purgedfile_stream ps;
   FILE * ix = fopen_maybe_compressed(indexname, "r");
 
   /* array of (a,b) pairs from (purgedname) file */
@@ -48,18 +60,16 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file  */
   sm_relset_ptr rels;
 
-  purgedfile_stream_init(ps);
-  purgedfile_stream_openfile(ps, purgedname);
+  uint64_t nrows, ncols;
+  purgedfile_read_firstline (purgedname, &nrows, &ncols);
 
-  pairs = (poly_t *) malloc(ps->nrows * sizeof(poly_t));
+  pairs = (poly_t *) malloc(nrows * sizeof(poly_t));
 
-  /* Parse purgedfile (a,b)-pairs only */
-  ps->parse_only_ab = 1;
-  uint64_t npairs;
-  for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
-    ASSERT_ALWAYS(npairs < ps->nrows);
-    poly_alloc_and_set_from_ab(pairs[npairs], ps->a, ps->b);
-  }
+  /* For each rel, read the a,b-pair and init the corresponding poly pairs[] */
+  read_sm_data_t data = {.pairs = pairs};
+  char *fic[2] = {(char *) purgedname, NULL};
+  filter_rels (fic, (filter_rels_callback_t) thread_sm, &data,
+          EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
 
   /* small_ncols isn't used here: we don't care */
   int small_ncols;
@@ -118,11 +128,9 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   poly_free(tmp);
 
   fclose_maybe_compressed(ix, indexname);
-  purgedfile_stream_closefile(ps);
-  purgedfile_stream_clear(ps);
 
-  while (npairs > 0)
-    poly_free (pairs[--npairs]);
+  for (uint64_t i = 0; i < nrows; i++)
+    poly_free (pairs[i]);
   free (pairs);
   mpz_clear (ee);
   

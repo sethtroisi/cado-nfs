@@ -1065,10 +1065,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
             fprintf(stderr, "Considering only the first 64 dependencies\n");
     }
 
-    /* We also initiate the purgedfile_stream structure, it gives us the
-     * number of (a,b) pairs -- and we need to allocate a structure of
-     * that size early on
-     */
+    /* Read the number of (a,b) pairs */
     uint64_t nrows, ncols;
     purgedfile_read_firstline (purgedname, &nrows, &ncols);
     
@@ -1114,20 +1111,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         dep_files[i] = fopen_maybe_compressed (dep_names[i], "wb");
         ASSERT_ALWAYS(dep_files[i] != NULL);
     }
-    /*
-    for(uint64_t i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-        ASSERT_ALWAYS(i < ps->nrows);
-        for(unsigned int j = 0 ; j < nonzero_deps ; j++) {
-            if (abs[i] & dep_masks[j]) {
-                fprintf(dep_files[j], "%" PRId64 " %" PRIu64 "\n", ps->a, ps->b);
-                dep_counts[j]++;
-            }
-        }
-        if (purgedfile_stream_disp_progress_now_p(ps)) {
-            fprintf(stderr, "read (a,b) pair # %d / %" PRIu64 " at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
-                    ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
-        }
-    }*/
+
     sqrt_data_t data = {.abs = abs, .dep_masks = dep_masks,
                         .dep_counts = dep_counts, .nonzero_deps = nonzero_deps,
                         .dep_files = dep_files};
