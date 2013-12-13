@@ -1,6 +1,6 @@
 #include "cado.h"
 #include <stdlib.h> /* for malloc and free */
-#include "mpz_poly.h"
+#include "implicit_mpz_poly.h"
 #include "gmp_aux.h"
 
 static void mp_poly_evalz(mpz_t r, mpz_t * poly, int deg, mpz_srcptr a)

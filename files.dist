@@ -871,12 +871,10 @@ utils/modul_poly.c
 utils/modul_poly.h
 utils/mpz_array.c
 utils/mpz_array.h
-utils/mpz_poly.c
-utils/mpz_poly.h
+utils/implicit_mpz_poly.c
+utils/implicit_mpz_poly.h
 utils/params.c
 utils/params.h
-utils/plain_poly.c
-utils/plain_poly.h
 utils/poly.c
 utils/poly.h
 utils/purgedfile.c

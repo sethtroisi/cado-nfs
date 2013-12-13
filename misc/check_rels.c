@@ -21,7 +21,7 @@
 #include "utils.h"
 #include "relation.h"
 
-#include "mpz_poly.h"
+#include "implicit_mpz_poly.h"
 #include "filter_utils.h"
 
 static index_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
