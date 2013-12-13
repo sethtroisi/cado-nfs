@@ -643,11 +643,7 @@ class WorkunitClient(object):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
         options = "clientid=" + self.settings["CLIENTID"]
-        while not self.get_missing_file(url, self.wu_filename, options=options):
-            logging.error("Error downloading workunit file")
-            wait = float(self.settings["DOWNLOADRETRY"])
-            logging.error("Waiting %s seconds before retrying", wait)
-            time.sleep(wait)
+        self.get_missing_file(url, self.wu_filename, options=options)
 
     def cleanup(self):
         logging.info ("Removing workunit file %s", self.wu_filename)
@@ -664,7 +660,7 @@ class WorkunitClient(object):
                 # In Python 2, get_type() must be used to get the scheme
                 scheme = request.get_type().lower()
             else:
-                # The .get_Type() method was deprecated in 3.3 and removed
+                # The .get_type() method was deprecated in 3.3 and removed
                 # in 3.4, now the scheme is stored in the .type attribute
                 scheme = request.type.lower()
         else:
@@ -830,6 +826,15 @@ class WorkunitClient(object):
     
     def get_missing_file(self, urlpath, filename, checksum=None,
                          options=None):
+        """ Downloads a file if it does not exit already.
+
+        Also checks the checksum, if specified; if the file already exists and
+        has a wrong checksum, it is deleted an downloaded anew. If the
+        downloaded file has the wrong checksum, it is deleted and downloaded
+        anew. If the downloaded file has the same, incorrect checksum twice
+        in a row, the function returns False. In all other cases, it returns
+        True.
+        """
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
             logging.info ("%s already exists, not downloading", filename)
