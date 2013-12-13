@@ -51,7 +51,7 @@ void sieve_info_clear_unsieve_data(sieve_info_ptr si);
 
 void sieve_info_init_j_div(sieve_info_ptr);
 void sieve_info_clear_j_div(sieve_info_ptr);
-int  search_survivors_in_line(unsigned char * const[2], const unsigned char[2], 
+int  search_survivors_in_line(unsigned char * const restrict[2], const unsigned char[2], 
         unsigned int, unsigned int, int, j_div_srcptr, unsigned int,
         unsieve_aux_data_srcptr);
 
