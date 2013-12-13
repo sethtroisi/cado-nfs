@@ -2756,7 +2756,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
-        const unsigned int unsieve_thresh = 1;
+        const unsigned int unsieve_thresh = 100;
         surv += search_survivors_in_line(both_S, both_bounds,
                                          si->conf->logI, j + first_j, N,
                                          si->j_div, unsieve_thresh,
@@ -2840,7 +2840,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
-
+            // ASSERT_ALWAYS(bin_gcd_int64_safe(a,b)==1 || b == 0);
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
                 fprintf(stderr, "# about to start cofactorization for (%" PRId64 ",%" PRIu64 ")  %d %u\n",a,b, x, SS[x]);
