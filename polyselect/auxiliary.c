@@ -3216,7 +3216,6 @@ static void
 fdminus3_translated (mpz_poly_ptr h, mpz_poly_ptr f)
 {
   unsigned int d = f->deg;
-  ASSERT_ALWAYS(d == 3);
   ASSERT_ALWAYS(h->deg == 3);
   mpz_mul_ui (h->coeff[3], f->coeff[d], (d * (d-1) * (d-2)) / 6);
   mpz_mul_ui (h->coeff[2], f->coeff[d-1], ((d-1) * (d-2)) / 2);
