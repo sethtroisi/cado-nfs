@@ -3351,7 +3351,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         # realtotal = self.get_total_cpu_or_real_time(False)
         self.print_cpu_real_time(cputotal, elapsed, "everything");
 
-        if not last_status:
+        if last_task and not last_status:
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
             return None
 
