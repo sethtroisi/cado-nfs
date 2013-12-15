@@ -19,7 +19,7 @@
 // shared by merge and replay, and needs to know about it.
 
 typedef struct {
-    int32_t ind_row;
+    uint32_t ind_row;
     int32_t e;
 } multirel_t;
 
