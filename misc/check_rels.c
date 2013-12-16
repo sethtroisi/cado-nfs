@@ -168,9 +168,10 @@ process_one_relation (earlyparsed_relation_ptr rel)
       {
         if (verbose != 0)
         {
+          unsigned int side = (unsigned int) rel->primes[i].h;
           print_error_line (rel->num, rel->a, rel->b, err, nonprime);
           fprintf (stderr, "    given factor %" PRpr " is not prime on side "
-                           "%u\n", p, rel->primes[i].h);
+                           "%u\n", p, side);
         }
         nonprime = 1;
         if (complete_rels) // if complete_rels = 1, we factor it

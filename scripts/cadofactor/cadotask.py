@@ -3323,11 +3323,13 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 
         self.servertask.run()
         
+        last_task = None
+        last_status = True
         try:
             self.start_all_clients()
             
-            while self.run_next_task():
-                pass
+            while last_status:
+                last_status, last_task = self.run_next_task()
             
             for task in self.tasks:
                 task.print_stats()
@@ -3342,13 +3344,18 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 
         if had_interrupt:
             return None
-        else:
-            cputotal = self.get_total_cpu_or_real_time(True)
-            # Do we want the sum of real times over all sub-processes for
-            # something?
-            # realtotal = self.get_total_cpu_or_real_time(False)
-            self.print_cpu_real_time(cputotal, elapsed, "everything");
-            return self.sqrt.get_factors()
+
+        cputotal = self.get_total_cpu_or_real_time(True)
+        # Do we want the sum of real times over all sub-processes for
+        # something?
+        # realtotal = self.get_total_cpu_or_real_time(False)
+        self.print_cpu_real_time(cputotal, elapsed, "everything");
+
+        if last_task and not last_status:
+            self.logger.fatal("Premature exit within %s. Bye.", last_task)
+            return None
+
+        return self.sqrt.get_factors()
     
     def start_all_clients(self):
         url = self.servertask.get_url()
@@ -3386,8 +3393,8 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 # self.logger.info("Next task that wants to run: %s",
                 #                  task.title)
                 self.tasks_that_want_to_run.remove(task)
-                return task.run()
-        return False
+                return [task.run(), task.title]
+        return [False, None]
     
     def get_total_cpu_or_real_time(self, is_cpu):
         total = 0;

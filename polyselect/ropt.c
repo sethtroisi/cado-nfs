@@ -25,20 +25,23 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
   mpz_t m, *fuv, *guv;
+  mpz_poly_t Fuv;
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
 
   /* var for computing E */
-  fuv = (mpz_t*) malloc ((poly->d + 1) * sizeof (mpz_t));
+  mpz_poly_init (Fuv, poly->d);
+  Fuv->deg = poly->d;
+  fuv = Fuv->coeff;
   guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
-  if (fuv == NULL || guv == NULL) {
+  if (guv == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in "
              "ropt_get_bestpoly().\n");
     exit (1);
   }
   for (i = 0; i <= poly->d; i++)
-    mpz_init_set (fuv[i], poly->f[i]);
+    mpz_set (fuv[i], poly->f[i]);
   for (i = 0; i < 2; i++)
     mpz_init_set (guv[i], poly->g[i]);
 
@@ -56,8 +59,8 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d,
                     global_E_pqueue->u[i], global_E_pqueue->v[i]);
-    optimize_aux (fuv, poly->d, guv, 0, 0, CIRCULAR);
-    ave_MurphyE = print_poly_fg (fuv, guv, poly->d, poly->n, 0);
+    optimize_aux (Fuv, guv, 0, 0, CIRCULAR);
+    ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
     if (ave_MurphyE > best_E) {
       best_E = ave_MurphyE;
@@ -70,12 +73,10 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   }
 
 
-  for (i = 0; i <= poly->d; i++)
-    mpz_clear (fuv[i]);
+  mpz_poly_free (Fuv);
   for (i = 0; i < 2; i++)
     mpz_clear (guv[i]);
   mpz_clear (m);
-  free (fuv);
   free (guv);
 }
 
@@ -96,21 +97,24 @@ ropt_do_stage2 (ropt_poly_t poly,
   ropt_bound_t bound;
   ropt_s2param_t s2param;
   MurphyE_pq *global_E_pqueue;
+  mpz_poly_t Fuv;
 
   ropt_bound_init (bound);
   new_MurphyE_pq (&global_E_pqueue, 4);
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
-  fuv = (mpz_t*) malloc ((poly->d + 1) * sizeof (mpz_t));
+  mpz_poly_init (Fuv, poly->d);
+  Fuv->deg = poly->d;
+  fuv = Fuv->coeff;
   guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
-  if (fuv == NULL || guv == NULL) {
+  if (guv == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in "
              "ropt_do_stage2().\n");
     exit (1);
   }
   for (i = 0; i <= poly->d; i++)
-    mpz_init_set (fuv[i], poly->f[i]);
+    mpz_set (fuv[i], poly->f[i]);
   for (i = 0; i < 2; i++)
     mpz_init_set (guv[i], poly->g[i]);
 
@@ -125,7 +129,7 @@ ropt_do_stage2 (ropt_poly_t poly,
 
   /* print some basic information */
   compute_fuv_mp (fuv, poly->f, poly->g, poly->d, param->s2_u, param->s2_v);
-  alpha_lat = get_alpha (fuv, poly->d, 2000);
+  alpha_lat = get_alpha (Fuv, 2000);
   gmp_fprintf ( stderr,
                 "\n# Info: Sieve on sublattice, (w, u, v): (%d, %Zd, %Zd) "
                 "(mod %Zd)\n"
@@ -158,11 +162,9 @@ ropt_do_stage2 (ropt_poly_t poly,
   ropt_bound_free (bound);
   ropt_s2param_free (poly, s2param);
   mpz_clear (m);
-  for (i = 0; i <= poly->d; i++)
-    mpz_clear (fuv[i]);
+  mpz_poly_free (Fuv);
   for (i = 0; i < 2; i++)
     mpz_clear (guv[i]);
-  free (fuv);
   free (guv);
 
 }

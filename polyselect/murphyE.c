@@ -55,6 +55,12 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
   double one_over_logBf, one_over_logBg;
   double_poly_t f, g;
   unsigned int i;
+  mpz_poly_t F, G;
+
+  F->coeff = cpoly->alg->f;
+  F->deg = cpoly->alg->degree;
+  G->coeff = cpoly->rat->f;
+  G->deg = cpoly->rat->degree;
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);
@@ -64,8 +70,8 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
     f->coeff[i] = mpz_get_d (cpoly->alg->f[i]);
   for (i = 0; i <= g->deg; i++)
     g->coeff[i] = mpz_get_d (cpoly->rat->f[i]);
-  alpha_f = get_alpha (cpoly->alg->f, f->deg, ALPHA_BOUND);
-  alpha_g = get_alpha (cpoly->rat->f, g->deg, ALPHA_BOUND);
+  alpha_f = get_alpha (F, ALPHA_BOUND);
+  alpha_g = get_alpha (G, ALPHA_BOUND);
   one_over_logBf = 1.0 / log (Bf);
   one_over_logBg = 1.0 / log (Bg);
   for (int i = 0; i < K; i++)

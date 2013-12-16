@@ -527,12 +527,12 @@ writeIndex(const char *indexname, index_data_t index_data,
         fprintf(indexfile, "%d", index_data[i].n);
         for (unsigned int j = 0; j < index_data[i].n; ++j) {
 #ifdef FOR_DL
-            fprintf(indexfile, " %" PRxid ":%d",
+            fprintf(indexfile, " %" PRIx32 ":%d",
                     index_data[i].rels[j].ind_row,
                     index_data[i].rels[j].e);
 #else
             ASSERT (index_data[i].rels[j].e == 1);
-            fprintf(indexfile, " %" PRxid "",
+            fprintf(indexfile, " %" PRIx32 "",
                     index_data[i].rels[j].ind_row);
 #endif
         }

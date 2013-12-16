@@ -1,13 +1,11 @@
 /* arithmetic on polynomial with double-precision coefficients */
 #include "cado.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
-#include "macros.h"
-#include "double_poly.h"
+#include "utils.h"
 #include "portability.h"
 
 /* Initialize a polynomial of degree d */
@@ -105,4 +103,14 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
     }
 
   fprintf (stream, "\n");
+}
+
+void
+double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q)
+{
+  unsigned int d = p->deg, i;
+
+  ASSERT_ALWAYS (d == (unsigned int) q->deg);
+  for (i = 0; i <= d; i++)
+    p->coeff[i] = mpz_get_d (q->coeff[i]);
 }

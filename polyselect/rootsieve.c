@@ -186,21 +186,22 @@ alpha_p_projective (mpz_t *f, int d, mpz_t disc, unsigned long p)
 
   if (mpz_divisible_ui_p (disc, p))
     {
-      mpz_array_t *q;
       mpz_t c;
-
+      mpz_poly_t q;
+      
       /* compute q = reverse(f)(px): q[0] = f[d], q[1] = f[d-1]*p, ...,
 	 q[d] = f[0]*p^d */
-	q = alloc_mpz_array (d + 1);
+        mpz_poly_init (q, d);
+        q->deg = d;
 	mpz_init_set_ui (c, 1);
 	for (i = 0; i <= d; i++)
 	  {
-	    mpz_mul ((q->data)[i], f[d-i], c);
+	    mpz_mul ((q->coeff)[i], f[d-i], c);
 	    mpz_mul_ui (c, c, p);
 	  }
-	e = average_valuation_affine (q->data, d, p) / (double) (p + 1);
+	e = average_valuation_affine (q, p) / (double) (p + 1);
 	mpz_clear (c);
-	clear_mpz_array (q);
+        mpz_poly_free (q);
 	return -e * log ((double) p);
     }
   else

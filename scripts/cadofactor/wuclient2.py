@@ -608,6 +608,13 @@ class WorkunitParseError(ValueError):
     """ Parsing the workunit failed """
     pass
 
+class WorkunitClientToFinish(Exception):
+    """ we received a 410 (probably while attempting to download a WU) """
+    def __init__(self, explanation):
+        self.text = explanation
+    def  __str__(self):
+        return self.text
+
 class WorkunitClient(object):
     def __init__(self, settings):
         self.settings = settings
@@ -643,11 +650,7 @@ class WorkunitClient(object):
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
         options = "clientid=" + self.settings["CLIENTID"]
-        while not self.get_missing_file(url, self.wu_filename, options=options):
-            logging.error("Error downloading workunit file")
-            wait = float(self.settings["DOWNLOADRETRY"])
-            logging.error("Waiting %s seconds before retrying", wait)
-            time.sleep(wait)
+        self.get_missing_file(url, self.wu_filename, options=options)
 
     def cleanup(self):
         logging.info ("Removing workunit file %s", self.wu_filename)
@@ -664,7 +667,7 @@ class WorkunitClient(object):
                 # In Python 2, get_type() must be used to get the scheme
                 scheme = request.get_type().lower()
             else:
-                # The .get_Type() method was deprecated in 3.3 and removed
+                # The .get_type() method was deprecated in 3.3 and removed
                 # in 3.4, now the scheme is stored in the .type attribute
                 scheme = request.type.lower()
         else:
@@ -688,30 +691,54 @@ class WorkunitClient(object):
             # urlopen() does not accept)
             return urllib_request.urlopen(request)
     
-    @staticmethod
-    def _urlopen(request, wait, silent_wait=False, is_upload=False, cafile=None):
+    def _urlopen(self, request, wait, is_upload=False, cafile=None):
         """ Wrapper around urllib2.urlopen() that retries in case of
         connection failure.
         """
         conn = None
         waiting_since = 0
+        # this knowingly mixes http status codes in the 400- 500- range
+        # with errno errors. It's ugly.
+        last_error = 0
+        current_error = 0
+        # record the number of connection failures
+        connfailed = 0
+        maxconnfailed = int(self.settings["MAX_CONNECTION_FAILURES"])
+        silent_wait=self.settings["SILENT_WAIT"]
         while conn is None:
             try:
                 conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
+            except urllib_error.HTTPError as error:
+                current_error = error.code
+                if error.code == 410:
+                    # We interpret error code 410 as the work unit server
+                    # being gone for good. This instructs us to terminate
+                    # the workunit client, which we do by letting an
+                    # exception pop up a few levels up (eeek)
+                    raise WorkunitClientToFinish("Received 410 from server")
+                conn = None
+                errorstr = "URL error: %s" % str(error)
             except urllib_error.URLError as error:
                 conn = None
                 errorstr = "URL error: %s" % str(error)
+                current_error = error.reason.errno
             except BadStatusLine as error:
                 conn = None
                 errorstr = "Bad Status line: %s" % str(error)
-            except socket.error as error:
-                if error.errno == errno.ECONNRESET:
-                    conn = None
-                    errorstr = "Error connecting: %s" % str(error)
-                else:
-                    raise
+            # we used to trap socket.error, but I believe it's always
+            # wrapped by urllib, so we shouldn't see it.
             if not conn:
-                if waiting_since == 0 or not silent_wait:
+                givemsg = is_upload or not silent_wait or waiting_since == 0
+                if current_error > 0:
+                    if current_error != last_error:
+                        givemsg = True
+                    if current_error == errno.ECONNREFUSED or \
+                            current_error == errno.ECONNRESET:
+                        connfailed += 1
+                    else:
+                        connfailed = 0
+
+                if givemsg:
                     logging.error("%s failed, %s", 
                                   'Upload' if is_upload else 'Download', 
                                   errorstr)
@@ -719,10 +746,14 @@ class WorkunitClient(object):
                         logging.error("Waiting %s seconds before retrying (I have been waiting since %s seconds)", wait, waiting_since)
                     else:
                         logging.error("Waiting %s seconds before retrying", wait)
+                if current_error > 0:
+                    last_error = current_error
+                    if connfailed > maxconnfailed:
+                        raise WorkunitClientToFinish("Connection failed %s times" % maxconnfailed)
                 time.sleep(wait)
                 waiting_since+=wait
         if waiting_since > 0:
-            logging.info ("Got work after %s seconds wait", waiting_since)
+            logging.info ("Opened URL %s after %s seconds wait", request, waiting_since)
         return conn
 
     @staticmethod
@@ -747,12 +778,16 @@ class WorkunitClient(object):
         """ Runs a command to download a file, retrying indefinitely in case
         of error
         """
+        silent_wait=self.settings["SILENT_WAIT"]
+        waiting_since = 0
         while True:
             (rc, stdout, stderr) = run_command (command, print_error=True)
             if rc == 0:
                 return True
-            logging.error("Download of %s failed. Waiting %s seconds before "
-                          "retrying,", url, wait)
+            if waiting_since == 0 or not silent_wait:
+                logging.error("Download of %s failed. Waiting %s seconds before "
+                              "retrying,", url, wait)
+            waiting_since+=wait
             time.sleep(wait)
 
     def wget_file(self, url, wait, dlpath, cafile=None):
@@ -801,7 +836,7 @@ class WorkunitClient(object):
             elif HAVE_CURL:
                 return self.curl_get_file(url, wait, dlpath, cafile=cafile)
 
-        request = self._urlopen(url, wait, silent_wait=self.settings["SILENT_WAIT"], cafile=cafile)
+        request = self._urlopen(url, wait, cafile=cafile)
         # Try to open the file exclusively
         try:
             fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
@@ -830,6 +865,15 @@ class WorkunitClient(object):
     
     def get_missing_file(self, urlpath, filename, checksum=None,
                          options=None):
+        """ Downloads a file if it does not exit already.
+
+        Also checks the checksum, if specified; if the file already exists and
+        has a wrong checksum, it is deleted an downloaded anew. If the
+        downloaded file has the wrong checksum, it is deleted and downloaded
+        anew. If the downloaded file has the same, incorrect checksum twice
+        in a row, the function returns False. In all other cases, it returns
+        True.
+        """
         # print('get_missing_file(%s, %s, %s)' % (urlpath, filename, checksum))
         if os.path.isfile(filename):
             logging.info ("%s already exists, not downloading", filename)
@@ -848,11 +892,8 @@ class WorkunitClient(object):
         # workunit do not agree
         last_filesum = None
         while True:
-            try:
-                self.get_file(urlpath, filename, options)
-            except urllib_error.HTTPError as error:
-                logging.error (str(error))
-                return False
+            # we were catching HTTPError here previously. Useless now ?
+            self.get_file(urlpath, filename, options)
             if checksum is None:
                 return True
             filesum = self.do_checksum(filename)
@@ -1130,6 +1171,7 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                      ("10", "Time to wait before download retries"),
                      "CERTSHA1" : (None, "SHA1 of server SSL certificate"),
                      "SILENT_WAIT": (None, "Discard repeated messages about client waiting for work (does not affect uploads)"),
+                     "MAX_CONNECTION_FAILURES" : ("999999", "Maximum number of successive connection failures to tolerate"),
                      "NICENESS" : 
                      ("0", "Run subprocesses under this niceness"),
                      "LOGLEVEL" : ("INFO", "Verbosity of logging"),
@@ -1293,6 +1335,9 @@ if __name__ == '__main__':
                     logging.critical("Had %d bad workunit files. Aborting.", bad_wu_counter)
                     break
                 continue
+            except WorkunitClientToFinish as e:
+                logging.info("Client finishing: %s. Bye." % e)
+                break
             client_ok = client.process()
         except Exception:
             logging.exception("Exception occurred")
