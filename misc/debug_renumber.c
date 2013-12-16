@@ -8,9 +8,7 @@
 #include "utils.h"
 
 #ifdef FOR_FFS
-#include "fppol.h"
-#include "fq.h"
-#include "utils_ffs.h"
+#include "utils-ffs.h"
 #endif
 
 static void declare_usage(param_list pl)

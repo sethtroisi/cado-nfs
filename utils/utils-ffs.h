@@ -1,9 +1,11 @@
+#ifndef	CADO_UTILS_FFS_H_
+#define	CADO_UTILS_FFS_H_
 /* Contains functions used when doing filter step for FFS instead of NFS */
-#ifndef UTILS_FFS_H_
-#define UTILS_FFS_H_
+
+#include "utils_with_io.h"
 
 index_t findroot_ffs (int64_t a, uint64_t b, index_t p);
 int ffs_poly_read(cado_poly poly, const char *filename);
-int sq_is_irreducible(sq_srcptr p);
 
-#endif
+
+#endif	/* CADO_UTILS_FFS_H_ */

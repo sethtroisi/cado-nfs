@@ -4,6 +4,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "fppol.h"
+#include "fq.h"
 
 #include "types.h"
 #include "polyfactor.h"
@@ -37,16 +38,6 @@ findroot_ffs (int64_t a, uint64_t b, p_r_values_t p)
   fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
 
   return (index_t) fppol64_get_ui_sparse(pol_r);
-}
-
-int sq_is_irreducible(sq_srcptr p)
-{
-  fppol_t P;
-  fppol_init(P);
-  fppol_set_sq(P, p);
-  int ret = fppol_is_irreducible(P);
-  fppol_clear(P);
-  return ret;
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)

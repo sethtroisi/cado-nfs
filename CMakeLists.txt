@@ -214,7 +214,6 @@ configure_file(cado_config_h.in cado_config.h ESCAPE_QUOTES @ONLY)
 include_directories (${CADO_NFS_SOURCE_DIR})
 include_directories (${CADO_NFS_SOURCE_DIR}/utils)
 include_directories (${CADO_NFS_BINARY_DIR})
-include_directories (${CADO_NFS_SOURCE_DIR}/filter)
 
 # link_directories (${CADO_NFS_BINARY_DIR}/utils)
 # link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)

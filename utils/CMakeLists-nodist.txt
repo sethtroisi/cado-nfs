@@ -6,4 +6,22 @@ add_executable(qrange_to_qlist qrange_to_qlist.c)
 target_link_libraries(qrange_to_qlist utils)
 install(TARGETS qrange_to_qlist RUNTIME DESTINATION bin/utils)
 
+
+#utils lib for ffs
+link_directories (${CADO_NFS_BINARY_DIR}/ffs/f2)
+link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
+include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
+#link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs) # to link gf2x
+
+add_library (utils-ffs-f2 ${CADO_SHARED} EXCLUDE_FROM_ALL utils-ffs.c)
+target_link_libraries(utils-ffs-f2 utils_with_io libfppol-f2.a)
+#target_link_libraries(utils-ffs-f2 utils_with_io libfppol-f2.a gf2x) # to link gf2x
+set_target_properties(utils-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+#add_dependencies(utils-ffs-f2 gf2x-build) # to link gf2x
+
+add_library (utils-ffs-f3 ${CADO_SHARED} EXCLUDE_FROM_ALL utils-ffs.c)
+target_link_libraries(utils-ffs-f3 utils_with_io libfppol-f3.a)
+set_target_properties(utils-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
+
+
 # vim: set ft=cmake:

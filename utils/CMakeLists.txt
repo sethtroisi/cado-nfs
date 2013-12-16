@@ -21,12 +21,12 @@ set (sources_io
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils ${CADO_SHARED} ${sources})
 target_link_libraries(utils pthread ${gmp_libname} m)
-install(TARGETS utils DESTINATION lib/${package_basename})
 
-add_library (filter_with_io ${CADO_SHARED} ${sources_io})
-target_link_libraries(filter_with_io utils)
-install(TARGETS filter_with_io DESTINATION lib/${package_basename})
-add_dependencies(filter_with_io antebuffer)
+add_library (utils_with_io ${CADO_SHARED} ${sources_io})
+target_link_libraries(utils_with_io utils)
+add_dependencies(utils_with_io antebuffer)
+
+install(TARGETS utils utils_with_io DESTINATION lib/${package_basename})
 
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)

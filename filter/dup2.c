@@ -52,9 +52,7 @@
 #include "filter_common.h"
 
 #ifdef FOR_FFS
-#include "fppol.h"
-#include "fq.h"
-#include "utils_ffs.h"
+#include "utils-ffs.h"
 #endif
 #include "filter_badideals.h"
 
