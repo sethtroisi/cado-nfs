@@ -62,12 +62,8 @@ factor.sh
 filter/CMakeLists.txt
 filter/Makefile
 filter/filter_badideals.h
-filter/filter_io.cpp
-filter/filter_io.h
-filter/filter_utils.c
-filter/filter_utils.h
-filter/filter_memalloc.c
-filter/filter_memalloc.h
+filter/filter_common.c
+filter/filter_common.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c
@@ -88,11 +84,7 @@ filter/report.c
 filter/report.h
 filter/sparse.c
 filter/sparse.h
-filter/utils_ffs.c
-filter/utils_ffs.h
 filter/sm.c
-filter/filter_sm.c
-filter/filter_sm.h
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING
@@ -408,6 +400,7 @@ local.sh.macosx-10.5
 local.sh.macosx-10.8
 macros.h
 misc/CMakeLists.txt
+misc/CMakeLists-nodist.txt
 misc/convert_poly.c
 misc/convert_rels.c
 misc/check_rels.c
@@ -911,6 +904,16 @@ utils/varlist.h
 utils/roots_mod.c
 utils/test_roots_mod.c
 utils/test_omega.c
+utils/memalloc.c
+utils/memalloc.h
+utils/filter_io.cpp
+utils/filter_io.h
+utils/filter_io.tex
+utils/sm_utils.c
+utils/sm_utils.h
+utils/utils_with_io.h
+utils/utils-ffs.c
+utils/utils-ffs.h
 linalg/bwc/mpfq/abase_p_3.c
 linalg/bwc/mpfq/abase_p_3.h
 linalg/bwc/mpfq/abase_p_3_t.c
@@ -1042,4 +1045,3 @@ ffs/timing.h
 ffs/types.h
 ffs/version.sh
 ffs/Makefile.local.example
-filter/filter_io.tex
