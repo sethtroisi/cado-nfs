@@ -1531,6 +1531,7 @@ if __name__ == '__main__': # {
         value =  getattr(__builtins__, itemtype)(keyvalue)
         dbdict = DictDbAccess(dbname, name)
         dbdict[keyname] = value
+        del(dbdict)
 
     # Functions for testing
     if args["assign"]:
