@@ -383,7 +383,7 @@ shash_init (shash_t H, unsigned int init_size)
 
   /* round up to multiple of SHASH_NBUCKETS */
   init_size = 1 + (init_size - 1) / SHASH_NBUCKETS;
-  init_size += init_size / 10 + 128; /* use 10% margin */
+  init_size += init_size / 8 + 128; /* use 12.5% margin */
   if (init_size > init_size0)
     init_size = init_size0;
   H->alloc = init_size * (SHASH_NBUCKETS + 1) + 8;
