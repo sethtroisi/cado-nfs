@@ -106,7 +106,10 @@ void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 int factor_leftover_norm (mpz_t n,
                           mpz_array_t* const factors,
 			  uint32_array_t* const multis,
-                          sieve_info_ptr si, int side);
+                          sieve_info_srcptr si, int side);
+static int
+factor_both_leftover_norms(mpz_t *, const mpz_t, mpz_array_t **, 
+                           uint32_array_t **, sieve_info_srcptr);
 /* }}} */
 
 /*****************************/
@@ -2936,39 +2939,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 }
             }
 
-            unsigned int nbits[2];
-            int first;
-
-            for (int z = 0; z < 2; z++)
-              nbits[z] = mpz_sizeinbase (norm[z], 2);
-
-            if (cof_calls[0][nbits[0]] > 0 && cof_calls[1][nbits[1]] > 0)
-              {
-                if (cof_fails[0][nbits[0]] / cof_calls[0][nbits[0]] >
-                    cof_fails[1][nbits[1]] / cof_calls[1][nbits[1]])
-                  first = 0;
-                else
-                  first = 1;
-              }
-            else
-              /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
-               * be smooth. We factor it first. Otherwise we factor it last. */
-              first = mpz_cmp (norm[RATIONAL_SIDE], BLPrat) > 0
-                ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
-
-            for (int z = 0 ; pass > 0 && z < 2 ; z++)
-              {
-                int side = first ^ z;
-                cof_calls[side][nbits[side]] ++;
-                pass = factor_leftover_norm (norm[side], f[side], m[side],
-                                             si, side);
-                if (pass <= 0)
-                  cof_fails[side][nbits[side]] ++;
-#ifdef TRACE_K
-                if (trace_on_spot_ab(a, b) && pass == 0)
-                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%" PRId64 ",%" PRIu64 "), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
-#endif
-              }
+            pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
 
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                         factorization was incomplete */
@@ -3193,7 +3164,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 int
 factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
                       uint32_array_t* const multis,
-                      sieve_info_ptr si, int side)
+                      sieve_info_srcptr si, int side)
 {
   unsigned int lpb = si->conf->sides[side]->lpb;
   facul_strategy_t *strategy = si->sides[side]->strategy;
@@ -3271,6 +3242,59 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
         return -1;
     }
   return 0; /* unable to completely factor n */
+}
+/*}}}*/
+
+/* {{{ factor_both_leftover_norms */
+/*
+    This function factors the leftover norms on both sides. Currently it 
+    simply calls factor_leftover_norm() twice, first on the side more likely
+    to fail the smoothness test so that the second call can be omitted.
+    The long-term plan is to use a more elaborate factoring strategy,
+    passing both composites to facul_*() so it can try individual factoring
+    methods on each side until smoothness or (likely) non-smoothness is
+    decided.
+*/
+
+static int
+factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
+                           uint32_array_t **m, sieve_info_srcptr si)
+{
+    unsigned int nbits[2];
+    int first, pass = 1;
+
+    for (int z = 0; z < 2; z++)
+      nbits[z] = mpz_sizeinbase (norm[z], 2);
+
+    if (cof_calls[0][nbits[0]] > 0 && cof_calls[1][nbits[1]] > 0)
+      {
+        if (cof_fails[0][nbits[0]] * cof_calls[1][nbits[1]] >
+            cof_fails[1][nbits[1]] * cof_calls[0][nbits[0]])
+          first = 0;
+        else
+          first = 1;
+      }
+    else
+      /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
+       * be smooth. We factor it first. Otherwise we factor it last. */
+      first = mpz_cmp (norm[RATIONAL_SIDE], BLPrat) > 0
+        ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+
+    for (int z = 0 ; pass > 0 && z < 2 ; z++)
+      {
+        int side = first ^ z;
+        cof_calls[side][nbits[side]] ++;
+        pass = factor_leftover_norm (norm[side], f[side], m[side],
+                                     si, side);
+        if (pass <= 0)
+          cof_fails[side][nbits[side]] ++;
+#ifdef TRACE_K
+        if (trace_on_spot_ab(a, b) && pass == 0)
+          gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%" PRId64 ",%" PRIu64 "), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
+#endif
+      }
+    return pass;
+
 }
 /*}}}*/
 
