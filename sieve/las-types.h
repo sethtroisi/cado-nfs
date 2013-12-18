@@ -187,6 +187,7 @@ struct sieve_info_s {
 
     /* I think that by default, unsieving is not done */
     unsieve_aux_data us;
+    j_div_ptr j_div;
 
     /* used in check_leftover_norm */
     mpz_t BB[2], BBB[2], BBBB[2];

@@ -3,18 +3,24 @@
 #include <string.h>
 
 #include "las-unsieve.h"
+#include "ularith.h"
+#include "las-norms.h"
+#include "gcd.h"
+
+static const int verify_gcd = 0; /* Enable slow but thorough test */
 
 /* Set every stride-th byte, starting at index 0, to 255 in an array of
-   stride unsieve_pattern_t's */
+   stride unsieve_pattern_t's, and set all other bytes to 0. */
 static void
-minisieve(unsieve_pattern_t *array, size_t stride)
+minisieve(unsieve_pattern_t * const array, const size_t stride)
 {
     memset (array, 0, stride * sizeof(unsieve_pattern_t));
     for (size_t i = 0; i < stride * sizeof(unsieve_pattern_t); i += stride)
       ((unsigned char *) array)[i] = 255;
 }
 
-void sieve_info_init_unsieve_data(sieve_info_ptr si)
+void
+sieve_info_init_unsieve_data(sieve_info_ptr si)
 {
   /* Store largest prime factor of k in si->us->lpf[k], 0 for k=0, 1 for k=1 */
   si->us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) << si->conf->logI);
@@ -55,50 +61,49 @@ void sieve_info_clear_unsieve_data(sieve_info_ptr si)
   free (si->us->entries);
 }
 
-#ifdef UNSIEVE_NOT_COPRIME
 static inline void
 unsieve_one_prime (unsigned char *line_start, const unsigned int p, 
-                   const unsigned int y, const unsigned int start_idx,
-                   sieve_info_srcptr si)
+                   const unsigned int j, const unsigned int start_idx,
+                   const unsigned int I)
 {
-  unsigned int x, np = p; /* if 2|y, np=2p, else np=p */
+  unsigned int x, np = p; /* if 2|j, np=2p, else np=p */
 
   x = start_idx;
-  if (y % 2U == 0U)
+  if (j % 2U == 0U)
     {
       np += p;
       if (x % 2U == 0U)
         x += p;
     }
-  for ( ; x < si->I; x += np)
+  for ( ; x < I; x += np)
     line_start[x] = 255;
 }
 
 
 static inline void
 unsieve_3(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i, pattern_idx;
   unsieve_pattern_t p0, p1, p2;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
 
-  if (sizeof(unsieve_pattern_t) == 4)
+  if (sizeof(unsieve_pattern_t) == 4) {
     /* -4^(-1) == 2 (mod 3) */
     pattern_idx = (2 * start_idx) % 3;
-  else if (sizeof(unsieve_pattern_t) == 8)
+  } else if (sizeof(unsieve_pattern_t) == 8) {
     /* -8^(-1) == 1 (mod 3) */
     pattern_idx = start_idx;
-  else if (sizeof(unsieve_pattern_t) == 16)
+  } else if (sizeof(unsieve_pattern_t) == 16) {
     /* -16^(-1) == 2 (mod 3) */
     pattern_idx = (2 * start_idx) % 3;
-  else
+  } else
     abort();
   
-  p0 = si->us->pattern3[pattern_idx];
-  p1 = si->us->pattern3[(pattern_idx + 1) % 3];
-  p2 = si->us->pattern3[(pattern_idx + 2) % 3];
+  p0 = us->pattern3[pattern_idx];
+  p1 = us->pattern3[(pattern_idx + 1) % 3];
+  p2 = us->pattern3[(pattern_idx + 2) % 3];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -118,9 +123,9 @@ unsieve_3(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_5(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
@@ -138,11 +143,11 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
   } else
     abort();
   
-  p0 = si->us->pattern5[pattern_idx];
-  p1 = si->us->pattern5[(pattern_idx + 1) % 5];
-  p2 = si->us->pattern5[(pattern_idx + 2) % 5];
-  p3 = si->us->pattern5[(pattern_idx + 3) % 5];
-  p4 = si->us->pattern5[(pattern_idx + 4) % 5];
+  p0 = us->pattern5[pattern_idx];
+  p1 = us->pattern5[(pattern_idx + 1) % 5];
+  p2 = us->pattern5[(pattern_idx + 2) % 5];
+  p3 = us->pattern5[(pattern_idx + 3) % 5];
+  p4 = us->pattern5[(pattern_idx + 4) % 5];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -167,9 +172,9 @@ unsieve_5(unsigned char *line_start, const unsigned int start_idx,
 
 static inline void
 unsieve_7(unsigned char *line_start, const unsigned int start_idx,
-          sieve_info_srcptr si)
+          const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int I_upt  = si->I / sizeof (unsieve_pattern_t);
+  const unsigned int I_upt  = I / sizeof (unsieve_pattern_t);
   unsigned int i;
   unsieve_pattern_t p0, p1, p2, p3, p4, p5, p6;
   unsieve_pattern_t * restrict ul_line_start = (unsieve_pattern_t *) line_start;
@@ -187,13 +192,13 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
   } else
     abort();
   
-  p0 = si->us->pattern7[pattern_idx];
-  p1 = si->us->pattern7[(pattern_idx + 1) % 7];
-  p2 = si->us->pattern7[(pattern_idx + 2) % 7];
-  p3 = si->us->pattern7[(pattern_idx + 3) % 7];
-  p4 = si->us->pattern7[(pattern_idx + 4) % 7];
-  p5 = si->us->pattern7[(pattern_idx + 5) % 7];
-  p6 = si->us->pattern7[(pattern_idx + 6) % 7];
+  p0 = us->pattern7[pattern_idx];
+  p1 = us->pattern7[(pattern_idx + 1) % 7];
+  p2 = us->pattern7[(pattern_idx + 2) % 7];
+  p3 = us->pattern7[(pattern_idx + 3) % 7];
+  p4 = us->pattern7[(pattern_idx + 4) % 7];
+  p5 = us->pattern7[(pattern_idx + 5) % 7];
+  p6 = us->pattern7[(pattern_idx + 6) % 7];
 
   ASSERT_ALWAYS(((unsigned char *)&p0)[start_idx] == 255);
   
@@ -222,52 +227,396 @@ unsieve_7(unsigned char *line_start, const unsigned int start_idx,
     UNSIEVE_OR(ul_line_start[i + 5], p5);
 }
 
-/* Set locations where gcd(i,j) != 1 to 255 */
-void 
-unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
+
+static void
+unsieve_not_coprime_line(unsigned char * restrict line_start,
+                         const unsigned int j, const unsigned int min_p,
+                         const unsigned int I, unsieve_aux_data_srcptr us)
 {
-  const unsigned int lines_per_region = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-  unsigned int y; /* Line coordinate within bucket region */
-  for (y = (N == 0U ? 1U : 0U); y < lines_per_region; y++)
+  unsigned int p, start_idx, c = j;
+
+  if (j == 0)
+    return;
+
+  while (c % 2U == 0U) 
+    c >>= 1;
+
+  while (1)
     {
-      unsigned int c = y + N * lines_per_region;
-      unsigned int p, start_idx;
-      unsigned char *line_start = S + (y << si->conf->logI);
-
-      while (c % 2U == 0U) 
-        c >>= 1;
-
-      while (1)
-        {
-          p = si->us->entries[c].lpf; /* set p to largest prime factor of c */
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-          if (p <= 7)
-            break;
-          unsieve_one_prime (line_start, p, y, start_idx, si);
-        }
-      
-      if (p == 7U)
-        {
-          unsieve_7(line_start, start_idx, si);
-          p = si->us->entries[c].lpf;
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-        }
-
-      if (p == 5U)
-        {
-          unsieve_5(line_start, start_idx, si);
-          p = si->us->entries[c].lpf;
-          start_idx = si->us->entries[c].start;
-          c = si->us->entries[c].cof;
-        }
-
-      if (p == 3U)
-        {
-          unsieve_3(line_start, start_idx, si);
-        }
-      ASSERT_ALWAYS(c <= 1);
+      p = us->entries[c].lpf; /* set p to largest prime factor of c */
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+      if (p < min_p)
+        return;
+      if (p <= 7)
+        break;
+      unsieve_one_prime (line_start, p, j, start_idx, I);
     }
+  
+  if (p == 7U)
+    {
+      unsieve_7(line_start, start_idx, I, us);
+      p = us->entries[c].lpf;
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+    }
+
+  if (p < min_p)
+    return;
+  
+  if (p == 5U)
+    {
+      unsieve_5(line_start, start_idx, I, us);
+      p = us->entries[c].lpf;
+      start_idx = us->entries[c].start;
+      c = us->entries[c].cof;
+    }
+
+  if (p < min_p)
+    return;
+  
+  if (p == 3U)
+    {
+      unsieve_3(line_start, start_idx, I, us);
+    }
+  ASSERT_ALWAYS(c <= 1);
 }
-#endif /* ifdef UNSIEVE_NOT_COPRIME */
+
+
+void
+sieve_info_init_j_div(sieve_info_ptr si)
+{
+  /* Store largest prime factor of k in si->j_div[k].p, for 1 < k < J,
+     and store 0 for k=0, 1 for k=1 */
+  si->j_div = (j_div_ptr) malloc (sizeof (struct j_div_s) * si->J);
+  FATAL_ERROR_CHECK(si->j_div == NULL, "malloc failed");
+  si->j_div[0].p   = 0U;
+  si->j_div[0].cof = 0U;
+  si->j_div[0].inv = 0U;
+  si->j_div[0].bound = 0U;
+  si->j_div[1].p   = 1U;
+  si->j_div[1].cof = 1U;
+  si->j_div[1].inv = 1U;
+  si->j_div[1].inv = UINT_MAX;
+  for (unsigned int k = 2U; k < si->J; k++) {
+    /* Find largest prime factor of k */
+    unsigned int p, c = k;
+    for (p = 2U; p * p <= c; p += 1U + p % 2U)
+      {
+        while (c % p == 0U)
+          c /= p;
+        if (c == 1U)
+          break;
+      }
+    p = (c == 1U) ? p : c;
+    c = k; do {c /= p;} while (c % p == 0);
+    si->j_div[k].p = p;
+    si->j_div[k].cof = c;
+    si->j_div[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
+    si->j_div[k].bound = UINT_MAX / p;
+  }
+}
+
+void
+sieve_info_clear_j_div(sieve_info_ptr si)
+{
+  free(si->j_div);
+  si->j_div = NULL;
+}
+
+static inline unsigned int 
+extract_j_div(unsigned int (*div)[2], const unsigned int j, j_div_srcptr j_div, 
+              const unsigned int pmin, const unsigned int pmax)
+{
+    unsigned int c, nr_div = 0;
+    /* For each distict odd prime factor p of j, if pmin <= p <= pmax,
+       store the inverse and bound in array */
+    c = j;
+    c >>= ularith_ctz(c);
+    while (c > 1) {
+      unsigned int p = j_div[c].p;
+      if (p < pmin)
+          break;
+      if (p <= pmax) {
+          div[nr_div][0] = j_div[c].inv;
+          div[nr_div++][1] = j_div[c].bound;
+      }
+      c = j_div[c].cof;
+    }
+    return nr_div;
+}
+
+/* In SS[2][x_start] ... SS[2][x_start * x_step - 1], look for survivors.
+   If SSE is available, the bounds check was already done. If no SSE2 is
+   available, we still have to do it. In both cases, we still have to test
+   divisibility of the resulting i value by the trial-divided primes.
+   Return the number of survivors found. */
+static inline int
+search_single_survivors(unsigned char * const restrict SS[2],
+        const unsigned char bound[2] MAYBE_UNUSED, const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED,
+        const int x_start, const int x_step, const unsigned int nr_div,
+        unsigned int (*div)[2])
+{
+  int survivors = 0;
+  for (int x = x_start; x < x_start + x_step; x++) {
+#ifndef HAVE_SSE2
+      if (!sieve_info_test_lognorm(bound[0], bound[1], SS[0][x], SS[1][x]))
+      {
+          SS[0][x] = 255;
+          continue;
+      }
+#else
+      if (SS[0][x] == 255)
+          continue;
+#endif
+      survivors++;
+
+      /* The very small prime used in the bound pattern, and unsieving larger
+         primes have not identified this as gcd(i,j) > 1. It remains to check
+         the trial-divided primes. */
+      const unsigned int i = abs (x - (1 << (log_I - 1)));
+      int divides = 0;
+      switch (nr_div) {
+          case 6: divides |= (i * div[5][0] <= div[5][1]);
+          case 5: divides |= (i * div[4][0] <= div[4][1]);
+          case 4: divides |= (i * div[3][0] <= div[3][1]);
+          case 3: divides |= (i * div[2][0] <= div[2][1]);
+          case 2: divides |= (i * div[1][0] <= div[1][1]);
+          case 1: divides |= (i * div[0][0] <= div[0][1]);
+          case 0: while(0){};
+      }
+
+      if (divides)
+      {
+          if (verify_gcd)
+              ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) != 1);
+#ifdef TRACE_K
+          if (trace_on_spot_Nx(N, x)) {
+              fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                      trace_Nx.x, trace_Nx.N, i, j);
+          }
+#endif
+          SS[0][x] = 255;
+      } else {
+          if (verify_gcd)
+              ASSERT_ALWAYS(bin_gcd_int64_safe (i, j) == 1);
+#ifdef TRACE_K
+          if (trace_on_spot_Nx(N, x)) {
+              fprintf(stderr, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
+                      trace_Nx.x, trace_Nx.N);
+          }
+#endif
+      }
+  }
+  return survivors;
+}
+
+
+/* This function works for all j */
+static int
+search_survivors_in_line1(unsigned char * const restrict SS[2],
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int td_max)
+{
+    unsigned int div[6][2], nr_div;
+
+    nr_div = extract_j_div(div, j, j_div, 3, td_max);
+    ASSERT(nr_div <= 6);
+
+#ifdef HAVE_SSE2
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    /* The reason for the bound+1 here is documented in
+       sieve_info_test_lognorm_sse2() */
+    __m128i patterns[2] = {
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion),
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion)
+    };
+    const int x_step = sizeof(__m128i);
+
+    /* If j is even, set all the even entries on the bound pattern to
+       unsigned 0 -> signed -128 */
+    if (j % 2 == 0)
+        for (size_t i = 0; i < sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0])[i] = 0x80;
+#else
+    const int x_step = 1;
+#endif
+    int survivors = 0;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+#ifdef HAVE_SSE2
+        /* Do bounds check using SSE pattern, set non-survivors in SS[0] array
+           to 255 */
+        int sse_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0],
+                                         (__m128i*) (SS[1] + x_start), patterns[1]);
+        if (sse_surv == 0)
+            continue;
+#endif
+        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
+            x_step, nr_div, div);
+#ifdef HAVE_SSE2
+        ASSERT(sse_surv == surv);
+#endif
+        survivors += surv;
+    }
+    return survivors;
+}
+
+
+/* This function assumes j % 3 == 0. It uses an SSE bound pattern where 
+   i-coordinates with i % 3 == 0 are set to a bound of 0. */
+#ifdef HAVE_SSE2
+int
+search_survivors_in_line3(unsigned char * const restrict SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED, j_div_srcptr j_div,
+        const unsigned int td_max)
+{
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    __m128i patterns[2][3];
+    const int x_step = sizeof(__m128i);
+    const int pmin = 5;
+    int next_pattern = 0;
+    int survivors = 0;
+
+    /* We know that 3 does not divide j in the code of this function, and we
+       don't store 2. Allowing 5 distinct odd prime factors >3 thus handles
+       all j < 1616615, which is the smallest integer with 6 such factors */
+    unsigned int div[5][2];
+    unsigned int nr_div;
+
+    nr_div = extract_j_div(div, j, j_div, pmin, td_max);
+    ASSERT(nr_div <= 5);
+
+    patterns[0][0] = patterns[0][1] = patterns[0][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+    patterns[1][0] = patterns[1][1] = patterns[1][2] = 
+        _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+
+    if (j % 2 == 0)
+        for (size_t i = 0; i < 3 * sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0][0])[i] = 0x80;
+
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 3 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 3), or d == I/2 (mod 3). With
+       I = 2^log_I and 2 == -1 (mod 3), we have d == -1^(log_I-1) (mod 3),
+       or d = 2 if log_I is even and d = 1 if log_I is odd.
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    size_t d = 2 - log_I % 2;
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[3*i + d] = 0x80;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+        int sse_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == 3)
+            next_pattern = 0;
+        if (sse_surv == 0)
+            continue;
+        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
+            x_step, nr_div, div);
+        ASSERT(sse_surv == surv);
+        survivors += surv;
+    }
+    return survivors;
+}
+#endif
+
+
+#ifdef HAVE_SSE2
+/* This function assumes j % 3 != 0 and j % 5 == 0. It uses an SSE bound 
+   pattern where i-coordinates with i % 5 == 0 are set to a bound of 0,
+   and trial divies only by primes > 5. */
+int
+search_survivors_in_line5(unsigned char * const restrict SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N MAYBE_UNUSED, 
+        j_div_srcptr restrict j_div, const unsigned int td_max)
+{
+    const __m128i sse2_sign_conversion = _mm_set1_epi8(-128);
+    const int nr_patterns = 5;
+    __m128i patterns[2][nr_patterns];
+    const int x_step = sizeof(__m128i);
+    const int pmin = 7;
+    int next_pattern = 0;
+    int survivors = 0;
+
+    /* We know that 3 and 5 do not divide j in the code of this function, and
+       we don't store 2. Allowing 5 distinct odd prime factors >5 thus handles
+       all j < 7436429 */
+    unsigned int div[5][2];
+    unsigned int nr_div;
+
+    nr_div = extract_j_div(div, j, j_div, pmin, td_max);
+    ASSERT(nr_div <= 5);
+
+    for (int i = 0; i < nr_patterns; i++) {
+        patterns[0][i] = _mm_xor_si128(_mm_set1_epi8(bound[0] + 1), sse2_sign_conversion);
+        patterns[1][i] = _mm_xor_si128(_mm_set1_epi8(bound[1] + 1), sse2_sign_conversion);
+    }
+
+    if (j % 2 == 0)
+        for (size_t i = 0; i < nr_patterns * sizeof(__m128i); i += 2)
+            ((unsigned char *)&patterns[0][0])[i] = 0x80;
+
+    /* Those locations in patterns[0] that correspond to i being a multiple
+       of 5 are set to 0. Byte 0 of patterns[0][0] corresponds to i = -I/2.
+       We want d s.t. -I/2 + d == 0 (mod 5), or d == I/2 (mod 5). With
+       I = 2^log_I and ord_5(2) == 4 (mod 5), we have d == 2^((log_I-1)%4)
+       (mod 5), so we want a function: 0->3, 1->1, 2->2, 3->4.
+       We use the sign conversion trick (i.e., XOR 0x80), so to get an
+       effective bound of unsigned 0, we need to set the byte to 0x80. */
+    static const unsigned char d_lut[] = {3,1,2,4};
+    size_t d = d_lut[log_I % 4];
+    for (size_t i = 0; i < sizeof(__m128i); i++)
+        ((unsigned char *)&patterns[0][0])[nr_patterns*i + d] = 0x80;
+
+    for (int x_start = 0; x_start < (1 << log_I); x_start += x_step)
+    {
+        int sse_surv = 
+            sieve_info_test_lognorm_sse2((__m128i*) (SS[0] + x_start), patterns[0][next_pattern],
+                                         (__m128i*) (SS[1] + x_start), patterns[1][next_pattern]);
+        if (++next_pattern == nr_patterns)
+            next_pattern = 0;
+        if (sse_surv == 0)
+            continue;
+        int surv = search_single_survivors(SS, bound, log_I, j, N, x_start,
+            x_step, nr_div, div);
+        ASSERT(sse_surv == surv);
+        survivors += surv;
+    }
+    return survivors;
+}
+#endif
+
+
+#define USE_PATTERN_3 1
+#define USE_PATTERN_5 1
+
+int
+search_survivors_in_line(unsigned char * const restrict SS[2], 
+        const unsigned char bound[2], const unsigned int log_I,
+        const unsigned int j, const int N, j_div_srcptr j_div,
+        const unsigned int td_max, unsieve_aux_data_srcptr us)
+{
+    unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
+
+#if defined(HAVE_SSE2) && USE_PATTERN_3
+    if (j % 3 == 0)
+      return search_survivors_in_line3(SS, bound, log_I, j, N, j_div, td_max);
+#if defined(HAVE_SSE2) && USE_PATTERN_5
+    else if (j % 5 == 0)
+      return search_survivors_in_line5(SS, bound, log_I, j, N, j_div, td_max);
+#endif
+    else
+#endif
+      return search_survivors_in_line1(SS, bound, log_I, j, N, j_div, td_max);
+}
