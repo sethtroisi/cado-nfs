@@ -15,15 +15,11 @@
 static inline void
 mpz_add_log_mod_si (mpz_t a, mpz_t l, int32_t e, mpz_t q)
 {
-#ifdef FOR_ALGO_FM
-  mpz_add_log_mod_si (l, sm->smlog[0], a, sm->q);
-#else
   if (e > 0)
     mpz_addmul_ui (a, l, e);
   else
     mpz_submul_ui (a, l, -e);
   mpz_mod (a, a, q);
-#endif
 }
 
 static inline void
@@ -151,6 +147,9 @@ sm_data_free (sm_data_t *d)
 static inline void
 add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
 {
+#ifdef FOR_ALGO_FM
+  mpz_add_log_mod_si (l, sm->smlog[0], a, sm->q);
+#else
   mpz_poly_t SMres;
   mpz_poly_init(SMres, sm->F->deg);
   SMres->deg = 0;
@@ -160,6 +159,7 @@ add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
   for (i = 0; i < sm->nbsm && i <= (unsigned int) SMres->deg; i++)
     mpz_add_log_mod_mpz (l, sm->smlog[i], SMres->coeff[i], sm->q);
   mpz_poly_free(SMres);
+#endif
 }
 #endif /* ifndef FOR_FFS */
 
