@@ -851,7 +851,11 @@ class WuAccess(object): # {
     def _checkstatus(wu, status):
         # logger.debug("WuAccess._checkstatus(%s, %s)", wu, status)
         wu_status = wu["status"]
-        if wu_status != status:
+        if isinstance(status, collections.Container):
+            ok = wu_status in status
+        else:
+            ok = wu_status == status
+        if not ok:
             msg = "Workunit %s has status %s (%s), expected %s (%s)" % \
                   (wu["wuid"], wu_status, WuStatus.get_name(wu_status), 
                    status, WuStatus.get_name(status))
@@ -1045,7 +1049,7 @@ class WuAccess(object): # {
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         try:
-            self._checkstatus(data, WuStatus.RECEIVED_OK)
+            self._checkstatus(data, [WuStatus.RECEIVED_OK, WuStatus.RECEIVED_ERROR])
         except StatusUpdateError:
             if commit:
                 conn_commit(self.conn)
@@ -1097,8 +1101,8 @@ class WuAccess(object): # {
     
     def get_one_result(self):
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
-        #if not r:
-        #    r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
+        if not r:
+            r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
         if not r:
             return None
         else:

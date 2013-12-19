@@ -929,7 +929,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
                             "output_files=[%s]",
                             self.name, wuid, rc, ", ".join(output_files))
         if rc != 0:
-            self.logger.error("Return code is: %d", rc)
+            self.logger.debug("Return code is: %d", rc)
         if stdout:
             self.logger.debug("stdout is: %s", stdout)
         if stderr:
@@ -1321,6 +1321,12 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
+            return
+        # If the command exited with non-zero status, print error, mark
+        # workunit as verified with error, and move on
+        if message.get_exitcode(0) != 0:
+            self.log_failed_command_error(message, 0)
+            self.verification(message.get_wu_id(), False, commit=True)
             return
         (filename, ) = message.get_output_files()
         ok = self.process_polyfile(filename, commit=False)
@@ -1723,6 +1729,12 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
+            return
+        # If the command exited with non-zero status, print error, mark
+        # workunit as verified with error, and move on
+        if message.get_exitcode(0) != 0:
+            self.log_failed_command_error(message, 0)
+            self.verification(message.get_wu_id(), False, commit=True)
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
