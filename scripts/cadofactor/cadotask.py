@@ -875,6 +875,20 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             assert command_nr == 0
             return self.cmd_line
 
+    def log_failed_command_error(self, message, command_nr):
+            self.logger.error("Program failed with exit code %d", 
+                              message.get_exitcode(command_nr))
+            cmd_line = message.get_command_line(command_nr)
+            if cmd_line:
+                self.logger.error("Command line was: %s", cmd_line)
+            stderr = message.read_stderr(command_nr).decode('ascii')
+            stderrfilename = message.get_stderrfile(command_nr)
+            if stderrfilename:
+                stderrmsg = " (stored in file %s)" % stderrfilename
+            else:
+                stderrmsg = ""
+            if stderr:
+                self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
@@ -893,16 +907,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         message = Task.ResultInfo(wuname, rc, stdout, stderr, command, 
                                   command.make_command_line())
         if rc != 0 and log_errors:
-            self.logger.error("Program failed with exit code %d", rc)
-            self.logger.error("Command line was: %s", command.make_command_line())
-            stderr = message.read_stderr(0).decode('ascii')
-            stderrfilename = message.get_stderrfile(0)
-            if stderrfilename:
-                stderrmsg = " (stored in file %s)" % stderrfilename
-            else:
-                stderrmsg = ""
-            if stderr:
-                self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+            self.log_failed_command_error(message, 0)
 
         if isinstance(self, patterns.Observer):
             # pylint: disable=E1101
