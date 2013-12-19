@@ -839,7 +839,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         return arr
     
     class ResultInfo(wudb.WuResultMessage):
-        def __init__(self, wuid, rc, stdout, stderr, program):
+        def __init__(self, wuid, rc, stdout, stderr, program, cmd_line):
             self.wuid = wuid
             self.rc = rc
             self.stdout = stdout if stdout else None
@@ -851,6 +851,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             # stderr must be either in a string or in a file, but not both
             assert self.stderr is None or not self.stderrfile
             self.output_files = program.get_regular_output_files()
+            self.cmd_line = cmd_line
         def get_wu_id(self):
             return self.wuid
         def get_output_files(self):
@@ -870,6 +871,10 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         def get_exitcode(self, command_nr):
             assert command_nr == 0
             return self.rc
+        def get_command_line(self, command_nr):
+            assert command_nr == 0
+            return self.cmd_line
+
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
@@ -885,7 +890,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         realtime_used = time.time() - realtime_used
         self.update_cpu_or_real_time(True, command.name, cputime_used, False)
         self.update_cpu_or_real_time(False, command.name, realtime_used, commit)
-        message = Task.ResultInfo(wuname, rc, stdout, stderr, command)
+        message = Task.ResultInfo(wuname, rc, stdout, stderr, command, 
+                                  command.make_command_line())
         if rc != 0 and log_errors:
             self.logger.error("Program failed with exit code %d", rc)
             self.logger.error("Command line was: %s", command.make_command_line())

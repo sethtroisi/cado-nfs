@@ -1127,6 +1127,9 @@ class WuResultMessage(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_exitcode(self, command_nr):
         pass
+    @abc.abstractmethod
+    def get_command_line(self, command_nr):
+        pass
     def _read(self, filename, data):
         if not filename is None:
             with open(filename, "rb") as inputfile:
@@ -1206,6 +1209,9 @@ class ResultInfo(WuResultMessage):
             return int(self.record["errorcode"])
         else:
             return 0
+
+    def get_command_line(self, command_nr):
+        return None
 
 
 class DbListener(patterns.Observable):
