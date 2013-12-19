@@ -15,7 +15,8 @@ int relation_is_duplicate(relation_t *, double, int, sieve_info_srcptr);
    (las-qlattice.c?) and the prototypes to the corresponding header file. */
 int sieve_info_adjust_IJ(sieve_info_ptr, double, int);
 int check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side);
-
+int factor_both_leftover_norms(mpz_t *, const mpz_t, mpz_array_t **, 
+                               uint32_array_t **, sieve_info_srcptr);
 
 #ifdef __cplusplus
 }
