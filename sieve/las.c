@@ -103,12 +103,13 @@ static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 1
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       sieve_info_srcptr si, int side);
-int factor_leftover_norm (mpz_t n,
-                          mpz_array_t* const factors,
-			  uint32_array_t* const multis,
-                          sieve_info_srcptr si, int side);
-static int
-factor_both_leftover_norms(mpz_t *, const mpz_t, mpz_array_t **, 
+static int 
+factor_leftover_norm (mpz_t n,
+                      mpz_array_t* const factors,
+                      uint32_array_t* const multis,
+                      sieve_info_srcptr si, int side);
+int
+factor_both_leftover_norms(mpz_t *, const mpz_t, mpz_array_t **,
                            uint32_array_t **, sieve_info_srcptr);
 /* }}} */
 
@@ -2988,7 +2989,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 const double skew = las->cpoly->skew;
                 int do_check = th->las->suppress_duplicates;
                 int is_dup = do_check && relation_is_duplicate(rel, skew, las->nb_threads, si);
-                const char *comment = is_dup ? "# " : "";
+                const char *comment = is_dup ? "# DUPE " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
@@ -3256,7 +3257,7 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
     decided.
 */
 
-static int
+int
 factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
                            uint32_array_t **m, sieve_info_srcptr si)
 {
