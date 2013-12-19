@@ -938,7 +938,7 @@ class WorkunitClient(object):
         mimedata.attach_key("clientid", self.settings["CLIENTID"])
         if processor.errorcode:
             mimedata.attach_key("errorcode", processor.errorcode)
-        if processor.failedcommand:
+        if not processor.failedcommand is None:
             mimedata.attach_key("failedcommand", processor.failedcommand)
         for filename in self.workunit.get("RESULT", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
