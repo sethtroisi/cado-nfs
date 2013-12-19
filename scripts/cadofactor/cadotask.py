@@ -839,7 +839,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         return arr
     
     class ResultInfo(wudb.WuResultMessage):
-        def __init__(self, wuid, rc, stdout, stderr, program, cmd_line):
+        def __init__(self, wuid, rc, stdout, stderr, program, cmd_line, host):
             self.wuid = wuid
             self.rc = rc
             self.stdout = stdout if stdout else None
@@ -852,6 +852,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             assert self.stderr is None or not self.stderrfile
             self.output_files = program.get_regular_output_files()
             self.cmd_line = cmd_line
+            self.host = host
         def get_wu_id(self):
             return self.wuid
         def get_output_files(self):
@@ -874,10 +875,14 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         def get_command_line(self, command_nr):
             assert command_nr == 0
             return self.cmd_line
+        def get_host(self):
+            return self.host
 
     def log_failed_command_error(self, message, command_nr):
-            self.logger.error("Program failed with exit code %d", 
-                              message.get_exitcode(command_nr))
+            host = message.get_host()
+            host_msg = " run on %s" % host if host else ""
+            self.logger.error("Program%s failed with exit code %d", 
+                              host_msg, message.get_exitcode(command_nr))
             cmd_line = message.get_command_line(command_nr)
             if cmd_line:
                 self.logger.error("Command line was: %s", cmd_line)
@@ -905,7 +910,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.update_cpu_or_real_time(True, command.name, cputime_used, False)
         self.update_cpu_or_real_time(False, command.name, realtime_used, commit)
         message = Task.ResultInfo(wuname, rc, stdout, stderr, command, 
-                                  command.make_command_line())
+                                  command.make_command_line(), "server")
         if rc != 0 and log_errors:
             self.log_failed_command_error(message, 0)
 

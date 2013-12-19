@@ -1130,6 +1130,9 @@ class WuResultMessage(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_command_line(self, command_nr):
         pass
+    @abc.abstractmethod
+    def get_host(self):
+        pass
     def _read(self, filename, data):
         if not filename is None:
             with open(filename, "rb") as inputfile:
@@ -1158,6 +1161,8 @@ class ResultInfo(WuResultMessage):
         #  'files': None}
         self.record = record
     
+    def __str__(self):
+        return str(self.record)
     def get_wu_id(self):
         return self.record["wuid"]
     
@@ -1212,6 +1217,9 @@ class ResultInfo(WuResultMessage):
 
     def get_command_line(self, command_nr):
         return None
+
+    def get_host(self):
+        return self.record["resultclient"]
 
 
 class DbListener(patterns.Observable):
