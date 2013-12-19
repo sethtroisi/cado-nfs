@@ -1171,11 +1171,9 @@ unmap:
     }
 
 closefile:
-    if (returncode == 0) {
-        if (fclose(f) != 0) {
-            fprintf(stderr, "Could not close file %s: %s\n",
-                     filename, strerror(errno));
-        }
+    if (fclose(f) != 0) {
+        fprintf(stderr, "Could not close file %s: %s\n",
+                 filename, strerror(errno));
     }
 
 freemem:
