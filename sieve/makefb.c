@@ -13,13 +13,13 @@
  */
 void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
     ASSERT (a != 0  &&  d >= 1);
-    // lazy: use the mpz_poly_t interface of utils/mpz_poly.h 
+    // lazy: use the mpz_poly_t interface of utils/mpz_poly.h
     mpz_poly_t aXpb, aXpbi, G, Aux;
     mpz_poly_init(aXpb, 1);  // alloc sets to zero
-    mpz_poly_init(aXpbi, d);  
+    mpz_poly_init(aXpbi, d);
     mpz_poly_init(G, d);
     mpz_poly_init(Aux, d);
-    { 
+    {
         mpz_t aux;
         mpz_init(aux);
         mpz_set_si(aux, a);
@@ -54,7 +54,7 @@ int mpz_p_val(mpz_t z, unsigned long p) {
     unsigned long r;
     do {
         r = mpz_tdiv_q_ui(zz, zz, p);
-        if (r == 0) 
+        if (r == 0)
             v++;
     } while (r == 0 && mpz_cmp_ui(zz, 1)!=0);
     mpz_clear(zz);
@@ -102,7 +102,7 @@ mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, mpz_t a)
 
 // Same function as above, with a slightly different interface.
 unsigned long
-lift_root_unramified(mpz_t *f, int d, unsigned long r, 
+lift_root_unramified(mpz_t *f, int d, unsigned long r,
         unsigned long p,int kmax) {
     mpz_t aux, aux2, mp_p, mp_r;
     int k = 1;
@@ -126,7 +126,7 @@ lift_root_unramified(mpz_t *f, int d, unsigned long r,
         mpz_mul(aux, aux, aux2);
         mpz_sub(aux, mp_r, aux);
         mpz_mod(mp_r, aux, mp_p);
-        k *= 2; 
+        k *= 2;
     }
     r = mpz_get_ui(mp_r);
     mpz_clear(aux);
@@ -138,7 +138,7 @@ lift_root_unramified(mpz_t *f, int d, unsigned long r,
 
 typedef struct {
     unsigned long q;
-    unsigned long r; 
+    unsigned long r;
     int n1;
     int n0;
 } entry;
@@ -171,7 +171,7 @@ int cmp_entry(const void *A, const void *B) {
     entry a, b;
     a = ((entry *)A)[0];
     b = ((entry *)B)[0];
-    if (a.q < b.q) 
+    if (a.q < b.q)
         return -1;
     if (a.q > b.q)
         return 1;
@@ -197,7 +197,7 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
     unsigned long *roots;
     mpz_t aux;
 
-    if (k0 >= kmax) { 
+    if (k0 >= kmax) {
         return;
     }
     roots = (unsigned long*) malloc(d * sizeof(unsigned long));
@@ -229,7 +229,7 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
                 E.n0 = k0+l-1;
                 push_entry(L, E);
             }
-        } else { 
+        } else {
             mpz_t *ff;
             ff = (mpz_t *) malloc((d+1)*sizeof(mpz_t));
             for (int j = 0; j <= d; ++j)
@@ -302,7 +302,7 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
         }
         int v = mp_poly_p_val_of_content(fh, d, p);
         if (v > 0) { // We have projective roots only in that case
-            { 
+            {
                 entry E;
                 E.q = p;
                 E.r = p;
@@ -327,7 +327,7 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
                 L.list[i] = E;
             }
         }
-        for (int i = 0; i <= d; ++i) 
+        for (int i = 0; i <= d; ++i)
             mpz_clear(fh[i]);
         mpz_clear(pk);
         free(fh);
@@ -340,10 +340,13 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
 }
 
 
-void makefb_with_powers(FILE* outfile, mpz_t *f, int d, unsigned long alim, 
+void makefb_with_powers(FILE* outfile, mpz_poly_t F, unsigned long alim,
         int maxbits) {
+    mpz_t *f = F->coeff;
+    int d = F->deg;
+
     fprintf(outfile, "# Roots for polynomial ");
-    fprint_polynomial(outfile, f, d);
+    mpz_poly_fprintf(outfile, F);
     fprintf(outfile, "# DEGREE: %d\n", d);
     fprintf(outfile, "# alim = %lu\n", alim);
     fprintf(outfile, "# maxbits = %d\n", maxbits);
@@ -366,13 +369,13 @@ void makefb_with_powers(FILE* outfile, mpz_t *f, int d, unsigned long alim,
                 if (i > 0)
                     fprintf(outfile, "\n");
                 oldq = q; oldn1 = n1; oldn0 = n0;
-                if (n1 == 1 && n0 == 0) 
+                if (n1 == 1 && n0 == 0)
                     fprintf(outfile, "%lu: %lu", q, r);
                 else
                     fprintf(outfile, "%lu:%d,%d: %lu", q, n1, n0, r);
             }
         }
-        if (L.len > 0) 
+        if (L.len > 0)
             fprintf(outfile, "\n");
         entry_list_clear(&L);
     }
@@ -441,7 +444,7 @@ main (int argc, char *argv[])
   } else {
     outputfile = stdout;
   }
-  
+
 
   if (!cado_poly_read(cpoly, filename))
     {
@@ -450,8 +453,7 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  makefb_with_powers (outputfile, cpoly->alg->coeff, cpoly->alg->deg,
-          alim, maxbits);
+  makefb_with_powers (outputfile, cpoly->alg, alim, maxbits);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {

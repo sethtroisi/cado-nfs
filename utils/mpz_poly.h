@@ -50,7 +50,7 @@ typedef poly_base_struct_t poly_base_t[1];
 /* Management of the structure, set and print coefficients. */
 void mpz_poly_init(mpz_poly_t, int d);
 void mpz_poly_free(mpz_poly_t f);
-void mpz_poly_print(const mpz_poly_t f);
+void mpz_poly_fprintf(FILE *fp, const mpz_poly_t f);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_t f);

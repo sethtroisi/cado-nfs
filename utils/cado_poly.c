@@ -14,35 +14,23 @@ const char * sidenames[2] = {
 
 void cado_poly_init(cado_poly poly)
 {
-    int i;
-
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly[0]));
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = poly->pols[side];
-        ps->coeff = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
-        /* mpzs as well are zero */
-        for (i = 0; i < (MAXDEGREE + 1); i++) {
-            mpz_init_set_ui(ps->coeff[i], 0);
-            ps->deg = -1;
-        }
-    }
+    for(int side = 0 ; side < 2 ; side++)
+      mpz_poly_init (poly->pols[side], MAXDEGREE);
+
     mpz_init_set_ui(poly->n, 0);
     mpz_init_set_ui(poly->m, 0);
 }
 
 void cado_poly_clear(cado_poly poly)
 {
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = poly->pols[side];
-        for (int i = 0; i < (MAXDEGREE + 1); i++) {
-            mpz_clear(ps->coeff[i]);
-        }
-        free(ps->coeff);
-    }
+    for(int side = 0 ; side < 2 ; side++)
+      mpz_poly_free (poly->pols[side]);
+
     mpz_clear(poly->n);
     mpz_clear(poly->m);
     memset(poly, 0, sizeof(poly[0]));
@@ -54,13 +42,8 @@ cado_poly_set (cado_poly p, cado_poly q)
 {
     mpz_set (p->n, q->n);
     p->skew = q->skew;
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = p->pols[side];
-        mpz_poly_ptr qs = q->pols[side];
-        ps->deg = qs->deg;
-        for (int i = 0; i <= qs->deg; i++)
-            mpz_set (ps->coeff[i], qs->coeff[i]);
-    }
+    for(int side = 0 ; side < 2 ; side++)
+      mpz_poly_copy (p->pols[side], q->pols[side]);
     mpz_set (p->m, q->m);
 }
 
@@ -164,34 +147,6 @@ int cado_poly_read(cado_poly poly, const char *filename)
 }
 
 
-void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
-{
-    int i, s, first = 1;
-    mpz_t c;
-
-    mpz_init(c);
-    for (i = d; i >= 0; i--) {
-	s = mpz_cmp_ui(f[i], 0);
-	if (s != 0) {
-	    if (s > 0) {
-		if (first == 0)
-		    gmp_fprintf(fp, " + ");
-		gmp_fprintf(fp, "%Zd", f[i]);
-	    } else if (s < 0) {
-		mpz_abs(c, f[i]);
-		gmp_fprintf(fp, " - %Zd", c);
-	    }
-	    first = 0;
-	    if (i >= 2)
-		gmp_fprintf(fp, "*x^%d", i);
-	    else if (i == 1)
-		gmp_fprintf(fp, "*x");
-	}
-    }
-    mpz_clear(c);
-    fprintf(fp, "\n");
-}
-
 /* check that m is a root of both f and g mod n */
 void cado_poly_check(cado_poly cpoly)
 {
@@ -203,12 +158,7 @@ void cado_poly_check(cado_poly cpoly)
         mpz_poly_ptr ps = cpoly->pols[side];
 
         /* check m is a root of f mod n */
-        mpz_set (tmp, ps->coeff[ps->deg]);
-        for (int i = ps->deg - 1; i >= 0; i--)
-        {
-            mpz_mul (tmp, tmp, cpoly->m);
-            mpz_add (tmp, tmp, ps->coeff[i]);
-        }
+        mpz_poly_eval (tmp, ps, cpoly->m);
         mpz_mod (tmp, tmp, cpoly->n);
         if (mpz_cmp_ui (tmp, 0) != 0)
         {

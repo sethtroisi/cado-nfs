@@ -35,8 +35,6 @@ extern const char * sidenames[2];
 extern "C" {
 #endif
 
-extern void fprint_polynomial (FILE *, mpz_t *, const int);
-
 // This reads a file created by polyselect and fill in the structure
 // accordingly. Return 1 if success, 0 if failure (and diagnostic on
 // stderr)

@@ -855,10 +855,9 @@ main(int argc, char *argv[])
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
-  /* Construct mpz_poly_t F from cado_poly pol (algebraic side) */
+  /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
 #ifndef FOR_FFS
-  mpz_poly_t F;
-  mpz_poly_t_from_cado_poly_alg(F, poly);
+  mpz_poly_ptr F = poly->pols[ALGEBRAIC_SIDE];
   FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->deg, "Too many SM");
 #endif
 
@@ -913,9 +912,6 @@ main(int argc, char *argv[])
   free(log);
   mpz_clear(q);
   mpz_clear(smexp);
-#ifndef FOR_FFS
-  mpz_poly_free(F);
-#endif
 
   renumber_free (renumber_table);
   cado_poly_clear (poly);

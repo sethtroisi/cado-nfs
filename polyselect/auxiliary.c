@@ -2536,8 +2536,10 @@ optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int method)
   mpz_t kt, k2, k1, k0, kttmp, k2tmp, k1tmp, k0tmp; /* current offset */
   int d = f->deg;
   mpz_t gtmp[2], g0[2];
-  mpz_poly_t ftmp, f0;
+  mpz_poly_t ftmp, f0, G;
 
+  G->coeff = g;
+  G->deg = 1;
   mpz_init_set_ui (k0, 1);
   mpz_init_set_ui (k2, 1);
   mpz_init_set_ui (k1, 1);
@@ -2649,8 +2651,8 @@ optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int method)
                  f[d], logmu00, logmu0);
     if (verbose > 1)
     {
-      fprintf (stderr, "# "); fprint_polynomial (stderr, f->coeff, d);
-      fprintf (stderr, "# "); fprint_polynomial (stderr, g, 1);
+      fprintf (stderr, "# "); mpz_poly_fprintf (stderr, f);
+      fprintf (stderr, "# "); mpz_poly_fprintf (stderr, G);
     }
   }
 
@@ -2688,7 +2690,10 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
   int prec = SKEWNESS_DEFAULT_PREC;
   int count = 0;
   int d = f->deg;
+  mpz_poly_t G;
 
+  G->coeff = g;
+  G->deg = 1;
   skew = L2_skewness (f, prec, method);
   logmu00 = logmu0 = L2_lognorm (f, skew, method);
   mpz_init_set_ui (k, 1);
@@ -2897,8 +2902,8 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
                    khitot, lamtot, mutot, ktot);
       if (verbose > 1)
         {
-          fprintf (stderr, "# "); fprint_polynomial (stderr, f->coeff, d);
-          fprintf (stderr, "# "); fprint_polynomial (stderr, g, 1);
+          fprintf (stderr, "# "); mpz_poly_fprintf (stderr, f);
+          fprintf (stderr, "# "); mpz_poly_fprintf (stderr, G);
         }
     }
 

@@ -348,7 +348,7 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  mpz_poly_t F;
+  mpz_poly_ptr F;
   sm_relset_ptr rels = NULL;
   int sr;
   mpz_t ell, ell2, eps;
@@ -426,10 +426,10 @@ int main (int argc, char **argv)
     usage (argv0, NULL, pl);
   param_list_print_command_line (stdout, pl);
 
-  /* Construct mpz_poly_t F from cado_poly pol (algebraic side) */
-  mpz_poly_t_from_cado_poly_alg(F, pol);
+  /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
+  F = pol->pols[ALGEBRAIC_SIDE];
   fprintf(stderr, "F = ");
-  mpz_poly_print(F);
+  mpz_poly_fprintf(stderr,F);
 
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
@@ -469,7 +469,6 @@ int main (int argc, char **argv)
   mpz_clear(eps);
   mpz_clear(ell);
   mpz_clear(ell2);
-  mpz_poly_free(F);
   cado_poly_clear(pol);
   param_list_clear(pl);
 

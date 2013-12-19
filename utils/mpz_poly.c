@@ -10,10 +10,10 @@
 
 
 #include "cado.h"
-#include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <gmp.h>
 #include "utils.h"
 #include "portability.h"
 
@@ -273,19 +273,25 @@ void mpz_poly_free(mpz_poly_t f) {
 }
 
 /* Print coefficients of f. */
-void mpz_poly_print(const mpz_poly_t f) {
+void
+mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
+{
   int i;
-  if (f->deg == -1) {
-    printf("0\n");
-    return;
-  } else if (f->deg == 0) {
-    gmp_printf("%Zd\n", f->coeff[0]);
-    return;
-  }
-  gmp_printf("%Zd + ", f->coeff[0]);
+
+  if (f->deg == -1)
+    {
+      fprintf (fp, "0\n");
+      return;
+    }
+  else if (f->deg == 0)
+    {
+      gmp_fprintf (fp, "%Zd\n", f->coeff[0]);
+      return;
+    }
+  gmp_fprintf (fp, "%Zd + ", f->coeff[0]);
   for (i = 1; i < f->deg; ++i)
-    gmp_printf("%Zd*x^%d + ", f->coeff[i], i);
-  gmp_printf("%Zd*x^%d\n", f->coeff[f->deg], f->deg);
+    gmp_fprintf (fp, "%Zd*x^%d + ", f->coeff[i], i);
+  gmp_fprintf (fp, "%Zd*x^%d\n", f->coeff[f->deg], f->deg);
 }
 
 /* Find polynomial degree. */

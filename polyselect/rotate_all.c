@@ -74,7 +74,7 @@ main (int argc, char **argv)
     mpz_set (poly->rat->coeff[1], b);
     mpz_neg (poly->rat->coeff[0], m);
     /* optimize again, but only translation */
-    fprint_polynomial (stdout, poly->rat->coeff, poly->rat->deg);
+    mpz_poly_fprintf (stdout, poly->rat);
     optimize (F, poly->rat->coeff, verbose - 1, 0);
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     mpz_clear(b);
