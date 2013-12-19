@@ -259,9 +259,9 @@ void
 renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
 {
 
-  if (pol->pols[0]->degree != 1 && pol->pols[1]->degree != 1)
+  if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
     renumber_info->rat = -1;
-  else if (pol->pols[0]->degree == 1)
+  else if (pol->pols[0]->deg == 1)
     renumber_info->rat = 0;
   else
     renumber_info->rat = 1;
@@ -716,11 +716,11 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     {
       int ret;
       //if we have at least one root on side 1, it is the largest
-      if (get_largest_root_mod_p(r, pol->pols[1]->f, pol->pols[1]->degree, *p))
+      if (get_largest_root_mod_p(r, pol->pols[1]->coeff, pol->pols[1]->deg, *p))
         *side = 1;
       else // else this is the largest on side 0
       {
-        ret=get_largest_root_mod_p(r, pol->pols[0]->f, pol->pols[0]->degree, *p);
+        ret=get_largest_root_mod_p(r, pol->pols[0]->coeff, pol->pols[0]->deg, *p);
         ASSERT_ALWAYS (ret > 0);
         *side = 0;
       }
@@ -746,7 +746,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
-      int ret = get_largest_root_mod_p(r, pol->alg->f, pol->alg->degree, *p);
+      int ret = get_largest_root_mod_p(r, pol->alg->coeff, pol->alg->deg, *p);
       ASSERT_ALWAYS (ret > 0);
       *side = 1 - renumber_info->rat;
     }

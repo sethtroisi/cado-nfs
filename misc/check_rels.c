@@ -121,8 +121,8 @@ process_one_relation (earlyparsed_relation_ptr rel)
   /* compute the norm on alg and rat sides */
   for(unsigned int side = 0 ; side < 2 ; side++)
   {
-    cado_poly_side_ptr ps = cpoly->pols[side];
-    mp_poly_homogeneous_eval_siui(norm[side], ps->f, ps->degree, rel->a, rel->b);
+    mpz_poly_ptr ps = cpoly->pols[side];
+    mp_poly_homogeneous_eval_siui(norm[side], ps->coeff, ps->deg, rel->a, rel->b);
   }
 
   /* check for correctness of the factorization of the norms */

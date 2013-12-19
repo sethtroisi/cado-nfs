@@ -151,7 +151,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   unsigned long nprd; /* number of accumulated products in prd[] */
   unsigned long res, peakres = 0;
 
-  if (pol->rat->degree != 1)
+  if (pol->rat->deg != 1)
     {
       fprintf (stderr, "Error, calculateSqrtRat called with non-linear polynomial\n");
       exit (EXIT_FAILURE);
@@ -202,8 +202,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           freerels ++;
 
         /* accumulate g1*a+g0*b */
-        mpz_mul_si (v, pol->rat->f[1], a);
-        mpz_addmul_si (v, pol->rat->f[0], b);
+        mpz_mul_si (v, pol->rat->coeff[1], a);
+        mpz_addmul_si (v, pol->rat->coeff[0], b);
 
         prd = accumulate_fast (prd, v, &lprd, nprd++);
           
@@ -223,7 +223,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   /* we must divide by g1^ab_pairs: if the number of (a,b) pairs is odd, we
      multiply by g1, and divide by g1^(ab_pairs+1) */
   if (ab_pairs & 1)
-    mpz_mul (prd[0], prd[0], pol->rat->f[1]);
+    mpz_mul (prd[0], prd[0], pol->rat->coeff[1]);
 
   fprintf (stderr, "SqrtRat: size of product = %zu bits\n",
            mpz_sizeinbase (prd[0], 2));
@@ -281,7 +281,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
   
-  mpz_powm_ui (v, pol->rat->f[1], (ab_pairs + 1) / 2, Np);
+  mpz_powm_ui (v, pol->rat->coeff[1], (ab_pairs + 1) / 2, Np);
   fprintf (stderr, "SqrtRat: computed g1^(nab/2) mod n at %lums\n", milliseconds ());
 
   mpz_invert (v, v, Np);
@@ -751,8 +751,8 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   depfile = fopen_maybe_compressed (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
 
-  deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->degree;
-  f = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->f;
+  deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->deg;
+  f = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->coeff;
 
   ASSERT_ALWAYS(deg > 1);
   
@@ -1234,7 +1234,7 @@ int main(int argc, char *argv[])
         mpz_init(gg);
         mpz_set(Np, pol->n);
         do {
-            mpz_gcd(gg, Np, pol->rat->f[pol->rat->degree]);
+            mpz_gcd(gg, Np, pol->rat->coeff[pol->rat->deg]);
             if (mpz_cmp_ui(gg, 1) != 0) {
                 gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of g: %Zd\n", gg);
                 print_factor(gg);
@@ -1242,7 +1242,7 @@ int main(int argc, char *argv[])
             }
         } while (mpz_cmp_ui(gg, 1) != 0);
         do {
-            mpz_gcd(gg, Np, pol->alg->f[pol->alg->degree]);
+            mpz_gcd(gg, Np, pol->alg->coeff[pol->alg->deg]);
             if (mpz_cmp_ui(gg, 1) != 0) {
                 gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of f: %Zd\n", gg);
                 print_factor(gg);
@@ -1302,7 +1302,7 @@ int main(int argc, char *argv[])
 
     if (opt_rat) {
         ASSERT_ALWAYS(numdep != -1);
-        if (pol->rat->degree == 1)
+        if (pol->rat->deg == 1)
             calculateSqrtRat (prefix, numdep, pol, Np);
         else
             calculateSqrtAlg (prefix, numdep, pol, 1, Np);

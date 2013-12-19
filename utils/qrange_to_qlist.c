@@ -76,20 +76,20 @@ main (int argc0, char *argv0[])
   mpz_sub_ui(q0,q0,1);
   mpz_init_set (P, q0);
   mpz_nextprime (P, P);
-  cado_poly_side_ptr ps = pol->pols[ALGEBRAIC_SIDE];
+  mpz_poly_ptr ps = pol->pols[ALGEBRAIC_SIDE];
   mpz_t * roots;
-  roots = malloc(ps->degree * sizeof(mpz_t));
-  for(int i = 0 ; i < ps->degree ; i++) {
+  roots = malloc(ps->deg * sizeof(mpz_t));
+  for(int i = 0 ; i < ps->deg ; i++) {
       mpz_init(roots[i]);
   }
   while (mpz_cmp (P, q1) < 0) {
-    int nr = poly_roots (roots, ps->f, ps->degree, P);
+    int nr = poly_roots (roots, ps->coeff, ps->deg, P);
     for(int i = 0 ; i < nr ; i++) {
         gmp_printf("%s %Zd %Zd\n", sidenames[side], P, roots[i]);
     }
     mpz_nextprime(P,P);
   }
-  for(int i = 0 ; i < ps->degree ; i++) {
+  for(int i = 0 ; i < ps->deg ; i++) {
       mpz_clear(roots[i]);
   }
   free(roots);

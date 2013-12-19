@@ -859,7 +859,7 @@ main(int argc, char *argv[])
 #ifndef FOR_FFS
   mpz_poly_t F;
   mpz_poly_t_from_cado_poly_alg(F, poly);
-  FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->degree, "Too many SM");
+  FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->deg, "Too many SM");
 #endif
 
 

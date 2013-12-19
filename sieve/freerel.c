@@ -1,4 +1,4 @@
-/* 
+/*
  * Program: free relations
  * Original author : F. Morain
  * Purpose: creating free relations in a suitable format
@@ -52,8 +52,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
   rat_side = renumber_table->rat;
   alg_side = 1 - rat_side;
-  d[rat_side] = pol->rat->degree;
-  d[alg_side] = pol->alg->degree;
+  d[rat_side] = pol->rat->deg;
+  d[alg_side] = pol->alg->deg;
 
   /* we generate all free relations up to the *minimum* of the two large
      prime bounds, since larger primes will never occur on both sides */
@@ -83,12 +83,12 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
       k[rat_side] = 1;
     else
       k[rat_side] = 0;
-      
+
     if (p < lpb[alg_side])
     {
-      k[alg_side] = poly_roots_ulong(roots[alg_side],pol->alg->f,d[alg_side],p);
+      k[alg_side] = poly_roots_ulong(roots[alg_side],pol->alg->coeff,d[alg_side],p);
       // Check for a projective root
-      if (mpz_divisible_ui_p (pol->alg->f[d[alg_side]], p)) 
+      if (mpz_divisible_ui_p (pol->alg->coeff[d[alg_side]], p))
         roots[alg_side][k[alg_side]++] = p;
     }
     else
@@ -109,7 +109,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
     old_table_size = renumber_table->size;
   }
-  
+
   getprime (0);
   free (roots[0]);
   free (roots[1]);
@@ -188,7 +188,7 @@ main (int argc, char *argv[])
     badidealsfilename = param_list_lookup_string(pl, "badideals");
     renumberfilename = param_list_lookup_string(pl, "renumber");
 
-    
+
     if (polyfilename == NULL)
     {
       fprintf (stderr, "Error, missing -poly command line argument\n");
@@ -227,7 +227,7 @@ main (int argc, char *argv[])
     {
       usage (pl, argv0);
     }
-    
+
     renumber_init (renumber_table, cpoly, lpb);
     renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
                          add_full_col);

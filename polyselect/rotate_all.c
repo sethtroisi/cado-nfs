@@ -48,8 +48,8 @@ main (int argc, char **argv)
     MAX_k = kmax;
 
     mpz_poly_t F;
-    F->coeff = poly->alg->f;
-    F->deg = poly->alg->degree;
+    F->coeff = poly->alg->coeff;
+    F->deg = poly->alg->deg;
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 
     printf ("Initial polynomial:\n");
@@ -58,7 +58,7 @@ main (int argc, char **argv)
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (F, ALPHA_BOUND));
-    optimize (F, poly->rat->f, verbose - 1, 1);
+    optimize (F, poly->rat->coeff, verbose - 1, 1);
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     
     printf ("After norm optimization:\n");
@@ -68,14 +68,14 @@ main (int argc, char **argv)
       printf ("skewness=%1.2f, alpha=%1.2f\n",
               poly->skew, get_alpha (F, ALPHA_BOUND));
 
-    mpz_set (b, poly->rat->f[1]);
-    mpz_neg (m, poly->rat->f[0]);
+    mpz_set (b, poly->rat->coeff[1]);
+    mpz_neg (m, poly->rat->coeff[0]);
     rotate (F, alim, m, b, &jmin, &kmin, 0, verbose - 1, DEFAULT_L2_METHOD);
-    mpz_set (poly->rat->f[1], b);
-    mpz_neg (poly->rat->f[0], m);
+    mpz_set (poly->rat->coeff[1], b);
+    mpz_neg (poly->rat->coeff[0], m);
     /* optimize again, but only translation */
-    fprint_polynomial (stdout, poly->rat->f, poly->rat->degree);
-    optimize (F, poly->rat->f, verbose - 1, 0);
+    fprint_polynomial (stdout, poly->rat->coeff, poly->rat->deg);
+    optimize (F, poly->rat->coeff, verbose - 1, 0);
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     mpz_clear(b);
     mpz_clear(m);

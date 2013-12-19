@@ -219,10 +219,10 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     }
 
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr pol = las->cpoly->pols[side];
+        mpz_poly_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
         unsigned long lim = si->conf->sides[side]->lim;
-        if (pol->degree > 1) {
+        if (pol->deg > 1) {
             tfb = seconds ();
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
@@ -262,7 +262,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 fprintf (las->output, "# Using default value of %d for rpow_lim\n", rpow_lim);
             }
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
-                                     (const mpz_t *) pol->f, (fbprime_t) lim,
+                                     (const mpz_t *) pol->coeff, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
                                      rpow_lim, las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
@@ -559,8 +559,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
 {
     mpz_poly_t f;
-    mpz_poly_init(f, si->cpoly->pols[(*todo)->side]->degree);
-    mpz_poly_set(f,  si->cpoly->pols[(*todo)->side]->f, si->cpoly->pols[(*todo)->side]->degree);
+    mpz_poly_init(f, si->cpoly->pols[(*todo)->side]->deg);
+    mpz_poly_set(f,  si->cpoly->pols[(*todo)->side]->coeff, si->cpoly->pols[(*todo)->side]->deg);
     mpz_t x;
     mpz_init(x);
     mpz_poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
@@ -1088,7 +1088,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     /* Otherwise we're going to process the next few sq's and put them
      * into the list */
     mpz_t * roots;
-    int deg = MAX(las->cpoly->rat->degree, las->cpoly->alg->degree);
+    int deg = MAX(las->cpoly->rat->deg, las->cpoly->alg->deg);
     roots = (mpz_t *) malloc (deg * sizeof (mpz_t));
     for(int i = 0 ; i < deg  ; i++) {
         mpz_init(roots[i]);
@@ -1099,8 +1099,8 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         mpz_nextprime(q, q);
         if (mpz_cmp(q, q1) >= 0)
             break;
-        cado_poly_side_ptr f = las->cpoly->pols[qside];
-        int nroots = poly_roots(roots, f->f, f->degree, q);
+        mpz_poly_ptr f = las->cpoly->pols[qside];
+        int nroots = poly_roots(roots, f->coeff, f->deg, q);
 
         /* {{{ This print is now dead (or we're going to print it at
          * weird times)
@@ -1170,9 +1170,9 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
                    x+=nread;
                    ASSERT_ALWAYS(rc == 1);  /* %n does not count */
                    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
-                   cado_poly_side_ptr f = las->cpoly->pols[RATIONAL_SIDE];
-                   ASSERT_ALWAYS(f->degree == 1);
-                   int nroots = poly_roots(&r, f->f, f->degree, p);
+                   mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
+                   ASSERT_ALWAYS(f->deg == 1);
+                   int nroots = poly_roots(&r, f->coeff, f->deg, p);
                    ASSERT_ALWAYS(nroots == 1);
                    /* We may in fact also have the root specified. We
                     * ignore what is in the file, the root is computed
@@ -2884,7 +2884,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 mpz_t * f = si->sides[side]->fij;
-                int deg = cpoly->pols[side]->degree;
+                int deg = cpoly->pols[side]->deg;
                 int lim = si->conf->sides[side]->lim;
                 int i;
                 unsigned int j;
@@ -3875,10 +3875,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 #if 0
         /* I think that there is sufficient provision in las_todo_feed now */
         ASSERT_ALWAYS(mpz_cmp_ui(las->todo->r, 0) != 0);
-        if (si->cpoly->pols[si->doing->pside]->degree == 1) {
+        if (si->cpoly->pols[si->doing->pside]->deg == 1) {
             /* compute the good rho */
             int n;
-            n = poly_roots(&si->doing->r, si->cpoly->pols[si->doing->pside]->f, 1, si->doing->p);
+            n = poly_roots(&si->doing->r, si->cpoly->pols[si->doing->pside]->coeff, 1, si->doing->p);
             ASSERT_ALWAYS(n);
         } else {
             mpz_set(si->doing->r, las->todo->r);

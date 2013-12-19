@@ -2298,29 +2298,29 @@ print_cadopoly (FILE *fp, cado_poly p)
    double alpha, alpha_proj, logmu, e;
    mpz_poly_t F;
 
-   F->coeff = p->alg->f;
-   F->deg = p->alg->degree;
+   F->coeff = p->alg->coeff;
+   F->deg = p->alg->deg;
 
    /* print f, g only*/
-   print_cadopoly_fg (fp, F->coeff, F->deg, p->rat->f, p->n);
+   print_cadopoly_fg (fp, F->coeff, F->deg, p->rat->coeff, p->n);
 
 #ifdef DEBUG
    fprintf (fp, "# ");
-   fprint_polynomial (fp, p->alg->f, p->alg->degree);
+   fprint_polynomial (fp, p->alg->coeff, p->alg->deg);
 #endif
 
    /* m and type */
    fprintf (fp, "m: ");
    /* if f[1]<>1, then m = -f[0]/f[1] mod n */
-   if (mpz_cmp_ui (p->rat->f[1], 1) != 0)
+   if (mpz_cmp_ui (p->rat->coeff[1], 1) != 0)
    {
-      mpz_invert (p->m, p->rat->f[1], p->n);
+      mpz_invert (p->m, p->rat->coeff[1], p->n);
       mpz_neg (p->m, p->m);
-      mpz_mul (p->m, p->m, p->rat->f[0]);
+      mpz_mul (p->m, p->m, p->rat->coeff[0]);
       mpz_mod (p->m, p->m, p->n);
    }
    else
-      mpz_neg (p->m, p->rat->f[0]);
+      mpz_neg (p->m, p->rat->coeff[0]);
    mpz_out_str (fp, 10, p->m);
    fprintf (fp, "\n");
 
@@ -2329,7 +2329,7 @@ print_cadopoly (FILE *fp, cado_poly p)
    logmu = L2_lognorm (F, p->skew, DEFAULT_L2_METHOD);
    alpha = get_alpha (F, ALPHA_BOUND);
    alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
-   nroots = numberOfRealRoots (p->alg->f, p->alg->degree, 0, 0, NULL);
+   nroots = numberOfRealRoots (p->alg->coeff, p->alg->deg, 0, 0, NULL);
    e = MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
    fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
@@ -2376,13 +2376,13 @@ print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
    cado_poly cpoly;
    cado_poly_init(cpoly);
    for (i = 0; i < (d + 1); i++)
-      mpz_set(cpoly->alg->f[i], f->coeff[i]);
+      mpz_set(cpoly->alg->coeff[i], f->coeff[i]);
    for (i = 0; i < 2; i++)
-      mpz_set(cpoly->rat->f[i], g[i]);
+      mpz_set(cpoly->rat->coeff[i], g[i]);
    mpz_set(cpoly->n, N);
    cpoly->skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-   cpoly->alg->degree = d;
-   cpoly->rat->degree = 1;
+   cpoly->alg->deg = d;
+   cpoly->rat->deg = 1;
 
    if (mode == 1)
      {

@@ -897,7 +897,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree,
+    d = si->cpoly->alg->deg,
     p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
 
 #define FILL_OTHER_LINES do {						\
@@ -1152,7 +1152,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
+    d = si->cpoly->alg->deg;
 
   /******************* Beginning of local define ****************/
 #define ALG_IL0A "movapd %7, %%xmm1\n"
@@ -1509,7 +1509,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
+    d = si->cpoly->alg->deg;
   __m128d two = _mm_set1_pd(2.0);
   
   j *= ej;
@@ -1887,7 +1887,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
+    d = si->cpoly->alg->deg;
 
   /* True if one byte of the uint64_t *(xS + ih) are ~ >
      si->sides[RATIONAL_SIDE]->bound */
@@ -2054,7 +2054,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree,
+    d = si->cpoly->alg->deg,
     p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
 
 #define FILL_OTHER_LINES do {						\
@@ -2236,7 +2236,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
+    d = si->cpoly->alg->deg;
   uint64_t m;
   uint8_t ratbound = si->sides[RATIONAL_SIDE]->bound;
 
@@ -2438,7 +2438,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   ssize_t ih, Idiv2 = (si->I >> 1);
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
+    d = si->cpoly->alg->deg;
   
 #define ALG1(A)	do {				\
     ABSG1; g += un;				\
@@ -2727,7 +2727,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
 static double
 get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
 {
-  unsigned int d = cpoly->alg->degree, k;
+  unsigned int d = cpoly->alg->deg, k;
   double *fd; /* double-precision coefficients of f */
   double norm, max_norm, pows, tmp;
   double B = l_infty_snorm_u;
@@ -2735,7 +2735,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
   fd = (double*) malloc ((d + 1) * sizeof (double));
   FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
   for (k = 0; k <= d; k++)
-    fd[k] = mpz_get_d (cpoly->alg->f[k]);
+    fd[k] = mpz_get_d (cpoly->alg->coeff[k]);
 
   /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
   max_norm = get_maxnorm_aux (fd, d, cpoly->skew);
@@ -2790,7 +2790,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   double step, begin;
   for (int side = 0; side < 2; side++)
     {
-      int d = si->cpoly->pols[side]->degree;
+      int d = si->cpoly->pols[side]->deg;
       si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
       FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
       si->sides[side]->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
@@ -2825,8 +2825,8 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
    * also bug #15617).
    * Now (a,b)=i*(a0,b0)+j*(a1,b1) with |i|<I/2 and |j|<=J gives
    * |a| <= s*I*B and |b| <= I*B, whence |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
-  r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
-    + fabs (mpz_get_d (si->cpoly->rat->f[0]));
+  r = fabs (mpz_get_d (si->cpoly->rat->coeff[1])) * si->cpoly->skew
+    + fabs (mpz_get_d (si->cpoly->rat->coeff[0]));
   r *= B * (double) si->I;
 
   /* if the special-q is on the rational side, divide by it */
@@ -2915,8 +2915,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 {
     for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
-        cado_poly_side_ptr ps = si->cpoly->pols[side];
-        for (int k = 0; k <= ps->degree; k++)
+        mpz_poly_ptr ps = si->cpoly->pols[side];
+        for (int k = 0; k <= ps->deg; k++)
             mpz_clear(s->fij[k]);
         free(s->fij);
         free(s->fijd);
@@ -2934,15 +2934,15 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
-      cado_poly_side_ptr ps = si->cpoly->pols[side];
+      mpz_poly_ptr ps = si->cpoly->pols[side];
       double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
       double_poly_t F;
 
-      double_poly_init (F, ps->degree);
-      for (int k = 0; k <= ps->degree; k++)
+      double_poly_init (F, ps->deg);
+      for (int k = 0; k <= ps->deg; k++)
         {
           /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
-          F->coeff[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
+          F->coeff[ps->deg - k] = fabs (s->fijd[k]) * powIover2;
           powIover2 *= Iover2;
         }
       v = double_poly_eval (F, Jmax);
@@ -2977,17 +2977,17 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
         sieve_side_info_ptr s = si->sides[side];
-        cado_poly_side_ptr ps = si->cpoly->pols[side];
-        mp_poly_homography (s->fij, ps->f, ps->degree, H);
+        mpz_poly_ptr ps = si->cpoly->pols[side];
+        mp_poly_homography (s->fij, ps->coeff, ps->deg, H);
         /* On the special-q side, divide all the coefficients of the 
            transformed polynomial by q */
         if (si->conf->side == side) {
-            for (int i = 0; i <= ps->degree; i++) {
+            for (int i = 0; i <= ps->deg; i++) {
                 ASSERT_ALWAYS(mpz_divisible_p(s->fij[i], si->doing->p));
                 mpz_divexact(s->fij[i], s->fij[i], si->doing->p);
             }
         }
-        for (int k = 0; k <= ps->degree; k++)
+        for (int k = 0; k <= ps->deg; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]);
     }
 

@@ -484,10 +484,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       max_opt_lognorm = logmu;
 
     /* MurphyE */
-    mpz_set (curr_poly->rat->f[0], g[0]);
-    mpz_set (curr_poly->rat->f[1], g[1]);
+    mpz_set (curr_poly->rat->coeff[0], g[0]);
+    mpz_set (curr_poly->rat->coeff[1], g[1]);
     for (j = d + 1; j -- != 0; )
-      mpz_set (curr_poly->alg->f[j], f[j]);
+      mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
     E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
@@ -866,10 +866,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       max_opt_lognorm = logmu;
 
     /* MurphyE */
-    mpz_set (curr_poly->rat->f[0], g[0]);
-    mpz_set (curr_poly->rat->f[1], g[1]);
+    mpz_set (curr_poly->rat->coeff[0], g[0]);
+    mpz_set (curr_poly->rat->coeff[1], g[1]);
     for (j = d + 1; j -- != 0; )
-      mpz_set (curr_poly->alg->f[j], f[j]);
+      mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
     E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
@@ -2182,10 +2182,10 @@ main (int argc, char *argv[])
   /* set cpoly */
   mpz_set (best_poly->n, N);
   mpz_set (curr_poly->n, N);
-  best_poly->alg->degree = d;
-  best_poly->rat->degree = 1;
-  curr_poly->alg->degree = d;
-  curr_poly->rat->degree = 1;
+  best_poly->alg->deg = d;
+  best_poly->rat->deg = 1;
+  curr_poly->alg->deg = d;
+  curr_poly->rat->deg = 1;
 
   /* if resume, read admin */
   if (resume != NULL)

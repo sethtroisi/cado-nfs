@@ -450,7 +450,7 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  makefb_with_powers (outputfile, cpoly->alg->f, cpoly->alg->degree, 
+  makefb_with_powers (outputfile, cpoly->alg->coeff, cpoly->alg->deg,
           alim, maxbits);
 
   cado_poly_clear (cpoly);

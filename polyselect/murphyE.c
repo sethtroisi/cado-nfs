@@ -1,6 +1,6 @@
 /* Compute Murphy's E-value.
 
-Copyright 2010 Paul Zimmermann
+Copyright 2010, 2013 Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -57,19 +57,19 @@ MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
   unsigned int i;
   mpz_poly_t F, G;
 
-  F->coeff = cpoly->alg->f;
-  F->deg = cpoly->alg->degree;
-  G->coeff = cpoly->rat->f;
-  G->deg = cpoly->rat->degree;
+  F->coeff = cpoly->alg->coeff;
+  F->deg = cpoly->alg->deg;
+  G->coeff = cpoly->rat->coeff;
+  G->deg = cpoly->rat->deg;
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);
-  double_poly_init (f, cpoly->alg->degree);
+  double_poly_init (f, cpoly->alg->deg);
   double_poly_init (g, 1);
   for (i = 0; i <= f->deg; i++)
-    f->coeff[i] = mpz_get_d (cpoly->alg->f[i]);
+    f->coeff[i] = mpz_get_d (cpoly->alg->coeff[i]);
   for (i = 0; i <= g->deg; i++)
-    g->coeff[i] = mpz_get_d (cpoly->rat->f[i]);
+    g->coeff[i] = mpz_get_d (cpoly->rat->coeff[i]);
   alpha_f = get_alpha (F, ALPHA_BOUND);
   alpha_g = get_alpha (G, ALPHA_BOUND);
   one_over_logBf = 1.0 / log (Bf);

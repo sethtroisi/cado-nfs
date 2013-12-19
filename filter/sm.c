@@ -412,9 +412,9 @@ int main (int argc, char **argv)
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
 
-  int nsm = pol->alg->degree;
+  int nsm = pol->alg->deg;
   param_list_parse_int(pl, "nsm", &nsm);
-  if (nsm < 1 || nsm > pol->alg->degree)
+  if (nsm < 1 || nsm > pol->alg->deg)
   {
     fprintf(stderr, "Error: parameter nsm must be at least 1 and at most"
                     "the degree of the rational polynomial\n");

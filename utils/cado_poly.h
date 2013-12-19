@@ -5,6 +5,7 @@
 #include <gmp.h>
 
 #include "params.h"
+#include "mpz_poly.h"
 
 /* The maximum degree of polynomials supported. Used for statically 
    allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
@@ -13,20 +14,13 @@
 #define RATIONAL_SIDE   0
 #define ALGEBRAIC_SIDE   1
 
-struct cado_poly_side_s {
-  mpz_t *f;          /* rational coefficients */
-  int degree;        /* degree of polynomial g */
-};
-typedef struct cado_poly_side_s cado_poly_side[1];
-typedef struct cado_poly_side_s * cado_poly_side_ptr;
-
 struct cado_poly_s {
   mpz_t n;        /* number to factor */
   mpz_t m;        /* common root of f and g mod n */
   double skew;    /* skewness */
 
-  cado_poly_side_ptr rat, alg;
-  cado_poly_side pols[2];
+  mpz_poly_ptr rat, alg;
+  mpz_poly_t pols[2];
 };
 typedef struct cado_poly_s cado_poly[1];
 typedef struct cado_poly_s * cado_poly_ptr;

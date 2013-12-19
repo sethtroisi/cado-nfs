@@ -22,12 +22,12 @@ void cado_poly_init(cado_poly poly)
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = poly->pols[side];
-        ps->f = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
+        mpz_poly_ptr ps = poly->pols[side];
+        ps->coeff = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
         /* mpzs as well are zero */
         for (i = 0; i < (MAXDEGREE + 1); i++) {
-            mpz_init_set_ui(ps->f[i], 0);
-            ps->degree = -1;
+            mpz_init_set_ui(ps->coeff[i], 0);
+            ps->deg = -1;
         }
     }
     mpz_init_set_ui(poly->n, 0);
@@ -37,11 +37,11 @@ void cado_poly_init(cado_poly poly)
 void cado_poly_clear(cado_poly poly)
 {
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = poly->pols[side];
+        mpz_poly_ptr ps = poly->pols[side];
         for (int i = 0; i < (MAXDEGREE + 1); i++) {
-            mpz_clear(ps->f[i]);
+            mpz_clear(ps->coeff[i]);
         }
-        free(ps->f);
+        free(ps->coeff);
     }
     mpz_clear(poly->n);
     mpz_clear(poly->m);
@@ -55,11 +55,11 @@ cado_poly_set (cado_poly p, cado_poly q)
     mpz_set (p->n, q->n);
     p->skew = q->skew;
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = p->pols[side];
-        cado_poly_side_ptr qs = q->pols[side];
-        ps->degree = qs->degree;
-        for (int i = 0; i <= qs->degree; i++)
-            mpz_set (ps->f[i], qs->f[i]);
+        mpz_poly_ptr ps = p->pols[side];
+        mpz_poly_ptr qs = q->pols[side];
+        ps->deg = qs->deg;
+        for (int i = 0; i <= qs->deg; i++)
+            mpz_set (ps->coeff[i], qs->coeff[i]);
     }
     mpz_set (p->m, q->m);
 }
@@ -81,13 +81,13 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     for (i = 0; i < (MAXDEGREE + 1); i++) {
         char tag[4];
         snprintf(tag, sizeof(tag), "c%d", i);
-        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->f[i]);
+        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
         if (!have_f[ALGEBRAIC_SIDE][i]) {
             snprintf(tag, sizeof(tag), "X%d", i);
-            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->f[i]);
+            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->coeff[i]);
         }
         snprintf(tag, sizeof(tag), "Y%d", i);
-        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->f[i]);
+        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
     }
 
     mpz_set_ui (poly->m, 0);
@@ -95,24 +95,24 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     have_m = mpz_cmp_ui (poly->m, 0);
 
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = poly->pols[side];
+        mpz_poly_ptr ps = poly->pols[side];
         int d;
         for (d = MAXDEGREE; d >= 0 && !have_f[side][d]; d--) {
-            if (have_f[side][d] && mpz_cmp_ui(ps->f[d], 0) != 0)
+            if (have_f[side][d] && mpz_cmp_ui(ps->coeff[d], 0) != 0)
                 break;
         }
-        ps->degree = d;
+        ps->deg = d;
     }
 
     ASSERT_ALWAYS(have_n);
 
     // compute m, the common root of f and g mod n
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = poly->pols[side];
-        if (ps->degree != 1) continue;
+        mpz_poly_ptr ps = poly->pols[side];
+        if (ps->deg != 1) continue;
         mpz_init (tmp);
-        mpz_invert (tmp, ps->f[1], poly->n);
-        mpz_mul (tmp, tmp, ps->f[0]);
+        mpz_invert (tmp, ps->coeff[1], poly->n);
+        mpz_mul (tmp, tmp, ps->coeff[0]);
         mpz_mod (tmp, tmp, poly->n);
         mpz_sub (tmp, poly->n, tmp);
         mpz_mod (tmp, tmp, poly->n);
@@ -200,14 +200,14 @@ void cado_poly_check(cado_poly cpoly)
     mpz_init(tmp);
 
     for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr ps = cpoly->pols[side];
+        mpz_poly_ptr ps = cpoly->pols[side];
 
         /* check m is a root of f mod n */
-        mpz_set (tmp, ps->f[ps->degree]);
-        for (int i = ps->degree - 1; i >= 0; i--)
+        mpz_set (tmp, ps->coeff[ps->deg]);
+        for (int i = ps->deg - 1; i >= 0; i--)
         {
             mpz_mul (tmp, tmp, cpoly->m);
-            mpz_add (tmp, tmp, ps->f[i]);
+            mpz_add (tmp, tmp, ps->coeff[i]);
         }
         mpz_mod (tmp, tmp, cpoly->n);
         if (mpz_cmp_ui (tmp, 0) != 0)

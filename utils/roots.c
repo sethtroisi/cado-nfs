@@ -70,7 +70,7 @@ int main(int argc0, char *argv0[])
 	exit(EXIT_FAILURE);
     }
 
-    cado_poly_side_ptr ps = pol->pols[side];
+    mpz_poly_ptr ps = pol->pols[side];
 
     if (q) {
         /* check that q fits in an unsigned long */
@@ -81,14 +81,14 @@ int main(int argc0, char *argv0[])
 
         modulusul_t qq;
         modul_initmod_ul(qq, q);
-        residueul_t * r = malloc(ps->degree * sizeof(residueul_t));
-        for(int i = 0 ; i < ps->degree ; i++)
+        residueul_t * r = malloc(ps->deg * sizeof(residueul_t));
+        for(int i = 0 ; i < ps->deg ; i++)
             modul_init(r[i], qq);
-        int nr = modul_poly_roots(r, ps->f, ps->degree, qq);
+        int nr = modul_poly_roots(r, ps->coeff, ps->deg, qq);
         for(int i = 0 ; i < nr ; i++) {
             printf("%lu\n", modul_get_ul(r[i], qq));
         }
-        for(int i = 0 ; i < ps->degree ; i++)
+        for(int i = 0 ; i < ps->deg ; i++)
             modul_clear(r[i], qq);
     } else {
         if (q0 > q1)
@@ -109,10 +109,10 @@ int main(int argc0, char *argv0[])
         for( ; mpz_get_ui(qz) < q1 ; mpz_nextprime(qz,qz) ) {
             modulusul_t qq;
             modul_initmod_ul(qq, mpz_get_ui(qz));
-            residueul_t * r = malloc(ps->degree * sizeof(residueul_t));
-            for(int i = 0 ; i < ps->degree ; i++)
+            residueul_t * r = malloc(ps->deg * sizeof(residueul_t));
+            for(int i = 0 ; i < ps->deg ; i++)
                 modul_init(r[i], qq);
-            int nr = modul_poly_roots(r, ps->f, ps->degree, qq);
+            int nr = modul_poly_roots(r, ps->coeff, ps->deg, qq);
             if (nr) {
                 printf("%lu", mpz_get_ui(qz));
                 for(int i = 0 ; i < nr ; i++) {
@@ -120,7 +120,7 @@ int main(int argc0, char *argv0[])
                 }
                 printf("\n");
             }
-            for(int i = 0 ; i < ps->degree ; i++)
+            for(int i = 0 ; i < ps->deg ; i++)
                 modul_clear(r[i], qq);
         }
     }
