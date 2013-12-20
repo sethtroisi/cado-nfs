@@ -1826,7 +1826,7 @@ rotate_auxg_si (mpz_t *f, mpz_t *g, long k, unsigned int t)
 }
 
 /* replace f by f + k * x^t * (b*x + g0) */
-static void
+void
 rotate_auxg_z (mpz_t *f, mpz_t b, mpz_t g0, mpz_t k, unsigned int t)
 {
   mpz_addmul (f[t + 1], b, k);

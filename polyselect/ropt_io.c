@@ -399,7 +399,7 @@ print_poly_info_short ( mpz_t *f,
   cpoly->skew = skew;
   e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
-  printf ("# lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
+  printf ("# lognorm: %.2f, alpha: %.2f, (proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
           logmu,
           alpha,
           alpha_proj,
