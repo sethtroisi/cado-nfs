@@ -36,7 +36,7 @@ Step 1: Compile utils library from CADO-NFS
 
   In cado-nfs/utils directory, type:
 
-    make utils
+    make utils_with_io
 
 Step 2: Compile freerels binary for FFS and libfppol-f*.a
 
@@ -54,7 +54,7 @@ Step 3: Compile filtering binaries for DL
 
   In cado-nfs directory, type:
 
-    make dup1 dup2-ffs-f2 purge merge-dl replay-dl
+    make dup1 dup2-ffs-f2 purge merge-dl replay-dl reconstructlog-ffs-f2
 
 
 2. Run:
