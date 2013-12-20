@@ -3623,9 +3623,10 @@ int main(int argc, char **argv)
 
     // FIXME: merge these two instances of the algebraic polynomial in
     // one type only.
-    mpz_poly_init(glob.F, glob.n);
+    mpz_poly_init (glob.F, glob.n);
+    /* FIXME: use mpz_poly_copy if/when f_hat is a mpz_poly_t too */
     for (int i = glob.pol->alg->deg; i >= 0; --i)
-        mpz_poly_setcoeff(glob.F, i, glob.f_hat[i]);
+      mpz_poly_setcoeff(glob.F, i, glob.f_hat[i]);
 
     // fprintf(stderr, "# [%2.2lf] A is f_d^%zu*f_hat'(alpha_hat)*prod(f_d a - b alpha_hat)\n", WCT, nab + (nab &1));
 
@@ -3895,8 +3896,7 @@ int main(int argc, char **argv)
 
 // Init F to be the algebraic polynomial
 mpz_poly_init(F, degree);
-for (i = pol->alg->deg; i >= 0; --i)
-mpz_poly_setcoeff(F, i, pol->alg->coeff[i]);
+mpz_poly_copy (F, pol->alg);
 
 // Init prd to 1.
 mpz_poly_init(prd->p, pol->alg->deg);
