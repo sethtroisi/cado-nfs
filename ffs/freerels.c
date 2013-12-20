@@ -385,17 +385,17 @@ int main(int argc, char **argv)
     renumber_t tab;
     cado_poly_init(dummy_poly);
 
-    dummy_poly->pols[0]->degree = ffspol[0]->deg;
-    dummy_poly->pols[1]->degree = ffspol[1]->deg;
+    dummy_poly->pols[0]->deg = ffspol[0]->deg;
+    dummy_poly->pols[1]->deg = ffspol[1]->deg;
     unsigned long dummy_lpb[2] = { __FP_BITS + __FP_BITS * lpb[0],
                                   __FP_BITS + __FP_BITS * lpb[1]};
 
-    if (dummy_poly->pols[1]->degree == 1)
+    if (dummy_poly->pols[1]->deg == 1)
     {
       dummy_poly->rat  = dummy_poly->pols[1];
       dummy_poly->alg  = dummy_poly->pols[0];
     }
-    else if (dummy_poly->pols[0]->degree == 1)
+    else if (dummy_poly->pols[0]->deg == 1)
     {
       dummy_poly->rat  = dummy_poly->pols[0];
       dummy_poly->alg  = dummy_poly->pols[1];

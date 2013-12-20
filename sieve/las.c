@@ -566,7 +566,7 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     mpz_poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
     ASSERT_ALWAYS(mpz_cmp_ui(x, 0) == 0);
     mpz_clear(x);
-    mpz_poly_free(f);
+    mpz_poly_clear(f);
     mpz_clear(si->doing->p);
     mpz_clear(si->doing->r);
     memcpy(si->doing, *todo, sizeof(las_todo));

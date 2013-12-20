@@ -7,9 +7,11 @@
 
 /*
   Usage within CADO-NFS:
-  1) run: crtalgsqrt -v -depfile c75.dep.000 -ratdepfile c75.dep.rat.000 -polyfile c75.poly
+  1) run: crtalgsqrt -v -depfile c75.dep.000 -polyfile c75.poly
      and let "alg" be the last integer value printed, for example 271...279:
 # [83.72] c7 (+++---++) -2 [271185940941113750637336882505937475494764983427230684073069569288946725279]
+     (note that the programm also accepts a ratdepfile parameter,
+     but this one unused for the moment).
   2) let "rat" be the value of the rational square root (given by sqrt)
   3) compute gcd(alg-rat, n) and gcd(alg+rat, n)
   4) if this fails, try another dependency
@@ -17,7 +19,12 @@
 
 /* TODO list.
  *
- * This program seems to work, but is not complete.
+ * This program can be used as a replacement for the _algebraic_ part of
+ * the square root. At the moment it doesn't do the rational root, which
+ * is a pity.
+ *
+ * There are several outstanding things which could/should be done with
+ * this program.
  *
  * For correctness:
  *
@@ -212,6 +219,7 @@ static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
 }
 #endif
 
+#if 0 /* unused */
 static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
 {
     STOPWATCH_DECL;
@@ -225,6 +233,7 @@ static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
                 (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
+#endif
 
 static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
 {
@@ -542,7 +551,7 @@ void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t
             polymodF_mul_monic(P, P, Q, F);
         }
     }
-    mpz_poly_free(Q);
+    mpz_poly_clear(Q);
 }/*}}}*/
 static void broadcast_poly(mpz_poly_t P, int maxdeg, int root, MPI_Comm comm) /*{{{*/
 {
@@ -1016,11 +1025,10 @@ struct sqrt_globals {
     mpz_t P;    // prime product (not to the power prec)
     size_t nbits_sqrt;
     // size_t nbits_a;
-    mpz_t * f_hat;
-    mpz_t * f_hat_diff;
+    mpz_poly_t f_hat;
+    mpz_poly_t f_hat_diff;
     double f_hat_coeffs;
     cado_poly pol;
-    mpz_poly_t F;
     ab_source ab;
     int lll_maxdim;
     int rank;
@@ -1099,7 +1107,7 @@ polymodF_mul_monic (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
     ASSERT_ALWAYS(mpz_poly_normalized_p (P2));
     mpz_poly_mul(prd, P1, P2);
     mpz_poly_reducemodF_monic(Q, prd, F);
-    mpz_poly_free(prd);
+    mpz_poly_clear(prd);
 }
 
 // }}}
@@ -1194,7 +1202,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
         eval_points[i] *= mpz_get_d(glob.pol->alg->coeff[n]);
     }
     for(int i = 0 ; i <= n ; i++) {
-        double_coeffs[i] = mpz_get_d(glob.f_hat[i]);
+        double_coeffs[i] = mpz_get_d(glob.f_hat->coeff[i]);
     }
     // }}}
 
@@ -1693,65 +1701,6 @@ void sqrt_lift(struct prime_data * p, mpz_ptr A, mpz_ptr sx, int precision)
 }
 /* }}} */
 
-/* {{{ evaluation of polynomials (one or two polynomials) */
-static void mp_poly_eval_mod(mpz_ptr r, mpz_t * poly, int deg, mpz_srcptr a, mpz_srcptr q, mpz_srcptr qx)
-{
-    int i;
-
-    mpz_set(r, poly[deg]);
-    for (i = deg - 1; i >= 0; i--) {
-        WRAP_mpz_mul(r, r, a);
-        // falls back on mpz_mod if qx == NULL
-        WRAP_barrett_mod(r, r, q, qx);
-        // mpz_mod(r, r, q);
-        mpz_add(r, r, poly[i]);
-    }
-    WRAP_barrett_mod(r, r, q, qx);
-}
-
-static void mp_2poly_eval_mod(mpz_ptr r, mpz_ptr s, mpz_t * f, mpz_t * g, int degf, int degg, mpz_srcptr a, mpz_srcptr q, mpz_srcptr qx)
-{
-    int i;
-
-    if (r == NULL) {
-        mp_poly_eval_mod(s, g, degg, a, q, qx);
-        return;
-    }
-
-    if (s == NULL) {
-        mp_poly_eval_mod(r, f, degf, a, q, qx);
-        return;
-    }
-
-    mpz_t w;
-    mpz_init(w);
-    mpz_set(r,f[0]);
-    mpz_set(s,g[0]);
-    mpz_set(w, a);
-    WRAP_mpz_addmul(r, w, f[1]);
-    WRAP_mpz_addmul(s, w, g[1]);
-    for(i = 2 ; i <= degf && i <= degg ; i++) {
-        WRAP_mpz_mul(w, w, a);
-        WRAP_barrett_mod(w, w, q, qx);
-        WRAP_mpz_addmul(r, w, f[i]);
-        WRAP_mpz_addmul(s, w, g[i]);
-    }
-    for( ; i <= degf ; i++) {
-        WRAP_mpz_mul(w, w, a);
-        WRAP_barrett_mod(w, w, q, qx);
-        WRAP_mpz_addmul(r, w, f[i]);
-    }
-    for( ; i <= degg ; i++) {
-        WRAP_mpz_mul(w, w, a);
-        WRAP_barrett_mod(w, w, q, qx);
-        WRAP_mpz_addmul(s, w, g[i]);
-    }
-    WRAP_barrett_mod(r, r, q, qx);
-    WRAP_barrett_mod(s, s, q, qx);
-    mpz_clear(w);
-}
-/* }}} */
-
 /* {{{ This wraps around barrett reduction, depending on whether we
  * choose to use it or not */
 mpz_ptr my_barrett_init(mpz_srcptr px MAYBE_UNUSED)
@@ -1806,7 +1755,10 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
     // f(r) (to full precision), and obtain 1/f'(r) to half-precision. We
     // compute f'(r) to half-precision as a side-effect of the
     // computation of f(r).
-    mp_2poly_eval_mod(tb, fprime, glob.f_hat, glob.f_hat_diff, glob.n, glob.n-1, rx, pk, qk);
+
+    mpz_ptr rr[2] = { tb, fprime };
+    mpz_poly_srcptr ff[2] = { glob.f_hat, glob.f_hat_diff };
+    mpz_poly_eval_several_mod_mpz_barrett(rr, ff, 2, rx, pk, qk);
     /* use irx. only one iteration of newton.  */
     mpz_srcptr ql = NULL;       /* FIXME if we use barrett reduction */
     WRAP_barrett_mod(fprime, fprime, pl, ql);
@@ -1848,10 +1800,10 @@ void prime_cleanup(struct prime_data * p)/* {{{ */
     free(p->r);
     alg_ptree_clear(p->T);
 
-    mpz_poly_free(p->A);
-    mpz_poly_free(p->evals);
-    mpz_poly_free(p->lroots);
-    mpz_poly_free(p->sqrts);
+    mpz_poly_clear(p->A);
+    mpz_poly_clear(p->evals);
+    mpz_poly_clear(p->lroots);
+    mpz_poly_clear(p->sqrts);
 
     memset(p, 0, sizeof(struct prime_data));
 }
@@ -2029,16 +1981,16 @@ void crtalgsqrt_knapsack_prepare(struct crtalgsqrt_knapsack * cks, size_t lc_exp
     mpz_powm_ui(cks->lcx, glob.pol->alg->coeff[glob.n], lc_exp, glob.pol->n);
     mpz_invert(cks->lcx, cks->lcx, glob.pol->n);
 
-    mpz_ptr z = cks->fhdiff_modN;
     // evaluate the derivative of f_hat in alpha_hat mod N, that is lc*m.
-    mpz_set_ui(z, 0);
-    for(int k = glob.n ; k > 0 ; k--) {
-        mpz_mul(z, z, glob.pol->m);
-        mpz_mul(z, z, glob.pol->alg->coeff[glob.n]);
-        mpz_addmul_ui(z, glob.f_hat[k], k);
-        mpz_mod(z, z, glob.pol->n);
+    {
+        mpz_t alpha_hat;
+        mpz_init(alpha_hat);
+        mpz_mul(alpha_hat, glob.pol->m, glob.pol->alg->coeff[glob.n]);
+        mpz_poly_eval_mod_mpz(cks->fhdiff_modN,
+                glob.f_hat_diff, alpha_hat, glob.pol->n);
+        mpz_clear(alpha_hat);
     }
-    mpz_invert(z, z, glob.pol->n);
+    mpz_invert(cks->fhdiff_modN, cks->fhdiff_modN, glob.pol->n);
 
     cks->ks->cb_arg = cks;
     cks->ks->cb = (knapsack_object_callback_t) crtalgsqrt_knapsack_callback;
@@ -2266,7 +2218,7 @@ size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t 
             int r = ab_source_next(ab, &a, &b);
             FATAL_ERROR_CHECK(!r, "dep file ended prematurely\n");
             mpz_poly_from_ab_monic(tmp, a, b);
-            polymodF_mul_monic(P, P, tmp, glob.F);
+            polymodF_mul_monic(P, P, tmp, glob.f_hat);
         }
         return res;
     }
@@ -2276,9 +2228,9 @@ size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t 
     mpz_poly_init(Pr, glob.n);
     res += accumulate_ab_poly(Pl, ab, off0, off0 + d, tmp);
     res += accumulate_ab_poly(Pr, ab, off0 + d, off1, tmp);
-    polymodF_mul_monic(P, Pl, Pr, glob.F);
-    mpz_poly_free(Pl);
-    mpz_poly_free(Pr);
+    polymodF_mul_monic(P, Pl, Pr, glob.f_hat);
+    mpz_poly_clear(Pl);
+    mpz_poly_clear(Pr);
     return res;
 }
 
@@ -2311,7 +2263,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
     mpz_poly_t tmp;
     mpz_poly_init(tmp, 1);
     info->nab_loc = accumulate_ab_poly(P, ab, off0, off1, tmp);
-    mpz_poly_free(tmp);
+    mpz_poly_clear(tmp);
     ab_source_clear(ab);
 
     if (wcache && cachefile_open_w(c)) {
@@ -2328,7 +2280,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
 
 void * a_poly_read_share_child2(struct subtask_info_t * info)
 {
-    polymodF_mul_monic(info->P0, info->P0, info->P1, glob.F);
+    polymodF_mul_monic(info->P0, info->P0, info->P1, glob.f_hat);
     return NULL;
 }
 
@@ -2411,7 +2363,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
     free(a_tasks2);
 
     mpz_poly_swap(P, a_tasks[0].P);
-    for(int j = j0 ; j < j1 ; j++) mpz_poly_free(pols[j-j0]);
+    for(int j = j0 ; j < j1 ; j++) mpz_poly_clear(pols[j-j0]);
 
     free(a_tasks);
 
@@ -2421,7 +2373,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
 
     log_step(": sharing");
 
-    allreduce_polymodF_mul_monic(P, glob.acomm, glob.F);
+    allreduce_polymodF_mul_monic(P, glob.acomm, glob.f_hat);
     MPI_Allreduce(MPI_IN_PLACE, &nab_loc, 1, MPI_MY_SIZE_T, MPI_SUM, MPI_COMM_WORLD);
 
     STOPWATCH_GET();
@@ -2532,7 +2484,7 @@ void * lifting_roots_child(struct subtask_info_t * info)/* {{{ */
     mpz_t irx;
     mpz_init(irx);
 
-    mp_poly_eval_mod(irx, glob.f_hat_diff, glob.n-1, rx, p1, NULL);
+    mpz_poly_eval_mod_mpz(irx, glob.f_hat_diff, rx, p1);
     mpz_invert(irx, irx, p1);
 
     logprint("lifting p=%lu, r=%lu\n", p->p, p->r[j]);
@@ -2713,7 +2665,7 @@ void reduce_poly_mod_rat_ptree(mpz_poly_ptr P, rat_ptree_t * T)/*{{{*/
     mpz_poly_cleandeg(P, glob.n - 1);
     reduce_poly_mod_rat_ptree(temp, T->t0);
     reduce_poly_mod_rat_ptree(P, T->t1);
-    mpz_poly_free(temp);
+    mpz_poly_clear(temp);
 }/*}}}*/
 
 void * rational_reduction_child(struct subtask_info_t * info)
@@ -2743,7 +2695,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             mpz_poly_t foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
-            mpz_poly_free(foo);
+            mpz_poly_clear(foo);
         }
     } else {
         ASSERT_ALWAYS(ptree != NULL);
@@ -2758,12 +2710,12 @@ void * rational_reduction_child(struct subtask_info_t * info)
             mpz_poly_t foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
-            mpz_poly_free(foo);
+            mpz_poly_clear(foo);
         }
         // This computes P mod p_i for all p_i, and stores it into the
         // relevant field at the ptree leaves (->a)
         reduce_poly_mod_rat_ptree(temp, ptree);
-        mpz_poly_free(temp);
+        mpz_poly_clear(temp);
     }
 
     rat_ptree_clear(ptree);
@@ -3282,7 +3234,7 @@ void prime_postcomputations_child(struct postcomp_subtask_info_t * info)
     for(int k = glob.n - 1 ; k >= 0 ; k--) {
         if (k < glob.n - 1) {
             WRAP_mpz_mul(ta, ta, rx);
-            mpz_add(ta, ta, glob.f_hat[k+1]);
+            mpz_add(ta, ta, glob.f_hat->coeff[k+1]);
             WRAP_mpz_mod(ta, ta, px);
         }
         // multiply directly with H^-x * sqrt
@@ -3437,7 +3389,7 @@ void old_prime_postcomputations(int64_t * c64, mp_limb_t * cN, struct prime_data
         for(int k = glob.n - 1 ; k >= 0 ; k--) {
             if (k < glob.n - 1) {
                 WRAP_mpz_mul(ta, ta, rx);
-                mpz_add(ta, ta, glob.f_hat[k+1]);
+                mpz_add(ta, ta, glob.f_hat->coeff[k+1]);
                 WRAP_mpz_mod(ta, ta, px);
             }
             // multiply directly with H^-x * sqrt
@@ -3602,30 +3554,26 @@ int main(int argc, char **argv)
     /* {{{ create f_hat, the minimal polynomial of alpha_hat = lc(f) *
      * alpha */
     {
+        mpz_poly_init(glob.f_hat, glob.n);
+        mpz_poly_init(glob.f_hat_diff, glob.n - 1);
+
+
         mpz_t tmp;
         mpz_init_set_ui(tmp, 1);
-
-        glob.f_hat = malloc((glob.n + 1) * sizeof(mpz_t));
-        glob.f_hat_diff = malloc(glob.n * sizeof(mpz_t));
-        mpz_init_set_ui(glob.f_hat[glob.n], 1);
+        mpz_set_ui(glob.f_hat->coeff[glob.n], 1);
         for(int i = glob.n - 1 ; i >= 0 ; i--) {
-            mpz_init(glob.f_hat[i]);
-            mpz_init(glob.f_hat_diff[i]);
-            mpz_mul(glob.f_hat[i], tmp, glob.pol->alg->coeff[i]);
+            mpz_mul(glob.f_hat->coeff[i], tmp, glob.pol->alg->coeff[i]);
             mpz_mul(tmp, tmp, glob.pol->alg->coeff[glob.n]);
-            mpz_mul_ui(glob.f_hat_diff[i], glob.f_hat[i+1], i+1);
         }
+        mpz_poly_cleandeg(glob.f_hat, glob.n);
         mpz_clear(tmp);
+
+        mpz_poly_derivative(glob.f_hat_diff, glob.f_hat);
+
         if (glob.rank == 0)
             fprintf(stderr, "# [%2.2lf] Note: all computations done with polynomial f_hat\n", WCT);
     }
     /* }}} */
-
-    // FIXME: merge these two instances of the algebraic polynomial in
-    // one type only.
-    mpz_poly_init(glob.F, glob.n);
-    for (int i = glob.pol->alg->deg; i >= 0; --i)
-        mpz_poly_setcoeff(glob.F, i, glob.f_hat[i]);
 
     // fprintf(stderr, "# [%2.2lf] A is f_d^%zu*f_hat'(alpha_hat)*prod(f_d a - b alpha_hat)\n", WCT, nab + (nab &1));
 
@@ -3799,7 +3747,7 @@ int main(int argc, char **argv)
 
     logprint("Number of pairs is %zu\n", nab);
 
-    mpz_poly_free(P);
+    mpz_poly_clear(P);
 
     banner(); /*********************************************/
     prime_inversion_lifts(primes, i0, i1);
@@ -3868,20 +3816,11 @@ int main(int argc, char **argv)
     free(contribs64);
     free(contribsN);
 
-    {
-        for(int i = glob.n ; i >= 0 ; i--) {
-            mpz_clear(glob.f_hat[i]);
-        }
-        for(int i = glob.n - 1 ; i >= 0 ; i--) {
-            mpz_clear(glob.f_hat_diff[i]);
-        }
-        free(glob.f_hat);
-        free(glob.f_hat_diff);
-    }
+    mpz_poly_clear(glob.f_hat);
+    mpz_poly_clear(glob.f_hat_diff);
 
     mpz_clear(glob.P);
     cado_poly_clear(glob.pol);
-    mpz_poly_free(glob.F);
 
     ab_source_clear(glob.ab);
     param_list_clear(pl);
@@ -3895,8 +3834,7 @@ int main(int argc, char **argv)
 
 // Init F to be the algebraic polynomial
 mpz_poly_init(F, degree);
-for (i = pol->alg->deg; i >= 0; --i)
-mpz_poly_setcoeff(F, i, pol->alg->coeff[i]);
+mpz_poly_copy (F, pol->alg);
 
 // Init prd to 1.
 mpz_poly_init(prd->p, pol->alg->deg);
@@ -3954,7 +3892,7 @@ int nab = 0, nfree = 0;
     mpz_poly_copy(prd->p, prd_tab[0]->p);
     prd->v = prd_tab[0]->v;
     for (i = 0; i < (long) lprd; ++i)
-        mpz_poly_free(prd_tab[i]->p);
+        mpz_poly_clear(prd_tab[i]->p);
     free(prd_tab);
 }
 #endif
@@ -4048,9 +3986,9 @@ if (!found)
     cado_poly_clear(pol);
     mpz_clear(aux);
     mpz_clear(algsqrt);
-    mpz_poly_free(F);
-    mpz_poly_free(prd->p);
-    mpz_poly_free(tmp->p);
+    mpz_poly_clear(F);
+    mpz_poly_clear(prd->p);
+    mpz_poly_clear(tmp->p);
 
     return 0;
 #endif/*}}}*/

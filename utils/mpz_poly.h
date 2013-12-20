@@ -49,7 +49,7 @@ typedef poly_base_struct_t poly_base_t[1];
 
 /* Management of the structure, set and print coefficients. */
 void mpz_poly_init(mpz_poly_t, int d);
-void mpz_poly_free(mpz_poly_t f);
+void mpz_poly_clear(mpz_poly_t f);
 void mpz_poly_fprintf(FILE *fp, const mpz_poly_t f);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
@@ -91,6 +91,13 @@ void mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mp
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x);
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m);
+void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
+                       const mpz_t m, const mpz_t mx);
+void mpz_poly_eval_several_mod_mpz(mpz_ptr * res, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m);
+void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * res, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m, const mpz_t mx);
+
 void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   const mpz_poly_t F);
 void mpz_poly_reduce_mod_mpz(mpz_poly_t Q, const mpz_poly_t P, const mpz_t m);

@@ -72,8 +72,8 @@ int main() {
 
   print_lattices(rootsieve(f->coeff,5,g->coeff[0],g->coeff[1],U_LBOUND,U_UBOUND,V_LBOUND,V_UBOUND,PUB,VERBOSE));
 
-  mpz_poly_free(f);
-  mpz_poly_free(g);
+  mpz_poly_clear(f);
+  mpz_poly_clear(g);
   }*/
 
 
@@ -145,9 +145,9 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
       mpz_poly_fprintf(stdout,rdict->fdg_gdf);
   }
 
-  mpz_poly_free(aux);
-  mpz_poly_free(dg);
-  mpz_poly_free(df);
+  mpz_poly_clear(aux);
+  mpz_poly_clear(dg);
+  mpz_poly_clear(df);
 
   mpz_poly_init(rdict->f,f->deg);
   mpz_poly_copy(rdict->f,f);
@@ -169,9 +169,9 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
     }
   }
 
-  mpz_poly_free(rdict->f);
-  mpz_poly_free(rdict->g);
-  mpz_poly_free(rdict->fdg_gdf);
+  mpz_poly_clear(rdict->f);
+  mpz_poly_clear(rdict->g);
+  mpz_poly_clear(rdict->fdg_gdf);
 
   // We pack and return the list of lattices
   lattice_list ll;
@@ -316,16 +316,16 @@ long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
     printf("Finished rootsieving modulo %lu and its powers...\n",p);
   }
 
-  mpz_poly_free(ff);
-  mpz_poly_free(gg);
-  mpz_poly_free(fdg_gdf);
-  mpz_poly_free(id);
+  mpz_poly_clear(ff);
+  mpz_poly_clear(gg);
+  mpz_poly_clear(fdg_gdf);
+  mpz_poly_clear(id);
 
   for( i=0 ; i<=rdict->maxpow; ++i)
     mpz_clear(rdict->ppow[i]);
   free(rdict->ppow);
 
-  mpz_poly_free(rdict->gmodp);
+  mpz_poly_clear(rdict->gmodp);
 
   return hits;
 }
@@ -864,7 +864,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
       mpz_poly_reduce_mod_mpz(auxpoly,ff,rdict->ppow[1]);
       ASSERT_ALWAYS(mpz_poly_is_constant(auxpoly));
       //printf("f mod %lu is supposed to be constant, and the test gives %s \n",p,(mpz_poly_is_constant(auxpoly))?"constant":"not constant");
-      mpz_poly_free(auxpoly);
+      mpz_poly_clear(auxpoly);
     }
 
     mpz_t mp_tmp;
@@ -941,13 +941,13 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
 	printf("No hits, returning total hits and terminating (Rotation Inner)...\n");
       }
 
-      mpz_poly_free(minus_f_over_g_modp);
-      mpz_poly_free(nfdg_gdf);
-      mpz_poly_free(nff);
-      mpz_poly_free(ngg);
-      mpz_poly_free(ndphi);
-      mpz_poly_free(twist_f);
-      mpz_poly_free(tmp_poly);
+      mpz_poly_clear(minus_f_over_g_modp);
+      mpz_poly_clear(nfdg_gdf);
+      mpz_poly_clear(nff);
+      mpz_poly_clear(ngg);
+      mpz_poly_clear(ndphi);
+      mpz_poly_clear(twist_f);
+      mpz_poly_clear(tmp_poly);
       mpz_clear(rhs);
 
       return thits;
@@ -1011,13 +1011,13 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,mpz_poly_t ff,mp
     }
 
   }
-  mpz_poly_free(minus_f_over_g_modp);
-  mpz_poly_free(nfdg_gdf);
-  mpz_poly_free(nff);
-  mpz_poly_free(ngg);
-  mpz_poly_free(ndphi);
-  mpz_poly_free(twist_f);
-  mpz_poly_free(tmp_poly);
+  mpz_poly_clear(minus_f_over_g_modp);
+  mpz_poly_clear(nfdg_gdf);
+  mpz_poly_clear(nff);
+  mpz_poly_clear(ngg);
+  mpz_poly_clear(ndphi);
+  mpz_poly_clear(twist_f);
+  mpz_poly_clear(tmp_poly);
   mpz_clear(rhs);
 
   return thits;
@@ -1238,7 +1238,7 @@ void compose_psi(mpz_poly_t f, const mpz_poly_t g, unsigned long l, mpz_t * ppow
   mpz_clear(tmpsum);
   mpz_clear(tmpterm);
   mpz_clear(tmplpow);
-  mpz_poly_free(aux);
+  mpz_poly_clear(aux);
 
 }
 
@@ -1252,7 +1252,7 @@ void compose_reduce(mpz_poly_t f, const mpz_poly_t g,unsigned long l,mpz_t * ppo
   //mpz_poly_fprintf(stdout,g);
   //printf("(Compose reduce) and\n");
   //mpz_poly_fprintf(stdout,f);
-  mpz_poly_free(aux);
+  mpz_poly_clear(aux);
 }
 
 /* Prints a   */

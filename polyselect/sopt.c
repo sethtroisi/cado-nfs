@@ -195,7 +195,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 mpz_clear (g[1]);
 	 mpz_clear (t);
 	 mpz_clear (M);
-         mpz_poly_free (F);
+         mpz_poly_clear (F);
 	 return 0;
 }
 

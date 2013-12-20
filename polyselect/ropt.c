@@ -73,7 +73,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
   }
 
 
-  mpz_poly_free (Fuv);
+  mpz_poly_clear (Fuv);
   for (i = 0; i < 2; i++)
     mpz_clear (guv[i]);
   mpz_clear (m);
@@ -162,7 +162,7 @@ ropt_do_stage2 (ropt_poly_t poly,
   ropt_bound_free (bound);
   ropt_s2param_free (poly, s2param);
   mpz_clear (m);
-  mpz_poly_free (Fuv);
+  mpz_poly_clear (Fuv);
   for (i = 0; i < 2; i++)
     mpz_clear (guv[i]);
   free (guv);

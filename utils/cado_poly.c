@@ -29,7 +29,7 @@ void cado_poly_init(cado_poly poly)
 void cado_poly_clear(cado_poly poly)
 {
     for(int side = 0 ; side < 2 ; side++)
-      mpz_poly_free (poly->pols[side]);
+      mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
     mpz_clear(poly->m);

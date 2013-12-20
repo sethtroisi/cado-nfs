@@ -121,7 +121,7 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
   mpz_set_ui (V, 0);
   rotate_aux_mpz (poly->f, b, m, tmpv, V, 0);
 
-  mpz_poly_free (F);
+  mpz_poly_clear (F);
   for (j = 0; j < 2; j ++)
     mpz_clear (g[j]);
   free (g);
@@ -222,7 +222,7 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
   /* go back to w=0 */
   rotate_aux (poly->f, b, m, w0, 0, 1);
 
-  mpz_poly_free (F);
+  mpz_poly_clear (F);
   for (j = 0; j < 2; j ++)
     mpz_clear (g[j]);
   free (g);
@@ -320,7 +320,7 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
   /* go back to w=0 */
   rotate_aux (poly->f, b, m, w0, 0, 2);
 
-  mpz_poly_free (F);
+  mpz_poly_clear (F);
   for (i = 0; i < 2; i ++)
     mpz_clear (g[i]);
   free (g);

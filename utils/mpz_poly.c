@@ -265,7 +265,7 @@ void mpz_poly_realloc (mpz_poly_t f, int nc) {
 }
 
 /* Free polynomial f in mpz_poly_t. */
-void mpz_poly_free(mpz_poly_t f) {
+void mpz_poly_clear(mpz_poly_t f) {
   int i;
   for (i = 0; i < f->alloc; ++i)
     mpz_clear(f->coeff[i]);
@@ -442,7 +442,7 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_init(aux,-1);
     mpz_poly_add(aux,g,h);
     mpz_poly_copy(f,aux);
-    mpz_poly_free(aux);
+    mpz_poly_clear(aux);
     return;
   }
   int i, maxdeg;
@@ -536,7 +536,7 @@ void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_init(aux,-1);
     mpz_poly_mul(aux,g,h);
     mpz_poly_copy(f,aux);
-    mpz_poly_free(aux);
+    mpz_poly_clear(aux);
     return;
   }
 
@@ -649,7 +649,7 @@ void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
   mpz_poly_cleandeg(f, maxdeg);
   ASSERT_ALWAYS(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
 
-  mpz_poly_free(prd);
+  mpz_poly_clear(prd);
 }
 
 /* Set f=g*a where a is unsigned long. */
@@ -872,7 +872,13 @@ void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
 
 /* Set res=f(x) (mod m) */
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
-                       const mpz_t m) {
+                       const mpz_t m)
+{
+    mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
+}
+
+void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
+                       const mpz_t m, const mpz_t mx) {
   int i, d;
   d = f->deg;
   if (d == -1) {
@@ -883,8 +889,60 @@ void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
   for (i = d-1; i>=0; --i) {
     mpz_mul(res, res, x);
     mpz_add(res, res, f->coeff[i]);
-    mpz_mod(res, res, m);
+    barrett_mod(res, res, m, mx);
   }
+}
+
+/* This evaluates several polynomials at the same point w. It is possible
+ * to do fewer modular reductions in this case.
+ *
+ * When k==1, we use mpz_poly_eval_mod_mpz instead, since it's faster
+ * then.
+ */
+void mpz_poly_eval_several_mod_mpz(mpz_ptr * res, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m)
+{
+    mpz_poly_eval_several_mod_mpz_barrett(res, f, k, x, m, NULL);
+}
+
+void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m, const mpz_t mx)
+{
+    int i;
+
+    if (k == 1) {
+        mpz_poly_eval_mod_mpz_barrett(r[0], f[0], x, m, mx);
+        return;
+    }
+
+    mpz_t w;
+    mpz_init(w);
+    int maxdeg = -1;
+    for(int j = 0 ; j < k ; j++) {
+        if (f[j]->deg >= 0)
+            mpz_set(r[j],f[j]->coeff[0]);
+        else
+            mpz_set_ui(r[j], 0);
+        if (f[j]->deg > maxdeg)
+            maxdeg = f[j]->deg;
+    }
+
+    mpz_set(w, x);
+    for(int j = 0 ; j < k ; j++) {
+        if (f[j]->deg >= 1)
+            mpz_addmul(r[j], w, f[j]->coeff[1]);
+    }
+    for(i = 2 ; i <= maxdeg ; i++) {
+        mpz_mul(w, w, x);
+        barrett_mod(w, w, m, mx);
+        for(int j = 0 ; j < k ; j++)
+            if (f[j]->deg >= i)
+                mpz_addmul(r[j], w, f[j]->coeff[i]);
+    }
+    for(int j = 0 ; j < k ; j++) {
+        barrett_mod(r[j], r[j], m, mx);
+    }
+    mpz_clear(w);
 }
 
 /* Set Q=P1*P2 (mod F). Warning: Q might equal P1. */
@@ -903,7 +961,7 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
 
   mpz_poly_reducemodF(Q, prd, F);
   Q->v += v;
-  mpz_poly_free(prd);
+  mpz_poly_clear(prd);
 }
 
 /* Set Q = P (mod m) */
@@ -1037,7 +1095,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
 
   mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 // Q = P^2 mod f, mod m
@@ -1079,7 +1137,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
 
   mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* Affects the derivative of f to df. Assumes df different from f.
@@ -1127,7 +1185,7 @@ mpz_poly_power_mod_f_mod_ui (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t 
 
   mpz_poly_copy(Q, R);
   mpz_clear (m);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
@@ -1158,7 +1216,7 @@ mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t
   }
 
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* store in invm the value of floor(B^(2k)/m), where m has k limbs,
@@ -1307,7 +1365,7 @@ mpz_poly_base_modp_clear (mpz_poly_t *P)
 
   while (1)
   {
-    mpz_poly_free (t[0]);
+    mpz_poly_clear (t[0]);
     if (t[0]->deg == -1)
       break;
     t ++;
@@ -1427,11 +1485,11 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
       mpz_clear(inv);
     }
 
-  mpz_poly_free(gg);
-  mpz_poly_free(uu);
-  mpz_poly_free(vv);
-  mpz_poly_free(q);
-  mpz_poly_free(tmp);
+  mpz_poly_clear(gg);
+  mpz_poly_clear(uu);
+  mpz_poly_clear(vv);
+  mpz_poly_clear(q);
+  mpz_poly_clear(tmp);
 }
 
 
@@ -1506,9 +1564,9 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
       mpz_sub (a, a, p);
   }
 
-  mpz_poly_free (q);
-  mpz_poly_free (h);
-  mpz_poly_free (ff);
+  mpz_poly_clear (q);
+  mpz_poly_clear (h);
+  mpz_poly_clear (ff);
 
 clear_a:
   mpz_clear (a);
@@ -1559,10 +1617,10 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
     ASSERT (n == nr);
   }
 
-  mpz_poly_free(mpz_poly_fp);
-  mpz_poly_free(mpz_poly_f);
-  mpz_poly_free(g);
-  mpz_poly_free(h);
+  mpz_poly_clear(mpz_poly_fp);
+  mpz_poly_clear(mpz_poly_f);
+  mpz_poly_clear(g);
+  mpz_poly_clear(h);
   mpz_clear (tmp);
 
   /* Sort the roots */
