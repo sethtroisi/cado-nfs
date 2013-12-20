@@ -872,7 +872,13 @@ void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
 
 /* Set res=f(x) (mod m) */
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
-                       const mpz_t m) {
+                       const mpz_t m)
+{
+    mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
+}
+
+void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
+                       const mpz_t m, const mpz_t mx) {
   int i, d;
   d = f->deg;
   if (d == -1) {
@@ -883,8 +889,60 @@ void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
   for (i = d-1; i>=0; --i) {
     mpz_mul(res, res, x);
     mpz_add(res, res, f->coeff[i]);
-    mpz_mod(res, res, m);
+    barrett_mod(res, res, m, mx);
   }
+}
+
+/* This evaluates several polynomials at the same point w. It is possible
+ * to do fewer modular reductions in this case.
+ *
+ * When k==1, we use mpz_poly_eval_mod_mpz instead, since it's faster
+ * then.
+ */
+void mpz_poly_eval_several_mod_mpz(mpz_ptr * res, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m)
+{
+    mpz_poly_eval_several_mod_mpz_barrett(res, f, k, x, m, NULL);
+}
+
+void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int k, const mpz_t x,
+                       const mpz_t m, const mpz_t mx)
+{
+    int i;
+
+    if (k == 1) {
+        mpz_poly_eval_mod_mpz_barrett(r[0], f[0], x, m, mx);
+        return;
+    }
+
+    mpz_t w;
+    mpz_init(w);
+    int maxdeg = -1;
+    for(int j = 0 ; j < k ; j++) {
+        if (f[j]->deg >= 0)
+            mpz_set(r[j],f[j]->coeff[0]);
+        else
+            mpz_set_ui(r[j], 0);
+        if (f[j]->deg > maxdeg)
+            maxdeg = f[j]->deg;
+    }
+
+    mpz_set(w, x);
+    for(int j = 0 ; j < k ; j++) {
+        if (f[j]->deg >= 1)
+            mpz_addmul(r[j], w, f[j]->coeff[1]);
+    }
+    for(i = 2 ; i <= maxdeg ; i++) {
+        mpz_mul(w, w, x);
+        barrett_mod(w, w, m, mx);
+        for(int j = 0 ; j < k ; j++)
+            if (f[j]->deg >= i)
+                mpz_addmul(r[j], w, f[j]->coeff[i]);
+    }
+    for(int j = 0 ; j < k ; j++) {
+        barrett_mod(r[j], r[j], m, mx);
+    }
+    mpz_clear(w);
 }
 
 /* Set Q=P1*P2 (mod F). Warning: Q might equal P1. */
