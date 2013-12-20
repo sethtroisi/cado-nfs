@@ -60,19 +60,19 @@ int ffs_poly_set_plist(cado_poly poly, param_list pl)
   for (deg = 0; *s != '\0'; s++)
     if (*s == ',')
       deg++;
-  poly->pols[0]->degree = deg;
+  poly->pols[0]->deg = deg;
   s = param_list_lookup_string(pl, "pol1");
   for (deg = 0; *s != '\0'; s++)
     if (*s == ',')
       deg++;
-  poly->pols[1]->degree = deg;
+  poly->pols[1]->deg = deg;
 
-  if (poly->pols[1]->degree == 1)
+  if (poly->pols[1]->deg == 1)
   {
     poly->rat  = poly->pols[1];
     poly->alg  = poly->pols[0];
   }
-  else if (poly->pols[0]->degree == 1)
+  else if (poly->pols[0]->deg == 1)
   {
     poly->rat  = poly->pols[0];
     poly->alg  = poly->pols[1];
