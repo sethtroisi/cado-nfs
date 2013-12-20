@@ -201,7 +201,7 @@ alpha_p_projective (mpz_t *f, int d, mpz_t disc, unsigned long p)
 	  }
 	e = average_valuation_affine (q, p) / (double) (p + 1);
 	mpz_clear (c);
-        mpz_poly_free (q);
+        mpz_poly_clear (q);
 	return -e * log ((double) p);
     }
   else

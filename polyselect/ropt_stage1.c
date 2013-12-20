@@ -941,7 +941,7 @@ ropt_stage1 ( ropt_poly_t poly,
 
   /* free priority queue */
   free_sublattice_pq (&pqueue);
-  mpz_poly_free (Fuv);
+  mpz_poly_clear (Fuv);
 
   return 0;
 }

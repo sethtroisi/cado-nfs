@@ -155,7 +155,7 @@ add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
   unsigned int i;
   for (i = 0; i < sm->nbsm && i <= (unsigned int) SMres->deg; i++)
     mpz_add_log_mod_mpz (l, sm->smlog[i], SMres->coeff[i], sm->q);
-  mpz_poly_free(SMres);
+  mpz_poly_clear(SMres);
 }
 #endif /* ifndef FOR_FFS */
 

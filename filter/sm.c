@@ -123,12 +123,12 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
     mpz_poly_cleandeg(rels[i].denom, F->deg);
 
   }
-  mpz_poly_free(tmp);
+  mpz_poly_clear(tmp);
 
   fclose_maybe_compressed(ix, indexname);
 
   for (uint64_t i = 0; i < nrows; i++)
-    mpz_poly_free (pairs[i]);
+    mpz_poly_clear (pairs[i]);
   free (pairs);
   mpz_clear (ee);
   
@@ -173,9 +173,9 @@ void * thread_start(void *arg) {
   }
 
   mpz_clear(tmp);
-  mpz_poly_free(g);
-  mpz_poly_free(U);
-  mpz_poly_free(V);
+  mpz_poly_clear(g);
+  mpz_poly_clear(U);
+  mpz_poly_clear(V);
   return NULL;
 }
 
@@ -258,7 +258,7 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t 
   free(threads);
   for (int i = 0; i < nt; ++i) {
     for (int j = 0; j < SM_BLOCK; ++j) {
-      mpz_poly_free(SM[i][j]);
+      mpz_poly_clear(SM[i][j]);
     }
     free(SM[i]);
   }
@@ -302,9 +302,9 @@ void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
     print_sm (out, SM, nsm);
   }
 
-  mpz_poly_free(SM);
-  mpz_poly_free(U);
-  mpz_poly_free(V);
+  mpz_poly_clear(SM);
+  mpz_poly_clear(U);
+  mpz_poly_clear(V);
   mpz_clear(invl2);
   mpz_clear(tmp);
   fclose(out);

@@ -265,7 +265,7 @@ void mpz_poly_realloc (mpz_poly_t f, int nc) {
 }
 
 /* Free polynomial f in mpz_poly_t. */
-void mpz_poly_free(mpz_poly_t f) {
+void mpz_poly_clear(mpz_poly_t f) {
   int i;
   for (i = 0; i < f->alloc; ++i)
     mpz_clear(f->coeff[i]);
@@ -442,7 +442,7 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_init(aux,-1);
     mpz_poly_add(aux,g,h);
     mpz_poly_copy(f,aux);
-    mpz_poly_free(aux);
+    mpz_poly_clear(aux);
     return;
   }
   int i, maxdeg;
@@ -536,7 +536,7 @@ void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     mpz_poly_init(aux,-1);
     mpz_poly_mul(aux,g,h);
     mpz_poly_copy(f,aux);
-    mpz_poly_free(aux);
+    mpz_poly_clear(aux);
     return;
   }
 
@@ -649,7 +649,7 @@ void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
   mpz_poly_cleandeg(f, maxdeg);
   ASSERT_ALWAYS(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
 
-  mpz_poly_free(prd);
+  mpz_poly_clear(prd);
 }
 
 /* Set f=g*a where a is unsigned long. */
@@ -961,7 +961,7 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
 
   mpz_poly_reducemodF(Q, prd, F);
   Q->v += v;
-  mpz_poly_free(prd);
+  mpz_poly_clear(prd);
 }
 
 /* Set Q = P (mod m) */
@@ -1095,7 +1095,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
 
   mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 // Q = P^2 mod f, mod m
@@ -1137,7 +1137,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
 
   mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* Affects the derivative of f to df. Assumes df different from f.
@@ -1185,7 +1185,7 @@ mpz_poly_power_mod_f_mod_ui (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t 
 
   mpz_poly_copy(Q, R);
   mpz_clear (m);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
@@ -1216,7 +1216,7 @@ mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t
   }
 
   mpz_poly_copy(Q, R);
-  mpz_poly_free(R);
+  mpz_poly_clear(R);
 }
 
 /* store in invm the value of floor(B^(2k)/m), where m has k limbs,
@@ -1365,7 +1365,7 @@ mpz_poly_base_modp_clear (mpz_poly_t *P)
 
   while (1)
   {
-    mpz_poly_free (t[0]);
+    mpz_poly_clear (t[0]);
     if (t[0]->deg == -1)
       break;
     t ++;
@@ -1485,11 +1485,11 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
       mpz_clear(inv);
     }
 
-  mpz_poly_free(gg);
-  mpz_poly_free(uu);
-  mpz_poly_free(vv);
-  mpz_poly_free(q);
-  mpz_poly_free(tmp);
+  mpz_poly_clear(gg);
+  mpz_poly_clear(uu);
+  mpz_poly_clear(vv);
+  mpz_poly_clear(q);
+  mpz_poly_clear(tmp);
 }
 
 
@@ -1564,9 +1564,9 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
       mpz_sub (a, a, p);
   }
 
-  mpz_poly_free (q);
-  mpz_poly_free (h);
-  mpz_poly_free (ff);
+  mpz_poly_clear (q);
+  mpz_poly_clear (h);
+  mpz_poly_clear (ff);
 
 clear_a:
   mpz_clear (a);
@@ -1617,10 +1617,10 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
     ASSERT (n == nr);
   }
 
-  mpz_poly_free(mpz_poly_fp);
-  mpz_poly_free(mpz_poly_f);
-  mpz_poly_free(g);
-  mpz_poly_free(h);
+  mpz_poly_clear(mpz_poly_fp);
+  mpz_poly_clear(mpz_poly_f);
+  mpz_poly_clear(g);
+  mpz_poly_clear(h);
   mpz_clear (tmp);
 
   /* Sort the roots */

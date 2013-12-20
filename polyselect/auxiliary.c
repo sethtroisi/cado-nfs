@@ -1407,7 +1407,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   }
     }
   free (roots);
-  mpz_poly_free (H);
+  mpz_poly_clear (H);
 
   if (G != NULL)
     clear_mpz_array (G);
@@ -1508,7 +1508,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
         mpz_mul_ui(t, t, p);
       }
       v += special_val0(G, p);
-      mpz_poly_free (G);
+      mpz_poly_clear (G);
       mpz_clear(t);
   }
   v /= pd + 1.0;
@@ -2664,8 +2664,8 @@ optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int method)
   mpz_clear (k2tmp);
   mpz_clear (k1tmp);
   mpz_clear (kttmp);
-  mpz_poly_free (ftmp);
-  mpz_poly_free (f0);
+  mpz_poly_clear (ftmp);
+  mpz_poly_clear (f0);
   mpz_clear (gtmp[0]);
   mpz_clear (gtmp[1]);
   mpz_clear (g0[0]);
@@ -3587,7 +3587,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 
     mpz_clear (k);
     mpz_clear (best_k);
-    mpz_poly_free (h);
+    mpz_poly_clear (h);
     for (i = 0; i < 3; i++)
       mpz_clear (r[i]);
     for (i = 0; i < d; i++)

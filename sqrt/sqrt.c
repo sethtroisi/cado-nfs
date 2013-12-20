@@ -433,13 +433,13 @@ TonelliShanks (mpz_poly_t res, const mpz_poly_t a, const mpz_poly_t F, unsigned 
     mpz_poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
 
     mpz_poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
-    mpz_poly_free(D);
-    mpz_poly_free(A);
+    mpz_poly_clear(D);
+    mpz_poly_clear(A);
     mpz_clear(m);
   }
 
-  mpz_poly_free(auxpol);
-  mpz_poly_free(delta);
+  mpz_poly_clear(auxpol);
+  mpz_poly_clear(delta);
   mpz_clear(q);
   mpz_clear(aux);
   mpz_clear(myp);
@@ -627,11 +627,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
 
   mpz_clear (pk);
   mpz_clear (invpk);
-  mpz_poly_free(tmp);
-  mpz_poly_free(tmp2);
-  mpz_poly_free (A);
-  mpz_poly_free (invsqrtA);
-  mpz_poly_free (a);
+  mpz_poly_clear(tmp);
+  mpz_poly_clear(tmp2);
+  mpz_poly_clear (A);
+  mpz_poly_clear (invsqrtA);
+  mpz_poly_clear (a);
 
   size_t sqrt_size = mpz_poly_sizeinbase (res->p, F->deg - 1, 2);
   fprintf (stderr, "maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
@@ -834,7 +834,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       mpz_poly_copy(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
       for (i = 0; i < (long)lprd; ++i)
-        mpz_poly_free(prd_tab[i]->p);
+        mpz_poly_clear(prd_tab[i]->p);
       free(prd_tab);
     }
   #endif
@@ -868,9 +868,9 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
     mpz_clear(aux);
     mpz_clear(algsqrt);
-    mpz_poly_free(prd->p);
-    mpz_poly_free(tmp->p);
-    mpz_poly_free(F);
+    mpz_poly_clear(prd->p);
+    mpz_poly_clear(tmp->p);
+    mpz_poly_clear(F);
     return 0;
 }
 

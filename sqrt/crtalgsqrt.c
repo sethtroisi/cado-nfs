@@ -551,7 +551,7 @@ void reduce_polymodF_mul_monic(mpz_poly_t P, int recv, MPI_Comm comm, mpz_poly_t
             polymodF_mul_monic(P, P, Q, F);
         }
     }
-    mpz_poly_free(Q);
+    mpz_poly_clear(Q);
 }/*}}}*/
 static void broadcast_poly(mpz_poly_t P, int maxdeg, int root, MPI_Comm comm) /*{{{*/
 {
@@ -1107,7 +1107,7 @@ polymodF_mul_monic (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
     ASSERT_ALWAYS(mpz_poly_normalized_p (P2));
     mpz_poly_mul(prd, P1, P2);
     mpz_poly_reducemodF_monic(Q, prd, F);
-    mpz_poly_free(prd);
+    mpz_poly_clear(prd);
 }
 
 // }}}
@@ -1800,10 +1800,10 @@ void prime_cleanup(struct prime_data * p)/* {{{ */
     free(p->r);
     alg_ptree_clear(p->T);
 
-    mpz_poly_free(p->A);
-    mpz_poly_free(p->evals);
-    mpz_poly_free(p->lroots);
-    mpz_poly_free(p->sqrts);
+    mpz_poly_clear(p->A);
+    mpz_poly_clear(p->evals);
+    mpz_poly_clear(p->lroots);
+    mpz_poly_clear(p->sqrts);
 
     memset(p, 0, sizeof(struct prime_data));
 }
@@ -2229,8 +2229,8 @@ size_t accumulate_ab_poly(mpz_poly_ptr P, ab_source_ptr ab, size_t off0, size_t 
     res += accumulate_ab_poly(Pl, ab, off0, off0 + d, tmp);
     res += accumulate_ab_poly(Pr, ab, off0 + d, off1, tmp);
     polymodF_mul_monic(P, Pl, Pr, glob.f_hat);
-    mpz_poly_free(Pl);
-    mpz_poly_free(Pr);
+    mpz_poly_clear(Pl);
+    mpz_poly_clear(Pr);
     return res;
 }
 
@@ -2263,7 +2263,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
     mpz_poly_t tmp;
     mpz_poly_init(tmp, 1);
     info->nab_loc = accumulate_ab_poly(P, ab, off0, off1, tmp);
-    mpz_poly_free(tmp);
+    mpz_poly_clear(tmp);
     ab_source_clear(ab);
 
     if (wcache && cachefile_open_w(c)) {
@@ -2363,7 +2363,7 @@ size_t a_poly_read_share(mpz_poly_t P, size_t off0, size_t off1)
     free(a_tasks2);
 
     mpz_poly_swap(P, a_tasks[0].P);
-    for(int j = j0 ; j < j1 ; j++) mpz_poly_free(pols[j-j0]);
+    for(int j = j0 ; j < j1 ; j++) mpz_poly_clear(pols[j-j0]);
 
     free(a_tasks);
 
@@ -2665,7 +2665,7 @@ void reduce_poly_mod_rat_ptree(mpz_poly_ptr P, rat_ptree_t * T)/*{{{*/
     mpz_poly_cleandeg(P, glob.n - 1);
     reduce_poly_mod_rat_ptree(temp, T->t0);
     reduce_poly_mod_rat_ptree(P, T->t1);
-    mpz_poly_free(temp);
+    mpz_poly_clear(temp);
 }/*}}}*/
 
 void * rational_reduction_child(struct subtask_info_t * info)
@@ -2695,7 +2695,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             mpz_poly_t foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
-            mpz_poly_free(foo);
+            mpz_poly_clear(foo);
         }
     } else {
         ASSERT_ALWAYS(ptree != NULL);
@@ -2710,12 +2710,12 @@ void * rational_reduction_child(struct subtask_info_t * info)
             mpz_poly_t foo;
             mpz_poly_init(foo, glob.n);
             mpz_poly_swap(info->P, foo);
-            mpz_poly_free(foo);
+            mpz_poly_clear(foo);
         }
         // This computes P mod p_i for all p_i, and stores it into the
         // relevant field at the ptree leaves (->a)
         reduce_poly_mod_rat_ptree(temp, ptree);
-        mpz_poly_free(temp);
+        mpz_poly_clear(temp);
     }
 
     rat_ptree_clear(ptree);
@@ -3747,7 +3747,7 @@ int main(int argc, char **argv)
 
     logprint("Number of pairs is %zu\n", nab);
 
-    mpz_poly_free(P);
+    mpz_poly_clear(P);
 
     banner(); /*********************************************/
     prime_inversion_lifts(primes, i0, i1);
@@ -3816,8 +3816,8 @@ int main(int argc, char **argv)
     free(contribs64);
     free(contribsN);
 
-    mpz_poly_free(glob.f_hat);
-    mpz_poly_free(glob.f_hat_diff);
+    mpz_poly_clear(glob.f_hat);
+    mpz_poly_clear(glob.f_hat_diff);
 
     mpz_clear(glob.P);
     cado_poly_clear(glob.pol);
@@ -3892,7 +3892,7 @@ int nab = 0, nfree = 0;
     mpz_poly_copy(prd->p, prd_tab[0]->p);
     prd->v = prd_tab[0]->v;
     for (i = 0; i < (long) lprd; ++i)
-        mpz_poly_free(prd_tab[i]->p);
+        mpz_poly_clear(prd_tab[i]->p);
     free(prd_tab);
 }
 #endif
@@ -3986,9 +3986,9 @@ if (!found)
     cado_poly_clear(pol);
     mpz_clear(aux);
     mpz_clear(algsqrt);
-    mpz_poly_free(F);
-    mpz_poly_free(prd->p);
-    mpz_poly_free(tmp->p);
+    mpz_poly_clear(F);
+    mpz_poly_clear(prd->p);
+    mpz_poly_clear(tmp->p);
 
     return 0;
 #endif/*}}}*/

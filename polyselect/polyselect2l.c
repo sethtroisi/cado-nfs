@@ -571,7 +571,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_clear (g[1]);
   mpz_clear (gold[0]);
   mpz_clear (gold[1]);
-  mpz_poly_free (F);
+  mpz_poly_clear (F);
   for (j = 0; j <= d; j++)
     mpz_clear (fold[j]);
   free (fold);
@@ -954,7 +954,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_clear (g[1]);
   mpz_clear (gold[0]);
   mpz_clear (gold[1]);
-  mpz_poly_free (F);
+  mpz_poly_clear (F);
   for (j = 0; j <= d; j++)
     mpz_clear (fold[j]);
   free (fold);
