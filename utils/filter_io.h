@@ -102,7 +102,7 @@ extern int filter_rels_force_posix_threads;
  * production of relation from the input files.  Alongside with the
  * relation on which the thread is allowed to work, all threads at level
  * k receive the void* argument specified in the array member. n
- * specifies the numer of worker threads to be used for each step.
+ * specifies the number of worker threads to be used for each step.
  */
 
 struct filter_rels_description {
