@@ -124,9 +124,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
     new_si->sides[side]->logmax = old_si->sides[side]->logmax;
     new_si->sides[side]->strategy = old_si->sides[side]->strategy;
     int d = new_si->cpoly->pols[side]->deg;
-    new_si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
-    for (int k = 0; k <= d; k++)
-      mpz_init (new_si->sides[side]->fij[k]);
+    mpz_poly_init (new_si->sides[side]->fij, d);
     new_si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
   }
 
@@ -150,12 +148,8 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 static void
 clear_sieve_info(sieve_info_ptr new_si)
 {
-  for(int side = 0; side < 2; side++) {
-    int d = new_si->cpoly->pols[side]->deg;
-    for (int k = 0; k <= d; k++)
-      mpz_clear (new_si->sides[side]->fij[k]);
-    free(new_si->sides[side]->fij);
-  }
+  for(int side = 0; side < 2; side++)
+    mpz_poly_clear (new_si->sides[side]->fij);
   for (int side = 0; side < 2; side++) {
     mpz_clear(new_si->BB[side]);
     mpz_clear(new_si->BBB[side]);

@@ -2791,12 +2791,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   for (int side = 0; side < 2; side++)
     {
       int d = si->cpoly->pols[side]->deg;
-      si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
-      FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
+      mpz_poly_init (si->sides[side]->fij, d);
       si->sides[side]->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
-      for (int k = 0; k <= d; k++)
-        mpz_init (si->sides[side]->fij[k]);
     }
 
   double r, maxlog2;
@@ -2915,10 +2912,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 {
     for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
-        mpz_poly_ptr ps = si->cpoly->pols[side];
-        for (int k = 0; k <= ps->deg; k++)
-            mpz_clear(s->fij[k]);
-        free(s->fij);
+        mpz_poly_clear (s->fij);
         free(s->fijd);
     }
 }
@@ -2978,17 +2972,17 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
     for (int side = 0; side < 2; side++) {
         sieve_side_info_ptr s = si->sides[side];
         mpz_poly_ptr ps = si->cpoly->pols[side];
-        mp_poly_homography (s->fij, ps->coeff, ps->deg, H);
+        mpz_poly_homography (s->fij, ps, H);
         /* On the special-q side, divide all the coefficients of the 
            transformed polynomial by q */
         if (si->conf->side == side) {
             for (int i = 0; i <= ps->deg; i++) {
-                ASSERT_ALWAYS(mpz_divisible_p(s->fij[i], si->doing->p));
-                mpz_divexact(s->fij[i], s->fij[i], si->doing->p);
+                ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
+                mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
             }
         }
         for (int k = 0; k <= ps->deg; k++)
-            s->fijd[k] = mpz_get_d (s->fij[k]);
+            s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
     }
 
     /* improve bound on J if possible */

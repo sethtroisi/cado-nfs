@@ -2883,7 +2883,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = si->sides[side]->fij;
+                mpz_t * f = si->sides[side]->fij->coeff;
                 int deg = cpoly->pols[side]->deg;
                 int lim = si->conf->sides[side]->lim;
                 int i;
