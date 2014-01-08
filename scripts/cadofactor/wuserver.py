@@ -580,6 +580,29 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
 
 class ServerLauncher(object):
+    openssl_configuration_template = \
+"""
+oid_section		= new_oids
+
+[ new_oids ]
+[ ca ]
+[ req ]
+default_bits		= {bits:d}
+distinguished_name	= req_distinguished_name
+attributes		= req_attributes
+x509_extensions	= v3_ca
+string_mask = utf8only
+
+[ req_distinguished_name ]
+[ req_attributes ]
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints = critical,CA:true
+subjectAltName=@altnames
+[altnames]
+{SAN:s}
+"""
     def __init__(self, address, port, threaded, dbfilename,
                 registered_filenames, uploaddir, *, bg = False,
                 use_db_pool = True, scriptdir = None, only_registered=False,
@@ -601,7 +624,30 @@ class ServerLauncher(object):
         #self.ch.setFormatter(formatter)
         #self.logger.addHandler(self.ch)
         #self.logger.propagate = False
-        
+
+        # We need to find out which addresses to put as SubjectAltNames (SAN)
+        # in the certificate.
+
+        # The server address might be given by the user in one of four ways:
+        # Not specified, then url_address is the (possibly short) hostname
+        # Specified as short hostname
+        # Specified as FQDN
+        # Specified as numeric IP address
+
+        # We can always fill in the IP address
+        ipaddr = socket.gethostbyname(self.url_address)
+        self.SAN = "IP.1 = %s\n" % ipaddr
+        fqdn = socket.getfqdn(self.url_address)
+        # If address was specified as IP address and fqdn could not find a
+        # hostname for it, we don't store it. Then only the IP address will
+        # be given in the SAN list
+        if not fqdn == ipaddr:
+            self.SAN += "DNS.1 = %s\n" % fqdn
+            # If the address was given as a short host name, or if 
+            # gethostname() produced a short host name, we store that
+            if self.url_address != fqdn and self.url_address != ipaddr:
+                self.SAN += "DNS.2 = %s\n" % self.url_address
+
         self.bg = bg
         if use_db_pool:
             self.db_pool = wudb.DbThreadPool(dbfilename, 1)
@@ -694,6 +740,12 @@ class ServerLauncher(object):
         if not HAVE_SSL:
             self.logger.warn("ssl module not available, won't generate certificate")
             return False
+
+        configuration_str = self.openssl_configuration_template.format(bits=1024, SAN=self.SAN)
+        config_filename = '%s.config' % self.cafile
+        with open(config_filename, 'w') as config_file:
+            config_file.write(configuration_str)
+        
         subj = [
             "C=XY",
             "ST=None",
@@ -706,7 +758,9 @@ class ServerLauncher(object):
         
         command = ['openssl', 'req', '-new', '-x509', '-batch', '-days', '365',
                    '-nodes', '-subj', '/%s/' % '/'.join(subj), 
+                   '-config', config_filename,
                    '-out', self.cafile, '-keyout', self.cafile]
+        self.logger.debug("Running %s" % " ".join(command))
         try:
             output = check_output(command, stderr=STDOUT)
         except (OSError, CalledProcessError) as e:
