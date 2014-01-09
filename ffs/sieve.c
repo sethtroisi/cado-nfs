@@ -301,6 +301,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
+    fprintf(stderr, "  longq    *       variant of -q to use if q is large\n");
+    fprintf(stderr, "  longrho  *       variant of -rho to use if rho is large\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           upper bound for special-q range\n");
     fprintf(stderr, "  sqt  [3]         skip special-q whose defect is sqt or more\n");
