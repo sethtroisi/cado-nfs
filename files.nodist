@@ -25,8 +25,6 @@ scripts/cadofactor/parameters
 scripts/cadofactor/parameters.oar
 scripts/cadofactor/parameters.rsa512.oar
 scripts/cadofactor/index.html
-scripts/cadofactor/parameters.F9
-scripts/cadofactor/F9.poly
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c
