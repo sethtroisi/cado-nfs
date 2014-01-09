@@ -291,8 +291,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  pol1 *           function field polynomial on side 1\n");
     fprintf(stderr, "  fb0  *           factor base file on side 0\n");
     fprintf(stderr, "  fb1  *           factor base file on side 1\n");
-    fprintf(stderr, "  fbb0             factor base bound on side 0\n");
-    fprintf(stderr, "  fbb1             factor base bound on side 1\n");
+    fprintf(stderr, "  fbb0 *           factor base bound on side 0\n");
+    fprintf(stderr, "  fbb1 *           factor base bound on side 1\n");
     fprintf(stderr, "  I    *           degree bound for i\n");
     fprintf(stderr, "  J    *           degree bound for j\n");
     fprintf(stderr, "  lpb0 *           large prime bound on side 0\n");
