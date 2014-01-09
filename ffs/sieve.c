@@ -89,6 +89,20 @@ int factor_survivor(fppol_t a, fppol_t b,
         // a multiple factor was larger than the lpb.
         for (int i = 0; i < factors[twice]->n; ++i) {
             if (fppol_deg(factors[twice]->factors[i]) > B[twice]) {
+                if (qlat->side == twice) {
+                    // might be q ?
+                    fppol_t qq;
+                    fppol_init(qq);
+                    if (!qlat->want_longq)
+                        fppol_set_sq(qq, qlat->q);
+                    else
+                        fppol_set(qq, qlat->longq);
+                    if (fppol_eq(factors[twice]->factors[i], qq)) {
+                        fppol_clear(qq);
+                        continue;
+                    }
+                    fppol_clear(qq);
+                }
                 fppol_fact_clear(factors[0]);
                 fppol_fact_clear(factors[1]);
                 fppol_clear(Nab);
