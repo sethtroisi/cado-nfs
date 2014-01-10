@@ -785,6 +785,7 @@ class WuClient(Program):
                  server: Parameter(prefix='--'),
                  daemon: Toggle(prefix='--') = None,
                  keepoldresult: Toggle(prefix='--') = None,
+                 nosha1check: Toggle(prefix='--') = None,
                  dldir: Parameter(prefix='--') = None,
                  workdir: Parameter(prefix='--') = None,
                  clientid: Parameter(prefix='--') = None,

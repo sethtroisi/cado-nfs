@@ -917,6 +917,8 @@ class WorkunitClient(object):
             archname = templ.safe_substitute({"ARCH": self.settings["ARCH"]})
             dlname = templ.safe_substitute({"ARCH": ""})
             dlpath = os.path.join(self.settings["DLDIR"], dlname)
+            if self.settings["NOSHA1CHECK"]:
+                checksum = None
             if not self.get_missing_file (archname, dlpath, checksum):
                 return False
             # Try to lock the file once to be sure that download has finished
@@ -1202,6 +1204,8 @@ if __name__ == '__main__':
                           help="Daemonize the client")
         parser.add_option("--keepoldresult", default=False, action="store_true", 
                           help="Keep and upload old results when client starts")
+        parser.add_option("--nosha1check", default=False, action="store_true", 
+                          help="Skip checking the SHA1 for input files")
         # Parse command line
         (options, args) = parser.parse_args()
         if args:
@@ -1259,6 +1263,7 @@ if __name__ == '__main__':
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]
 
     SETTINGS["KEEPOLDRESULT"] = options.keepoldresult
+    SETTINGS["NOSHA1CHECK"] = options.nosha1check
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):

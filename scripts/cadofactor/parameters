@@ -285,3 +285,16 @@ slaves.basepath = /tmp/work/$(name).wuclient
 # This example uses the debugging-enabled Python 3.2 interpreter to run
 # wuclient2.py.
 # slaves.wuclient.runprefix = /usr/bin/python3.2-dbg
+
+# If you want to do computations with slaves on machines with different
+# operating systems or CPU architectures, then the binaries to run cannot
+# be distributed by the server, as currently there is no mechanism in
+# cadofactor for distributing different binaries to different slaves.
+# A work-around to this is to copy the correct binary (for las and
+# polyselect2l) manually into the different slaves' download/ directories,
+# and disabling the SHA1 check for downloaded files so that the clients
+# use the supplied files without checking their SHA1 against the hash
+# supplied in the workunit. Disabling the SHA1 check can be effected with
+# the --nosha1check option to wuclient2.py, which can be enabled in the
+# parameter file by setting:
+# slaves.wuclient.nosha1check = True

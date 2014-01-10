@@ -158,6 +158,7 @@ class Parameters(object):
         "wipeout": BoolParam,
         "dryrun": BoolParam,
         "keepoldresult": BoolParam,
+        "nosha1check": BoolParam,
         "compression": BoolParam,
         "ssl": BoolParam,
         "threaded": BoolParam,
