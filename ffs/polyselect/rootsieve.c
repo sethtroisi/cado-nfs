@@ -314,9 +314,9 @@ is_irreducible (unsigned long *f, unsigned long d)
       fqpol_set_ffspol (Fbar, ffspol, Fq);
       if (Fbar->deg == d && fqpol_is_irreducible (Fbar, Fq))
         ret = 1;
+      fqpol_clear (Fbar);
+      fq_info_clear (Fq);
     }
-  fqpol_clear (Fbar);
-  fq_info_clear (Fq);
   ffspol_clear (ffspol);
   return ret;
 }
