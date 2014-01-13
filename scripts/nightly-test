@@ -52,7 +52,7 @@ cd $DIR
 : ${USER=`whoami`}
 
 # git clone --depth 2 $GIT scm
-git clone https://gforge.inria.fr/git/cado-nfs/cado-nfs.git scm
+git clone git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git scm
 SCM=scm
 
 # If the cado repository contains a local.sh for this machine, use it.
