@@ -19,24 +19,7 @@ fi
 
 ./build/x86_64.cov/run_example.sh c59
 
-# Now I use the lcov package, and its geninfo/genhtml scripts. geninfo
-# dislikes some file that gcov seems to spontaneously create, so the
-# following patch to /usr/bin/geninfo is useful:
-
-# (patch begins here)
---- /usr/bin/geninfo	2009-05-01 02:02:06.000000000 +0200
-+++ /tmp/geninfo	2010-10-03 22:52:10.216234888 +0200
-@@ -720,6 +723,7 @@
- 	@unprocessed = keys(%bb_content);
- 	foreach $gcov_file (@gcov_list)
- 	{
-+            next if $gcov_file eq '<built-in>.gcov';
- 		($source, $object) = read_gcov_header($gcov_file);
- 
- 		if (defined($source))
-# (end of patch)
-
-# Now I do:
+# Now I use the lcov package, and its geninfo/genhtml scripts.
 
 andouille ~/NFS/cado $ /tmp/geninfo --no-checksum --ignore-errors gcov,source  -q --output-filename cado-nfs.info ./build/x86_64.cov/
 andouille ~/NFS/cado $ genhtml -o ~/.webdir/cado/ cado-nfs.info 
@@ -45,3 +28,5 @@ andouille ~/NFS/cado $ genhtml -o ~/.webdir/cado/ cado-nfs.info
 # apache server serves the location ~/.webdir/cado/ ; of course this is
 # only my very own setup).
 
+
+Note that in order to not discard reports about the system include files, it is better to to a checkout in a fresh directory. See ./scripts/coverage-nightly.sh for that.
