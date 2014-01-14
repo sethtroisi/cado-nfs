@@ -818,7 +818,7 @@ class WuAccess(object): # {
             self._ownconn = False
         cursor = self.conn.cursor(MyCursor)
         cursor.pragma("foreign_keys = ON")
-        conn_commit(self.conn)
+        self.commit()
         cursor.close()
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
     
@@ -915,11 +915,15 @@ class WuAccess(object): # {
         else:
             self.mapper.subtables["files"].insert(cursor, d, foreign=rowid)
 
+    def commit(self, do_commit=True):
+        if do_commit:
+            conn_commit(self.conn)
+
     def create_tables(self):
         cursor = self.conn.cursor(MyCursor)
         cursor.pragma("journal_mode=WAL")
         self.mapper.create(cursor)
-        conn_commit(self.conn)
+        self.commit()
         cursor.close()
 
     def _create1(self, cursor, wutext, priority=None):
@@ -945,8 +949,7 @@ class WuAccess(object): # {
         else:
             for wu in wus:
                 self._create1(cursor, wu, priority)
-        if commit:
-            conn_commit(self.conn)
+        self.commit(commit)
         cursor.close()
 
     def assign(self, clientid, commit=True):
@@ -964,8 +967,7 @@ class WuAccess(object): # {
             try:
                 self._checkstatus(r[0], WuStatus.AVAILABLE)
             except StatusUpdateError:
-                if commit:
-                    conn_commit(self.conn)
+                self.commit(commit)
                 cursor.close()
                 raise
             if DEBUG > 0:
@@ -979,8 +981,7 @@ class WuAccess(object): # {
         else:
             result = None
         
-        if commit:
-            conn_commit(self.conn)
+        self.commit(commit)
         cursor.close()
         return result
 
@@ -999,15 +1000,13 @@ class WuAccess(object): # {
             cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
-            if commit:
-                conn_commit(self.conn)
+            self.commit(commit)
             cursor.close()
             return False
         try:
             self._checkstatus(data, WuStatus.ASSIGNED)
         except StatusUpdateError:
-            if commit:
-                conn_commit(self.conn)
+            self.commit(commit)
             cursor.close()
             if data["status"] == WuStatus.CANCELLED:
                 global PRINTED_CANCELLED_WARNING
@@ -1032,8 +1031,7 @@ class WuAccess(object): # {
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self._add_files(cursor, files, rowid = data[pk])
-        if commit:
-            conn_commit(self.conn)
+        self.commit(commit)
         cursor.close()
         return True
 
@@ -1043,16 +1041,14 @@ class WuAccess(object): # {
             cursor.begin(EXCLUSIVE)
         data = self.get_by_wuid(cursor, wuid)
         if data is None:
-            if commit:
-                conn_commit(self.conn)
+            self.commit(commit)
             cursor.close()
             return False
         # FIXME: should we do the update by wuid and skip these checks?
         try:
             self._checkstatus(data, [WuStatus.RECEIVED_OK, WuStatus.RECEIVED_ERROR])
         except StatusUpdateError:
-            if commit:
-                conn_commit(self.conn)
+            self.commit(commit)
             cursor.close()
             raise
         if DEBUG > 0:
@@ -1061,8 +1057,7 @@ class WuAccess(object): # {
         d["status"] = WuStatus.VERIFIED_OK if ok else WuStatus.VERIFIED_ERROR
         pk = self.mapper.getpk()
         self.mapper.table.update(cursor, d, eq={pk:data[pk]})
-        if commit:
-            conn_commit(self.conn)
+        self.commit(commit)
         cursor.close()
         return True
 
@@ -1081,7 +1076,7 @@ class WuAccess(object): # {
             cursor.begin(EXCLUSIVE)
         d = {"status": WuStatus.CANCELLED}
         self.mapper.table.update(cursor, d, **conditions)
-        conn_commit(self.conn)
+        self.commit()
         cursor.close()
 
     def query(self, limit=None, **conditions):
