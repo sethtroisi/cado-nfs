@@ -1,5 +1,5 @@
-#ifndef FPOLY_H_
-#define FPOLY_H_
+#ifndef DOUBLE_POLY_H_
+#define DOUBLE_POLY_H_
 
 #include <stdio.h>
 #include "mpz_poly.h"
@@ -40,4 +40,4 @@ double_poly_scale (double *u, const double *t, unsigned int d, double h)
 }
 #endif
 
-#endif	/* FPOLY_H_ */
+#endif	/* DOUBLE_POLY_H_ */
