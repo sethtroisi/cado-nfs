@@ -367,8 +367,12 @@ class WuMIMEMultipart(MIMEMultipart):
         whose data should be sent
         '''
         logging.debug ("Adding result file %s to upload", filepath)
-        with open(filepath, "rb") as infile:
-            filedata = infile.read()
+        try:
+            with open(filepath, "rb") as infile:
+                filedata = infile.read()
+        except IOError as err:
+            logging.error ("Could not read file %s: %s", filepath, str(err))
+            return
         self.attach_data(name, filename, filedata, filetype, command)
 
     def attach_key(self, key, value):
@@ -598,7 +602,10 @@ class WorkunitProcessor(object):
         for filename in self.workunit.get("RESULT", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
             logging.info ("Removing result file %s", filepath)
-            os.remove(filepath)
+            try:
+                os.remove(filepath)
+            except OSError as err:
+                logging.error("Could not remove file: %s", err)
         for filename in self.workunit.get("DELETE", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
             logging.info ("Removing file %s", filepath)
