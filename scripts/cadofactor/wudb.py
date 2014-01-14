@@ -1171,6 +1171,8 @@ class ResultInfo(WuResultMessage):
         Only files that were specified in RESULT lines appear here;
         automatically captured stdout and stderr does not. 
         """
+        if self.record["files"] is None:
+            return []
         files = []
         for f in self.record["files"]:
             if f["type"] == "RESULT":
@@ -1181,6 +1183,8 @@ class ResultInfo(WuResultMessage):
         """ Get the file location of the stdout or stderr file of the
         command_nr-th command. Used internally.
         """
+        if self.record["files"] is None:
+            return None
         for f in self.record["files"]:
             if f["type"] == filetype and int(f["command"]) == command_nr:
                 return f["path"]
