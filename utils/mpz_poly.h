@@ -123,7 +123,7 @@ void mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p);
   void mpz_poly_xgcd_mpz(mpz_poly_t gcd, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p);
 int mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth);
 int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
-void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
+
 void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
 
 #ifdef __cplusplus
