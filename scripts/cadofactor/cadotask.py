@@ -18,6 +18,7 @@ import cadoprograms
 import cadoparams
 import cadocommand
 import wuserver
+import workunit
 from struct import error as structerror
 from workunit import Workunit
 
@@ -1016,7 +1017,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
         return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
-                                     "maxtimedout")
+                                     "maxtimedout", "maxfailed")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1024,8 +1025,10 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.state.setdefault("wu_timedout", 0)
+        self.state.setdefault("wu_failed", 0)
         self.params.setdefault("maxwu", 10)
         self.params.setdefault("maxtimedout", 100)
+        self.params.setdefault("maxfailed", 100)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -1104,16 +1107,19 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             self.resubmit_timed_out_wus()
             time.sleep(1)
     
-    def resubmit_one_wu(self, wu, commit=True):
+    def resubmit_one_wu(self, wu, commit=True, maxresubmit=None):
         """ Takes a Workunit instance and adds it to workunits table under
         a modified name.
         """
         wuid = wu.get_id()
         (name, task, identifier, attempt) = self.split_wuname(wuid)
         attempt = 2 if attempt is None else attempt + 1
-        if attempt > int(self.params.get("maxresubmit", 5)):
+        if maxresubmit is None:
+            maxresubmit = int(self.params.get("maxresubmit", 5))
+        if attempt > maxresubmit:
             self.logger.info("Not resubmitting workunit %s, failed %d times",
                              wuid, attempt - 1)
+            self.wuar.commit(commit)
             return
         new_wuid = self.make_wuname(identifier, attempt)
         wu.set_id(new_wuid)
@@ -1148,6 +1154,31 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         for entry in results:
             self.cancel_wu(entry["wuid"], commit=False)
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
+
+    def handle_error_result(self, message):
+        """ Handle workunit with non-zero exit code
+        
+        If the result message indicates a failed command, log an error
+        message, set the workunit to VERIFIED_ERROR in the DB, resubmit
+        the work unit (but no more than once) and return True.
+        If it indicates no error, return False. """
+        if message.get_exitcode(0) == 0:
+            return False
+        self.log_failed_command_error(message, 0)
+        key = "wu_failed"
+        maxfailed = int(self.params["maxfailed"])
+        if not self.state[key] < maxfailed:
+            self.logger.error("Exceeded maximum number of failed "
+                              "workunits, maxfailed=%d ", maxfailed)
+            raise Exception("Too many failed work units")
+        results = self.wuar.query(eq={"wuid":message.get_wu_id()})
+        assert len(results) == 1 # There must be exactly 1 WU
+        assert results[0]["status"] == wudb.WuStatus.RECEIVED_ERROR
+        wu = workunit.Workunit(results[0]["wu"])
+        self.state.update({key: self.state[key] + 1}, commit=False)
+        self.verification(message.get_wu_id(), False, commit=False)
+        self.resubmit_one_wu(wu, commit=True, maxresubmit=2)
+        return True
 
 
 class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
@@ -1322,11 +1353,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if not identifier:
             # This notification was not for me
             return
-        # If the command exited with non-zero status, print error, mark
-        # workunit as verified with error, and move on
-        if message.get_exitcode(0) != 0:
-            self.log_failed_command_error(message, 0)
-            self.verification(message.get_wu_id(), False, commit=True)
+        if self.handle_error_result(message):
             return
         (filename, ) = message.get_output_files()
         ok = self.process_polyfile(filename, commit=False)
@@ -1730,11 +1757,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         if not identifier:
             # This notification was not for me
             return
-        # If the command exited with non-zero status, print error, mark
-        # workunit as verified with error, and move on
-        if message.get_exitcode(0) != 0:
-            self.log_failed_command_error(message, 0)
-            self.verification(message.get_wu_id(), False, commit=True)
+        if self.handle_error_result(message):
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
