@@ -218,7 +218,7 @@ print_poly_info ( mpz_t *f,
   else
     printf ("# lognorm ");
   printf ("%1.2f, skew %1.2f, alpha %1.2f (proj: %1.2f), E %1.2f"
-          ",  exp_E %1.2f, %u rroots\n",
+          ", exp_E %1.2f, %u rroots\n",
           logmu, skew, alpha, alpha_proj, logmu + alpha,
           exp_E, nroots);
 
