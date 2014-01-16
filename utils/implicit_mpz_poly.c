@@ -102,17 +102,6 @@ int lift_rootz(mpz_t * f, int d, mpz_t pk, mpz_t r)
     return 1;
 }
 
-/* return 0 if f and g (both of degree d) are equal, non-zero otherwise */
-int
-mp_poly_cmp (mpz_t *f, mpz_t *g, int d)
-{
-  int i;
-
-  for (i = 0; i <= d; i++)
-    if (mpz_cmp (f[i], g[i]))
-      return 1; /* f and g differ */
-  return 0;
-}
 
 /* v <- |f(i,j)|, where f is of degree d */
 void
