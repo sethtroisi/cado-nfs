@@ -412,6 +412,19 @@ void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f) {
     mpz_poly_setcoeff(g, i, f->coeff[i]);
 }
 
+
+/* Put in c the content of f */
+void mpz_poly_content (mpz_t c, mpz_poly_t f)
+{
+  int i;
+
+  mpz_set (c, f->coeff[0]);
+  for (i = 1; i <= f->deg; i++)
+    mpz_gcd (c, c, f->coeff[i]);
+  mpz_abs (c, c);
+}
+
+
 /* -------------------------------------------------------------------------- */
 /* return 0 if f and g are equal, non-zero otherwise */
 int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
