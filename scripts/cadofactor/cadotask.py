@@ -3258,7 +3258,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.params = self.parameters.myparams(("name", "workdir", "N"))
+        self.params = self.parameters.myparams(("name", "workdir", "N", "dlp"))
         self.db_listener = self.make_db_listener()
         
         # Init WU BD
@@ -3291,6 +3291,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
+        ## tasks that are common to factorization and dlp
         self.polysel = PolyselTask(mediator = self,
                                    db = db,
                                    parameters = self.parameters,
@@ -3327,20 +3328,34 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                  db = db,
                                  parameters = self.parameters,
                                  path_prefix = linalgpath)
-        self.characters = CharactersTask(mediator = self,
-                                         db = db,
-                                         parameters = self.parameters,
-                                         path_prefix = linalgpath)
-        self.sqrt = SqrtTask(mediator = self,
+	if self.params["dlp"]:
+            ## Tasks specific to dlp
+            self.sm = SMTask(mediator = self,
                              db = db,
                              parameters = self.parameters,
-                             path_prefix = parampath)
+                             path_prefix = filterpath)
+            ## more to be added...
+        else:
+            ## Tasks specific to factorization
+            self.characters = CharactersTask(mediator = self,
+                                             db = db,
+                                             parameters = self.parameters,
+                                             path_prefix = linalgpath)
+            self.sqrt = SqrtTask(mediator = self,
+                                 db = db,
+                                 parameters = self.parameters,
+                                 path_prefix = parampath)
         
         # Defines an order on tasks in which tasks that want to run should be
         # run
-        self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
-                      self.dup1, self.dup2, self.purge, self.merge,
-                      self.linalg, self.characters, self.sqrt)
+        if self.params["dlp"]:
+            self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
+                          self.dup1, self.dup2, self.purge, self.merge,
+                          self.sm, self.linalg)
+        else:
+            self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
+                          self.dup1, self.dup2, self.purge, self.merge,
+                          self.linalg, self.characters, self.sqrt)
         
         self.request_map = {
             Request.GET_POLYNOMIAL: self.polysel.get_poly,
@@ -3363,9 +3378,14 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             Request.GET_DEPENDENCY_FILENAME: \
                 self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
-            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
+        ## add requests specific to dlp or factoring
+        if self.params["dlp"]:
+            self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
+        else:
+            self.request_map[Request.GET_KERNEL_FILENAME] = \
+                self.characters.get_kernel_filename
 
     def run(self):
         had_interrupt = False
