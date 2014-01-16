@@ -6,6 +6,7 @@ import logging
 import cadologger
 import cadotask
 import cadoparams
+import itertools
 from cadocommand import shellquote
 
 if __name__ == '__main__':
@@ -58,8 +59,7 @@ if __name__ == '__main__':
     logger.debug("Root parameter dictionary:\n%s", parameters)
 
     # Write a snapshot of the parameters to a file
-    # Could use an unbouded iterator from itertools but 10^9 should do it
-    for counter in range(10**9):
+    for counter in itertools.count():
         snapshot_filename = "%s%s%s.parameters_snapshot.%d" % \
                 (tasksparams["workdir"], os.sep, tasksparams["name"], counter)
         if not os.path.isfile(snapshot_filename):
