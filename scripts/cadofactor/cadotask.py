@@ -3259,6 +3259,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
         self.params = self.parameters.myparams(("name", "workdir", "N", "dlp"))
+        dlp = self.params.get("dlp", False)
         self.db_listener = self.make_db_listener()
         
         # Init WU BD
@@ -3328,7 +3329,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                  db = db,
                                  parameters = self.parameters,
                                  path_prefix = linalgpath)
-	if self.params["dlp"]:
+        if dlp:
             ## Tasks specific to dlp
             self.sm = SMTask(mediator = self,
                              db = db,
@@ -3348,7 +3349,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         
         # Defines an order on tasks in which tasks that want to run should be
         # run
-        if self.params["dlp"]:
+        if dlp:
             self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.sm, self.linalg)
@@ -3381,7 +3382,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
         ## add requests specific to dlp or factoring
-        if self.params["dlp"]:
+        if dlp:
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = \
