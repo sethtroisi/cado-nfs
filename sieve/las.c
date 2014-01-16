@@ -4066,6 +4066,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 #else
     int dont_print_tally = 1;
 #endif
+    if (bucket_prime_stats) {
+        fprintf (las->output, "# nr_bucket_primes = %lu, nr_div_tests = %lu, nr_composite_tests = %lu, nr_wrap_was_composite = %lu\n",
+                 nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
+    }
+
     if (dont_print_tally && las->nb_threads > 1) 
         print_stats (las->output, "# Total cpu time %1.1fs [tally only available in mono-thread]\n", t0);
     else
