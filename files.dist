@@ -647,6 +647,8 @@ params_py/params.c96
 params_py/params.c97
 params_py/params.c98
 params_py/params.c99
+params_py/parameters.F9
+params_py/F9.poly
 polyselect/CMakeLists.txt
 polyselect/Makefile
 polyselect/auxiliary.c
@@ -718,8 +720,6 @@ scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
 scripts/cadofactor/CMakeLists.txt
 scripts/cadofactor/start_clients.sh
-scripts/cadofactor/parameters.F9
-scripts/cadofactor/F9.poly
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format
