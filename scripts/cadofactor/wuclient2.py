@@ -520,7 +520,8 @@ class WorkunitProcessor(object):
             else:
                 self.cleanup()
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            paths = {key:self.settings[key] for key in ["DLDIR", "WORKDIR"]}
+            paths = {"DLDIR":self.settings["DLDIR"], 
+                     "WORKDIR":self.settings["WORKDIR"]}
             if self.settings["BINDIR"]:
                 paths["EXECDIR"] = self.settings["BINDIR"]
             else:
