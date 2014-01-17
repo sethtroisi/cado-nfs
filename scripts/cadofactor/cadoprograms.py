@@ -788,6 +788,7 @@ class WuClient(Program):
                  nosha1check: Toggle(prefix='--') = None,
                  dldir: Parameter(prefix='--') = None,
                  workdir: Parameter(prefix='--') = None,
+                 bindir: Parameter(prefix='--') = None,
                  clientid: Parameter(prefix='--') = None,
                  basepath: Parameter(prefix='--') = None,
                  getwupath: Parameter(prefix='--') = None,

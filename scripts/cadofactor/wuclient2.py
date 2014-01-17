@@ -520,7 +520,11 @@ class WorkunitProcessor(object):
             else:
                 self.cleanup()
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            paths = {key:self.settings[key] for key in ["DLDIR", "WORKDIR", "EXECDIR"]}
+            paths = {key:self.settings[key] for key in ["DLDIR", "WORKDIR"]}
+            if self.settings["BINDIR"]:
+                paths["EXECDIR"] = self.settings["BINDIR"]
+            else:
+                paths["EXECDIR"] = self.settings["DLDIR"]
             command = Template(command).safe_substitute(paths)
             logging.info ("Running command for workunit %s: %s", 
                           self.workunit.get_id(), command)
@@ -919,8 +923,10 @@ class WorkunitClient(object):
         return True
 
     def get_files(self):
-        for (filename, checksum) in self.workunit.get("FILE", []) + \
-                self.workunit.get("EXECFILE", []):
+        files_to_download = self.workunit.get("FILE", [])
+        if not self.settings["BINDIR"]:
+            files_to_download += self.workunit.get("EXECFILE", [])
+        for (filename, checksum) in files_to_download:
             templ = Template(filename)
             archname = templ.safe_substitute({"ARCH": self.settings["ARCH"]})
             dlname = templ.safe_substitute({"ARCH": ""})
@@ -1167,6 +1173,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                                    "<hostname>.<random hex number> is used"), 
                      "DLDIR" : ('download/', "Directory for downloading files"),
                      "WORKDIR" : (None, "Directory for result files"),
+                     "BINDIR" : (None, "Directory with existing executable "
+                                       "files to use"),
                      "BASEPATH" : (None, "Base directory for download and work "
                                          "directories"),
                      "GETWUPATH" : 
@@ -1266,8 +1274,6 @@ if __name__ == '__main__':
                                            SETTINGS["WORKDIR"])
         SETTINGS["DLDIR"] = os.path.join(SETTINGS["BASEPATH"], 
                                          SETTINGS["DLDIR"])
-    # By default, ${EXECDIR} expands to the same as ${DLDIR}
-    SETTINGS["EXECDIR"] = SETTINGS["DLDIR"]
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]

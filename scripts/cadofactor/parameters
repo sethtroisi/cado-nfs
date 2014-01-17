@@ -298,3 +298,11 @@ slaves.basepath = /tmp/work/$(name).wuclient
 # the --nosha1check option to wuclient2.py, which can be enabled in the
 # parameter file by setting:
 # slaves.wuclient.nosha1check = True
+
+# If the "--bindir path/to/executables/" parameter for wuclient2py is
+# specified, it does not try to download any executable files, but
+# uses the executables in the directory path/to/executables/ (where
+# they must exist, i.e., you need to copy them there). Their SHA1
+# checksum is not verified against the value in the workunit, so
+# machine-specific binaries can be used.
+# slaves.wuclient.bindir = /usr/local/bin
