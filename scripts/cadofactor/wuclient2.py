@@ -520,7 +520,8 @@ class WorkunitProcessor(object):
             else:
                 self.cleanup()
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            command = Template(command).safe_substitute(self.settings)
+            paths = {key:self.settings[key] for key in ["DLDIR", "WORKDIR", "EXECDIR"]}
+            command = Template(command).safe_substitute(paths)
             logging.info ("Running command for workunit %s: %s", 
                           self.workunit.get_id(), command)
 
@@ -1265,6 +1266,8 @@ if __name__ == '__main__':
                                            SETTINGS["WORKDIR"])
         SETTINGS["DLDIR"] = os.path.join(SETTINGS["BASEPATH"], 
                                          SETTINGS["DLDIR"])
+    # By default, ${EXECDIR} expands to the same as ${DLDIR}
+    SETTINGS["EXECDIR"] = SETTINGS["DLDIR"]
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]
