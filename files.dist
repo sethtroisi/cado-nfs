@@ -703,6 +703,7 @@ scripts/cpu_time.sh
 scripts/install-cmake.sh
 scripts/version.sh
 scripts/winlinks.sh
+scripts/oar_start_clients.sh
 scripts/cadofactor/cadocommand.py
 scripts/cadofactor/cadofactor.py
 scripts/cadofactor/cadologger.py
@@ -719,7 +720,6 @@ scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
 scripts/cadofactor/CMakeLists.txt
-scripts/cadofactor/start_clients.sh
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format
