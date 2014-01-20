@@ -111,7 +111,6 @@ recurse_roots(double_poly_srcptr poly, double *roots,
         {
           /* b is a root of dg[k+1], or s, the end of the interval */
           const double b = (l < sign_changes) ? roots[l] : s;
-          ASSERT_ALWAYS(0 <= b && b <= s);
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
             roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
