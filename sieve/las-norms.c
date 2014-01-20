@@ -2634,68 +2634,33 @@ void init_alg_norms_bucket_region(unsigned char *S,
 static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
-  unsigned int k, l, sign_change, new_sign_change;
-  double_poly_t *dg;    /* derivatives of g */
-  double a, va, b, vb;
-  double *roots, gmax;
+  double_poly_t poly, deriv;
 
-  dg = (double_poly_t*) malloc (d * sizeof (double_poly_t));
-  FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
-  /* make dg[0] point directly to g, to avoid copy */
-  dg[0]->coeff = g;
-  dg[0]->deg = d;
-  for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
-                             degree d-k, i.e., d-k+1 coefficients */
-    double_poly_init (dg[k], d - k);
-  roots = (double*) malloc (d * sizeof (double));
+  double *roots = (double*) malloc (d * sizeof (double));
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
-  for (k = 1; k < d; k++)
-    for (l = 0; l <= d - k; l++)
-      dg[k]->coeff[l] = (l + 1) * dg[k - 1]->coeff[l + 1];
-  /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
-     most one sign change in (0, s), this happens iff dg[d-1][0] and
-     dg[d-1][0]+s*dg[d-1][1] have different signs */
-  if (dg[d-1]->coeff[0] * (dg[d-1]->coeff[0] + s * dg[d-1]->coeff[1]) < 0)
+
+  /* make poly[0] point directly to g, to avoid copy */
+  poly->coeff = g;
+  poly->deg = d;
+  /* Compute the derivative of g */
+  double_poly_init (deriv, d - 1);
+  double_poly_derivative (deriv, poly);
+
+  /* Look for extrema of the polynomial, i.e., for roots of the derivative */
+  const unsigned int nr_roots = double_poly_compute_roots(roots, poly, s);
+
+  /* now abscissae of all extrema of g are 0, roots[0], ..., 
+     roots[nr_roots-1], s */
+  double gmax = fabs (g[0]);
+  for (unsigned int k = 0; k <= nr_roots; k++)
     {
-      sign_change = 1;
-      roots[0] = - dg[d-1]->coeff[0] / dg[d-1]->coeff[1]; /* root of (d-1)-th derivative */
-    }
-  else
-    sign_change = 0;
-  roots[sign_change] = s; /* end of interval */
-  for (k = d - 1; k-- > 1;)
-    {
-      /* invariant: sign_change is the number of sign changes of the
-         (k+1)-th derivative, with corresponding roots in roots[0]...
-         roots[sign_change-1], and roots[sign_change] = s. */
-      a = 0.0;
-      va = dg[k]->coeff[0]; /* value of dg[k] at x=0 */
-      new_sign_change = 0;
-      for (l = 0; l <= sign_change; l++)
-        {
-          b = roots[l]; /* root of dg[k+1], or end of interval */
-          vb = double_poly_eval (dg[k], b);
-          if (va * vb < 0) /* root in interval */
-            roots[new_sign_change++] = double_poly_dichotomy (dg[k], a, b,
-                                                              va, 20);
-          a = b;
-          va = vb;
-        }
-      roots[new_sign_change] = s; /* end of interval */
-      sign_change = new_sign_change;
-    }
-  /* now all extrema of g are 0, roots[0], ..., roots[sign_change] = s */
-  gmax = fabs (g[0]);
-  for (k = 0; k <= sign_change; k++)
-    {
-      va = fabs (double_poly_eval (dg[0], roots[k]));
+      double x = (k < nr_roots) ? roots[k] : s;
+      double va = fabs (double_poly_eval (poly, x));
       if (va > gmax)
         gmax = va;
     }
   free (roots);
-  for (k = 1; k < d; k++)
-    double_poly_clear (dg[k]);
-  free (dg);
+  double_poly_clear(deriv);
   return gmax;
 }
 
