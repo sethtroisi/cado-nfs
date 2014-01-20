@@ -8,18 +8,12 @@
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
-#else
-#ifdef HAVE_SSSE3
+#elif defined(HAVE_SSSE3)
 #include <tmmintrin.h>
-#else
-#ifdef HAVE_SSE3
+#elif defined(HAVE_SSE3)
 #include <pmmintrin.h>
-#else
-#ifdef HAVE_SSE2
+#elif defined(HAVE_SSE2)
 #include <emmintrin.h>
-#endif
-#endif
-#endif
 #endif
 
 #include "las-config.h"
