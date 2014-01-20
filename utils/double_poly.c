@@ -70,6 +70,23 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
   return (a + b) * 0.5;
 }
 
+/* Stores the derivative of f in df. Assumes df different from f.
+   Assumes df has been initialized with degree at least f->deg-1. */
+void
+double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
+{
+  unsigned int n;
+  if (f->deg == 0) {
+    df->deg = 0; /* How do we store deg -\infty polynomials? */
+    df->coeff[0] = 0;
+    return;
+  }
+  // at this point, f->deg >=1
+  df->deg = f->deg-1;
+  for(n=0; n<=f->deg-1; n++)
+    df->coeff[n] = f->coeff[n+1] * (double)(n+1);
+}
+
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
