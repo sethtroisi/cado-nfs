@@ -2,6 +2,7 @@
 #ifndef MPZ_POLY_H_
 #define MPZ_POLY_H_
 
+#include <stdint.h>
 #include <gmp.h>
 #ifdef __cplusplus
 extern "C" {
