@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 #include "double_poly.h"
 
 
@@ -47,7 +48,7 @@ parse_poly(double_poly_ptr poly, const char *str)
 
 int cmp_double(const double d1, const double d2, const double err_margin)
 {
-  return d1 * (1. - err_margin) <= d2 && d2 <= d1 * (1. + err_margin);
+  return fabs(d1) * (1. - err_margin) <= fabs(d2) && fabs(d2) <= fabs(d1) * (1. + err_margin);
 }
 
 void 
@@ -103,7 +104,12 @@ test_double_poly_compute_roots(const int verbose)
   /* (x-1)*(x-2)*(x-3)*(x-4)*(x-5) */
   test_double_poly_compute_roots1("-120 274 -225 85 -15 1", "1 2 3 4 5", 1e-6, 6., verbose);
   
-  /* Let f(x+1/x) * x^6 == (x^13-1)/(x-1), this is f(x-2). 6 real roots, 0 rational */
+  /* Let f(x+1/x) * x^6 == (x^13-1)/(x-1). Test the positive roots */
+  test_double_poly_compute_roots1("-1 3 6 -4 -5 1 1", "0.241073360510646, 1.13612949346231, 1.77091205130642", 1e-6, 2., verbose);
+  /* and the negative ones */
+  test_double_poly_compute_roots1("-1 3 6 -4 -5 1 1", "-0.709209774085071 -1.49702149634220 -1.94188363485210", 1e-6, -2., verbose);
+  
+  /* this is f(x-2). 6 real roots, 0 rational */
   test_double_poly_compute_roots1("1, -21, 70, -84, 45, -11, 1", "0.0581163651478959 0.502978503657798 1.29079022591493 2.24107336051065 3.13612949346231 3.77091205130642", 1e-6, 4., verbose);
   
 }
