@@ -2,6 +2,7 @@
 #define DOUBLE_POLY_H_
 
 #include <stdio.h>
+#include <limits.h>
 #include "mpz_poly.h"
 
 /* floating point polynomials */
