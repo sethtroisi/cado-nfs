@@ -41,6 +41,7 @@ add_executable(test_modredc_2ul2 ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_2ul2
 add_executable(test-rootfinder ${EXCLUDE_FROM_RELEASE_BUILD} test-rootfinder.c)
 add_executable(test_roots_mod ${EXCLUDE_FROM_RELEASE_BUILD} test_roots_mod.c)
 add_executable(test_omega ${EXCLUDE_FROM_RELEASE_BUILD} test_omega.c)
+add_executable(test_double_poly ${EXCLUDE_FROM_RELEASE_BUILD} test_double_poly.c)
 add_executable(gmp_prob_prime gmp_prob_prime.c)
 add_executable(gmp_nextprime gmp_nextprime.c)
 add_executable(random_integer random_integer.c)
@@ -62,6 +63,7 @@ target_link_libraries(gmp_nextprime ${gmp_libname})
 target_link_libraries(random_integer ${gmp_libname})
 target_link_libraries(test_omega utils)
 target_link_libraries(antebuffer pthread)
+target_link_libraries(test_double_poly utils)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
