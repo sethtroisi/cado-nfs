@@ -2740,11 +2740,14 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
   return log2(tmp);
 }
 
-/* this function initializes the scaling factors and report bounds on the
-   rational and algebraic sides */
-void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
+/*
+   Allocates:
+     si->sides[side]->fij
+     si->sides[side]->fijd
+*/
+
+void sieve_info_init_norm_data(sieve_info_ptr si)
 {
-  double step, begin;
   for (int side = 0; side < 2; side++)
     {
       int d = si->cpoly->pols[side]->deg;
@@ -2753,6 +2756,83 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
     }
 
+}
+
+void sieve_info_clear_norm_data(sieve_info_ptr si)
+{
+    for(int side = 0 ; side < 2 ; side++) {
+        sieve_side_info_ptr s = si->sides[side];
+        mpz_poly_clear (s->fij);
+        free(s->fijd);
+    }
+}
+
+/* return largest possible J by simply bounding the Fij and Gij polynomials
+   using the absolute value of their coefficients */
+static unsigned int
+sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
+{
+  double Iover2 = (double) (si->I >> 1);
+  double Jmax = Iover2;
+
+  for (int side = 0; side < 2; side++)
+    {
+      sieve_side_info_ptr s = si->sides[side];
+      mpz_poly_ptr ps = si->cpoly->pols[side];
+      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
+      double_poly_t F;
+
+      double_poly_init (F, ps->deg);
+      for (int k = 0; k <= ps->deg; k++)
+        {
+          /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
+          F->coeff[ps->deg - k] = fabs (s->fijd[k]) * powIover2;
+          powIover2 *= Iover2;
+        }
+      v = double_poly_eval (F, Jmax);
+      if (v > maxnorm)
+        { /* use dichotomy to determine largest Jmax */
+          double a, b, c;
+          a = 0.0;
+          b = Jmax;
+          while (trunc (a) != trunc (b))
+            {
+              c = (a + b) * 0.5;
+              v = double_poly_eval (F, c);
+              if (v < maxnorm)
+                a = c;
+              else
+                b = c;
+            }
+          Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
+        }
+      double_poly_clear (F);
+    }
+
+  return (unsigned int) Jmax;
+}
+
+/* this function initializes the scaling factors and report bounds on the
+   rational and algebraic sides */
+/*
+   Updates:
+     si->sides[RATIONAL_SIDE]->logmax
+     si->sides[RATIONAL_SIDE]->scale
+     si->sides[RATIONAL_SIDE]->cexp2[]
+     si->sides[RATIONAL_SIDE]->bound
+     
+     si->sides[ALGEBRAIC_SIDE]->logmax
+     si->sides[ALGEBRAIC_SIDE]->scale
+     si->sides[ALGEBRAIC_SIDE]->cexp2[]
+     si->sides[ALGEBRAIC_SIDE]->bound
+*/
+
+void
+sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads, double q0d, int qside)
+{
+    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+
+  double step, begin;
   double r, maxlog2;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
@@ -2853,67 +2933,6 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-}
-
-void sieve_info_clear_norm_data(sieve_info_ptr si)
-{
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr s = si->sides[side];
-        mpz_poly_clear (s->fij);
-        free(s->fijd);
-    }
-}
-
-/* return largest possible J by simply bounding the Fij and Gij polynomials
-   using the absolute value of their coefficients */
-static unsigned int
-sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
-{
-  double Iover2 = (double) (si->I >> 1);
-  double Jmax = Iover2;
-
-  for (int side = 0; side < 2; side++)
-    {
-      sieve_side_info_ptr s = si->sides[side];
-      mpz_poly_ptr ps = si->cpoly->pols[side];
-      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
-      double_poly_t F;
-
-      double_poly_init (F, ps->deg);
-      for (int k = 0; k <= ps->deg; k++)
-        {
-          /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
-          F->coeff[ps->deg - k] = fabs (s->fijd[k]) * powIover2;
-          powIover2 *= Iover2;
-        }
-      v = double_poly_eval (F, Jmax);
-      if (v > maxnorm)
-        { /* use dichotomy to determine largest Jmax */
-          double a, b, c;
-          a = 0.0;
-          b = Jmax;
-          while (trunc (a) != trunc (b))
-            {
-              c = (a + b) * 0.5;
-              v = double_poly_eval (F, c);
-              if (v < maxnorm)
-                a = c;
-              else
-                b = c;
-            }
-          Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
-        }
-      double_poly_clear (F);
-    }
-
-  return (unsigned int) Jmax;
-}
-
-void
-sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
-{
-    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
-
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
