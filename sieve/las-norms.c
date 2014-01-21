@@ -2876,7 +2876,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 
 /* return largest possible J by simply bounding the Fij and Gij polynomials
    using the absolute value of their coefficients */
-unsigned int
+static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
   double Iover2 = (double) (si->I >> 1);
