@@ -17,6 +17,9 @@ typedef struct abase_vbase_tmpl_s const * abase_vbase_tmpl_srcptr;
 
 struct abase_vbase_s {
     void * obj; /* pointer to global implementation private fields */
+    const char * (*impl_name)();
+    unsigned long (*impl_max_characteristic_bits)();
+    unsigned long (*impl_max_degree)();
     void (*field_characteristic)(abase_vbase_ptr, mpz_t);
     int (*field_degree)(abase_vbase_ptr);
     void (*field_init)(abase_vbase_ptr);
@@ -156,7 +159,6 @@ struct abase_vbase_s {
     MPI_Op (*mpi_addition_op)(abase_vbase_ptr);
     MPI_Op (*mpi_addition_op_ur)(abase_vbase_ptr);
     void (*mpi_ops_clear)(abase_vbase_ptr);
-    const char * (*oo_impl_name)(abase_vbase_ptr);
     void (*oo_field_init)(abase_vbase_ptr);
     void (*oo_field_clear)(abase_vbase_ptr);
 };

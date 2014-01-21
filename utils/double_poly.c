@@ -70,6 +70,87 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
   return (a + b) * 0.5;
 }
 
+/* Stores the derivative of f in df. Assumes df different from f.
+   Assumes df has been initialized with degree at least f->deg-1. */
+void
+double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
+{
+  unsigned int n;
+  if (f->deg == 0) {
+    df->deg = 0; /* How do we store deg -\infty polynomials? */
+    df->coeff[0] = 0;
+    return;
+  }
+  // at this point, f->deg >=1
+  df->deg = f->deg-1;
+  for(n=0; n<=f->deg-1; n++)
+    df->coeff[n] = f->coeff[n+1] * (double)(n+1);
+}
+
+static unsigned int
+recurse_roots(double_poly_srcptr poly, double *roots,
+              const unsigned int sign_changes, const double s)
+{
+  unsigned int new_sign_changes = 0;
+  if (poly->deg <= 0) {
+      /* A constant polynomial (degree 0 or -\infty) has no sign changes */
+  } else if (poly->deg == 1) {
+      /* A polynomial of degree 1 can have at most one sign change in (0, s),
+         this happens iff poly(0) = poly[0] and poly(s) have different signs */
+      if (poly->coeff[0] * double_poly_eval(poly, s) < 0) {
+          new_sign_changes = 1;
+          roots[0] = - poly->coeff[0] / poly->coeff[1];
+      }
+  } else {
+      /* invariant: sign_changes is the number of sign changes of the
+         (k+1)-th derivative, with corresponding roots in roots[0]...
+         roots[sign_changes-1], and roots[sign_changes] = s. */
+      double a = 0.0;
+      double va = poly->coeff[0]; /* value of poly at x=0 */
+      for (unsigned int l = 0; l <= sign_changes; l++)
+        {
+          /* b is a root of dg[k+1], or s, the end of the interval */
+          const double b = (l < sign_changes) ? roots[l] : s;
+          const double vb = double_poly_eval (poly, b);
+          if (va * vb < 0) /* root in interval [va, vb] */
+            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
+          a = b;
+          va = vb;
+        }
+  }
+
+  return new_sign_changes;
+}
+
+unsigned int
+double_poly_compute_roots(double *roots, double_poly_ptr poly, double s)
+{
+  const unsigned int d = poly->deg;
+  double_poly_t *dg; /* derivatives of poly */
+  dg = (double_poly_t *) malloc (d * sizeof (double_poly_t));
+  FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
+
+  dg[0]->deg = poly->deg;
+  dg[0]->coeff = poly->coeff;
+  
+  for (unsigned int k = 1; k < d; k++) {
+    /* dg[k] is the k-th derivative, thus has degree d-k, i.e., d-k+1
+       coefficients */
+    double_poly_init (dg[k], d - k);
+    double_poly_derivative (dg[k], dg[k - 1]);
+  }
+  
+  unsigned int sign_changes = 0;
+  for (unsigned int k = d; k > 0; k--)
+    sign_changes = recurse_roots(dg[k - 1], roots, sign_changes, s);
+
+  for (unsigned int k = 1; k < d; k++)
+    double_poly_clear (dg[k]);
+  free (dg);
+
+  return sign_changes;
+}
+
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 

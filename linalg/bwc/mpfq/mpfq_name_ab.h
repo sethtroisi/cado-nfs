@@ -52,6 +52,10 @@
 
 
 
+#define abimpl_name()	abcommon_name_(impl_name) ()
+#define abimpl_max_characteristic_bits()	abcommon_name_(impl_max_characteristic_bits) ()
+#define abimpl_max_degree()	abcommon_name_(impl_max_degree) ()
+
 
 #define abfield_characteristic(a0,a1)	abcommon_name_(field_characteristic) (a0,a1)
 #define abfield_degree(a0)	abcommon_name_(field_degree) (a0)
@@ -237,7 +241,6 @@
 
 
 
-#define aboo_impl_name(a0)	abcommon_name_(oo_impl_name) (a0)
 #define aboo_field_init(a0)	abcommon_name_(oo_field_init) (a0)
 #define aboo_field_clear(a0)	abcommon_name_(oo_field_clear) (a0)
 

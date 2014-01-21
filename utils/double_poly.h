@@ -2,6 +2,7 @@
 #define DOUBLE_POLY_H_
 
 #include <stdio.h>
+#include <limits.h>
 #include "mpz_poly.h"
 
 /* floating point polynomials */
@@ -25,6 +26,8 @@ void double_poly_clear (double_poly_ptr);
 double double_poly_eval (double_poly_srcptr, const double);
 double double_poly_dichotomy (double_poly_srcptr, double, double, double,
                               unsigned int);
+void double_poly_derivative(double_poly_ptr, double_poly_srcptr);
+unsigned int double_poly_compute_roots(double *, double_poly_ptr, double);
 void double_poly_print (FILE *, double_poly_srcptr, char *name);
 void double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q);
 
