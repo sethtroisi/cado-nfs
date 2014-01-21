@@ -122,7 +122,7 @@ process_one_relation (earlyparsed_relation_ptr rel)
   for(unsigned int side = 0 ; side < 2 ; side++)
   {
     mpz_poly_ptr ps = cpoly->pols[side];
-    mp_poly_homogeneous_eval_siui(norm[side], ps->coeff, ps->deg, rel->a, rel->b);
+    mpz_poly_homogeneous_eval_siui(norm[side], ps, rel->a, rel->b);
   }
 
   /* check for correctness of the factorization of the norms */
