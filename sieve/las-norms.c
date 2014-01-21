@@ -2664,6 +2664,15 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   return gmax;
 }
 
+/* Like get_maxnorm_aux(), but for interval [-s, s] */
+static double
+get_maxnorm_aux_pm (double *g, const unsigned int d, double s)
+{
+    double norm1 = get_maxnorm_aux(g, d, s);
+    double norm2 = get_maxnorm_aux(g, d, -s);
+    return (norm2 > norm1) ? norm2 : norm1;
+}
+
 /* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
    for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
@@ -2677,11 +2686,10 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
 
    Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
    of the rectangle, i.e.:
-   (a) either on F(s,y) for 0 <= y <= 1
+   (a) either on F(s,y) for -1 <= y <= 1
    (b) either on F(x,1) for -s <= x <= s
-   (c) either on F(-s,y) for 0 <= y <= 1
    (d) or on F(x,0) for -s <= x <= s, but this maximum is f[d]*s^d,
-       and is attained in (a) or (c).
+       and is attained in (a).
 */
 static double
 get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
@@ -2697,12 +2705,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
     fd[k] = mpz_get_d (cpoly->alg->coeff[k]);
 
   /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
-  max_norm = get_maxnorm_aux (fd, d, cpoly->skew);
-
-  /* (b2) determine the maximum of |f(-x)| for 0 <= x <= s */
-  norm = get_maxnorm_aux (fd, d, -cpoly->skew);
-  if (norm > max_norm)
-    max_norm = norm;
+  max_norm = get_maxnorm_aux_pm (fd, d, cpoly->skew);
 
   for (pows = 1., k = 0; k <= d; k++)
     {
@@ -2718,12 +2721,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
     }
 
   /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
-  norm = get_maxnorm_aux (fd, d, 1.);
-  if (norm > max_norm)
-    max_norm = norm;
-
-  /* (c) determine the maximum of |g(-y)| for 0 <= y <= 1 */
-  norm = get_maxnorm_aux (fd, d, -1.);
+  norm = get_maxnorm_aux_pm (fd, d, 1.);
   if (norm > max_norm)
     max_norm = norm;
 
@@ -2803,7 +2801,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
-  step = 1 / rat->scale;
+  step = 1. / rat->scale;
   begin = -step * GUARD;
   for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
@@ -2848,7 +2846,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
-  step = 1 / alg->scale;
+  step = 1. / alg->scale;
   begin = -step * GUARD;
   for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
   /* we want to report relations with a remaining log2-norm after sieving of
