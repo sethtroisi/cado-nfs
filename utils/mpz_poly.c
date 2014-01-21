@@ -294,6 +294,13 @@ mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
   gmp_fprintf (fp, "%Zd*x^%d\n", f->coeff[f->deg], f->deg);
 }
 
+/* Set polynomial degree */
+void mpz_poly_set_deg(mpz_poly_t f, int deg)
+{
+  f->deg = deg;
+}
+
+
 /* Find polynomial degree. */
 void mpz_poly_cleandeg(mpz_poly_t f, int deg) {
   ASSERT(deg >= -1);
@@ -1686,6 +1693,8 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
   for (k = 0; k <= d; k++)
     mpz_set (fij[k], f[k]);
 
+  mpz_poly_set_deg(Fij, d);
+
   g = malloc ((d + 1) * sizeof (mpz_t));
   for (k = 0; k <= d; k++)
     mpz_init (g[k]);
@@ -1742,4 +1751,20 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
   free (g);
 }
 
+/* v <- |f(i,j)|, where f is homogeneous of degree d */
+void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_t f, const int64_t i, const uint64_t j)
+{
+  unsigned int k;
+  mpz_t jpow;
 
+  mpz_init_set_ui (jpow, 1);
+  mpz_set (v, f->coeff[f->deg]);
+  for (k = f->deg; k-- > 0;)
+    {
+      mpz_mul_int64 (v, v, i);
+      mpz_mul_uint64 (jpow, jpow, j);
+      mpz_addmul (v, f->coeff[k], jpow);
+    }
+  mpz_abs (v, v); /* avoids problems with negative norms */
+  mpz_clear (jpow);
+}

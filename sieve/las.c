@@ -2694,7 +2694,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 {
     las_info_ptr las = th->las;
     sieve_info_ptr si = th->si;
-    cado_poly_ptr cpoly = si->cpoly;
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2];
@@ -2883,8 +2882,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = si->sides[side]->fij->coeff;
-                int deg = cpoly->pols[side]->deg;
                 int lim = si->conf->sides[side]->lim;
                 int i;
                 unsigned int j;
@@ -2894,7 +2891,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                    i,j-coordinates. The transformed polynomial on the 
                    special-q side is already divided by q */
                 NxToIJ (&i, &j, N, x, si);
-                mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
+		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
+
+
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
