@@ -194,12 +194,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     param_list_parse_int(pl, "apowlim", &apow_lim);
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
 
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr sis = si->sides[side];
-        unsigned long lim = si->conf->sides[side]->lim;
-        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
-    }
-
     if (fbcfilename != NULL) {
         /* Try to read the factor base cache file. If that fails, because
            the file does not exist or is not compatible with our parameters,
@@ -654,6 +648,14 @@ static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
+
+  /* Update the steps of the log of factor base primes */
+  for(int side = 0 ; side < 2 ; side++) {
+      sieve_side_info_ptr sis = si->sides[side];
+      unsigned long lim = si->conf->sides[side]->lim;
+      sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+  }
+
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
