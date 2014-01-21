@@ -2647,7 +2647,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   double_poly_derivative (deriv, poly);
 
   /* Look for extrema of the polynomial, i.e., for roots of the derivative */
-  const unsigned int nr_roots = double_poly_compute_roots(roots, poly, s);
+  const unsigned int nr_roots = double_poly_compute_roots(roots, deriv, s);
 
   /* now abscissae of all extrema of g are 0, roots[0], ..., 
      roots[nr_roots-1], s */
