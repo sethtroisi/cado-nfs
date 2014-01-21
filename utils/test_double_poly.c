@@ -66,7 +66,7 @@ test_double_poly_compute_roots1(const char *poly_str, const char *roots_str,
     double_poly_print (stdout, poly, "Testing polynomial ");
 
   nr_roots = double_poly_compute_roots(roots2->coeff, poly, s);
-  if (nr_roots != roots1->deg + 1) {
+  if (nr_roots != (int) roots1->deg + 1) {
     fprintf (stderr, "double_poly_compute_roots() produced wrong number of roots %d, reference has %d\n",
              nr_roots, roots1->deg + 1);
     abort();
