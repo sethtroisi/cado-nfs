@@ -2814,11 +2814,6 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
-  /* Obsolete: rat->Bound is replaced by a single threshold alg->bound */
-  /*
-  sieve_info_init_lognorm (rat->Bound, rat->bound, si->conf->sides[RATIONAL_SIDE]->lim,
-                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
-  */
 
   /************************** algebraic side *********************************/
 
@@ -2858,11 +2853,6 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-  /* Obsolete: alg->Bound is replaced by a single threshold alg->bound */
-  /*
-  sieve_info_init_lognorm (alg->Bound, alg->bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
-                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
-  */
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
