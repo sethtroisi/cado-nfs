@@ -2701,6 +2701,7 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
 static double
 get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si)
 {
+  const int debug = 0;
   unsigned int k;
   double norm, max_norm;
 
@@ -2709,7 +2710,8 @@ get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si
   for (k = 0; k <= d; k++)
     poly->coeff[k] = coeff[k];
 
-  double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
+  if (debug)
+    double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
 
   /* (b1) determine the maximum of |F(x)| for -s <= x <= s */
   max_norm = get_maxnorm_aux_pm (poly, 1.);
@@ -2726,7 +2728,8 @@ get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si
 
   double_poly_clear(poly);
 
-  fprintf(stdout, "# Max norm is %f\n", max_norm);
+  if (debug)
+    fprintf(stdout, "# Max norm is %f\n", max_norm);
 
   return log2(max_norm);
 }
