@@ -644,8 +644,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
 static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/*{{{*/
 {
   /* essentially update the fij polynomials */
-  siever_config_srcptr sc = si->conf;
-  sieve_info_update_norm_data(output, si, nb_threads, exp2(sc->bitsize), sc->side);
+  sieve_info_update_norm_data(output, si, nb_threads);
 
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;

@@ -213,7 +213,7 @@ check_one_prime(const unsigned long sq MAYBE_UNUSED,
     return 0;
   }
 
-  sieve_info_update_norm_data(stdout, si, nb_threads, (double) sq, sq_side);
+  sieve_info_update_norm_data(stdout, si, nb_threads);
 
   const uint32_t I = si->I, J = si->J;
   int i;

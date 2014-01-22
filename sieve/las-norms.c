@@ -2828,9 +2828,11 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 */
 
 void
-sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads, double q0d, int qside)
+sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 {
-    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+  int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+  double q0d = exp2(si->conf->bitsize);
+  int qside = si->doing->side;
 
   double step, begin;
   double r, maxlog2;
@@ -2933,36 +2935,36 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads, d
   if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-    /* Update floating point version of algebraic poly (do both, while
-     * we're at it...) */
-    for (int side = 0; side < 2; side++) {
-        sieve_side_info_ptr s = si->sides[side];
-        mpz_poly_ptr ps = si->cpoly->pols[side];
-        mpz_poly_homography (s->fij, ps, H);
-        /* On the special-q side, divide all the coefficients of the 
-           transformed polynomial by q */
-        if (si->conf->side == side) {
-            for (int i = 0; i <= ps->deg; i++) {
-                ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
-                mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
-            }
-        }
-        for (int k = 0; k <= ps->deg; k++)
-            s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
-    }
 
-    /* improve bound on J if possible */
-    unsigned int Jmax;
-    Jmax = sieve_info_update_norm_data_Jmax (si);
-    if (Jmax > si->J)
-      {
-        /* see sieve_info_adjust_IJ */
-        ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
-        uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-        i *= nb_threads;
-        si->J = (Jmax / i) * i; /* cannot be zero since the previous value
-                                   of si->J was already a multiple of i,
-                                   and this new value is larger */
+  /* Update floating point version of algebraic poly (do both, while
+   * we're at it...) */
+  for (int side = 0; side < 2; side++) {
+      sieve_side_info_ptr s = si->sides[side];
+      mpz_poly_ptr ps = si->cpoly->pols[side];
+      mpz_poly_homography (s->fij, ps, H);
+      /* On the special-q side, divide all the coefficients of the 
+         transformed polynomial by q */
+      if (si->conf->side == side) {
+          for (int i = 0; i <= ps->deg; i++) {
+              ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
+              mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
+          }
       }
-}
+      for (int k = 0; k <= ps->deg; k++)
+          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
+  }
 
+  /* improve bound on J if possible */
+  unsigned int Jmax;
+  Jmax = sieve_info_update_norm_data_Jmax (si);
+  if (Jmax > si->J)
+    {
+      /* see sieve_info_adjust_IJ */
+      ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
+      uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+      i *= nb_threads;
+      si->J = (Jmax / i) * i; /* cannot be zero since the previous value
+                                 of si->J was already a multiple of i,
+                                 and this new value is larger */
+    }
+}

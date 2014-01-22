@@ -44,7 +44,7 @@ void sieve_info_init_norm_data(sieve_info_ptr si);
 
 void sieve_info_clear_norm_data(sieve_info_ptr si);
 
-void sieve_info_update_norm_data (FILE *, sieve_info_ptr, int, double, int);
+void sieve_info_update_norm_data (FILE *, sieve_info_ptr, int);
 
 void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 
