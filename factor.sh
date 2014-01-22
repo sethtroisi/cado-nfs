@@ -131,7 +131,7 @@ done
 cado_prefix="@CMAKE_INSTALL_PREFIX@"
 cado_source_dir="@CADO_NFS_SOURCE_DIR@"
 cado_build_dir="@CADO_NFS_BINARY_DIR@"
-example_subdir_py="@example_subdir_py@"
+example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
 if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
@@ -139,13 +139,13 @@ if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     bindir="$cado_prefix/bin"
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
-    paramdir="$cado_prefix/$example_subdir_py"
+    paramdir="$cado_prefix/$example_subdir"
     cputime="$bindir/cpu_time.sh"
 elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
     cputime="$cado_source_dir/scripts/cpu_time.sh"
     scriptpath="$cado_source_dir/scripts/cadofactor"
-    paramdir="$cado_source_dir/params_py"
+    paramdir="$cado_source_dir/params"
     cadofactor="$scriptpath/cadofactor.py"
     # Make the path absolute.
     bindir="$cado_build_dir"
@@ -162,7 +162,7 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
       cputime="$srcdir/scripts/cpu_time.sh"
       scriptpath="${srcdir}/scripts/cadofactor"
       cadofactor="${scriptpath}/cadofactor.py"
-      paramdir="${srcdir}/params_py/"
+      paramdir="${srcdir}/params/"
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
     fi
