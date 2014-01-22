@@ -123,10 +123,9 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
     
     new_si->sides[side]->logmax = old_si->sides[side]->logmax;
     new_si->sides[side]->strategy = old_si->sides[side]->strategy;
-    int d = new_si->cpoly->pols[side]->deg;
-    mpz_poly_init (new_si->sides[side]->fij, d);
-    new_si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
   }
+
+  sieve_info_init_norm_data(new_si);
 
   /* Compute the root a/b (mod p) */
   mpz_init(new_si->doing->p);
@@ -148,14 +147,12 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 static void
 clear_sieve_info(sieve_info_ptr new_si)
 {
-  for(int side = 0; side < 2; side++)
-    mpz_poly_clear (new_si->sides[side]->fij);
   for (int side = 0; side < 2; side++) {
     mpz_clear(new_si->BB[side]);
     mpz_clear(new_si->BBB[side]);
     mpz_clear(new_si->BBBB[side]);
-    free(new_si->sides[side]->fijd);
   }
+  sieve_info_clear_norm_data(new_si);
   mpz_clear(new_si->doing->r);
   mpz_clear(new_si->doing->p);
 }
