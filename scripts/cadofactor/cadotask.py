@@ -2912,6 +2912,62 @@ class SqrtTask(Task):
             N += 2     
         return N
 
+
+
+class SMTask(Task):
+    """ Computes Schirokauher Maps """
+    @property
+    def name(self):
+        return "sm"
+    @property
+    def title(self):
+        return "Schirokauher Maps"
+    @property
+    def programs(self):
+        return (cadoprograms.SM,)
+    @property
+    def paramnames(self):
+        return super().paramnames + ()
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "sm" in self.state:
+            self.logger.info("Starting")
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            smfilename = self.workdir.make_filename("sm")
+            
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            densefilename = self.send_request(Request.GET_DENSE_FILENAME)
+            dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
+            
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.Characters.name)
+            p = cadoprograms.SM(poly=polyfilename,
+                    purged=purgedfilename, index=indexfilename,
+                    wfile=dependencyfilename, out=kernelfilename,
+                    heavyblock=densefilename, stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            if not smfilename.isfile():
+                raise Exception("Output file %s does not exist" % smfilename)
+            self.state["sm"] = smfilename.get_wdir_relative()
+        self.logger.debug("Exit SMTask.run(" + self.name + ")")
+        return True
+    
+    def get_sm_filename(self):
+        return self.get_state_filename("sm")
+
+
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
     """ Starts HTTP server """
     @property
