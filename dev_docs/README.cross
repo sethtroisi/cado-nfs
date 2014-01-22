@@ -53,9 +53,9 @@ that directory. From there, do:
     make install
 
 Following this, once you copy the files under SYSTEM_ROOT/usr/local to
-your target system, you should be able to run cadofactor.pl. Of course,
+your target system, you should be able to run cadofactor.py. Of course,
 this assumes that all the *run-time* dependencies of cado-nfs are met
-(perl, etc).
+(python3, etc).
 
 
 Issues with shared libraries (not only system ones, but those cado-nfs
