@@ -2640,26 +2640,30 @@ void init_alg_norms_bucket_region(unsigned char *S,
 /* return max |g(x)| for x in (0, s) where s can be negative,
    and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
-get_maxnorm_aux (double *g, const unsigned int d, double s)
+get_maxnorm_aux (double_poly_srcptr poly, double s)
 {
-  double_poly_t poly, deriv;
+  double_poly_t deriv;
+  const int d = poly->deg;
 
-  double *roots = (double*) malloc (d * sizeof (double));
+  if (d < 0) {
+    return 0;
+  } else if (d == 0) {
+    return poly->coeff[0];
+  }
+
+  double *roots = (double*) malloc (poly->deg * sizeof (double));
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
 
-  /* make poly[0] point directly to g, to avoid copy */
-  poly->coeff = g;
-  poly->deg = d;
-  /* Compute the derivative of g */
+  /* Compute the derivative of polynomial */
   double_poly_init (deriv, d - 1);
   double_poly_derivative (deriv, poly);
 
   /* Look for extrema of the polynomial, i.e., for roots of the derivative */
   const unsigned int nr_roots = double_poly_compute_roots(roots, deriv, s);
 
-  /* now abscissae of all extrema of g are 0, roots[0], ..., 
+  /* now abscissae of all extrema of poly are 0, roots[0], ..., 
      roots[nr_roots-1], s */
-  double gmax = fabs (g[0]);
+  double gmax = fabs (poly->coeff[0]);
   for (unsigned int k = 0; k <= nr_roots; k++)
     {
       double x = (k < nr_roots) ? roots[k] : s;
@@ -2674,11 +2678,11 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
 
 /* Like get_maxnorm_aux(), but for interval [-s, s] */
 static double
-get_maxnorm_aux_pm (double *g, const unsigned int d, double s)
+get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
 {
-    double norm1 = get_maxnorm_aux(g, d, s);
-    double norm2 = get_maxnorm_aux(g, d, -s);
-    return (norm2 > norm1) ? norm2 : norm1;
+  double norm1 = get_maxnorm_aux(poly, s);
+  double norm2 = get_maxnorm_aux(poly, -s);
+  return (norm2 > norm1) ? norm2 : norm1;
 }
 
 /* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
@@ -2703,37 +2707,25 @@ static double
 get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
 {
   unsigned int d = cpoly->alg->deg, k;
-  double *fd; /* double-precision coefficients of f */
-  double norm, max_norm, pows, tmp;
+  double norm, max_norm, tmp;
   double B = l_infty_snorm_u;
 
-  fd = (double*) malloc ((d + 1) * sizeof (double));
-  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
+  double_poly_t poly;
+  double_poly_init (poly, d);
   for (k = 0; k <= d; k++)
-    fd[k] = mpz_get_d (cpoly->alg->coeff[k]);
+    poly->coeff[k] = mpz_get_d (cpoly->alg->coeff[k]);
 
-  /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
-  max_norm = get_maxnorm_aux_pm (fd, d, cpoly->skew);
+  /* (b1) determine the maximum of |f(x)| for -s <= x <= s */
+  max_norm = get_maxnorm_aux_pm (poly, cpoly->skew);
 
-  for (pows = 1., k = 0; k <= d; k++)
-    {
-      fd[k] *= pows;
-      pows *= cpoly->skew;
-    }
-  /* swap coefficients; if d is odd, we need to go up to k = floor(d/2) */
-  for (k = 0; k <= d / 2; k++)
-    {
-      tmp = fd[k];
-      fd[k] = fd[d - k];
-      fd[d - k] = tmp;
-    }
-
-  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
-  norm = get_maxnorm_aux_pm (fd, d, 1.);
+  /* (a) determine the maximum of |g(y)| for -1 <= y <= 1, with g(y) = F(s,y) */
+  double_poly_scale(poly, poly, cpoly->skew);
+  double_poly_revert(poly);
+  norm = get_maxnorm_aux_pm (poly, 1.);
   if (norm > max_norm)
     max_norm = norm;
 
-  free (fd);
+  double_poly_clear(poly);
 
   /* multiply by (B*I)^d: don't use the pow() function since it does not
      work properly when the rounding mode is not to nearest (at least under
