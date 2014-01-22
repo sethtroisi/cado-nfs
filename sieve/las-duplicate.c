@@ -115,6 +115,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 
   new_si->conf->side = old_si->conf->side;
   new_si->conf->logI = old_si->conf->logI;
+  new_si->conf->bitsize = old_si->conf->bitsize;
   for(int side = 0; side < 2; side++) {
     new_si->conf->sides[side]->lim = old_si->conf->sides[side]->lim;
     new_si->conf->sides[side]->lpb = old_si->conf->sides[side]->lpb;
@@ -135,6 +136,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
   mpz_invert(new_si->doing->r, new_si->doing->r, new_si->doing->p);
   mpz_mul_int64(new_si->doing->r, new_si->doing->r, a);
   mpz_mod(new_si->doing->r, new_si->doing->r, new_si->doing->p);
+  new_si->doing->side = old_si->doing->side;
 
   for (int side = 0; side < 2; side++) {
     mpz_init_set(new_si->BB[side], old_si->BB[side]);
