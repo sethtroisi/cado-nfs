@@ -270,9 +270,6 @@ add_custom_target(dist
     WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
 )
 
-install(PROGRAMS cadofactor.pl DESTINATION bin)
-install(FILES cadofct.pm DESTINATION bin)
-
 install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
 install(DIRECTORY params_py/ DESTINATION ${example_subdir_py} FILES_MATCHING PATTERN "params.*")
 
