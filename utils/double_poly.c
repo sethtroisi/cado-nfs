@@ -154,6 +154,14 @@ double_poly_compute_roots(double *roots, double_poly_ptr poly, double s)
 {
   const unsigned int d = poly->deg;
   double_poly_t *dg; /* derivatives of poly */
+  
+  /* The roots of the zero polynomial are ill-defined. Bomb out */
+  ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
+
+  /* Handle constant polynomials separately */
+  if (d == 0)
+    return 0; /* Constant non-zero poly -> no roots */
+
   dg = (double_poly_t *) malloc (d * sizeof (double_poly_t));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
 
