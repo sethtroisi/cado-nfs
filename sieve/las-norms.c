@@ -437,6 +437,14 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
      NB: Somes SSE algorithms needs __x86_64; all __x86_64 are SSE2.
 **************************************************************************/
 
+static inline void
+poly_scale (double *u, const double *t, unsigned int d, double h)
+{
+  double hpow;
+  u[d] = t[d];
+  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
+}
+
 /**************** used #define from SSE2 to -41 **************************/
 #ifdef HAVE_SSE2
 
@@ -637,7 +645,7 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
 
 #define INITALGD(A) do {					\
     double du[d+1];						\
-    double_poly_scale(du, alg->fijd, d, (double) (A));		\
+    poly_scale(du, alg->fijd, d, (double) (A));		\
     for (uint32_t k=0; k<=d; k++) u[k] = _mm_set1_pd(du[k]);	\
   } while (0)
 
@@ -1812,7 +1820,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   } while(0)
  
 #define INITALGD(A)				\
-  double_poly_scale(u, alg->fijd, d, (double) (A))
+  poly_scale(u, alg->fijd, d, (double) (A))
  
 #define ABSG1 g=fabs(u0+h*u1)
  
