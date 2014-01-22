@@ -115,6 +115,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 
   new_si->conf->side = old_si->conf->side;
   new_si->conf->logI = old_si->conf->logI;
+  new_si->conf->bitsize = old_si->conf->bitsize;
   for(int side = 0; side < 2; side++) {
     new_si->conf->sides[side]->lim = old_si->conf->sides[side]->lim;
     new_si->conf->sides[side]->lpb = old_si->conf->sides[side]->lpb;
@@ -123,10 +124,9 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
     
     new_si->sides[side]->logmax = old_si->sides[side]->logmax;
     new_si->sides[side]->strategy = old_si->sides[side]->strategy;
-    int d = new_si->cpoly->pols[side]->deg;
-    mpz_poly_init (new_si->sides[side]->fij, d);
-    new_si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
   }
+
+  sieve_info_init_norm_data(new_si);
 
   /* Compute the root a/b (mod p) */
   mpz_init(new_si->doing->p);
@@ -136,6 +136,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
   mpz_invert(new_si->doing->r, new_si->doing->r, new_si->doing->p);
   mpz_mul_int64(new_si->doing->r, new_si->doing->r, a);
   mpz_mod(new_si->doing->r, new_si->doing->r, new_si->doing->p);
+  new_si->doing->side = old_si->doing->side;
 
   for (int side = 0; side < 2; side++) {
     mpz_init_set(new_si->BB[side], old_si->BB[side]);
@@ -148,14 +149,12 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 static void
 clear_sieve_info(sieve_info_ptr new_si)
 {
-  for(int side = 0; side < 2; side++)
-    mpz_poly_clear (new_si->sides[side]->fij);
   for (int side = 0; side < 2; side++) {
     mpz_clear(new_si->BB[side]);
     mpz_clear(new_si->BBB[side]);
     mpz_clear(new_si->BBBB[side]);
-    free(new_si->sides[side]->fijd);
   }
+  sieve_info_clear_norm_data(new_si);
   mpz_clear(new_si->doing->r);
   mpz_clear(new_si->doing->p);
 }
@@ -213,7 +212,7 @@ check_one_prime(const unsigned long sq MAYBE_UNUSED,
     return 0;
   }
 
-  sieve_info_update_norm_data(si, nb_threads);
+  sieve_info_update_norm_data(stdout, si, nb_threads);
 
   const uint32_t I = si->I, J = si->J;
   int i;

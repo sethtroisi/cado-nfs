@@ -27,17 +27,11 @@ double double_poly_eval (double_poly_srcptr, const double);
 double double_poly_dichotomy (double_poly_srcptr, double, double, double,
                               unsigned int);
 void double_poly_derivative(double_poly_ptr, double_poly_srcptr);
+void double_poly_scale(double_poly_ptr, double_poly_srcptr, double);
+void double_poly_revert(double_poly_ptr);
 unsigned int double_poly_compute_roots(double *, double_poly_ptr, double);
 void double_poly_print (FILE *, double_poly_srcptr, char *name);
 void double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q);
-
-static inline void
-double_poly_scale (double *u, const double *t, unsigned int d, double h)
-{
-  double hpow;
-  u[d] = t[d];
-  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
-}
 
 #ifdef __cplusplus
 }

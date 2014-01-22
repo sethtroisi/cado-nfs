@@ -494,7 +494,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* This (mildly) depends on the special q, but more importantly also
      * on the lpb/... bounds */
-    sieve_info_init_norm_data(las->output, si, exp2(sc->bitsize), sc->side);
+    sieve_info_init_norm_data(si);
 
     /* TODO: This function in itself is too expensive if called often */
     sieve_info_init_factor_bases(las, si, pl);
@@ -641,10 +641,10 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     return nJ > 0;
 }/*}}}*/
 
-static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
+static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/*{{{*/
 {
   /* essentially update the fij polynomials */
-  sieve_info_update_norm_data(si, nb_threads);
+  sieve_info_update_norm_data(output, si, nb_threads);
 
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
@@ -4011,7 +4011,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si, las->nb_threads);
+        sieve_info_update (las->output, si, las->nb_threads);
         totJ += (double) si->J;
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);

@@ -87,6 +87,33 @@ double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
     df->coeff[n] = f->coeff[n+1] * (double)(n+1);
 }
 
+/* Scale a polynomial: r(x) = f(x * scale). r == f is ok. */
+void
+double_poly_scale(double_poly_ptr r, double_poly_srcptr f, const double scale)
+{
+  double pows;
+  unsigned int k;
+  for (pows = 1., k = 0; k <= f->deg; k++)
+    {
+      r->coeff[k] = f->coeff[k] * pows;
+      pows *= scale;
+    }
+}
+
+/* Revert the coefficients in-place: f(x) => f(1/x) * x^degree */
+void
+double_poly_revert(double_poly_ptr f)
+{
+  const unsigned int d = f->deg;
+  for (unsigned int k = 0; k <= d / 2; k++)
+    {
+      double tmp = f->coeff[k];
+      f->coeff[k] = f->coeff[d - k];
+      f->coeff[d - k] = tmp;
+    }
+}
+
+
 static unsigned int
 recurse_roots(double_poly_srcptr poly, double *roots,
               const unsigned int sign_changes, const double s)
@@ -127,6 +154,14 @@ double_poly_compute_roots(double *roots, double_poly_ptr poly, double s)
 {
   const unsigned int d = poly->deg;
   double_poly_t *dg; /* derivatives of poly */
+  
+  /* The roots of the zero polynomial are ill-defined. Bomb out */
+  ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
+
+  /* Handle constant polynomials separately */
+  if (d == 0)
+    return 0; /* Constant non-zero poly -> no roots */
+
   dg = (double_poly_t *) malloc (d * sizeof (double_poly_t));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
 
