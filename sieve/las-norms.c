@@ -2685,59 +2685,50 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
   return (norm2 > norm1) ? norm2 : norm1;
 }
 
-/* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
-   for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
-   -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
-   where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = l_infty_snorm_u).
-
-   Since |a0| <= s*B and |b0| <= B, then
-   |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
-   thus it suffices to compute M = max |F(x,y)| in the rectangle
-   -s <= x <= s, 0 <= y <= 1, and to multiply M by (B*I)^deg(F).
-
-   Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
-   of the rectangle, i.e.:
-   (a) either on F(s,y) for -1 <= y <= 1
-   (b) either on F(x,1) for -s <= x <= s
-   (d) or on F(x,0) for -s <= x <= s, but this maximum is f[d]*s^d,
+/* returns the maximal norm of log2|F'(i,j)| for -I/2 <= i <= I/2, 0 <= j <= J.
+   Since F is homogeneous, we know M = max |F'(i,j)| = |f'(i/j) * j^d| is
+   attained on the border of the rectangle, i.e.:
+   (a) either on F'(I/2,j) for -J <= j <= J (right-hand-side border, and the
+       mirrored image of the left-hand-side border);
+       with F'(i,j) = rev(F)(j,i), we want the maximum of
+       rev(F')(j, I/2) = rev(f')(j/(I/2)) * (I/2)^d for -J <= j <= J;
+       assuming I = 2J, this is rev(f')(x) * J^d for -1 <= x <= 1.
+   (b) either on F'(i,J) for -I/2 <= i <= I/2 (top border)
+       = f(i/J) * J^d; assuming I = 2J, f(x) * J^d for -1 <= x <= 1.
+   (d) or on F(i,0) for -I <= i <= I (lower border), but this maximum is f[d]*I^d,
        and is attained in (a).
 */
 static double
-get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
+get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si)
 {
-  unsigned int d = cpoly->alg->deg, k;
-  double norm, max_norm, tmp;
-  double B = l_infty_snorm_u;
+  unsigned int k;
+  double norm, max_norm;
 
   double_poly_t poly;
   double_poly_init (poly, d);
   for (k = 0; k <= d; k++)
-    poly->coeff[k] = mpz_get_d (cpoly->alg->coeff[k]);
+    poly->coeff[k] = coeff[k];
 
-  /* (b1) determine the maximum of |f(x)| for -s <= x <= s */
-  max_norm = get_maxnorm_aux_pm (poly, cpoly->skew);
+  double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
+
+  /* (b1) determine the maximum of |F(x)| for -s <= x <= s */
+  max_norm = get_maxnorm_aux_pm (poly, 1.);
 
   /* (a) determine the maximum of |g(y)| for -1 <= y <= 1, with g(y) = F(s,y) */
-  double_poly_scale(poly, poly, cpoly->skew);
   double_poly_revert(poly);
   norm = get_maxnorm_aux_pm (poly, 1.);
   if (norm > max_norm)
     max_norm = norm;
 
+  /* Both cases (a) and (b) want to multiply by J^d = (I/2)^d. Since J may
+     not have been initialised yet, we use I. */
+  max_norm *= pow((double)(si->I / 2), (double)d);
+
   double_poly_clear(poly);
 
-  /* multiply by (B*I)^d: don't use the pow() function since it does not
-     work properly when the rounding mode is not to nearest (at least under
-     Linux with the glibc). Moreover for a small exponent d a direct loop
-     as follows should not be much slower (if any), anyway the efficiency of
-     that function is not critical */
-  for (tmp = max_norm, k = 0; k < d; k++)
-    tmp *= B * (double) si->I;
-  /* divide by q0 if sieving on alg side */
-  if (qside == ALGEBRAIC_SIDE)
-      tmp /= q0d;
-  return log2(tmp);
+  fprintf(stdout, "# Max norm is %f\n", max_norm);
+
+  return log2(max_norm);
 }
 
 /*
@@ -2831,45 +2822,36 @@ void
 sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 {
   int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
-  double q0d = exp2(si->conf->bitsize);
-  int qside = si->doing->side;
 
   double step, begin;
   double r, maxlog2;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
-  /* Let u = (a0, b0) and v = (a1, b1) the two vectors obtained from skew
-     Gauss reduction, and u' = (a0, s*b0), v' = (a1, s*b1). Assume |u'|<=|v'|.
-     We know from Gauss reduction that the vectors u' and v' form an
-     angle of at least pi/3, and their determinant is qs, thus:
-     |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
-     Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
-
-  /* this was called si->B earlier. This bounds the skewed-L\infty norm
-   * of u=(a0,b0), following |a0| <= s*B and |b0| <= B.
-   * (IMO we have another notational convention elsewhere regarding what
-   * the skewed norm is. But it's the one which is used here).
-   */
-  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
+  /* Update floating point version of both polynomials. They will be used in
+   * get_maxnorm_alg(). */
+  for (int side = 0; side < 2; side++) {
+      sieve_side_info_ptr s = si->sides[side];
+      mpz_poly_ptr ps = si->cpoly->pols[side];
+      mpz_poly_homography (s->fij, ps, H);
+      /* On the special-q side, divide all the coefficients of the
+         transformed polynomial by q */
+      if (si->conf->side == side) {
+          for (int i = 0; i <= ps->deg; i++) {
+              ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
+              mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
+          }
+      }
+      for (int k = 0; k <= ps->deg; k++)
+          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
+  }
 
   /************************** rational side **********************************/
 
-  /* If J is chosen such that J<=I/2*s*B/max(|a1|,s*|b1|),
-   * then |j*a1| <= I/2*s*B, and |j*b1| <= I/2*B
-   * J is set to honour this requirement in sieve_info_adjust_IJ (but see
-   * also bug #15617).
-   * Now (a,b)=i*(a0,b0)+j*(a1,b1) with |i|<I/2 and |j|<=J gives
-   * |a| <= s*I*B and |b| <= I*B, whence |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
-  r = fabs (mpz_get_d (si->cpoly->rat->coeff[1])) * si->cpoly->skew
-    + fabs (mpz_get_d (si->cpoly->rat->coeff[0]));
-  r *= B * (double) si->I;
-
-  /* if the special-q is on the rational side, divide by it */
-  if (qside == RATIONAL_SIDE)
-    r /= q0d;
-
-  rat->logmax = log2 (r);
+  /* Compute the maximum norm of the rational polynomial over the sieve
+     region. The polynomial coefficient in fijd are already divided by q
+     on the special-q side. */
+  rat->logmax = get_maxnorm_alg (si->sides[RATIONAL_SIDE]->fijd, si->cpoly->pols[RATIONAL_SIDE]->deg, si); /* log2(max norm) */
 
   /* we increase artificially 'logmax', to allow larger values of J */
   rat->logmax += 1.;
@@ -2899,7 +2881,11 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /************************** algebraic side *********************************/
 
-  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0d, B, qside); /* log2(max norm) */
+  /* Compute the maximum norm of the algebraic polynomial over the sieve
+     region. The polynomial coefficient in fijd are already divided by q
+     on the special-q side. */
+  alg->logmax = get_maxnorm_alg (si->sides[ALGEBRAIC_SIDE]->fijd, si->cpoly->pols[ALGEBRAIC_SIDE]->deg, si); /* log2(max norm) */
+
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
@@ -2936,23 +2922,6 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
 
-  /* Update floating point version of algebraic poly (do both, while
-   * we're at it...) */
-  for (int side = 0; side < 2; side++) {
-      sieve_side_info_ptr s = si->sides[side];
-      mpz_poly_ptr ps = si->cpoly->pols[side];
-      mpz_poly_homography (s->fij, ps, H);
-      /* On the special-q side, divide all the coefficients of the 
-         transformed polynomial by q */
-      if (si->conf->side == side) {
-          for (int i = 0; i <= ps->deg; i++) {
-              ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
-              mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
-          }
-      }
-      for (int k = 0; k <= ps->deg; k++)
-          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
-  }
 
   /* improve bound on J if possible */
   unsigned int Jmax;
