@@ -14,12 +14,12 @@ tasks.threads = 2
 # Polynomial selection
 ###########################################################################
 
-tasks.polyselect.degree = 5		
+tasks.polyselect.degree = 5
 
-tasks.polyselect.P = 400000		
-tasks.polyselect.admax = 1e7		
-tasks.polyselect.adrange = 1e5		
-tasks.polyselect.incr = 60		
+tasks.polyselect.P = 400000
+tasks.polyselect.admax = 1e7
+tasks.polyselect.adrange = 1e5
+tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1000
 
 ###########################################################################
@@ -35,18 +35,18 @@ tasks.sieve.mfba = 87
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.sieve.I = 13		
-tasks.sieve.qmin = 20000000		
-tasks.sieve.qrange = 20000		
-tasks.sieve.rels_wanted = 50000000		
+tasks.sieve.I = 13
+tasks.sieve.qmin = 20000000
+tasks.sieve.qrange = 20000
+tasks.sieve.rels_wanted = 50000000
 slaves.niceness = 10
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-tasks.filter.purge.keep = 160		
-tasks.filter.maxlevel = 20		
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 20
 tasks.filter.ratio = 1.1
 tasks.filter.merge.forbw = 3
 tasks.merge.coverNmax = 100
@@ -64,4 +64,4 @@ tasks.linalg.bwc.shuffled_product = 1
 # Characters
 ###########################################################################
 
-tasks.linalg.characters.nchar = 50		
+tasks.linalg.characters.nchar = 50
