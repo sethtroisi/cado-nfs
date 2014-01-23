@@ -71,6 +71,7 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
   exponent_t e = rel->primes[i].e;
   p_r_values_t p = rel->primes[i].p;
   unsigned int side = rel->primes[i].h, pr = 2;
+  modulusul_t m;
   do
   {
     exponent_t e_pr_in_p = 0;
@@ -89,8 +90,10 @@ factor_nonprime_ideal(earlyparsed_relation_ptr rel, weight_t i)
       rel_add_prime (rel, side, pr, e * e_pr_in_p);
 
     pr = getprime(pr);
-  } while (!modul_isprime((const long unsigned int *)&p));
+    modul_initmod_ul (m, p);
+  } while (!modul_isprime(m));
   getprime(0);
+  modul_clearmod (m);
   if (p != 1) //means remaining p is prime
     rel->primes[i] = (prime_t) {.h = side, .p = p, .e = e};
 }
@@ -163,20 +166,22 @@ process_one_relation (earlyparsed_relation_ptr rel)
     weight_t len = rel->nb; // no need to check the prime that can be added
     for(weight_t i = 0; i < len ; i++)
     {
-      p_r_values_t p = rel->primes[i].p;
-      if (!modul_isprime((const long unsigned int *)&p))
+      modulusul_t p;
+      modul_initmod_ul (p, rel->primes[i].p);
+      if (!modul_isprime(p))
       {
         if (verbose != 0)
         {
           unsigned int side = (unsigned int) rel->primes[i].h;
           print_error_line (rel->num, rel->a, rel->b, err, nonprime);
           fprintf (stderr, "    given factor %" PRpr " is not prime on side "
-                           "%u\n", p, side);
+                           "%u\n", rel->primes[i].p, side);
         }
         nonprime = 1;
         if (complete_rels) // if complete_rels = 1, we factor it
           factor_nonprime_ideal(rel, i);
       }
+      modul_clearmod (p);
     }
   }
 
