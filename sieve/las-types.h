@@ -91,7 +91,8 @@ void las_todo_pop(las_todo_ptr * d);
 
 /* {{{ sieve_side_info */
 struct sieve_side_info_s {
-    unsigned char bound;
+    unsigned char bound; /* A sieve array entry is a sieve survivor if it is
+                            at most "bound" on each side */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
     struct {
@@ -108,21 +109,21 @@ struct sieve_side_info_s {
         int rs[2];
         int rest[2];
     } fb_parts_x[1];
-    /* The call to dispatch_fb from thread_data alloc splits up the main
-     * fb field into several fields, by reallocation. All fields are
-     * still owned by the sieve_info struct in the end, and stored here
+    /* The reading, mapping or generating the factor base all create the
+     * factor base in several pieces: small primes, and large primes split
+     * into one piece for each thread.
      */
     factorbase_degn_t * fb;
     factorbase_degn_t ** fb_bucket_threads;
+    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
+       if it is created by malloc() */
+    int fb_is_mmapped;
     /* log_steps[i] contains the largest integer x such that 
        fb_log(x, scale, 0.) == i, i.e., the integer after which the 
        rounded logarithm increases, i.o.w., x = floor(scale^(i+0.5)),
        for 0 <= i <= log_steps_max, where log_steps_max = fb_log(fbb, scale)
        For i > log_steps_max, log_steps[i] is undefined.
     */
-    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
-       if it is created by malloc() */
-    int fb_is_mmapped;
     fbprime_t log_steps[256];
     unsigned char log_steps_max;
     /* When threads pick up this sieve_info structure, they should check
@@ -185,8 +186,9 @@ struct sieve_info_s {
 
     sieve_side_info sides[2];
 
-    /* I think that by default, unsieving is not done */
+    /* Data for unsieving locations where gcd(i,j) > 1 */
     unsieve_aux_data us;
+    /* Data for divisibility tests p|i in lines where p|j */
     j_div_ptr j_div;
 
     /* used in check_leftover_norm */

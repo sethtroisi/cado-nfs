@@ -492,8 +492,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     mpz_init(si->doing->p);
     mpz_init(si->doing->r);
 
-    /* This (mildly) depends on the special q, but more importantly also
-     * on the lpb/... bounds */
+    /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
 
     /* TODO: This function in itself is too expensive if called often */
@@ -969,6 +968,8 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     cado_poly_clear(las->cpoly);
 }/*}}}*/
 
+/* Look for an existing sieve_info in las->sievers with configuration matching
+   that in sc; if none exists, create one. */
 sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr sc, param_list pl)/*{{{*/
 {
     int n = 0;
@@ -3833,7 +3834,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         param_list_print_usage(pl, argv0[0], stderr);
         exit(EXIT_FAILURE);
     }
-
 
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
