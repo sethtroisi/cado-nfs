@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
 
+double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
 
 static void usage_and_die(char *argv0) {
     fprintf(stderr, "usage: %s poly j k\n", argv0);

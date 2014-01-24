@@ -2330,7 +2330,7 @@ print_cadopoly (FILE *fp, cado_poly p)
    alpha = get_alpha (F, ALPHA_BOUND);
    alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
    nroots = numberOfRealRoots (p->alg->coeff, p->alg->deg, 0, 0, NULL);
-   e = MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K);
+   e = MurphyE (p, bound_f, bound_g, area, MURPHY_K);
 
    fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
         logmu,
@@ -2339,8 +2339,8 @@ print_cadopoly (FILE *fp, cado_poly p)
         logmu + alpha,
         nroots);
 
-   fprintf (fp, "# MurphyE(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e\n",
-        BOUND_F, BOUND_G, AREA, e);
+   fprintf (fp, "# MurphyE(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e\n",
+        bound_f, bound_g, area, e);
 
    return e;
 }
@@ -2390,7 +2390,7 @@ print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
        fflush(stdout);
      }
    else
-     e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+     e = MurphyE (cpoly, bound_f, bound_g, area, MURPHY_K);
 
    cado_poly_clear (cpoly);
    return e;
