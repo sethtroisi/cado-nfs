@@ -23,7 +23,6 @@ int main(int argc, char **argv) {
 
     mpz_init(b);
     mpz_init(m);
-    printf ("%d %c\n", argc, argv[1][0]);
     while (argc >= 2 && argv[1][0] == '-')
       {
         if (strcmp (argv[1], "-area") == 0)
