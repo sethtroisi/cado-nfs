@@ -17,7 +17,8 @@
 struct cado_poly_s {
   mpz_t n;        /* number to factor */
   mpz_t m;        /* common root of f and g mod n */
-  double skew;    /* skewness */
+  double default_skewness;    /* skewness from poly file, if given,
+                                 otherwise 0. */
 
   mpz_poly_ptr rat, alg;
   mpz_poly_t pols[2];

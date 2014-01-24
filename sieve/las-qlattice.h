@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-int SkewGauss (sieve_info_ptr si, double skewness);
+int SkewGauss (sieve_info_ptr si);
 
 static inline fbprime_t
 fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,

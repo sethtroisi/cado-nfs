@@ -36,6 +36,7 @@ struct siever_config_s {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
     int logI;
+    double skewness;
     struct {
         unsigned long lim; /* factor base bound */
         int lpb;           /* large prime bound is 2^lpbr */
