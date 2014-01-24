@@ -34,10 +34,6 @@ powers that are after si->bucket_thresh (in general si->bucket_thresh is
 I).
 
 Lines starting with a # are comments.
-For freerels.c, it is currently mandatory to have one line in the header
-of the form:
-# DEGREE: 5
-(yes, this is a bit strange to rely on a comment...)
 
 
 Rem:
