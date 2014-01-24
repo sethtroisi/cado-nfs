@@ -871,7 +871,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     siever_config_ptr sc = las->default_config;
     memset(sc, 0, sizeof(siever_config));
 
-    sc->skewness = las->cpoly->default_skewness;
+    sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
     param_list_parse_double(pl, "skew", &(sc->skewness));

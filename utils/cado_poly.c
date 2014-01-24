@@ -41,7 +41,7 @@ void
 cado_poly_set (cado_poly p, cado_poly q)
 {
     mpz_set (p->n, q->n);
-    p->default_skewness = q->default_skewness;
+    p->skew = q->skew;
     for(int side = 0 ; side < 2 ; side++)
       mpz_poly_copy (p->pols[side], q->pols[side]);
     mpz_set (p->m, q->m);
@@ -58,9 +58,9 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     mpz_t tmp;
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
-    poly->default_skewness = 0.0; /* to ensure that we get an invalid skewness in case
-                                    it is not given */
-    param_list_parse_double(pl, "skew", &(poly->default_skewness));
+    poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
+                         it is not given */
+    param_list_parse_double(pl, "skew", &(poly->skew));
     for (i = 0; i < (MAXDEGREE + 1); i++) {
         char tag[4];
         snprintf(tag, sizeof(tag), "c%d", i);
