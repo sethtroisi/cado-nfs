@@ -2422,7 +2422,7 @@ main (int argc, char *argv[])
       printf ("\n");
     }
 
-  /* print total time (format for cpu_time.sh) */
+  /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */
