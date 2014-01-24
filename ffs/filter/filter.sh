@@ -10,6 +10,8 @@
 # Mandatory options for NFS-DL (for FFS they are not used):
 #     ell=NN                        group size (modulus for linear algebra)
 #     smexp=NN                      exponent for the Shirokauer maps
+#     lpba=NN                       large prime bound for algebraic side
+#     lpbr=NN                       large prime bound for rational side
 # Other options:
 #     wdir=path/to/output/directory (default ./<name>.filter.`date`)
 #             if wdir already exists, continue previous computation
@@ -21,8 +23,12 @@
 #     addfullcol=[0|1]              (default 0)
 #     badideals=file                (default "")
 #     verbose=[0|1]                 (default 0)
-# ex:
+# ex (FFS):
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
+#
+# ex (NFS-DL):
+# ./filter.sh nfsdl=1 name=p59 rels=/local/rsa768/nfsdl-p59/rels param=/local/rsa768/nfsdl-p59/p59.poly ell=1736165235353602373200097377 smexp=9085821971738468305174634139306491860371732326191060953799536680344441448968240155058317467401074187228256640 badideals=/local/rsa768/nfsdl-p59/p59.badideals addfullcol=1 lpba=22 lpbr=22
+#
 #
 # TODO: addfullcol should be 1 by default for NFS-DL, 0 for FFS
 #       multi thread for freerels for FFS
