@@ -104,7 +104,7 @@ static const int verbose = 1;
 
 static void
 fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
-                   const int64_t a, const uint64_t b, const double skewness,
+                   const int64_t a, const uint64_t b,
                    sieve_info_srcptr old_si)
 {
   // memset(new_si, 0, sizeof(sieve_info));
@@ -116,6 +116,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
   new_si->conf->side = old_si->conf->side;
   new_si->conf->logI = old_si->conf->logI;
   new_si->conf->bitsize = old_si->conf->bitsize;
+  new_si->conf->skewness = old_si->conf->skewness;
   for(int side = 0; side < 2; side++) {
     new_si->conf->sides[side]->lim = old_si->conf->sides[side]->lim;
     new_si->conf->sides[side]->lpb = old_si->conf->sides[side]->lpb;
@@ -143,7 +144,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
     mpz_init_set(new_si->BBB[side], old_si->BBB[side]);
     mpz_init_set(new_si->BBBB[side], old_si->BBBB[side]);
   }
-  SkewGauss(new_si, skewness);  
+  SkewGauss(new_si);  
 }
 
 static void
@@ -186,7 +187,7 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
 int
 check_one_prime(const unsigned long sq MAYBE_UNUSED, 
                 const int64_t a, const uint64_t b,
-                const double skewness, const int nb_threads,
+                const int nb_threads,
                 mpz_t cof[2], int sq_side, sieve_info_ptr si)
 {
   const unsigned long p = mpz_get_ui(si->doing->p);
@@ -205,7 +206,7 @@ check_one_prime(const unsigned long sq MAYBE_UNUSED,
   const uint32_t oldI = si->I, oldJ = si->J;
   /* If resulting optimal J is so small that it's not worth sieving,
      this special-q gets skipped, so relation is not a duplicate */
-  if (sieve_info_adjust_IJ(si, skewness, nb_threads) == 0) {
+  if (sieve_info_adjust_IJ(si, nb_threads) == 0) {
     if (verbose) {
       printf("# DUPECHECK J too small\n");
     }
@@ -282,7 +283,7 @@ check_one_prime(const unsigned long sq MAYBE_UNUSED,
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(relation_t *relation, const double skewness, 
+relation_is_duplicate(relation_t *relation,  
                       const int nb_threads, sieve_info_srcptr si)
 {
   int is_dupe = 0;
@@ -351,9 +352,9 @@ relation_is_duplicate(relation_t *relation, const double skewness,
     /* Create a dummy sieve_info struct with just enough info to let us use
        the lattice-reduction and coordinate-conversion functions */
     sieve_info new_si;
-    fill_in_sieve_info (new_si, p, a, b, skewness, si);
+    fill_in_sieve_info (new_si, p, a, b, si);
     compute_cofactor(cof[sq_side], p, large_primes[sq_side], nr_lp[sq_side]);
-    is_dupe = check_one_prime(sq, a, b, skewness, nb_threads, cof, sq_side, new_si);
+    is_dupe = check_one_prime(sq, a, b, nb_threads, cof, sq_side, new_si);
     if (verbose) {
       printf("# DUPECHECK relation is probably%s a dupe\n", is_dupe ? "" : " not");
     }

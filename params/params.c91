@@ -198,7 +198,7 @@ tasks.sieve.ratq = 0
     # taken on the rational side (ratq=1) or on the algebraic side
     # (ratq=0). ratq should be set on the side where the largest norms are
     # expected. As a very rough rule of thumb, this means ratq=0 for gnfs
-    # runs and usually for snfs runs, but ratq=1 for snfs runs where the 
+    # runs and usually for snfs runs, but ratq=1 for snfs runs where the
     # degree of the polynomial is forced to be small by algebraic factors.
 
 tasks.sieve.qmin = 400000		# Start of the special-q range
@@ -348,7 +348,7 @@ slaves.nrclients = 2
 # scriptpath must point to the directory in which the wuclient2.py script
 # can be found on the client machines. I.e., with scriptpath as set in this
 # example and if, for example, "sourcedir = /tmp/cado-nfs", then clients will
-# be started through: 
+# be started through:
 # "ssh [hostname] /tmp/cado-nfs/scripts/cadofactor/wuclient2.py [client parameters]"
 slaves.scriptpath = $(sourcedir)/scripts/cadofactor
 
@@ -367,10 +367,10 @@ slaves.niceness = 10		# nice level for the sieving jobs
 # the same factorization use the same download directory; files are
 # protected by locking to prevent download races. If the download directory
 # is on a shared file system, then this filesystem must support locking.
-# The working directories should be unique; the default choice for the 
+# The working directories should be unique; the default choice for the
 # working directory includes the clientid which should ensure uniqueness.
 
-# Since this example runs its slaves on localhost, we use a subdirectory 
+# Since this example runs its slaves on localhost, we use a subdirectory
 # of the cadofactor.py working directory, so that all files of both master
 # and clients can be cleaned up easily.
 slaves.basepath = /tmp/c91.wuclients

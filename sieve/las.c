@@ -134,11 +134,8 @@ void siever_config_display(FILE * o, siever_config_srcptr sc)/*{{{*/
             sc->sides[ALGEBRAIC_SIDE]->mfb,
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
-#if 0   /* disabled for the moment, as we haven't made the skewness part
-         * of the siever_config. Should we ? */
     fprintf(o, "#                     skewness=%1.1f\n",
-	    las->cpoly->skew);
-#endif
+	    sc->skewness);
 }/*}}}*/
 
 int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
@@ -492,8 +489,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     mpz_init(si->doing->p);
     mpz_init(si->doing->r);
 
-    /* This (mildly) depends on the special q, but more importantly also
-     * on the lpb/... bounds */
+    /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
 
     /* TODO: This function in itself is too expensive if called often */
@@ -585,7 +581,7 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
  * Now for efficiency reasons, the ``minimum reasonable'' number of
  * buckets should be more than that.
  */
-int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
+int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 {
     /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
        and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
@@ -599,6 +595,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
+    const double skewness = si->conf->skewness;
     if (0) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
@@ -869,23 +866,23 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
+    /* {{{ Parse default siever config (fill all possible fields) */
+
+    siever_config_ptr sc = las->default_config;
+    memset(sc, 0, sizeof(siever_config));
+
+    sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
-    /* TODO should the skewness go into siever_config or not ? */
-    param_list_parse_double(pl, "skew", &(las->cpoly->skew));
+    param_list_parse_double(pl, "skew", &(sc->skewness));
 
-    if (las->cpoly->skew <= 0.0) {
+    if (sc->skewness <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     /* }}} */
-
-    /* {{{ Parse default siever config (fill all possible fields) */
-
-    siever_config_ptr sc = las->default_config;
-    memset(sc, 0, sizeof(siever_config));
 
     /* The default config is not necessarily a complete bit of
      * information.
@@ -969,6 +966,8 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     cado_poly_clear(las->cpoly);
 }/*}}}*/
 
+/* Look for an existing sieve_info in las->sievers with configuration matching
+   that in sc; if none exists, create one. */
 sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr sc, param_list pl)/*{{{*/
 {
     int n = 0;
@@ -987,8 +986,6 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
     siever_config_display(las->output, sc);
-    fprintf(las->output, "#                     skewness=%1.1f\n",
-            las->cpoly->skew);
     return si;
 }/*}}}*/
 
@@ -3045,9 +3042,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (1)
 #endif
             {
-                const double skew = las->cpoly->skew;
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel, skew, las->nb_threads, si);
+                int is_dup = do_check && relation_is_duplicate(rel, las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
@@ -3834,7 +3830,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
-
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
 
@@ -3971,7 +3966,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         double qt0 = seconds();
         tt_qstart = seconds();
 
-        if (SkewGauss (si, si->cpoly->skew) != 0)
+        if (SkewGauss (si) != 0)
             continue;
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
@@ -3990,7 +3985,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * Just for correctness at the moment we're doing it in very
          * extreme cases, see bug 15617
          */
-        if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
+        if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
             gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
                     sidenames[si->conf->side],
                     si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,

@@ -21,7 +21,7 @@ tasks.threads = 2
 ###########################################################################
 ###########################################################################
 
-tasks.polyselect.degree = 5		
+tasks.polyselect.degree = 5
 
 # the polynomial (found by Shi Bai) for N240 c186 had
 # lognorm: 60.63, alpha: -8.76 (proj: -2.41), E: 51.87, nr: 3
@@ -29,10 +29,10 @@ tasks.polyselect.degree = 5
 
 ## Parameters of polyselect
 # note: those parameters are just a guess, they might be far from optimal
-tasks.polyselect.P = 500000		
-tasks.polyselect.admax = 2e7		
-tasks.polyselect.adrange = 2e5		
-tasks.polyselect.incr = 60		
+tasks.polyselect.P = 500000
+tasks.polyselect.admax = 2e7
+tasks.polyselect.adrange = 2e5
+tasks.polyselect.incr = 60
 tasks.polyselect.nq = 1000
 
 ###########################################################################
@@ -55,11 +55,11 @@ tasks.sieve.mfba = 96
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.sieve.I = 15		
+tasks.sieve.I = 15
 # Wagstaff did use I=14, I=15 should be better
-tasks.sieve.qmin = 80000000		
+tasks.sieve.qmin = 80000000
 # Sam Wagstaff did sieve special-q's < 1660M
-tasks.sieve.qrange = 20000		
+tasks.sieve.qrange = 20000
 # of that many relations found.
 slaves.niceness = 10
 tasks.sieve.rels_wanted = 1
@@ -67,8 +67,8 @@ tasks.sieve.rels_wanted = 1
 ###########################################################################
 ###########################################################################
 
-tasks.filter.purge.keep = 160		
-tasks.filter.maxlevel = 25		
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 25
 tasks.filter.ratio = 1.1
 tasks.filter.merge.forbw = 3
 tasks.merge.coverNmax = 100
@@ -84,4 +84,4 @@ tasks.linalg.bwc.shuffled_product = 1
 ###########################################################################
 ###########################################################################
 
-tasks.linalg.characters.nchar = 50		
+tasks.linalg.characters.nchar = 50
