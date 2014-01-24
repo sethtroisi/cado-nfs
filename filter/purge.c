@@ -764,7 +764,7 @@ int main(int argc, char **argv)
     size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
     tot_alloc_bytes += cur_alloc;					\
     fprintf(stderr,                                                     \
-            "Allocated rel_used of %zuMB (total %zuMB so far)\n",       \
+            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",       \
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
 } while (0)
     /* }}} */
