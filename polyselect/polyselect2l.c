@@ -42,6 +42,7 @@ char *phash = "";
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
+int keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
@@ -435,9 +436,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
-    for (j = KEEP - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
       best_raw_logmu[j] = best_raw_logmu[j-1];
     best_raw_logmu[j] = logmu;
 
@@ -448,10 +449,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -513,9 +514,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -821,10 +822,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
     int k;
-    for (k = KEEP - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
+    for (k = keep - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
       best_raw_logmu[k] = best_raw_logmu[k-1];
     best_raw_logmu[k] = logmu;
 
@@ -835,10 +836,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -895,9 +896,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -2088,6 +2089,7 @@ declare_usage(param_list pl)
   snprintf(str, 200, "maximum number of special-q's considered\n"
           "               for each ad (default %d)", INT_MAX);
   param_list_decl_usage(pl, "nq", str);
+  param_list_decl_usage(pl, "keep", "number of polynomials kept (default 10)");
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
@@ -2177,6 +2179,12 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_int (pl, "keep", &keep);
+  if (keep <= 0 || keep > KEEP)
+    {
+      fprintf (stderr, "Error, keep should be in [1,%d]\n", KEEP);
+      exit (1);
+    }
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
@@ -2248,7 +2256,7 @@ main (int argc, char *argv[])
   }
 
   /* initialize best norms */
-  for (i = 0; i < KEEP; i++)
+  for (i = 0; i < keep; i++)
     {
       best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
       best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
@@ -2405,19 +2413,19 @@ main (int argc, char *argv[])
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
           tries, tot_found, opt_found, ros_found);
 
-  /* print best KEEP values of logmu */
+  /* print best keep values of logmu */
   if (collisions_good > 0)
     {
       printf ("# Stat: best raw logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_raw_logmu[i]);
       printf ("\n");
       printf ("# Stat: best opt logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
       printf ("# Stat: best logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_logmu[i]);
       printf ("\n");
     }
