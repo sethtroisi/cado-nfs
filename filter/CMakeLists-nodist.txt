@@ -1,6 +1,7 @@
 #add_executable(explain explain.c)
 #target_link_libraries(explain utils)
 
+include_directories(${CADO_NFS_SOURCE_DIR}/ffs)
 link_directories (${CADO_NFS_BINARY_DIR}/ffs/f2)
 link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
 
