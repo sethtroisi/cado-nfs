@@ -277,8 +277,6 @@ configure_file(
     ESCAPE_QUOTES
     @ONLY)
 
-install(PROGRAMS scripts/cpu_time.sh DESTINATION bin)
-
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
