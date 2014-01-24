@@ -10,7 +10,7 @@ extern "C" {
 
 int relation_is_duplicate(relation_t *, int, sieve_info_srcptr);
 
-/* FIXME: These function is defined in las.c. The prototypes should not be 
+/* FIXME: These function are defined in las.c. The prototypes should not be 
    here. The functions should be moved to an appropriate file 
    (las-qlattice.c?) and the prototypes to the corresponding header file. */
 int sieve_info_adjust_IJ(sieve_info_ptr, int);
