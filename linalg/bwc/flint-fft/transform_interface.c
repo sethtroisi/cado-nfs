@@ -41,6 +41,11 @@
 #include "ulong_extras.h"
 #include "fft_tuning.h"
 
+#ifndef iceildiv
+/* unfortunately this fails miserably if x+y-1 overflows */
+#define iceildiv(x,y)	(((x)+(y)-1)/(y))
+#endif
+
 /* This is copied from mul_fft_main.c ; given the size of the tuning
  * table for this code, there's no bloat danger */
 static int fft_tuning_table[5][2] = FFT_TAB;
@@ -83,25 +88,27 @@ static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
  *
  * We are basing our estimates on the same logic as above. As far as
  * tuning is concerned, this is probably not optimal.
+ *
+ * see further down concerning mp_flag
  */
-void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc)
+static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_size_t mp_flag)
 {
     mp_size_t off, depth = 6;
     mp_size_t w = 1;
     mp_size_t n = ((mp_size_t) 1 << depth);
     unsigned int log_nacc = FLINT_CLOG2(nacc);
     mp_bitcnt_t bits = (n * w - (depth + 1) - log_nacc) / 2;
-    mp_size_t j1 = (bits1 - 1) / bits + 1;
-    mp_size_t j2 = (bits2 - 1) / bits + 1;
+    mp_size_t j1 = iceildiv(bits1, bits);
+    mp_size_t j2 = iceildiv(bits2, bits);
 
     memset(fti, 0, sizeof(*fti));
     fti->bits1 = bits1;
     fti->bits2 = bits2;
     fti->nacc = nacc;
 
-    assert(j1 + j2 - 1 > 2 * n);
+    assert(j1 + j2 - !mp_flag > 2 * n);
 
-    while (j1 + j2 - 1 > 4 * n) {	/* find initial n, w */
+    while (j1 + j2 - !mp_flag > 4 * n) {	/* find initial n, w */
 	if (w == 1)
 	    w = 2;
 	else {
@@ -119,11 +126,11 @@ void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, 
         bits &= ~(mp_bitcnt_t) 3;
 #endif
 
-	j1 = (bits1 - 1) / bits + 1;
-	j2 = (bits2 - 1) / bits + 1;
+	j1 = iceildiv(bits1, bits);
+	j2 = iceildiv(bits2, bits);
     }
 
-    assert(j1 + j2 - 1 <= 4 * n);
+    assert(j1 + j2 - !mp_flag <= 4 * n);
     assert(j1 * bits >= bits1);
     assert(j2 * bits >= bits2);
     assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
@@ -203,14 +210,14 @@ void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, 
                  */
                 bits &= ~(mp_bitcnt_t) 3;
 #endif
-		j1 = (bits1 - 1) / bits + 1;
-		j2 = (bits2 - 1) / bits + 1;
-	    } while (j1 + j2 - 1 <= 4 * n && w > wadj);
+		j1 = iceildiv(bits1, bits);
+		j2 = iceildiv(bits2, bits);
+	    } while (j1 + j2 - !mp_flag <= 4 * n && w > wadj);
 	    w += wadj;
 	}
         fti->alg = 0;
     } else {
-	if (j1 + j2 - 1 <= 3 * n) {
+	if (j1 + j2 - !mp_flag <= 3 * n) {
             /* make the transform length twice smaller, with 2^wn only
              * moderately larger, as in this case we can afford it */
 	    depth--;
@@ -228,14 +235,46 @@ void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, 
      */
     bits &= ~(mp_bitcnt_t) 3;
 #endif
-    j1 = (bits1 - 1) / bits + 1;
-    j2 = (bits2 - 1) / bits + 1;
+    j1 = iceildiv(bits1, bits);
+    j2 = iceildiv(bits2, bits);
     fti->w = w;
     fti->depth = depth;
     fti->bits = bits;
-    fti->trunc0 = j1 + j2 - 1;
+    fti->trunc0 = j1 + j2 - !mp_flag;
 
-    fprintf(stderr, "DEPTH = %zu, ALG = %d\n", fti->depth, fti->alg);
+    fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
+}
+
+void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc)
+{
+    fft_get_transform_info_generic(fti, bits1, bits2, nacc, 0);
+}
+
+/* This is almost the same as
+ *
+ *      fft_get_transform_info(fti, bitsmin, bitsmax-bitsmin, nacc)
+ *
+ * except that there is one extra optimization we can't do. When we
+ * assert above that j1+j2-1 has to be less than 4n, this still allows
+ * the evaluated polynomial (PQ)(2^bits) has coefficients of index up to
+ * 4*n*bits + (bitsize(n*w)-bits). For the middle product context, we do
+ * want the full input to be captured when clamping at 2^bits. So the
+ * constraints differ. We want iceildiv(bitsmax, bits) <= 4*n
+ *
+ */
+void fft_get_transform_info_mp(struct fft_transform_info * fti, mp_bitcnt_t bitsmin, mp_bitcnt_t bitsmax, unsigned int nacc)
+{
+    assert(bitsmax >= bitsmin);
+    mp_bitcnt_t bits1 = bitsmin;
+    mp_bitcnt_t bits2 = bitsmax-bitsmin;
+    /* our input takes iceildiv(bitsmax, bits), which is more than just
+     * j1+j2-1 bits-sized coefficients. Because this j1+j2-1 implicitly
+     * considers _products_ which are wider than [bits]
+     *
+     * Bottom line: we want j1+j2, not j1+j2-1, to fit within 4*n
+     */
+
+    fft_get_transform_info_generic(fti, bits1, bits2, nacc, 1);
 }
 
 /* Provide the transform info necessary for accumulating nacc products of
@@ -248,6 +287,13 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * FLINT_MIN(n1, n2));
     fft_get_transform_info(fti, n1 * cbits, n2 * cbits, nacc);
     /* The maximum number of summands is MIN(n1, n2) */
+    fti->ks_coeff_bits = cbits;
+}
+void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
+{
+    mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * nmin);
+    fft_get_transform_info_mp(fti, nmin * cbits, nmax * cbits, nacc);
+    /* The maximum number of summands is nmin */
     fti->ks_coeff_bits = cbits;
 }
 
@@ -532,6 +578,120 @@ void fft_combine_fppol(mp_limb_t * x, mp_size_t nx, void * y, struct fft_transfo
      *
      */
 }
+
+/* y is a polynomial over R[x]. We want to evaluate it at 2^bits,
+ * and pick the resulting coefficients from bit windows 
+ * [d0*ks_coeff_bits..(d1+1)*ks_coeff_bits[. Note
+ * that the evaluation at 2^bits involves additions.
+ *
+ * Because of possible carry propagation, our first "easy" approach does
+ * the full evaluation. Contributions to the first of the bits we're
+ * interested in may include a carry from previous coefficients. The
+ * presence of a carry is directly decided from the presence of the bit
+ * just before the lowest polynomial coefficient in R[x].
+ */
+void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
+{
+    mp_size_t rsize0 = fti_rsize0(fti);
+    mp_limb_t ** ptrs = (mp_limb_t **) y;
+
+    mp_size_t np = mpz_size(p);
+    assert(nx % np == 0);
+    mpn_zero(x, nx);
+
+    /* XXX silly placeholder, doing extra allocation */
+
+    /* bits1 and bits2 being in fact multiples of ks_coeff_bits, the
+     * reality is that the "product", which in fact is one of our
+     * operands, since we're doing the transposed operation, is smaller
+     * than just bits1 + bits2.
+     */
+
+    /* MP context: y=MP(x, z)
+     * bits1 = MIN(nx,nz) * ks_coeff_bits
+     * bits2 = ny * ks_coeff_bits
+     *
+     * (ny = MAX(nx, nz) - MIN(nx, nz) + 1).
+     *
+     * --> bxtemp = 
+     *  MAX(nx, nz) * ks_coeff_bits = bits1 + bits2 - ks_coeff_bits
+     */
+
+    mp_bitcnt_t bxtemp = fti->bits1 + fti->bits2 - fti->ks_coeff_bits;
+    /* Then lxtemp is normally eactly the number of coefficients of the
+     * largest of the two operands in R[x] */
+    mp_size_t lxtemp = 1 + (bxtemp-1) / fti->bits;
+    assert(lxtemp <= (4 << fti->depth));
+
+    /* nxtemp is an approximation of the number of words it takes to
+     * write the evaluated integer.
+     */
+    mp_size_t nxtemp = (1 + (fti->bits - 1) / FLINT_BITS) * (lxtemp - 1);
+    /* even though we evaluate at 2^bits, coeffs are in R. So we should
+     * take into account the fact that R is slightly larger... */
+    nxtemp += (1 + ((fti->w << fti->depth) - 1) / FLINT_BITS);
+
+    mp_limb_t * xtemp = malloc(nxtemp * sizeof(mp_limb_t));
+    mpn_zero(xtemp, nxtemp);
+    /* TODO: remove this middle man, and read directly from ptrs */
+    fft_combine_bits(xtemp, ptrs, fti->trunc0, fti->bits, rsize0, nxtemp);
+
+    mp_size_t nmin = fti->bits1 / fti->ks_coeff_bits - 1;
+    mp_size_t nmax = bxtemp / fti->ks_coeff_bits - 1;
+
+    mp_size_t ksspan = (fti->ks_coeff_bits / FLINT_BITS + 2);
+    mp_limb_t * temp = malloc((2*ksspan+1) * sizeof(mp_limb_t));
+
+    /* Beware. Because we're doing Kronecker-Schönhage, we know that at
+     * least a full half-coefficient is zero on top of both source
+     * operands. This means that we have a corresponding amount of zeros
+     * on top of the product, namely one full coefficient. Hence the +1
+     * in the condition below.
+     */
+    mp_limb_t topmask = (1UL << (fti->ks_coeff_bits % FLINT_BITS)) - 1UL;
+
+    for(mp_size_t j = nmin ; j < nmax ; j++) {
+        mp_bitcnt_t bit0 = j * fti->ks_coeff_bits;
+        mp_bitcnt_t bit1 = (j+1) * fti->ks_coeff_bits;
+        assert((j     - nmin) * np <  nx);
+        assert((j + 1 - nmin) * np <= nx);
+
+        /* TODO: rather read these from ptrs directly */
+        /* How much words does [bit0..bit1[ span ? */
+        mp_size_t w0 = bit0 / FLINT_BITS;
+        mp_size_t w1 = (bit1 + FLINT_BITS - 1) / FLINT_BITS;
+
+        assert(w1 - w0 <= ksspan);
+
+        mp_size_t nwritten = (fti->ks_coeff_bits + FLINT_BITS - 1) / FLINT_BITS;
+        assert(nwritten == w1 - w0 || nwritten+1 == w1-w0);
+        if (bit0 % FLINT_BITS) {
+            mpn_rshift(temp, xtemp + w0, w1 - w0, bit0 % FLINT_BITS);
+        } else {
+            mpn_copyi(temp, xtemp + w0, w1 - w0);
+        }
+        if (topmask) {
+            temp[nwritten-1] &= topmask;
+        }
+        /* TODO: Barrett ! */
+        mpn_tdiv_qr(temp + ksspan, x + (j - nmin) * np, 0, temp, nwritten, p->_mp_d, mpz_size(p));
+    }
+    free(temp);
+    free(xtemp);
+    /* We go through all limbs of the evaluated polynomial, calculating
+     * them as we go
+     *
+     * limb starting at bit k*bits + j receives contribution from bits j
+     * and above from coefficient k, but also from bits j+bits and above
+     * from coefficient k-1, and even from the top bit of coefficient k-2
+     * if j happens to be zero.
+     *
+     * As we do the calculations, we fill a temp window of size
+     * ks_coeff_bits. When filling is done, its contents are reduced to
+     * form a new coefficient of the resulting polynomial.
+     *
+     */
+}
 /* }}} */
 
 /* {{{ dft/ift backends */
@@ -648,7 +808,7 @@ void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_t
     fft_do_dft_backend(y, temp, fti);                                          
 }
 
-#if 0
+#if 1
 void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_info * fti)
 {
     mp_size_t n = 1 << fti->depth;
@@ -696,11 +856,11 @@ void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_in
 void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
     fft_split_fppol(y, x, nx, fti, p);
-#if 0
+#if 1
     fft_debug_print_ft("/tmp/before_dft.m", y, fti);
 #endif
     fft_do_dft_backend(y, temp, fti);
-#if 0
+#if 1
     fft_debug_print_ft("/tmp/after_dft.m", y, fti);
 #endif
 }
@@ -720,14 +880,29 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
  */
 void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
-#if 0
+#if 1
     fft_debug_print_ft("/tmp/before_ift.m", y, fti);
 #endif
     fft_do_ift_backend(y, temp, fti);
-#if 0
+#if 1
     fft_debug_print_ft("/tmp/after_ift.m", y, fti);
 #endif
     fft_combine_fppol(x, nx, y, fti, p);
+}
+
+/* Same, but store the result as a polynomial over GF(p). nx must be a
+ * multiple of mpz_size(p)
+ */
+void fft_do_ift_fppol_hack_debug_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
+{
+#if 1
+    fft_debug_print_ft("/tmp/before_ift.m", y, fti);
+#endif
+    fft_do_ift_backend(y, temp, fti);
+#if 1
+    fft_debug_print_ft("/tmp/after_ift.m", y, fti);
+#endif
+    fft_combine_fppol_mp(x, nx, y, fti, p);
 }
 /* }}} */
 
