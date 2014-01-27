@@ -46,6 +46,8 @@
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
+#define DEBUG_FFT
+
 /* This is copied from mul_fft_main.c ; given the size of the tuning
  * table for this code, there's no bloat danger */
 static int fft_tuning_table[5][2] = FFT_TAB;
@@ -694,9 +696,52 @@ void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, struct fft_tran
 }
 /* }}} */
 
+#ifdef DEBUG_FFT/*{{{*/
+void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_info * fti)
+{
+    mp_size_t n = 1 << fti->depth;
+    mp_size_t rsize0 = fti_rsize0(fti);
+    mp_limb_t ** ptrs = (mp_limb_t **) y;
+    FILE * f = fopen(filename, "w");
+    if (f == NULL) {
+        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+        return;
+    }
+    fprintf(f, "data:=[");
+    int i1 = 4*n;
+    int z = 1;
+    for( ; z && i1 > 0 ; i1-=z) {
+        mp_limb_t * x = ptrs[i1-1];
+        for(int i = 0 ; z && i < rsize0 + 1 ; i++) {
+            z = (x[i] == 0);
+        }
+    }
+    for(int i = 0 ; i < i1 ; i++) {
+        if (i) fprintf(f, ", ");
+        // fprintf(f, "\n");
+        mp_limb_t * x = ptrs[i];
+        fprintf(f, "[");
+        int j1 = rsize0 + 1;
+        for( ; j1 > 0 ; j1--) {
+            if (x[j1-1] != 0) break;
+        }
+        for(int i = 0 ; i < j1 ; i++) {
+            if (i) fprintf(f, ", ");
+            fprintf(f, "%lu", x[i]);
+        }
+        fprintf(f, "]");
+    }
+    fprintf(f, "];\n");
+    fclose(f);
+}
+#endif/*}}}*/
+
 /* {{{ dft/ift backends */
 static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info * fti)
 {
+#ifdef DEBUG_FFT
+    fft_debug_print_ft("/tmp/before_dft.m", y, fti);
+#endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
@@ -742,10 +787,16 @@ static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info 
         /* Continue following fft_mfa_truncate_sqrt2_inner. iffts follow,
          * and then outer steps */
     }
+#ifdef DEBUG_FFT
+    fft_debug_print_ft("/tmp/after_dft.m", y, fti);
+#endif
 }
 
 static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info * fti)
 {
+#ifdef DEBUG_FFT
+    fft_debug_print_ft("/tmp/before_ift.m", y, fti);
+#endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
@@ -790,6 +841,9 @@ static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info 
         /* outer. Does the division and normalization. */
         ifft_mfa_truncate_sqrt2_outer(ptrs, n, fti->w, tslot0, tslot1, &s1, n1, trunc);
     }
+#ifdef DEBUG_FFT
+    fft_debug_print_ft("/tmp/after_ift.m", y, fti);
+#endif
 }
 /* }}} */
 
@@ -808,46 +862,6 @@ void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_t
     fft_do_dft_backend(y, temp, fti);                                          
 }
 
-#if 1
-void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_info * fti)
-{
-    mp_size_t n = 1 << fti->depth;
-    mp_size_t rsize0 = fti_rsize0(fti);
-    mp_limb_t ** ptrs = (mp_limb_t **) y;
-    FILE * f = fopen(filename, "w");
-    if (f == NULL) {
-        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-        return;
-    }
-    fprintf(f, "data:=[");
-    int i1 = 4*n;
-    int z = 1;
-    for( ; z && i1 > 0 ; i1-=z) {
-        mp_limb_t * x = ptrs[i1-1];
-        for(int i = 0 ; z && i < rsize0 + 1 ; i++) {
-            z = (x[i] == 0);
-        }
-    }
-    for(int i = 0 ; i < i1 ; i++) {
-        if (i) fprintf(f, ", ");
-        // fprintf(f, "\n");
-        mp_limb_t * x = ptrs[i];
-        fprintf(f, "[");
-        int j1 = rsize0 + 1;
-        for( ; j1 > 0 ; j1--) {
-            if (x[j1-1] != 0) break;
-        }
-        for(int i = 0 ; i < j1 ; i++) {
-            if (i) fprintf(f, ", ");
-            fprintf(f, "%lu", x[i]);
-        }
-        fprintf(f, "]");
-    }
-    fprintf(f, "];\n");
-    fclose(f);
-}
-#endif
-
 /* This does the same as above, except that the nx limbs at x are the
  * coefficients of a polynomial modulo GF(p). Coefficients of the
  * polynomial have to span an integral number of limbs, so nx must be a
@@ -856,13 +870,7 @@ void fft_debug_print_ft(const char * filename, void * y, struct fft_transform_in
 void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
     fft_split_fppol(y, x, nx, fti, p);
-#if 1
-    fft_debug_print_ft("/tmp/before_dft.m", y, fti);
-#endif
     fft_do_dft_backend(y, temp, fti);
-#if 1
-    fft_debug_print_ft("/tmp/after_dft.m", y, fti);
-#endif
 }
 
 void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti)
@@ -880,13 +888,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
  */
 void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
-#if 1
-    fft_debug_print_ft("/tmp/before_ift.m", y, fti);
-#endif
     fft_do_ift_backend(y, temp, fti);
-#if 1
-    fft_debug_print_ft("/tmp/after_ift.m", y, fti);
-#endif
     fft_combine_fppol(x, nx, y, fti, p);
 }
 
@@ -895,13 +897,7 @@ void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct
  */
 void fft_do_ift_fppol_hack_debug_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
-#if 1
-    fft_debug_print_ft("/tmp/before_ift.m", y, fti);
-#endif
     fft_do_ift_backend(y, temp, fti);
-#if 1
-    fft_debug_print_ft("/tmp/after_ift.m", y, fti);
-#endif
     fft_combine_fppol_mp(x, nx, y, fti, p);
 }
 /* }}} */
