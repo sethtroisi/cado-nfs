@@ -379,7 +379,7 @@ linalg/bwc/secure.c
 linalg/bwc/short_matmul.c
 linalg/bwc/split.c
 linalg/bwc/strassen-thresholds.h
-linalg/bwc/test.c
+linalg/bwc/spmv_test.c
 linalg/bwc/worker-threads.c
 linalg/bwc/worker-threads.h
 linalg/bwc/xdotprod.c
