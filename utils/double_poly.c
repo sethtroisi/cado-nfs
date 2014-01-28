@@ -24,6 +24,16 @@ double_poly_clear (double_poly_ptr p)
   free (p->coeff);
 }
 
+/* Set r = s. Assumes r has enough memory allocated. */
+void
+double_poly_set (double_poly_ptr r, double_poly_srcptr s)
+{
+  r->deg = s->deg;
+  for (unsigned int i = 0; i <= s->deg; i++) {
+    r->coeff[i] = s->coeff[i];
+  }
+}
+
 /* Evaluate the polynomial p at point x */
 double
 double_poly_eval (double_poly_srcptr p, const double x)
