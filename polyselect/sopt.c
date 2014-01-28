@@ -28,6 +28,8 @@
 #include "utils.h"
 #include "auxiliary.h"
 
+double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
+
 #define MAX_LINE_LENGTH 1024
 
 int fake = 0; // optimize anyway regardless of the common root condition

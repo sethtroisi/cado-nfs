@@ -170,7 +170,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       if (w < bmin)
         bmin = w;
 #if DEBUG >= 1
-      fprintf(stderr, "# Burying j=%d (wt=%d)\n", h, w);
+      fprintf(stderr, "# Burying j=%" PRIu64 " (wt=%" PRId32 ")\n", h, w);
 #endif
     }
     printf("# Number of buried columns is %" PRid " (min_weight=%" PRId32 ", "

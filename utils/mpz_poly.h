@@ -2,6 +2,7 @@
 #ifndef MPZ_POLY_H_
 #define MPZ_POLY_H_
 
+#include <stdint.h>
 #include <gmp.h>
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +52,7 @@ typedef poly_base_struct_t poly_base_t[1];
 void mpz_poly_init(mpz_poly_t, int d);
 void mpz_poly_clear(mpz_poly_t f);
 void mpz_poly_fprintf(FILE *fp, const mpz_poly_t f);
+void mpz_poly_set_deg(mpz_poly_t f, int deg);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_t f);
@@ -62,6 +64,8 @@ void mpz_poly_setcoeff_str(mpz_poly_t f, int i,char *str, int base);
 void mpz_poly_get(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f);
 void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
+
+void mpz_poly_content (mpz_t c, mpz_poly_t f);
 
 /* Comparison functions */
 int mpz_poly_cmp(mpz_poly_t, mpz_poly_t);
@@ -125,6 +129,8 @@ int mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth
 int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
 
 void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
+
+void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_t f, const int64_t i, const uint64_t j);
 
 #ifdef __cplusplus
 }

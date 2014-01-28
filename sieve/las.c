@@ -134,11 +134,8 @@ void siever_config_display(FILE * o, siever_config_srcptr sc)/*{{{*/
             sc->sides[ALGEBRAIC_SIDE]->mfb,
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
-#if 0   /* disabled for the moment, as we haven't made the skewness part
-         * of the siever_config. Should we ? */
     fprintf(o, "#                     skewness=%1.1f\n",
-	    las->cpoly->skew);
-#endif
+	    sc->skewness);
 }/*}}}*/
 
 int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
@@ -193,12 +190,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
-
-    for(int side = 0 ; side < 2 ; side++) {
-        sieve_side_info_ptr sis = si->sides[side];
-        unsigned long lim = si->conf->sides[side]->lim;
-        sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
-    }
 
     if (fbcfilename != NULL) {
         /* Try to read the factor base cache file. If that fails, because
@@ -498,9 +489,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     mpz_init(si->doing->p);
     mpz_init(si->doing->r);
 
-    /* This (mildly) depends on the special q, but more importantly also
-     * on the lpb/... bounds */
-    sieve_info_init_norm_data(las->output, si, exp2(sc->bitsize), sc->side);
+    /* Allocate memory for transformed polynomials */
+    sieve_info_init_norm_data(si);
 
     /* TODO: This function in itself is too expensive if called often */
     sieve_info_init_factor_bases(las, si, pl);
@@ -591,7 +581,7 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
  * Now for efficiency reasons, the ``minimum reasonable'' number of
  * buckets should be more than that.
  */
-int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
+int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 {
     /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
        and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
@@ -605,6 +595,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
        |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
+    const double skewness = si->conf->skewness;
     if (0) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
                "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
@@ -647,13 +638,21 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     return nJ > 0;
 }/*}}}*/
 
-static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
+static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/*{{{*/
 {
   /* essentially update the fij polynomials */
-  sieve_info_update_norm_data(si, nb_threads);
+  sieve_info_update_norm_data(output, si, nb_threads);
 
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
+
+  /* Update the steps of the log of factor base primes */
+  for(int side = 0 ; side < 2 ; side++) {
+      sieve_side_info_ptr sis = si->sides[side];
+      unsigned long lim = si->conf->sides[side]->lim;
+      sis->log_steps_max = fb_make_steps(sis->log_steps, lim, sis->scale * LOG_SCALE);
+  }
+
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
@@ -867,23 +866,23 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	exit(EXIT_FAILURE);
     }
 
+    /* {{{ Parse default siever config (fill all possible fields) */
+
+    siever_config_ptr sc = las->default_config;
+    memset(sc, 0, sizeof(siever_config));
+
+    sc->skewness = las->cpoly->skew;
     /* -skew (or -S) may override (or set) the skewness given in the
      * polynomial file */
-    /* TODO should the skewness go into siever_config or not ? */
-    param_list_parse_double(pl, "skew", &(las->cpoly->skew));
+    param_list_parse_double(pl, "skew", &(sc->skewness));
 
-    if (las->cpoly->skew <= 0.0) {
+    if (sc->skewness <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
     }
     /* }}} */
-
-    /* {{{ Parse default siever config (fill all possible fields) */
-
-    siever_config_ptr sc = las->default_config;
-    memset(sc, 0, sizeof(siever_config));
 
     /* The default config is not necessarily a complete bit of
      * information.
@@ -967,6 +966,8 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     cado_poly_clear(las->cpoly);
 }/*}}}*/
 
+/* Look for an existing sieve_info in las->sievers with configuration matching
+   that in sc; if none exists, create one. */
 sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr sc, param_list pl)/*{{{*/
 {
     int n = 0;
@@ -985,8 +986,6 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
     siever_config_display(las->output, sc);
-    fprintf(las->output, "#                     skewness=%1.1f\n",
-            las->cpoly->skew);
     return si;
 }/*}}}*/
 
@@ -1629,6 +1628,7 @@ struct thread_data_s {
   las_info_ptr las;
   sieve_info_ptr si;
   las_report rep;
+  unsigned int checksum_post_sieve[2];
 };
 typedef struct thread_data_s thread_data[1];
 typedef struct thread_data_s * thread_data_ptr;
@@ -2686,6 +2686,57 @@ check_leftover_norm (const mpz_t n, sieve_info_srcptr si, int side)
   return 1;
 }
 
+
+/* Compute a checksum over the bucket region.
+
+   We import the bucket region into an mpz_t and take it modulo
+   checksum_prime. The checksums for different bucket regions are added up,
+   modulo checksum_prime. This makes the combined checksum independent of
+   the order in which buckets are processed, but it is dependent on size of
+   the bucket region. Note that the selection of the sieve region, i.e., of J
+   depends somewhat on the number of threads, as we want an equal number of
+   bucket regions per thread. Thus the checksums are not necessarily
+   comparable between runs with different numbers of threads. */
+
+static const unsigned int checksum_prime = 4294967291; /* < 2^32 */
+
+/* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
+   but using modul_*() to handle sums >= 2^32 correctly. */
+unsigned int
+combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
+{
+    modulusul_t m;
+    residueul_t r1, r2;
+    unsigned int checksum;
+
+    modul_initmod_ul(m, checksum_prime);
+    modul_init(r1, m);
+    modul_set_ul(r1, checksum1, m);
+    modul_init(r2, m);
+    modul_set_ul(r2, checksum2, m);
+    modul_add(r1, r1, r2, m);
+    checksum = modul_get_ul(r1, m);
+    modul_clear(r1, m);
+    modul_clear(r2, m);
+    modul_clearmod(m);
+    return checksum;
+}
+
+unsigned int
+bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
+{
+    mpz_t mb;
+    unsigned long checksum;
+
+    mpz_init(mb);
+    mpz_import(mb, BUCKET_REGION, -1, sizeof(unsigned char), -1, 0, bucket);
+    checksum = mpz_tdiv_ui(mb, checksum_prime);
+    mpz_clear(mb);
+    checksum = combine_checksum (checksum, prev_checksum);
+
+    return checksum;
+}
+
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
@@ -2694,7 +2745,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 {
     las_info_ptr las = th->las;
     sieve_info_ptr si = th->si;
-    cado_poly_ptr cpoly = si->cpoly;
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2];
@@ -2734,6 +2784,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         gmp_fprintf(stderr, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
+
+    if (las->verbose) {
+        /* Update the checksums over the bucket regions */
+        for (int side = 0; side < 2; side++)
+            th->checksum_post_sieve[side] = bucket_checksum(S[side], th->checksum_post_sieve[side]);
+    }
 
     /* This is the one which gets the merged information in the end */
     unsigned char * SS = S[0];
@@ -2883,8 +2939,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = si->sides[side]->fij->coeff;
-                int deg = cpoly->pols[side]->deg;
                 int lim = si->conf->sides[side]->lim;
                 int i;
                 unsigned int j;
@@ -2894,7 +2948,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                    i,j-coordinates. The transformed polynomial on the 
                    special-q side is already divided by q */
                 NxToIJ (&i, &j, N, x, si);
-                mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
+		mpz_poly_homogeneous_eval_siui (norm[side], si->sides[side]->fij, i, j);
+
+
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
@@ -2986,9 +3042,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (1)
 #endif
             {
-                const double skew = las->cpoly->skew;
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel, skew, las->nb_threads, si);
+                int is_dup = do_check && relation_is_duplicate(rel, las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
@@ -3527,6 +3582,7 @@ static thread_data * thread_data_alloc(las_info_ptr las, int n)/*{{{*/
         thrs[i]->id = i;
         thrs[i]->las = las;
         las_report_init(thrs[i]->rep);
+        thrs[i]->checksum_post_sieve[0] = thrs[i]->checksum_post_sieve[1] = 0;
     }
     return thrs;
 }/*}}}*/
@@ -3620,14 +3676,19 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     /* Display results for this special q */
     las_report rep;
     las_report_init(rep);
+    unsigned int checksum_post_sieve[2] = {0, 0};
+    
     for (int i = 0; i < las->nb_threads; ++i) {
         las_report_accumulate(rep, thrs[i]->rep);
+        for (int side = 0; side < 2; side++)
+            checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i]->checksum_post_sieve[side]);
     }
     if (las->verbose) {
         fprintf (las->output, "# ");
       /* fprintf (las->output, "%lu survivors after rational sieve,", rep->survivors0); */
         fprintf (las->output, "%lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
+        fprintf (las->output, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
     }
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
@@ -3769,7 +3830,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         exit(EXIT_FAILURE);
     }
 
-
     if (param_list_parse_switch(pl, "-stats-stderr"))
         stats_output = stderr;
 
@@ -3906,7 +3966,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         double qt0 = seconds();
         tt_qstart = seconds();
 
-        if (SkewGauss (si, si->cpoly->skew) != 0)
+        if (SkewGauss (si) != 0)
             continue;
 
         /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
@@ -3925,7 +3985,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * Just for correctness at the moment we're doing it in very
          * extreme cases, see bug 15617
          */
-        if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
+        if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
             gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
                     sidenames[si->conf->side],
                     si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
@@ -3946,7 +4006,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si, las->nb_threads);
+        sieve_info_update (las->output, si, las->nb_threads);
         totJ += (double) si->J;
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);

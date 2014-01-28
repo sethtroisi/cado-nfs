@@ -76,7 +76,7 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
     char solib[256];
     snprintf(solib, sizeof(solib),
             MATMUL_LIBS_PREFIX "matmul_%s_%s" MATMUL_LIBS_SUFFIX,
-            x->oo_impl_name(x), impl);
+            x->impl_name(x), impl);
 
     void * handle = dlopen(solib, RTLD_NOW);
     if (handle == NULL) {
@@ -89,7 +89,7 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
         abort();
     }
 #else   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
-    rebinder = get_rebinder(impl, x->oo_impl_name(x));
+    rebinder = get_rebinder(impl, x->impl_name(x));
 #endif   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
 
     (*rebinder)(fake);

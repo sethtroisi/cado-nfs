@@ -520,7 +520,13 @@ class WorkunitProcessor(object):
             else:
                 self.cleanup()
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            command = Template(command).safe_substitute(self.settings)
+            paths = {"DLDIR":self.settings["DLDIR"], 
+                     "WORKDIR":self.settings["WORKDIR"]}
+            if self.settings["BINDIR"]:
+                paths["EXECDIR"] = self.settings["BINDIR"]
+            else:
+                paths["EXECDIR"] = self.settings["DLDIR"]
+            command = Template(command).safe_substitute(paths)
             logging.info ("Running command for workunit %s: %s", 
                           self.workunit.get_id(), command)
 
@@ -918,8 +924,10 @@ class WorkunitClient(object):
         return True
 
     def get_files(self):
-        for (filename, checksum) in self.workunit.get("FILE", []) + \
-                self.workunit.get("EXECFILE", []):
+        files_to_download = self.workunit.get("FILE", [])
+        if not self.settings["BINDIR"]:
+            files_to_download += self.workunit.get("EXECFILE", [])
+        for (filename, checksum) in files_to_download:
             templ = Template(filename)
             archname = templ.safe_substitute({"ARCH": self.settings["ARCH"]})
             dlname = templ.safe_substitute({"ARCH": ""})
@@ -1166,6 +1174,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                                    "<hostname>.<random hex number> is used"), 
                      "DLDIR" : ('download/', "Directory for downloading files"),
                      "WORKDIR" : (None, "Directory for result files"),
+                     "BINDIR" : (None, "Directory with existing executable "
+                                       "files to use"),
                      "BASEPATH" : (None, "Base directory for download and work "
                                          "directories"),
                      "GETWUPATH" : 

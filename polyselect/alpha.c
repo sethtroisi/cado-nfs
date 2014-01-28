@@ -40,6 +40,8 @@
  * 
  * */
 
+double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
+
 void trivial_method (mpz_t *f, int d, mpz_t b, mpz_t m, unsigned long alim) {
   FILE * true_alpha = fopen("true_alpha.txt","w");
   long J0, K0, J1, K1, k0, j0, k, j; 

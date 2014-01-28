@@ -48,6 +48,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define AREA    1e16
 #define MURPHY_K 1000
 
+extern double bound_f, bound_g, area;
+
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
   else mpz_sub_ui (a, b, -(c))

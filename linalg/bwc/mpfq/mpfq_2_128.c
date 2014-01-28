@@ -1,6 +1,6 @@
 /* MPFQ generated file -- do not edit */
 
-#include "mpfq/mpfq_2_128.h"
+#include "mpfq_2_128.h"
 
 #ifndef GMP_LIMB_BITS
 #error "Please arrange so that GMP_LIMB_BITS is defined before including this file"
@@ -22,14 +22,14 @@
 /* Active handler: Mpfq::gf2n::mul */
 /* Active handler: Mpfq::defaults::poly */
 /* Options used:{
-   slice=4,
+   coeffs=[ 128, 7, 2, 1, 0, ],
    helper=/tmp/mpfq-cado/gf2n/helper/helper,
    n=128,
    output_path=.,
-   coeffs=[ 128, 7, 2, 1, 0, ],
-   w=64,
-   tag=2_128,
+   slice=4,
    table=/tmp/mpfq-cado/gf2x/wizard.table,
+   tag=2_128,
+   w=64,
    } */
 
 
@@ -154,9 +154,9 @@ void mpfq_2_128_fprint(mpfq_2_128_dst_field k, FILE * file, mpfq_2_128_src_elt x
 int mpfq_2_128_sscan(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt z, const char * str)
 {
     if (k->io_type <= 16) {
-        char *tmp;
+        unsigned char *tmp;
         int len = strlen(str);
-        tmp = (char *)malloc(len+1);
+        tmp = (unsigned char *)malloc(len+1);
         int i;
         for (i = 0; i < len; ++i) {
             if (str[i] > '9')

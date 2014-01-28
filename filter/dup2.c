@@ -438,9 +438,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "nrels",
                               "number of relations to be found in the slice");
-  param_list_decl_usage(pl, "outdir", "be default input files are overwritten");
+  param_list_decl_usage(pl, "outdir", "by default, input files are overwritten");
   param_list_decl_usage(pl, "outfmt",
-                               "format of output file (default same as input");
+                               "format of output file (default same as input)");
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "dl", "(switch) do not reduce exponents modulo 2");
 #endif

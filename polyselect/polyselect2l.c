@@ -42,12 +42,14 @@ char *phash = "";
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
+int keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
+double area, bound_f, bound_g;
 
 /* read-write global variables */
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
@@ -435,9 +437,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
-    for (j = KEEP - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
       best_raw_logmu[j] = best_raw_logmu[j-1];
     best_raw_logmu[j] = logmu;
 
@@ -448,10 +450,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -513,9 +515,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -531,7 +533,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     for (j = d + 1; j -- != 0; )
       mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
 
     mpz_neg (m, g[0]);
 
@@ -575,8 +577,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
         gmp_printf ("# Optimized polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         print_poly_info (f, d, g, 0, phash);
-        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-                BOUND_F, BOUND_G, AREA, E, best_E);
+        printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+                bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);
 #ifdef MAX_THREADS
@@ -821,10 +823,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
     int k;
-    for (k = KEEP - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
+    for (k = keep - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
       best_raw_logmu[k] = best_raw_logmu[k-1];
     best_raw_logmu[k] = logmu;
 
@@ -835,10 +837,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -895,9 +897,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -913,7 +915,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     for (j = d + 1; j -- != 0; )
       mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
 
     mpz_neg (m, g[0]);
 
@@ -956,8 +958,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       gmp_printf ("# Optimized polynomial:\n");
       gmp_printf ("#%sn: %Zd\n", phash, N);
       print_poly_info (f, d, g, 0, phash);
-      printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-              BOUND_F, BOUND_G, AREA, E, best_E);
+      printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+              bound_f, bound_g, area, E, best_E);
       printf ("\n");
       fflush (stdout);
 #ifdef MAX_THREADS
@@ -2085,9 +2087,10 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
   char str[200];
-  snprintf(str, 200, "maximum number of special-q's considered\n"
-          "               for each ad (default %d)", INT_MAX);
+  snprintf (str, 200, "maximum number of special-q's considered\n"
+            "               for each ad (default %d)", INT_MAX);
   param_list_decl_usage(pl, "nq", str);
+  param_list_decl_usage(pl, "keep", "number of polynomials kept (default 10)");
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
@@ -2097,6 +2100,12 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "q", "(switch) quiet mode");
+  snprintf (str, 200, "sieving area (default %.2e)", AREA);
+  param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
+  param_list_decl_usage(pl, "Bf", str);
+  snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
+  param_list_decl_usage(pl, "Bg", str);
 }
 
 static void
@@ -2177,9 +2186,21 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_int (pl, "keep", &keep);
+  if (keep <= 0 || keep > KEEP)
+    {
+      fprintf (stderr, "Error, keep should be in [1,%d]\n", KEEP);
+      exit (1);
+    }
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
   if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
     admin = 0;
   else
@@ -2248,7 +2269,7 @@ main (int argc, char *argv[])
   }
 
   /* initialize best norms */
-  for (i = 0; i < KEEP; i++)
+  for (i = 0; i < keep; i++)
     {
       best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
       best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
@@ -2405,24 +2426,24 @@ main (int argc, char *argv[])
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
           tries, tot_found, opt_found, ros_found);
 
-  /* print best KEEP values of logmu */
+  /* print best keep values of logmu */
   if (collisions_good > 0)
     {
       printf ("# Stat: best raw logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_raw_logmu[i]);
       printf ("\n");
       printf ("# Stat: best opt logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
       printf ("# Stat: best logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_logmu[i]);
       printf ("\n");
     }
 
-  /* print total time (format for cpu_time.sh) */
+  /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */

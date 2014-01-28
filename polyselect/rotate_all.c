@@ -6,6 +6,8 @@
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
 
+double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
+
 extern int MAX_k;
 
 static void

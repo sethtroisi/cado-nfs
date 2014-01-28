@@ -12,11 +12,38 @@
 /* Active handler: Mpfq::gfp::elt */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
+   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+   fieldtype=prime,
+   n=1,
+   nn=3,
+   opthw=,
+   tag=p_1,
    type=plain,
+   vbase_stuff={
+    choose_byfeatures=<code>,
+    families=[
+     [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_2, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     ],
+    member_templates_restrict={
+     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_2, }, ],
+     p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     u64k1=[ u64k1, u64k2, ],
+     u64k2=[ u64k1, u64k2, ],
+     },
+    vc:includes=[ <stdarg.h>, ],
+    },
    virtual_base={
     filebase=abase_vbase,
-    name=abase_vbase,
     global_prefix=abase_,
+    name=abase_vbase,
     substitutions=[
      [ (?^:abase_p_1_elt \*), void *, ],
      [ (?^:abase_p_1_src_elt\b), const void *, ],
@@ -40,35 +67,8 @@
      [ (?^:abase_p_1_dst_poly\b), void *, ],
      ],
     },
-   w=64,
-   fieldtype=prime,
-   nn=3,
-   tag=p_1,
-   vbase_stuff={
-    choose_byfeatures=<code>,
-    vc:includes=[ <stdarg.h>, ],
-    families=[
-     [ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     [ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     [ u64k1, u64k2, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     [ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     ],
-    member_templates_restrict={
-     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     p_2=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     u64k2=[ u64k1, u64k2, ],
-     p_3=[ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     p_4=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     },
-    },
-   opthw=,
-   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-   n=1,
    vtag=p_1,
+   w=64,
    } */
 
 

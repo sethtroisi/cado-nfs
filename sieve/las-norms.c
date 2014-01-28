@@ -8,18 +8,12 @@
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
-#else
-#ifdef HAVE_SSSE3
+#elif defined(HAVE_SSSE3)
 #include <tmmintrin.h>
-#else
-#ifdef HAVE_SSE3
+#elif defined(HAVE_SSE3)
 #include <pmmintrin.h>
-#else
-#ifdef HAVE_SSE2
+#elif defined(HAVE_SSE2)
 #include <emmintrin.h>
-#endif
-#endif
-#endif
 #endif
 
 #include "las-config.h"
@@ -443,6 +437,14 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
      NB: Somes SSE algorithms needs __x86_64; all __x86_64 are SSE2.
 **************************************************************************/
 
+static inline void
+poly_scale (double *u, const double *t, unsigned int d, double h)
+{
+  double hpow;
+  u[d] = t[d];
+  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
+}
+
 /**************** used #define from SSE2 to -41 **************************/
 #ifdef HAVE_SSE2
 
@@ -643,7 +645,7 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
 
 #define INITALGD(A) do {					\
     double du[d+1];						\
-    double_poly_scale(du, alg->fijd, d, (double) (A));		\
+    poly_scale(du, alg->fijd, d, (double) (A));		\
     for (uint32_t k=0; k<=d; k++) u[k] = _mm_set1_pd(du[k]);	\
   } while (0)
 
@@ -1818,7 +1820,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
   } while(0)
  
 #define INITALGD(A)				\
-  double_poly_scale(u, alg->fijd, d, (double) (A))
+  poly_scale(u, alg->fijd, d, (double) (A))
  
 #define ABSG1 g=fabs(u0+h*u1)
  
@@ -2638,156 +2640,108 @@ void init_alg_norms_bucket_region(unsigned char *S,
 /* return max |g(x)| for x in (0, s) where s can be negative,
    and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
-get_maxnorm_aux (double *g, const unsigned int d, double s)
+get_maxnorm_aux (double_poly_srcptr poly, double s)
 {
-  unsigned int k, l, sign_change, new_sign_change;
-  double_poly_t *dg;    /* derivatives of g */
-  double a, va, b, vb;
-  double *roots, gmax;
+  double_poly_t deriv;
+  const int d = poly->deg;
 
-  dg = (double_poly_t*) malloc (d * sizeof (double_poly_t));
-  FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
-  /* make dg[0] point directly to g, to avoid copy */
-  dg[0]->coeff = g;
-  dg[0]->deg = d;
-  for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
-                             degree d-k, i.e., d-k+1 coefficients */
-    double_poly_init (dg[k], d - k);
-  roots = (double*) malloc (d * sizeof (double));
+  if (d < 0) {
+    return 0;
+  } else if (d == 0) {
+    return poly->coeff[0];
+  }
+
+  double *roots = (double*) malloc (poly->deg * sizeof (double));
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
-  for (k = 1; k < d; k++)
-    for (l = 0; l <= d - k; l++)
-      dg[k]->coeff[l] = (l + 1) * dg[k - 1]->coeff[l + 1];
-  /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
-     most one sign change in (0, s), this happens iff dg[d-1][0] and
-     dg[d-1][0]+s*dg[d-1][1] have different signs */
-  if (dg[d-1]->coeff[0] * (dg[d-1]->coeff[0] + s * dg[d-1]->coeff[1]) < 0)
+
+  /* Compute the derivative of polynomial */
+  double_poly_init (deriv, d - 1);
+  double_poly_derivative (deriv, poly);
+
+  /* Look for extrema of the polynomial, i.e., for roots of the derivative */
+  const unsigned int nr_roots = double_poly_compute_roots(roots, deriv, s);
+
+  /* now abscissae of all extrema of poly are 0, roots[0], ..., 
+     roots[nr_roots-1], s */
+  double gmax = fabs (poly->coeff[0]);
+  for (unsigned int k = 0; k <= nr_roots; k++)
     {
-      sign_change = 1;
-      roots[0] = - dg[d-1]->coeff[0] / dg[d-1]->coeff[1]; /* root of (d-1)-th derivative */
-    }
-  else
-    sign_change = 0;
-  roots[sign_change] = s; /* end of interval */
-  for (k = d - 1; k-- > 1;)
-    {
-      /* invariant: sign_change is the number of sign changes of the
-         (k+1)-th derivative, with corresponding roots in roots[0]...
-         roots[sign_change-1], and roots[sign_change] = s. */
-      a = 0.0;
-      va = dg[k]->coeff[0]; /* value of dg[k] at x=0 */
-      new_sign_change = 0;
-      for (l = 0; l <= sign_change; l++)
-        {
-          b = roots[l]; /* root of dg[k+1], or end of interval */
-          vb = double_poly_eval (dg[k], b);
-          if (va * vb < 0) /* root in interval */
-            roots[new_sign_change++] = double_poly_dichotomy (dg[k], a, b,
-                                                              va, 20);
-          a = b;
-          va = vb;
-        }
-      roots[new_sign_change] = s; /* end of interval */
-      sign_change = new_sign_change;
-    }
-  /* now all extrema of g are 0, roots[0], ..., roots[sign_change] = s */
-  gmax = fabs (g[0]);
-  for (k = 0; k <= sign_change; k++)
-    {
-      va = fabs (double_poly_eval (dg[0], roots[k]));
+      double x = (k < nr_roots) ? roots[k] : s;
+      double va = fabs (double_poly_eval (poly, x));
       if (va > gmax)
         gmax = va;
     }
   free (roots);
-  for (k = 1; k < d; k++)
-    double_poly_clear (dg[k]);
-  free (dg);
+  double_poly_clear(deriv);
   return gmax;
 }
 
-/* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
-   for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
-   -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
-   where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = l_infty_snorm_u).
-
-   Since |a0| <= s*B and |b0| <= B, then
-   |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
-   thus it suffices to compute M = max |F(x,y)| in the rectangle
-   -s <= x <= s, 0 <= y <= 1, and to multiply M by (B*I)^deg(F).
-
-   Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
-   of the rectangle, i.e.:
-   (a) either on F(s,y) for 0 <= y <= 1
-   (b) either on F(x,1) for -s <= x <= s
-   (c) either on F(-s,y) for 0 <= y <= 1
-   (d) or on F(x,0) for -s <= x <= s, but this maximum is f[d]*s^d,
-       and is attained in (a) or (c).
-*/
+/* Like get_maxnorm_aux(), but for interval [-s, s] */
 static double
-get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
+get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
 {
-  unsigned int d = cpoly->alg->deg, k;
-  double *fd; /* double-precision coefficients of f */
-  double norm, max_norm, pows, tmp;
-  double B = l_infty_snorm_u;
-
-  fd = (double*) malloc ((d + 1) * sizeof (double));
-  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
-  for (k = 0; k <= d; k++)
-    fd[k] = mpz_get_d (cpoly->alg->coeff[k]);
-
-  /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
-  max_norm = get_maxnorm_aux (fd, d, cpoly->skew);
-
-  /* (b2) determine the maximum of |f(-x)| for 0 <= x <= s */
-  norm = get_maxnorm_aux (fd, d, -cpoly->skew);
-  if (norm > max_norm)
-    max_norm = norm;
-
-  for (pows = 1., k = 0; k <= d; k++)
-    {
-      fd[k] *= pows;
-      pows *= cpoly->skew;
-    }
-  /* swap coefficients; if d is odd, we need to go up to k = floor(d/2) */
-  for (k = 0; k <= d / 2; k++)
-    {
-      tmp = fd[k];
-      fd[k] = fd[d - k];
-      fd[d - k] = tmp;
-    }
-
-  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
-  norm = get_maxnorm_aux (fd, d, 1.);
-  if (norm > max_norm)
-    max_norm = norm;
-
-  /* (c) determine the maximum of |g(-y)| for 0 <= y <= 1 */
-  norm = get_maxnorm_aux (fd, d, -1.);
-  if (norm > max_norm)
-    max_norm = norm;
-
-  free (fd);
-
-  /* multiply by (B*I)^d: don't use the pow() function since it does not
-     work properly when the rounding mode is not to nearest (at least under
-     Linux with the glibc). Moreover for a small exponent d a direct loop
-     as follows should not be much slower (if any), anyway the efficiency of
-     that function is not critical */
-  for (tmp = max_norm, k = 0; k < d; k++)
-    tmp *= B * (double) si->I;
-  /* divide by q0 if sieving on alg side */
-  if (qside == ALGEBRAIC_SIDE)
-      tmp /= q0d;
-  return log2(tmp);
+  double norm1 = get_maxnorm_aux(poly, s);
+  double norm2 = get_maxnorm_aux(poly, -s);
+  return (norm2 > norm1) ? norm2 : norm1;
 }
 
-/* this function initializes the scaling factors and report bounds on the
-   rational and algebraic sides */
-void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
+/* returns the maximal norm of log2|F'(i,j)| for -I/2 <= i <= I/2, 0 <= j <= J.
+   Since F is homogeneous, we know M = max |F'(i,j)| = |f'(i/j) * j^d| is
+   attained on the border of the rectangle, i.e.:
+   (a) either on F'(I/2,j) for -J <= j <= J (right-hand-side border, and the
+       mirrored image of the left-hand-side border);
+       with F'(i,j) = rev(F)(j,i), we want the maximum of
+       rev(F')(j, I/2) = rev(f')(j/(I/2)) * (I/2)^d for -J <= j <= J;
+       assuming I = 2J, this is rev(f')(x) * J^d for -1 <= x <= 1.
+   (b) either on F'(i,J) for -I/2 <= i <= I/2 (top border)
+       = f(i/J) * J^d; assuming I = 2J, f(x) * J^d for -1 <= x <= 1.
+   (d) or on F(i,0) for -I <= i <= I (lower border), but this maximum is f[d]*I^d,
+       and is attained in (a).
+*/
+static double
+get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si)
 {
-  double step, begin;
+  const int debug = 0;
+  unsigned int k;
+  double norm, max_norm;
+
+  double_poly_t poly;
+  double_poly_init (poly, d);
+  for (k = 0; k <= d; k++)
+    poly->coeff[k] = coeff[k];
+
+  if (debug)
+    double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
+
+  /* (b1) determine the maximum of |F(x)| for -s <= x <= s */
+  max_norm = get_maxnorm_aux_pm (poly, 1.);
+
+  /* (a) determine the maximum of |g(y)| for -1 <= y <= 1, with g(y) = F(s,y) */
+  double_poly_revert(poly);
+  norm = get_maxnorm_aux_pm (poly, 1.);
+  if (norm > max_norm)
+    max_norm = norm;
+
+  /* Both cases (a) and (b) want to multiply by J^d = (I/2)^d. Since J may
+     not have been initialised yet, we use I. */
+  max_norm *= pow((double)(si->I / 2), (double)d);
+
+  double_poly_clear(poly);
+
+  if (debug)
+    fprintf(stdout, "# Max norm is %f\n", max_norm);
+
+  return log2(max_norm);
+}
+
+/*
+   Allocates:
+     si->sides[side]->fij
+     si->sides[side]->fijd
+*/
+
+void sieve_info_init_norm_data(sieve_info_ptr si)
+{
   for (int side = 0; side < 2; side++)
     {
       int d = si->cpoly->pols[side]->deg;
@@ -2796,116 +2750,6 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
     }
 
-  double r, maxlog2;
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-
-  /* Let u = (a0, b0) and v = (a1, b1) the two vectors obtained from skew
-     Gauss reduction, and u' = (a0, s*b0), v' = (a1, s*b1). Assume |u'|<=|v'|.
-     We know from Gauss reduction that the vectors u' and v' form an
-     angle of at least pi/3, and their determinant is qs, thus:
-     |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
-     Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
-
-  /* this was called si->B earlier. This bounds the skewed-L\infty norm
-   * of u=(a0,b0), following |a0| <= s*B and |b0| <= B.
-   * (IMO we have another notational convention elsewhere regarding what
-   * the skewed norm is. But it's the one which is used here).
-   */
-  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
-
-  /************************** rational side **********************************/
-
-  /* If J is chosen such that J<=I/2*s*B/max(|a1|,s*|b1|),
-   * then |j*a1| <= I/2*s*B, and |j*b1| <= I/2*B
-   * J is set to honour this requirement in sieve_info_adjust_IJ (but see
-   * also bug #15617).
-   * Now (a,b)=i*(a0,b0)+j*(a1,b1) with |i|<I/2 and |j|<=J gives
-   * |a| <= s*I*B and |b| <= I*B, whence |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
-  r = fabs (mpz_get_d (si->cpoly->rat->coeff[1])) * si->cpoly->skew
-    + fabs (mpz_get_d (si->cpoly->rat->coeff[0]));
-  r *= B * (double) si->I;
-
-  /* if the special-q is on the rational side, divide by it */
-  if (qside == RATIONAL_SIDE)
-    r /= q0d;
-
-  rat->logmax = log2 (r);
-
-  /* we increase artificially 'logmax', to allow larger values of J */
-  rat->logmax += 1.;
-
-  /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
-     and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
-
-  maxlog2 = rat->logmax;
-  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
-  step = 1 / rat->scale;
-  begin = -step * GUARD;
-  for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
-  /* we want to select relations with a cofactor of less than r bits on the
-     rational side */
-  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
-  rat->bound = (unsigned char) (r * rat->scale + GUARD);
-  fprintf (output, " bound=%u\n", rat->bound);
-  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
-      si->conf->sides[RATIONAL_SIDE]->lpb;
-  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
-      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
-  }
-  /* Obsolete: rat->Bound is replaced by a single threshold alg->bound */
-  /*
-  sieve_info_init_lognorm (rat->Bound, rat->bound, si->conf->sides[RATIONAL_SIDE]->lim,
-                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
-  */
-
-  /************************** algebraic side *********************************/
-
-  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0d, B, qside); /* log2(max norm) */
-  /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
-     and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
-
-  /* we increase artificially 'logmax', to allow larger values of J */
-  alg->logmax += 2.0;
-
-  /* on the algebraic side, we want that the non-reports on the rational
-     side, which are set to 255, remain larger than the report bound 'r',
-     even if the algebraic norm is totally smooth. For this, we artificially
-     increase by 'r' the maximal range.
-     If lambda * lpb < logmax, which is the usual case, then non-reports on
-     the rational side will start from logmax + lambda * lpb or more, and
-     decrease to lambda * lpb or more, thus above the threshold as we want.
-     If logmax < lambda * lpb, non-reports on the rational side will start
-     from 2*logmax or more, and decrease to logmax or more. */
-  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
-  maxlog2 = alg->logmax + r;
-
-  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
-     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
-  step = 1 / alg->scale;
-  begin = -step * GUARD;
-  for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
-  /* we want to report relations with a remaining log2-norm after sieving of
-     at most lambda * lpb, which corresponds in the y-range to
-     y >= GUARD + lambda * lpb * scale */
-  alg->bound = (unsigned char) (r * alg->scale + GUARD);
-  fprintf (output, " bound=%u\n", alg->bound);
-  double max_alambda = (alg->logmax) / si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
-      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
-  }
-  /* Obsolete: alg->Bound is replaced by a single threshold alg->bound */
-  /*
-  sieve_info_init_lognorm (alg->Bound, alg->bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
-                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
-  */
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
@@ -2919,7 +2763,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 
 /* return largest possible J by simply bounding the Fij and Gij polynomials
    using the absolute value of their coefficients */
-unsigned int
+static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
   double Iover2 = (double) (si->I >> 1);
@@ -2962,41 +2806,137 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   return (unsigned int) Jmax;
 }
 
+/* this function initializes the scaling factors and report bounds on the
+   rational and algebraic sides */
+/*
+   Updates:
+     si->sides[RATIONAL_SIDE]->logmax
+     si->sides[RATIONAL_SIDE]->scale
+     si->sides[RATIONAL_SIDE]->cexp2[]
+     si->sides[RATIONAL_SIDE]->bound
+     
+     si->sides[ALGEBRAIC_SIDE]->logmax
+     si->sides[ALGEBRAIC_SIDE]->scale
+     si->sides[ALGEBRAIC_SIDE]->cexp2[]
+     si->sides[ALGEBRAIC_SIDE]->bound
+*/
+
 void
-sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
+sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 {
-    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+  int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
 
-    /* Update floating point version of algebraic poly (do both, while
-     * we're at it...) */
-    for (int side = 0; side < 2; side++) {
-        sieve_side_info_ptr s = si->sides[side];
-        mpz_poly_ptr ps = si->cpoly->pols[side];
-        mpz_poly_homography (s->fij, ps, H);
-        /* On the special-q side, divide all the coefficients of the 
-           transformed polynomial by q */
-        if (si->conf->side == side) {
-            for (int i = 0; i <= ps->deg; i++) {
-                ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
-                mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
-            }
-        }
-        for (int k = 0; k <= ps->deg; k++)
-            s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
-    }
+  double step, begin;
+  double r, maxlog2;
+  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
-    /* improve bound on J if possible */
-    unsigned int Jmax;
-    Jmax = sieve_info_update_norm_data_Jmax (si);
-    if (Jmax > si->J)
-      {
-        /* see sieve_info_adjust_IJ */
-        ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
-        uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
-        i *= nb_threads;
-        si->J = (Jmax / i) * i; /* cannot be zero since the previous value
-                                   of si->J was already a multiple of i,
-                                   and this new value is larger */
+  /* Update floating point version of both polynomials. They will be used in
+   * get_maxnorm_alg(). */
+  for (int side = 0; side < 2; side++) {
+      sieve_side_info_ptr s = si->sides[side];
+      mpz_poly_ptr ps = si->cpoly->pols[side];
+      mpz_poly_homography (s->fij, ps, H);
+      /* On the special-q side, divide all the coefficients of the
+         transformed polynomial by q */
+      if (si->conf->side == side) {
+          for (int i = 0; i <= ps->deg; i++) {
+              ASSERT_ALWAYS(mpz_divisible_p(s->fij->coeff[i], si->doing->p));
+              mpz_divexact(s->fij->coeff[i], s->fij->coeff[i], si->doing->p);
+          }
       }
-}
+      for (int k = 0; k <= ps->deg; k++)
+          s->fijd[k] = mpz_get_d (s->fij->coeff[k]);
+  }
 
+  /************************** rational side **********************************/
+
+  /* Compute the maximum norm of the rational polynomial over the sieve
+     region. The polynomial coefficient in fijd are already divided by q
+     on the special-q side. */
+  rat->logmax = get_maxnorm_alg (si->sides[RATIONAL_SIDE]->fijd, si->cpoly->pols[RATIONAL_SIDE]->deg, si); /* log2(max norm) */
+
+  /* we increase artificially 'logmax', to allow larger values of J */
+  rat->logmax += 1.;
+
+  /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
+     and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
+
+  maxlog2 = rat->logmax;
+  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  step = 1. / rat->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
+  /* we want to select relations with a cofactor of less than r bits on the
+     rational side */
+  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
+  rat->bound = (unsigned char) (r * rat->scale + GUARD);
+  fprintf (output, " bound=%u\n", rat->bound);
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) /
+      si->conf->sides[RATIONAL_SIDE]->lpb;
+  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
+      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
+
+  /************************** algebraic side *********************************/
+
+  /* Compute the maximum norm of the algebraic polynomial over the sieve
+     region. The polynomial coefficient in fijd are already divided by q
+     on the special-q side. */
+  alg->logmax = get_maxnorm_alg (si->sides[ALGEBRAIC_SIDE]->fijd, si->cpoly->pols[ALGEBRAIC_SIDE]->deg, si); /* log2(max norm) */
+
+  /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
+     and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
+
+  /* we increase artificially 'logmax', to allow larger values of J */
+  alg->logmax += 2.0;
+
+  /* on the algebraic side, we want that the non-reports on the rational
+     side, which are set to 255, remain larger than the report bound 'r',
+     even if the algebraic norm is totally smooth. For this, we artificially
+     increase by 'r' the maximal range.
+     If lambda * lpb < logmax, which is the usual case, then non-reports on
+     the rational side will start from logmax + lambda * lpb or more, and
+     decrease to lambda * lpb or more, thus above the threshold as we want.
+     If logmax < lambda * lpb, non-reports on the rational side will start
+     from 2*logmax or more, and decrease to logmax or more. */
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
+  maxlog2 = alg->logmax + r;
+
+  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  step = 1. / alg->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
+  /* we want to report relations with a remaining log2-norm after sieving of
+     at most lambda * lpb, which corresponds in the y-range to
+     y >= GUARD + lambda * lpb * scale */
+  alg->bound = (unsigned char) (r * alg->scale + GUARD);
+  fprintf (output, " bound=%u\n", alg->bound);
+  double max_alambda = (alg->logmax) / si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
+      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
+
+
+  /* improve bound on J if possible */
+  unsigned int Jmax;
+  Jmax = sieve_info_update_norm_data_Jmax (si);
+  if (Jmax > si->J)
+    {
+      /* see sieve_info_adjust_IJ */
+      ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
+      uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+      i *= nb_threads;
+      si->J = (Jmax / i) * i; /* cannot be zero since the previous value
+                                 of si->J was already a multiple of i,
+                                 and this new value is larger */
+    }
+}

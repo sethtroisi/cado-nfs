@@ -500,7 +500,7 @@ class Program(object, metaclass=InspectType):
         for filename in self.get_input_files():
             append_file(workunit, 'FILE', filename)
         append_file(workunit, 'EXECFILE', self.get_exec_file())
-        cmdline = self.make_command_line(binpath = "${DLDIR}",
+        cmdline = self.make_command_line(binpath = "${EXECDIR}",
             inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
         workunit.append('COMMAND %s' % cmdline)
         for filename in self.get_output_files():
@@ -539,6 +539,7 @@ class Polyselect2l(Program):
                  maxtime : Parameter() = None,
                  out : Parameter() = None,
                  printdelay : Parameter("s") = None,
+                 keep: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -788,6 +789,7 @@ class WuClient(Program):
                  nosha1check: Toggle(prefix='--') = None,
                  dldir: Parameter(prefix='--') = None,
                  workdir: Parameter(prefix='--') = None,
+                 bindir: Parameter(prefix='--') = None,
                  clientid: Parameter(prefix='--') = None,
                  basepath: Parameter(prefix='--') = None,
                  getwupath: Parameter(prefix='--') = None,
