@@ -2769,6 +2769,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   basis in the sense that its image forms a rectangle A/2 <= a < A/2, 
   0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2 here).
   Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A = I*sqrt(q*skew).
+  The norm is then the maximum of |F(a,b)| in this rectangle, divided by
+  q on the special-q side.
 
   Then we reduce J so that the maximum norm in the image of the actual sieve
   regionis no larger than this optimal maximum, times some constant fudge
@@ -2777,24 +2779,48 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  double Iover2 = (double) (si->I >> 1);
-  double Jmax = Iover2;
+  const int verbose = 0;
+  const double fudge_factor = 4.; /* How much bigger a norm than optimal
+                                     we're willing to tolerate */
+  const double I = (double) (si->I);
+  const double q = mpz_get_d(si->doing->p);
+  const double skew = si->cpoly->skew;
+  const double A = I*sqrt(q*skew);
+  const double B = A/2./skew;
+  double Jmax = I/2.;
 
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
       mpz_poly_ptr ps = si->cpoly->pols[side];
-      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
-      double_poly_t F;
 
-      double_poly_init (F, ps->deg);
-      for (int k = 0; k <= ps->deg; k++)
-        {
-          /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
-          F->coeff[ps->deg - k] = fabs (s->fijd[k]) * powIover2;
-          powIover2 *= Iover2;
-        }
-      v = double_poly_eval (F, Jmax);
+      /* Compute the best possible maximum norm, i.e., assuming a nice
+         rectangular sieve region in the a,b-plane */
+      double_poly_t dpoly;
+      double_poly_init (dpoly, ps->deg);
+      double_poly_set_mpz_poly (dpoly, ps);
+      double maxnorm = get_maxnorm_alg (dpoly, A/2., B);
+      double_poly_clear (dpoly);
+      if (side == si->doing->side)
+        maxnorm /= q;
+      if (verbose) {
+        printf ("Best possible maxnorm for side %d: %g\n", side, maxnorm);
+      }
+
+      maxnorm *= fudge_factor;
+      if (verbose) {
+        printf ("Threshold for acceptable norm for side %d: %g\n", side, maxnorm);
+      }
+
+      double_poly_t F;
+      F->deg = ps->deg;
+      F->coeff = s->fijd;
+      
+      double v = get_maxnorm_alg (F, I, Jmax);
+      if (verbose) {
+        printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)Jmax, v);
+      }
+      
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
           double a, b, c;
@@ -2803,17 +2829,25 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = double_poly_eval (F, c);
+              v = get_maxnorm_alg (F, I, c);
+              if (verbose) {
+                printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)c, v);
+              }
               if (v < maxnorm)
                 a = c;
               else
                 b = c;
             }
           Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
+          if (verbose) {
+            printf ("Setting Jmax=%d\n", (int)Jmax);
+          }
         }
-      double_poly_clear (F);
     }
 
+   if (verbose) {
+     printf ("Final maxnorm J=%d\n", (int)Jmax);
+   }
   return (unsigned int) Jmax;
 }
 
