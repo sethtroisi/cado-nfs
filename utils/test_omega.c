@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <gmp.h>
 #include "ularith.h"
 #include "modredc_ul.h"
@@ -10,16 +11,22 @@
 void omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp);
 
 int main(int argc, char **argv) {
-  unsigned long p, minp = 3, maxp = ~0UL;
+  unsigned long p, minp = 3, maxp = 5000UL;
   enumeratediv_t div;
+  int use_gp = 0;
+  
+  if (argc > 1 && strcmp(argv[1], "-gp") == 0){
+    use_gp = 1;
+    argc--;
+    argv++;
+  }
   
   if (argc > 1)
     minp = strtoul (argv[1], NULL, 10);
   if (argc > 2)
     maxp = strtoul (argv[2], NULL, 10);
 
-  printf ("minp = %lu, maxp = %lu\n", minp, maxp);
-
+  printf ("/* minp = %lu, maxp = %lu */\n", minp, maxp);
 
   for (p = minp; p <= maxp; p += 2UL) {
     modulus_t pp;
@@ -38,32 +45,32 @@ int main(int argc, char **argv) {
     mod_init (o, pp);
     mod_init (pow, pp);
 
-#if 1
-    enumeratediv_init (&div, p-1);
-    printf ("divisors(%lu) == vecsort([1", p-1);
-    while ((k = enumeratediv(&div)) != 0)
-      if (k > 1)
-        printf (", %lu", k);
-    printf ("])\n");
-#endif
+    if (use_gp) {
+      enumeratediv_init (&div, p-1);
+      printf ("divisors(%lu) == vecsort([1", p-1);
+      while ((k = enumeratediv(&div)) != 0)
+        if (k > 1)
+          printf (", %lu", k);
+      printf ("])\n");
+    }
 
     enumeratediv_init (&div, p-1);
     while ((k = enumeratediv(&div)) != 0) {
       omega (o, b, k, pp);
 
-#if 1
-      /* Test using output to be piped into Pari/GP */
-      printf ("znorder(Mod(%lu, %lu)) == %lu\n", 
-              mod_get_ul(o, pp), mod_getmod_ul (pp), k);
-#else
-      /* Slow but reliable test */
-      for (i = 1; i < k; i++) {
-        mod_pow_ul (pow, o, i, pp);
-        ASSERT_ALWAYS (!mod_is1(pow, pp));
-        mod_pow_ul (pow, o, k, pp);
-        ASSERT_ALWAYS (mod_is1(pow, pp));
+      if (use_gp) {
+        /* Test using output to be piped into Pari/GP */
+        printf ("znorder(Mod(%lu, %lu)) == %lu\n", 
+                mod_get_ul(o, pp), mod_getmod_ul (pp), k);
+      } else {
+        /* Slow but reliable test */
+        for (unsigned long i = 1; i < k; i++) {
+          mod_pow_ul (pow, o, i, pp);
+          ASSERT_ALWAYS (!mod_is1(pow, pp));
+          mod_pow_ul (pow, o, k, pp);
+          ASSERT_ALWAYS (mod_is1(pow, pp));
+        }
       }
-#endif
     }
 
     mod_clear (b, pp);
