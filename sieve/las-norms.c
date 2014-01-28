@@ -163,6 +163,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
   int int_i;
   uint8_t oy, y;
 
+  ASSERT_ALWAYS(isfinite(invu1));
   j1 = LOG_BUCKET_REGION - si->conf->logI;
   j = j << j1;
   j1 = (1U << j1) + j;
