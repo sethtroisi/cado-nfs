@@ -2685,7 +2685,7 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
   return (norm2 > norm1) ? norm2 : norm1;
 }
 
-/* returns the maximal norm of log2|F(x,y)| for -X <= x <= X, 0 <= y <= Y,
+/* returns the maximal norm of |F(x,y)| for -X <= x <= X, 0 <= y <= Y,
    where F(x,y) is a homogeneous polynomial of degree d.
    Let F(x,y) = f(x/y)*y^d, and F(x,y) = rev(F)(y,x).
    Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
@@ -2700,16 +2700,16 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
        maximum is f[d]*X^d, and is attained in (a).
 */
 static double
-get_maxnorm_alg (const double *coeff, const unsigned int d, const double X,
-                 const double Y)
+get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
+  const unsigned int d = src_poly->deg;
   const int debug = 0;
   double norm, max_norm;
 
+  /* Make copy of polynomial as we need to revert the coefficients */
   double_poly_t poly;
   double_poly_init (poly, d);
-  for (unsigned int k = 0; k <= d; k++)
-    poly->coeff[k] = coeff[k];
+  double_poly_set (poly, src_poly);
 
   if (debug)
     double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
@@ -2838,6 +2838,7 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   double step, begin;
   double r, maxlog2;
+  double_poly_t poly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
@@ -2864,8 +2865,9 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   /* Compute the maximum norm of the rational polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
-  rat->logmax = log2(get_maxnorm_alg (si->sides[RATIONAL_SIDE]->fijd, 
-      si->cpoly->pols[RATIONAL_SIDE]->deg, (double)si->I/2, (double)si->I/2));
+  poly->deg = si->cpoly->pols[RATIONAL_SIDE]->deg;
+  poly->coeff = si->sides[RATIONAL_SIDE]->fijd;
+  rat->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
   /* we increase artificially 'logmax', to allow larger values of J */
   rat->logmax += 1.;
@@ -2898,8 +2900,9 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   /* Compute the maximum norm of the algebraic polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
-  alg->logmax = log2(get_maxnorm_alg (si->sides[ALGEBRAIC_SIDE]->fijd, 
-      si->cpoly->pols[ALGEBRAIC_SIDE]->deg, (double)si->I/2, (double)si->I/2)); /* log2(max norm) */
+  poly->deg = si->cpoly->pols[ALGEBRAIC_SIDE]->deg;
+  poly->coeff = si->sides[ALGEBRAIC_SIDE]->fijd;
+  alg->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
