@@ -2483,6 +2483,94 @@ class PurgeTask(Task):
                                 % (self.title, self.programs[0].name, key, stdout))
         return [r[key] for key in keys]
 
+class MergeDLPTask(Task):
+    """ Merges relations """
+    @property
+    def name(self):
+        return "merge"
+    @property
+    def title(self):
+        return "Filtering - Merging"
+    @property
+    def programs(self):
+        return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+        skip = self.progparams[0].get("skip", 0)
+        self.progparams[0].setdefault("skip", skip)
+        self.progparams[0].setdefault("keep", 0)
+
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "mergedfile" in self.state:
+            self.logger.info("Starting")
+            if "indexfile" in self.state:
+                del(self.state["indexfile"])
+            if "mergedfile" in self.state:
+                del(self.state["mergedfile"])
+            if "densefile" in self.state:
+                del(self.state["densefile"])
+            
+            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            historyfile = self.workdir.make_filename("history" + use_gz)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
+            p = cadoprograms.MergeDLP(mat=purged_filename,
+                                   out=historyfile,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath),
+                                   **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            indexfile = self.workdir.make_filename("index" + use_gz)
+            mergedfile = self.workdir.make_filename("small.bin")
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
+            idealfile = self.workdir.make_filename("ideal")
+            p = cadoprograms.ReplayDLP(purged=purged_filename,
+                                    ideals=idealfile,
+                                    history=historyfile, index=indexfile,
+                                    out=mergedfile, stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
+                                    **self.progparams[1])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            if not indexfile.isfile():
+                raise Exception("Output file %s does not exist" % indexfile)
+            if not mergedfile.isfile():
+                raise Exception("Output file %s does not exist" % mergedfile)
+            update = {"indexfile": indexfile.get_wdir_relative(),
+                      "mergedfile": mergedfile.get_wdir_relative()}
+            densefilename = self.workdir.make_filename("small.dense.bin")
+            if densefilename.isfile():
+                update["densefile"] = densefilename.get_wdir_relative()
+            self.state.update(update)
+            
+        self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        return True
+    
+    def get_index_filename(self):
+        return self.get_state_filename("indexfile")
+    
+    def get_merged_filename(self):
+        return self.get_state_filename("mergedfile")
+    
+    def get_dense_filename(self):
+        return self.get_state_filename("densefile")
+
+
 class MergeTask(Task):
     """ Merges relations """
     @property
@@ -3377,10 +3465,6 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                db = db,
                                parameters = self.parameters,
                                path_prefix = filterpath)
-        self.merge = MergeTask(mediator = self,
-                               db = db,
-                               parameters = self.parameters,
-                               path_prefix = filterpath)
         self.linalg = LinAlgTask(mediator = self,
                                  db = db,
                                  parameters = self.parameters,
@@ -3392,9 +3476,17 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 #                             parameters = self.parameters,
 #                             path_prefix = filterpath)
             ## more to be added...
+            self.merge = MergeDLPTask(mediator = self,
+                                   db = db,
+                                   parameters = self.parameters,
+                                   path_prefix = filterpath)
             x=1
         else:
             ## Tasks specific to factorization
+            self.merge = MergeTask(mediator = self,
+                                   db = db,
+                                   parameters = self.parameters,
+                                   path_prefix = filterpath)
             self.characters = CharactersTask(mediator = self,
                                              db = db,
                                              parameters = self.parameters,
