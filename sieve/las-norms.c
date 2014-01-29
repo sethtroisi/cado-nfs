@@ -2780,8 +2780,8 @@ static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
   const int verbose = 0;
-  const double fudge_factor = 4.; /* How much bigger a norm than optimal
-                                     we're willing to tolerate */
+  const double fudge_factor = 16.; /* How much bigger a norm than optimal
+                                      we're willing to tolerate */
   const double I = (double) (si->I);
   const double q = mpz_get_d(si->doing->p);
   const double skew = si->cpoly->skew;
