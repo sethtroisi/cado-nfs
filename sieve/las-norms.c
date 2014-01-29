@@ -2769,8 +2769,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   basis in the sense that its image forms a rectangle A/2 <= a < A/2, 
   0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2 here).
   Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A = I*sqrt(q*skew).
-  The norm is then the maximum of |F(a,b)| in this rectangle, divided by
-  q on the special-q side.
+  The optimal maximum norm is then the maximum of |F(a,b)| in this rectangle,
+  divided by q on the special-q side.
 
   Then we reduce J so that the maximum norm in the image of the actual sieve
   regionis no larger than this optimal maximum, times some constant fudge
