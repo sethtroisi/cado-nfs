@@ -2512,6 +2512,8 @@ class MergeDLPTask(Task):
         
         if not "mergedfile" in self.state:
             self.logger.info("Starting")
+            if "idealfile" in self.state:
+                del(self.state["idealfile"])
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "mergedfile" in self.state:
@@ -2547,12 +2549,15 @@ class MergeDLPTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
+            if not idealfile.isfile():
+                raise Exception("Output file %s does not exist" % idealfile)
             if not indexfile.isfile():
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
             update = {"indexfile": indexfile.get_wdir_relative(),
-                      "mergedfile": mergedfile.get_wdir_relative()}
+                      "mergedfile": mergedfile.get_wdir_relative(),
+                      "idealfile": idealfile.get_wdir_relative()}
             densefilename = self.workdir.make_filename("small.dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
@@ -2563,6 +2568,9 @@ class MergeDLPTask(Task):
     
     def get_index_filename(self):
         return self.get_state_filename("indexfile")
+    
+    def get_ideal_filename(self):
+        return self.get_state_filename("idealfile")
     
     def get_merged_filename(self):
         return self.get_state_filename("mergedfile")
@@ -3001,59 +3009,55 @@ class SqrtTask(Task):
         return N
 
 
-# 
-# class SMTask(Task):
-#     """ Computes Schirokauher Maps """
-#     @property
-#     def name(self):
-#         return "sm"
-#     @property
-#     def title(self):
-#         return "Schirokauher Maps"
-#     @property
-#     def programs(self):
-#         return (cadoprograms.SM,)
-#     @property
-#     def paramnames(self):
-#         return super().paramnames + ()
-# 
-#     def __init__(self, *, mediator, db, parameters, path_prefix):
-#         super().__init__(mediator = mediator, db = db, parameters = parameters,
-#                          path_prefix = path_prefix)
-#     
-#     def run(self):
-#         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-#                           self.state)
-#         
-#         if not "sm" in self.state:
-#             self.logger.info("Starting")
-#             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-#             smfilename = self.workdir.make_filename("sm")
-#             
-#             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-#             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-#             densefilename = self.send_request(Request.GET_DENSE_FILENAME)
-#             dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
-#             
-#             (stdoutpath, stderrpath) = \
-#                     self.make_std_paths(cadoprograms.Characters.name)
-#             p = cadoprograms.SM(poly=polyfilename,
-#                     purged=purgedfilename, index=indexfilename,
-#                     wfile=dependencyfilename, out=kernelfilename,
-#                     heavyblock=densefilename, stdout=str(stdoutpath),
-#                     stderr=str(stderrpath),
-#                     **self.progparams[0])
-#             message = self.submit_command(p, "", log_errors=True)
-#             if message.get_exitcode(0) != 0:
-#                 raise Exception("Program failed")
-#             if not smfilename.isfile():
-#                 raise Exception("Output file %s does not exist" % smfilename)
-#             self.state["sm"] = smfilename.get_wdir_relative()
-#         self.logger.debug("Exit SMTask.run(" + self.name + ")")
-#         return True
-#     
-#     def get_sm_filename(self):
-#         return self.get_state_filename("sm")
+class SMTask(Task):
+    """ Computes Schirokauher Maps """
+    @property
+    def name(self):
+        return "sm"
+    @property
+    def title(self):
+        return "Schirokauher Maps"
+    @property
+    def programs(self):
+        return (cadoprograms.SM,)
+    @property
+    def paramnames(self):
+        return super().paramnames + ("gorder", "smexp")
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "sm" in self.state:
+            self.logger.info("Starting")
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            smfilename = self.workdir.make_filename("sm")
+            
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.SM.name)
+            p = cadoprograms.SM(poly=polyfilename,
+                    purged=purgedfilename, index=indexfilename,
+                    out=smfilename,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            if not smfilename.isfile():
+                raise Exception("Output file %s does not exist" % smfilename)
+            self.state["sm"] = smfilename.get_wdir_relative()
+        self.logger.debug("Exit SMTask.run(" + self.name + ")")
+        return True
+    
+    def get_sm_filename(self):
+        return self.get_state_filename("sm")
 
 
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
@@ -3381,6 +3385,7 @@ class Request(Message):
     GET_PURGED_FILENAME = object()
     GET_MERGED_FILENAME = object()
     GET_INDEX_FILENAME = object()
+    GET_IDEAL_FILENAME = object()
     GET_DENSE_FILENAME = object()
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
@@ -3471,16 +3476,15 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                  path_prefix = linalgpath)
         if dlp:
             ## Tasks specific to dlp
-#            self.sm = SMTask(mediator = self,
-#                             db = db,
-#                             parameters = self.parameters,
-#                             path_prefix = filterpath)
+            self.sm = SMTask(mediator = self,
+                             db = db,
+                             parameters = self.parameters,
+                             path_prefix = filterpath)
             ## more to be added...
             self.merge = MergeDLPTask(mediator = self,
                                    db = db,
                                    parameters = self.parameters,
                                    path_prefix = filterpath)
-            x=1
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator = self,
@@ -3502,8 +3506,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.tasks = (self.polysel, self.fb, # self.badideals,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
-                          self.linalg)
-                          # self.sm, self.linalg)
+                          self.sm, self.linalg)
         else:
             self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
@@ -3534,8 +3537,8 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         }
         ## add requests specific to dlp or factoring
         if dlp:
+            self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
 #            self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
-            x=1
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = \
                 self.characters.get_kernel_filename

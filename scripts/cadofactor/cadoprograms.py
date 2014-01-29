@@ -779,23 +779,20 @@ class BWC(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
-# class SM(Program):
-#     binary = "sm"
-#     name = binary
-#     subdir = "filter"
-#     def __init__(self, *,
-#                  poly: Parameter(),
-#                  purged: Parameter(),
-#                  index: Parameter(),
-#                  heavyblock: Parameter(),
-#                  out: Parameter(),
-#                  wfile: Parameter("ker"),
-#                  lpbr: Parameter(),
-#                  lpba: Parameter(),
-#                  nchar: Parameter() = None,
-#                  threads: Parameter("t") = None,
-#                  **kwargs):
-#         super().__init__(locals(), **kwargs)
+class SM(Program):
+    binary = "sm"
+    name = binary
+    subdir = "filter"
+    def __init__(self, *,
+                 poly: Parameter(),
+                 purged: Parameter(),
+                 index: Parameter(),
+                 out: Parameter(),
+                 gorder: Parameter(),
+                 smexp: Parameter(),
+                 threads: Parameter("mt") = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
  
 class Characters(Program):
     binary = "characters"
