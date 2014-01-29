@@ -892,14 +892,6 @@ void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct
     fft_combine_fppol(x, nx, y, fti, p);
 }
 
-/* Same, but store the result as a polynomial over GF(p). nx must be a
- * multiple of mpz_size(p)
- */
-void fft_do_ift_fppol_hack_debug_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
-{
-    fft_do_ift_backend(y, temp, fti);
-    fft_combine_fppol_mp(x, nx, y, fti, p);
-}
 /* }}} */
 
 void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti)
