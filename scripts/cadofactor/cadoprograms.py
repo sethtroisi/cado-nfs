@@ -587,6 +587,7 @@ class FreeRel(Program):
                  badideals: Parameter(is_output_file = True) = None,
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,
+                 dlp: Toggle("addfullcol") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -654,6 +655,8 @@ class Duplicates2(Program):
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_input_file = True),
                  filelist: Parameter(is_input_file = True) = None,
+                 badidealinfo: Parameter(is_input_file = True) = None,
+                 dlp: Toggle("dl") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -702,6 +705,26 @@ class Merge(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class MergeDLP(Program):
+    binary = "merge-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self,
+                 mat: Parameter(is_input_file = True),
+                 out: Parameter(is_output_file = True),
+                 maxlevel: Parameter() = None,
+                 keep: Parameter() = None,
+                 skip: Parameter() = None,
+                 forbw: Parameter() = None,
+                 ratio: Parameter() = None,
+                 coverNmax: Parameter() = None,
+                 nbmergemax: Parameter() = None,
+                 resume: Parameter() = None,
+                 mkztype: Parameter() = None,
+                 wmstmax: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 # Todo: define is_input_file/is_output_file for remaining programs
 class Replay(Program):
     binary = "replay"
@@ -715,6 +738,20 @@ class Replay(Program):
                  out: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
+
+class ReplayDLP(Program):
+    binary = "replay-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self,
+                 purged: Parameter() = None,
+                 ideals: Parameter() = None,
+                 history: Parameter("his") = None,
+                 index: Parameter() = None,
+                 out: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 
 class BWC(Program):
     binary = "bwc.pl"
@@ -742,6 +779,24 @@ class BWC(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+# class SM(Program):
+#     binary = "sm"
+#     name = binary
+#     subdir = "filter"
+#     def __init__(self, *,
+#                  poly: Parameter(),
+#                  purged: Parameter(),
+#                  index: Parameter(),
+#                  heavyblock: Parameter(),
+#                  out: Parameter(),
+#                  wfile: Parameter("ker"),
+#                  lpbr: Parameter(),
+#                  lpba: Parameter(),
+#                  nchar: Parameter() = None,
+#                  threads: Parameter("t") = None,
+#                  **kwargs):
+#         super().__init__(locals(), **kwargs)
+ 
 class Characters(Program):
     binary = "characters"
     name = binary
