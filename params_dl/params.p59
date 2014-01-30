@@ -1,0 +1,70 @@
+###########################################################################
+#     Parameter file for Cado-NFS ; DLP version
+###########################################################################
+
+###########################################################################
+# General parameters
+###########################################################################
+
+name = p59
+
+## The "dlp" flag tells the main script that we want to do dlog
+dlp = true
+## N is the prime modulo which we want dlogs.
+N = 53236943330228380237618624445646085674945074907141464418703
+
+## The number of SM could in principle be tuned automatically
+## For the moment, it is mandatory to set it equal to the poly degree.
+tasks.nmaps = 4 ## number of SM FIXME: this should be chosen automatically
+
+## Standard stuff; edit according to your config.
+slaves.nrclients=2
+tasks.threads = 2
+tasks.execpath = ...
+tasks.workdir =  ...
+slaves.hostnames=localhost
+slaves.scriptpath=...
+slaves.basepath=...
+
+## From here, the parameter are similar to factorization.
+
+###########################################################################
+# Polynomial selection with Kleinjung's algorithm
+###########################################################################
+
+tasks.polyselect.degree = 4
+
+tasks.polyselect.admax = 10000
+tasks.polyselect.incr = 60
+tasks.polyselect.adrange = 5000
+tasks.polyselect.P = 420
+tasks.polyselect.nq = 1000
+
+###########################################################################
+# Sieve
+###########################################################################
+
+
+rlim = 50000
+alim = 100000
+lpbr = 22
+lpba = 22
+tasks.sieve.mfbr = 24
+tasks.sieve.mfba = 24
+tasks.sieve.rlambda = 1.2
+tasks.sieve.alambda = 1.2
+
+tasks.sieve.I = 11
+tasks.sieve.qmin = 200000
+tasks.sieve.qrange = 1000
+tasks.sieve.rels_wanted = 222540
+slaves.niceness = 10
+
+###########################################################################
+# Filtering
+###########################################################################
+
+tasks.filter.maxlevel = 15
+tasks.filter.ratio = 1.1
+tasks.filter.merge.forbw = 3
+tasks.filter.coverNmax = 100
