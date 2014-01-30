@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 unset ELL
 unset NMAPS
@@ -34,7 +34,10 @@ do
   fi
 done
 
-CMD="magma ell:=$ELL nmaps:=$NMAPS sparsefile:=$SPARSE smfile:=$SM kerfile:=$KER /users/caramel/gaudry/Recherche/cado-nfs/scripts/badideals/linalg.mag"
+# where am I ?
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+CMD="magma ell:=$ELL nmaps:=$NMAPS sparsefile:=$SPARSE smfile:=$SM kerfile:=$KER $DIR/linalg.mag"
 
 echo $CMD
 

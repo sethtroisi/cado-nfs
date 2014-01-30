@@ -1598,7 +1598,8 @@ class FreeRelTask(Task):
             use_gz = ".gz" if self.params.get("gzip", True) else ""
             freerelfilename = self.workdir.make_filename("freerel" + use_gz)
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
-            if self.params["dlp"]:
+            dlp = self.params.get("dlp", False)
+            if dlp:
                 badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
@@ -2178,7 +2179,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(name, do_increment=(i == 0))
              
-            if self.params["dlp"]:
+            dlp = self.params.get("dlp", False)
+            if dlp:
                 badinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
             else:
                 badinfofilename = None

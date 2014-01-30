@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 unset P
 unset ELL
@@ -40,6 +40,9 @@ done
 rm -f $BAD
 rm -f $BADINFO
 
-CMD="magma -b ell:=$ELL mainp:=$P polyfile:=$POLY badfile:=$BAD badinfofile:=$BADINFO /users/caramel/gaudry/Recherche/cado-nfs/scripts/badideals/badideals.m" 
+# where am I ?
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+CMD="magma -b ell:=$ELL mainp:=$P polyfile:=$POLY badfile:=$BAD badinfofile:=$BADINFO $DIR/badideals.mag" 
 
 $CMD
