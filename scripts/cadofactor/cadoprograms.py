@@ -806,6 +806,26 @@ class SM(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
  
+class ReconstructLog(Program):
+    binary = "reconstructlog-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self, *,
+                 gorder: Parameter(),
+                 smexp: Parameter(),
+                 ker: Parameter("log"),
+                 dlog: Parameter("out"),
+                 renumber: Parameter(),
+                 poly: Parameter(),
+                 purged: Parameter(),
+                 ideals: Parameter(),
+                 relsdel: Parameter(),
+                 nrels: Parameter(),
+                 nmaps: Parameter("sm"),
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+
 class Characters(Program):
     binary = "characters"
     name = binary

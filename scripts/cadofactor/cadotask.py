@@ -2301,6 +2301,8 @@ class PurgeTask(Task):
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
         purgedfile = self.workdir.make_filename("purged.gz")
+        ### FIXME: relsdel is only required for DLP.
+        relsdelfile = self.workdir.make_filename("relsdel.gz")
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
@@ -2309,6 +2311,7 @@ class PurgeTask(Task):
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
+                                   outdel=relsdelfile,
                                    minindex=minindex, nprimes=nprimes,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -2319,6 +2322,7 @@ class PurgeTask(Task):
                 filelistfile.write("\n".join(files))
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
+                                   outdel=relsdelfile,
                                    nprimes=nprimes, filelist=filelistname,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -2331,7 +2335,8 @@ class PurgeTask(Task):
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
             self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels})
+                               "input_nrels": input_nrels,
+                               "relsdelfile": relsdelfile.get_wdir_relative() })
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2386,6 +2391,10 @@ class PurgeTask(Task):
     
     def get_purged_filename(self):
         return self.get_state_filename("purgedfile")
+    
+    ## FIXME: should be there only for DLP
+    def get_relsdel_filename(self):
+        return self.get_state_filename("relsdelfile")
     
     def parse_stderr(self, stderr, input_nrels):
         # If stderr ends with
@@ -2686,26 +2695,27 @@ class LinAlgDLPTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        self.logger.info("Starting")
-        
-        kerfile = self.workdir.make_filename("ker")
-        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
-        smfile = self.send_request(Request.GET_SM_FILENAME)
-        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
-        p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
-                               ker=kerfile,
-                               sm=smfile,
-                               stdout=str(stdoutpath),
-                               stderr=str(stderrpath),
-                               **self.progparams[0])
-        message = self.submit_command(p, "", log_errors=True)
-        if message.get_exitcode(0) != 0:
-            raise Exception("Program failed")
-        
-        if not kerfile.isfile():
-            raise Exception("Output file %s does not exist" % kerfile)
-        update = {"kerfile": kerfile.get_wdir_relative()}
-        self.state.update(update)
+        if not "kerfile" in self.state: 
+            self.logger.info("Starting")
+            
+            kerfile = self.workdir.make_filename("ker")
+            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+            smfile = self.send_request(Request.GET_SM_FILENAME)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
+            p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
+                                   ker=kerfile,
+                                   sm=smfile,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath),
+                                   **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            if not kerfile.isfile():
+                raise Exception("Output file %s does not exist" % kerfile)
+            update = {"kerfile": kerfile.get_wdir_relative()}
+            self.state.update(update)
             
         self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
         return True
@@ -3057,7 +3067,6 @@ class SqrtTask(Task):
             N += 2     
         return N
 
-
 class SMTask(Task):
     """ Computes Schirokauher Maps """
     @property
@@ -3107,6 +3116,70 @@ class SMTask(Task):
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
+
+
+
+class ReconstructLogTask(Task):
+    """ Logarithms Reconstruction Task """
+    @property
+    def name(self):
+        return "reconstructlog"
+    @property
+    def title(self):
+        return "Logarithms Reconstruction"
+    @property
+    def programs(self):
+        return (cadoprograms.ReconstructLog,)
+    @property
+    def paramnames(self):
+        return super().paramnames + ("gorder", "smexp", "nmaps")
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+
+        if not "dlog" in self.state:
+            self.logger.info("Starting")
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            kerfilename = self.send_request(Request.GET_KERNEL_FILENAME)
+            idealfilename = self.send_request(Request.GET_IDEAL_FILENAME)
+            relsdelfilename = self.send_request(Request.GET_RELSDEL_FILENAME)
+            dlogfilename = self.workdir.make_filename("dlog")
+
+            nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
+            nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+            nrels = nfree+nunique
+            
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.SM.name)
+            p = cadoprograms.ReconstructLog(poly=polyfilename,
+                    purged=purgedfilename,
+                    renumber=renumberfilename,
+                    dlog=dlogfilename,
+                    ker=kerfilename,
+                    ideals=idealfilename,
+                    relsdel=relsdelfilename,
+                    nrels=nrels,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            if not dlogfilename.isfile():
+                raise Exception("Output file %s does not exist" % smfilename)
+            self.state["dlog"] = dlogfilename.get_wdir_relative()
+        self.logger.debug("Exit ReconstructLogTask.run(" + self.name + ")")
+        return True
+    
+    def get_dlog_filename(self):
+        return self.get_state_filename("dlog")
 
 
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
@@ -3439,6 +3512,7 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
+    GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
     GET_WU_RESULT = object()
 
@@ -3534,6 +3608,10 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                      db = db,
                                      parameters = self.parameters,
                                      path_prefix = linalgpath)
+            self.reconstructlog = ReconstructLogTask(mediator = self,
+                                     db = db,
+                                     parameters = self.parameters,
+                                     path_prefix = filterpath)
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator = self,
@@ -3559,7 +3637,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.tasks = (self.polysel, self.fb, # self.badideals,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
-                          self.sm, self.linalg)
+                          self.sm, self.linalg, self.reconstructlog)
         else:
             self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
@@ -3590,6 +3668,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
+            self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
@@ -3634,7 +3713,12 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
             return None
 
-        return self.sqrt.get_factors()
+        dlp = self.params.get("dlp")
+        if dlp:
+            ## TODO: what should we return???
+            return 1
+        else:
+            return self.sqrt.get_factors()
     
     def start_all_clients(self):
         url = self.servertask.get_url()
