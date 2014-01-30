@@ -713,7 +713,7 @@ class MergeDLP(Program):
                  mat: Parameter(is_input_file = True),
                  out: Parameter(is_output_file = True),
                  maxlevel: Parameter() = None,
-                 keep: Parameter() = None,
+                 nmaps: Parameter("keep") = None,
                  skip: Parameter() = None,
                  forbw: Parameter() = None,
                  ratio: Parameter() = None,
@@ -751,6 +751,20 @@ class ReplayDLP(Program):
                  out: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
+
+class MagmaNmbrthry(Program):
+    binary = "magma-nmbrthry-wrapper.sh"
+    name = binary
+    subdir = "scripts"
+    def __init__(self,
+                 poly: Parameter(),
+                 N: Parameter("p"),
+                 badidealinfo: Parameter("badinfofile"),
+                 badideals: Parameter("badfile"),
+                 gorder: Parameter("ell") = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 
 class MagmaLinalg(Program):
     binary = "magma-linalg-wrapper.sh"
