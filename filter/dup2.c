@@ -560,7 +560,8 @@ main (int argc, char *argv[])
     }
 
     allbad_info_t badinfo;
-    read_bad_ideals_info(badinfofile, badinfo);
+    if (is_for_dl)
+        read_bad_ideals_info(badinfofile, badinfo);
 
     set_antebuffer_path (argv0, path_antebuffer);
 
@@ -648,7 +649,8 @@ main (int argc, char *argv[])
           { .f = thread_dup2, .arg=0, .n=1, },
           { .f = NULL, },
       };
-      desc[0].arg = (void *) &badinfo[0];
+      if (is_for_dl)
+          desc[0].arg = (void *) &badinfo[0];
       fprintf (stderr, "Reading new files"
               " (using %d auxiliary threads for roots mod p):\n",
               desc[0].n);
@@ -719,7 +721,8 @@ main (int argc, char *argv[])
       }
   }
 
-  free(badinfo->badid_info);
+  if (is_for_dl)
+      free(badinfo->badid_info);
   free (H);
   free (sanity_a);
   free (sanity_b);
