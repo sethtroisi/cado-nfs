@@ -835,25 +835,15 @@ ell := StringToInteger(ell);
 
 if ell eq 0 then
     p := StringToInteger(mainp);
-    fff,gg,hh := Factorization(p-1 : ECMLimit:=10000, MPQSLimit:=0);
-    if assigned hh then
-        ell := hh[1];
-    else 
-        ell := fff[#fff][1];
-    end if;
+    fff := Factorization(p-1);
+    ell := fff[#fff][1];
 end if;
 
 lcm := 1;
-if IsPrime(ell) then
-    ff := Factorization(f, GF(ell));
-    for f in ff do
-        lcm := LCM(lcm, ell^Degree(f[1])-1);
-    end for;
-else
-    for i := 1 to Degree(f) do 
-        lcm := LCM(lcm, ell^i-1);
-    end for;
-end if;
+ff := Factorization(f, GF(ell));
+for f in ff do
+    lcm := LCM(lcm, ell^Degree(f[1])-1);
+end for;
 
 printf "ell %o\n", ell;
 printf "smexp %o\n", lcm;
