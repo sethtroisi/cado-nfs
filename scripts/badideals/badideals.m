@@ -1,7 +1,3 @@
-// Usage:
-//   magma -b "polyfile:=p59.polyselect.poly" < badideals.m
-//
-
 ZZ:=Integers();
 QQ:=Rationals();
 
@@ -17,7 +13,10 @@ for l in lines do
     f +:= c*x^e;
 end for;
 
-printf "# badideals for f=%o\n", f;
+SBAD := "";
+SBADINFO := "";
+
+SBAD := Sprintf("%o# badideals for f=%o\n", SBAD, f);
 
 /*
 // p180
@@ -689,8 +688,8 @@ for pf in FacBadPrimes do
             else
                 QQ := p;
             end if;
-            printf "%o,%o:1: %o\n", IntegerToString(p, 16),
-            IntegerToString(QQ, 16), #[x : x in vals | x ne 0];
+            SBAD := Sprintf("%o%o,%o:1: %o\n", SBAD, IntegerToString(p, 16),
+            IntegerToString(QQ, 16), #[x : x in vals | x ne 0]);
         end if;
         text:=Sprintf("### %o %o %o %o", p, Q, w, vals);
         // print [ val(ii, pi) : pi in fac ];
@@ -723,10 +722,10 @@ for pf in FacBadPrimes do
             f_inert:=prime_ideal_inertia_degree(G, fac[i][1]);
             assert vals[i]*f_inert eq w;
             Include(~found, matches[1]);
-            printf "%o ; easy.\n", text;
+            SBADINFO := Sprintf("%o%o ; easy.\n", SBADINFO, text);
             continue;
         end if;
-        print text;
+        SBADINFO := Sprintf("%o%o\n", SBADINFO, text);
         /* Now see how this root lifts */
         /* we'll be tredding over some variables which are used above, sorry
          */
@@ -778,19 +777,21 @@ for pf in FacBadPrimes do
                             assert #[a:a in above|i in a[4]] in {0,1,p};
                             // print [a:a in above|i in a[4]];
                             // print [a[3][i]:a in above | i in a[4]];
-                            printf "# %o mod %o^%o ; v_%o_%o=e-%o\n",
+                            SBADINFO := Sprintf("%o# %o mod %o^%o ; v_%o_%o=e-%o\n",
+                                SBADINFO,
                                 cQ, p, k-1,
-                                p, i, totval;
+                                p, i, totval);
                             str := Sprintf("%o -%o", str, totval);
                         else
-                            printf "# %o mod %o^%o ; v_%o_%o=%o\n",
+                            SBADINFO := Sprintf("%o# %o mod %o^%o ; v_%o_%o=%o\n",
+                                SBADINFO,
                                 cQ, p, k-1,
-                                p, i, base[i];
+                                p, i, base[i]);
                             str := Sprintf("%o %o", str, base[i]);
                         end if;
                     end for;
                     Append(~report, str);
-                    print "##";
+                    SBADINFO := Sprintf("%o##\n", SBADINFO);
                 else
                     /* we are going to recurse on a subset of lQs, which might
                      * be strict. If this is the case, then we must provide
@@ -807,13 +808,14 @@ for pf in FacBadPrimes do
                         end if;
                         str := Sprintf("%o %o %o", p, k, ccQ);
                         for i in matches do
-                            printf "# (%o : %o) mod %o^%o ; v_%o_%o=%o\n",
+                            SBADINFO := Sprintf("%o# (%o : %o) mod %o^%o ; v_%o_%o=%o\n",
+                                SBADINFO,
                                 uv[1], uv[2], p, k,
-                                p, i, base[i];
+                                p, i, base[i]);
                             str := Sprintf("%o %o", str, base[i]);
                         end for;
                         Append(~report, str);
-                        print "##";
+                        SBADINFO := Sprintf("%o##\n", SBADINFO);
                     end for;
                     next_status cat:= next_status_above_this;
                 end if;
@@ -821,52 +823,39 @@ for pf in FacBadPrimes do
             status:=next_status;
         end while;
         for l in report do
-            print l;
+            SBADINFO := Sprintf("%o%o\n",SBADINFO,l);
         end for;
     end for;
-    // print "Not found yet: ", {1..#fac} diff found;
 end for;
 
+fprintf badfile, SBAD;
+fprintf badinfofile, SBADINFO;
 
-/*
-for i := 1 to 10000 do
-repeat 
-    aa := Random(2^30);
-    bb := Random(2^30);
-until GCD(aa, bb) eq 1 and aa mod 2 eq 0;
-rel:=  bb*a - aa;
-J := [ K!x : x in Basis(JJ*ideal<O|rel>)];
+ell := StringToInteger(ell);
 
-Integers(32)!(aa/bb),
-[ valuation_of_ideal_at_prime_ideal(G, J, II[1], p, II[2]) : II in FacBadPrimes[1] ];
-end for;
+if ell eq 0 then
+    p := StringToInteger(mainp);
+    fff,gg,hh := Factorization(p-1 : ECMLimit:=10000, MPQSLimit:=0);
+    if assigned hh then
+        ell := hh[1];
+    else 
+        ell := fff[#fff][1];
+    end if;
+end if;
 
-*/
+lcm := 1;
+if IsPrime(ell) then
+    ff := Factorization(f, GF(ell));
+    for f in ff do
+        lcm := LCM(lcm, ell^Degree(f[1])-1);
+    end for;
+else
+    for i := 1 to Degree(f) do 
+        lcm := LCM(lcm, ell^i-1);
+    end for;
+end if;
 
+printf "ell %o\n", ell;
+printf "smexp %o\n", lcm;
 
-
-
-
-
-
-
-
-/*
-
-
-printf "%o ideals found above %o\n", #fac_p, p;
-for i in [1..#fac_p] do
-    I,e:=Explode(fac_p[i]);
-    status := IsPrime(ideal<OK|I>);
-    printf "Primality check for ideal %o, ramification index %o: %o\n", i, e, status;
-end for;
-
-I:=G;
-for Je in fac_p do
-    J,e:=Explode(Je);
-    for i in [1..e] do I:=ideal_multiply(G, I, J); end for;
-end for;
-
-print "Check for pOK=prod(I^e)", t where t is is_basis_of_same_z_module(I, [p*x:x in G]);
-
-*/
+exit;
