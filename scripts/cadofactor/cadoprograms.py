@@ -539,6 +539,9 @@ class Polyselect2l(Program):
                  maxtime : Parameter() = None,
                  out : Parameter() = None,
                  printdelay : Parameter("s") = None,
+                 area : Parameter() = None,
+                 Bf : Parameter() = None,
+                 Bg : Parameter() = None,
                  keep: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)

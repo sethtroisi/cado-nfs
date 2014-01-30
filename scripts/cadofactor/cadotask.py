@@ -1195,7 +1195,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("adrange", "admin", "admax", "import")
+            ("adrange", "admin", "admax", "import", "I", "alim", "rlim")
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
@@ -1299,6 +1299,14 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.did_import = False
+        # FIXME: in the parameter files so far, "I" is specified under 
+        # tasks.sieving, so polysel does not see the value. We use a default
+        # of 13 here to avoid a key error exception. Maybe we should move
+        # the "I" parameter to tasks.
+        self.params.setdefault("I", 13)
+        self.progparams[0].setdefault("area", 2**self.params["I"] * self.params["alim"])
+        self.progparams[0].setdefault("Bf", self.params["alim"])
+        self.progparams[0].setdefault("Bg", self.params["rlim"])
     
     def run(self):
         self.logger.info("Starting")

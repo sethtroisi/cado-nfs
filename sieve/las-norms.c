@@ -163,6 +163,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
   int int_i;
   uint8_t oy, y;
 
+  ASSERT_ALWAYS(isfinite(invu1));
   j1 = LOG_BUCKET_REGION - si->conf->logI;
   j = j << j1;
   j1 = (1U << j1) + j;
@@ -2685,53 +2686,50 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
   return (norm2 > norm1) ? norm2 : norm1;
 }
 
-/* returns the maximal norm of log2|F'(i,j)| for -I/2 <= i <= I/2, 0 <= j <= J.
-   Since F is homogeneous, we know M = max |F'(i,j)| = |f'(i/j) * j^d| is
-   attained on the border of the rectangle, i.e.:
-   (a) either on F'(I/2,j) for -J <= j <= J (right-hand-side border, and the
-       mirrored image of the left-hand-side border);
-       with F'(i,j) = rev(F)(j,i), we want the maximum of
-       rev(F')(j, I/2) = rev(f')(j/(I/2)) * (I/2)^d for -J <= j <= J;
-       assuming I = 2J, this is rev(f')(x) * J^d for -1 <= x <= 1.
-   (b) either on F'(i,J) for -I/2 <= i <= I/2 (top border)
-       = f(i/J) * J^d; assuming I = 2J, f(x) * J^d for -1 <= x <= 1.
-   (d) or on F(i,0) for -I <= i <= I (lower border), but this maximum is f[d]*I^d,
-       and is attained in (a).
+/* returns the maximal norm of |F(x,y)| for -X <= x <= X, 0 <= y <= Y,
+   where F(x,y) is a homogeneous polynomial of degree d.
+   Let F(x,y) = f(x/y)*y^d, and F(x,y) = rev(F)(y,x).
+   Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
+   of the rectangle, i.e.:
+   (a) either on F(X,y) for -Y <= y <= Y (right-hand-side border, and the
+       mirrored image of the left-hand-side border); We want the maximum of
+       rev(F)(y,X) = rev(f)(y/X) * X^d for -Y <= j <= Y;
+       this is rev(f)(t) * X^d for -Y/X <= t <= Y/X.
+   (b) either on F(x,Y) for -X <= x <= X (top border)
+       = f(x/Y) * Y^d; this is f(t) * Y^d for -X/Y <= t <= X/J.
+   (d) or on F(x,0) for -X <= x <= X (lower border, on the abscissa), but this
+       maximum is f[d]*X^d, and is attained in (a).
 */
 static double
-get_maxnorm_alg (const double *coeff, const unsigned int d, sieve_info_srcptr si)
+get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
+  const unsigned int d = src_poly->deg;
   const int debug = 0;
-  unsigned int k;
   double norm, max_norm;
 
+  /* Make copy of polynomial as we need to revert the coefficients */
   double_poly_t poly;
   double_poly_init (poly, d);
-  for (k = 0; k <= d; k++)
-    poly->coeff[k] = coeff[k];
+  double_poly_set (poly, src_poly);
 
   if (debug)
     double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
 
-  /* (b1) determine the maximum of |F(x)| for -s <= x <= s */
-  max_norm = get_maxnorm_aux_pm (poly, 1.);
+  /* (b) determine the maximum of |f(x)| * Y^d for -X/Y <= x <= X/Y */
+  max_norm = get_maxnorm_aux_pm (poly, X/Y) * pow(Y, (double)d);
 
   /* (a) determine the maximum of |g(y)| for -1 <= y <= 1, with g(y) = F(s,y) */
   double_poly_revert(poly);
-  norm = get_maxnorm_aux_pm (poly, 1.);
+  norm = get_maxnorm_aux_pm (poly, Y/X) * pow(X, (double)d);
   if (norm > max_norm)
     max_norm = norm;
-
-  /* Both cases (a) and (b) want to multiply by J^d = (I/2)^d. Since J may
-     not have been initialised yet, we use I. */
-  max_norm *= pow((double)(si->I / 2), (double)d);
 
   double_poly_clear(poly);
 
   if (debug)
     fprintf(stdout, "# Max norm is %f\n", max_norm);
 
-  return log2(max_norm);
+  return max_norm;
 }
 
 /*
@@ -2762,28 +2760,67 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 }
 
 /* return largest possible J by simply bounding the Fij and Gij polynomials
-   using the absolute value of their coefficients */
+
+  The image in the a,b-plane of the sieve region might be slanted at an angle
+  against the abscissa, thus even though it has the correct skewness, it
+  might include larger a,b-coordinates than a non-slanted image would.
+
+  We compute the maximum norm that would occur if we had a perfect lattice
+  basis in the sense that its image forms a rectangle A/2 <= a < A/2, 
+  0 <= b < B, with A/2/B = skew, and A*B = I*J*q (assuming J=I/2 here).
+  Thus we have B = A/2/skew, A*A/2/skew = I*I/2*q, A = I*sqrt(q*skew).
+  The optimal maximum norm is then the maximum of |F(a,b)| in this rectangle,
+  divided by q on the special-q side.
+
+  Then we reduce J so that the maximum norm in the image of the actual sieve
+  regionis no larger than this optimal maximum, times some constant fudge
+  factor.
+*/
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  double Iover2 = (double) (si->I >> 1);
-  double Jmax = Iover2;
+  const int verbose = 0;
+  const double fudge_factor = 16.; /* How much bigger a norm than optimal
+                                      we're willing to tolerate */
+  const double I = (double) (si->I);
+  const double q = mpz_get_d(si->doing->p);
+  const double skew = si->cpoly->skew;
+  const double A = I*sqrt(q*skew);
+  const double B = A/2./skew;
+  double Jmax = I/2.;
 
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
       mpz_poly_ptr ps = si->cpoly->pols[side];
-      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.;
-      double_poly_t F;
 
-      double_poly_init (F, ps->deg);
-      for (int k = 0; k <= ps->deg; k++)
-        {
-          /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
-          F->coeff[ps->deg - k] = fabs (s->fijd[k]) * powIover2;
-          powIover2 *= Iover2;
-        }
-      v = double_poly_eval (F, Jmax);
+      /* Compute the best possible maximum norm, i.e., assuming a nice
+         rectangular sieve region in the a,b-plane */
+      double_poly_t dpoly;
+      double_poly_init (dpoly, ps->deg);
+      double_poly_set_mpz_poly (dpoly, ps);
+      double maxnorm = get_maxnorm_alg (dpoly, A/2., B);
+      double_poly_clear (dpoly);
+      if (side == si->doing->side)
+        maxnorm /= q;
+      if (verbose) {
+        printf ("Best possible maxnorm for side %d: %g\n", side, maxnorm);
+      }
+
+      maxnorm *= fudge_factor;
+      if (verbose) {
+        printf ("Threshold for acceptable norm for side %d: %g\n", side, maxnorm);
+      }
+
+      double_poly_t F;
+      F->deg = ps->deg;
+      F->coeff = s->fijd;
+      
+      double v = get_maxnorm_alg (F, I, Jmax);
+      if (verbose) {
+        printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)Jmax, v);
+      }
+      
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
           double a, b, c;
@@ -2792,17 +2829,25 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = double_poly_eval (F, c);
+              v = get_maxnorm_alg (F, I, c);
+              if (verbose) {
+                printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)c, v);
+              }
               if (v < maxnorm)
                 a = c;
               else
                 b = c;
             }
           Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
+          if (verbose) {
+            printf ("Setting Jmax=%d\n", (int)Jmax);
+          }
         }
-      double_poly_clear (F);
     }
 
+   if (verbose) {
+     printf ("Final maxnorm J=%d\n", (int)Jmax);
+   }
   return (unsigned int) Jmax;
 }
 
@@ -2828,6 +2873,7 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   double step, begin;
   double r, maxlog2;
+  double_poly_t poly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
@@ -2854,7 +2900,9 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   /* Compute the maximum norm of the rational polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
-  rat->logmax = get_maxnorm_alg (si->sides[RATIONAL_SIDE]->fijd, si->cpoly->pols[RATIONAL_SIDE]->deg, si); /* log2(max norm) */
+  poly->deg = si->cpoly->pols[RATIONAL_SIDE]->deg;
+  poly->coeff = si->sides[RATIONAL_SIDE]->fijd;
+  rat->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
   /* we increase artificially 'logmax', to allow larger values of J */
   rat->logmax += 1.;
@@ -2887,7 +2935,9 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   /* Compute the maximum norm of the algebraic polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
-  alg->logmax = get_maxnorm_alg (si->sides[ALGEBRAIC_SIDE]->fijd, si->cpoly->pols[ALGEBRAIC_SIDE]->deg, si); /* log2(max norm) */
+  poly->deg = si->cpoly->pols[ALGEBRAIC_SIDE]->deg;
+  poly->coeff = si->sides[ALGEBRAIC_SIDE]->fijd;
+  alg->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */

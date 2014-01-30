@@ -130,7 +130,7 @@ int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
 
 void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
 
-void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_t f, const int64_t i, const uint64_t j);
+void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 
 #ifdef __cplusplus
 }

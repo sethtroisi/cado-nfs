@@ -69,3 +69,12 @@ include(CMakeLists-nodist.txt OPTIONAL)
 
 install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION bin/utils)
 install(TARGETS cut_n_roots roots gmp_nextprime antebuffer RUNTIME DESTINATION bin/utils)
+
+add_test( "double_poly" test_double_poly )
+add_test( "mod_ul" test_mod_ul )
+add_test( "modredc_ul" test_modredc_ul )
+add_test( "modredc_15ul" test_modredc_15ul )
+add_test( "modredc_2ul2" test_modredc_2ul2 )
+# add_test( "rootfinder" test-rootfinder )
+add_test( "roots_mod" test_roots_mod )
+add_test( "omega" test_omega )

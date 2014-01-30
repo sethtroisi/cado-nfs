@@ -1752,7 +1752,7 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
 }
 
 /* v <- |f(i,j)|, where f is homogeneous of degree d */
-void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_t f, const int64_t i, const uint64_t j)
+void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j)
 {
   unsigned int k;
   mpz_t jpow;

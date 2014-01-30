@@ -34,6 +34,10 @@ execute_process(COMMAND scripts/version.sh
 message(STATUS "Configuring CADO revision ${CADO_REV}")
 
 #####################################################################
+# Allow building unit test programs with "make test"
+enable_testing()
+
+#####################################################################
 # Get some overrides from the environment.
 
 macro(get_override extname intname)

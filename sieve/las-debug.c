@@ -96,8 +96,8 @@ void trace_per_sq_init(sieve_info_srcptr si MAYBE_UNUSED)
 
     for(int side = 0 ; side < 2 ; side++) {
         mpz_init(traced_norms[side]);
-        mp_poly_homogeneous_eval_siui(traced_norms[side], si->sides[side]->fij,
-                si->cpoly->pols[side]->degree, trace_ij.i, trace_ij.j);
+        mpz_poly_homogeneous_eval_siui(traced_norms[side], si->sides[side]->fij,
+                trace_ij.i, trace_ij.j);
     }
 }
 
