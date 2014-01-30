@@ -2997,6 +2997,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             }
 
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
+#ifdef TRACE_K
+            if (trace_on_spot_ab(a, b) && pass == 0)
+              gmp_fprintf (stderr, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n", 
+                           a, b, norm[0], norm[1]);
+#endif
 
             if (pass <= 0) continue; /* a factor was > 2^lpb, or some
                                         factorization was incomplete */
@@ -3344,10 +3349,6 @@ factor_both_leftover_norms(mpz_t *norm, const mpz_t BLPrat, mpz_array_t **f,
                                      si, side);
         if (pass <= 0)
           cof_fails[side][nbits[side]] ++;
-#ifdef TRACE_K
-        if (trace_on_spot_ab(a, b) && pass == 0)
-          gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%" PRId64 ",%" PRIu64 "), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
-#endif
       }
     return pass;
 

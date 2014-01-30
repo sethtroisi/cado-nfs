@@ -5,6 +5,7 @@
 #include "las-unsieve.h"
 #include "ularith.h"
 #include "las-norms.h"
+#include "las-debug.h"
 #include "gcd.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
@@ -394,7 +395,7 @@ search_single_survivors(unsigned char * const restrict SS[2],
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
               fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                      trace_Nx.x, trace_Nx.N, i, j);
+                      x, N, i, j);
           }
 #endif
           SS[0][x] = 255;
@@ -404,7 +405,7 @@ search_single_survivors(unsigned char * const restrict SS[2],
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
               fprintf(stderr, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
-                      trace_Nx.x, trace_Nx.N);
+                      x, N);
           }
 #endif
       }
