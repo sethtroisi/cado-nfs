@@ -2536,7 +2536,7 @@ class MergeDLPTask(Task):
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
-            mergedfile = self.workdir.make_filename("small.bin")
+            mergedfile = self.workdir.make_filename("small.txt")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             idealfile = self.workdir.make_filename("ideal")
             p = cadoprograms.ReplayDLP(purged=purged_filename,
@@ -2663,6 +2663,55 @@ class MergeTask(Task):
     
     def get_dense_filename(self):
         return self.get_state_filename("densefile")
+
+class LinAlgDLPTask(Task):
+    """ Runs the linear algebra step for dlp"""
+    @property
+    def name(self):
+        return "magmalinalg"
+    @property
+    def title(self):
+        return "Linear Algebra for DLP"
+    @property
+    def programs(self):
+        return (cadoprograms.MagmaLinalg,)
+    @property
+    def paramnames(self):
+        return super().paramnames + ("gorder", "nmaps")
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        self.logger.info("Starting")
+        
+        kerfile = self.workdir.make_filename("ker")
+        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+        smfile = self.send_request(Request.GET_SM_FILENAME)
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
+        p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
+                               ker=kerfile,
+                               sm=smfile,
+                               stdout=str(stdoutpath),
+                               stderr=str(stderrpath),
+                               **self.progparams[0])
+        message = self.submit_command(p, "", log_errors=True)
+        if message.get_exitcode(0) != 0:
+            raise Exception("Program failed")
+        
+        if not kerfile.isfile():
+            raise Exception("Output file %s does not exist" % kerfile)
+        update = {"kerfile": kerfile.get_wdir_relative()}
+        self.state.update(update)
+            
+        self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
+        return True
+    
+    def get_kernel_filename(self):
+        return self.get_state_filename("kerfile")
 
 
 class LinAlgTask(Task, HasStatistics):
@@ -3390,6 +3439,7 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
+    GET_SM_FILENAME = object()
     GET_WU_RESULT = object()
 
 class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
@@ -3470,27 +3520,30 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                db = db,
                                parameters = self.parameters,
                                path_prefix = filterpath)
-        self.linalg = LinAlgTask(mediator = self,
-                                 db = db,
-                                 parameters = self.parameters,
-                                 path_prefix = linalgpath)
         if dlp:
             ## Tasks specific to dlp
             self.sm = SMTask(mediator = self,
                              db = db,
                              parameters = self.parameters,
                              path_prefix = filterpath)
-            ## more to be added...
             self.merge = MergeDLPTask(mediator = self,
                                    db = db,
                                    parameters = self.parameters,
                                    path_prefix = filterpath)
+            self.linalg = LinAlgDLPTask(mediator = self,
+                                     db = db,
+                                     parameters = self.parameters,
+                                     path_prefix = linalgpath)
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator = self,
                                    db = db,
                                    parameters = self.parameters,
                                    path_prefix = filterpath)
+            self.linalg = LinAlgTask(mediator = self,
+                                     db = db,
+                                     parameters = self.parameters,
+                                     path_prefix = linalgpath)
             self.characters = CharactersTask(mediator = self,
                                              db = db,
                                              parameters = self.parameters,
@@ -3530,18 +3583,17 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
-            Request.GET_DEPENDENCY_FILENAME: \
-                self.linalg.get_dependency_filename,
-            Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
         ## add requests specific to dlp or factoring
         if dlp:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
-#            self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
+            self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
         else:
-            self.request_map[Request.GET_KERNEL_FILENAME] = \
-                self.characters.get_kernel_filename
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
+            self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
+            self.request_map[Request.GET_LINALG_PREFIX] = self.linalg.get_prefix
 
     def run(self):
         had_interrupt = False

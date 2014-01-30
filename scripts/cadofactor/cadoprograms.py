@@ -752,6 +752,18 @@ class ReplayDLP(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class MagmaLinalg(Program):
+    binary = "magma-linalg-wrapper.sh"
+    name = binary
+    subdir = "scripts"
+    def __init__(self,
+                 gorder: Parameter("ell"),
+                 nmaps: Parameter(),
+                 sparsemat: Parameter(),
+                 sm: Parameter(),
+                 ker: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
 
 class BWC(Program):
     binary = "bwc.pl"
