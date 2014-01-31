@@ -55,7 +55,7 @@ tasks.sieve.mfba = 96
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.sieve.I = 15
+tasks.I = 15
 # Wagstaff did use I=14, I=15 should be better
 tasks.sieve.qmin = 80000000
 # Sam Wagstaff did sieve special-q's < 1660M
