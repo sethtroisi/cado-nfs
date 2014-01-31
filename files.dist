@@ -705,6 +705,7 @@ utils/fix-endianness.h
 utils/double_poly.c
 utils/double_poly.h
 utils/test_double_poly.c
+utils/test_gmp_aux.c
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c

@@ -103,7 +103,7 @@ void rootsieve_method (mpz_t *f, int d, mpz_t b, mpz_t m, unsigned long alim, in
     n=0; // We start from the zero-th lattice.
 
     for (p = PLB; p <= alim; p += 1 + (p & 1))
-      if (isprime (p)) {
+      if (ulong_isprime (p)) {
 	//fprintf(stderr,"p=%lu lattices[n].p=%lu \n",p,lattices[n].p);
 	offset = (log(p))/((double)(p-1));
 	for(k = K0; k <= K1; k++)

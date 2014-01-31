@@ -1553,10 +1553,10 @@ get_alpha (mpz_poly_ptr f, unsigned long B)
 
   /* FIXME: generate all primes up to B and pass them to get_alpha */
   for (p = 3; p <= B; p += 2)
-    if (isprime (p))
+    if (ulong_isprime (p))
       {
-  e = special_valuation (f, p, disc);
-  alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
+        e = special_valuation (f, p, disc);
+        alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
       }
   mpz_clear (disc);
   return alpha;
@@ -1633,7 +1633,7 @@ get_biased_alpha_projective (mpz_poly_ptr f, unsigned long B)
 
    /* FIXME: generate all primes up to B and pass them to get_alpha */
    for (p = 3; p <= B; p += 2)
-      if (isprime (p)) {
+      if (ulong_isprime (p)) {
          e = special_valuation(f, p, disc) - special_valuation_affine (f, p, disc);
          alpha += (- e) * log ((double) p);
       }
@@ -1665,7 +1665,7 @@ get_biased_alpha_affine (mpz_poly_ptr f, unsigned long B)
 
    /* FIXME: generate all primes up to B and pass them to get_alpha */
    for (p = 3; p <= B; p += 2)
-      if (isprime (p)) {
+      if (ulong_isprime (p)) {
          e = special_valuation_affine (f, p, disc);
          alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
          //printf ("\np: %u, val: %f, alpha: %f\n", p, e, alpha);
@@ -2098,7 +2098,7 @@ rotate (mpz_poly_ptr f, unsigned long alim, mpz_t m, mpz_t b,
   A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
 
   for (p = 2; p <= alim; p += 1 + (p & 1))
-    if (isprime (p))
+    if (ulong_isprime (p))
       {
         int i;
         /* We skip primes which divide all coefficients of f, since then
