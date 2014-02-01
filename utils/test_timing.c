@@ -174,7 +174,7 @@ int test_timingstats_dict()
 #ifdef HAVE_GETRUSAGE
     struct rusage res[1];
     getrusage(RUSAGE_SELF, res);
-    timingstats_dict_add(td, "Hello", self);
+    timingstats_dict_add(td, "Hello", res);
 #endif
     timingstats_dict_add_myprocess(td, "main");
     pthread_t sub[NTHREADS_TEST];
