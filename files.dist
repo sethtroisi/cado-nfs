@@ -770,6 +770,7 @@ utils/test_mod_ul.c
 utils/test_modredc_15ul.c
 utils/test_modredc_2ul2.c
 utils/test_modredc_ul.c
+utils/test_timing.c
 utils/testbase-rootfinder.quick
 utils/testmpz-rootfinder.quick
 utils/timing.cpp
