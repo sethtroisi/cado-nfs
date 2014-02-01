@@ -11,20 +11,20 @@ name = p59
 ## The "dlp" flag tells the main script that we want to do dlog
 dlp = true
 ## N is the prime modulo which we want dlogs.
-N = 53236943330228380237618624445646085674945074907141464418703
+#  N = 53236943330228380237618624445646085674945074907141464418703
 
 ## The number of SM could in principle be tuned automatically
 ## For the moment, it is mandatory to set it equal to the poly degree.
 tasks.nmaps = 4 ## number of SM FIXME: this should be chosen automatically
 
-## Standard stuff; edit according to your config.
-slaves.nrclients=2
-tasks.threads = 2
-tasks.execpath = ...
-tasks.workdir =  ...
-slaves.hostnames=localhost
-slaves.scriptpath=...
-slaves.basepath=...
+## Standard stuff; uncomment and edit according to your config.
+#slaves.nrclients=2
+#tasks.threads = 2
+#tasks.execpath = ...
+#tasks.workdir =  ...
+#slaves.hostnames=localhost
+#slaves.scriptpath=...
+#slaves.basepath=...
 
 ## From here, the parameter are similar to factorization.
 
