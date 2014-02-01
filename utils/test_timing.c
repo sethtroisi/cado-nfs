@@ -1,3 +1,5 @@
+#include "cado.h"
+
 #include <stdint.h>
 #include <inttypes.h>
 #include <pthread.h>
