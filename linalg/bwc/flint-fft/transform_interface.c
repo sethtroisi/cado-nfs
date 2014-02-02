@@ -248,7 +248,6 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
          *
          * We restrict here to depth=2, n'=4, w'=512, i.e. working modulo
          * 2^2048+1. We can afford chunks of quite a few bits here:
-         * 102^2048+1. We can afford chunks of quite a few bits here:
          * 1022. A transform of length 4n' means a product of 16000 bits,
          * this fits.
          *
@@ -354,9 +353,9 @@ void fft_get_transform_info_mp(struct fft_transform_info * fti, mp_bitcnt_t bits
  */
 void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t n1, mp_size_t n2, unsigned int nacc)
 {
+    /* The maximum number of summands is MIN(n1, n2) */
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * FLINT_MIN(n1, n2));
     fft_get_transform_info(fti, n1 * cbits, n2 * cbits, nacc);
-    /* The maximum number of summands is MIN(n1, n2) */
     fti->ks_coeff_bits = cbits;
 }
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
@@ -433,7 +432,7 @@ void * fft_transform_alloc(struct fft_transform_info * fti)
 /* {{{ kronecker-schönhage */
 void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t nx, struct fft_transform_info * fti, mpz_srcptr p)
 {
-    /* XXX We are implicitly asserting that the transform are here is
+    /* XXX We are implicitly asserting that the transform here is
      * straight out of fft_transform_prepare(). If it is not, then we
      * will have trouble. Should we enforce this as an API requirement,
      * or sanitize the transform area by ourselves ? If the latter, is
@@ -995,6 +994,54 @@ void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct
 {
     fft_do_ift_backend(y, temp, fti);
     fft_combine_fppol(x, nx, y, fti, p);
+}
+
+void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift)
+{
+    fft_do_ift_backend(y, temp, fti);
+    mp_size_t nbigtemp = fft_get_mulmod_output_minlimbs(fti);
+    mp_limb_t * bigtemp = malloc(nbigtemp * sizeof(mp_limb_t));
+    mp_size_t rsize0 = fti_rsize0(fti);
+    fft_combine_bits(bigtemp, y, fti->trunc0, fti->bits, rsize0, nbigtemp);
+
+    mp_size_t np = mpz_size(p);
+    assert(nx % np == 0);
+
+    mp_size_t ksspan = (fti->ks_coeff_bits / FLINT_BITS + 2);
+    mp_limb_t * smalltemp = malloc((2*ksspan+1) * sizeof(mp_limb_t));
+    mp_limb_t topmask = (1UL << (fti->ks_coeff_bits % FLINT_BITS)) - 1UL;
+
+    mpn_zero(x, nx);
+
+    for(mp_size_t j = 0 ; j * np < nx ; j++) {
+        mp_bitcnt_t bit0 = (j+shift) * fti->ks_coeff_bits;
+        mp_bitcnt_t bit1 = (j+shift+1) * fti->ks_coeff_bits;
+        assert(j * np < nx);
+        assert((j+1) * np <= nx);
+
+        /* TODO: rather read these from ptrs directly */
+        /* How much words does [bit0..bit1[ span ? */
+        mp_size_t w0 = bit0 / FLINT_BITS;
+        mp_size_t w1 = (bit1 + FLINT_BITS - 1) / FLINT_BITS;
+
+        assert(w1 - w0 <= ksspan);
+
+        mp_size_t nwritten = (fti->ks_coeff_bits + FLINT_BITS - 1) / FLINT_BITS;
+        assert(nwritten == w1 - w0 || nwritten+1 == w1-w0);
+        if (bit0 % FLINT_BITS) {
+            mpn_rshift(smalltemp, bigtemp + w0, w1 - w0, bit0 % FLINT_BITS);
+        } else {
+            mpn_copyi(smalltemp, bigtemp + w0, w1 - w0);
+        }
+        if (topmask) {
+            smalltemp[nwritten-1] &= topmask;
+        }
+        /* TODO: Barrett ! */
+        mpn_tdiv_qr(smalltemp + ksspan, x + j * np, 0, smalltemp, nwritten, p->_mp_d, mpz_size(p));
+    }
+
+    free(smalltemp);
+    free(bigtemp);
 }
 
 /* }}} */

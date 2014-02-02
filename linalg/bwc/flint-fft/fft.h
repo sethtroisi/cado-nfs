@@ -386,6 +386,7 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc);
 void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
 void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
+void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift);
 
 /* indicates whether the integer returned is actually reduced modulo some
  * B^n-a, with a=\pm1. Returns n, and sets a. If the result is known to
