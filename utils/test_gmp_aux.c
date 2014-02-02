@@ -243,7 +243,7 @@ test_ulong_nextprime ()
   unsigned long q = lrand48 (), r, s;
   int i;
 
-  for (i = 0; i < 1000000 && q < 300000000; i++)
+  for (i = 0; i < 100000 && q < 300000000; i++)
     {
       for (s = q + 1; s != 0 && ulong_isprime (s) == 0; s++);
       r = ulong_nextprime (q);

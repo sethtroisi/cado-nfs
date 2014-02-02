@@ -114,9 +114,28 @@ test_double_poly_compute_roots(const int verbose)
   
 }
 
+void
+test_double_poly_set (void)
+{
+  double_poly_t s, r;
+
+  double_poly_init (s, 2);
+  double_poly_init (r, 3);
+  s->coeff[0] = -1.0;
+  s->coeff[1] = 17.0;
+  s->coeff[2] = 42.0;
+  double_poly_set (r, s);
+  assert (r->deg == 2);
+  assert (r->coeff[0] == -1.0);
+  assert (r->coeff[1] == 17.0);
+  assert (r->coeff[2] == 42.0);
+  double_poly_clear (s);
+  double_poly_clear (r);
+}
 
 int main()
 {
   test_double_poly_compute_roots(0);
+  test_double_poly_set ();
   exit(EXIT_SUCCESS);
 }
