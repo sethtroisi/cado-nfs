@@ -177,11 +177,11 @@ class Parameters(object):
         path is specified as a string with path segments separated '.'
         
         >>> d = {'a':1,'b':2,'c':3,'foo':{'a':3},'bar':{'a':4,'baz':{'a':5}}}
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo')
-        {'a': 3, 'b': 2}
+        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': 3, 'b': 2}
+        True
         
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz')
-        {'a': 5, 'b': 2}
+        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': 5, 'b': 2}
+        True
         '''
         # path can be an array of partial paths, i.e., each entry can contain
         # one or more path segments separated by '.'. First join

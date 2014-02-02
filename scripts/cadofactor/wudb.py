@@ -65,8 +65,9 @@ def join3(l, pre=None, post=None, sep=", "):
 def dict_join3(d, sep=None, op=None, pre=None, post=None):
     """ 
     If any parameter is None, it is interpreted as the empty string
-    >>> dict_join3 ( {"a": "1", "b": "2"}, sep=",", op="=", pre="-", post="+")
-    '-a=1+,-b=2+'
+    >>> t = dict_join3 ( {"a": "1", "b": "2"}, sep=",", op="=", pre="-", post="+")
+    >>> t == '-a=1+,-b=2+' or t == '-b=2+,-a=1+'
+    True
     """
     if pre is None:
         pre = ""
