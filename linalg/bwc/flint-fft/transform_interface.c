@@ -91,9 +91,51 @@ static inline mp_size_t fti_rsize0(struct fft_transform_info * fti)
  * We are basing our estimates on the same logic as above. As far as
  * tuning is concerned, this is probably not optimal.
  *
- * see further down concerning mp_flag
  */
-static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_size_t mp_flag)
+
+/* j1 = ceiling(x1/b)
+ * j2 = ceiling(x2/b)
+ *
+ * Lemma: x1+x2 <= 4*n*b implies j1+j2-1<=4*n
+ *
+ * Proof:
+ *     bj1+bj2-e1-e2 <= 4*n*b
+ *     j1+j2-(e1+e2)/b <= 4n
+ *     Let now Z=j1+j2-(e1+e2+1)/b.
+ *     We have: Z < j1+j2-(e1+e2)/b <= 4n
+ *            e1+e2+1 <= 2*b-1, whence 0 < (e1+e2+1)/b < 2
+ *     Thus j1+j2-1 <= Ceiling(Z) <= j1 + j2, and Ceiling(Z) <= 4*n.
+ *
+ * Conclusion: checking minwrap as in 4*n*bits >= minwrap is actually
+ * more restrictive than just checking 4*n >= j1+j2-1 
+ *
+ * (example b=30 x1=150 x2=95 j1=5 j2=4 j1+j2-1=8 ; 4*n=8. This wraps at
+ * 240 bits, but the degree 7 coefficient of the polynomials contains all
+ * the needed bits. Nothing will appear in the coefficient of degee 8 in
+ * the polynomial product.
+ *
+ */
+
+/* returns the index of the first wrapped bit when multiplying P1 * P2 in
+ * R[X] modulo X^(4*n)\pm 1, with the integer evaluation of P1 at 2^bits
+ * is the integer a1, and P1 has j1 coefficients.
+ */
+static unsigned long firstwrap(mp_size_t j1, mp_size_t j2, mp_bitcnt_t bits, mp_size_t n)
+{
+    if (j1 + j2 - 1 <= 4*n) {
+        /* Then no single coefficient wraps. We're happy */
+        return ULONG_MAX;
+    } else {
+        /* The coefficient at degree 4*n will be the first to wrap, but
+         * bits from the previous coefficient will also have to be
+         * added/subtracted in order to compute exactly the modular
+         * result.
+         */
+        return 4*n*bits;
+    }
+}
+
+void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_bitcnt_t minwrap)
 {
     mp_size_t off, depth = 6;
     mp_size_t w = 1;
@@ -107,10 +149,14 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
     fti->bits1 = bits1;
     fti->bits2 = bits2;
     fti->nacc = nacc;
+    fti->minwrap = minwrap;
 
-    assert(j1 + j2 - !mp_flag > 2 * n);
+    if (minwrap == 0)
+        minwrap = bits1 + bits2;
 
-    while (j1 + j2 - !mp_flag > 4 * n) {	/* find initial n, w */
+    assert(j1 + j2 - 1 > 2 * n);
+
+    while (firstwrap(j1, j2, bits, n) < (unsigned long) minwrap) {
 	if (w == 1)
 	    w = 2;
 	else {
@@ -119,7 +165,20 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
 	    n *= 2;
 	}
 
-	bits = (n * w - (depth + 1) - log_nacc) / 2;
+        /* Take [[bits]] as small as we can, subject to the constraint
+         * that coefficients may be multiplied in R=Z/2^(nw)+1 with no
+         * wraparound.
+         *
+         * Based on this, we cannot set [[bits]] to a higher value.
+         *
+         * If we elect to set [[bits]] to a value which is smaller than
+         * the upper bound we computed, then this would
+         * increase the degrees j1 and j2 somewhat. A second effect
+         * is that 4*n*bits is even smaller. As a consequence, we always
+         * set [[bits]] to the upper bound.
+         */
+        log_nacc = FLINT_CLOG2(nacc*iceildiv(4*n, j1+j2-1));
+        bits = (n * w - (depth + 1) - log_nacc) / 2;
 
 #if 0
         /* XXX Hack for debugging. Make sure that bits is a multiple of
@@ -132,9 +191,9 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
 	j2 = iceildiv(bits2, bits);
     }
 
-    assert(j1 + j2 - !mp_flag <= 4 * n);
     assert(j1 * bits >= bits1);
     assert(j2 * bits >= bits2);
+    assert(firstwrap(j1, j2, bits, n) >= (unsigned long) minwrap);
     assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
     assert(w==1 || w==2);
 
@@ -214,12 +273,12 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
 #endif
 		j1 = iceildiv(bits1, bits);
 		j2 = iceildiv(bits2, bits);
-	    } while (j1 + j2 - !mp_flag <= 4 * n && w > wadj);
+	    } while (firstwrap(j1, j2, bits, n) >= minwrap && w > wadj);
 	    w += wadj;
 	}
         fti->alg = 0;
     } else {
-	if (j1 + j2 - !mp_flag <= 3 * n) {
+	if (j1 + j2 - 1 <= 3 * n) {
             /* make the transform length twice smaller, with 2^wn only
              * moderately larger, as in this case we can afford it */
 	    depth--;
@@ -230,6 +289,7 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
         fti->alg = 1;
     }
 
+    log_nacc = FLINT_CLOG2(nacc*iceildiv(4*n, j1+j2-1));
     bits = (n * w - (depth + 1) - log_nacc) / 2;
 #if 0
     /* XXX Hack for debugging. Make sure that bits is a multiple of
@@ -239,19 +299,26 @@ static void fft_get_transform_info_generic(struct fft_transform_info * fti, mp_b
 #endif
     j1 = iceildiv(bits1, bits);
     j2 = iceildiv(bits2, bits);
+    assert(firstwrap(j1, j2, bits, n) >= (unsigned long) minwrap);
+    assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
     fti->w = w;
     fti->depth = depth;
     fti->bits = bits;
-    fti->trunc0 = j1 + j2 - !mp_flag;
+    if (j1 + j2 - 1 <= 4 * n) {
+        fti->trunc0 = j1 + j2 - 1;
+    } else {
+        fti->trunc0 = 4 * n;
+    }
 
     fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
 }
 
 void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc)
 {
-    fft_get_transform_info_generic(fti, bits1, bits2, nacc, 0);
+    fft_get_transform_info_mulmod(fti, bits1, bits2, nacc, 0);
 }
 
+#if 0
 /* This is almost the same as
  *
  *      fft_get_transform_info(fti, bitsmin, bitsmax-bitsmin, nacc)
@@ -278,6 +345,7 @@ void fft_get_transform_info_mp(struct fft_transform_info * fti, mp_bitcnt_t bits
 
     fft_get_transform_info_generic(fti, bits1, bits2, nacc, 1);
 }
+#endif
 
 /* Provide the transform info necessary for accumulating nacc products of
  * polynomials having respectively n1 and n2 coefficients, over GF(p),
@@ -294,7 +362,11 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
 {
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * nmin);
-    fft_get_transform_info_mp(fti, nmin * cbits, nmax * cbits, nacc);
+    fft_get_transform_info_mulmod(fti,
+            nmin * cbits,
+            nmax * cbits,
+            nacc,
+            nmax * cbits + 1);
     /* The maximum number of summands is nmin */
     fti->ks_coeff_bits = cbits;
 }
@@ -880,7 +952,40 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
     mp_size_t rsize0 = n*w/FLINT_BITS;  /* need rsize0+1 words for x\in R */
     fft_do_ift_backend(y, temp, fti);
     mpn_zero(x, nx);
+    if (!fti->minwrap) {
+        fft_combine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
+        return;
+    }
+
+    /* it's slightly less trivial here. We perform the overwrap. (ok, in
+     * typical middle product uses, we don't need it. But it's cheap).
+     */
+    /* we want at least (4*n-1)*bits+n*w bits in the output zone */
+    mp_bitcnt_t need = (4*n-1)*fti->bits+n*w;
+    assert(nx >= (mp_size_t) iceildiv(need, FLINT_BITS));
     fft_combine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
+    /* bits above 4*n*fti->bits need to wrap around */
+    mp_bitcnt_t outneed = need - 4*n*fti->bits;
+    mp_size_t outneedlimbs = iceildiv(outneed, FLINT_BITS);
+    assert(outneedlimbs <= rsize0 + 1);
+    mp_size_t toplimb = (4*n*fti->bits) / FLINT_BITS;
+    unsigned int topoffset = (4*n*fti->bits) % FLINT_BITS;
+    mp_size_t cy;
+    mpn_zero(temp, rsize0 + 1);
+    do {
+        if (topoffset) {
+            mpn_rshift(temp, x + toplimb, nx - toplimb, topoffset);
+            x[toplimb] &= ((1UL<<topoffset)-1);
+            if (nx - toplimb > 1)
+                memset(x + toplimb + 1, 0, (nx - toplimb - 1) * sizeof(mp_limb_t));
+        } else {
+            memcpy(temp, x + toplimb, (nx - toplimb) * sizeof(mp_limb_t));
+            memset(x + toplimb, 0, (nx - toplimb) * sizeof(mp_limb_t));
+        }
+        cy = mpn_add_n(x, x, temp, outneedlimbs);
+        cy = mpn_add_1(x + outneedlimbs, x + outneedlimbs, toplimb - outneedlimbs, cy);
+        mpn_add_1(x + toplimb, x + toplimb, nx - toplimb, cy);
+    } while (cy);
 }
 
 /* Same, but store the result as a polynomial over GF(p). nx must be a

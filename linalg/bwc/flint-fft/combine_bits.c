@@ -104,9 +104,13 @@ void fft_combine_bits(mp_limb_t * res, mp_limb_t ** poly, slong length,
 	if (shift_bits) {
 	    mpn_lshift(temp, poly[i], output_limbs + 1, shift_bits);
 	    mpn_add_n(limb_ptr, limb_ptr, temp, output_limbs + 1);
-	} else
+	} else {
+            /* XXX: it looks as if poly[i] is asserted to not contain the
+             * value 2^nw, which does seem possible to me.
+             */
 	    mpn_add(limb_ptr, limb_ptr, output_limbs + 1, poly[i],
 		    output_limbs);
+        }
 
 	shift_bits += top_bits;
 	limb_ptr += (coeff_limbs - 1);

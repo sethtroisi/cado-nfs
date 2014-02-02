@@ -330,6 +330,7 @@ struct fft_transform_info {
                            truncation point, because the truncation point
                            is also subject to a few extra criteria. */
     mp_bitcnt_t ks_coeff_bits;  /* This is used only for kronecker substitution */
+    mp_bitcnt_t minwrap;        /* zero when no wraparound wanted */
     int alg;            /* alg==1: use matrix fourier algorithm */
 };
 
@@ -374,7 +375,7 @@ struct fft_transform_info {
  */
 
 void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc);
-void fft_get_transform_info_mp(struct fft_transform_info * fti, mp_bitcnt_t bitsmin, mp_bitcnt_t bitsmax, unsigned int nacc);
+void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t xbits, mp_bitcnt_t ybits, unsigned int nacc, mp_bitcnt_t minwrap);
 void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti);
 void fft_transform_prepare(void * x, struct fft_transform_info * fti);
 void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);
@@ -385,6 +386,26 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc);
 void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
 void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
+
+/* indicates whether the integer returned is actually reduced modulo some
+ * B^n-a, with a=\pm1. Returns n, and sets a. If the result is known to
+ * be valid in Z, then n is returned as 0.
+ */
+static inline mp_bitcnt_t fft_get_mulmod(struct fft_transform_info * fti, int * a)
+{
+    *a=1;
+    return fti->minwrap ? (4<<fti->depth)*fti->bits : 0;
+}
+
+static inline mp_size_t fft_get_mulmod_output_minlimbs(struct fft_transform_info * fti)
+{
+    if (!fti->minwrap) return 0;
+    mp_size_t w = fti->w;
+    mp_size_t n = 1 << fti->depth;
+    mp_bitcnt_t need = (4*n-1)*fti->bits+n*w;
+    return (need + FLINT_BITS - 1) / FLINT_BITS;
+}
+
 
 #ifdef __cplusplus
 }

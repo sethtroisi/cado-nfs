@@ -2,7 +2,7 @@
 #include <unistd.h>
 
 #include "flint-fft/fft.h"
-
+/*{{{ macros */
 #ifndef PTR
 #define PTR(x) ((x)->_mp_d)
 #endif
@@ -76,13 +76,16 @@
 /* unfortunately this fails miserably if x+y-1 overflows */
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
+/*}}}*/
 
 void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_info * fti);
 
 #define xxPARI
-
+/*{{{ display macros */
 #ifdef PARI
 #define ppol(_name, _x, _nx) do {					\
+    mpz_t tmp;								\
+    mpz_init(tmp);							\
     printf("v"_name"=[");						\
     for(int i = 0 ; i < _nx ; i++) {					\
         MPZ_SET_MPN(tmp, _x + (_nx-1-i) * np, np);			\
@@ -90,11 +93,14 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
         gmp_printf("%Zd", tmp);	        		        	\
     }									\
     printf("];\n");							\
-    printf(_name"=Pol(vector(#v"_name",i,Mod(v"_name"[i],p)));\n");			\
+    printf(_name"=Pol(vector(#v"_name",i,Mod(v"_name"[i],p)));\n");	\
+    mpz_clear(tmp);							\
 } while (0)
 #define pint(_name, _x, _nx) gmp_printf(_name "=%Nd;\n", _x, _nx)
 #else
 #define ppol(_name, _x, _nx) do {					\
+    mpz_t tmp;								\
+    mpz_init(tmp);							\
     printf(_name ":=Polynomial(GF(p),[");				\
     for(int i = 0 ; i < _nx ; i++) {					\
         MPZ_SET_MPN(tmp, _x + i * np, np);				\
@@ -102,28 +108,15 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
         gmp_printf("%Zd", tmp);	        		                \
     }									\
     printf("]);\n");							\
+    mpz_clear(tmp);							\
 } while (0)
 #define pint(_name, _x, _nx) gmp_printf(_name ":=%Nd;\n", _x, _nx)
 #endif
+/*}}}*/
 
-
-/* test multiplication of integers */
-int test_mul(gmp_randstate_t rstate) /*{{{*/
+/*{{{ setup operand sizes */
+int operand_sizes(int * xbits, int * ybits, int s, gmp_randstate_t rstate)
 {
-    int seed = getpid();
-    int s = 0;
-    int longstrings = 0;
-
-    // s=84; seed=12682; longstrings=0; 
-    // s=93; seed=13156; longstrings=0;
-    // s=10; seed=22442; longstrings=0;
-
-    gmp_randseed_ui(rstate, seed);
-
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-
-    int xbits;
-    int ybits;
     int base;
     int rs;
 
@@ -132,16 +125,95 @@ int test_mul(gmp_randstate_t rstate) /*{{{*/
         rs = 10 + gmp_urandomm_ui(rstate, 200);
         if (s == 0) s = rs;
         base = 120 * s + gmp_urandomm_ui(rstate, 20 * s);
-        xbits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-        ybits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-        if (xbits < 10) xbits = 10;
-        if (ybits < 10) ybits = 10;
+        *xbits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        *ybits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        if (*xbits < 10) *xbits = 10;
+        if (*ybits < 10) *ybits = 10;
         /* Do this so that we don't loop forever on easy cases */
         s++;
-    } while (xbits + ybits < 4000);
+    } while (*xbits + *ybits < 4000);
+    if (*xbits > *ybits) { int a; a = *xbits; *xbits = *ybits; *ybits = a; }
+    return 1;
+}
 
+int operand_sizes_fppol(int * nx, int * ny, mpz_t p, int s, gmp_randstate_t rstate)
+{
+    size_t bits_of_p;
+    int n;
+    bits_of_p = 32 + gmp_urandomm_ui(rstate, 512);
+
+    mp_size_t np;
+
+    do {
+        mpz_ui_pow_ui(p, 2, bits_of_p);
+        mpz_sub_ui(p, p, 1);
+        for( ; !mpz_probab_prime_p(p, 2) ; mpz_sub_ui(p, p, 2));
+        np = mpz_size(p);
+        n = 120 * s + gmp_urandomm_ui(rstate, 20 * s);
+        *nx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        *ny = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        if (*nx < 10) *nx = 10;
+        if (*ny < 10) *ny = 10;
+    } while ((*nx+*ny-1) * np * FLINT_BITS < 4000);
+
+    // finer-grain control can go here. But it does not change the
+    // picture much.
+    if (*nx > *ny) { int a; a = *nx; *nx = *ny; *ny = a; }
+    return 1;
+}
+/*}}}*/
+
+/*{{{ setting entries to random */
+void bitrandom(mp_limb_t * x, int xbits, int longstrings, gmp_randstate_t rstate)
+{
+    int nx = iceildiv(xbits, FLINT_BITS);
+    if (longstrings) {
+        mpn_rrandom(x, rstate, nx);
+    } else {
+        mpn_randomb(x, rstate, nx);
+    }
+    if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
+}
+
+void bitrandom_fppol(mp_limb_t * x, int nx, mpz_srcptr p, int longstrings, gmp_randstate_t rstate)
+{
+    mpz_t tmp;
+    mpz_init(tmp);
+    int np = mpz_size(p);
+    int xbits = nx * mpz_size(p) * FLINT_BITS;
+    if (longstrings) {
+        mpn_rrandom(x, rstate, nx);
+    } else {
+        mpn_randomb(x, rstate, nx);
+    }
+    if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
+    for(int i = 0 ; i < nx ; i++) {
+        MPZ_SET_MPN(tmp, x + i * np, np);
+        mpz_mod(tmp, tmp, p);
+        MPN_SET_MPZ(x + i * np, np, tmp);
+    }
+    mpz_clear(tmp);
+}
+/*}}}*/
+
+/* test multiplication of integers */
+int test_mul(gmp_randstate_t rstate) /*{{{*/
+{
+    int seed = getpid();
+    int s = 0;
+    int longstrings = 0;
+    int xbits;
+    int ybits;
+
+    // s=84; seed=12682; longstrings=0; 
+    // s=93; seed=13156; longstrings=0;
+    // s=10; seed=22442; longstrings=0;
+
+    gmp_randseed_ui(rstate, seed);
+    operand_sizes(&xbits, &ybits, s, rstate);
+
+    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
     fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
-
     int zbits = xbits + ybits;
 
     mp_size_t nx = iceildiv(xbits, FLINT_BITS);
@@ -151,15 +223,8 @@ int test_mul(gmp_randstate_t rstate) /*{{{*/
     mp_limb_t * y = malloc(ny * sizeof(mp_limb_t));
     mp_limb_t * z = malloc(nz * sizeof(mp_limb_t));
 
-    if (longstrings) {
-        mpn_rrandom(x, rstate, nx);
-        mpn_rrandom(y, rstate, ny);
-    } else {
-        mpn_randomb(x, rstate, nx);
-        mpn_randomb(y, rstate, ny);
-    }
-    if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
-    if (ybits % FLINT_BITS) { y[ny-1] &= (1UL<<(ybits%FLINT_BITS))-1; }
+    bitrandom(x, xbits, longstrings, rstate);
+    bitrandom(y, ybits, longstrings, rstate);
 
     struct fft_transform_info fti[1];
     size_t fft_alloc_sizes[3];
@@ -248,68 +313,51 @@ A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
     return 0;
 }/*}}}*/
 
-/* test middle product of integers */
-int test_mp(gmp_randstate_t rstate) /*{{{*/
+/* test wrapped product of integers. This computea A*B mod base^n\pm1 */
+int test_mulmod(gmp_randstate_t rstate) /*{{{*/
 {
     int seed = getpid();
     int s = 0;
     int longstrings = 0;
+    int xbits;
+    int ybits;
 
     // s=84; seed=12682; longstrings=0; 
-    s=93; seed=13156; longstrings=0;
+    // s=93; seed=13156; longstrings=0;
+    // s=10; seed=22442; longstrings=0;
+    // s=0; seed=8412; longstrings=0;
 
     gmp_randseed_ui(rstate, seed);
-    int rs = 10 + gmp_urandomm_ui(rstate, 200);
-    if (s == 0) s = rs;
+    operand_sizes(&xbits, &ybits, s, rstate);
+    int wrap = gmp_urandomm_ui(rstate, 128);
+
+    
 
     fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-
-    int base = 120 * s + gmp_urandomm_ui(rstate, 20 * s);
-    int xbits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-    int ybits = base + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-    if (xbits < 10) xbits = 10;
-    if (ybits < 10) ybits = 10;
-
-    if (xbits > ybits) { int a; a = xbits; xbits = ybits; ybits = a; }
-
     fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
 
-    /* middle product of integers in base B (here B=2) is defined as:
-     *
-     * MP(x,y) = \sum_{k=xbits-1}^{k=ybits-1}\sum_{i+j=k}x_i*y_j*B^k
-     *
-     * Note that this does *not*, in general, correspond to the bits at
-     * positions [xbits-1...ybits-1] in the product, although for
-     * practical uses we will force this to happen.
-     *
-     * Examining the middle product can be done by computing the result
-     * modulo 2^k-1 if k>=ybits, provided that we pay attention to the
-     * carries properly.
-     */
-    int zbits = ybits - xbits + 1;
+    // int zbits = ybits - xbits + 1;
+
+
+    struct fft_transform_info fti[1];
+    /* 3 is the maximum number of products we intend to accumulate */
+    fft_get_transform_info_mulmod(fti, xbits, ybits, 3, ybits + wrap);
+
+    int a;
+    int zbits = (int) fft_get_mulmod(fti, &a);
 
     mp_size_t nx = iceildiv(xbits, FLINT_BITS);
     mp_size_t ny = iceildiv(ybits, FLINT_BITS);
-    mp_size_t nz = iceildiv(zbits, FLINT_BITS);
+    mp_size_t nz = fft_get_mulmod_output_minlimbs(fti);
     mp_limb_t * x = malloc(nx * sizeof(mp_limb_t));
     mp_limb_t * y = malloc(ny * sizeof(mp_limb_t));
     mp_limb_t * z = malloc(nz * sizeof(mp_limb_t));
 
-    if (longstrings) {
-        mpn_rrandom(x, rstate, nx);
-        mpn_rrandom(y, rstate, ny);
-    } else {
-        mpn_randomb(x, rstate, nx);
-        mpn_randomb(y, rstate, ny);
-    }
-    if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
-    if (ybits % FLINT_BITS) { y[ny-1] &= (1UL<<(ybits%FLINT_BITS))-1; }
+    bitrandom(x, xbits, longstrings, rstate);
+    bitrandom(y, ybits, longstrings, rstate);
 
-    struct fft_transform_info fti[1];
+
     size_t fft_alloc_sizes[3];
-
-    /* 3 is the maximum number of products we intend to accumulate */
-    fft_get_transform_info(fti, xbits, ybits, 3);
 
 #ifndef PARI
     printf("fti_bits:=%lu; fti_ks_coeff_bits:=%lu; fti_depth:=%zu;\n",
@@ -346,6 +394,8 @@ int test_mp(gmp_randstate_t rstate) /*{{{*/
     fft_add(tz, tz, tz, fti);
     fft_add(tz, tz, tx, fti);
     fft_add(tz, tz, ty, fti);
+    /*
+    */
     fft_do_ift(z, nz, tz, tt, fti);
     rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
     rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
@@ -356,10 +406,13 @@ int test_mp(gmp_randstate_t rstate) /*{{{*/
     // printf("assert P2 eq P0*P1;\n");
     printf("quit\n");
 #else
-    printf("A2 eq 2*A0*A1+A0+A1;\n");
+    printf("A2 eq (2*A0*A1+A0+A1) mod (2^%d-%d);\n", zbits, a);
 #endif
 
+    /* TODO: we must take into account the fact that the wraparound adds
+     * extra summands to each polynomial coefficient */
     /* magma check code
+
 Z:=Integers();
 ZP<T>:=PolynomialRing(Z);
 n:=2^fti_depth;
@@ -376,10 +429,14 @@ rho:=R!2^(fti_w div 2);
 seqmatch:=func<S,T,n|S[1..n] eq T[1..n]>;
 seqmatch([Evaluate(Q0,rho^i):i in bitrevseq(fti_depth+2)], tQ0, fti_trunc0);
 seqmatch([Evaluate(Q1,rho^i):i in bitrevseq(fti_depth+2)], tQ1, fti_trunc0);
+load "/tmp/P2_after_ift.m"; cQ2:=Polynomial([R!Seqint(x,2^64):x in data]);
 load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
-Q2:=2*Q0*Q1+Q0+Q1 mod (T^(4*n)-1);
+Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
+// Q2:=Q0*Q1 mod (T^(4*n)-1);
+Q2 eq cQ2;
 seqmatch([Evaluate(Q2,rho^i):i in bitrevseq(fti_depth+2)], tQ2, fti_trunc0);
-A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
+A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits) mod (2^(4*n*fti_bits)-1);
+
     */
 
     free(tx);
@@ -396,77 +453,38 @@ A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
 int test_mul_fppol(gmp_randstate_t rstate) /*{{{*/
 {
     mpz_t p;
-    mpz_t tmp;
-
     int seed = getpid();
     int s = 0;
     int longstrings = 0;
+    mpz_init(p);
+    int nx;
+    int ny;
 
     // seed=6286; longstrings=0;
 
     gmp_randseed_ui(rstate, seed);
-    int rs = 10 + gmp_urandomm_ui(rstate, 200);
-    if (s == 0) s = rs;
-
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-
-    size_t bits_of_p = 32 + gmp_urandomm_ui(rstate, 512);
-
-
-    int n = 120 * s + gmp_urandomm_ui(rstate, 20 * s);
-    int nx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-    int ny = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-    if (nx < 10) nx = 10;
-    if (ny < 10) ny = 10;
-
-    // finer-grain control can go here. But it does not change the
-    // picture much.
-
-#ifndef PARI
-    fprintf(stderr, "nx:=%d; ny:=%d; bits_of_p:=%zu;\n", nx, ny, bits_of_p);
-#else
-    fprintf(stderr, "nx=%d; ny=%d; bits_of_p=%zu;\n", nx, ny, bits_of_p);
-#endif
-
-    int nz = nx + ny - 1;
-
-    mpz_init(p);
-    mpz_ui_pow_ui(p, 2, bits_of_p);
-    mpz_sub_ui(p, p, 1);
-    for( ; !mpz_probab_prime_p(p, 2) ; mpz_sub_ui(p, p, 2));
+    operand_sizes_fppol(&nx, &ny, p, s, rstate);
     mp_size_t np = mpz_size(p);
 
-    mpz_init(tmp);
+
+    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
+    fprintf(stderr, "nx:=%d; ny:=%d; bits_of_p:=%zu;\n", nx, ny, mpz_sizeinbase(p, 2));
+    int nz = nx + ny - 1;
+
+
     mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
     mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
     mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
-
-    if (longstrings) {
-        mpn_rrandom(x, rstate, nx*np);
-        mpn_rrandom(y, rstate, ny*np);
-    } else {
-        mpn_randomb(x, rstate, nx*np);
-        mpn_randomb(y, rstate, ny*np);
-    }
+    bitrandom_fppol(y, ny, p, longstrings, rstate);
+    bitrandom_fppol(x, nx, p, longstrings, rstate);
 
     // mul_mfa_truncate_sqrt2(z, x, nx*np, y, ny*np, 10, 6);
-
-    for(int i = 0 ; i < nx ; i++) {
-        MPZ_SET_MPN(tmp, x + i * np, np);
-        mpz_mod(tmp, tmp, p);
-        MPN_SET_MPZ(x + i * np, np, tmp);
-    }
-    for(int i = 0 ; i < ny ; i++) {
-        MPZ_SET_MPN(tmp, y + i * np, np);
-        mpz_mod(tmp, tmp, p);
-        MPN_SET_MPZ(y + i * np, np, tmp);
-    }
 
     struct fft_transform_info fti[1];
     size_t fft_alloc_sizes[3];
 
     /* 3 is the maximum number of products we intend to accumulate */
-    fft_get_transform_info_fppol(fti, p, nx, ny, 3);
+    fft_get_transform_info_fppol_mp(fti, p, nx, ny, 3);
 
 #ifndef PARI
     printf("fti_bits:=%lu; fti_ks_coeff_bits:=%lu; fti_depth:=%zu;\n",
@@ -547,56 +565,49 @@ bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
     free(x);
     free(y);
     free(z);
+    mpz_clear(p);
     return 0;
 }/*}}}*/
 
+#if 0
+/* middle product of polynomials */
 int test_mp_fppol(gmp_randstate_t rstate)/*{{{*/
 {
     mpz_t p;
-    mpz_t tmp;
-
     int seed = getpid();
     int s = 0;
     int longstrings = 0;
+    mpz_init(p);
+    int nx;
+    int ny;
 
     // Here is the list of setup bugs I had to cover, successively.
     // s=3; seed = 17769; longstrings=1;
     // s=12; seed=1010; longstrings=0;
     s=24; seed=6931; longstrings=0;
 
-
     gmp_randseed_ui(rstate, seed);
-    int rs = 10 + gmp_urandomm_ui(rstate, 20);
-    if (s == 0) s = rs;
+    operand_sizes_fppol(&nx, &ny, p, s, rstate);
+    mp_size_t np = mpz_size(p);
+
+    /* We'll do the transpose of
+     * MUL(nx, ny) == nz ; which is MP(nx, nz) == ny.
+     * But we'll rewrite this as MP(nx, ny) == nz by swapping ny and nz.
+     */
+    int nz = ny;
+    ny = nx + nz - 1;
 
     fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-
-
-    size_t bits_of_p = 32 + gmp_urandomm_ui(rstate, 64);
-
-
-    int n = 20 * s + gmp_urandomm_ui(rstate, 20 * s);
-    int nx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-    int nz = n + gmp_urandomm_ui(rstate, 5 * s) + 2*s;
-    if (nx < 10) nx = 10;
-    if (nz < 10) nz = 10;
-    if (nx > nz) { int a; a = nx; nx = nz; nz = a; }
-
-    // finer-grain control can go here. But it does not change the
-    // picture much.
-
-#ifndef PARI
-    fprintf(stderr, "nx:=%d; nz:=%d; bits_of_p:=%zu;\n", nx, nz, bits_of_p);
-#else
-    fprintf(stderr, "nx=%d; nz=%d; bits_of_p=%zu;\n", nx, nz, bits_of_p);
-#endif
-
-    int ny = MAX(nx, nz) - MIN(nx, nz) + 1;
-
     fprintf(stderr,
             "/* MP(degree %d, degree %d) -> degree %d */\n",
-            nx - 1, nz - 1, ny - 1);
+            nx - 1, ny - 1, nz - 1);
 
+
+    mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
+    mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
+    mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
+    bitrandom_fppol(y, ny, p, longstrings, rstate);
+    bitrandom_fppol(x, nx, p, longstrings, rstate);
 
     mpz_init(p);
     mpz_ui_pow_ui(p, 2, bits_of_p);
@@ -604,31 +615,11 @@ int test_mp_fppol(gmp_randstate_t rstate)/*{{{*/
     for( ; !mpz_probab_prime_p(p, 2) ; mpz_sub_ui(p, p, 2));
     mp_size_t np = mpz_size(p);
 
-    mpz_init(tmp);
     mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
     mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
     mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
 
-    if (longstrings) {
-        mpn_rrandom(x, rstate, nx*np);
-        mpn_rrandom(z, rstate, nz*np);
-    } else {
-        mpn_randomb(x, rstate, nx*np);
-        mpn_randomb(z, rstate, nz*np);
-    }
-
     // mul_mfa_truncate_sqrt2(y, x, nx*np, z, nz*np, 10, 6);
-
-    for(int i = 0 ; i < nx ; i++) {
-        MPZ_SET_MPN(tmp, x + i * np, np);
-        mpz_mod(tmp, tmp, p);
-        MPN_SET_MPZ(x + i * np, np, tmp);
-    }
-    for(int i = 0 ; i < nz ; i++) {
-        MPZ_SET_MPN(tmp, z + i * np, np);
-        mpz_mod(tmp, tmp, p);
-        MPN_SET_MPZ(z + i * np, np, tmp);
-    }
 
     struct fft_transform_info fti[1];
     size_t fft_alloc_sizes[3];
@@ -739,12 +730,15 @@ MP(P0,P1) eq P2;
     free(y);
     return 0;
 }/*}}}*/
+#endif
+
 
 int main()
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    test_mul(rstate);
+    // test_mul(rstate);
+    test_mulmod(rstate);
     // test_mul_fppol(rstate);
     // test_mp_fppol(rstate);
     gmp_randclear(rstate);
