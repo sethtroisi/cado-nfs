@@ -35,7 +35,7 @@ tasks.sieve.mfba = 102
 tasks.sieve.rlambda = 2.1
 tasks.sieve.alambda = 2.8
 
-tasks.sieve.I = 16
+tasks.I = 16
 tasks.sieve.qmin = 500000000
 tasks.sieve.qrange = 10000
 slaves.niceness = 10
