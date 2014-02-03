@@ -29,11 +29,8 @@ extern void mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
 extern void mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern void mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern int mpz_fits_int64_p(mpz_srcptr);
-extern int mpz_fits_uint64_p(mpz_srcptr);
-extern uint64_t uint64_nextprime (uint64_t);
 extern unsigned long ulong_nextprime (unsigned long);
-extern int isprime (unsigned long);
-extern void mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d);
+extern int ulong_isprime (unsigned long);
 extern void mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d);
 
 /* return the number of bits of p, counting from the least significant end */

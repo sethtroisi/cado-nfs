@@ -60,19 +60,14 @@ mpz_get_int64 (mpz_srcptr z)
     return mpz_get_uint64(z) * (int64_t) mpz_sgn(z);
 }
 
-int mpz_fits_int64_p(mpz_srcptr z)
+int
+mpz_fits_int64_p (mpz_srcptr z)
 {
     int l = mpz_sizeinbase(z, 2);
     if (l <= 63) return 1;
     /* Also accept -2^63, which is INT64_MIN */
     if (mpz_sgn(z) < 0 && l == 64  && mpz_scan1(z, 0) == 63) return 1;
     return 0;
-}
-
-int mpz_fits_uint64_p(mpz_srcptr z)
-{
-    ASSERT_ALWAYS(mpz_sgn(z) >= 0);
-    return mpz_sizeinbase(z, 2) <= 64;
 }
 
 void
@@ -105,6 +100,7 @@ mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
+/* a <- a + b * c */
 void
 mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
@@ -120,39 +116,37 @@ mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
-/* returns the smallest prime > q */
-uint64_t
-uint64_nextprime (uint64_t q)
-{
-  mpz_t p;
-
-  mpz_init (p);
-  mpz_set_uint64 (p, q);
-  mpz_nextprime (p, p);
-  q = mpz_get_uint64 (p);
-  mpz_clear (p);
-  return q;
-}
-
-/* same as above, for an unsigned long */
+/* returns the smallest prime > q, guaranteed correct for q < 300M */
 unsigned long
 ulong_nextprime (unsigned long q)
 {
   mpz_t p;
+  unsigned long s[] = {16661633, 18790021, 54470491, 73705633, 187546133,
+                       300164287, (unsigned long) (-1L)};
+  int i;
 
   mpz_init (p);
   mpz_set_ui (p, q);
-  mpz_nextprime (p, p);
-  ASSERT_ALWAYS (mpz_fits_ulong_p (p));
-  q = mpz_get_ui (p);
+  do
+    {
+      mpz_nextprime (p, p);
+      ASSERT_ALWAYS (mpz_fits_ulong_p (p));
+      q = mpz_get_ui (p);
+      for (i = 0; q > s[i]; i++);
+    }
+  while (q == s[i]);
   mpz_clear (p);
   return q;
 }
 
-#define REPS 1 /* number of Miller-Rabin tests in isprime */
+#define REPS 3 /* number of Miller-Rabin tests in isprime */
 
+/* with REPS=1, the smallest composite reported prime is 1537381
+   with REPS=2, it is 1943521
+   with REPS=3, correct for p < 300M
+*/
 int
-isprime (unsigned long p)
+ulong_isprime (unsigned long p)
 {
   mpz_t P;
   int res;
@@ -174,8 +168,9 @@ int nbits (uintmax_t p)
 
 /* q <- n/d rounded to nearest, assuming d <> 0
    r <- n - q*d
+   Output: -d/2 <= r < d/2
 */
-void
+static void
 mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
 {
   int s;
@@ -192,6 +187,9 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
+/* q <- n/d rounded to nearest, assuming d <> 0
+   Output satisfies |n-q*d| <= |d|/2
+*/
 void
 mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
 {
@@ -201,5 +199,3 @@ mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
   mpz_ndiv_qr (q, r, n, d);
   mpz_clear (r);
 }
-
-

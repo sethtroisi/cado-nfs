@@ -97,25 +97,17 @@ double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
     df->coeff[n] = f->coeff[n+1] * (double)(n+1);
 }
 
-/* Scale a polynomial: r(x) = f(x * scale). r == f is ok. */
-void
-double_poly_scale(double_poly_ptr r, double_poly_srcptr f, const double scale)
-{
-  double pows;
-  unsigned int k;
-  for (pows = 1., k = 0; k <= f->deg; k++)
-    {
-      r->coeff[k] = f->coeff[k] * pows;
-      pows *= scale;
-    }
-}
-
 /* Revert the coefficients in-place: f(x) => f(1/x) * x^degree */
 void
-double_poly_revert(double_poly_ptr f)
+double_poly_revert (double_poly_ptr f)
 {
   const unsigned int d = f->deg;
-  for (unsigned int k = 0; k <= d / 2; k++)
+
+  if (d <= 0)
+    return;
+
+  /* if d is even, nothing to do for k=d/2 */
+  for (unsigned int k = 0; k <= (d - 1) / 2; k++)
     {
       double tmp = f->coeff[k];
       f->coeff[k] = f->coeff[d - k];

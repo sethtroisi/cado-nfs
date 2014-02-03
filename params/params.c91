@@ -186,12 +186,15 @@ tasks.sieve.alambda = 2.2
     # allowed, to set rlambda to e.g. k + 0.2, in order to compensate for
     # inaccuracies due to sieving.
 
-tasks.sieve.I = 11		# Sieving range in lattice siever
+tasks.I = 11		# Sieving range in lattice siever
     # The lattice siever sieves over a range in the (i,j) plane which is
     # 2^I times 2^(I-1), to put things simply (some rescaling may change
     # this, but the size of the sieve area remains constant). Increasing
     # I by 1 multiplies the amount of required RAM for the siever by a
     # factor of 4.
+    # Note: now I is used also in the polynomial selection (for the computation
+    # of Murphy's E value) thus we define it at the "tasks" level, not at the
+    # "tasks.sieve" level.
 
 tasks.sieve.ratq = 0
     # The ratq parameter specifies whether or not the special-q is to be

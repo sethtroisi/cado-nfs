@@ -513,10 +513,10 @@ class Polyselect2l(Program):
     """
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line()
-    'polyselect2l -N 42 -degree 4 -v 5'
+    'polyselect2l -P 5 -N 42 -degree 4 -v'
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
     >>> p.make_command_line()
-    'polyselect2l -N 42 -degree 4 -v 5'
+    'polyselect2l -P 5 -N 42 -degree 4 -v'
     """
     binary = "polyselect2l"
     name = binary
@@ -549,12 +549,12 @@ class Polyselect2l(Program):
 
 class MakeFB(Program):
     """
-    >>> p = MakeFB("foo.poly")
+    >>> p = MakeFB(poly="foo.poly", alim=1)
     >>> p.make_command_line()
-    'makefb -poly foo.poly'
-    >>> p = MakeFB(poly="foo.poly", nopowers=True, maxbits=5, stdout="foo.roots")
+    'makefb -poly foo.poly -alim 1'
+    >>> p = MakeFB(poly="foo.poly", alim=1, maxbits=5, stdout="foo.roots")
     >>> p.make_command_line()
-    'makefb -poly foo.poly -nopowers -maxbits 5 > foo.roots'
+    'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
     """
     binary = "makefb"
     name = binary
@@ -571,12 +571,12 @@ class MakeFB(Program):
 
 class FreeRel(Program):
     """
-    >>> p = FreeRel("foo.poly", "foo.renumber")
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
     >>> p.make_command_line()
-    'freerel -poly foo.poly -renumber foo.renumber'
-    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", badideals="foo.bad", verbose=True, pmin=123, pmax=234)
+    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel'
+    >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
     >>> p.make_command_line()
-    'freerel -poly foo.poly -renumber foo.renumber -badideals foo.bad -v -pmin 123 -pmax 234'
+    'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
     binary = "freerel"
     name = binary

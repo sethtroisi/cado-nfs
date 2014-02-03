@@ -1303,8 +1303,13 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         # tasks.sieving, so polysel does not see the value. We use a default
         # of 13 here to avoid a key error exception. Maybe we should move
         # the "I" parameter to tasks.
-        self.params.setdefault("I", 13)
-        self.progparams[0].setdefault("area", 2**self.params["I"] * self.params["alim"])
+        if not "I" in self.params:
+            self.params["I"] = 13
+            self.logger.warn("No value for I given (maybe specified only under"
+                             " tasks.sieve?) Using default of %s.", 
+                             self.params["I"])
+        self.progparams[0].setdefault("area", 2**(2*int(self.params["I"])-1) \
+                * self.params["alim"])
         self.progparams[0].setdefault("Bf", self.params["alim"])
         self.progparams[0].setdefault("Bg", self.params["rlim"])
     

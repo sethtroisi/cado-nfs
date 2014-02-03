@@ -319,23 +319,39 @@ modredc2ul2_intbits (const modintredc2ul2_t a)
 }
 
 
+/* r = trunc(s / 2^i) */
 MAYBE_UNUSED
 static inline void
 modredc2ul2_intshr (modintredc2ul2_t r, const modintredc2ul2_t s, const int i)
 {
-  r[0] = s[0];
-  ularith_shrd (&(r[0]), s[1], i);
-  r[1] = s[1] >> i;
+  if (i >= 2 * LONG_BIT) {
+    r[1] = r[0] = 0UL;
+  } else if (i >= LONG_BIT) {
+    r[0] = s[1] >> (i - LONG_BIT);
+    r[1] = 0UL; /* May overwrite s[1] */
+  } else { /* i < LONG_BIT */
+    r[0] = s[0];
+    ularith_shrd (&(r[0]), s[1], i);
+    r[1] = s[1] >> i;
+  }
 }
 
 
+/* r = (s * 2^i) % (2^(2 * LONG_BIT)) */
 MAYBE_UNUSED
 static inline void
 modredc2ul2_intshl (modintredc2ul2_t r, const modintredc2ul2_t s, const int i)
 {
-  r[1] = s[1];
-  ularith_shld (&(r[1]), s[0], i);
-  r[0] = s[0] << i;
+  if (i >= 2 * LONG_BIT) {
+    r[1] = r[0] = 0UL;
+  } else if (i >= LONG_BIT) {
+    r[1] = s[0] << (i - LONG_BIT);
+    r[0] = 0UL;
+  } else { /* i < LONG_BIT */
+    r[1] = s[1];
+    ularith_shld (&(r[1]), s[0], i);
+    r[0] = s[0] << i;
+  }
 }
 
 

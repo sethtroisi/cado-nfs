@@ -160,7 +160,7 @@ lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff
   }
 
   for ( p = PLB ; p <= prime_bound ; p += 1 + (1 & p)) {
-    if (isprime(p)) {
+    if (ulong_isprime (p)) {
 
       if(VERBOSE)
 	printf("Finding lattices for prime: %lu\n",p);

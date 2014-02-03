@@ -326,34 +326,39 @@ modredc15ul_intbits (const modintredc15ul_t a)
 }
 
 
+/* r = trunc(s / 2^i) */
 MAYBE_UNUSED
 static inline void
 modredc15ul_intshr (modintredc15ul_t r, const modintredc15ul_t s, const int i)
 {
-#if (__GNUC__ == 4 && __GNUC_MINOR__ <= 2)
-  /* gcc 4.2.1 on 32-bit Intel CPUs seems to get confused over register 
-     allocation when s == r, when using the shrd instruction via inline
-     assembly in ularith_shrd(), and when modredc15ul_intshr() itself gets 
-     inlined. This extra variable seems to fix it. */
-  unsigned long t = s[1];
-  r[0] = s[0];
-  ularith_shrd (&(r[0]), t, i);
-  r[1] = t >> i;
-#else
-  r[0] = s[0];
-  ularith_shrd (&(r[0]), s[1], i);
-  r[1] = s[1] >> i;
-#endif
+  if (i >= 2 * LONG_BIT) {
+    r[1] = r[0] = 0UL;
+  } else if (i >= LONG_BIT) {
+    r[0] = s[1] >> (i - LONG_BIT);
+    r[1] = 0UL; /* May overwrite s[1] */
+  } else { /* i < LONG_BIT */
+    r[0] = s[0];
+    ularith_shrd (&(r[0]), s[1], i);
+    r[1] = s[1] >> i;
+  }
 }
 
 
+/* r = (s * 2^i) % (2^(2 * LONG_BIT)) */
 MAYBE_UNUSED
 static inline void
 modredc15ul_intshl (modintredc15ul_t r, const modintredc15ul_t s, const int i)
 {
-  r[1] = s[1];
-  ularith_shld (&(r[1]), s[0], i);
-  r[0] = s[0] << i;
+  if (i >= 2 * LONG_BIT) {
+    r[1] = r[0] = 0UL;
+  } else if (i >= LONG_BIT) {
+    r[1] = s[0] << (i - LONG_BIT);
+    r[0] = 0UL;
+  } else { /* i < LONG_BIT */
+    r[1] = s[1];
+    ularith_shld (&(r[1]), s[0], i);
+    r[0] = s[0] << i;
+  }
 }
 
 

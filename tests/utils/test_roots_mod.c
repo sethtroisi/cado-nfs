@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
           minp, maxp, mina, maxa, mind, maxd);
 
   r1 = malloc (sizeof(uint64_t) * maxd);
-  r2 = malloc (sizeof(unsigned long) * maxd);
+  r2 = malloc (sizeof(uint64_t) * maxd);
   
   for (p = 2; p < minp; p = getprime(p));
 
