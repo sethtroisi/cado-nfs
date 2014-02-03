@@ -133,9 +133,29 @@ test_double_poly_set (void)
   double_poly_clear (r);
 }
 
+void
+test_double_poly_eval (void)
+{
+  double_poly_t s;
+  unsigned int deg;
+  double v, w;
+
+  double_poly_init (s, 52);
+  for (deg = 0, w = 0.0; deg <= 52; deg++)
+    {
+      s->coeff[deg] = 1.0;
+      s->deg = deg;
+      v = double_poly_eval (s, 2.0);
+      w = 2.0 * w + s->coeff[deg];
+      assert (v == w);
+    }
+  double_poly_clear (s);
+}
+
 int main()
 {
   test_double_poly_compute_roots(0);
   test_double_poly_set ();
+  test_double_poly_eval ();
   exit(EXIT_SUCCESS);
 }
