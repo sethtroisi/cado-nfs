@@ -130,7 +130,7 @@ int test_seconds_user_sys()
 
 int test_wct_seconds()
 {
-    double now = wct_seconds();
+    wct_seconds();
     return 1;
 }
 
