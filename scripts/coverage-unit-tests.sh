@@ -54,5 +54,6 @@ make -j8 test
 cd $DIR
 geninfo --no-checksum --ignore-errors gcov,source -q --output-filename $DIR/cado-nfs.info  ./ --no-external
 rm -rf ~/.webdir/cado-unit-tests/ || :
+find . -name 'test_*.gcda' -print0 | xargs -0 -r rm
 genhtml   -o ~/.webdir/cado-unit-tests/ $DIR/cado-nfs.info
 rm -rf $DIR $F
