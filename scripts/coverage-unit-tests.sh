@@ -51,7 +51,7 @@ make cmake
 echo "Starting tests at: `date`"
 make -j8 test ARGS=-j8
 # find . -name 'test_*.gcda' -print0 | xargs -0 -r rm
-find $CADO_DIST_ARCHIVE_NAME/tests -name '*.gcda' -print0 | xargs -0 -r rm
+find tests -name '*.gcda' -print0 | xargs -0 -r rm
 
 cd $DIR
 geninfo --no-checksum --ignore-errors gcov,source -q --output-filename $DIR/cado-nfs.info  ./ --no-external
