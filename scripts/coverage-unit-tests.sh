@@ -47,14 +47,29 @@ echo "Starting compilation at: `date`"
 # This is a kludge.
 touch files.dist
 make cmake
-make -j8
+# make -j8
 echo "Starting tests at: `date`"
-make -j8 test
+make -j8 test ARGS=-j8
 # find . -name 'test_*.gcda' -print0 | xargs -0 -r rm
 find $CADO_DIST_ARCHIVE_NAME/tests -name '*.gcda' -print0 | xargs -0 -r rm
 
 cd $DIR
 geninfo --no-checksum --ignore-errors gcov,source -q --output-filename $DIR/cado-nfs.info  ./ --no-external
 rm -rf ~/.webdir/cado-unit-tests/ || :
-genhtml   -o ~/.webdir/cado-unit-tests/ $DIR/cado-nfs.info
+cp -p $(which genhtml) $DIR/genhtml
+ex $DIR/genhtml <<EOF
+/sub get_date_string()$
+/{
+mark a
+/}
+mark b
+'a,'b c
+{
+       return scalar localtime;
+}
+.
+wq
+EOF
+chmod 755 $DIR/genhtml
+$DIR/genhtml   -o ~/.webdir/cado-unit-tests/ $DIR/cado-nfs.info
 rm -rf $DIR $F
