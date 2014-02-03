@@ -926,3 +926,5 @@ ffs/timing.h
 ffs/types.h
 ffs/version.sh
 ffs/Makefile.local.example
+tests/CMakeLists.txt
+tests/utils/CMakeLists.txt
