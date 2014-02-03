@@ -388,6 +388,19 @@ void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct
 void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p);
 void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift);
 
+/* fft_transform_export modifies the transform area in x and makes it
+ * position independent, so that the data may be moved, or transferred to
+ * another machine.
+ *             /=============================================\
+ *             | This (reversibly) invalidates the data in x |
+ *             \=============================================/
+ * fft_transform_import must be called on x to revert the effect of
+ * fft_transform_export (possibly after moving/transferring).
+ */
+void fft_transform_export(void * x, struct fft_transform_info * fti);
+void fft_transform_import(void * x, struct fft_transform_info * fti);
+
+
 /* indicates whether the integer returned is actually reduced modulo some
  * B^n-a, with a=\pm1. Returns n, and sets a. If the result is known to
  * be valid in Z, then n is returned as 0.

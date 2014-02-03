@@ -418,6 +418,45 @@ void fft_transform_prepare(void * x, struct fft_transform_info * fti)
     }
 }
 
+void fft_transform_export(void * x, struct fft_transform_info * fti)
+{
+    mp_size_t n = 1 << fti->depth;
+    mp_limb_t ** ptrs = (mp_limb_t **) x;
+    if (sizeof(unsigned long) == sizeof(mp_limb_t *)) {
+        unsigned long * offs = (unsigned long *) x;
+        for(mp_size_t i = 0 ; i < 4*n+2 ; i++) {
+            offs[i] = ptrs[i] - (mp_limb_t *) x;
+        }
+    } else if (sizeof(unsigned int) == sizeof(mp_limb_t *)) {
+        unsigned int * offs = (unsigned int *) x;
+        for(mp_size_t i = 0 ; i < 4*n+2 ; i++) {
+            offs[i] = ptrs[i] - (mp_limb_t *) x;
+        }
+    } else {
+        abort();
+    }
+}
+
+
+void fft_transform_import(void * x, struct fft_transform_info * fti)
+{
+    mp_size_t n = 1 << fti->depth;
+    mp_limb_t ** ptrs = (mp_limb_t **) x;
+    if (sizeof(unsigned long) == sizeof(mp_limb_t *)) {
+        unsigned long * offs = (unsigned long *) x;
+        for(mp_size_t i = 0 ; i < 4*n+2 ; i++) {
+            ptrs[i] = (mp_limb_t *) x + offs[i];
+        }
+    } else if (sizeof(unsigned int) == sizeof(mp_limb_t *)) {
+        unsigned int * offs = (unsigned int *) x;
+        for(mp_size_t i = 0 ; i < 4*n+2 ; i++) {
+            ptrs[i] = (mp_limb_t *) x + offs[i];
+        }
+    } else {
+        abort();
+    }
+}
+
 /* Hardly useful, in fact */
 void * fft_transform_alloc(struct fft_transform_info * fti)
 {
