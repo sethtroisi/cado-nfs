@@ -267,6 +267,7 @@ add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
 add_subdirectory (misc)
 add_subdirectory (scripts/cadofactor)
+add_subdirectory (tests EXCLUDE_FROM_ALL)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}
