@@ -765,7 +765,6 @@ utils/rootfinder.h
 utils/roots.c
 utils/select_mpi.h
 tests/utils/test-rootfinder-script.sh
-tests/utils/test-rootfinder.c
 tests/utils/test_mod.c
 tests/utils/test_mod_ul.c
 tests/utils/test_modredc_15ul.c
@@ -928,3 +927,8 @@ ffs/version.sh
 ffs/Makefile.local.example
 tests/CMakeLists.txt
 tests/utils/CMakeLists.txt
+scripts/coverage-unit-tests.sh
+tests/utils/OpenPegasusNOTICE.txt
+tests/utils/test_rootfinder.c
+tests/utils/test_strlcat.c
+tests/utils/test_strlcpy.c
