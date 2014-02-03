@@ -728,11 +728,21 @@ tests_mod_jacobi (int iter)
 int main(int argc, char **argv)
 {
   int iter = 10000;
+  /* Seed RNG with nr of seconds since epoch */
+  int seed = time (NULL);
 
-  if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'r')
-    srand (time (NULL)); /* Seed RNG with nr of seconds since epoch */
-  else if (argc > 1)
+  if (argc > 2 && argv[1][0] == '-' && argv[1][1] == 's') {
+    /* Use specified seed */
+    seed = atoi (argv[2]);
+    ASSERT_ALWAYS(seed >= 0);
+    argc -= 2;
+    argv += 2;
+  }
+  if (argc > 1)
     iter = atoi (argv[1]);
+
+  printf ("Using seed = %d\n", seed);
+  srand ((unsigned int) seed);
 
   printf ("Testing mod_intmod()\n");
   tests_mod_intmod (iter);
