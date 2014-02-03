@@ -34,9 +34,9 @@ tasks.nmaps = 4 ## number of SM FIXME: this should be chosen automatically
 
 tasks.polyselect.degree = 4
 
-tasks.polyselect.admax = 10000
+tasks.polyselect.admax = 1000
 tasks.polyselect.incr = 60
-tasks.polyselect.adrange = 5000
+tasks.polyselect.adrange = 500
 tasks.polyselect.P = 420
 tasks.polyselect.nq = 1000
 
@@ -57,7 +57,7 @@ tasks.sieve.alambda = 1.2
 tasks.sieve.I = 11
 tasks.sieve.qmin = 200000
 tasks.sieve.qrange = 1000
-tasks.sieve.rels_wanted = 222540
+tasks.sieve.rels_wanted = 250000
 slaves.niceness = 10
 
 ###########################################################################
