@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include <string.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <assert.h>
 
@@ -84,7 +86,7 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
 #define xxPARI
 /*{{{ display macros */
 #ifdef PARI
-#define ppol(_name, _x, _nx) do {					\
+#define ppol(_name, _x, _cx) do {					\
     mpz_t tmp;								\
     mpz_init(tmp);							\
     printf("v"_name"=[");						\
@@ -99,11 +101,11 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
 } while (0)
 #define pint(_name, _x, _nx) gmp_printf(_name "=%Nd;\n", _x, _nx)
 #else
-#define ppol(_name, _x, _nx) do {					\
+#define ppol(_name, _x, _cx) do {					\
     mpz_t tmp;								\
     mpz_init(tmp);							\
     printf(_name ":=Polynomial(GF(p),[");				\
-    for(int i = 0 ; i < _nx ; i++) {					\
+    for(int i = 0 ; i < _cx ; i++) {					\
         MPZ_SET_MPN(tmp, _x + i * np, np);				\
         if (i) gmp_printf(", ");					\
         gmp_printf("%Zd", tmp);	        		                \
@@ -111,7 +113,7 @@ void get_ft_hash(mpz_t h, int bits_per_coeff, void * data, struct fft_transform_
     printf("]);\n");							\
     mpz_clear(tmp);							\
 } while (0)
-#define pint(_name, _x, _nx) gmp_printf(_name ":=%Nd;\n", _x, _nx)
+#define pint(_name, _x, _cx) gmp_printf(_name ":=%Nd;\n", _x, _cx)
 #endif
 /*}}}*/
 
@@ -137,7 +139,7 @@ int operand_sizes(int * xbits, int * ybits, int s, gmp_randstate_t rstate)
     return 1;
 }
 
-int operand_sizes_fppol(int * nx, int * ny, mpz_t p, int s, gmp_randstate_t rstate)
+int operand_sizes_fppol(int * cx, int * cy, mpz_t p, int s, gmp_randstate_t rstate)
 {
     size_t bits_of_p;
     int n;
@@ -154,15 +156,23 @@ int operand_sizes_fppol(int * nx, int * ny, mpz_t p, int s, gmp_randstate_t rsta
         for( ; !mpz_probab_prime_p(p, 2) ; mpz_sub_ui(p, p, 2));
         np = mpz_size(p);
         n = 20 * s + gmp_urandomm_ui(rstate, 10 * s);
-        *nx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-        *ny = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
-        if (*nx < 10) *nx = 10;
-        if (*ny < 10) *ny = 10;
-    } while ((*nx+*ny-1) * np * FLINT_BITS < 4000);
+        *cx = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        *cy = n + gmp_urandomm_ui(rstate, 5 * s) - 2*s;
+        if (*cx < 10) *cx = 10;
+        if (*cy < 10) *cy = 10;
+    } while ((*cx+*cy-1) * np * FLINT_BITS < 4000);
 
     // finer-grain control can go here. But it does not change the
     // picture much.
-    if (*nx > *ny) { int a; a = *nx; *nx = *ny; *ny = a; }
+    if (*cx > *cy) { int a; a = *cx; *cx = *cy; *cy = a; }
+
+#ifdef PARI
+    gmp_printf("p=%Zd;\n", p);
+#else
+    gmp_printf("p:=%Zd;\n", p);
+    printf("KP<x>:=PolynomialRing(GF(p));\n");
+#endif
+
     return 1;
 }
 /*}}}*/
@@ -188,19 +198,19 @@ void bitrandom(mp_limb_t * x, int xbits, int longstrings, gmp_randstate_t rstate
     if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
 }
 
-void bitrandom_fppol(mp_limb_t * x, int nx, mpz_srcptr p, int longstrings, gmp_randstate_t rstate)
+void bitrandom_fppol(mp_limb_t * x, int cx, mpz_srcptr p, int longstrings, gmp_randstate_t rstate)
 {
     mpz_t tmp;
     mpz_init(tmp);
     int np = mpz_size(p);
-    int xbits = nx * mpz_size(p) * FLINT_BITS;
+    int xbits = cx * mpz_size(p) * FLINT_BITS;
     if (longstrings) {
-        mpn_rrandom(x, rstate, nx * np);
+        mpn_rrandom(x, rstate, cx * np);
     } else {
-        mpn_randomb(x, rstate, nx * np);
+        mpn_randomb(x, rstate, cx * np);
     }
-    if (xbits % FLINT_BITS) { x[nx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
-    for(int i = 0 ; i < nx ; i++) {
+    if (xbits % FLINT_BITS) { x[cx-1] &= (1UL<<(xbits%FLINT_BITS))-1; }
+    for(int i = 0 ; i < cx ; i++) {
         MPZ_SET_MPN(tmp, x + i * np, np);
         mpz_mod(tmp, tmp, p);
         MPN_SET_MPZ(x + i * np, np, tmp);
@@ -209,110 +219,35 @@ void bitrandom_fppol(mp_limb_t * x, int nx, mpz_srcptr p, int longstrings, gmp_r
 }
 /*}}}*/
 
-/* test multiplication of integers */
-int test_mul(gmp_randstate_t rstate) /*{{{*/
+
+/* These are globals, used within this script */
+
+int seed;
+int s = 0;
+int longstrings = 0;
+int xbits;
+int ybits;
+mp_size_t nx;
+mp_size_t ny;
+mp_size_t nz;
+mp_limb_t * x;
+mp_limb_t * y;
+mp_limb_t * z;
+struct fft_transform_info fti[1];
+size_t fft_alloc_sizes[3];
+void * tx;
+void * ty;
+void * tz;
+void * tt;
+
+static void alloc_everything()
 {
-    int seed = getpid();
-    int s = 0;
-    int longstrings = 0;
-    int xbits;
-    int ybits;
+    x = malloc(nx * sizeof(mp_limb_t));
+    y = malloc(ny * sizeof(mp_limb_t));
+    z = malloc(nz * sizeof(mp_limb_t));
+}
 
-    // s=84; seed=12682; longstrings=0; 
-    // s=93; seed=13156; longstrings=0;
-    // s=10; seed=22442; longstrings=0;
-
-    gmp_randseed_ui(rstate, seed);
-    operand_sizes(&xbits, &ybits, s, rstate);
-
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-    fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
-    int zbits = xbits + ybits;
-
-    mp_size_t nx = iceildiv(xbits, FLINT_BITS);
-    mp_size_t ny = iceildiv(ybits, FLINT_BITS);
-    mp_size_t nz = iceildiv(zbits, FLINT_BITS);
-    mp_limb_t * x = malloc(nx * sizeof(mp_limb_t));
-    mp_limb_t * y = malloc(ny * sizeof(mp_limb_t));
-    mp_limb_t * z = malloc(nz * sizeof(mp_limb_t));
-
-    bitrandom(x, xbits, longstrings, rstate);
-    bitrandom(y, ybits, longstrings, rstate);
-
-    struct fft_transform_info fti[1];
-    size_t fft_alloc_sizes[3];
-
-    /* 3 is the maximum number of products we intend to accumulate */
-    fft_get_transform_info(fti, xbits, ybits, 3);
-
-    fti_disp(fti);
-
-    fft_get_transform_allocs(fft_alloc_sizes, fti);
-
-    void * tx = malloc(fft_alloc_sizes[0]);
-    void * ty = malloc(fft_alloc_sizes[0]);
-    void * tz = malloc(fft_alloc_sizes[0]);
-    void * tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
-    fft_transform_prepare(tx, fti);
-    fft_transform_prepare(ty, fti);
-    fft_transform_prepare(tz, fti);
-
-#ifdef PARI
-    printf("allocatemem(800000000)\n");
-#endif
-
-    pint("A0", x, nx);
-    pint("A1", y, ny);
-
-    fft_do_dft(tx, x, nx, tt, fti);
-    rename("/tmp/before_dft.m", "/tmp/P0_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P0_after_dft.m");
-    fft_do_dft(ty, y, ny, tt, fti);
-    rename("/tmp/before_dft.m", "/tmp/P1_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P1_after_dft.m");
-
-    fft_mul(tz, tx, ty, tt, fti);
-    fft_add(tz, tz, tz, fti);
-    fft_add(tz, tz, tx, fti);
-    fft_add(tz, tz, ty, fti);
-    fft_do_ift(z, nz, tz, tt, fti);
-    rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
-    rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
-    pint("A2", z, nz);
-
-#ifdef  PARI
-    printf("print(A2==2*A0*A1+A0+A1)\n");
-    // printf("assert P2 eq P0*P1;\n");
-    printf("quit\n");
-#else
-    printf("A2 eq 2*A0*A1+A0+A1;\n");
-#endif
-
-    /* magma check code
-
-Z:=Integers();
-ZP<T>:=PolynomialRing(Z);
-n:=2^fti_depth;
-R:=Integers(2^(n*fti_w) + 1);
-load "/tmp/P0_before_dft.m"; Q0:=Polynomial([R!Seqint(x,2^64):x in data]);
-Q0 eq Polynomial(R,Intseq(A0,2^fti_bits));
-load "/tmp/P1_before_dft.m"; Q1:=Polynomial([R!Seqint(x,2^64):x in data]);
-Q1 eq Polynomial(R,Intseq(A1,2^fti_bits));
-load "/tmp/P0_after_dft.m"; tQ0:=([R!Seqint(x,2^64):x in data]);
-load "/tmp/P1_after_dft.m"; tQ1:=([R!Seqint(x,2^64):x in data]);
-bitrev:=func<x,n|Seqint(Reverse(Intseq(x,2,n)),2)>;
-bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
-rho:=fti_w mod 2 eq 0 select R!2^(fti_w div 2) else R!(2^(3*u)-2^u)^fti_w where u is (n*fti_w div 4);
-seqmatch:=func<S,T,n|S[1..n] eq T[1..n]>;
-seqmatch([Evaluate(Q0,rho^i):i in bitrevseq(fti_depth+2)], tQ0, fti_trunc0);
-seqmatch([Evaluate(Q1,rho^i):i in bitrevseq(fti_depth+2)], tQ1, fti_trunc0);
-load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
-Q2:=2*Q0*Q1+Q0+Q1 mod (T^(4*n)-1);
-seqmatch([Evaluate(Q2,rho^i):i in bitrevseq(fti_depth+2)], tQ2, fti_trunc0);
-A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
-     
-    */
-
+static void free_everything() {
     free(tx);
     free(ty);
     free(tz);
@@ -320,137 +255,111 @@ A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
     free(x);
     free(y);
     free(z);
+}
+
+static void prepare_transforms() {
+    tx = malloc(fft_alloc_sizes[0]);
+    ty = malloc(fft_alloc_sizes[0]);
+    tz = malloc(fft_alloc_sizes[0]);
+    tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
+    fft_transform_prepare(tx, fti);
+    fft_transform_prepare(ty, fti);
+    fft_transform_prepare(tz, fti);
+}
+
+static void do_renames(const char * step, const char * varname)
+{
+    char * s, * t;
+    int rc;
+    rc = asprintf(&s, "/tmp/%s_before_%s.m", varname, step);
+    if (rc < 0) abort();
+    rc = asprintf(&t, "/tmp/before_%s.m", step);
+    if (rc < 0) abort();
+    rename(t, s);
+    free(t);
+    free(s);
+    rc = asprintf(&s, "/tmp/%s_after_%s.m", varname, step);
+    if (rc < 0) abort();
+    rc = asprintf(&t, "/tmp/after_%s.m", step);
+    if (rc < 0) abort();
+    rename(t, s);
+    free(t);
+    free(s);
+}
+
+/* test multiplication of integers */
+int test_mul(gmp_randstate_t rstate) /*{{{*/
+{
+    int xbits, ybits;
+    operand_sizes(&xbits, &ybits, s, rstate);
+
+    fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
+    int zbits = xbits + ybits;
+
+    fft_get_transform_info(fti, xbits, ybits, 3);
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    fti_disp(fti);
+
+    nx = iceildiv(xbits, FLINT_BITS);
+    ny = iceildiv(ybits, FLINT_BITS);
+    nz = iceildiv(zbits, FLINT_BITS);
+
+    alloc_everything();
+    bitrandom(x, xbits, longstrings, rstate);
+    bitrandom(y, ybits, longstrings, rstate);
+    prepare_transforms();
+
+    printf("check:=\"%s\";\n", __func__);
+    pint("A0", x, nx);
+    pint("A1", y, ny);
+    fft_do_dft(tx, x, nx, tt, fti); do_renames("dft", "P0");
+    fft_do_dft(ty, y, ny, tt, fti); do_renames("dft", "P1");
+    fft_mul(tz, tx, ty, tt, fti);
+    fft_add(tz, tz, tz, fti);
+    fft_add(tz, tz, tx, fti);
+    fft_add(tz, tz, ty, fti);
+    fft_do_ift(z, nz, tz, tt, fti); do_renames("ift", "P2");
+    pint("A2", z, nz);
+
+    free_everything();
     return 0;
 }/*}}}*/
 
 /* test wrapped product of integers. This computea A*B mod base^n\pm1 */
 int test_mulmod(gmp_randstate_t rstate) /*{{{*/
 {
-    int seed = getpid();
-    int s = 0;
-    int longstrings = 0;
-    int xbits;
-    int ybits;
-
-    // s=84; seed=12682; longstrings=0; 
-    // s=93; seed=13156; longstrings=0;
-    // s=10; seed=22442; longstrings=0;
-    // s=0; seed=8412; longstrings=0;
-
-    gmp_randseed_ui(rstate, seed);
+    int xbits, ybits;
     operand_sizes(&xbits, &ybits, s, rstate);
-    int wrap = gmp_urandomm_ui(rstate, 128);
 
-    
-
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
     fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
 
-    // int zbits = ybits - xbits + 1;
-
-
-    struct fft_transform_info fti[1];
-    /* 3 is the maximum number of products we intend to accumulate */
+    int wrap = gmp_urandomm_ui(rstate, 128);
     fft_get_transform_info_mulmod(fti, xbits, ybits, 3, ybits + wrap);
-
-    int a;
-    int zbits = (int) fft_get_mulmod(fti, &a);
-
-    mp_size_t nx = iceildiv(xbits, FLINT_BITS);
-    mp_size_t ny = iceildiv(ybits, FLINT_BITS);
-    mp_size_t nz = fft_get_mulmod_output_minlimbs(fti);
-    mp_limb_t * x = malloc(nx * sizeof(mp_limb_t));
-    mp_limb_t * y = malloc(ny * sizeof(mp_limb_t));
-    mp_limb_t * z = malloc(nz * sizeof(mp_limb_t));
-
-    bitrandom(x, xbits, longstrings, rstate);
-    bitrandom(y, ybits, longstrings, rstate);
-
-
-    size_t fft_alloc_sizes[3];
-
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
-    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    nx = iceildiv(xbits, FLINT_BITS);
+    ny = iceildiv(ybits, FLINT_BITS);
+    nz = fft_get_mulmod_output_minlimbs(fti);
 
-    void * tx = malloc(fft_alloc_sizes[0]);
-    void * ty = malloc(fft_alloc_sizes[0]);
-    void * tz = malloc(fft_alloc_sizes[0]);
-    void * tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
-    fft_transform_prepare(tx, fti);
-    fft_transform_prepare(ty, fti);
-    fft_transform_prepare(tz, fti);
+    alloc_everything();
+    bitrandom(x, xbits, longstrings, rstate);
+    bitrandom(y, ybits, longstrings, rstate);
+    prepare_transforms();
 
-#ifdef PARI
-    printf("allocatemem(800000000)\n");
-#endif
-
+    printf("check:=\"%s\";\n", __func__);
     pint("A0", x, nx);
     pint("A1", y, ny);
-
-    fft_do_dft(tx, x, nx, tt, fti);
-    rename("/tmp/before_dft.m", "/tmp/P0_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P0_after_dft.m");
-    fft_do_dft(ty, y, ny, tt, fti);
-    rename("/tmp/before_dft.m", "/tmp/P1_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P1_after_dft.m");
-
+    fft_do_dft(tx, x, nx, tt, fti); do_renames("dft", "P0");
+    fft_do_dft(ty, y, ny, tt, fti); do_renames("dft", "P1");
     fft_mul(tz, tx, ty, tt, fti);
     fft_add(tz, tz, tz, fti);
     fft_add(tz, tz, tx, fti);
     fft_add(tz, tz, ty, fti);
-    /*
-    */
-    fft_do_ift(z, nz, tz, tt, fti);
-    rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
-    rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
+    fft_do_ift(z, nz, tz, tt, fti); do_renames("ift", "P2");
     pint("A2", z, nz);
 
-#ifdef  PARI
-    printf("print(A2==2*A0*A1+A0+A1)\n");
-    // printf("assert P2 eq P0*P1;\n");
-    printf("quit\n");
-#else
-    printf("A2 eq (2*A0*A1+A0+A1) mod (2^%d-%d);\n", zbits, a);
-#endif
-
-    /* TODO: we must take into account the fact that the wraparound adds
-     * extra summands to each polynomial coefficient */
-    /* magma check code
-
-Z:=Integers();
-ZP<T>:=PolynomialRing(Z);
-n:=2^fti_depth;
-R:=Integers(2^(n*fti_w) + 1);
-load "/tmp/P0_before_dft.m"; Q0:=Polynomial([R!Seqint(x,2^64):x in data]);
-Q0 eq Polynomial(R,Intseq(A0,2^fti_bits));
-load "/tmp/P1_before_dft.m"; Q1:=Polynomial([R!Seqint(x,2^64):x in data]);
-Q1 eq Polynomial(R,Intseq(A1,2^fti_bits));
-load "/tmp/P0_after_dft.m"; tQ0:=([R!Seqint(x,2^64):x in data]);
-load "/tmp/P1_after_dft.m"; tQ1:=([R!Seqint(x,2^64):x in data]);
-bitrev:=func<x,n|Seqint(Reverse(Intseq(x,2,n)),2)>;
-bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
-rho:=fti_w mod 2 eq 0 select R!2^(fti_w div 2) else R!(2^(3*u)-2^u)^fti_w where u is (n*fti_w div 4);
-seqmatch:=func<S,T,n|S[1..n] eq T[1..n]>;
-seqmatch([Evaluate(Q0,rho^i):i in bitrevseq(fti_depth+2)], tQ0, fti_trunc0);
-seqmatch([Evaluate(Q1,rho^i):i in bitrevseq(fti_depth+2)], tQ1, fti_trunc0);
-load "/tmp/P2_after_ift.m"; cQ2:=Polynomial([R!Seqint(x,2^64):x in data]);
-load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
-Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
-// Q2:=Q0*Q1 mod (T^(4*n)-1);
-Q2 eq cQ2;
-seqmatch([Evaluate(Q2,rho^i):i in bitrevseq(fti_depth+2)], tQ2, fti_trunc0);
-A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits) mod (2^(4*n*fti_bits)-1);
-
-    */
-
-    free(tx);
-    free(ty);
-    free(tz);
-    free(tt);
-    free(x);
-    free(y);
-    free(z);
+    free_everything();
     return 0;
 }/*}}}*/
 
@@ -458,169 +367,41 @@ A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits) mod (2^(4*n*fti_bits)-1);
 int test_mul_fppol(gmp_randstate_t rstate) /*{{{*/
 {
     mpz_t p;
-    int seed = getpid();
-    int s = 0;
-    int longstrings = 0;
     mpz_init(p);
-    int nx;
-    int ny;
+    int cx, cy, cz;
 
-    // seed=6286; longstrings=0;
-    // s=0; seed=16083; longstrings=0;
-    // s=0; seed=19066; longstrings=0;
-    // s=0; seed=19239; longstrings=0;
-    // s=0; seed=19302; longstrings=0;
-    // s=0; seed=25058; longstrings=0;
-
-    gmp_randseed_ui(rstate, seed);
-    operand_sizes_fppol(&nx, &ny, p, s, rstate);
+    operand_sizes_fppol(&cx, &cy, p, s, rstate);
     mp_size_t np = mpz_size(p);
 
+    fprintf(stderr, "cx:=%d; cy:=%d; bits_of_p:=%zu;\n", cx, cy, mpz_sizeinbase(p, 2));
+    cz = cx + cy - 1;
 
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
-    fprintf(stderr, "nx:=%d; ny:=%d; bits_of_p:=%zu;\n", nx, ny, mpz_sizeinbase(p, 2));
-    int nz = nx + ny - 1;
-
-
-    mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
-    mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
-    mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
-    bitrandom_fppol(y, ny, p, longstrings, rstate);
-    bitrandom_fppol(x, nx, p, longstrings, rstate);
-
-    struct fft_transform_info fti[1];
-    size_t fft_alloc_sizes[3];
-
-    /* 3 is the maximum number of products we intend to accumulate */
-    fft_get_transform_info_fppol(fti, p, nx, ny, 3);
-
+    fft_get_transform_info_fppol(fti, p, cx, cy, 3);
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
-    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    nx = cx * np; ny = cy * np; nz = cz * np;
 
-    void * tx = malloc(fft_alloc_sizes[0]);
-    void * ty = malloc(fft_alloc_sizes[0]);
-    void * tz = malloc(fft_alloc_sizes[0]);
-    void * tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
-    fft_transform_prepare(tx, fti);
-    fft_transform_prepare(ty, fti);
-    fft_transform_prepare(tz, fti);
+    alloc_everything();
+    bitrandom_fppol(y, cy, p, longstrings, rstate);
+    bitrandom_fppol(x, cx, p, longstrings, rstate);
+    prepare_transforms();
 
-#ifdef PARI
-    printf("allocatemem(800000000)\n");
-    gmp_printf("p=%Zd;\n", p);
-#else
-    gmp_printf("p:=%Zd;\n", p);
-    printf("KP<x>:=PolynomialRing(GF(p));\n");
-#endif
-
-    ppol("P0", x, nx);
-    ppol("P1", y, ny);
-
-    fft_do_dft_fppol(tx, x, nx * np, tt, fti, p);
-    // get_ft_hash(tmp, 1, tx, fti);
-    // gmp_fprintf(stderr, "%Zx\n", tmp);
-    rename("/tmp/before_dft.m", "/tmp/P0_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P0_after_dft.m");
-    fft_do_dft_fppol(ty, y, ny * np, tt, fti, p);
-    rename("/tmp/before_dft.m", "/tmp/P1_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P1_after_dft.m");
-
+    printf("check:=\"%s\";\n", __func__);
+    ppol("P0", x, cx);
+    ppol("P1", y, cy);
+    fft_do_dft_fppol(tx, x, cx, tt, fti, p); do_renames("dft", "P0");
+    fft_do_dft_fppol(ty, y, cy, tt, fti, p); do_renames("dft", "P1");
     fft_mul(tz, tx, ty, tt, fti);
     fft_add(tz, tz, tz, fti);
     fft_add(tz, tz, tx, fti);
     fft_add(tz, tz, ty, fti);
-    fft_do_ift_fppol(z, nz * np, tz, tt, fti, p);
-    rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
+    fft_do_ift_fppol(z, cz, tz, tt, fti, p); do_renames("ift", "P2");
     /* beware: after the IFT, coefficient of indices >= trunc are not
      * computed at all -- there's noise in there ! */
-    rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
+    ppol("P2", z, cz);
 
-    ppol("P2", z, nz);
-
-#ifdef  PARI
-    printf("print(P2==2*P0*P1+P0+P1)\n");
-    // printf("assert P2 eq P0*P1;\n");
-    printf("quit\n");
-#endif
-
-    /* magma check code
-
-    n:=2^fti_depth;
-    Z:=Integers();
-    R:=Integers(2^(n*fti_w) + 1);
-    RP<T>:=PolynomialRing(R);
-
-    depth1 := fti_depth div 2;
-    depth2 := fti_depth + 1 - depth1;
-    n1 := 2^depth1; // for MFA
-    tr:=fti_trunc0;
-    if tr le 2*n then tr:=2*n+1; end if;
-    if fti_alg eq 0 then
-       // trunc must be even and greater than 2n
-       tr:=fti_trunc0 + (fti_trunc0 mod 2);
-    else
-       // trunc must be greater than 2n and multiple of 2*n1
-       tr:= 2 * n1 * Ceiling(tr / (2 * n1));
-    end if;
-
-    bitrev:=func<x,n|Seqint(Reverse(Intseq(x,2,n)),2)>;
-    bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
-    rho:=fti_w mod 2 eq 0 select
-            R!2^(fti_w div 2)
-        else
-            R!(2^(3*u)-2^u)^fti_w
-        where u is (n*fti_w div 4);
-
-    // in the MFA context, coefficients appear in an order which is
-    // slightly more complicated than just bitrev.
-
-    // mfaorder:=func<x|Seqint([b[1+i]:i in mfabitorder],2) where b is Intseq(x,2,fti_depth+2)>;
-    
-    load "/tmp/P0_before_dft.m"; Q0:=Polynomial([R!Seqint(x,2^64):x in data]);
-    load "/tmp/P1_before_dft.m"; Q1:=Polynomial([R!Seqint(x,2^64):x in data]);
-    zP0:=Evaluate(ChangeRing(P0,Z),2^fti_ks_coeff_bits);
-    zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
-    Q0 eq Polynomial(R,Intseq(zP0,2^fti_bits));
-    Q1 eq Polynomial(R,Intseq(zP1,2^fti_bits));
-
-
-    load "/tmp/P0_after_dft.m"; tQ0:=([R!Seqint(x,2^64):x in data]);
-    load "/tmp/P1_after_dft.m"; tQ1:=([R!Seqint(x,2^64):x in data]);
-    load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
-
-    Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
-
-    if fti_alg eq 0 then
-        seqmatch:=func<S,T,n|S[1..n] eq T[1..n]>;
-        pows:=[R|1];
-        time for i in [1..2^(fti_depth+2)-1] do Append(~pows, pows[#pows]*rho); end for;
-        assert rho^(4*n) eq 1;
-       // vdm:=Matrix(R,fti_trunc0, fti_trunc0, [pows[((i*j) mod (4*n))+1]: i in bitrevseq(fti_depth+2)[1..fti_trunc0], j in [0..fti_trunc0-1]]);
-
-       time seqmatch([Evaluate(Q0,pows[i+1]):i in bitrevseq(fti_depth+2)], tQ0, fti_trunc0);
-       time seqmatch([Evaluate(Q1,pows[i+1]):i in bitrevseq(fti_depth+2)], tQ1, fti_trunc0);
-       time seqmatch([Evaluate(Q2,pows[i+1]):i in bitrevseq(fti_depth+2)], tQ2, fti_trunc0);
-   else
-    print "not checking transform due to MFA";
-   end if;
-
-
-    load "/tmp/P2_after_ift.m"; cQ2:=Polynomial([R!Seqint(x,2^64):x in data]);
-    cQ2 mod:= T^fti_trunc0;
-    Q2 eq cQ2;
-     P2 eq 2*P0*P1+P0+P1;
-
-
-    */
-
-    free(tx);
-    free(ty);
-    free(tz);
-    free(tt);
-    free(x);
-    free(y);
-    free(z);
+    free_everything();
     mpz_clear(p);
     return 0;
 }/*}}}*/
@@ -629,144 +410,200 @@ int test_mul_fppol(gmp_randstate_t rstate) /*{{{*/
 int test_mp_fppol(gmp_randstate_t rstate)/*{{{*/
 {
     mpz_t p;
-    int seed = getpid();
-    int s = 0;
-    int longstrings = 0;
     mpz_init(p);
-    int nx;
-    int ny;
+    int cx, cy, cz;
 
-    // Here is the list of setup bugs I had to cover, successively.
-    // s=3; seed = 17769; longstrings=1;
-    // s=12; seed=1010; longstrings=0;
-    // s=24; seed=6931; longstrings=0;
-
-    gmp_randseed_ui(rstate, seed);
-    operand_sizes_fppol(&nx, &ny, p, s, rstate);
+    operand_sizes_fppol(&cx, &cy, p, s, rstate);
     mp_size_t np = mpz_size(p);
 
     /* We're doing the transpose of
-     * MUL(nx, ny) == nz ; which is MP(nx, nz) == ny.
-     * But we rewrite this as MP(nx, ny) == nz by swapping ny and nz.
+     * MUL(cx, cy) == cz ; which is MP(cx, cz) == cy.
+     * But we rewrite this as MP(cx, cy) == cz by swapping cy and cz.
      */
-    int nz = ny;
-    ny = nx + nz - 1;
-    assert(ny >= nx);
-    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n",
-            s, seed, longstrings);
+    cz = cy;
+    cy = cx + cz - 1;
+    assert(cy >= cx);
     fprintf(stderr, "/* MP(degree %d, degree %d) -> degree %d */\n",
-            nx - 1, ny - 1, nz - 1);
+            cx - 1, cy - 1, cz - 1);
 
-
-
-    mp_limb_t * x = malloc(nx * np * sizeof(mp_limb_t));
-    mp_limb_t * y = malloc(ny * np * sizeof(mp_limb_t));
-    mp_limb_t * z = malloc(nz * np * sizeof(mp_limb_t));
-    bitrandom_fppol(y, ny, p, longstrings, rstate);
-    bitrandom_fppol(x, nx, p, longstrings, rstate);
-
-    struct fft_transform_info fti[1];
-    size_t fft_alloc_sizes[3];
-
-    /* 3 is the maximum number of products we intend to accumulate */
-    fft_get_transform_info_fppol_mp(fti, p, nx, ny, 3);
-
+    fft_get_transform_info_fppol_mp(fti, p, cx, cy, 3);
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
-    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    nx = cx * np; ny = cy * np; nz = cz * np;
+    
+    alloc_everything();
+    bitrandom_fppol(y, cy, p, longstrings, rstate);
+    bitrandom_fppol(x, cx, p, longstrings, rstate);
+    prepare_transforms();
 
-    void * tx = malloc(fft_alloc_sizes[0]);
-    void * tz = malloc(fft_alloc_sizes[0]);
-    void * ty = malloc(fft_alloc_sizes[0]);
-    void * tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
-    fft_transform_prepare(tx, fti);
-    fft_transform_prepare(tz, fti);
-    fft_transform_prepare(ty, fti);
-
-#ifdef PARI
-    printf("allocatemem(800000000)\n");
-    gmp_printf("p=%Zd;\n", p);
-#else
-    gmp_printf("p:=%Zd;\n", p);
-    printf("KP<x>:=PolynomialRing(GF(p));\n");
-#endif
-
-    ppol("P0", x, nx);
-    ppol("P1", y, ny);
-
-    fft_do_dft_fppol(tx, x, nx * np, tt, fti, p);
-    rename("/tmp/before_dft.m", "/tmp/P0_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P0_after_dft.m");
-
-    fft_do_dft_fppol(ty, y, ny * np, tt, fti, p);
-    rename("/tmp/before_dft.m", "/tmp/P1_before_dft.m");
-    rename("/tmp/after_dft.m", "/tmp/P1_after_dft.m");
-
+    printf("check:=\"%s\";\n", __func__);
+    ppol("P0", x, cx);
+    ppol("P1", y, cy);
+    fft_do_dft_fppol(tx, x, cx, tt, fti, p); do_renames("dft", "P0");
+    fft_do_dft_fppol(ty, y, cy, tt, fti, p); do_renames("dft", "P1");
     fft_mul(tz, tx, ty, tt, fti);
+    fft_do_ift_fppol_mp(z, cz, tz, tt, fti, p, cx - 1); do_renames("ift", "P2");
+    ppol("P2", z, cz);
 
-#if 0
-
-Here is some magma code for checking.
-     
-n:=2^fti_depth;
-R:=Integers(2^(n*fti_w) + 1);
-RP<T>:=PolynomialRing(R);
-Z:=Integers();
-// integers
-zP0:=Evaluate(ChangeRing(P0,Z),2^fti_ks_coeff_bits);
-zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
-load "/tmp/P0_before_dft.m"; Q0:=Polynomial([R!Seqint(x,2^64):x in data]);
-load "/tmp/P1_before_dft.m"; Q1:=Polynomial([R!Seqint(x,2^64):x in data]);
-// now polynomials over R. We pick blocks of fti_bits, which is less
-// than half of n*fti_w
-Q0 eq Polynomial(R,Intseq(zP0,2^fti_bits));
-Q1 eq Polynomial(R,Intseq(zP1,2^fti_bits));
-load "/tmp/P0_after_dft.m"; tQ0:=([R!Seqint(x,2^64):x in data]);
-load "/tmp/P1_after_dft.m"; tQ1:=([R!Seqint(x,2^64):x in data]);
-bitrev:=func<x,n|Seqint(Reverse(Intseq(x,2,n)),2)>;
-bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
-rho:=fti_w mod 2 eq 0 select R!2^(fti_w div 2) else R!(2^(3*u)-2^u)^fti_w where u is (n*fti_w div 4);
-[Evaluate(Q0,rho^i):i in bitrevseq(fti_depth+2)][1..fti_trunc0] eq tQ0[1..fti_trunc0];
-[Evaluate(Q1,rho^i):i in bitrevseq(fti_depth+2)][1..fti_trunc0] eq tQ1[1..fti_trunc0];
-load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
-Q2:=(Q0*Q1) mod (T^(4*n)-1);
-tQ2[1..fti_trunc0] eq [Evaluate(Q2,rho^i):i in bitrevseq(fti_depth+2)][1..fti_trunc0];
-zP2:=Evaluate(ChangeRing(Q2,Z),2^fti_bits);
-// check that product in RP gives the info to recover MP(P0,P1) as
-// desired. We're checking all this between the integers on one side, and
-// GF(p) on the other side. There are other ways to write the same
-// (explicitly writing "mod p", e.g.).
-MP:=func<P0,P1|[Coefficient(P,i) :i in [Min(Degree(P0),Degree(P1))..Max(Degree(P0),Degree(P1))]] where P is P0*P1>;
-P2:=Intseq(zP2,2^fti_ks_coeff_bits)[Degree(P0)+1..Degree(P1)+1];
-MP(P0,P1) eq P2;
-#endif
-
-    fft_do_ift_fppol_mp(z, nz * np, tz, tt, fti, p, nx - 1);
-    rename("/tmp/before_ift.m", "/tmp/P2_before_ift.m");
-    rename("/tmp/after_ift.m", "/tmp/P2_after_ift.m");
-
-    ppol("P2", z, nz);
-
-
-    free(tx);
-    free(tz);
-    free(ty);
-    free(tt);
-    free(x);
-    free(z);
-    free(y);
+    free_everything();
+    mpz_clear(p);
     return 0;
 }/*}}}*/
 
-int main()
+int main(int argc, char * argv[])
 {
+    seed = getpid();
+    // s=84; seed=12682; longstrings=0; 
+    // s=93; seed=13156; longstrings=0;
+    // s=10; seed=22442; longstrings=0;
+    // s=84; seed=12682; longstrings=0; 
+    // s=93; seed=13156; longstrings=0;
+    // s=10; seed=22442; longstrings=0;
+    // s=0; seed=8412; longstrings=0;
+    // seed=6286; longstrings=0;
+    // s=0; seed=16083; longstrings=0;
+    // s=0; seed=19066; longstrings=0;
+    // s=0; seed=19239; longstrings=0;
+    // s=0; seed=19302; longstrings=0;
+    // s=0; seed=25058; longstrings=0;
+    // s=12; seed=1010; longstrings=0;
+    // s=24; seed=6931; longstrings=0;
+
+
+    fprintf(stderr, "/* s=%d; seed=%d; longstrings=%d; */\n", s, seed, longstrings);
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    // test_mul(rstate);
-    // test_mulmod(rstate);
-    // test_mul_fppol(rstate);
-    test_mp_fppol(rstate);
+    gmp_randseed_ui(rstate, seed);
+
+#ifdef PARI
+    printf("allocatemem(800000000)\n");
+#endif
+
+    int done_tests = 0;
+    for(int i = 1 ; i < argc ; i++) {
+        const char * p = argv[i];
+        if (strncmp(p, "test_", 5) == 0) p += 5;
+        if (strcmp(p, "mul") == 0) { test_mul(rstate); done_tests++; continue; }
+        if (strcmp(p, "mulmod") == 0) { test_mulmod(rstate); done_tests++; continue; }
+        if (strcmp(p, "mul_fppol") == 0) { test_mul_fppol(rstate); done_tests++; continue; }
+        if (strcmp(p, "mp_fppol") == 0) { test_mp_fppol(rstate); done_tests++; continue; }
+        fprintf(stderr, "Unexpected argument: %s\n", p);
+        exit(EXIT_FAILURE);
+    }
+    if (!done_tests) {
+        fprintf(stderr, "Please supply at least one test name\n");
+        exit(EXIT_FAILURE);
+    }
     gmp_randclear(rstate);
     return 0;
 }
 
+#if 0
+
+/* This magma script may be run *after* the output of this program */
+
+n:=2^fti_depth;
+Z:=Integers();
+R:=Integers(2^(n*fti_w) + 1);
+RP<T>:=PolynomialRing(R);
+/* sqrt(2) in R */
+rho:=fti_w mod 2 eq 0 select
+        R!2^(fti_w div 2)
+    else
+        R!(2^(3*u)-2^u)^fti_w
+    where u is (n*fti_w div 4);
+
+/* These make sense only in the context of the matrix algorithm (MFA) */
+depth1 := fti_depth div 2;
+depth2 := fti_depth + 1 - depth1;
+n1 := 2^depth1; // for MFA
+
+/* compute the truncation point */
+tr:=fti_trunc0;
+if tr le 2*n then tr:=2*n+1; end if;
+if fti_alg eq 0 then
+// trunc must be even and greater than 2n
+tr:=fti_trunc0 + (fti_trunc0 mod 2);
+else
+// trunc must be greater than 2n and multiple of 2*n1
+tr:= 2 * n1 * Ceiling(tr / (2 * n1));
+end if;
+
+/* transform coefficients are created in bitrev order, at least for the
+ * non-MFA algorithm. This script is presently incapable of checking the
+ * validity of transformed data for the MFA, but fixing it should not be
+ * terribly hard. */
+bitrev:=func<x,n|Seqint(Reverse(Intseq(x,2,n)),2)>;
+bitrevseq:=func<n|[bitrev(i,n):i in [0..2^n-1]]>;
+
+// mfaorder:=func<x|Seqint([b[1+i]:i in mfabitorder],2) where b is Intseq(x,2,fti_depth+2)>;
+
+
+/* precompute powers */
+seqmatch:=func<S,T,n|S[1..n] eq T[1..n]>;
+pows:=[R|1];
+for i in [1..2^(fti_depth+2)-1] do Append(~pows, pows[#pows]*rho); end for;
+assert rho^(4*n) eq 1;
+
+load "/tmp/P0_before_dft.m"; Q0:=Polynomial([R!Seqint(x,2^64):x in data]);
+load "/tmp/P1_before_dft.m"; Q1:=Polynomial([R!Seqint(x,2^64):x in data]);
+load "/tmp/P0_after_dft.m";  tQ0:=([R!Seqint(x,2^64):x in data]);
+load "/tmp/P1_after_dft.m";  tQ1:=([R!Seqint(x,2^64):x in data]);
+load "/tmp/P2_before_ift.m"; tQ2:=([R!Seqint(x,2^64):x in data]);
+load "/tmp/P2_after_ift.m";  cQ2:=Polynomial([R!Seqint(x,2^64):x in data]);
+cQ2 mod:= T^tr;
+
+ch:=func<Q,tQ|fti_alg eq 0 select  seqmatch([Evaluate(Q,pows[i+1]):i in bitrevseq(fti_depth+2)], tQ, tr) else "skipped (MFA)">;
+
+/* work around magma bugs */
+if not assigned P0 then P0:=0; end if;
+if not assigned P1 then P1:=0; end if;
+if not assigned P2 then P2:=0; end if;
+if not assigned A0 then A0:=0; end if;
+if not assigned A1 then A1:=0; end if;
+if not assigned A2 then A2:=0; end if;
+
+print "Active test: ", check;
+
+if check eq "test_mul" then
+    Q0 eq Polynomial(R,Intseq(A0,2^fti_bits));
+    Q1 eq Polynomial(R,Intseq(A1,2^fti_bits));
+    Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
+    Q2 eq cQ2;
+    A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits);
+elif check eq "test_mulmod" then
+    Q0 eq Polynomial(R,Intseq(A0,2^fti_bits));
+    Q1 eq Polynomial(R,Intseq(A1,2^fti_bits));
+    Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
+    Q2 eq cQ2;
+    A2 eq Evaluate(ChangeRing(Q2,Z),2^fti_bits) mod (2^(4*n*fti_bits)-1);
+elif check eq "test_mul_fppol" then
+    zP0:=Evaluate(ChangeRing(P0,Z),2^fti_ks_coeff_bits);
+    zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
+    Q0 eq Polynomial(R,Intseq(zP0,2^fti_bits));
+    Q1 eq Polynomial(R,Intseq(zP1,2^fti_bits));
+    Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
+    Q2 eq cQ2;
+    P2 eq 2*P0*P1+P0+P1;
+elif check eq "test_mp_fppol" then
+    zP0:=Evaluate(ChangeRing(P0,Z),2^fti_ks_coeff_bits);
+    zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
+    Q0 eq Polynomial(R,Intseq(zP0,2^fti_bits));
+    Q1 eq Polynomial(R,Intseq(zP1,2^fti_bits));
+    Q2:=(Q0*Q1) mod (T^(4*n)-1);
+    Q2 eq cQ2;
+    zP2:=Evaluate(ChangeRing(Q2,Z),2^fti_bits);
+    P2:=Intseq(zP2,2^fti_ks_coeff_bits)[Degree(P0)+1..Degree(P1)+1];
+    MP:=func<P0,P1|[Coefficient(P,i) :i in [Min(Degree(P0),Degree(P1))..Max(Degree(P0),Degree(P1))]] where P is P0*P1>;
+    MP(P0,P1) eq P2;
+else
+    print "check not understood";
+end if;
+
+print "checking transform T0: ", ch(Q0, tQ0);
+print "checking transform T1: ", ch(Q1, tQ1);
+print "checking transform T2: ", ch(Q2, tQ2);
+
+
+#endif

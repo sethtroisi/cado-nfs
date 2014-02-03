@@ -430,7 +430,7 @@ void * fft_transform_alloc(struct fft_transform_info * fti)
 /* }}} */
 
 /* {{{ kronecker-schönhage */
-void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t nx, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t cx, struct fft_transform_info * fti, mpz_srcptr p)
 {
     /* XXX We are implicitly asserting that the transform here is
      * straight out of fft_transform_prepare(). If it is not, then we
@@ -443,7 +443,7 @@ void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t nx, struct fft_transform
     mp_limb_t ** ptrs = (mp_limb_t **) y;
 
     mp_size_t np = mpz_size(p);
-    assert(nx % np == 0);
+    mp_size_t nx = cx * np;
     mp_size_t ks_coeff_bits = fti->ks_coeff_bits;
     /* We re-implement fft_split_bits */
     mp_limb_t * area = ptrs[0]; // assumes fft_transform_prepare()
@@ -580,14 +580,17 @@ void fft_split_fppol(void * y, mp_limb_t * x, mp_size_t nx, struct fft_transform
  * Because of possible carry propagation, we must scan through the entire
  * input set, and compute the additions, in order to be able to recognize
  * the correct bits.
+ *
+ * The nx first coefficients of the result (each occupying mpz_size(p)
+ * limbs) go to the limb array x.
  */
-void fft_combine_fppol(mp_limb_t * x, mp_size_t nx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_combine_fppol(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
 {
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
 
     mp_size_t np = mpz_size(p);
-    assert(nx % np == 0);
+    mp_size_t nx = cx * np;
     mpn_zero(x, nx);
 
     /* XXX silly placeholder, doing extra allocation */
@@ -663,13 +666,13 @@ void fft_combine_fppol(mp_limb_t * x, mp_size_t nx, void * y, struct fft_transfo
  * presence of a carry is directly decided from the presence of the bit
  * just before the lowest polynomial coefficient in R[x].
  */
-void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transform_info * fti, mpz_srcptr p)
 {
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
 
     mp_size_t np = mpz_size(p);
-    assert(nx % np == 0);
+    mp_size_t nx = cx * np;
     mpn_zero(x, nx);
 
     /* XXX silly placeholder, doing extra allocation */
@@ -751,19 +754,6 @@ void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, struct fft_tran
     }
     free(temp);
     free(xtemp);
-    /* We go through all limbs of the evaluated polynomial, calculating
-     * them as we go
-     *
-     * limb starting at bit k*bits + j receives contribution from bits j
-     * and above from coefficient k, but also from bits j+bits and above
-     * from coefficient k-1, and even from the top bit of coefficient k-2
-     * if j happens to be zero.
-     *
-     * As we do the calculations, we fill a temp window of size
-     * ks_coeff_bits. When filling is done, its contents are reduced to
-     * form a new coefficient of the resulting polynomial.
-     *
-     */
 }
 /* }}} */
 
@@ -933,14 +923,12 @@ void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_t
     fft_do_dft_backend(y, temp, fti);                                          
 }
 
-/* This does the same as above, except that the nx limbs at x are the
- * coefficients of a polynomial modulo GF(p). Coefficients of the
- * polynomial have to span an integral number of limbs, so nx must be a
- * multiple of mpz_size(p).
+/* This does the same as above, except that x is an array of nx
+ * coefficients modulo p, each taking mpz_size(p) limbs
  */
-void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t cx, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
-    fft_split_fppol(y, x, nx, fti, p);
+    fft_split_fppol(y, x, cx, fti, p);
     fft_do_dft_backend(y, temp, fti);
 }
 
@@ -990,13 +978,13 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
 /* Same, but store the result as a polynomial over GF(p). nx must be a
  * multiple of mpz_size(p)
  */
-void fft_do_ift_fppol(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
+void fft_do_ift_fppol(mp_limb_t * x, mp_size_t cx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p)
 {
     fft_do_ift_backend(y, temp, fti);
-    fft_combine_fppol(x, nx, y, fti, p);
+    fft_combine_fppol(x, cx, y, fti, p);
 }
 
-void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift)
+void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, struct fft_transform_info * fti, mpz_srcptr p, mp_size_t shift)
 {
     fft_do_ift_backend(y, temp, fti);
     mp_size_t nbigtemp = fft_get_mulmod_output_minlimbs(fti);
@@ -1005,7 +993,7 @@ void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t nx, void * y, void * temp, str
     fft_combine_bits(bigtemp, y, fti->trunc0, fti->bits, rsize0, nbigtemp);
 
     mp_size_t np = mpz_size(p);
-    assert(nx % np == 0);
+    mp_size_t nx = cx * np;
 
     mp_size_t ksspan = (fti->ks_coeff_bits / FLINT_BITS + 2);
     mp_limb_t * smalltemp = malloc((2*ksspan+1) * sizeof(mp_limb_t));
