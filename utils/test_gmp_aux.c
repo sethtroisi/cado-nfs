@@ -240,9 +240,10 @@ test_mpz_addmul_int64 ()
 void
 test_ulong_nextprime ()
 {
-  unsigned long q = lrand48 (), r, s;
+  unsigned long q, r, s;
   int i;
 
+  q = lrand48 () % 300000000;
   for (i = 0; i < 100000 && q < 300000000; i++)
     {
       for (s = q + 1; s != 0 && ulong_isprime (s) == 0; s++);
