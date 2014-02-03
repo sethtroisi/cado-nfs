@@ -160,10 +160,32 @@ test_double_poly_eval (void)
 #pragma GCC diagnostic pop
 #endif
 
+void
+test_double_poly_derivative (void)
+{
+  double_poly_t f, df;
+
+  double_poly_init (f, 1);
+  double_poly_init (df, 0);
+
+  f->coeff[0] = 17.0;
+  f->coeff[1] = 42.0;
+  double_poly_derivative (df, f);
+  assert (df->deg == 0 && df->coeff[0] == 42.0);
+
+  f->deg = 0;
+  double_poly_derivative (df, f);
+  assert (df->deg == 0 && df->coeff[0] == 0.0);
+
+  double_poly_clear (f);
+  double_poly_clear (df);
+}
+
 int main()
 {
   test_double_poly_compute_roots(0);
   test_double_poly_set ();
   test_double_poly_eval ();
+  test_double_poly_derivative ();
   exit(EXIT_SUCCESS);
 }
