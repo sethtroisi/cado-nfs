@@ -1086,6 +1086,44 @@ mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
   return d;
 }
 
+/*  Reduce frac (= num / denom) mod F mod m ,
+    i.e. compute num * denom^-1 mod F mod m .
+    The return value is in num, denom is set to constant polynomial 1
+    */
+void
+mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
+                                    const mpz_poly_t F, const mpz_t m)
+{
+  if (denom->deg == 0)
+  {
+    mpz_t inv;
+    mpz_init (inv);
+    mpz_poly_getcoeff (inv, 0, denom); /* inv <- denom[0] */
+    mpz_invert (inv, inv, m);          /* inv <- denom[0]^-1 */
+    mpz_poly_mul_mpz (num, num, inv);  /* num <- num * inv */
+    mpz_poly_reduce_mod_mpz (num, num, m); /* num <- num * inv mod m */
+    mpz_clear (inv);
+  }
+  else
+  {
+    int d;
+    mpz_poly_t g, U, V;
+    mpz_poly_init (g, 0);
+    mpz_poly_init (U, 0);
+    mpz_poly_init (V, 0);
+    mpz_poly_xgcd_mpz (g, F, denom, U, V, m);
+    mpz_poly_mul (num, num, V);
+    d=mpz_poly_mod_f_mod_mpz (num->coeff, num->deg, F->coeff, F->deg, m, NULL);
+    mpz_poly_cleandeg(num, d);
+    mpz_poly_clear (g);
+    mpz_poly_clear (U);
+    mpz_poly_clear (V);
+  }
+  mpz_poly_set_zero (denom);
+  mpz_poly_setcoeff_si (denom, 0, 1);
+}
+
+
 // Q = P1*P2 mod f, mod m
 // f is the original algebraic polynomial (non monic but small coefficients)
 void
@@ -1291,6 +1329,40 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
   mpz_clear (c);
   mpz_mod (a, a, m);
 }
+
+/* Q = P^a mod f, mod p. Note, p is mpz_t */
+/* Same as mpz_poly_power_mod_f_mod_mpz but use barrett for reduction mod p */
+void
+mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
+                                      const mpz_poly_t f, const mpz_t a,
+                                      const mpz_t p, const mpz_t invp)
+{
+  int k = mpz_sizeinbase(a, 2);
+  mpz_poly_t R;
+
+  if (mpz_cmp_ui(a, 0) == 0) {
+    Q->deg = 0;
+    mpz_set_ui(Q->coeff[0], 1);
+    return;
+  }
+
+  mpz_poly_init(R, 2*f->deg);
+
+  // Initialize R to P
+  mpz_poly_copy(R, P);
+
+  // Horner
+  for (k -= 2; k >= 0; k--)
+  {
+    mpz_poly_sqr_mod_f_mod_mpz(R, R, f, p, invp);  // R <- R^2
+    if (mpz_tstbit(a, k))
+      mpz_poly_mul_mod_f_mod_mpz(R, R, P, f, p, invp);  // R <- R*P
+  }
+
+  mpz_poly_copy(Q, R);
+  mpz_poly_clear(R);
+}
+
 
 /* Return a list of polynomials P[0], P[1], ..., P[l] such that
    P0 = Q[l-1] + p^K[1]*P[l]

@@ -48,17 +48,17 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 }
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
-			  int * small_nrows, mpz_poly_t F, const mpz_t ell2)
+                             int * small_nrows, mpz_poly_t F, const mpz_t ell2)
 {
-  FILE * ix = fopen_maybe_compressed(indexname, "r");
-
   /* array of (a,b) pairs from (purgedname) file */
   mpz_poly_t *pairs;
-  
-  /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file  */
+  /* Array of (small_nrows) relation-sets built from array (pairs) and
+     (indexname) file  */
   sm_relset_ptr rels;
-
   uint64_t nrows, ncols;
+
+  FILE * ix = fopen_maybe_compressed(indexname, "r");
+
   purgedfile_read_firstline (purgedname, &nrows, &ncols);
 
   pairs = (mpz_poly_t *) malloc(nrows * sizeof(mpz_poly_t));
@@ -78,7 +78,9 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
   for (int k = 0 ; k < *small_nrows ; k++) {
     mpz_poly_init(rels[k].num, F->deg);
+    mpz_poly_setcoeff_si(rels[k].num, 0, 1);      /* rels[k].num = 1   */
     mpz_poly_init(rels[k].denom, F->deg);
+    mpz_poly_setcoeff_si(rels[k].denom, 0, 1);    /* rels[k].denom = 1 */
   }
     
   unsigned int ridx;
@@ -93,11 +95,6 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
     ASSERT_ALWAYS(ret == 1);
-
-    (rels[i].num)->deg = 0;
-    (rels[i].denom)->deg = 0;
-    mpz_poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
-    mpz_poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
 
     for(int k = 0 ; k < nc ; k++) {
       ret = fscanf(ix, "%x:%ld", &ridx, &e); 
@@ -157,32 +154,21 @@ void * thread_start(void *arg) {
   mpz_srcptr invl2 = ti->invl2;
   mpz_poly_t *sm = ti->sm;
   int offset = ti->offset;
-  mpz_t tmp;
-
-  mpz_init(tmp);
-
-  mpz_poly_t g, U, V;
-  mpz_poly_init(g, 0);
-  mpz_poly_init (U,0);
-  mpz_poly_init (V,0);
-
 
   for (int i = 0; i < ti->nb; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
+    mpz_poly_reduce_frac_mod_f_mod_mpz(rels[offset+i].num, rels[offset+i].denom,
+                                       F, ell2);
     compute_sm (sm[i], rels[offset+i].num, F, ell, eps, ell2, invl2);
   }
 
-  mpz_clear(tmp);
-  mpz_poly_clear(g);
-  mpz_poly_clear(U);
-  mpz_poly_clear(V);
   return NULL;
 }
 
 #define SM_BLOCK 500
 
-void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
-    const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
+void mt_sm (int nt, const char * outname, sm_relset_ptr rels, int sr,
+            mpz_poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2,
+            int nsm)
 {
   // allocate space for results of threads
   mpz_poly_t **SM;
@@ -266,19 +252,15 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t 
 }
 
 
-void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
-	const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
+void sm (const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
+         const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   FILE * out = fopen(outname, "w");
   mpz_poly_t SM;
   mpz_t invl2;
-  mpz_t tmp;
-  
-  mpz_init(tmp);
 
   mpz_init(invl2);
   barrett_init(invl2, ell2);
-
 
   fprintf(stderr, "\tBuilding %d relation sets mod ell^2:\n", sr);
   fprintf(stderr, "\tell^2 = ");
@@ -286,27 +268,16 @@ void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
   fprintf(stderr, "\n");
 
   mpz_poly_init(SM, F->deg);
-  SM->deg = 0;
-  mpz_poly_setcoeff_si(SM, 0, 1);
 
-  mpz_poly_t g, U, V;
-  mpz_poly_init(g, 0);
-  mpz_poly_init (U,0);
-  mpz_poly_init (V,0);
-  
   fprintf(out, "%d\n", sr);
 
   for (int i=0; i<sr; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
+    mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm);
   }
 
-  mpz_poly_clear(SM);
-  mpz_poly_clear(U);
-  mpz_poly_clear(V);
   mpz_clear(invl2);
-  mpz_clear(tmp);
   fclose(out);
 }
 

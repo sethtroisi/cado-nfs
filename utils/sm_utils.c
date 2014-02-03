@@ -3,32 +3,8 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Q = P^a mod f, mod p. Note, p is mpz_t */
+/* Init polynomial rel and set it to b*x - a */
 void
-mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                    const mpz_t a, const mpz_t p, MAYBE_UNUSED const mpz_t invp)
-{
-  int k = mpz_sizeinbase(a, 2);
-
-  if (mpz_cmp_ui(a, 0) == 0) {
-    Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
-    return;
-  }
-  
-  // Initialize Q to P
-  mpz_poly_copy(Q, P);
-
-  // Horner
-  for (k -= 2; k >= 0; k--)
-  {
-    mpz_poly_sqr_mod_f_mod_mpz(Q, Q, f, p, NULL);  // R <- R^2
-    if (mpz_tstbit(a, k))
-      mpz_poly_mul_mod_f_mod_mpz(Q, Q, P, f, p, NULL);  // R <- R*P
-  }
-}
-
-inline void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
   if (b == 0)
@@ -36,7 +12,6 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
     /* freerel */
     mpz_poly_init(rel, 0);
     mpz_poly_setcoeff_int64(rel, 0, a);
-    rel->deg=0;
   }
   else
   {
@@ -44,34 +19,11 @@ mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
     mpz_poly_init(rel, 1);
     mpz_poly_setcoeff_int64(rel, 0, a);
     mpz_poly_setcoeff_int64(rel, 1, -b);
-    rel->deg = 1;
-  }
-}
-
-
-/*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
-inline void
-mpz_poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const mpz_poly_t F,
-                        const mpz_t m, mpz_t tmp, mpz_poly_t g, mpz_poly_t U, mpz_poly_t V)
-{
-  if (frac->denom->deg == 0)
-  {
-    mpz_invert(tmp, frac->denom->coeff[0], m);
-    mpz_poly_mul_mpz(frac->num, frac->num, tmp);
-    mpz_poly_reduce_mod_mpz(frac->num, frac->num, m);
-  }
-  else
-  {
-    mpz_poly_xgcd_mpz (g, F, frac->denom, U, V, m);
-    mpz_poly_mul (frac->num, frac->num, V);
-    int d = mpz_poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
-                                F->deg, m, NULL);
-    mpz_poly_cleandeg(frac->num, d);
   }
 }
 
 /* compute the SM */
-inline void
+void
 compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
@@ -86,7 +38,7 @@ compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
   }
 }
 
-inline void
+void
 print_sm (FILE *f, mpz_poly_t SM, int nSM)
 {
   for(int j=0; j<nSM; j++)
@@ -101,14 +53,12 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM)
 
 /* Computed the Shirokauer maps of a single pair (a,b). 
    SM must be allocated and is viewed as a polynomial of degree F->deg. */
-void sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F, const mpz_t eps, 
-                   const mpz_t ell, const mpz_t ell2, const mpz_t invl2)
+void sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F,
+                   const mpz_t eps, const mpz_t ell, const mpz_t ell2,
+                   const mpz_t invl2)
 {
   mpz_poly_t rel;
 
-  SM->deg = 0;
-  mpz_poly_setcoeff_si(SM, 0, 1);
-  
   mpz_poly_init_set_ab(rel, a, b);
   compute_sm (SM, rel, F, ell, eps, ell2, invl2);
 }

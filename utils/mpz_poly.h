@@ -84,6 +84,8 @@ int mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
                             const mpz_poly_t f, const mpz_t m,
                             const mpz_t invm);
+void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
+                                         const mpz_poly_t F, const mpz_t m);
 void mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p);
 void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p);
 void mpz_poly_div_ui(mpz_poly_t f, const mpz_poly_t g, unsigned long a);
@@ -113,6 +115,9 @@ void mpz_poly_power_mod_f_mod_ui(mpz_poly_t Q, const mpz_poly_t P, const mpz_pol
                              const mpz_t a, unsigned long p);
 void mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
                                const mpz_t a, const mpz_t p);
+void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t, const mpz_poly_t,
+                                           const mpz_poly_t, const mpz_t,
+                                           const mpz_t, const mpz_t);
 void mpz_poly_derivative(mpz_poly_t df, const mpz_poly_t f);
 void barrett_init (mpz_ptr invm, mpz_srcptr m);
 void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m,
