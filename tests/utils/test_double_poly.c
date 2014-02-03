@@ -20,8 +20,8 @@ parse_poly_str (double_poly_ptr poly, const char *str)
   double coeff;
   
   while (next != NULL) {
-    sscanf(next, "%lf", &coeff);
-    // printf("%lf\n", coeff);
+    if (sscanf(next, "%lf", &coeff) != 1)
+      break;
     if (poly) {
       assert((unsigned int) i <= poly->deg);
       poly->coeff[i] = coeff;
@@ -41,6 +41,7 @@ parse_poly(double_poly_ptr poly, const char *str)
   if (n == 0) {
     double_poly_init (poly, 0);
     poly->coeff[0] = 0.;
+    poly->deg = -1; /* so that deg+1 is the number of roots */
   } else {
     double_poly_init (poly, n - 1);
   }
@@ -89,6 +90,8 @@ test_double_poly_compute_roots1(const char *poly_str, const char *roots_str,
 static void
 test_double_poly_compute_roots(const int verbose)
 {
+  test_double_poly_compute_roots1("1", "", 1e-9, 3., verbose);
+
   /* A few roots of 2 */
   test_double_poly_compute_roots1("-2 1", "2", 1e-9, 3., verbose);
   test_double_poly_compute_roots1("-2 0 1", "1.41421356237310", 1e-6, 3., verbose);
