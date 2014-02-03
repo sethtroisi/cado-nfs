@@ -1,3 +1,7 @@
+# The SRCFILE parameter to this macro is the file name of the source file to
+# build. The LIBRARIES parameter is any libraries that should be linked in.
+# Any additional parameters are added to the command line of the test
+# executable that gets run.
 macro(build_and_run_test SRCFILE LIBRARIES)
 
     # The name of the binary executable is equal to the name of the source
@@ -55,7 +59,7 @@ macro(build_and_run_test SRCFILE LIBRARIES)
               --output-on-failure
 
               # And finally the binary that should be run as the actual test
-              --test-command "${DSTFILE}")
+              --test-command "${DSTFILE}" ${ARGN})
 endmacro(build_and_run_test)
 
 add_subdirectory (utils)
