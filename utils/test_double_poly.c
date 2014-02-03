@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include "macros.h"
 #include "double_poly.h"
 
 
@@ -133,6 +134,10 @@ test_double_poly_set (void)
   double_poly_clear (r);
 }
 
+#if GNUC_VERSION_ATLEAST(4,4,0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
 void
 test_double_poly_eval (void)
 {
@@ -151,6 +156,9 @@ test_double_poly_eval (void)
     }
   double_poly_clear (s);
 }
+#if GNUC_VERSION_ATLEAST(4,4,0)
+#pragma GCC diagnostic pop
+#endif
 
 int main()
 {
