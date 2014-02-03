@@ -54,7 +54,7 @@ cat > $DIR/epilog.html <<EOF
 <p style="text-align: center;">See also the <a href="./@basedir@/make-test.txt">test results</a></p>
 EOF
 maketest() {
-if make -j8 test ARGS=-j8 ; then
+if make -j8 test $EXTRA_MAKETEST_ARGS; then
     :
 else
     cat > $DIR/epilog.html <<EOF
