@@ -770,5 +770,5 @@ int main(int argc, char **argv)
   tests_mod_inv (iter);
   printf ("Testing mod_jacobi()\n");
   tests_mod_jacobi (iter);
-  return 1;
+  return 0;
 }
