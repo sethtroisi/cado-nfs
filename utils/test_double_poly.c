@@ -181,11 +181,34 @@ test_double_poly_derivative (void)
   double_poly_clear (df);
 }
 
+void
+test_double_poly_revert (void)
+{
+  double_poly_t f;
+
+  double_poly_init (f, 2);
+
+  /* try with degree 2 */
+  f->coeff[0] = 1.0;
+  f->coeff[1] = 2.0;
+  f->coeff[2] = 3.0;
+  double_poly_revert (f);
+  assert (f->coeff[0] == 3.0 && f->coeff[1] == 2.0 && f->coeff[2] == 1.0);
+
+  /* now with degree 1 */
+  f->deg = 1;
+  double_poly_revert (f);
+  assert (f->coeff[0] == 2.0 && f->coeff[1] == 3.0);
+
+  double_poly_clear (f);
+}
+
 int main()
 {
   test_double_poly_compute_roots(0);
   test_double_poly_set ();
   test_double_poly_eval ();
   test_double_poly_derivative ();
+  test_double_poly_revert ();
   exit(EXIT_SUCCESS);
 }
