@@ -2,12 +2,8 @@ build_and_run_test(test_strlcat.c utils)
 build_and_run_test(test_strlcpy.c utils)
 build_and_run_test(test_double_poly.c utils)
 build_and_run_test(test_gmp_aux.c utils)
-<<<<<<< HEAD
-build_and_run_test(test_gcd.c utils)
-build_and_run_test(test_getprime.c utils)
-=======
 build_and_run_test(test_gcd.c "utils;tests")
->>>>>>> 7efb9d0d3767fad5b1dbbb6d1d9f8b07fd2e0b72
+build_and_run_test(test_getprime.c utils)
 build_and_run_test(test_roots_mod.c utils 100 1000)
 build_and_run_test(test_omega.c utils)
 build_and_run_test(test_timing.c utils)
