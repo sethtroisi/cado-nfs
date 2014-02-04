@@ -707,6 +707,7 @@ utils/double_poly.h
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
+tests/utils/test_getprime.c
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
