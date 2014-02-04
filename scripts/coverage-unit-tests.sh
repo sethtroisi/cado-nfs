@@ -1,6 +1,8 @@
 #!/bin/bash
 
 set -e
+
+: ${WEBDIR=$HOME/.webdir}
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`
 export CADO_DEBUG=1
 export COV=1
@@ -88,7 +90,7 @@ mark b
 wq
 EOF
 chmod 755 $DIR/genhtml
-$DIR/genhtml --html-epilog $DIR/epilog.html  -o ~/.webdir/cado-unit-tests/ $DIR/cado-nfs.info
-cp $DIR/make-test.txt ~/.webdir/cado-unit-tests
+$DIR/genhtml --html-epilog $DIR/epilog.html  -o $WEBDIR/cado-unit-tests/ $DIR/cado-nfs.info
+cp $DIR/make-test.txt $WEBDIR/cado-unit-tests
 rm -rf $DIR $F
 
