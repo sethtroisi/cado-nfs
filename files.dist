@@ -710,6 +710,9 @@ tests/utils/test_gcd.c
 tests/utils/test_getprime.c
 tests/test_iter.c
 tests/test_iter.h
+tests/sieve/CMakeLists.txt
+tests/sieve/F9.sievetest.sh
+tests/sieve/sievetest.sh
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
