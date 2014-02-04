@@ -112,6 +112,7 @@ int main(int argc, char **argv) {
     }
     p = getprime(p);
   }
+  getprime(0);
   free (r1);
   free (r2);
   exit (EXIT_SUCCESS);

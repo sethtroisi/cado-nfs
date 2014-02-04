@@ -17,6 +17,7 @@ test_getprime ()
   getprime (0);
   for (p = 2, i = 0; i < 1000000; p = getprime (p), i++);
   assert (p == 15485867);
+  getprime (0);
 }
 
 int
