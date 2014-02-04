@@ -630,6 +630,19 @@ end function;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+function NormalizeProjectiveElement(uv, pk)
+    R := Integers(pk);
+    u := R!uv[1];
+    v := R!uv[2];
+    if IsInvertible(v) then
+        u := u/v;
+        return Integers()!u;
+    else
+        assert IsInvertible(u);
+        v := v/u;
+        return pk + Integers()!v;
+    end if;
+end function;
 
 K<alpha>:=NumberField(f);
 
@@ -765,12 +778,7 @@ for pf in FacBadPrimes do
                         if i in alive_above_this then continue; end if;
                         totval+:=base[i]*prime_ideal_inertia_degree(G, fac[i][1]);
                     end for;
-                    if cQ[2] ne 1 then
-                        assert cQ[1] eq 1;
-                        ccQ := p^(k-1)+Integers()!cQ[2];
-                    else
-                        ccQ := Integers()!cQ[1];
-                    end if;
+                    ccQ := NormalizeProjectiveElement(cQ, p^(k-1));
                     str := Sprintf("%o %o %o", p, k-1, ccQ);
                     for i in matches do
                         if i in alive_above_this then
@@ -801,13 +809,8 @@ for pf in FacBadPrimes do
                     for a in above do
                         uv,ii,nvals,alive:=Explode(a);
                         if #alive gt 0 then continue; end if;
-                        if uv[2] ne 1 then
-                            assert uv[1] eq 1;
-                            ccQ := p^k+uv[2];
-                        else
-                            ccQ := uv[1];
-                        end if;
-                        str := Sprintf("%o %o %o", p, k, ccQ);
+                        ccQ := NormalizeProjectiveElement(uv, p^k);
+                                                str := Sprintf("%o %o %o", p, k, ccQ);
                         for i in matches do
                             SBADINFO := Sprintf("%o# (%o : %o) mod %o^%o ; v_%o_%o=%o\n",
                                 SBADINFO,
@@ -850,6 +853,7 @@ nr := #Roots(f, RealField());
 nc := Degree(f)-nr;
 assert IsEven(nc);
 
+SetColumns(0);
 printf "ell %o\n", ell;
 printf "smexp %o\n", lcm;
 printf "nmaps %o\n", nr + (nc div 2) -1;
