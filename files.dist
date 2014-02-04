@@ -933,3 +933,10 @@ tests/utils/OpenPegasusNOTICE.txt
 tests/utils/test_rootfinder.c
 tests/utils/test_strlcat.c
 tests/utils/test_strlcpy.c
+filter/filter_badideals.c
+params_dl/params.p59
+scripts/badideals.mag
+scripts/linalg.mag
+scripts/magma-linalg-wrapper.sh
+scripts/magma-nmbrthry-wrapper.sh
+
