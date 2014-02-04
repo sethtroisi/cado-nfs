@@ -521,6 +521,9 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
     if (!na || !nb) {
         return;
     }
+    /* we consider using karatsuba only when the smallest of the two
+     * operands is large enough.
+     */
     if (polymat_cutoff_get_subdivide_ub(&polymat_mul_kara_cutoff, na, nb) == 0) {
         polymat_mul_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
         return;
@@ -531,16 +534,24 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
     }
 
     for( ; nb >= na ; ) {
-        polymat_mul_raw_kara(ab, c, xc,
-                a, xa, na, b, xb, na, transpose, 1);
+        polymat_mul_raw_kara(ab, c, xc, a, xa, na, b, xb, na, transpose, 1);
         xb += na;
         xc += na;
         nb -= na;
     }
+    /* see below comment in #if0'ed block. Seems to me that the code
+     * theere is bogus */
+    ASSERT_ALWAYS(nb < na);
+    polymat_mul_raw_subdivide(ab, c, xc, a, xa, na, b, xb, nb, transpose, 1);
+#if 0
     if (!nb) {
         /* This condition also catches the Karatsuba case n, n */
         return;
     }
+    /* FIXME: nb might be very small here. Why do we do
+     * polymat_mul_raw_kara ? This defeats the semantics of the subdivide
+     * check, apparently.
+     */
     ASSERT_ALWAYS(nb < na);
     /* Fixup needed, now. Treat the largest possible subblock. We want
      * the intervals [0,na-k[ and [0, nb[ to match a kara scheme, i.e.
@@ -551,6 +562,7 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
             a, xa, nb, b, xb, nb, transpose, 1);
     polymat_mul_raw_subdivide(ab, c, xc + na - chop,
             a, xa + nb, chop, b, xb, nb, transpose, 1);
+#endif
 }/*}}}*/
 
 void polymat_mul_raw(abdst_field ab,/*{{{*/

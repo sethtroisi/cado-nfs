@@ -24,8 +24,11 @@
 
 #include <vector>
 #include <utility>
+#include <map>
+#include <string>
 #include <ostream>
 #include <iostream>
+#include <sstream>
 
 
 using namespace std;
@@ -42,21 +45,25 @@ struct cutoff_array {
         x.push_back(make_pair(n, winner));
         return 0;
     }
-    /* XXX final_alg is unused for the moment. This is because our
-     * interface has in fact very little expressivity. */
-    void export_to_cutoff_info(polymat_cutoff_info * dst, unsigned int final_cut, unsigned int final_alg MAYBE_UNUSED) const {
-        unsigned int v = 0;
-        for( ; v < x.size() && x[v].first < final_cut ; v++);
-        dst->table_size = v;
-        dst->cut = final_cut;
-        dst->subdivide = final_cut;
+    /* XXX this is really horrible and must be removed */
+    void export_to_cutoff_info(polymat_cutoff_info * dst) const {
+        dst->cut = x.back().first;
+        dst->subdivide = x.back().first;
+        dst->table_size = x.size();
         dst->table = (unsigned int (*)[2]) realloc(dst->table,
                 dst->table_size * sizeof(unsigned int[2]));
-        for(v = 0 ; v < dst->table_size ; v++) {
+        // cout << "cutoffs for kara:";
+        for(unsigned int v = 0 ; v < dst->table_size ; v++) {
+            if (x[v].second == 1 && x[v].first < dst->subdivide) {
+                dst->subdivide = x[v].first;
+            }
             dst->table[v][0] = x[v].first;
             dst->table[v][1] = x[v].second;
-        }
+            // cout << " " << x[v].first << " " << x[v].second << ",";
+        };
+        // cout <<"\n";
     }
+
     friend ostream& operator<<(ostream& o, cutoff_array const& A);
 };
 ostream& operator<<(ostream& o, cutoff_array const& A) {
@@ -93,11 +100,18 @@ struct cutoff_finder {
     double scale;
     int stable_cutoff_break;
     cutoff_array cutoffs;
-    unsigned int win_end;
+    unsigned int ntests;
     int stable;
+    vector<double> benches;
+    vector<bool> meaningful;
+    vector<pair<unsigned int, pair<vector<double>, int> > > all_results;
+    map<int, string> method_names;
 
-    cutoff_finder(unsigned int win_start, unsigned int win_end, unsigned int min_length = 1)
-        : cutoffs(make_pair(min_length, win_start)), win_end(win_end)
+    cutoff_finder(unsigned int ntests, unsigned int min_length = 1)
+        : cutoffs(make_pair(min_length, 0)),
+        ntests(ntests),
+        benches(ntests),
+        meaningful(ntests, true)
     {
         /* Fill defaults */
         enough_repeats = 1000;
@@ -108,32 +122,101 @@ struct cutoff_finder {
         stable = 0;
     }
 
-    inline unsigned int next(unsigned int k) const {
+    inline void set_method_name(int k, string const& s) {
+        method_names.insert(make_pair(k, s));
+    }
+    inline string method_name(int i) const {
+        ostringstream v;
+        map<int, string>::const_iterator z = method_names.find(i);
+        if (z == method_names.end()) {
+            v << "method " << i;
+            return v.str();
+        }
+        return z->second;
+    }
+
+    inline unsigned int next_length(unsigned int k) const {
         return MAX(k+1, scale*k);
     }
 
     inline int done() const {
+        int nactive=0;
+        for(int i = 0 ; i < ntests ; i++) {
+            nactive += meaningful[i];
+        }
+        if (nactive > 1) return 0;
         return !(stable < stable_cutoff_break);
     }
 
-    void new_winner(unsigned int k, unsigned int w) {
-        if (!cutoffs.push(k, w) || w != win_end) {
+    inline bool still_meaningful_to_test(int i) { return meaningful[i]; }
+
+    void summarize_for_this_length(unsigned int k)
+    {
+        const double slowness_ratio = 2;
+        const int age_slow_discard = 5;
+        std::ostringstream comments;
+        int best = -1;
+        for(int i = 0 ; i < ntests ; i++) {
+            if (meaningful[i] && (best < 0 || benches[i] < benches[best])) best = i;
+        }
+        ASSERT_ALWAYS(best >= 0);
+        all_results.push_back(make_pair(k,
+                    make_pair(benches, best)));
+
+        if (cutoffs.x.empty() || best != cutoffs.x.back().second) {
             stable = 0;
         } else {
             stable++;
         }
+
+        cutoffs.push(k, best);
+
+        vector<bool> was_meaningful = meaningful;
+
+        /* try to discard those which are slow */
+        for(int i = 0 ; i < best ; i++) {
+            /* already dead ? */
+            if (!meaningful[i]) continue;
+
+            /* for how long has it been slow ? */
+            unsigned int age_slow = 0;
+            for( ; age_slow < all_results.size() ; age_slow++) {
+                vector<double> const& these(all_results[all_results.size()-1-age_slow].second.first);
+                int best_there = all_results[all_results.size()-1-age_slow].second.second;
+                /* not so slow */
+                if (these[i] <= these[best_there] * slowness_ratio) break;
+            }
+            if (age_slow >= age_slow_discard) {
+                /* ok, discard */
+                comments << "  ; discarding " << method_name(i);
+                meaningful[i] = false;
+            }
+        }
+        cout << k;
+        for(int i = 0 ; i < ntests ; i++) {
+            if (was_meaningful[i]) {
+                cout << " " << benches[i];
+                if (i==best) cout << '#';
+            } else {
+                cout << " *";
+            }
+            benches[i] = 999999;
+        }
+        cout << " " << method_name(best) << comments.str() << "\n";
+
     }
 
     cutoff_array const& result() const { return cutoffs; }
-    void export_to_cutoff_info(polymat_cutoff_info* dst, unsigned int final_cut)
+    /*
+    void export_to_cutoff_info(polymat_cutoff_info* dst, pair<unsigned int, int> final_step)
     {
-        cutoffs.export_to_cutoff_info(dst, final_cut, win_end);
+        cutoffs.export_to_cutoff_info(dst, final_step);
     }
     void export_to_cutoff_info(polymat_cutoff_info* dst)
     {
-        ASSERT_ALWAYS(cutoffs.x.back().second == win_end);
-        cutoffs.export_to_cutoff_info(dst, cutoffs.x.back().first, win_end);
+        cutoffs.export_to_cutoff_info(dst);
     }
+    */
 
 
     template<typename T = T0>
@@ -158,8 +241,8 @@ struct cutoff_finder {
     };
 
     template<typename T = T0>
-    small_bench<T> micro_bench(double& t) const {
-        return small_bench<T>(*this, t);
+    small_bench<T> micro_bench(int i) {
+        return small_bench<T>(*this, benches[i]);
     }
 
 };
@@ -178,12 +261,14 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
     /* arguments to the ctor:
-     * 0 : initially, we know that method 0 wins (basecase)
-     * 1 : in the end, we expect method 1 to win (kara)
+     * 3 : we are benching 3 methods (numbered 0, 1, 2)
      * 1 : size makes sense only for >=1
      */
     /* TODO: support multiple values in my cutoff table finder ? */
-    cutoff_finder<timer_rusage> finder(0, 1, 1);
+    cutoff_finder<timer_rusage> finder(3, 1);
+    finder.set_method_name(0, "polymat-basecase");
+    finder.set_method_name(1, "polymat-karatsuba");
+    finder.set_method_name(2, "matpoly-kronecker-schönhage");
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -191,53 +276,77 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_init(always_basecase);
     polymat_cutoff_info_init(improved);
 
+    cout << "# Tuning "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products\n";
     /* Beware, k is a length, not a degree. Hence length 1 clearly makes
      * no sense */
-    for(unsigned int k = 2 ; !finder.done() ; k=finder.next(k)) {
-        /* Note: we are benching degree k, but the degree we are
-         * interested in for pi is k*m/(m+n) */
+    cout << "# ncoeffs, basecase, only-one-kara, matpoly+ks\n";
+    cout << "# Note: for input length k within plingen, we use k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+
+    /* Note: we are benching degree k, but the degree we are
+     * interested in for pi is k*m/(m+n) */
+    for(unsigned int k = 2 ; !finder.done() ; k=finder.next_length(k)) {
         polymat pi, piL, piR;
         polymat_init(ab, piL, m+n, m+n, k);
         polymat_init(ab, piR, m+n, m+n, k);
         polymat_init(ab, pi, m+n, m+n, 2*k-1);
         polymat_fill_random(ab, piL, k, rstate);
         polymat_fill_random(ab, piR, k, rstate);
-        double ttb;
-        /* disable kara for a minute */
-        polymat_set_mul_kara_cutoff(always_basecase, NULL);
-        for(auto x = finder.micro_bench(ttb); x; ++x) {
-            x.push();
-            polymat_mul(ab, pi, piL, piR);
-            x.pop();
+
+
+        if (finder.still_meaningful_to_test(0)) {
+            /* disable kara for a minute */
+            polymat_set_mul_kara_cutoff(always_basecase, NULL);
+            for(auto x = finder.micro_bench(0); x; ++x) {
+                x.push();
+                polymat_mul(ab, pi, piL, piR);
+                x.pop();
+            }
         }
 
-        double ttk;
-        /* This yields exactly *one* kara recursion step */
-        finder.export_to_cutoff_info(improved, k);
-        polymat_set_mul_kara_cutoff(improved, NULL);
-        for(auto x = finder.micro_bench(ttk); x; ++x) {
-            x.push();
-            polymat_mul(ab, pi, piL, piR);
-            x.pop();
+        if (finder.still_meaningful_to_test(1)) {
+            /* This temporarily sets the cutoff table to enable karatsuba for
+             * length >=k (hence for this test) at least, possibly using
+             * karatsuba one or more times in the recursive calls depending
+             * on what has been measured as best so far.
+             */
+            cutoff_array tmp_cutoffs = finder.cutoffs;
+            tmp_cutoffs.push(k, 1);
+            tmp_cutoffs.export_to_cutoff_info(improved);
+            polymat_set_mul_kara_cutoff(improved, NULL);
+            for(auto x = finder.micro_bench(1); x; ++x) {
+                x.push();
+                polymat_mul(ab, pi, piL, piR);
+                x.pop();
+            }
         }
 
-        double ttm;
-        /* The matpoly layer is just completetly different -- and gets
-         * faster quite early on... */
-        for(auto x = finder.micro_bench(ttm); x; ++x) {
-            x.push();
-            matpoly_mul(ab, (matpoly_ptr) pi, (matpoly_ptr) piL, (matpoly_ptr) piR);
-            x.pop();
+        if (finder.still_meaningful_to_test(2)) {
+            /* The matpoly layer is just completetly different -- and gets
+             * faster quite early on... */
+            for(auto x = finder.micro_bench(2); x; ++x) {
+                x.push();
+                matpoly_mul(ab, (matpoly_ptr) pi, (matpoly_ptr) piL, (matpoly_ptr) piR);
+                x.pop();
+            }
         }
+
+        finder.summarize_for_this_length(k);
+
+#if 0
         printf("%d %1.6f %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttm, ttk/ttb);
-        finder.new_winner(k, ttk < ttb); /* < : kara wins: 1 */
+
+        int best = 0;
+        if (ttk < ttb) { best++; if (ttm < ttk) best++; }
+        finder.new_winner(k, best); /* < : kara wins: 1 */
+#endif
 
         polymat_clear(ab, piL);
         polymat_clear(ab, piR);
         polymat_clear(ab, pi);
     }
 
-    finder.export_to_cutoff_info(improved);
+
+    finder.cutoffs.export_to_cutoff_info(improved);
     polymat_set_mul_kara_cutoff(improved, NULL);
 
     cout << "/* Cutoffs for "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products: */\n";
@@ -249,17 +358,17 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
+#if 0
 void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
     /* arguments to the ctor:
-     * 0 : initially, we know that method 0 wins (basecase)
-     * 1 : in the end, we expect method 1 to win (kara)
+     * 2 : we are benching 2 methods
      * 1 : size makes sense only for >=1
      */
-    cutoff_finder<timer_rusage> finder(0, 1, 1);
+    cutoff_finder<timer_rusage> finder(2, 1);
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -269,7 +378,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 
     /* Beware, k is a length, not a degree. Hence length 1 clearly makes
      * no sense */
-    for(unsigned int k = 2 ; !finder.done() ; k=finder.next(k)) {
+    for(unsigned int k = 2 ; !finder.done() ; k=finder.next_length(k)) {
         /* For a 2\ell lingen call, we need a MP which is
          *
          * (2-n/(m+n))\ell times m/(m+n)\ell --> \ell
@@ -336,18 +445,17 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
     /* arguments to the ctor:
-     * 0 : initially, we know that method 0 wins (basecase)
-     * 1 : in the end, we expect method 1 to win (kara)
+     * 2 : we are benching 2 methods
      * 1 : size makes sense only for >=1
      */
-    cutoff_finder<> finder(0, 1, 1);
+    cutoff_finder<> finder(2, 1);
 
     bigpolymat model;
     bigpolymat_init_model(model, comm, m1, n1);
 
     /* Beware, k is a length, not a degree. Hence length 1 clearly makes
      * no sense */
-    for(unsigned int k = 2 ; !finder.done() ; k=finder.next(k)) {
+    for(unsigned int k = 2 ; !finder.done() ; k=finder.next_length(k)) {
         /* Note: we are benching degree k, but the degree we are
          * interested in for pi is k*m/(m+n) */
         polymat pi, piL, piR;
@@ -400,6 +508,7 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
     }
     gmp_randclear(rstate);
 }/*}}}*/
+#endif
 
 void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm comm, param_list_ptr pl)
 {
@@ -422,6 +531,9 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
+    plingen_tune_mul(ab, m, n);
+
+#if 0
     /* This should normally be reasonably quick, and running it every
      * time can be considered as an option */
     if (rank == 0) {
@@ -434,6 +546,7 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     bigpolymat_bcast_polymat_cutoff(&polymat_mp_kara_cutoff, 0, comm);
 
     plingen_tune_bigmul(ab, m, n, mpi[0]*thr[0], mpi[1]*thr[1], comm);
+#endif
 
 #if 0
     int tune_bm_basecase = 1;

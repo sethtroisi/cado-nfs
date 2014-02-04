@@ -251,7 +251,7 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 4)
+set(plingen_prime_nwords 8)
 
 if(WITH_MPIR)
     file(GLOB flint_fft_files flint-fft/*.c)
