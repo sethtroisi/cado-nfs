@@ -706,6 +706,7 @@ utils/double_poly.c
 utils/double_poly.h
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
+tests/utils/test_gcd.c
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
@@ -932,3 +933,10 @@ tests/utils/OpenPegasusNOTICE.txt
 tests/utils/test_rootfinder.c
 tests/utils/test_strlcat.c
 tests/utils/test_strlcpy.c
+filter/filter_badideals.c
+params_dl/params.p59
+scripts/badideals.mag
+scripts/linalg.mag
+scripts/magma-linalg-wrapper.sh
+scripts/magma-nmbrthry-wrapper.sh
+filter/filter_badideals.c

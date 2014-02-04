@@ -1,0 +1,91 @@
+
+/*
+
+Run with
+  magma ell:=$ELL nmaps:=$SMAPS sparsefile:=$SPARSE smfile:=$SM kerfile:=$KER linalg.mag
+
+*/
+
+ell := StringToInteger(ell);
+nmaps := StringToInteger(nmaps);
+
+
+function ReadLineIndex(str)
+    S := Split(str, " ");
+    n := StringToInteger(S[1]);
+    assert #S eq n+1;
+    C := [];
+    for i := 1 to n do
+        A := Split(S[i+1], ":");
+        Append(~C, [ StringToInteger(A[1], 16), StringToInteger(A[2]) ]);
+    end for;
+    return C;
+end function;
+
+
+function ReadLineSmall(str)
+    S := Split(str, " ");
+    n := StringToInteger(S[1]);
+    assert #S eq n+1;
+    C := [];
+    for i := 1 to n do
+        A := Split(S[i+1], ":");
+        Append(~C, [ StringToInteger(A[1]), StringToInteger(A[2]) ]);
+    end for;
+    return C;
+end function;
+
+M := SparseMatrix();
+
+// Main part
+printf "Reading the sparse matrix %o...\n", sparsefile;
+SmallFile := Read(sparsefile);
+Lines := Split(SmallFile);
+m, n := Explode(StringToIntegerSequence(Lines[1]));
+
+for i := 1 to m do
+    C := ReadLineSmall(Lines[i+1]);
+    for j := 1 to #C do
+        SetEntry(~M, i, 1+C[j][1], C[j][2]);
+    end for;
+end for;
+
+// SM part
+printf "Reading the SM part %o...\n", smfile;
+SMFile := Read(smfile);
+Lines := Split(SMFile);
+mm := StringToInteger(Lines[1]);
+assert mm eq m;
+
+for i := 1 to m do
+    C := StringToIntegerSequence(Lines[i+1]);
+    assert #C ge nmaps;
+    for j := 1 to nmaps do
+        SetEntry(~M, i, n+j, C[j]);
+    end for;
+end for;
+
+/*
+// Column for the J ideal.
+IndexFile := Read("/localdisk/p59/c59.index");
+Lines := Split(IndexFile);
+mm, nn := Explode(StringToIntegerSequence(Lines[1]));
+assert mm eq m and nn eq n;
+
+for i := 1 to m do
+    C := ReadLineIndex(Lines[i+1]);
+    nJ := &+[x[2] : x in C];
+    SetEntry(~M, i, n+nmaps+1, nJ);
+end for;
+*/
+
+printf "Computing kernel...\n";
+time v := ModularSolution(M, ell);
+
+printf "Write result to %o...\n", kerfile;
+SetOutputFile(kerfile: Overwrite:=true);
+for i := 1 to Dimension(Parent(v)) do
+    print v[i];
+end for;
+UnsetOutputFile();
+exit;

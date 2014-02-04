@@ -163,7 +163,8 @@ class Parameters(object):
         "ssl": BoolParam,
         "threaded": BoolParam,
         "only_registered": BoolParam,
-        "run": BoolParam
+        "run": BoolParam,
+        "dlp": BoolParam
     }
 
     def __init__(self, *args, **kwargs):

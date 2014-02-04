@@ -17,6 +17,7 @@ Usage: $0 <integer> [options] [arguments passed to cadofactor.py]
                     and free of small prime factors [parameters are
                     optimized only for 85 digits and above]
 options:
+    -dlp          - don't factor, solve dlp in GF(integer)
     -t <integer>  - numbers of cores to be used
     -s <integer>  - numbers of slave scripts to be used
     -h <host1>,<host2>,...,<hostn>
@@ -78,6 +79,7 @@ fi
 cores=1
 slaves=1
 verbose=false
+dlp=false
 while [ -n "$1" ] ; do
   if [ "$1" = "-t" ]; then
     cores=$2
@@ -110,6 +112,10 @@ while [ -n "$1" ] ; do
       echo "timeout binary not found. Timeout disabled"
     fi
     shift 2
+  elif [ "$1" = "-dlp" ]; then
+    dlp=true
+    CADO_DEBUG="Yes, pleas"
+    shift
   elif [ "$1" = "-v" ]; then
     verbose=true
     shift
@@ -159,7 +165,7 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     if ! [ -z "$build_tree" ] ; then
       scriptpath="${srcdir}/scripts/cadofactor"
       cadofactor="${scriptpath}/cadofactor.py"
-      paramdir="${srcdir}/params/"
+      paramdir="${srcdir}/params"
       # Make the path absolute.
       bindir=`cd "$build_tree" ; pwd`
     fi
@@ -168,6 +174,10 @@ if [ -z "$cadofactor" ] ; then
     echo "I don't know where I am !" >&2
     # but I do care!
     exit 1
+fi
+
+if $dlp ; then
+    paramdir="${paramdir}_dl"
 fi
 
 if ! [ -d "$paramdir" ] ; then
@@ -185,7 +195,11 @@ size=${#n}
 
 # Try n, n+1, n-1, n+2...
 for ((i=1; i<=4; i=i+1)) ; do
-  file="$paramdir/params.c$size"
+  if $dlp ; then
+    file="$paramdir/params.p$size"
+  else 
+    file="$paramdir/params.c$size"
+  fi
   if [ -f $file ] ; then
     break
   fi
@@ -233,6 +247,11 @@ rc=$?
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
+    if $dlp ; then
+        # print ell, logs of 2 and 3
+        grep ell $t/*magma-nmbrthry-wrapper.sh.stdout*
+        awk '/ 2 0 rat/ {print "log2 " $NF} / 3 0 rat/ {print "log3 "$NF}' $t/*.reconstructlog.dlog
+    fi
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi

@@ -282,6 +282,17 @@ configure_file(
     ESCAPE_QUOTES
     @ONLY)
 
+# Copy magma scripts, to make our life easier; this should be removed 
+# once everything will be rewritten in C.
+foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
+        badideals.mag  linalg.mag)
+    configure_file(
+        ${CADO_NFS_SOURCE_DIR}/scripts/${script}
+        ${CADO_NFS_BINARY_DIR}/scripts/${script}
+        COPYONLY)
+endforeach(script)
+
+
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})

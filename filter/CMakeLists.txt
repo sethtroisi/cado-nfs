@@ -6,7 +6,7 @@ set (bin_list
 add_executable(dup1 dup1.c)
 target_link_libraries(dup1 utils_with_io)
 
-add_executable(dup2 dup2.c)
+add_executable(dup2 dup2.c filter_badideals.c)
 target_link_libraries(dup2 utils_with_io)
 
 add_executable(purge filter_common.c purge.c)

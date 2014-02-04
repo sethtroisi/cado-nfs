@@ -203,7 +203,7 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
  *  - the bad ideals
  */
 static inline void
-compute_index_rel (earlyparsed_relation_ptr rel)
+compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
 {
   unsigned int i;
   p_r_values_t r;
@@ -246,7 +246,7 @@ compute_index_rel (earlyparsed_relation_ptr rel)
       if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r, side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS] = {0,};
-        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e);
+        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, info);
         
         /* allocate room for (nb) more valuations */
         if (rel->nb + nb - 1 > rel->nb_alloc)
@@ -374,7 +374,7 @@ thread_dup2 (void * context_data, earlyparsed_relation_ptr rel)
 
 
 void *
-thread_root(void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr rel)
+thread_root(void * context_data, earlyparsed_relation_ptr rel)
 {
     if (!is_for_dl) { /* Do we reduce mod 2 */
         /* XXX should we compress as well ? */
@@ -382,7 +382,7 @@ thread_root(void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr rel)
             rel->primes[i].e &= 1;
     }
 
-    compute_index_rel (rel);
+    compute_index_rel (rel, context_data);
 
     return NULL;
 }
@@ -444,6 +444,7 @@ static void declare_usage(param_list pl)
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "dl", "(switch) do not reduce exponents modulo 2");
 #endif
+  param_list_decl_usage(pl, "badidealinfo", "file containing info about bad ideals");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
@@ -501,6 +502,7 @@ main (int argc, char *argv[])
     const char * basepath = param_list_lookup_string(pl, "basepath");
     const char * outdir = param_list_lookup_string(pl, "outdir");
     const char * renumberfilename = param_list_lookup_string(pl, "renumber");
+    const char * badinfofile = param_list_lookup_string(pl, "badidealinfo");
     const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
     param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
@@ -518,6 +520,10 @@ main (int argc, char *argv[])
     if (renumberfilename == NULL)
     {
       fprintf (stderr, "Error, missing -renumber command line argument\n");
+      usage(pl, argv0);
+    }
+    if (badinfofile == NULL && is_for_dl) {
+      fprintf (stderr, "Error, missing -badidealinfo command line argument\n");
       usage(pl, argv0);
     }
     if (nrels_expected == 0)
@@ -552,6 +558,10 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
+
+    allbad_info_t badinfo;
+    if (is_for_dl)
+        read_bad_ideals_info(badinfofile, badinfo);
 
     set_antebuffer_path (argv0, path_antebuffer);
 
@@ -639,6 +649,8 @@ main (int argc, char *argv[])
           { .f = thread_dup2, .arg=0, .n=1, },
           { .f = NULL, },
       };
+      if (is_for_dl)
+          desc[0].arg = (void *) &badinfo[0];
       fprintf (stderr, "Reading new files"
               " (using %d auxiliary threads for roots mod p):\n",
               desc[0].n);
@@ -709,6 +721,8 @@ main (int argc, char *argv[])
       }
   }
 
+  if (is_for_dl)
+      free(badinfo->badid_info);
   free (H);
   free (sanity_a);
   free (sanity_b);

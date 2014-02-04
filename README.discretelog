@@ -1,3 +1,7 @@
+[ News: the cadofactor.py script can now do a full dlp computation in a
+prime field, with a bit of help from Magma; the description below is
+therefore obsolete for GF(p) computations ]
+
 This file explains how to use the discrete log (DL) possibilities of
 CADO-NFS. It is possible to deal with finite fields of one of the three
 following forms:

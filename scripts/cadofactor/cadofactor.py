@@ -74,7 +74,12 @@ if __name__ == '__main__':
                                                parameters = parameters,
                                                path_prefix = [])
     factors = factorjob.run()
-    if factors is None:
-        sys.exit("Error occurred, terminating")
-    else:
-        print(" ".join(factors))
+    
+    dlp_param = parameters.myparams(("dlp",), "")
+    dlp = dlp_param.get("dlp", False)
+    if not dlp:
+        if factors is None:
+            sys.exit("Error occurred, terminating")
+        else:
+            print(" ".join(factors))
+     ## TODO: output of dlp is still to be defined.

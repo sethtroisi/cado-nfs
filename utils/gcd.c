@@ -9,7 +9,8 @@ gcd_int64 (int64_t a, int64_t b)
 {
   int64_t t;
 
-  ASSERT (b != 0);
+  if (b == 0)
+    return a;
 
   if (a < 0)
     a = -a;
@@ -35,7 +36,8 @@ gcd_uint64 (uint64_t a, uint64_t b)
 {
   uint64_t t;
 
-  ASSERT (b != 0);
+  if (b == 0)
+    return a;
 
   if (a >= b)
     a %= b;
@@ -56,11 +58,9 @@ gcd_ul (unsigned long a, unsigned long b)
 {
   unsigned long t;
 
-  if (b == 0) {
-    ASSERT_ALWAYS(a != 0);
+  if (b == 0)
     return a;
-  }
-  
+
   if (a >= b)
     a %= b;
 
@@ -75,29 +75,6 @@ gcd_ul (unsigned long a, unsigned long b)
   return b;
 }
 
-/* Binary gcd; a can be odd or even, b can be zero. */
-int64_t
-bin_gcd_int64 (int64_t a, int64_t b)
-{
-  ASSERT (b == 0 || b % 2 == 1);
-  while (b != 0)
-    {
-      /* if a is odd, reduce a wrt b, i.e., cancel the two low bits of a,
-         so that a + q*b = 0 (mod 4) */
-      b >>= ctzl (b);
-      a = ((a ^ b) & 2) ? a + b : a - b;
-      /* if a was even, then since b is now odd, the new a is odd */
-      if (a == 0)
-        return (b > 0) ? b : -b;
-      a >>= ctzl (a);
-      /* from here on, a and b are odd (or zero) */
-      ASSERT(a & 1);
-      /* reduce b wrt a */
-      b = ((b ^ a) & 2) ? b + a : b - a;
-    }
-  return (a > 0) ? a : -a;
-}
-
 /* Binary gcd; any input allowed. */
 int64_t
 bin_gcd_int64_safe (int64_t a, int64_t b)
@@ -110,27 +87,32 @@ bin_gcd_int64_safe (int64_t a, int64_t b)
   if (b == 0)
     return a;
 
-  s = ctzl (a);
-  t = ctzl (b);
-  a >>= s;
-  b >>= t;
+  /* C99: long long has at least 64 bits */
+  uint64_t ua = (uint64_t) llabs(a), ub = (uint64_t) llabs(b);
+
+  s = ctzll (ua);
+  t = ctzll (ub);
+  ua >>= s;
+  ub >>= t;
   if (t < s)
     s = t;
-  
-  while (b != 0)
+  /* Here ua, ub > 0 and both odd */
+
+  while (1)
     {
-      /* if a is odd, reduce a wrt b, i.e., cancel the two low bits of a,
-         so that a + q*b = 0 (mod 4) */
-      b >>= ctzl (b);
-      a = ((a ^ b) & 2) ? a + b : a - b;
-      /* if a was even, then since b is now odd, the new a is odd */
-      if (a == 0)
-        return (b > 0) ? (b << s) : ((-b) << s);
-      a >>= ctzl (a);
-      /* from here on, a and b are odd (or zero) */
-      ASSERT(a & 1);
-      /* reduce b wrt a */
-      b = ((b ^ a) & 2) ? b + a : b - a;
+      while (ua >= ub) {
+        /* Here, ua >= ub > 0, and ua, ub are both odd */
+        ua -= ub;
+        if (ua == 0)
+          return ub << s;
+        ua >>= ctzll (ua);
+      }
+      while (ub >= ua) {
+       /* Here, ub >= ua > 0, and ua, ub are both odd */
+       ub -= ua;
+       if (ub == 0)
+         return ua << s;
+       ub >>= ctzll (ub);
+      }
     }
-  return (a > 0) ? (a << s) : ((-a) << s);
 }

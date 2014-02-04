@@ -88,11 +88,27 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
 /* those builtins seem to have appeared in 3.4 (April 2004) */
 #ifndef HAVE_clzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
+#define clzll(x)        __builtin_clzll(x)
 #define clzl(x)         __builtin_clzl(x)
 #define clz(x)          __builtin_clz(x)
 #define HAVE_clzl
 #else
 /* provide slow fallbacks */
+static inline int clzll(unsigned long long x)
+{
+        /* We assume exactly 64 bits in a long long for now */
+        static const int t[4] = { 2, 1, 0, 0 };
+        int a = 0;
+        int res;
+        if (x >> 32) { a += 32; x >>= 32; }
+        if (x >> 16) { a += 16; x >>= 16; }
+        if (x >>  8) { a +=  8; x >>=  8; }
+        if (x >>  4) { a +=  4; x >>=  4; }
+        if (x >>  2) { a +=  2; x >>=  2; }
+        res = 64 - 2 - a + t[x];
+        return res;
+}
+
 static inline int clzl(unsigned long x)
 {
         static const int t[4] = { 2, 1, 0, 0 };
@@ -139,6 +155,7 @@ static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
 
 #ifndef HAVE_ctzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
+#define ctzll(x)        __builtin_ctzll(x)
 #define ctzl(x)         __builtin_ctzl(x)
 #define ctz(x)          __builtin_ctz(x)
 #define HAVE_ctzl
@@ -146,6 +163,10 @@ static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
 /* the following code is correct because if x = 0...0abc10...0, then
    -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
+static inline int ctzll(unsigned long long x)
+{
+  return (64 - 1) - clzll(x & - x);
+}
 static inline int ctzl(unsigned long x)
 {
   ASSERT(GMP_LIMB_BITS == sizeof(unsigned long) * CHAR_BIT);

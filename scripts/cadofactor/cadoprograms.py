@@ -590,6 +590,7 @@ class FreeRel(Program):
                  badideals: Parameter(is_output_file = True) = None,
                  pmin: Parameter() = None,
                  pmax: Parameter() = None,
+                 dlp: Toggle("addfullcol") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -657,6 +658,8 @@ class Duplicates2(Program):
                  poly: Parameter(is_input_file = True),
                  renumber: Parameter(is_input_file = True),
                  filelist: Parameter(is_input_file = True) = None,
+                 badidealinfo: Parameter(is_input_file = True) = None,
+                 dlp: Toggle("dl") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -705,6 +708,26 @@ class Merge(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class MergeDLP(Program):
+    binary = "merge-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self,
+                 mat: Parameter(is_input_file = True),
+                 out: Parameter(is_output_file = True),
+                 maxlevel: Parameter() = None,
+                 keep: Parameter() = None,
+                 skip: Parameter() = None,
+                 forbw: Parameter() = None,
+                 ratio: Parameter() = None,
+                 coverNmax: Parameter() = None,
+                 nbmergemax: Parameter() = None,
+                 resume: Parameter() = None,
+                 mkztype: Parameter() = None,
+                 wmstmax: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 # Todo: define is_input_file/is_output_file for remaining programs
 class Replay(Program):
     binary = "replay"
@@ -716,6 +739,46 @@ class Replay(Program):
                  history: Parameter("his") = None,
                  index: Parameter() = None,
                  out: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+class ReplayDLP(Program):
+    binary = "replay-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self,
+                 purged: Parameter() = None,
+                 ideals: Parameter() = None,
+                 history: Parameter("his") = None,
+                 index: Parameter() = None,
+                 out: Parameter() = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+class MagmaNmbrthry(Program):
+    binary = "magma-nmbrthry-wrapper.sh"
+    name = binary
+    subdir = "scripts"
+    def __init__(self,
+                 poly: Parameter(),
+                 N: Parameter("p"),
+                 badidealinfo: Parameter("badinfofile"),
+                 badideals: Parameter("badfile"),
+                 gorder: Parameter("ell") = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+
+class MagmaLinalg(Program):
+    binary = "magma-linalg-wrapper.sh"
+    name = binary
+    subdir = "scripts"
+    def __init__(self,
+                 gorder: Parameter("ell"),
+                 nmaps: Parameter(),
+                 sparsemat: Parameter(),
+                 sm: Parameter(),
+                 ker: Parameter() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -744,6 +807,43 @@ class BWC(Program):
                  bwc_bindir: ParameterEq() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
+
+class SM(Program):
+    binary = "sm"
+    name = binary
+    subdir = "filter"
+    def __init__(self, *,
+                 poly: Parameter(),
+                 purged: Parameter(),
+                 index: Parameter(),
+                 out: Parameter(),
+                 gorder: Parameter(),
+                 smexp: Parameter(),
+                 nmaps: Parameter("nsm") = None,
+                 threads: Parameter("mt") = None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+ 
+class ReconstructLog(Program):
+    binary = "reconstructlog-dl"
+    name = binary
+    subdir = "filter"
+    def __init__(self, *,
+                 gorder: Parameter(),
+                 smexp: Parameter(),
+                 ker: Parameter("log"),
+                 dlog: Parameter("out"),
+                 renumber: Parameter(),
+                 poly: Parameter(),
+                 purged: Parameter(),
+                 ideals: Parameter(),
+                 relsdel: Parameter(),
+                 nrels: Parameter(),
+                 partial: Toggle() = None,
+                 nmaps: Parameter("sm"),
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
 
 class Characters(Program):
     binary = "characters"
