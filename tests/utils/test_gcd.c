@@ -118,7 +118,7 @@ test_bin_gcd_int64_safe (void)
       d = b / g;
       h = gcd_int64 (c, d);
       if (h != 1)
-        printf ("a=%ld b=%ld g=%ld\n", a, b, g);
+        printf ("a=%ld b=%ld g=%ld c=%ld d=%ld h=%ld\n", a, b, g, c, d, h);
       assert (h == 1);
     }
 }
