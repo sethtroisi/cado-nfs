@@ -51,7 +51,8 @@ macro(build_and_run_test SRCFILE LIBRARIES)
               # "make clean."
               --build-noclean
 
-              # When we build this test, build only test_strlcat
+              # When we build and run this test, build only the binary
+              # required for this test
               --build-target "${DSTFILE}"
 
               # If any test fails, print its output to stdout.
