@@ -939,4 +939,3 @@ scripts/badideals.mag
 scripts/linalg.mag
 scripts/magma-linalg-wrapper.sh
 scripts/magma-nmbrthry-wrapper.sh
-
