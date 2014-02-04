@@ -3298,6 +3298,7 @@ class ReconstructLogTask(Task):
                     dlog=dlogfilename,
                     gorder=gorder, smexp=smexp,
                     nmaps=nmaps,
+                    partial=True,
                     ker=kerfilename,
                     ideals=idealfilename,
                     relsdel=relsdelfilename,

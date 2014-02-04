@@ -839,6 +839,7 @@ class ReconstructLog(Program):
                  ideals: Parameter(),
                  relsdel: Parameter(),
                  nrels: Parameter(),
+                 partial: Toggle() = None,
                  nmaps: Parameter("sm"),
                  **kwargs):
         super().__init__(locals(), **kwargs)

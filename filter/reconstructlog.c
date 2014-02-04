@@ -692,6 +692,7 @@ static void declare_usage(param_list pl)
                                       "(see purge -outdel parameter)");
   param_list_decl_usage(pl, "nrels", "number of relations (same as purge "
                                      "-nrels parameter)");
+  param_list_decl_usage(pl, "partial", "(switch) do not reconstruct everything that can be reconstructed");
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "sm", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp parameter)");
@@ -719,6 +720,7 @@ main(int argc, char *argv[])
   uint64_t nprimes, i, known_log;
   index_t *matrix_indexing = NULL;
   int mt = 1;
+  int partial = 0;
 
   unsigned int nbsm = 0;
   mpz_t q, smexp, *log = NULL;
@@ -729,6 +731,7 @@ main(int argc, char *argv[])
   declare_usage(pl);
   argv++,argc--;
 
+  param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
 #ifdef HAVE_MINGW
@@ -867,27 +870,29 @@ main(int argc, char *argv[])
   known_log = ncols_matrix;
   free (matrix_indexing);
 
-  /* Computing log using rels in purged file */
-  known_log +=
+  if (!partial) {
+    /* Computing log using rels in purged file */
+    known_log +=
 #ifndef FOR_FFS
-    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
-                              nbsm, smexp, F, mt);
+      compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
+                                nbsm, smexp, F, mt);
 #else
-    compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes, mt);
+      compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes, mt);
 #endif
-  printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
-  fflush(stdout);
+    printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
+    fflush(stdout);
 
-  /* Computing log using rels in del file */
-  known_log +=
+    /* Computing log using rels in del file */
+    known_log +=
 #ifndef FOR_FFS
-    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
-                              nbsm, smexp, F, mt);
+      compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
+                                nbsm, smexp, F, mt);
 #else
-    compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes, mt);
+      compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes, mt);
 #endif
-  printf ("# %" PRIu64 " known logarithms.\n", known_log);
-  fflush(stdout);
+    printf ("# %" PRIu64 " known logarithms.\n", known_log);
+    fflush(stdout);
+  }
 
   /* Writing all the logs in outfile */
   write_log (outfilename, log, q, renumber_table, poly, known_log);
