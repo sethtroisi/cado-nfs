@@ -24,6 +24,8 @@ then
 fi
 
 MAKEFB="${BINDIR}/sieve/makefb"
+cd ${BINDIR}
+make makefb
 LAS="${BINDIR}/sieve/las"
 BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
