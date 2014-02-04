@@ -2823,11 +2823,13 @@ class LinAlgDLPTask(Task):
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             smfile = self.send_request(Request.GET_SM_FILENAME)
             gorder = self.send_request(Request.GET_ELL)
+            nmaps = self.send_request(Request.GET_NMAPS)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
             p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
                                    ker=kerfile,
                                    sm=smfile,
                                    gorder=gorder,
+                                   nmaps=nmaps,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
@@ -3261,7 +3263,7 @@ class ReconstructLogTask(Task):
         return (cadoprograms.ReconstructLog,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "nmaps")
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
