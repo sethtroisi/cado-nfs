@@ -9,7 +9,8 @@ gcd_int64 (int64_t a, int64_t b)
 {
   int64_t t;
 
-  ASSERT (b != 0);
+  if (b == 0)
+    return a;
 
   if (a < 0)
     a = -a;
@@ -35,7 +36,8 @@ gcd_uint64 (uint64_t a, uint64_t b)
 {
   uint64_t t;
 
-  ASSERT (b != 0);
+  if (b == 0)
+    return a;
 
   if (a >= b)
     a %= b;
@@ -58,7 +60,7 @@ gcd_ul (unsigned long a, unsigned long b)
 
   if (b == 0)
     return a;
-  
+
   if (a >= b)
     a %= b;
 
