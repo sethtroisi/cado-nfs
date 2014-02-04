@@ -129,7 +129,6 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
         }
         return;
     }
-    printf("a = %ld, b = %lu, p = %lu\n", a, b, p);
     ASSERT_ALWAYS(0);
 }
 
