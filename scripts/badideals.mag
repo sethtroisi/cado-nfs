@@ -845,7 +845,12 @@ for f in ff do
     lcm := LCM(lcm, ell^Degree(f[1])-1);
 end for;
 
+nr := #Roots(f, RealField());
+nc := Degree(f)-nr;
+assert IsEven(nc);
+
 printf "ell %o\n", ell;
 printf "smexp %o\n", lcm;
+printf "nmaps %o\n", nr + (nc div 2) -1;
 
 exit;

@@ -13,10 +13,6 @@ dlp = true
 ## N is the prime modulo which we want dlogs.
 #  N = 53236943330228380237618624445646085674945074907141464418703
 
-## The number of SM could in principle be tuned automatically
-## For the moment, it is mandatory to set it equal to the poly degree.
-tasks.nmaps = 4 ## number of SM FIXME: this should be chosen automatically
-
 ## Standard stuff; uncomment and edit according to your config.
 #slaves.nrclients=2
 #tasks.threads = 2
@@ -27,6 +23,8 @@ tasks.nmaps = 4 ## number of SM FIXME: this should be chosen automatically
 #slaves.basepath=...
 
 ## From here, the parameter are similar to factorization.
+
+tasks.I = 11
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
@@ -54,7 +52,6 @@ tasks.sieve.mfba = 24
 tasks.sieve.rlambda = 1.2
 tasks.sieve.alambda = 1.2
 
-tasks.sieve.I = 11
 tasks.sieve.qmin = 200000
 tasks.sieve.qrange = 1000
 tasks.sieve.rels_wanted = 250000

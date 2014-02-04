@@ -2297,15 +2297,12 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "alim", "rlim", "nmaps")
+        return super().paramnames + ("dlp", "alim", "rlim")
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state.setdefault("input_nrels", 0)
-        dlp = self.params.get("dlp", False)
-        if dlp:
-            self.progparams[0]["keep"] = self.params["nmaps"]
     
     def run(self):
         self.logger.info("Starting")
@@ -2340,6 +2337,11 @@ class PurgeTask(Task):
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
+        
+        dlp = self.params.get("dlp", False)
+        if dlp:
+            nmaps = self.send_request(Request.GET_NMAPS)
+            self.progparams[0]["keep"] = nmaps
         
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
@@ -2562,12 +2564,14 @@ class MergeDLPTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
+            keep = self.send_request(Request.GET_NMAPS)
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params.get("gzip", True) else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.MergeDLP(mat=purged_filename,
                                    out=historyfile,
+                                   keep=keep,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
@@ -2751,12 +2755,17 @@ class NmbrthryTask(Task):
             match = re.match(r'smexp (\d+)', line)
             if match:
                 update["smexp"] = match.group(1)
+            match = re.match(r'nmaps (\d+)', line)
+            if match:
+                update["nmaps"] = match.group(1)
         self.state.update(update)
         
         if not "ell" in self.state.keys():
             raise Exception("Stdout does not give ell")
         if not "smexp" in self.state.keys():
             raise Exception("Stdout does not give smexp")
+        if not "nmaps" in self.state.keys():
+            raise Exception("Stdout does not give nmaps")
         if not badfile.isfile():
             raise Exception("Output file %s does not exist" % badfile)
         if not badinfofile.isfile():
@@ -2780,6 +2789,9 @@ class NmbrthryTask(Task):
     
     def get_smexp(self):
         return self.state["smexp"]
+    
+    def get_nmaps(self):
+        return self.state["nmaps"]
 
 
 class LinAlgDLPTask(Task):
@@ -2795,7 +2807,7 @@ class LinAlgDLPTask(Task):
         return (cadoprograms.MagmaLinalg,)
     @property
     def paramnames(self):
-        return super().paramnames + ("nmaps",)
+        return super().paramnames
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3206,6 +3218,7 @@ class SMTask(Task):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            nmaps = self.send_request(Request.GET_NMAPS)
             smfilename = self.workdir.make_filename("sm")
 
             gorder = self.send_request(Request.GET_ELL)
@@ -3216,6 +3229,7 @@ class SMTask(Task):
             p = cadoprograms.SM(poly=polyfilename,
                     purged=purgedfilename, index=indexfilename,
                     gorder=gorder, smexp=smexp,
+                    nmaps=nmaps,
                     out=smfilename,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
@@ -3268,6 +3282,7 @@ class ReconstructLogTask(Task):
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
+            nmaps = self.send_request(Request.GET_NMAPS)
 
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -3280,6 +3295,7 @@ class ReconstructLogTask(Task):
                     renumber=renumberfilename,
                     dlog=dlogfilename,
                     gorder=gorder, smexp=smexp,
+                    nmaps=nmaps,
                     ker=kerfilename,
                     ideals=idealfilename,
                     relsdel=relsdelfilename,
@@ -3636,6 +3652,7 @@ class Request(Message):
     GET_BADIDEALINFO_FILENAME = object()
     GET_SMEXP = object()
     GET_ELL = object()
+    GET_NMAPS = object()
     GET_WU_RESULT = object()
 
 class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
@@ -3794,6 +3811,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
             self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
             self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
+            self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
             self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename

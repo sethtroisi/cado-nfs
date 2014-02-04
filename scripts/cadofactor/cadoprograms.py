@@ -716,7 +716,7 @@ class MergeDLP(Program):
                  mat: Parameter(is_input_file = True),
                  out: Parameter(is_output_file = True),
                  maxlevel: Parameter() = None,
-                 nmaps: Parameter("keep") = None,
+                 keep: Parameter() = None,
                  skip: Parameter() = None,
                  forbw: Parameter() = None,
                  ratio: Parameter() = None,
@@ -819,6 +819,7 @@ class SM(Program):
                  out: Parameter(),
                  gorder: Parameter(),
                  smexp: Parameter(),
+                 nmaps: Parameter("nsm") = None,
                  threads: Parameter("mt") = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
