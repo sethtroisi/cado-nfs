@@ -708,6 +708,7 @@ tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
 tests/utils/test_getprime.c
+tests/utils/test_memusage.c
 tests/test_iter.c
 tests/test_iter.h
 utils/gcd.c
