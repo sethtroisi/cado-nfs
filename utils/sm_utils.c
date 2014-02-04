@@ -7,19 +7,9 @@
 void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
-  if (b == 0)
-  {
-    /* freerel */
-    mpz_poly_init(rel, 0);
-    mpz_poly_setcoeff_int64(rel, 0, a);
-  }
-  else
-  {
-    /* an (a,b)-pair is a degree-1 poly */
-    mpz_poly_init(rel, 1);
-    mpz_poly_setcoeff_int64(rel, 0, a);
-    mpz_poly_setcoeff_int64(rel, 1, -b);
-  }
+  mpz_poly_init(rel, 1);
+  mpz_poly_setcoeff_int64(rel, 0, a);
+  mpz_poly_setcoeff_int64(rel, 1, -b);
 }
 
 /* compute the SM */

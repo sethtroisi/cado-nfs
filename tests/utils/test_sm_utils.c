@@ -7,6 +7,16 @@
 
 #define TEST_MAX_AB 16
 
+void
+mpz_poly_getcoeff_wrapper (mpz_t res, int i, const mpz_poly_t f)
+{
+  if (i <= f->deg)
+    mpz_poly_getcoeff (res, i, f);
+  else
+    mpz_set_ui (res, 0);
+}
+
+
 /* Return number of error */
 int
 test_sm (FILE * datafile)
@@ -127,9 +137,9 @@ test_sm (FILE * datafile)
       fprintf (stderr, "\n# (a,b) pairs are:\n");
       for (int i = 0; i < nb_ab; i++)
       {
-        mpz_poly_getcoeff (tmp, 0, ab_polys[i]);
+        mpz_poly_getcoeff_wrapper (tmp, 0, ab_polys[i]);
         a = mpz_get_si (tmp);
-        mpz_poly_getcoeff (tmp, 1, ab_polys[i]);
+        mpz_poly_getcoeff_wrapper (tmp, 1, ab_polys[i]);
         b = mpz_get_ui (tmp);
         fprintf (stderr, "%d %" SCNd64 ",%" SCNu64 "\n", i, a, b);
       }
@@ -152,13 +162,13 @@ test_sm (FILE * datafile)
       fprintf (stderr, "# Values of SM should be:\n");
       for (int i = 0; i < nbSM; i++)
       {
-        mpz_poly_getcoeff (tmp, i, SM);
+        mpz_poly_getcoeff_wrapper (tmp, i, SM);
         gmp_fprintf (stderr, "%Zi ", tmp);
       }
       fprintf (stderr, "\n# but computed values of SM are:\n");
       for (int i = 0; i < nbSM; i++)
       {
-        mpz_poly_getcoeff (tmp, i, SMc);
+        mpz_poly_getcoeff_wrapper (tmp, i, SMc);
         gmp_fprintf (stderr, "%Zi ", tmp);
       }
       fprintf (stderr, "\n#######################\n");
