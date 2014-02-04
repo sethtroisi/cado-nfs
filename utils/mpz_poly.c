@@ -1522,7 +1522,6 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
   mpz_poly_t q, tmp;
   mpz_poly_t gg;
 
-  mpz_poly_init(d, f->alloc);
   mpz_poly_init(gg, g->alloc);
   mpz_poly_copy(d, f);
   mpz_poly_copy(gg, g);

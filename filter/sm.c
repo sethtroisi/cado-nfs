@@ -243,6 +243,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
     print_sm (out, SM, nsm);
   }
 
+  mpz_poly_clear (SM);
   mpz_clear(invl2);
   fclose(out);
 }
