@@ -783,11 +783,12 @@ for pf in FacBadPrimes do
                                 p, i, totval);
                             str := Sprintf("%o -%o", str, totval);
                         else
+                            myval := base[i]*prime_ideal_inertia_degree(G, fac[i][1]);
                             SBADINFO := Sprintf("%o# %o mod %o^%o ; v_%o_%o=%o\n",
                                 SBADINFO,
                                 cQ, p, k-1,
-                                p, i, base[i]);
-                            str := Sprintf("%o %o", str, base[i]);
+                                p, i, myval);
+                            str := Sprintf("%o %o", str, myval);
                         end if;
                     end for;
                     Append(~report, str);
