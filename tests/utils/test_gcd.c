@@ -131,7 +131,6 @@ test_bin_gcd_int64_safe_ab (const int64_t a, const int64_t b)
 void
 test_bin_gcd_int64_safe (void)
 {
-  int64_t a, b;
   test_iter_t iter_a, iter_b;
   int i;
 
