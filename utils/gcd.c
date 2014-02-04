@@ -75,7 +75,12 @@ gcd_ul (unsigned long a, unsigned long b)
   return b;
 }
 
-/* Binary gcd; any input allowed. */
+/* Binary gcd; any input allowed.
+   This currently fails for large a, b because of overflow in a+b, a-b,
+   b+a or b-a. For example with a=7436860347290466450, b=8760886076089680163,
+   we get when entering the while loop:
+   a = 3718430173645233225, b = 8760886076089680163
+   then (a ^ b) & 2 = 2, thus a <= a + b which overflows INT64_MAX. */
 int64_t
 bin_gcd_int64_safe (int64_t a, int64_t b)
 {

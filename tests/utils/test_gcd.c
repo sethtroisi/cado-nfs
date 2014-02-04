@@ -24,9 +24,14 @@ test_gcd_int64 (void)
   
   for (i = 0; i < 200000; i++)
     {
-      a = (i == 0) ? 0 : random_int64 ();
-      do b = random_int64 (); while (b == 0);
+      a = (i == 0 || i == 1) ? 0 : random_int64 ();
+      b = (i == 0 || i == 2) ? 0 : random_int64 ();
       g = gcd_int64 (a, b);
+      if (g == 0)
+        {
+          assert (a == 0 && b == 0);
+          continue;
+        }
       assert ((a % g) == 0);
       assert ((b % g) == 0);
       c = a / g;
@@ -44,9 +49,14 @@ test_gcd_uint64 (void)
   
   for (i = 0; i < 200000; i++)
     {
-      a = (i == 0) ? 0 : random_uint64 ();
-      do b = random_uint64 (); while (b == 0);
+      a = (i == 0 || i == 1) ? 0 : random_uint64 ();
+      b = (i == 0 || i == 2) ? 0 : random_uint64 ();
       g = gcd_uint64 (a, b);
+      if (g == 0)
+        {
+          assert (a == 0 && b == 0);
+          continue;
+        }
       assert ((a % g) == 0);
       assert ((b % g) == 0);
       c = a / g;
@@ -82,6 +92,37 @@ test_gcd_ul (void)
     }
 }
 
+void
+test_bin_gcd_int64_safe (void)
+{
+  int64_t a, b, g, c, d, h;
+  int i;
+
+  for (i = 0; i < 200000; i++)
+    {
+      a = (i == 0 || i == 1) ? 0 : random_int64 ();
+      b = (i == 0 || i == 2) ? 0 : random_int64 ();
+      /* the current bin_gcd_int64_safe code might overflow when a, b are
+         larger than 2^62 in absolute value */
+      a >>= 1;
+      b >>= 1;
+      g = bin_gcd_int64_safe (a, b);
+      if (g == 0)
+        {
+          assert (a == 0 && b == 0);
+          continue;
+        }
+      assert ((a % g) == 0);
+      if (b % g)
+        printf ("a=%ld b=%ld g=%ld\n", a, b, g);
+      assert ((b % g) == 0);
+      c = a / g;
+      d = b / g;
+      h = gcd_int64 (c, d);
+      assert (h == 1);
+    }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -93,5 +134,6 @@ main (int argc, char *argv[])
   test_gcd_int64 ();
   test_gcd_uint64 ();
   test_gcd_ul ();
+  test_bin_gcd_int64_safe ();
   exit (EXIT_SUCCESS);
 }
