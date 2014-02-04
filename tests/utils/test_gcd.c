@@ -82,33 +82,6 @@ test_gcd_ul (void)
     }
 }
 
-void
-test_bin_gcd_int64 (void)
-{
-  int64_t a, b, g, c, d, h;
-  int i;
-  
-  for (i = 0; i < 200000; i++)
-    {
-      a = (i == 0 || i == 1) ? 0 : random_int64 ();
-      do b = (i == 0 || i == 2) ? 0 : (2 * random_int64 () + 1); while (b < 0);
-      g = bin_gcd_int64 (a, b);
-      if (g == 0)
-        {
-          assert (a == 0 && b == 0);
-          continue;
-        }
-      assert ((a % g) == 0);
-      assert ((b % g) == 0);
-      c = a / g;
-      d = b / g;
-      h = (d == 0) ? c : gcd_int64 (c, d);
-      if (h != 1)
-        printf ("%ld %ld %ld %ld %ld %ld\n", a, b, g, c, d, h);
-      assert (h == 1);
-    }
-}
-
 int
 main (int argc, char *argv[])
 {
@@ -120,6 +93,5 @@ main (int argc, char *argv[])
   test_gcd_int64 ();
   test_gcd_uint64 ();
   test_gcd_ul ();
-  test_bin_gcd_int64 ();
   exit (EXIT_SUCCESS);
 }
