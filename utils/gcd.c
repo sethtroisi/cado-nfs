@@ -82,10 +82,10 @@ bin_gcd_int64_safe (int64_t a, int64_t b)
   int s, t;
 
   if (a == 0)
-    return b;
+    return llabs(b);
 
   if (b == 0)
-    return a;
+    return llabs(a);
 
   /* C99: long long has at least 64 bits */
   uint64_t ua = (uint64_t) llabs(a), ub = (uint64_t) llabs(b);
