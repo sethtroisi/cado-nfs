@@ -20,8 +20,8 @@ parse_poly_str (double_poly_ptr poly, const char *str)
   double coeff;
   
   while (next != NULL) {
-    sscanf(next, "%lf", &coeff);
-    // printf("%lf\n", coeff);
+    if (sscanf(next, "%lf", &coeff) != 1)
+      break;
     if (poly) {
       assert((unsigned int) i <= poly->deg);
       poly->coeff[i] = coeff;
@@ -41,6 +41,7 @@ parse_poly(double_poly_ptr poly, const char *str)
   if (n == 0) {
     double_poly_init (poly, 0);
     poly->coeff[0] = 0.;
+    poly->deg = -1; /* so that deg+1 is the number of roots */
   } else {
     double_poly_init (poly, n - 1);
   }
@@ -89,6 +90,8 @@ test_double_poly_compute_roots1(const char *poly_str, const char *roots_str,
 static void
 test_double_poly_compute_roots(const int verbose)
 {
+  test_double_poly_compute_roots1("1", "", 1e-9, 3., verbose);
+
   /* A few roots of 2 */
   test_double_poly_compute_roots1("-2 1", "2", 1e-9, 3., verbose);
   test_double_poly_compute_roots1("-2 0 1", "1.41421356237310", 1e-6, 3., verbose);
@@ -203,6 +206,51 @@ test_double_poly_revert (void)
   double_poly_clear (f);
 }
 
+void
+test_double_poly_print ()
+{
+  double_poly_t poly;
+
+  parse_poly (poly, "17");
+  double_poly_print (stdout, poly, "17: ");
+  double_poly_clear (poly);
+
+  parse_poly (poly, "17 42");
+  double_poly_print (stdout, poly, "42*x+17: ");
+  double_poly_clear (poly);
+
+  parse_poly (poly, "17 42 53");
+  double_poly_print (stdout, poly, "53*x^2+42*x+17: ");
+  double_poly_clear (poly);
+
+  parse_poly (poly, "17 0 53");
+  double_poly_print (stdout, poly, "53*x^2+17: ");
+  double_poly_clear (poly);
+
+  parse_poly (poly, "17 0 -53 99");
+  double_poly_print (stdout, poly, "99*x^3-53*x^2+17: ");
+  double_poly_clear (poly);
+}
+
+void
+test_double_poly_set_mpz_poly (void)
+{
+  double_poly_t p;
+  mpz_poly_t q;
+
+  mpz_poly_init (q, 2);
+  double_poly_init (p, 2);
+  mpz_set_ui (q->coeff[2], 17);
+  mpz_set_si (q->coeff[1], -42);
+  mpz_set_si (q->coeff[0], -3);
+  q->deg = 2;
+  double_poly_set_mpz_poly (p, q);
+  assert (p->deg == 2 && p->coeff[2] == 17.0 && p->coeff[1] == -42.0 &&
+          p->coeff[0] == -3.0);
+  double_poly_clear (p);
+  mpz_poly_clear (q);
+}
+
 int main()
 {
   test_double_poly_compute_roots(0);
@@ -210,5 +258,7 @@ int main()
   test_double_poly_eval ();
   test_double_poly_derivative ();
   test_double_poly_revert ();
+  test_double_poly_print ();
+  test_double_poly_set_mpz_poly ();
   exit(EXIT_SUCCESS);
 }
