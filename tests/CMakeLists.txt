@@ -51,7 +51,8 @@ macro(build_and_run_test SRCFILE LIBRARIES)
               # "make clean."
               --build-noclean
 
-              # When we build this test, build only test_strlcat
+              # When we build and run this test, build only the binary
+              # required for this test
               --build-target "${DSTFILE}"
 
               # If any test fails, print its output to stdout.
@@ -61,7 +62,7 @@ macro(build_and_run_test SRCFILE LIBRARIES)
               # then the debugging output shows --output-on-failure being
               # passed to the spawned ctest processes, but without -V, they
               # still don't print anything in case of failure. Maybe a bug.
-              # To get output, we have to pass it via ARGS to "make check."
+              # To get output, we have to pass it via ARGS to "make test".
               --output-on-failure
 
               # And finally the binary that should be run as the actual test
