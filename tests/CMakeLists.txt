@@ -73,3 +73,4 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 add_library (tests STATIC test_iter.c)
 
 add_subdirectory (utils)
+add_subdirectory (sieve)
