@@ -9,11 +9,11 @@ gcd_int64 (int64_t a, int64_t b)
 {
   int64_t t;
 
+  if (a < 0)
+    a = -a;
   if (b == 0)
     return a;
 
-  if (a < 0)
-    a = -a;
   if (b < 0)
     b = -b;
   

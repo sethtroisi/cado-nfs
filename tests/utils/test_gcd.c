@@ -1,8 +1,11 @@
 #include "cado.h"
 #include <stdint.h>
 #include <time.h>
+#include <gmp.h>
 #include "gcd.h"
 #include "macros.h"
+#include "gmp_aux.h"
+#include "test_iter.h"
 
 int64_t
 random_int64 (void)
@@ -93,33 +96,60 @@ test_gcd_ul (void)
 }
 
 void
+
+cmp_mpz_gcd_i64(int64_t a, int64_t b, int64_t g)
+{
+  mpz_t ma, mb, mg;
+  mpz_init (ma);
+  mpz_init (mb);
+  mpz_init (mg);
+
+  mpz_set_int64 (ma, a);
+  mpz_set_int64 (mb, b);
+  mpz_gcd (mg, ma, mb);
+  mpz_set_int64 (ma, a);
+  
+  if (mpz_get_int64 (mg) != g) {
+    fprintf (stderr, "GCD(%lld, %lld) = %lld is incorrect, GMP has %lld",
+             (long long int) a, (long long int) b, (long long int) g,
+             (long long int) mpz_get_int64 (mg));
+    abort();
+  }
+
+  mpz_clear (ma);
+  mpz_clear (mb);
+  mpz_clear (mg);
+}
+
+void
+test_bin_gcd_int64_safe_ab (const int64_t a, const int64_t b)
+{
+  const int64_t g = bin_gcd_int64_safe (a, b);
+  cmp_mpz_gcd_i64 (a, b, g);
+}
+
+void
 test_bin_gcd_int64_safe (void)
 {
-  int64_t a, b, g, c, d, h;
+  int64_t a, b;
+  test_iter_t iter_a, iter_b;
   int i;
+
+  test_iter_init(iter_a, 100);
+  while (!test_iter_isdone(iter_a)) {
+    int64_t a = test_iter_int64_next(iter_a);
+    test_iter_init(iter_b, 100);
+    while (!test_iter_isdone(iter_b)) {
+      int64_t b = test_iter_int64_next(iter_b);
+      test_bin_gcd_int64_safe_ab(a, b);
+    }
+  }
 
   for (i = 0; i < 200000; i++)
     {
-      a = (i == 0 || i == 1) ? 0 : random_int64 ();
-      b = (i == 0 || i == 2) ? 0 : random_int64 ();
-      g = bin_gcd_int64_safe (a, b);
-      if (g == 0)
-        {
-          assert (a == 0 && b == 0);
-          continue;
-        }
-      if (a % g)
-        printf ("a=%ld b=%ld g=%ld\n", a, b, g);
-      assert ((a % g) == 0);
-      if (b % g)
-        printf ("a=%ld b=%ld g=%ld\n", a, b, g);
-      assert ((b % g) == 0);
-      c = a / g;
-      d = b / g;
-      h = gcd_int64 (c, d);
-      if (h != 1)
-        printf ("a=%ld b=%ld g=%ld\n", a, b, g);
-      assert (h == 1);
+      int64_t a = (i == 0 || i == 1) ? 0 : random_int64 ();
+      int64_t b = (i == 0 || i == 2) ? 0 : random_int64 ();
+      test_bin_gcd_int64_safe_ab(a,b);
     }
 }
 
