@@ -33,8 +33,6 @@ Output
 
 #include "filter_common.h"
 
-#define MAX_LEN_RELSET 1024
-
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {

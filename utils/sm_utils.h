@@ -1,6 +1,8 @@
 #ifndef FILTER_SM_H_
 #define FILTER_SM_H_
 
+#define MAX_LEN_RELSET 1024
+
 typedef struct {
   mpz_poly_t num;
   mpz_poly_t denom;
