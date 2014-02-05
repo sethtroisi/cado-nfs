@@ -186,9 +186,9 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
 {
     double tfb;
     /* TODO should these go into siever_config or not ? */
-    int rpow_lim = 0, apow_lim = 0;
-    param_list_parse_int(pl, "rpowlim", &rpow_lim);
-    param_list_parse_int(pl, "apowlim", &apow_lim);
+    int pow_lim[2] = {0,0};
+    param_list_parse_int(pl, "rpowlim", &pow_lim[RATIONAL_SIDE]);
+    param_list_parse_int(pl, "apowlim", &pow_lim[ALGEBRAIC_SIDE]);
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
 
     if (fbcfilename != NULL) {
@@ -215,24 +215,24 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         unsigned long lim = si->conf->sides[side]->lim;
         if (pol->deg > 1) {
             tfb = seconds ();
-            /* FIXME: fbfilename should allow *distinct* file names, of
-             * course, for each side (think about the bi-algebraic case)
-             */
-            const char * fbfilename = param_list_lookup_string(pl, "fb");
+            char fbparamname[4];
+            sprintf(fbparamname, "fb%d", side);
+            const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             /* If apowlim is not given, or if it is too large, set it to
              * its maximum allowed value */
-            if (apow_lim >= si->bucket_thresh) {
-                apow_lim = si->bucket_thresh - 1;
-                fprintf (las->output, "# apow_lim reduced to %d\n", apow_lim);
+            if (pow_lim[side] >= si->bucket_thresh) {
+                pow_lim[side] = si->bucket_thresh - 1;
+                fprintf (las->output, "# pow_lim on side %s reduced to %d\n",
+                        sidenames[side], pow_lim[side]);
             }
-            if (apow_lim == 0) {
-                apow_lim = si->bucket_thresh - 1;
-                fprintf (las->output, "# Using default value of %d for apow_lim\n", apow_lim);
+            if (pow_lim[side] == 0) {
+                pow_lim[side] = si->bucket_thresh - 1;
+                fprintf (las->output, "# Using default value of %d for pow_lim on side %s\n", pow_lim[side], sidenames[side]);
             }
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->bucket_thresh, las->nb_threads, las->verbose,
-                              lim, apow_lim, las->output);
+                              lim, pow_lim[side], las->output);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             sis->fb_is_mmapped = 0;
@@ -243,19 +243,20 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     fb_size (sis->fb) >> 20, tfb);
         } else {
             tfb = seconds ();
-            if (rpow_lim >= si->bucket_thresh)
+            if (pow_lim[side] >= si->bucket_thresh)
               {
-                rpow_lim = si->bucket_thresh - 1;
-                printf ("# rpow_lim reduced to %d\n", rpow_lim);
+                pow_lim[side] = si->bucket_thresh - 1;
+                printf ("# pow_lim reduced to %d on side %s\n",
+                        pow_lim[side], sidenames[side]);
               }
-            if (rpow_lim == 0) {
-                rpow_lim = si->bucket_thresh - 1;
-                fprintf (las->output, "# Using default value of %d for rpow_lim\n", rpow_lim);
+            if (pow_lim[side] == 0) {
+                pow_lim[side] = si->bucket_thresh - 1;
+                fprintf (las->output, "# Using default value of %d for pow_lim on side %s\n", pow_lim[side], sidenames[side]);
             }
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->coeff, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
-                                     rpow_lim, las->verbose, 1, las->output);
+                                     pow_lim[side], las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
@@ -3745,7 +3746,8 @@ print_stats (FILE *file, char* fmt, ...)
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "poly", "polynomial file");
-  param_list_decl_usage(pl, "fb",   "factor base file");
+  param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
+  param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
   param_list_decl_usage(pl, "fbc",  "factor base cache file");
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
@@ -3809,6 +3811,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
+    param_list_configure_alias(pl, "-fb1", "-fb");
 
     argv++, argc--;
     for( ; argc ; ) {
