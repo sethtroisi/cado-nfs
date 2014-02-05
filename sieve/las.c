@@ -3041,11 +3041,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             }
 #endif
 
-#if 0   /* incompatible with the todo list */
-            if (!si->bench)
-#else
-            if (1)
-#endif
             {
                 int do_check = th->las->suppress_duplicates;
                 int is_dup = do_check && relation_is_duplicate(rel, las->nb_threads, si);
