@@ -33,7 +33,7 @@ import abc
 import logging
 import cadologger
 
-logger = logging.Logger("Parameters")
+logger = logging.getLogger("Parameters")
 
 parse_array = []
 
@@ -46,7 +46,7 @@ class BoolParam(object):
                 value.lower() in ["no", "false", "off", "0"]:
             self.value = False
         else:
-            raise ValueError("Could not parse %s as truth value" % value)
+            raise ValueError("Could not parse '%s' as truth value" % value)
 
     def __repr__(self):
         return str(self.value)
@@ -248,8 +248,9 @@ class Parameters(object):
                 if type(keys[key]) is type:
                     target_type = keys[key]
                     if not key in result:
-                        logger.critical("Parameter %s not found under path %d",
+                        logger.critical("Parameter %s not found under path %s",
                             key, joinpath)
+                        raise(KeyError)
                 else:
                     target_type = type(keys[key])
                     result.setdefault(key, keys[key])
@@ -257,7 +258,11 @@ class Parameters(object):
                 if target_type is bool:
                     target_type = BoolParam
                 # Convert type
-                result[key] = target_type(result[key])
+                try:
+                    result[key] = target_type(result[key])
+                except ValueError as e:
+                    logger.critical("Error while parsing parameter '%s': %s", key, str(e))
+                    raise
         return result
     
     @staticmethod
