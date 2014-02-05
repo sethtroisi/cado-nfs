@@ -37,28 +37,25 @@ logger = logging.getLogger("Parameters")
 
 parse_array = []
 
-class BoolParam(object):
-    def __init__(self, value):
-        if value is True or isinstance(value, str) and \
-                value.lower() in ["yes", "true", "on", "1"]:
-            self.value = True
-        elif value is False or isinstance(value, str) and \
-                value.lower() in ["no", "false", "off", "0"]:
-            self.value = False
-        else:
-            raise ValueError("Could not parse '%s' as truth value" % value)
-
-    def __repr__(self):
-        return str(self.value)
-    
-    def __bool__(self):
-        return self.value
-
-    def __eq__(self, val):
-        return self.value == val
-
-    def __str__(self):
-        return str(self.value)
+def BoolParam(value):
+    """
+    >>> BoolParam(True)
+    True
+    >>> BoolParam(False)
+    False
+    >>> BoolParam("yes")
+    True
+    >>> BoolParam("no")
+    False
+    """
+    if value is True or isinstance(value, str) and \
+            value.lower() in ["yes", "true", "on", "1"]:
+        return True
+    elif value is False or isinstance(value, str) and \
+            value.lower() in ["no", "false", "off", "0"]:
+        return False
+    else:
+        raise ValueError("Could not parse '%s' as truth value" % value)
 
 class Parameters(object):
     """ Class that stores parameters for cadofactor in hierarchical dictionaries
