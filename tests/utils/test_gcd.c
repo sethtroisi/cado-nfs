@@ -19,85 +19,8 @@ random_uint64 (void)
   return (lrand48 () << 33) + (lrand48 () << 2) + (lrand48 () & 3);
 }
 
-void
-test_gcd_int64 (void)
-{
-  int64_t a, b, g, c, d, h;
-  int i;
-  
-  for (i = 0; i < 200000; i++)
-    {
-      a = (i == 0 || i == 1) ? 0 : random_int64 ();
-      b = (i == 0 || i == 2) ? 0 : random_int64 ();
-      g = gcd_int64 (a, b);
-      if (g == 0)
-        {
-          assert (a == 0 && b == 0);
-          continue;
-        }
-      assert ((a % g) == 0);
-      assert ((b % g) == 0);
-      c = a / g;
-      d = b / g;
-      h = gcd_int64 (c, d);
-      assert (h == 1);
-    }
-}
-
-void
-test_gcd_uint64 (void)
-{
-  uint64_t a, b, g, c, d, h;
-  int i;
-  
-  for (i = 0; i < 200000; i++)
-    {
-      a = (i == 0 || i == 1) ? 0 : random_uint64 ();
-      b = (i == 0 || i == 2) ? 0 : random_uint64 ();
-      g = gcd_uint64 (a, b);
-      if (g == 0)
-        {
-          assert (a == 0 && b == 0);
-          continue;
-        }
-      assert ((a % g) == 0);
-      assert ((b % g) == 0);
-      c = a / g;
-      d = b / g;
-      h = gcd_uint64 (c, d);
-      assert (h == 1);
-    }
-}
-
-void
-test_gcd_ul (void)
-{
-  unsigned long a, b, g, c, d, h;
-  int i;
-
-  assert (sizeof(unsigned long) <= sizeof(uint64_t));
-  for (i = 0; i < 200000; i++)
-    {
-      a = (unsigned long) (i == 0 || i == 1) ? 0 : random_uint64 ();
-      b = (unsigned long) (i == 0 || i == 2) ? 0 : random_uint64 ();
-      g = gcd_ul (a, b);
-      if (g == 0)
-        {
-          assert (a == 0 && b == 0);
-          continue;
-        }
-      assert ((a % g) == 0);
-      assert ((b % g) == 0);
-      c = a / g;
-      d = b / g;
-      h = gcd_ul (c, d);
-      assert (h == 1);
-    }
-}
-
-void
-
-cmp_mpz_gcd_i64(int64_t a, int64_t b, int64_t g)
+static void
+cmp_mpz_gcd_i64(const int64_t a, const int64_t b, const int64_t g)
 {
   mpz_t ma, mb, mg;
   mpz_init (ma);
@@ -107,18 +30,89 @@ cmp_mpz_gcd_i64(int64_t a, int64_t b, int64_t g)
   mpz_set_int64 (ma, a);
   mpz_set_int64 (mb, b);
   mpz_gcd (mg, ma, mb);
-  mpz_set_int64 (ma, a);
   
   if (mpz_get_int64 (mg) != g) {
     fprintf (stderr, "GCD(%lld, %lld) = %lld is incorrect, GMP has %lld",
-             (long long int) a, (long long int) b, (long long int) g,
-             (long long int) mpz_get_int64 (mg));
+             (long long) a, (long long) b, (long long) g,
+             (long long) mpz_get_int64 (mg));
     abort();
   }
 
   mpz_clear (ma);
   mpz_clear (mb);
   mpz_clear (mg);
+}
+
+static void
+cmp_mpz_gcd_ui64(const uint64_t a, const uint64_t b, const uint64_t g)
+{
+  mpz_t ma, mb, mg;
+  mpz_init (ma);
+  mpz_init (mb);
+  mpz_init (mg);
+
+  mpz_set_uint64 (ma, a);
+  mpz_set_uint64 (mb, b);
+  mpz_gcd (mg, ma, mb);
+  
+  if (mpz_get_uint64 (mg) != g) {
+    fprintf (stderr, "GCD(%llu, %llu) = %llu is incorrect, GMP has %llu",
+             (unsigned long long) a, (unsigned long long int) b,
+             (unsigned long long int) g,
+             (unsigned long long) mpz_get_uint64 (mg));
+    abort();
+  }
+
+  mpz_clear (ma);
+  mpz_clear (mb);
+  mpz_clear (mg);
+}
+
+void
+test_gcd_int64 (void)
+{
+  int64_t a, b, g;
+  int i;
+  
+  for (i = 0; i < 200000; i++)
+    {
+      a = (i == 0 || i == 1) ? 0 : random_int64 ();
+      b = (i == 0 || i == 2) ? 0 : random_int64 ();
+      g = gcd_int64 (a, b);
+      cmp_mpz_gcd_i64(a, b, g);
+    }
+}
+
+void
+test_gcd_uint64 (void)
+{
+  uint64_t a, b, g;
+  int i;
+  
+  for (i = 0; i < 200000; i++)
+    {
+      a = (i == 0 || i == 1) ? 0 : random_uint64 ();
+      b = (i == 0 || i == 2) ? 0 : random_uint64 ();
+      g = gcd_uint64 (a, b);
+      cmp_mpz_gcd_ui64(a, b, g);
+    }
+}
+
+void
+test_gcd_ul (void)
+{
+  unsigned long a, b, g;
+  int i;
+
+  assert (sizeof(unsigned long) <= sizeof(uint64_t));
+  for (i = 0; i < 200000; i++)
+    {
+      a = (unsigned long) (i == 0 || i == 1) ? 0 : random_uint64 ();
+      b = (unsigned long) (i == 0 || i == 2) ? 0 : random_uint64 ();
+      g = gcd_ul (a, b);
+      ASSERT(sizeof(unsigned long) <= sizeof(uint64_t));
+      cmp_mpz_gcd_ui64(a, b, g);
+    }
 }
 
 void
