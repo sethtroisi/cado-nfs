@@ -82,4 +82,7 @@ if __name__ == '__main__':
             sys.exit("Error occurred, terminating")
         else:
             print(" ".join(factors))
-     ## TODO: output of dlp is still to be defined.
+    else:
+        print("The logarithms of the factor base elements are in %s" %
+                tasksparams["workdir"] + os.sep + tasksparams["name"] +
+                ".reconstructlog.dlog")

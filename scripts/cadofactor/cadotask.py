@@ -2305,6 +2305,7 @@ class PurgeTask(Task):
         self.state.setdefault("input_nrels", 0)
     
     def run(self):
+        dlp = self.params.get("dlp", False)
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
@@ -2331,14 +2332,15 @@ class PurgeTask(Task):
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
         purgedfile = self.workdir.make_filename("purged.gz")
-        ### FIXME: relsdel is only required for DLP.
-        relsdelfile = self.workdir.make_filename("relsdel.gz")
+        if dlp:
+            relsdelfile = self.workdir.make_filename("relsdel.gz")
+        else:
+            relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
-        dlp = self.params.get("dlp", False)
         if dlp:
             nmaps = self.send_request(Request.GET_NMAPS)
             self.progparams[0]["keep"] = nmaps
@@ -2370,8 +2372,9 @@ class PurgeTask(Task):
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
             self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels,
-                               "relsdelfile": relsdelfile.get_wdir_relative() })
+                               "input_nrels": input_nrels })
+            if dlp:
+                self.state.update({"relsdelfile": relsdelfile.get_wdir_relative() })
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2427,7 +2430,6 @@ class PurgeTask(Task):
     def get_purged_filename(self):
         return self.get_state_filename("purgedfile")
     
-    ## FIXME: should be there only for DLP
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
@@ -3826,8 +3828,12 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.request_map[Request.GET_LINALG_PREFIX] = self.linalg.get_prefix
 
     def run(self):
+        dlp = self.params.get("dlp", False)
         had_interrupt = False
-        self.logger.info("Factoring %s", self.params["N"])
+        if dlp:
+            self.logger.info("Computing Discrete Logs in GF(%s)", self.params["N"])
+        else:
+            self.logger.info("Factoring %s", self.params["N"])
         self.start_elapsed_time()
 
         self.servertask.run()
@@ -3864,9 +3870,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
             return None
 
-        dlp = self.params.get("dlp")
         if dlp:
-            ## TODO: what should we return???
             return 1
         else:
             return self.sqrt.get_factors()
