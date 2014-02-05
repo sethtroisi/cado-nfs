@@ -47,9 +47,15 @@ class BoolParam(object):
             self.value = False
         else:
             raise ValueError("Could not parse %s as truth value" % value)
+
+    def __repr__(self):
+        return str(self.value)
     
     def __bool__(self):
         return self.value
+
+    def __eq__(self, val):
+        return self.value == val
 
     def __str__(self):
         return str(self.value)
@@ -175,7 +181,15 @@ class Parameters(object):
         ''' From the hierarchical dictionary params, generate a flat 
         dictionary with those parameters which are listed in keys and that 
         are found along path. 
-        path is specified as a string with path segments separated '.'
+        path is specified as a string with path segments separated '.',
+        or as a list of path segments.
+        
+        If keys is a dictionary, then the dictionary key will be used as the
+        parameter key, and its value will be used as the default value. The
+        parameter value is converted to the same type as the dictionary value
+        is. If the dictionary value is a class (such as int, str, or bool),
+        then we assume that there is no default value and the key is mandatory;
+        an error will be raised if it is not found in the parameter hierarchy.
         
         >>> d = {'a':1,'b':2,'c':3,'foo':{'a':3},'bar':{'a':4,'baz':{'a':5}}}
         >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': 3, 'b': 2}
@@ -183,6 +197,27 @@ class Parameters(object):
         
         >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': 5, 'b': 2}
         True
+
+        Test returning the default value of a parameter not provided in the
+        parameter file
+        >>> Parameters(d).myparams(keys={'d': 1}, path=[])
+        {'d': 1}
+
+        Test converting to the same type as the default value
+        >>> Parameters(d).myparams(keys={'a': 'x'}, path='foo')
+        {'a': '3'}
+        
+        Test converting to an explicit type
+        >>> Parameters(d).myparams(keys={'a': str}, path='foo')
+        {'a': '3'}
+
+        Test converting if default value is bool
+        >>> Parameters({"foo": "yes"}).myparams(keys={"foo": False}, path=[])
+        {'foo': True}
+        
+        Test converting if explicit type is bool
+        >>> Parameters({"foo": "yes"}).myparams(keys={"foo": bool}, path=[])
+        {'foo': True}
         '''
         # path can be an array of partial paths, i.e., each entry can contain
         # one or more path segments separated by '.'. First join
@@ -200,6 +235,24 @@ class Parameters(object):
                 break
             source = source[segment]
             result.update(self._extract_by_keys(source, keys))
+        if isinstance(keys, dict):
+            for key in keys:
+                # If only the type without default value is specified, then
+                # the value must exist in the parameter file, and is converted
+                # to the specified type
+                if type(keys[key]) is type:
+                    target_type = keys[key]
+                    if not key in result:
+                        logger.critical("Parameter %s not found under path %d",
+                            key, joinpath)
+                else:
+                    target_type = type(keys[key])
+                    result.setdefault(key, keys[key])
+                # BoolType is special, we use BoolParam for the conversion
+                if target_type is bool:
+                    target_type = BoolParam
+                # Convert type
+                result[key] = target_type(result[key])
         return result
     
     @staticmethod
