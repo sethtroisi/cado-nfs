@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #define TEST_MAX_AB 16
+#define FREQ 2 // when possible one time out of FREQ we try sm_single_rel
 
 void
 mpz_poly_getcoeff_wrapper (mpz_t res, int i, const mpz_poly_t f)
@@ -25,6 +26,7 @@ test_sm (FILE * datafile)
   do
   {
     int ret, degF, degN, degD, nb_ab, nbSM;
+    unsigned int nb_test_single_rel = 0;
     mpz_poly_t F, N, Nc, D, Dc, SM, SMc;
     mpz_t tmp, ell, ell2, smexp, invl2;
     int64_t a, e[MAX_LEN_RELSET];
@@ -113,15 +115,31 @@ test_sm (FILE * datafile)
     /* Real tests begin here */
     barrett_init(invl2, ell2);
     mpz_poly_init (SMc, degF);
-    sm_relset_init (relset, degF);
-    sm_build_one_relset (relset, r, e, len_relset, ab_polys, F, ell2);
     mpz_poly_init (Nc, degF);
     mpz_poly_init (Dc, degF);
-    mpz_poly_copy (Nc, relset->num);
-    mpz_poly_copy (Dc, relset->denom);
-    mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num, relset->denom, F, ell2);
-    compute_sm (SMc, relset->num, F, ell, smexp, ell2, invl2);
-
+    if (len_relset == 1 && e[0] == 1 && nb_test_single_rel % FREQ == 0)
+    {
+      fprintf (stderr, "AAA\n");
+      mpz_poly_fprintf(stderr, F);
+      nb_test_single_rel++;
+      mpz_poly_getcoeff_wrapper (tmp, 0, ab_polys[r[0]]);
+      a = mpz_get_si (tmp);
+      mpz_poly_getcoeff_wrapper (tmp, 1, ab_polys[r[0]]);
+      b = mpz_get_ui (tmp);
+      sm_single_rel(SMc, a, b, F, smexp, ell, ell2, invl2);
+      mpz_poly_copy (Nc, ab_polys[r[0]]);
+      mpz_poly_setcoeff_si (Dc, 0, 1);
+    }
+    else
+    {
+      sm_relset_init (relset, degF);
+      sm_build_one_relset (relset, r, e, len_relset, ab_polys, F, ell2);
+      mpz_poly_copy (Nc, relset->num);
+      mpz_poly_copy (Dc, relset->denom);
+      mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num, relset->denom, F, ell2);
+      compute_sm (SMc, relset->num, F, ell, smexp, ell2, invl2);
+      sm_relset_clear (relset);
+    }
 
     /* In case of error, print all relevant information */
     if (mpz_poly_cmp(SM, SMc) != 0)
@@ -175,7 +193,6 @@ test_sm (FILE * datafile)
     }
 
 
-    sm_relset_clear (relset);
     for (int i = 0; i < nb_ab; i++)
       mpz_poly_clear (ab_polys[i]);
     mpz_clear (tmp);
