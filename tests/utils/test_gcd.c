@@ -128,12 +128,14 @@ test_bin_gcd_int64_safe (void)
   test_iter_t iter_a, iter_b;
   int i;
 
-  test_iter_init(iter_a, 100);
+  test_iter_init(iter_a, 100, test_iter_int64_next);
   while (!test_iter_isdone(iter_a)) {
-    int64_t a = test_iter_int64_next(iter_a);
-    test_iter_init(iter_b, 100);
+    int64_t a;
+    test_iter_next(&a, iter_a);
+    test_iter_init(iter_b, 100, test_iter_int64_next);
     while (!test_iter_isdone(iter_b)) {
-      int64_t b = test_iter_int64_next(iter_b);
+      int64_t b;
+      test_iter_next(&b, iter_b);
       test_bin_gcd_int64_safe_ab(a, b);
     }
   }
