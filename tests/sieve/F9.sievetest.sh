@@ -4,6 +4,7 @@
 
 SRCDIR="$1"
 BINDIR="$2"
+SOURCE_TEST_DIR="`dirname "$0"`"
 
 REFERENCE_SHA1="5ecca4127483d68d1b3cab3c62c8f6ff1ab371af"
 
@@ -21,6 +22,6 @@ q0=1200000
 q1=1200200
 
 export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 q1
-./sievetest.sh "${SRCDIR}/params/F9.poly" "${BINDIR}" "${REFERENCE_SHA1}" || exit 1
+"${SOURCE_TEST_DIR}"/sievetest.sh "${SRCDIR}/params/F9.poly" "${BINDIR}" "${REFERENCE_SHA1}" || exit 1
 
 exit 0

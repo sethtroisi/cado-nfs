@@ -10,7 +10,8 @@ Makefile
 NEWS
 README
 README.msieve
-README.discretelog
+README.ffs
+README.dlp
 README.Python
 cado.h
 cado_config_h.in

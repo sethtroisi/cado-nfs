@@ -388,6 +388,11 @@ static void declare_usage(param_list pl)
     param_list_decl_usage(pl, "maxbits", "(optional) maximal number of "
             "bits of powers");
     param_list_decl_usage(pl, "out", "(optional) name of the output file");
+    char str[1024];
+    sprintf(str, "(optional) create factor base for given side. "
+            "Side must be %d or %d (default is %d, i.e. algebraic).",
+            RATIONAL_SIDE, ALGEBRAIC_SIDE, ALGEBRAIC_SIDE);
+    param_list_decl_usage(pl, "side", str);
 }
 
 int
@@ -398,6 +403,7 @@ main (int argc, char *argv[])
   FILE * f, *outputfile;
   const char *outfilename = NULL;
   int maxbits = 1;  // disable powers by default
+  int side = ALGEBRAIC_SIDE;
   unsigned long alim = 0;
   char *argv0 = argv[0];
 
@@ -436,6 +442,14 @@ main (int argc, char *argv[])
       exit(EXIT_FAILURE);
   }
 
+  param_list_parse_int(pl, "side", &side);
+  if (side != RATIONAL_SIDE && side != ALGEBRAIC_SIDE) {
+      fprintf(stderr, "Error: side must be %d (for rational) or %d "
+              "(for algebraic)\n", RATIONAL_SIDE, ALGEBRAIC_SIDE);
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
   param_list_parse_int(pl, "maxbits", &maxbits);
 
   outfilename = param_list_lookup_string(pl, "out");
@@ -453,7 +467,10 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  makefb_with_powers (outputfile, cpoly->alg, alim, maxbits);
+  if (side == ALGEBRAIC_SIDE)
+      makefb_with_powers (outputfile, cpoly->alg, alim, maxbits);
+  else
+      makefb_with_powers (outputfile, cpoly->rat, alim, maxbits);
 
   cado_poly_clear (cpoly);
   if (outfilename != NULL) {

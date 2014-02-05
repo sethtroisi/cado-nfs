@@ -720,6 +720,59 @@ earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
 
 /************************************************************************/
 
+/* struct and functions that handle printing stats during the reading */
+struct filter_io_stats_s
+{
+  double t0; /* Time at init */
+  size_t nB; /* number of bytes read */
+  uint64_t nrels; /* number of rels read */
+  uint64_t nrels_at_last_report;
+  double t_at_last_report;
+};
+
+typedef struct filter_io_stats_s filter_io_stats_t[1];
+typedef struct filter_io_stats_s * filter_io_stats_ptr;
+
+void
+filter_io_stats_init (filter_io_stats_ptr s)
+{
+  s->nB = 0;
+  s->nrels = s->nrels_at_last_report = 0;
+  s->t0 = s->t_at_last_report = wct_seconds();
+}
+
+/* Return 1 if more than 2^18 relations were read since last progress report 
+        and if more than 1 seconds was spent since last progress report.
+   Otherwise return 0 */
+int
+filter_io_stats_test_progress (filter_io_stats_ptr s)
+{
+  if ((s->nrels >> 18) == (s->nrels_at_last_report >> 18))
+    return 0;
+  if (wct_seconds() < s->t_at_last_report + 1)
+    return 0;
+  return 1;
+}
+
+void
+filter_io_stats_print_progress (filter_io_stats_ptr s, const char *prefix)
+{
+  double t, dt, mb_s, rels_s;
+  t = wct_seconds();
+  dt = t - s->t0;
+  mb_s = dt > 0.01 ? (s->nB/dt * 1.0e-6) : 0;
+  rels_s = dt > 0.01 ? s->nrels/dt : 0;
+  const char * pre1 = (prefix == NULL) ? "" : prefix;
+  const char * pre2 = (prefix == NULL) ? "Read" : ", read";
+  fprintf(stderr, "%s%s %" PRIu64 " relations in %.1fs -- %.1f MB/s -- "
+                  "%.1f rels/s\n", pre1, pre2, s->nrels, dt, mb_s, rels_s);
+  s->t_at_last_report = t;
+  s->nrels_at_last_report = s->nrels;
+}
+
+
+/************************************************************************/
+
 /*{{{ filter_rels producer thread */
 struct filter_rels_producer_thread_arg_s {
     ringbuf_ptr rb;
@@ -832,7 +885,7 @@ uint64_t filter_rels2_inner(char ** input_files,
         bit_vector_srcptr active,
         timingstats_dict_ptr stats)
 {
-    relation_stream rs;         /* only for displaying progress */
+    filter_io_stats_t infostats;  /* for displaying progress */
 
     /* {{{ setup and start the producer thread (for the first pipe) */
     char ** commands = prepare_grouped_command_lines(input_files);
@@ -954,7 +1007,7 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* }}} */
 
     /* {{{ main loop */
-    relation_stream_init(rs);
+    filter_io_stats_init (infostats);
     inflight->enter(0);
     for(size_t avail_seen = 0 ; ; ) {
         pthread_mutex_lock(rb->mx);
@@ -976,7 +1029,7 @@ uint64_t filter_rels2_inner(char ** input_files,
         int nl;
         for(size_t avail_offset = 0; avail_offset < avail_seen && (nl = ringbuf_strchr(rb, '\n', 0)) > 0 ; ) {
             if (*rb->rhead != '#') {
-                uint64_t relnum = rs->nrels++;
+                uint64_t relnum = infostats->nrels++;
                 if (!active || bit_vector_getbit(active, relnum)) {
                     earlyparsed_relation_ptr slot = inflight->schedule(0);
                     slot->num = relnum;
@@ -986,14 +1039,12 @@ uint64_t filter_rels2_inner(char ** input_files,
             }
             /* skip the newline byte as well */
             nl++;
-            rs->pos += nl;
+            infostats->nB += nl;
             ringbuf_skip_get(rb, nl);
             avail_seen -= nl;
             avail_offset += nl;
-            if (relation_stream_disp_progress_now_p(rs))
-                fprintf(stderr, "Read %" PRIu64 " relations in %.1fs -- %.1f "
-                                "MB/s -- %.1f rels/s\n", rs->nrels, rs->dt,
-                                rs->mb_s, rs->rels_s);
+            if (filter_io_stats_test_progress(infostats))
+              filter_io_stats_print_progress (infostats, NULL);
         }
     }
     inflight->drain();
@@ -1011,17 +1062,13 @@ uint64_t filter_rels2_inner(char ** input_files,
 
     /* NOTE: the inflight dtor is called automatically */
 
-    uint64_t nrels = rs->nrels;
+    filter_io_stats_print_progress (infostats, "Done");
 
     /* clean producer stuff */
-    relation_stream_trigger_disp_progress(rs);
-    fprintf(stderr, "Done, read %" PRIu64 " relations in %.1fs -- %.1f MB/s -- "
-            "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    relation_stream_clear(rs);
     ringbuf_clear(rb);
     filelist_clear(commands);
 
-    return nrels;
+    return infostats->nrels;
 }
 
 uint64_t filter_rels2(char ** input_files,

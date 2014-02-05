@@ -715,13 +715,9 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         pass
     @abc.abstractproperty
     def paramnames(self):
-        # A list of parameter keywords which this task uses.
-        # This is used for extracting relevant parameters from the parameter
-        # hierarchical dictionary.
-        # Sub-classes need to define a property 'paramnames' which returns a
-        # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
-        return ("name", "workdir", "run")
+        return self.join_params(super().paramnames, 
+            {"name": str, "workdir": str, "run": True})
     @property
     def param_nodename(self):
         return self.name
@@ -757,7 +753,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.init_stats()
         # Request mediator to run this task, unless "run" parameter is set
         # to false
-        if self.params.get("run", True):
+        if self.params["run"]:
             self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
@@ -1016,8 +1012,12 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
-                                     "maxtimedout", "maxfailed")
+        return self.join_params(super().paramnames,  
+            {"maxwu": 10, 
+             "wutimeout": 10800,  # Default: 3h
+             "maxresubmit": 5, 
+             "maxtimedout": 100, 
+             "maxfailed": 100})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1026,9 +1026,6 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         self.state.setdefault("wu_received", 0)
         self.state.setdefault("wu_timedout", 0)
         self.state.setdefault("wu_failed", 0)
-        self.params.setdefault("maxwu", 10)
-        self.params.setdefault("maxtimedout", 100)
-        self.params.setdefault("maxfailed", 100)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -1041,7 +1038,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     def cancel_wu(self, wuid, commit=True):
         """ Cancel a WU and update wu_timedout counter """
         key = "wu_timedout"
-        maxtimedout = int(self.params["maxtimedout"])
+        maxtimedout = self.params["maxtimedout"]
         if not self.state[key] < maxtimedout:
             self.logger.error("Exceeded maximum number of timed out "
                               "workunits, maxtimedout=%d ", maxtimedout)
@@ -1115,7 +1112,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         (name, task, identifier, attempt) = self.split_wuname(wuid)
         attempt = 2 if attempt is None else attempt + 1
         if maxresubmit is None:
-            maxresubmit = int(self.params.get("maxresubmit", 5))
+            maxresubmit = self.params["maxresubmit"]
         if attempt > maxresubmit:
             self.logger.info("Not resubmitting workunit %s, failed %d times",
                              wuid, attempt - 1)
@@ -1143,7 +1140,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return
         self.last_timeout_check = now
         
-        timeout = int(self.params.get("wutimeout", 10800)) # Default: 3h
+        timeout = self.params["wutimeout"]
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
         self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
@@ -1166,7 +1163,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return False
         self.log_failed_command_error(message, 0)
         key = "wu_failed"
-        maxfailed = int(self.params["maxfailed"])
+        maxfailed = self.params["maxfailed"]
         if not self.state[key] < maxfailed:
             self.logger.error("Exceeded maximum number of failed "
                               "workunits, maxfailed=%d ", maxfailed)
@@ -1194,8 +1191,9 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         return (cadoprograms.Polyselect2l,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("adrange", "admin", "admax", "import", "I", "alim", "rlim")
+        return self.join_params(super().paramnames, {
+            "adrange": int, "admin": 0, "admax": int, "import": None,
+            "I": int, "alim": int, "rlim": int})
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
@@ -1294,21 +1292,12 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
         self.state["adnext"] = \
-            max(self.state.get("adnext", 0), self.params.get("admin", 0))
+            max(self.state.get("adnext", 0), self.params["admin"])
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.did_import = False
-        # FIXME: in the parameter files so far, "I" is specified under 
-        # tasks.sieving, so polysel does not see the value. We use a default
-        # of 13 here to avoid a key error exception. Maybe we should move
-        # the "I" parameter to tasks.
-        if not "I" in self.params:
-            self.params["I"] = 13
-            self.logger.warn("No value for I given (maybe specified only under"
-                             " tasks.sieve?) Using default of %s.", 
-                             self.params["I"])
-        self.progparams[0].setdefault("area", 2**(2*int(self.params["I"])-1) \
+        self.progparams[0].setdefault("area", 2**(2*self.params["I"]-1) \
                 * self.params["alim"])
         self.progparams[0].setdefault("Bf", self.params["alim"])
         self.progparams[0].setdefault("Bg", self.params["rlim"])
@@ -1480,8 +1469,7 @@ class FactorBaseTask(Task):
         return (cadoprograms.MakeFB,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("alim", "gzip", "I")
+        return self.join_params(super().paramnames, {"gzip": True, "I": int})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1519,7 +1507,7 @@ class FactorBaseTask(Task):
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
@@ -1555,8 +1543,7 @@ class FreeRelTask(Task):
         return (cadoprograms.FreeRel,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("dlp", "alim", "rlim", "gzip")
+        return self.join_params(super().paramnames, {"dlp": False, "gzip": True})
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -1600,11 +1587,10 @@ class FreeRelTask(Task):
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             freerelfilename = self.workdir.make_filename("freerel" + use_gz)
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
-            dlp = self.params.get("dlp", False)
-            if dlp:
+            if self.params["dlp"]:
                 badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
@@ -1675,8 +1661,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         return (cadoprograms.Las,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("qmin", "qrange", "rels_wanted", "alim", "import")
+        return self.join_params(super().paramnames, {
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int, 
+            "import": None, "gzip": True})
     _stat_conversions = (
         (
             "stats_avg_J",
@@ -1728,15 +1715,15 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        qmin = self.params.get("qmin", 0)
+        qmin = self.params["qmin"]
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            self.state["qnext"] = self.params.get("qmin", self.params["alim"])
+            # qmin = 0 is magic value that uses alim instead. Not pretty.
+            self.state["qnext"] = qmin if qmin > 0 else self.params["alim"]
         
         self.state.setdefault("rels_found", 0)
-        self.state["rels_wanted"] = self.params.get("rels_wanted", 0)
-        self.params.setdefault("maxwu", "10")
+        self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
@@ -1755,7 +1742,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output",
@@ -1907,8 +1894,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return (cadoprograms.Duplicates1,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("nslices_log",)
+        return self.join_params(super().paramnames, {"nslices_log": 1})
     _stat_conversions = (
         (
             "stats_dup1_time",
@@ -1931,7 +1917,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**self.params.get("nslices_log", 1)
+        self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
         self.already_split_input = self.make_db_dict(tablename,
                                                      connection=self.db_connection)
@@ -2124,7 +2110,8 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return (cadoprograms.Duplicates2,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "nslices_log", "alim", "rlim")
+        return self.join_params(super().paramnames, 
+            {"dlp": False, "nslices_log": 1})
     _stat_conversions = (
         (
             "stats_dup2_time",
@@ -2148,7 +2135,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        self.nr_slices = 2**self.params.get("nslices_log", 1)
+        self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
         self.already_done_input = self.make_db_dict(tablename, connection=self.db_connection)
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"), connection=self.db_connection)
@@ -2184,8 +2171,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(name, do_increment=(i == 0))
              
-            dlp = self.params.get("dlp", False)
-            if dlp:
+            if self.params["dlp"]:
                 badinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
             else:
                 badinfofilename = None
@@ -2297,7 +2283,8 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "alim", "rlim")
+        return self.join_params(super().paramnames, 
+            {"dlp": False, "alim": int, "rlim": int})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2331,15 +2318,16 @@ class PurgeTask(Task):
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
         purgedfile = self.workdir.make_filename("purged.gz")
-        ### FIXME: relsdel is only required for DLP.
-        relsdelfile = self.workdir.make_filename("relsdel.gz")
+        if self.params["dlp"]:
+            relsdelfile = self.workdir.make_filename("relsdel.gz")
+        else:
+            relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
-        dlp = self.params.get("dlp", False)
-        if dlp:
+        if self.params["dlp"]:
             nmaps = self.send_request(Request.GET_NMAPS)
             self.progparams[0]["keep"] = nmaps
         
@@ -2370,8 +2358,9 @@ class PurgeTask(Task):
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
             self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels,
-                               "relsdelfile": relsdelfile.get_wdir_relative() })
+                               "input_nrels": input_nrels })
+            if self.params["dlp"]:
+                self.state.update({"relsdelfile": relsdelfile.get_wdir_relative() })
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2427,7 +2416,6 @@ class PurgeTask(Task):
     def get_purged_filename(self):
         return self.get_state_filename("purgedfile")
     
-    ## FIXME: should be there only for DLP
     def get_relsdel_filename(self):
         return self.get_state_filename("relsdelfile")
     
@@ -2540,8 +2528,7 @@ class MergeDLPTask(Task):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("forbw", "coverNmax", "maxlevel", "ratio", "gzip")
+        return self.join_params(super().paramnames, {"gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2566,7 +2553,7 @@ class MergeDLPTask(Task):
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             keep = self.send_request(Request.GET_NMAPS)
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.MergeDLP(mat=purged_filename,
@@ -2636,13 +2623,13 @@ class MergeTask(Task):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
+        return self.join_params(super().paramnames,  \
+            {"skip": None, "keep": None, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
                          path_prefix = path_prefix)
-        skip = self.progparams[0].get("skip", 32)
+        skip = int(self.progparams[0].get("skip", 32))
         self.progparams[0].setdefault("skip", skip)
         self.progparams[0].setdefault("keep", skip + 128)
 
@@ -2661,7 +2648,7 @@ class MergeTask(Task):
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
@@ -2968,7 +2955,7 @@ class CharactersTask(Task):
         return (cadoprograms.Characters,)
     @property
     def paramnames(self):
-        return super().paramnames + ()
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3022,8 +3009,7 @@ class SqrtTask(Task):
         return (cadoprograms.Sqrt,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("N",)
+        return self.join_params(super().paramnames, {"N": int})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3205,7 +3191,8 @@ class SMTask(Task):
         return (cadoprograms.SM,)
     @property
     def paramnames(self):
-        return super().paramnames + ("gorder", "smexp")
+        return self.join_params(super().paramnames,
+            {"gorder": None, "smexp": None})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3329,8 +3316,9 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         return "Server Launcher"
     @property
     def paramnames(self):
-        return ("name", "workdir", "address", "port", "threaded", "ssl", "whitelist", 
-                "only_registered")
+        return {"name": str, "workdir": None, "address": None, "port": 8001,
+                "threaded": False, "ssl": True, "whitelist": None,
+                "only_registered": True}
     @property
     def param_nodename(self):
         return self.name
@@ -3344,16 +3332,16 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
         self.params = self.parameters.myparams(self.paramnames)
         serveraddress = self.params.get("address", None)
-        serverport = self.params.get("port", 8001)
+        serverport = self.params["port"]
         basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
-        threaded = self.params.get("threaded", False)
+        threaded = self.params["threaded"]
         # By default, allow access only to files explicitly registered by tasks,
         # i.e., those files required by clients when downloading input files for
         # their workunits. By setting only_registered=False, access to all files
         # under the server working directory is allowed.
-        only_registered = self.params.get("only_registered", True)
-        if self.params.get("ssl", True):
+        only_registered = self.params["only_registered"]
+        if self.params["ssl"]:
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
@@ -3415,8 +3403,7 @@ class StartClientsTask(Task):
         return (cadoprograms.WuClient,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ('hostnames', 'scriptpath', "nrclients")
+        return {'hostnames': str, 'scriptpath': None, "nrclients": 1, "run": True}
     @property
     def param_nodename(self):
         return None
@@ -3668,13 +3655,17 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     def param_nodename(self):
         return self.name
     @property
+    def paramnames(self):
+        # This isn't a Task subclass so we don't really need to define
+        # paramnames, but we do it out of habit
+        return {"name": str, "workdir": str, "N": int, "dlp": False}
+    @property
     def title(self):
         return "Complete Factorization"
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.params = self.parameters.myparams(("name", "workdir", "N", "dlp"))
-        dlp = self.params.get("dlp", False)
+        self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
         
         # Init WU BD
@@ -3736,7 +3727,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                                db = db,
                                parameters = self.parameters,
                                path_prefix = filterpath)
-        if dlp:
+        if self.params["dlp"]:
             ## Tasks specific to dlp
             self.nmbrthry = NmbrthryTask(mediator = self,
                              db = db,
@@ -3779,7 +3770,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         
         # Defines an order on tasks in which tasks that want to run should be
         # run
-        if dlp:
+        if self.params["dlp"]:
             self.tasks = (self.polysel, self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
@@ -3810,7 +3801,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
         ## add requests specific to dlp or factoring
-        if dlp:
+        if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
             self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
             self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
@@ -3827,7 +3818,10 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
 
     def run(self):
         had_interrupt = False
-        self.logger.info("Factoring %s", self.params["N"])
+        if self.params["dlp"]:
+            self.logger.info("Computing Discrete Logs in GF(%s)", self.params["N"])
+        else:
+            self.logger.info("Factoring %s", self.params["N"])
         self.start_elapsed_time()
 
         self.servertask.run()
@@ -3864,9 +3858,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
             return None
 
-        dlp = self.params.get("dlp")
-        if dlp:
-            ## TODO: what should we return???
+        if self.params["dlp"]:
             return 1
         else:
             return self.sqrt.get_factors()

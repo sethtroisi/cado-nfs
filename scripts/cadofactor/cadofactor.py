@@ -32,7 +32,7 @@ if __name__ == '__main__':
         parameters.read_old_defaults()
     parameters.readfile(paramfile, old_format = args.old)
     parameters.readparams(args.options, old_format = args.old)
-    tasksparams = parameters.myparams(("workdir", "name"), "tasks")
+    tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())
     logger = logging.getLogger()
@@ -82,4 +82,7 @@ if __name__ == '__main__':
             sys.exit("Error occurred, terminating")
         else:
             print(" ".join(factors))
-     ## TODO: output of dlp is still to be defined.
+    else:
+        print("The logarithms of the factor base elements are in %s" %
+                tasksparams["workdir"] + os.sep + tasksparams["name"] +
+                ".reconstructlog.dlog")

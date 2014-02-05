@@ -212,7 +212,6 @@ struct las_info_s {
     FILE *output;
     const char * outputname; /* keep track of whether it's gzipped or not */
     int verbose;
-    int bench;
     int suppress_duplicates;
 
     /* It's not ``general operational'', but global enough to be here */
