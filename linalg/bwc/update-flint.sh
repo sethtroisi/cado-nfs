@@ -54,7 +54,7 @@ s/^/\/\/ temp /
 
 s/^/\/\/ temp /
 
-s/^/\/\/temp /
+s/^/\/\/ temp /
 /ifdef.*__cplusplus
 s/^/\/\/ temp /
 
@@ -70,7 +70,7 @@ sed -e '/gmpcompat.h/ d' -i flint-fft/flint.h
 
 find flint-fft -name '*.[ch]' | xargs -n 1 indent -kr -i4 -sc -fca -fc1 -lc78
 
-find flint-fft -name '*.h' | xargs -n 1 sed -e "s/^\/\/ temp //g" -i
+find flint-fft -name '*.h' | xargs -n 1 sed -e "s/^ *\/\/ temp //g" -i
 find flint-fft -type f  | xargs grep -l 'fmpz' | xargs -n 1 sed -e 's/^#include "fmpz/\/\/ #include "fmpz/g' -i
 sed -e 's/^.*\(fmpz\|mpfr\)/\/\/ &/' -i flint-fft/memory_manager.c
 

@@ -260,9 +260,8 @@ if(WITH_MPIR)
     target_link_libraries(test-flint flint-fft ${gmp_libname})
 endif(WITH_MPIR)
 
-
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-add_executable(plingen EXCLUDE_FROM_ALL
+set(plingen_sources
                 bw-common.c
                 bw-common-mpi.c
                 plingen.c
@@ -272,10 +271,20 @@ add_executable(plingen EXCLUDE_FROM_ALL
                 lingen-polymat.c
                 lingen-bigpolymat.c
                 mpfq/abase_p_${plingen_prime_nwords}.c
-        )
+    )
+
+if(WITH_MPIR)
+set(plingen_sources ${plingen_sources} lingen-matpoly-ft.c)
+endif(WITH_MPIR)
+
+add_executable(plingen EXCLUDE_FROM_ALL ${plingen_sources})
 set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
+if(WITH_MPIR)
+target_link_libraries(plingen flint-fft ${gmp_libname} utils)
+else(WITH_MPIR)
 target_link_libraries(plingen ${gmp_libname} utils)
+endif(WITH_MPIR)
 set_target_properties(plingen PROPERTIES
     COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
     LINK_FLAGS "--mpi"

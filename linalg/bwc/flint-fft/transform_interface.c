@@ -376,9 +376,10 @@ void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr
  * to the info given in *fti.
  * [0]: space to be allocated (size_t) for each transform.
  * [1]: temp space to be passed alongside with each transform
- *      (needs be allocated only once).
- * [2]: temp space to be passed alongside with each convolution
- *      (needs be allocated only once).
+ *      (needs be allocated only once). This same amount is also needed
+ *      when calling fft_addmul
+ * [2]: temp space to be passed alongside with each fft_mul or fft_addmul
+ *       convolution (needs be allocated only once).
  *
  * spaces returned in [1] and [2] are independent and the same area may
  * be used for both, but of course the caller must then ensure that they
@@ -1219,6 +1220,67 @@ void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti)
             mp_size_t t = i * n1;
             for (mp_size_t j = 0; j < n1; j++, t++) {
                 mpn_addmod_2expp1(q[t], p0[t], p1[t], rsize0);
+            }
+        }
+    }
+}
+
+void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti)
+{
+    /* See mul_truncate_sqrt2 */
+    mp_size_t nw = fti->w << fti->depth;
+    mp_size_t rsize0 = fti_rsize0(fti);
+    mp_limb_t ** p0 = (mp_limb_t **) y0;
+    mp_limb_t ** p1 = (mp_limb_t **) y1;
+    mp_limb_t ** q = (mp_limb_t **) z;
+    mp_size_t trunc = fti_trunc(fti);
+    mp_limb_t * qt = (mp_limb_t *) qtemp;
+
+    /* It is tempting to believe that MFA makes no difference here. In
+     * fact it does, because of truncation, and the way rows are
+     * organized after the transforms
+     */
+
+    if (fti->alg == 0) {
+        for (mp_size_t j = 0; j < trunc; j++) {
+            /* c is a bitmask. bit 0 is for the top bit of p1[j], bit 1 is
+             * for the top bit of p1[j].  */
+            mp_limb_t c = 2 * p0[j][rsize0] + p1[j][rsize0];
+            qt[rsize0] = mpn_mulmod_2expp1(qt, p0[j], p1[j], c, nw, temp);
+            assert(qt[rsize0] <= 1);
+            /* now q[j] += qt : */
+            mpn_addmod_2expp1(q[j], q[j], qt, rsize0);
+        }
+    } else {
+        /* 4n coeffs split into 2n2 rows of n1 coeffs */
+        /* depth1+depth2 = depth + 1 */
+        mp_size_t n = 1 << fti->depth;
+        mp_size_t depth1 = fti->depth / 2;
+        mp_size_t depth2 = fti->depth + 1 - fti->depth / 2;
+        mp_size_t n1 = 1 << depth1; /* for MFA */
+        mp_size_t n2 = 1 << depth2; /* for MFA */
+        /* The first n2 rows need no truncation. The rest is truncated at
+         * (trunc), which means that we take only trunc2 rows. */
+        mp_size_t trunc2 = (trunc - 2 * n) / n1;
+
+        /* convolutions on relevant rows */
+        for (mp_size_t s = 0; s < trunc2; s++) {
+            mp_size_t t = 2*n + n_revbin(s, depth2) * n1;
+            for (mp_size_t j = 0; j < n1; j++, t++) {
+                mp_limb_t c = 2 * p0[t][rsize0] + p1[t][rsize0];
+                qt[rsize0] = mpn_mulmod_2expp1(qt, p0[t], p1[t], c, nw, temp);
+                assert(qt[rsize0] <= 1);
+                mpn_addmod_2expp1(q[t], q[t], qt, rsize0);
+            }
+        }
+        /* convolutions on rows */
+        for (mp_size_t i = 0; i < n2; i++) {
+            mp_size_t t = i * n1;
+            for (mp_size_t j = 0; j < n1; j++, t++) {
+                mp_limb_t c = 2 * p0[t][rsize0] + p1[t][rsize0];
+                qt[rsize0] = mpn_mulmod_2expp1(qt, p0[t], p1[t], c, nw, temp);
+                assert(qt[rsize0] <= 1);
+                mpn_addmod_2expp1(q[t], q[t], qt, rsize0);
             }
         }
     }

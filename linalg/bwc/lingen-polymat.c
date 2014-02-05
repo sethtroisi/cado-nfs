@@ -48,11 +48,13 @@ static void polymat_set_generic_cutoff(struct polymat_cutoff_info * slot, const 
     if (old_cutoff) {
         if (old_cutoff->table) free(old_cutoff->table);
         memcpy(old_cutoff, slot, sizeof(struct polymat_cutoff_info));
+    } else if (slot->table) {
+        free(slot->table);
     }
     memcpy(slot, new_cutoff, sizeof(struct polymat_cutoff_info));
     if (slot->table) {
-        slot->table = malloc(slot->table_size * sizeof(struct polymat_cutoff_info));
-        memcpy(slot->table, new_cutoff->table, slot->table_size * sizeof(struct polymat_cutoff_info));
+        slot->table = malloc(slot->table_size * sizeof(unsigned int [2]));
+        memcpy(slot->table, new_cutoff->table, slot->table_size * sizeof(unsigned int [2]));
     }
 }
 

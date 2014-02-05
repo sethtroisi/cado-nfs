@@ -55,6 +55,7 @@
 extern "C" {
 #endif
 
+
 #if defined(__MPIR_VERSION)
 
 #if !defined(__MPIR_RELEASE ) || __MPIR_RELEASE < 20600
@@ -381,6 +382,7 @@ void fft_transform_prepare(void * x, struct fft_transform_info * fti);
 void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);
 void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_transform_info * fti);
 void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti);
+void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti);
 void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti);
 void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t n1, mp_size_t n2, unsigned int nacc);
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc);

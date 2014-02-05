@@ -5,6 +5,10 @@
 #include "portability.h"
 #include "macros.h"
 #include "lingen-matpoly.h"
+#include "lingen-matpoly.h"
+#ifdef HAVE_MPIR
+#include "flint-fft/fft.h"
+#endif
 
 int matpoly_check_pre_init(matpoly_srcptr p)
 {

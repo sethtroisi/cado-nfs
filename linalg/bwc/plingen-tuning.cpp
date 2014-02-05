@@ -19,6 +19,9 @@
 #include "lingen-polymat.h"
 #include "lingen-matpoly.h"
 #include "lingen-bigpolymat.h"
+#ifdef  HAVE_MPIR
+#include "lingen-matpoly-ft.h"
+#endif
 #include "plingen.h"
 #include "plingen-tuning.h"
 
@@ -150,7 +153,7 @@ struct cutoff_finder {
 
     inline bool still_meaningful_to_test(int i) { return meaningful[i]; }
 
-    void summarize_for_this_length(unsigned int k)
+    string summarize_for_this_length(unsigned int k)
     {
         const double slowness_ratio = 2;
         const int age_slow_discard = 5;
@@ -192,18 +195,19 @@ struct cutoff_finder {
                 meaningful[i] = false;
             }
         }
-        cout << k;
+        ostringstream s;
+        s << k;
         for(int i = 0 ; i < ntests ; i++) {
             if (was_meaningful[i]) {
-                cout << " " << benches[i];
-                if (i==best) cout << '#';
+                s << " " << benches[i];
+                if (i==best) s << '#';
             } else {
-                cout << " *";
+                s << " *";
             }
             benches[i] = 999999;
         }
-        cout << " " << method_name(best) << comments.str() << "\n";
-
+        s << " " << method_name(best) << comments.str();
+        return s.str();
     }
 
     cutoff_array const& result() const { return cutoffs; }
@@ -265,10 +269,19 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
      * 1 : size makes sense only for >=1
      */
     /* TODO: support multiple values in my cutoff table finder ? */
-    cutoff_finder<timer_rusage> finder(3, 1);
+#ifdef HAVE_MPIR
+#define FINDER_NMETHODS 4
+#else  /* HAVE_MPIR */
+#define FINDER_NMETHODS 3
+#endif  /* HAVE_MPIR */
+
+    cutoff_finder<timer_rusage> finder(FINDER_NMETHODS, 1);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
     finder.set_method_name(2, "matpoly-kronecker-schönhage");
+#ifdef  HAVE_MPIR
+    finder.set_method_name(3, "matpoly-ft-kronecker-schönhage-caching");
+#endif
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -279,8 +292,12 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     cout << "# Tuning "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products\n";
     /* Beware, k is a length, not a degree. Hence length 1 clearly makes
      * no sense */
-    cout << "# ncoeffs, basecase, only-one-kara, matpoly+ks\n";
-    cout << "# Note: for input length k within plingen, we use k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+    cout << "# inputlength, ncoeffs";
+    for(unsigned int i = 0 ; i < finder.ntests ; i++) {
+        cout << ", " << finder.method_name(i);
+    }
+    cout << "\n";
+    cout << "# Note: for input length k within plingen, we use mcoeffs,k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
 
     /* Note: we are benching degree k, but the degree we are
      * interested in for pi is k*m/(m+n) */
@@ -330,7 +347,33 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             }
         }
 
-        finder.summarize_for_this_length(k);
+#ifdef HAVE_MPIR
+        if (finder.still_meaningful_to_test(3)) {
+            matpoly_ft tpi, tpiL, tpiR;
+            mpz_t p;
+            mpz_init(p);
+            abfield_characteristic(ab, p);
+            struct fft_transform_info fti[1];
+            fft_get_transform_info_fppol(fti, p, piL->size, piR->size, piL->n);
+            for(auto x = finder.micro_bench(3); x; ++x) {
+                x.push();
+                matpoly_ft_init(ab, tpiL, piL->m, piL->n, fti);
+                matpoly_ft_init(ab, tpiR, piR->m, piR->n, fti);
+                matpoly_ft_init(ab, tpi, piL->m, piR->n, fti);
+                matpoly_ft_dft(ab, tpiL, (matpoly_ptr) piL, fti);
+                matpoly_ft_dft(ab, tpiR, (matpoly_ptr) piR, fti);
+                matpoly_ft_mul(ab, tpi, tpiL, tpiR, fti);
+                matpoly_ft_ift(ab, (matpoly_ptr) pi, tpi, fti);
+                matpoly_ft_clear(ab, tpiL, fti);
+                matpoly_ft_clear(ab, tpiR, fti);
+                matpoly_ft_clear(ab, tpi,  fti);
+                x.pop();
+            }
+            mpz_clear(p);
+        }
+#endif
+
+        cout << (int) ((m+n)*k/m) << " " << finder.summarize_for_this_length(k) << "\n";
 
 #if 0
         printf("%d %1.6f %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttm, ttk/ttb);

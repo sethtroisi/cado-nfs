@@ -62,10 +62,10 @@ void matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b);
-
 #ifdef __cplusplus
 }
 #endif
+
 
 /* {{{ access interface for matpoly */
 static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {

@@ -521,8 +521,8 @@ while (0)
   } while (0)
 #endif
 
-    // temp #ifdef __cplusplus
-    // temp }
-    // temp #endif
+#ifdef __cplusplus
+}
+#endif
 
 #endif
