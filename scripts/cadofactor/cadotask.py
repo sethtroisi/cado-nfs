@@ -715,11 +715,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         pass
     @abc.abstractproperty
     def paramnames(self):
-        # A list of parameter keywords which this task uses.
-        # This is used for extracting relevant parameters from the parameter
-        # hierarchical dictionary.
-        # Sub-classes need to define a property 'paramnames' which returns a
-        # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
         return ("name", "workdir", "run")
     @property
@@ -3669,6 +3664,9 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     @property
     def param_nodename(self):
         return self.name
+    @property
+    def paramnames(self):
+        return []
     @property
     def title(self):
         return "Complete Factorization"

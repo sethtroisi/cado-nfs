@@ -511,6 +511,15 @@ class UseParameters(metaclass=abc.ABCMeta):
         """ The name of this object's node in the parameter tree """
         pass
     
+    @abc.abstractproperty
+    def paramnames(self):
+        # A list of parameter keywords which this task uses.
+        # This is used for extracting relevant parameters from the parameter
+        # hierarchical dictionary.
+        # Sub-classes need to define a property 'paramnames' which returns a
+        # list of parameters they accept, plus super()'s paramnames list
+        pass
+
     class MyParameters():
         """ Class that encapsules info on this node's parameters
         
