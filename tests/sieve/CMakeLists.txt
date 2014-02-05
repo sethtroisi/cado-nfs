@@ -1,1 +1,3 @@
-add_test(NAME F9_sievetest WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" COMMAND "./F9.sievetest.sh" "${CADO_NFS_SOURCE_DIR}" "${CADO_NFS_BINARY_DIR}")
+# CMake 2.8.4 and newer has a WORKING_DIRECTORY property, but we may want
+# to stay compatible with older versions
+add_test(F9_sievetest "${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh" "${CADO_NFS_SOURCE_DIR}" "${CADO_NFS_BINARY_DIR}")
