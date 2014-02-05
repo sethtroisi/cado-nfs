@@ -711,6 +711,7 @@ tests/utils/test_getprime.c
 tests/utils/test_memusage.c
 tests/test_iter.c
 tests/test_iter.h
+tests/test_mpz_poly.c
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh

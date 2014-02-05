@@ -29,7 +29,6 @@ scripts/cadofactor/parameters.rsa512.oar
 scripts/cadofactor/index.html
 polyselect/alpha.mpl
 polyselect/alpha.sage
-polyselect/alpha.c
 polyselect/debug_rootsieve.sage
 polyselect/dlpolyselect.c
 polyselect/gnuplot_stuff.sage
@@ -38,8 +37,6 @@ polyselect/integral.sage
 polyselect/kleinjung.sage
 polyselect/kleinjung-list-of-lattices.sage
 polyselect/linear_interpolation.sage
-polyselect/fast_rootsieve.h
-polyselect/fast_rootsieve.c
 polyselect/ropt_main.c
 polyselect/rotate.c
 polyselect/rotate_all.c
@@ -77,8 +74,6 @@ utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
-polyselect/fast_rootsieve.h
-polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
 filter/debug-tools.sh
 params/rsa155.poly
