@@ -237,6 +237,11 @@ class Parameters(object):
             result.update(self._extract_by_keys(source, keys))
         if isinstance(keys, dict):
             for key in keys:
+                # A default of None means no default or type given: if the
+                # parameter is in the parameter file, then store it in result
+                # as a string, and if not, then don't store it in result
+                if keys[key] is None:
+                    continue
                 # If only the type without default value is specified, then
                 # the value must exist in the parameter file, and is converted
                 # to the specified type
@@ -519,6 +524,37 @@ class UseParameters(metaclass=abc.ABCMeta):
         # Sub-classes need to define a property 'paramnames' which returns a
         # list of parameters they accept, plus super()'s paramnames list
         pass
+
+    @staticmethod
+    def list_to_dict(a):
+        if a is None:
+            return {}
+        elif isinstance(a, dict):
+            return a.copy()
+        else:
+            return {k:None for k in a}
+
+    @staticmethod
+    def join_params(a, b):
+        """ Join two dictionaries
+        
+        The values from the second take precedence in case of collision.
+        Lists are converted to dictionaries whose keys map to None.
+
+        >>> UseParameters.join_params(None, [2])
+        {2: None}
+        >>> UseParameters.join_params([1], None)
+        {1: None}
+        >>> UseParameters.join_params([1], [2]) == {1:None, 2:None}
+        True
+        >>> UseParameters.join_params({1:"a"}, [2]) == {1:"a", 2:None}
+        True
+        >>> UseParameters.join_params([1], {2:"a"}) == {1:None, 2:"a"}
+        True
+        """
+        c = UseParameters.list_to_dict(a)
+        c.update(UseParameters.list_to_dict(b))
+        return c
 
     class MyParameters():
         """ Class that encapsules info on this node's parameters
