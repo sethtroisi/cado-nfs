@@ -716,7 +716,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     @abc.abstractproperty
     def paramnames(self):
         # Parameters that all tasks use
-        return ("name", "workdir", "run")
+        return self.join_params(super().paramnames, ("name", "workdir", "run"))
     @property
     def param_nodename(self):
         return self.name
@@ -1011,8 +1011,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
-                                     "maxtimedout", "maxfailed")
+        return self.join_params(super().paramnames,  ("maxwu", "wutimeout", "maxresubmit", 
+                                     "maxtimedout", "maxfailed"))
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1189,8 +1189,8 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         return (cadoprograms.Polyselect2l,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("adrange", "admin", "admax", "import", "I", "alim", "rlim")
+        return self.join_params(super().paramnames,  \
+            ("adrange", "admin", "admax", "import", "I", "alim", "rlim"))
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
@@ -1475,8 +1475,8 @@ class FactorBaseTask(Task):
         return (cadoprograms.MakeFB,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("alim", "gzip", "I")
+        return self.join_params(super().paramnames,  \
+            ("alim", "gzip", "I"))
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1550,8 +1550,8 @@ class FreeRelTask(Task):
         return (cadoprograms.FreeRel,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("dlp", "alim", "rlim", "gzip")
+        return self.join_params(super().paramnames,  \
+            ("dlp", "alim", "rlim", "gzip"))
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -1670,8 +1670,8 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         return (cadoprograms.Las,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("qmin", "qrange", "rels_wanted", "alim", "import")
+        return self.join_params(super().paramnames,  \
+            ("qmin", "qrange", "rels_wanted", "alim", "import"))
     _stat_conversions = (
         (
             "stats_avg_J",
@@ -1902,8 +1902,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return (cadoprograms.Duplicates1,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("nslices_log",)
+        return self.join_params(super().paramnames,  \
+            ("nslices_log",))
     _stat_conversions = (
         (
             "stats_dup1_time",
@@ -2119,7 +2119,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return (cadoprograms.Duplicates2,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "nslices_log", "alim", "rlim")
+        return self.join_params(super().paramnames,  ("dlp", "nslices_log", "alim", "rlim"))
     _stat_conversions = (
         (
             "stats_dup2_time",
@@ -2292,7 +2292,7 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def paramnames(self):
-        return super().paramnames + ("dlp", "alim", "rlim")
+        return self.join_params(super().paramnames,  ("dlp", "alim", "rlim"))
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2537,8 +2537,8 @@ class MergeDLPTask(Task):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("forbw", "coverNmax", "maxlevel", "ratio", "gzip")
+        return self.join_params(super().paramnames,  \
+            ("forbw", "coverNmax", "maxlevel", "ratio", "gzip"))
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2633,8 +2633,8 @@ class MergeTask(Task):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
+        return self.join_params(super().paramnames,  \
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip"))
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2965,7 +2965,7 @@ class CharactersTask(Task):
         return (cadoprograms.Characters,)
     @property
     def paramnames(self):
-        return super().paramnames + ()
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3019,8 +3019,7 @@ class SqrtTask(Task):
         return (cadoprograms.Sqrt,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ("N",)
+        return self.join_params(super().paramnames,  ("N",))
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3202,7 +3201,7 @@ class SMTask(Task):
         return (cadoprograms.SM,)
     @property
     def paramnames(self):
-        return super().paramnames + ("gorder", "smexp")
+        return self.join_params(super().paramnames,  ("gorder", "smexp"))
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3412,8 +3411,8 @@ class StartClientsTask(Task):
         return (cadoprograms.WuClient,)
     @property
     def paramnames(self):
-        return super().paramnames + \
-            ('hostnames', 'scriptpath', "nrclients")
+        return self.join_params(super().paramnames,  \
+            ('hostnames', 'scriptpath', "nrclients"))
     @property
     def param_nodename(self):
         return None
