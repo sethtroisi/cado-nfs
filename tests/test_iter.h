@@ -15,6 +15,7 @@ struct test_iter_s {
 typedef struct test_iter_s test_iter_t[1];
 
 void test_iter_init (test_iter_t, unsigned long, test_iter_next_func_ptr);
+void test_iter_next (void *, test_iter_t);
 int test_iter_isdone (test_iter_t);
 void test_iter_int64_next(void *, test_iter_t);
 void test_iter_uint64_next(void *, test_iter_t);
