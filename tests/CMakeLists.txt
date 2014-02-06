@@ -74,3 +74,4 @@ add_library (tests STATIC test_iter.c)
 
 add_subdirectory (utils)
 add_subdirectory (sieve)
+add_subdirectory (polyselect)
