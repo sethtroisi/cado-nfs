@@ -4,6 +4,7 @@
 POLY="$1"
 BINDIR="$2"
 REFERENCE_SHA1="$3"
+REFERENCE_REVISION="$4"
 
 if [[ -z "${BINDIR}" || ! -d "${BINDIR}" ]]
 then
@@ -41,11 +42,15 @@ RELS="${TMPDIR}/${BASENAME}.rels"
 "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q1" -out "${RELS}" || exit 1
 
-SHA1=`grep -v "^#" "${RELS}" | sort | sha1sum`
+SHA1=`grep -v "^#" "${RELS}" | sort -n | sha1sum`
 SHA1="${SHA1%% *}"
 if [ "${SHA1}" != "${REFERENCE_SHA1}" ]
 then
-  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}. Files remain in ${TMPDIR}"
+  if [ -n "${REFERENCE_REVISION}" ]
+  then
+    REFMSG=", as created by Git revision ${REFERENCE_REVISION}"
+  fi
+  echo "$0: Got SHA1 of ${SHA1} but expected ${REFERENCE_SHA1}${REFMSG}. Files remain in ${TMPDIR}"
   exit 1
 fi
 
