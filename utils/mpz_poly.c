@@ -55,11 +55,15 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 #define MAX_T 13
   uint64_t M[MAX_T+1][MAX_T+1], g, h;
   int i, j, k;
+  mpz_t f0[MAX_T+1];
 
   ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
                                  and similarly for all intermediate
                                  computations on M[i][j]. This avoids the
                                  use of mpz_t to store the M[i][j]. */
+
+  for (i = 0; i <= t; i++)
+    mpz_init_set (f0[i], f[i]);
 
   /* initialize M[i][j] = i^j */
   for (i = 0; i <= t; i++)
@@ -87,9 +91,17 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
     for (j = i + 1; j <= t; j++)
       /* f[i] = f[i] - M[i][j] * f[j] */
       mpz_submul_ui (f[i], f[j], M[i][j]);
+    if (mpz_divisible_ui_p (f[i], M[i][i]) == 0)
+      {
+        for (i = 0; i <= t; i++)
+          gmp_fprintf (stderr, "f[%d]=%Zd\n", i, f0[i]);
+      }
     ASSERT (mpz_divisible_ui_p (f[i], M[i][i]));
     mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
+
+  for (i = 0; i <= t; i++)
+    mpz_clear (f0[i]);
 }
 
 /* Generic Toom-Cook implementation: stores in f[0..r+s] the coefficients
