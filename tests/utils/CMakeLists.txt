@@ -15,4 +15,5 @@ build_and_run_test(test_modredc_15ul.c utils 1000)
 build_and_run_test(test_modredc_2ul2.c utils 1000)
 build_and_run_test(test_sm_utils.c utils ${CMAKE_CURRENT_SOURCE_DIR}/test_sm_utils.data)
 build_and_run_test(test_mpz_poly.c utils)
+build_and_run_test(test_cado_poly.c utils)
 
