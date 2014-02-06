@@ -427,17 +427,6 @@ init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
   }
 }
 
-/**************************************************************************
-       8 algorithms for the initialization of the algebraics:
-                 init_alg_norms_bucket_region.
-       All the combinations with HAVE_SSE2, ALG_LAZY, ALG_RAT.
-       All these 8 algorithms use a big switch for the degree of
-       the algebraics; all the cases are independant and end by
-                      a return for lisibility.
-       All have a default which could replace all others cases.
-     NB: Somes SSE algorithms needs __x86_64; all __x86_64 are SSE2.
-**************************************************************************/
-
 static inline void
 poly_scale (double *u, const double *t, unsigned int d, double h)
 {
@@ -446,453 +435,27 @@ poly_scale (double *u, const double *t, unsigned int d, double h)
   for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
 }
 
-/**************** used #define from SSE2 to -41 **************************/
-#ifdef HAVE_SSE2
-
-#ifdef HAVE_SSE41
-#define TSTZXMM(A) _mm_testz_si128(A,A)
-#else
-#define TSTZXMM(A) ((uint16_t)_mm_movemask_epi8(_mm_cmpeq_epi8(_mm_add_epi8(A,tt),tt))==0xFFFF)
-#endif
-
-/* This macro avoids a stupid & boring C types control */
-#define _MM_SHUFFLE_EPI32(A,B,C) __asm__ __volatile__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
-
-/* CAREFUL! __m128 a=x|y => x is the strongest quadword, higher in memory.
-   INITALGN: uN= (j^N)*(alg->fijd[N]) | (j^N)*(alg->fijd[N])  
-   INITALG0 to 2 are simple. 3,5,7,9 & 4,6,8 have similar algorithms. */
-#define INITALG0 do {							\
-    uu0=_mm_set1_epi64((__m64)(0x0101010101010101*			\
-			       inttruncfastlog2(fabs(alg->fijd[0]),\
-						*(double *)&add,*(double *)&scale))); \
-  } while (0)
-
-#define INITALG1(A) do {			\
-    u1=_mm_load1_pd(alg->fijd+1);		\
-    u0=_mm_set1_pd((double)(A)*alg->fijd[0]);	\
-  } while (0)
-
-#define INITALG2(A) do {			\
-    h=_mm_set1_pd((double)(A));			\
-    u2=_mm_load1_pd(alg->fijd+2);		\
-    u1=_mm_load1_pd(alg->fijd+1);		\
-    u0=_mm_load1_pd(alg->fijd);			\
-    u1=_mm_mul_pd(u1,h);			\
-    u0=_mm_mul_pd(u0,h);			\
-    u0=_mm_mul_pd(u0,h);			\
-  } while (0)
-
-#define INITALG3(A) do {					\
-    h=_mm_set_sd((double)(A));     /* h=0|j */			\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    g=_mm_mul_pd(g,g);             /* g=j2|j2 */		\
-    u2=_mm_load_pd(alg->fijd+2);   /* u2=d3|d2 */		\
-    u0=_mm_load_pd(alg->fijd);     /* u0=d1|d0 */		\
-    u2=_mm_mul_sd(u2,h);           /* u2=d3|d2*j */		\
-    u0=_mm_mul_sd(u0,h);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u0=_mm_unpacklo_pd(u2,u2);					\
-  } while (0)
-
-#define INITALG4(A) do {					\
-    h=_mm_set1_pd((double)(A));					\
-    h=_mm_mul_sd(h,h);             /* h=j|j2 */			\
-    _MM_SHUFFLE_EPI32(g, h, 0x44); /* g=j2|j2 */		\
-    u4=_mm_load1_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u2=_mm_mul_pd(u2,h);					\
-    u0=_mm_mul_pd(u0,h);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-  } while (0)
-
-#define INITALG5(A) do {					\
-    h=_mm_set_sd((double)(A));					\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    g=_mm_mul_pd(g,g);						\
-    u4=_mm_load_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u4=_mm_mul_sd(u4,h);					\
-    u2=_mm_mul_sd(u2,h);					\
-    u0=_mm_mul_sd(u0,h);					\
-    u2=_mm_mul_pd(u2,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-    u4=_mm_unpacklo_pd(u4,u4);					\
-  } while (0)
-
-#define INITALG6(A) do {					\
-    h=_mm_set1_pd((double)(A));					\
-    h=_mm_mul_sd(h,h);						\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    u6=_mm_load1_pd(alg->fijd+6);				\
-    u4=_mm_load_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u4=_mm_mul_pd(u4,h);					\
-    u2=_mm_mul_pd(u2,h);					\
-    u0=_mm_mul_pd(u0,h);					\
-    u2=_mm_mul_pd(u2,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-    u4=_mm_unpacklo_pd(u4,u4);					\
-  } while (0)
-
-#define INITALG7(A) do {					\
-    h=_mm_set_sd((double)(A));					\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    g=_mm_mul_pd(g,g);						\
-    u6=_mm_load_pd(alg->fijd+6);				\
-    u4=_mm_load_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u6=_mm_mul_sd(u6,h);					\
-    u4=_mm_mul_sd(u4,h);					\
-    u2=_mm_mul_sd(u2,h);					\
-    u0=_mm_mul_sd(u0,h);					\
-    u4=_mm_mul_pd(u4,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    g=_mm_mul_pd(g,g);						\
-    u2=_mm_mul_pd(u2,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-    u4=_mm_unpacklo_pd(u4,u4);					\
-    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-    u6=_mm_unpacklo_pd(u6,u6);					\
-  } while (0)
-
-#define INITALG8(A) do {					\
-    h=_mm_set1_pd((double)(A));					\
-    h=_mm_mul_sd(h,h);						\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    u8=_mm_load1_pd(alg->fijd+8);				\
-    u6=_mm_load_pd(alg->fijd+6);				\
-    u4=_mm_load_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u6=_mm_mul_pd(u6,h);					\
-    u4=_mm_mul_pd(u4,h);					\
-    u2=_mm_mul_pd(u2,h);					\
-    u0=_mm_mul_pd(u0,h);					\
-    u4=_mm_mul_pd(u4,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    g=_mm_mul_pd(g,g);						\
-    u2=_mm_mul_pd(u2,g);					\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-    u4=_mm_unpacklo_pd(u4,u4);					\
-    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-    u6=_mm_unpacklo_pd(u6,u6);					\
-  } while (0)
-
-#define INITALG9(A) do {					\
-    h =_mm_set_sd((double)(A));					\
-    _MM_SHUFFLE_EPI32(g, h, 0x44);				\
-    g=_mm_mul_pd(g,g);						\
-    u8=_mm_load_pd(alg->fijd+8);				\
-    u6=_mm_load_pd(alg->fijd+6);				\
-    u4=_mm_load_pd(alg->fijd+4);				\
-    u2=_mm_load_pd(alg->fijd+2);				\
-    u0=_mm_load_pd(alg->fijd);					\
-    u8=_mm_mul_sd(u8,h);					\
-    u6=_mm_mul_sd(u6,h);					\
-    u4=_mm_mul_sd(u4,h);					\
-    u2=_mm_mul_sd(u2,h);					\
-    u0=_mm_mul_sd(u0,h);					\
-    u6=_mm_mul_pd(u6,g);					\
-    u2=_mm_mul_pd(u2,g);					\
-    g=_mm_mul_pd(g,g);						\
-    u4=_mm_mul_pd(u4,g);					\
-    u2=_mm_mul_pd(u2,g);					\
-    g=_mm_mul_pd(g,g);						\
-    u0=_mm_mul_pd(u0,g);					\
-    _MM_SHUFFLE_EPI32(u1, u0, 0xEE);				\
-    u0=_mm_unpacklo_pd(u0,u0);					\
-    _MM_SHUFFLE_EPI32(u3, u2, 0xEE);				\
-    u2=_mm_unpacklo_pd(u2,u2);					\
-    _MM_SHUFFLE_EPI32(u5, u4, 0xEE);				\
-    u4=_mm_unpacklo_pd(u4,u4);					\
-    _MM_SHUFFLE_EPI32(u7, u6, 0xEE);				\
-    u6=_mm_unpacklo_pd(u6,u6);					\
-    _MM_SHUFFLE_EPI32(u9, u8, 0xEE);				\
-    u8=_mm_unpacklo_pd(u8,u8);					\
-  } while (0)
-
-#define INITALGD(A) do {					\
-    double du[d+1];						\
-    poly_scale(du, alg->fijd, d, (double) (A));		\
-    for (uint32_t k=0; k<=d; k++) u[k] = _mm_set1_pd(du[k]);	\
-  } while (0)
-
-#define G1 g=_mm_add_pd(_mm_mul_pd(g,u1),u0)
-
-#define G2 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u2),u1),h),u0)
-
-#define G3 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u3),u2),h),u1),h),u0)
-
-#define G4 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u4),u3),h),u2),h),u1),h),u0)
-
-#define G5 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u5),u4),h),u3),h),u2),h),u1),h),u0)
-
-#define G6 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
-
-#define G7 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
-
-#define G8 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
-
-#define G9 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
-
-#define GD do {								\
-	g=u[d-1];							\
-	for (unsigned int k = d; --k != UINT_MAX; g = _mm_add_pd(_mm_mul_pd(g,h),u[k])); \
-      } while (0)
-
-#define ALG_INIT_SCALE_ADD_UN_A const __m128d				\
-      un MAYBE_UNUSED = _mm_set1_pd(1.),				\
-	a MAYBE_UNUSED = _mm_set1_pd(16.),				\
-	add = _mm_set1_pd(0x3FF00000 - GUARD / (alg->scale * (1./0x100000))), \
-	scale = _mm_set1_pd(alg->scale * (1./0x100000))
-
-#define ALG_INIT_SCALE_ADD_UN_A_TT					\
-  ALG_INIT_SCALE_ADD_UN_A;						\
-  const __m128i tt =							\
-    _mm_set1_epi64((__m64)(0x0101010101010101* (uint64_t)		\
-			   ((si->sides[RATIONAL_SIDE]->bound +		\
-			     (si->sides[RATIONAL_SIDE]->bound != 255 ? 1 : 0)))))
-
-#endif /* HAVE_SSE2 */
-/**************** End of used #define SSE ********************************/
-
-/**************** 1: HAVE_SSE2, ALG_LAZY, ALG_RAT ************************/
-#ifdef HAVE_SSE2
-#ifdef ALG_LAZY 
-#ifdef ALG_RAT
-/* Smart initialization of the algebraics. In one time, 16 bytes of
-   the rationals are tested. If one byte is > rat->bound, computes two
-   initialization (3th and 11th bytes) and initializes (8+8) algrebraics.
-   At the beginning, all are initialised to 255.
-   2nd fastest initialization, but maybe the smartest. SSE version.
-   32 bits compatible.
-   NOTA : the SSE and non SSE versions differs! */
-void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS, unsigned int j,
-				  sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->degree;
-  __m128i m;
-
-  memset (S, 255, (Idiv2<<1) * ej);
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  xS += Idiv2;
-  switch (d) {
-  case 0 : {
-    __m128i uu0;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    INITALG0;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-        if (UNLIKELY(!TSTZXMM(m))) {
-          __asm__ __volatile__ ( "movdqa %0,(%1,%2)\n"::"x"(uu0),"r"(S),"r"(ih));
-        }}}}
-    return;
-  case 1 : {
-    __m128d g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG1(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-        if (UNLIKELY(!TSTZXMM(m))) {
-	  G1;
-          w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-        }
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 2 : {
-    __m128d g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG2(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-        __asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-        if (UNLIKELY(!TSTZXMM(m))) {
-          g = h; G2;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 3 : {
-    __m128d g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG3(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm____volatile__  ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G3;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 4 : {
-    __m128d g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG4(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G4;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 5 : {
-    __m128d g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG5(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G5;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 6 : {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG6(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
- 	  g = h; G6;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 7 : {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG7(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G7;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}}}}
-    return;
-  case 8 : {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG8(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G8;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  case 9 : {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG9(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; G9;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  default: {
-    __m128d g, h, u[d+1];
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALGD(j);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	__asm__ __volatile__ ("movdqa %1,%0\npsubusb (%2,%3),%0\n":"=&x"(m):"x"(tt),"r"(xS),"r"(ih));
-	if (UNLIKELY(!TSTZXMM(m))) {
-	  g = h; GD;
-	  w128itruncfastlog2fabs(g, add, scale, S, ih, un);
-	}
-	h = _mm_add_pd(h, a);
-      }}}
-    return;
-  }
-}
-#endif
-#endif
-#endif
-
-/**************** 2: HAVE_SSE2, ALG_LAZY, !ALG_RAT ***********************/
-#ifdef HAVE_SSE2
-#ifdef ALG_LAZY
-#ifndef ALG_RAT
 /* Smart initialization of the algebraics. Computes the central
    initialization value of a box of (horizontail=8,vertical=p) and
    propagates it in the box. 8 is locked by the code and p is the
    minimum of VERT_NORM_STRIDE (#define, =4) and ej, with ej =
    2^(LOG_BUCKET_REGION-si->conf->logI).
    So, the fastest code is for logI <= 14.
-   It's the fastest initialization of the algebraics.
-   SSE version, 32bits compatible. */
+   2 versions: SSE version (32bits compatible) & non SSE versions. */
+
+/* Macro to fill the others lines, used on SSE and non SSE versions.
+   The first line is now OK; copy it on the VERT_NORM_STRIDE-1 next lines. */
+#define FILL_OTHER_LINES do {						\
+    if (LIKELY(p > 1)) {						\
+      unsigned char *mS = S + Idiv2;					\
+      S -= Idiv2;							\
+      for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
+	memcpy (mS, S, (Idiv2<<1));					\
+      S = mS + Idiv2; j += p;						\
+    }									\
+    else { S += (Idiv2<<1); j++; }					\
+  } while (0)
+
 void init_alg_norms_bucket_region(unsigned char *S,
 				  unsigned char *xS MAYBE_UNUSED, unsigned int j,
 				  sieve_info_ptr si)
@@ -902,39 +465,43 @@ void init_alg_norms_bucket_region(unsigned char *S,
   unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
     d = si->cpoly->alg->deg,
     p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
-
-#define FILL_OTHER_LINES do {						\
-    if (LIKELY(p > 1)) {						\
-      unsigned char *mS = S + Idiv2;					\
-      S -= Idiv2;							\
-      for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
-	memcpy (mS, S, (Idiv2<<1));					\
-      S = mS + Idiv2;							\
-      j += p;								\
-    }									\
-    else do {								\
-	S += (Idiv2<<1);						\
-	j++;								\
-      } while(0);							\
-  } while (0)
   
   j *= ej;
   ej += j;
   S += Idiv2;
+
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM_
+
+  /*************** Some SSE macros for this function ***********************/
+  /* This macro avoids a stupid & boring C types control */
+#define _MM_SHUFFLE_EPI32(A,B,C) __asm__ __volatile__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
+
+  /* Initialisation of the data with intrinsics. */
+#define ALG_INIT_SCALE_ADD_UN_A const __m128d				\
+    un MAYBE_UNUSED = _mm_set1_pd(1.),					\
+    a MAYBE_UNUSED = _mm_set1_pd(16.),					\
+    scale = _mm_set1_pd(alg->scale * (1./0x100000)),			\
+    add = _mm_set1_pd(0x3FF00000 - GUARD / (alg->scale * (1./0x100000))) \
+  /*************** End of the macros for this function *****************/
+  
+  /* This function is only a big switch in fact */
   switch (d) {
   case 0 : {
     ALG_INIT_SCALE_ADD_UN_A;
-    memset(S-Idiv2,inttruncfastlog2(fabs(alg->fijd[0]),*(double *)&add,*(double *)&scale),(Idiv2<<1)*(ej-j)); 
+    memset (S-Idiv2, inttruncfastlog2(fabs(alg->fijd[0]), *(double *)&add, *(double *)&scale),
+	    (Idiv2 << 1) * (ej - j)); 
   }
     return;
   case 1 : {
     __m128d h, g, u0, u1;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG1(j + (p >> 1));
+      u1 = _mm_load1_pd(alg->fijd+1);    
+      u0 = _mm_set1_pd((double)(j + (p >> 1))*alg->fijd[0]);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G1;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(g,u1),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -945,10 +512,16 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG2(j + (p >> 1));
+      h = _mm_set1_pd((double)(j + (p >> 1)));
+      u2 = _mm_load1_pd(alg->fijd+2);
+      u1 = _mm_load1_pd(alg->fijd+1);
+      u0 = _mm_load1_pd(alg->fijd);
+      u1 = _mm_mul_pd(u1,h);
+      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),h);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G2;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u2),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -959,10 +532,21 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG3(j + (p >> 1));
+      h = _mm_set_sd((double)(j + (p >> 1)));
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      g = _mm_mul_pd(g,g);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u2 = _mm_mul_sd(u2,h);
+      u0 = _mm_mul_pd(_mm_mul_sd(u0,h),g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u0 = _mm_unpacklo_pd(u2,u2);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G3;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u3),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -973,10 +557,22 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG4(j + (p >> 1));
+      h = _mm_set1_pd((double)(j + (p >> 1)));
+      h = _mm_mul_sd(h,h);
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      u4 = _mm_load1_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u2 = _mm_mul_pd(u2,h);
+      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G4;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u4),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -987,10 +583,25 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4, u5;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG5(j + (p >> 1));
+      h = _mm_set_sd((double)(j + (p >> 1)));
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      g = _mm_mul_pd(g,g);
+      u4 = _mm_load_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u4 = _mm_mul_sd(u4,h);
+      u2 = _mm_mul_pd(_mm_mul_sd(u2,h),g);
+      u0 = _mm_mul_pd(_mm_mul_pd(_mm_mul_sd(u0,h),g),g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
+      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
+      u4 = _mm_unpacklo_pd(u4,u4);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G5;
+	g = h; 
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u5),u4),h),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -1001,10 +612,26 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4, u5, u6;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG6(j + (p >> 1));
+      h = _mm_set1_pd((double)(j + (p >> 1)));
+      h = _mm_mul_sd(h,h);
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      u6 = _mm_load1_pd(alg->fijd+6);
+      u4 = _mm_load_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u4 = _mm_mul_pd(u4,h);
+      u2 = _mm_mul_pd(_mm_mul_pd(u2,h),g);
+      u0 = _mm_mul_pd(_mm_mul_pd(_mm_mul_pd(u0,h),g),g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
+      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
+      u4 = _mm_unpacklo_pd(u4,u4);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G6;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -1015,10 +642,32 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG7(j + (p >> 1));
+      h = _mm_set_sd((double)(j + (p >> 1)));
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      g = _mm_mul_pd(g,g);
+      u6 = _mm_load_pd(alg->fijd+6);
+      u4 = _mm_load_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u6 = _mm_mul_sd(u6,h);
+      u2 = _mm_mul_sd(u2,h);
+      u4 = _mm_mul_pd(_mm_mul_sd(u4,h),g);
+      u0 = _mm_mul_pd(_mm_mul_sd(u0,h),g);
+      g = _mm_mul_pd(g,g);
+      u2 = _mm_mul_pd(u2,g);
+      u0 = _mm_mul_pd(u0,g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
+      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
+      u4 = _mm_unpacklo_pd(u4,u4);
+      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
+      u6 = _mm_unpacklo_pd(u6,u6);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G7;
+	g = h; 
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -1029,10 +678,33 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG8(j + (p >> 1));
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
+      h = _mm_set1_pd((double)(j + (p >> 1)));
+      h = _mm_mul_sd(h,h);
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      u8 = _mm_load1_pd(alg->fijd+8);
+      u6 = _mm_load_pd(alg->fijd+6);
+      u4 = _mm_load_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u6 = _mm_mul_pd(u6,h);
+      u2 = _mm_mul_pd(u2,h);
+      u4 = _mm_mul_pd(_mm_mul_pd(u4,h),g);
+      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),g);
+      g = _mm_mul_pd(g,g);
+      u2 = _mm_mul_pd(u2,g);
+      u0 = _mm_mul_pd(u0,g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
+      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
+      u4 = _mm_unpacklo_pd(u4,u4);
+      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
+      u6 = _mm_unpacklo_pd(u6,u6);
+      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G8;
+	g = h; 
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
@@ -1043,1057 +715,93 @@ void init_alg_norms_bucket_region(unsigned char *S,
     __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALG9(j + (p >> 1));
+      h = _mm_set_sd((double)(j + (p >> 1)));
+      _MM_SHUFFLE_EPI32(g, h, 0x44);
+      g = _mm_mul_pd(g,g);
+      u8 = _mm_load_pd(alg->fijd+8);
+      u6 = _mm_load_pd(alg->fijd+6);
+      u4 = _mm_load_pd(alg->fijd+4);
+      u2 = _mm_load_pd(alg->fijd+2);
+      u0 = _mm_load_pd(alg->fijd);
+      u8 = _mm_mul_sd(u8,h);
+      u4 = _mm_mul_sd(u4,h);
+      u0 = _mm_mul_sd(u0,h);
+      u6 = _mm_mul_pd(_mm_mul_sd(u6,h),g);
+      u2 = _mm_mul_pd(_mm_mul_sd(u2,h),g);
+      g = _mm_mul_pd(g,g);
+      u4 = _mm_mul_pd(u4,g);
+      u2 = _mm_mul_pd(u2,g);
+      g = _mm_mul_pd(g,g);
+      u0 = _mm_mul_pd(u0,g);
+      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
+      u0 = _mm_unpacklo_pd(u0,u0);
+      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
+      u2 = _mm_unpacklo_pd(u2,u2);
+      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
+      u4 = _mm_unpacklo_pd(u4,u4);
+      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
+      u6 = _mm_unpacklo_pd(u6,u6);
+      _MM_SHUFFLE_EPI32(u9, u8, 0xEE);
+      u8 = _mm_unpacklo_pd(u8,u8);
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; G9;
+	g = h;
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
       FILL_OTHER_LINES;
     }}
     return;
-  default: {
+  default: { /* This default could remplace all (optimized) previous cases. */
     __m128d h, g, u[d+1];
     ALG_INIT_SCALE_ADD_UN_A;
     while (j < ej) {
-      INITALGD(j + (p >> 1));
+      { /* Generic initialization of all the u?. */
+	double du[d+1];
+	poly_scale(du, alg->fijd, d, (double) (j + (p >> 1)));
+	for (unsigned int k = 0; k <= d; k++) u[k] = _mm_set1_pd(du[k]);
+      }
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; GD;
+	g = u[d];
+	for (unsigned int k = d; --k != UINT_MAX; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
 	w128itruncfastlog2fabs(g, add, scale, S, ih, un);
 	h = _mm_add_pd(h, a);
       }
       FILL_OTHER_LINES;
     }}
     return;
-  }
-}
-#undef FILL_OTHER_LINES
-#endif 
-#endif
-#endif
-
-/**************** 3: HAVE_SSE2, !ALG_LAZY, ALG_RAT **************************/
-#if defined(NOTDEFINED) /* defined(__x86_64) && defined(HAVE_SSE2) */ /* Not active: code slower than non SSE version */
-#ifndef ALG_LAZY
-#ifdef ALG_RAT
-/* Smart initialization of the algebraics : only if the corresponding
-   rationnal is <= rat->bound, other 255 (by first memset), so ~ x 22 less
-   computation than systematic computation; but requires of course many
-   tests. SSE version.
-
-   CAREFUL: only x86-64 version! It's not possible to code this algorithm
-   with the intrinsics because it uses the carry flag with the instruction
-   rcr (rotates on 8/16/32/64 + carry flag) & immediatly a jump if not carry.
-   GCC cannot manipulate carry flag - it's a well known limitation.
-
-   NB: this algorithm is LESS EFFICIENT on my machine than the non SSE
-   version. Why ? Because it needs to find 2 interesting rationals
-   before the vectorised computation of the both corresponding algebraics.
-   So, I need 5 jumps to find these 2 algebraics in this code (1 when found,
-   1 to code its emplacement)x2, and one to return after computation.
-   In non SSE version, only 2 jumps by algebraic : one when found and one
-   to return after computation.
-   
-   I try to code it without any jump except loop with conditionnal move.
-   The idea is to fill an temp array with all the i value (from [-Idiv2
-   to Idiv2[) but the pointer is << conditionaly >> incremented. The
-   main asm code :
-   
-#define ALG_1BYTE                                               \
-  "xor %%ebx, %%ebx\n"                                          \
-  "mov %%eax, (%0)\n"                                           \
-  "rcr $1, %%ecx\n"                                             \
-  "rcl $3, %%ebx\n"                                             \
-  "inc %%rax\n"                                                 \
-  "add %%rbx, %0\n"
-           
-#define ALG_IL_P                                                \
-           __asm__ __volatile__  (                              \
-           "pxor %%xmm1, %%xmm1\n"                              \
-           "movq %2, %0\n"                                      \
-           "xor %%rbx, %%rbx\n"                                 \
-           "xor %%rax, %%rax\n"                                 \
-           "sub %3, %%rax\n"                                    \
-           ".balign 8\n"                                        \
-           "0: movdqa %4, %%xmm0\n"                             \
-           "psubusb (%1, %%rax), %%xmm0\n"                      \
-           "pcmpeqb %%xmm1, %%xmm0\n"                           \
-           "pmovmskb %%xmm0, %%ecx\n"                           \
-           "xor $0xFFFFFFFF, %%ecx\n"                           \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           ALG_1BYTE                                            \
-           "cmp %3, %%rax\n"                                    \
-           "jl 0b\n"                                            \
-           : "=&r"(cP)                                          \
-           : "r"(xS), "r"(P), "r"(Idiv2), "x"(tt)               \
-           : "%rax", "%rbx", "%rcx", "%xmm0", "%xmm1", "cc");
-
-   But the result is x1.5 slower than this version, because it needs
-   6 instructions to look at only one rational (ALG_1BYTE).
-*/
-   
-void init_alg_norms_bucket_region (unsigned char *S,
-				   unsigned char *xS, unsigned int j,
-				   sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg;
-
-  /******************* Beginning of local define ****************/
-#define ALG_IL0A "movapd %7, %%xmm1\n"
-#define ALG_IL1A "movapd %8, %%xmm1\n"
-#define ALG_IL2A "movapd %9, %%xmm1\n"
-#define ALG_IL3A "movapd %10, %%xmm1\n"
-#define ALG_IL4A "movapd %11, %%xmm1\n"
-#define ALG_IL5A "movapd %12, %%xmm1\n"
-#define ALG_IL6A "movapd %13, %%xmm1\n"
-#define ALG_IL7A "movapd %14, %%xmm1\n"
-#define ALG_IL8A "movapd %15, %%xmm1\n"
-#define ALG_IL9A "movapd %16, %%xmm1\n"
-
-#define ALG_IL1B "mulpd %%xmm0, %%xmm1\n addpd %7, %%xmm1\n"
-#define ALG_IL2B "mulpd %%xmm0, %%xmm1\n addpd %8, %%xmm1\n" ALG_IL1B 
-#define ALG_IL3B "mulpd %%xmm0, %%xmm1\n addpd %9, %%xmm1\n" ALG_IL2B 
-#define ALG_IL4B "mulpd %%xmm0, %%xmm1\n addpd %10, %%xmm1\n" ALG_IL3B 
-#define ALG_IL5B "mulpd %%xmm0, %%xmm1\n addpd %11, %%xmm1\n" ALG_IL4B 
-#define ALG_IL6B "mulpd %%xmm0, %%xmm1\n addpd %12, %%xmm1\n" ALG_IL5B 
-#define ALG_IL7B "mulpd %%xmm0, %%xmm1\n addpd %13, %%xmm1\n" ALG_IL6B 
-#define ALG_IL8B "mulpd %%xmm0, %%xmm1\n addpd %14, %%xmm1\n" ALG_IL7B 
-#define ALG_IL9B "mulpd %%xmm0, %%xmm1\n addpd %15, %%xmm1\n" ALG_IL8B 
-
-#define ALG_IL1C "mulsd %%xmm0, %%xmm1\n addsd %7, %%xmm1\n"
-#define ALG_IL2C "mulsd %%xmm0, %%xmm1\n addsd %8, %%xmm1\n" ALG_IL1B 
-#define ALG_IL3C "mulsd %%xmm0, %%xmm1\n addsd %9, %%xmm1\n" ALG_IL2B 
-#define ALG_IL4C "mulsd %%xmm0, %%xmm1\n addsd %10, %%xmm1\n" ALG_IL3B 
-#define ALG_IL5C "mulsd %%xmm0, %%xmm1\n addsd %11, %%xmm1\n" ALG_IL4B 
-#define ALG_IL6C "mulsd %%xmm0, %%xmm1\n addsd %12, %%xmm1\n" ALG_IL5B 
-#define ALG_IL7C "mulsd %%xmm0, %%xmm1\n addsd %13, %%xmm1\n" ALG_IL6B 
-#define ALG_IL8C "mulsd %%xmm0, %%xmm1\n addsd %14, %%xmm1\n" ALG_IL7B 
-#define ALG_IL9C "mulsd %%xmm0, %%xmm1\n addsd %15, %%xmm1\n" ALG_IL8B 
-
-#define ALG_ILD							\
-  "mov %8, %%r13\n"						\
-  "movapd (%7,%%r13), %%xmm1\n"					\
-  ".balign 8\n"							\
-  "7: test %%r13d, %%r13d\n"					\
-  "jz 8f\n"							\
-  "sub $0x10, %%r13d\n"						\
-  "mulpd %%xmm0, %%xmm1\n"					\
-  "addpd (%7,%%r13), %%xmm1\n"					\
-  "jmp 7b\n"							\
-  "8:\n"
-
-#define ALG_ILP1							\
-  __asm__ __volatile__  ( "pxor %%xmm2, %%xmm2\n"			\
-  "xor %%r12, %%r12\n"							\
-  "sub %2, %%r12\n"							\
-  "jmp 1f\n"								\
-									\
-  ".balign 8\n"								\
-  "0: add $0x10, %%r12\n"						\
-  "cmp %2, %%r12\n"							\
-  "jnl 6f\n"                               /* Exit */			\
-  "1: movdqa %3, %%xmm0\n"						\
-  "psubusb (%0, %%r12), %%xmm0\n"					\
-  "pcmpeqb %%xmm2, %%xmm0\n"						\
-  "pmovmskb %%xmm0, %%eax\n"						\
-  ".balign 4\n"								\
-									\
-  "rcr $0x1, %%eax\n jnc 100f\n"					\
-  "2: rcr $0x1, %%eax\n jnc 101f\n"					\
-  "rcr $0x1, %%eax\n jnc 102f\n"					\
-  "rcr $0x1, %%eax\n jnc 103f\n"					\
-  "rcr $0x1, %%eax\n jnc 104f\n"					\
-  "rcr $0x1, %%eax\n jnc 105f\n"					\
-  "rcr $0x1, %%eax\n jnc 106f\n"					\
-  "rcr $0x1, %%eax\n jnc 107f\n"					\
-  "rcr $0x1, %%eax\n jnc 108f\n"					\
-  "rcr $0x1, %%eax\n jnc 109f\n"					\
-  "rcr $0x1, %%eax\n jnc 110f\n"					\
-  "rcr $0x1, %%eax\n jnc 111f\n"					\
-  "rcr $0x1, %%eax\n jnc 112f\n"					\
-  "rcr $0x1, %%eax\n jnc 113f\n"					\
-  "rcr $0x1, %%eax\n jnc 114f\n"					\
-  "rcr $0x1, %%eax\n jnc 115f\n"					\
-									\
-  "jmp 0b\n"								\
-  									\
-  "100: movq %%r12, %%r14\n     jmp 200f\n"				\
-  "101: lea 0x1(%%r12), %%r14\n jmp 201f\n"				\
-  "102: lea 0x2(%%r12), %%r14\n jmp 202f\n"				\
-  "103: lea 0x3(%%r12), %%r14\n jmp 203f\n"				\
-  "104: lea 0x4(%%r12), %%r14\n jmp 204f\n"				\
-  "105: lea 0x5(%%r12), %%r14\n jmp 205f\n"				\
-  "106: lea 0x6(%%r12), %%r14\n jmp 206f\n"				\
-  "107: lea 0x7(%%r12), %%r14\n jmp 207f\n"				\
-  "108: lea 0x8(%%r12), %%r14\n jmp 208f\n"				\
-  "109: lea 0x9(%%r12), %%r14\n jmp 209f\n"				\
-  "110: lea 0xA(%%r12), %%r14\n jmp 210f\n"				\
-  "111: lea 0xB(%%r12), %%r14\n jmp 211f\n"				\
-  "112: lea 0xC(%%r12), %%r14\n jmp 212f\n"				\
-  "113: lea 0xD(%%r12), %%r14\n jmp 213f\n"				\
-  "114: lea 0xE(%%r12), %%r14\n jmp 214f\n"				\
-  "115: lea 0xF(%%r12), %%r14\n jmp 215f\n"				\
-  									\
-  ".balign 8\n"								\
-  "3: psubusb (%0, %%r12), %%xmm0\n"					\
-  "pcmpeqb %%xmm2, %%xmm0\n"						\
-  "pmovmskb %%xmm0, %%eax\n"						\
-  "     rcr $0x1, %%eax\n jnc 300f\n"					\
-  "200: rcr $0x1, %%eax\n jnc 301f\n"					\
-  "201: rcr $0x1, %%eax\n jnc 302f\n"					\
-  "202: rcr $0x1, %%eax\n jnc 303f\n"					\
-  "203: rcr $0x1, %%eax\n jnc 304f\n"					\
-  "204: rcr $0x1, %%eax\n jnc 305f\n"					\
-  "205: rcr $0x1, %%eax\n jnc 306f\n"					\
-  "206: rcr $0x1, %%eax\n jnc 307f\n"					\
-  "207: rcr $0x1, %%eax\n jnc 308f\n"					\
-  "208: rcr $0x1, %%eax\n jnc 309f\n"					\
-  "209: rcr $0x1, %%eax\n jnc 310f\n"					\
-  "210: rcr $0x1, %%eax\n jnc 311f\n"					\
-  "211: rcr $0x1, %%eax\n jnc 312f\n"					\
-  "212: rcr $0x1, %%eax\n jnc 313f\n"					\
-  "213: rcr $0x1, %%eax\n jnc 314f\n"					\
-  "214: rcr $0x1, %%eax\n jnc 315f\n"					\
-									\
-  "215: add $0x10, %%r12\n"						\
-  "cmp %2, %%r12\n"							\
-  "jnl 5f\n"                   /* Only 1 alg. init to compute & end */	\
-  "movdqa %3, %%xmm0\n"							\
-  "jmp 3b\n"								\
-  									\
-  "300: movq %%r12, %%r15\n     jmp 4f\n"				\
-  "301: lea 0x1(%%r12), %%r15\n jmp 4f\n"				\
-  "302: lea 0x2(%%r12), %%r15\n jmp 4f\n"				\
-  "303: lea 0x3(%%r12), %%r15\n jmp 4f\n"				\
-  "304: lea 0x4(%%r12), %%r15\n jmp 4f\n"				\
-  "305: lea 0x5(%%r12), %%r15\n jmp 4f\n"				\
-  "306: lea 0x6(%%r12), %%r15\n jmp 4f\n"				\
-  "307: lea 0x7(%%r12), %%r15\n jmp 4f\n"				\
-  "308: lea 0x8(%%r12), %%r15\n jmp 4f\n"				\
-  "309: lea 0x9(%%r12), %%r15\n jmp 4f\n"				\
-  "310: lea 0xA(%%r12), %%r15\n jmp 4f\n"				\
-  "311: lea 0xB(%%r12), %%r15\n jmp 4f\n"				\
-  "312: lea 0xC(%%r12), %%r15\n jmp 4f\n"				\
-  "313: lea 0xD(%%r12), %%r15\n jmp 4f\n"				\
-  "314: lea 0xE(%%r12), %%r15\n jmp 4f\n"				\
-  "315: lea 0xF(%%r12), %%r15\n"					\
-									\
-  ".balign 8\n"								\
-  "4: cvtsi2sd %%r15d, %%xmm0\n"					\
-  "unpcklpd %%xmm0, %%xmm0\n"						\
-  "cvtsi2sd %%r14d, %%xmm0\n"
-
-#define ALG_ILP0						\
-  "psllq $0x01, %%xmm1\n"					\
-  "psrlq $0x01, %%xmm1\n"					\
-  "addpd (%6), %%xmm1\n"  					\
-  "shufps $0xED, %%xmm1, %%xmm1\n"				\
-  "cvtdq2pd %%xmm1, %%xmm1\n"					\
-  "subpd %4, %%xmm1\n"						\
-  "mulpd %5, %%xmm1\n"						\
-  "cvtsd2si %%xmm1, %%r13d\n"					\
-  "mov %%r13b, (%1, %%r14)\n"
-
-#define ALG_ILP2						\
-  ALG_ILP0							\
-  "unpckhpd %%xmm1, %%xmm1\n"					\
-  "cvtsd2si %%xmm1, %%r13d\n"					\
-  "mov %%r13b, (%1, %%r15)\n"					\
-  								\
-  "sub %%r12, %%r15\n"						\
-  "lea 2b(,%%r15,4), %%r15\n"					\
-  "jmp * %%r15\n"						\
-  								\
-  ".balign 8\n"							\
-  "5: cvtsi2sd %%r14d, %%xmm0\n"
-  
-#define ALG_ILP3							\
-  ALG_ILP0								\
-  									\
-  "6:"									\
-  :: "r"(xS), "r"(S), "r"(Idiv2), "x"(tt), "x"(add),			\
-    "x"(scale), "r"(&un), "x"(u0), "x"(u1), "x"(u2),			\
-    "x"(u3), "x"(u4), "x"(u5), "x"(u6), "x"(u7),			\
-    "x"(u8), "x"(u9)							\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
-
-#define ALG_ILP3D							\
-  ALG_ILP0								\
-  									\
-  "6:"									\
-  :: "r"(xS), "r"(S), "r"(Idiv2), "x"(tt), "x"(add),			\
-    "x"(scale), "r"(&un), "r"(u), "r"((uint64_t) (d<<4))		\
-    : "%rax", "%r12", "%r13", "%r14", "%r15", "%xmm0", "%xmm1", "%xmm2", "cc")
-  /****************** End of local define ******************************/
-
-  memset (S, 255, (Idiv2<<1) * ej);
-  j *= ej;
-  ej += j;
-  xS += Idiv2;
-  S += Idiv2;
-  /* The next pragma is needed because u1...u9 are not "really" used 
-     when the keyword MAYBE_UNUSED is used: there are only used as false
-     inputs of the main X86 asm. But gcc warns there are not initialized!
-     So I desactive the warning. */
-#pragma GCC diagnostic ignored "-Wuninitialized"
-  switch(d) {
-  case 0: { /* Not optimal, but this case is so useless... */
-    __m128d u0=_mm_set1_pd(alg->fijd[0]), u1 MAYBE_UNUSED, u2 MAYBE_UNUSED,
-      u3 MAYBE_UNUSED, u4 MAYBE_UNUSED, u5 MAYBE_UNUSED, u6 MAYBE_UNUSED,
-      u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      ALG_ILP1 ALG_IL0A ALG_ILP2 ALG_IL0A ALG_ILP3;
-    }}
-    return;
-  case 1: {
-    __m128d u0, u1,
-      u2 MAYBE_UNUSED, u3 MAYBE_UNUSED, u4 MAYBE_UNUSED, u5 MAYBE_UNUSED,
-      u6 MAYBE_UNUSED, u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG1(j);
-      ALG_ILP1 ALG_IL1A ALG_IL1B ALG_ILP2 ALG_IL1A ALG_IL1C ALG_ILP3;
-    }}
-    return;
-  case 2: {
-    __m128d h, u0, u1, u2,
-      u3 MAYBE_UNUSED, u4 MAYBE_UNUSED, u5 MAYBE_UNUSED,
-      u6 MAYBE_UNUSED, u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG2(j);
-      ALG_ILP1 ALG_IL2A ALG_IL2B ALG_ILP2 ALG_IL2A ALG_IL2C ALG_ILP3;
-    }}
-    return;
-  case 3: {
-    __m128d g, h, u0, u1, u2, u3,
-      u4 MAYBE_UNUSED, u5 MAYBE_UNUSED, u6 MAYBE_UNUSED,
-      u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG3(j);
-      ALG_ILP1 ALG_IL3A ALG_IL3B ALG_ILP2 ALG_IL3A ALG_IL3C ALG_ILP3;
-    }}
-    return;
-  case 4: {
-    __m128d g, h, u0, u1, u2, u3, u4,
-      u5 MAYBE_UNUSED, u6 MAYBE_UNUSED,
-      u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG4(j);
-      ALG_ILP1 ALG_IL4A ALG_IL4B ALG_ILP2 ALG_IL4A ALG_IL4C ALG_ILP3;
-    }}
-    return;
-  case 5: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5,
-      u6 MAYBE_UNUSED, u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG5(j);
-      ALG_ILP1 ALG_IL5A ALG_IL5B ALG_ILP2 ALG_IL5A ALG_IL5C ALG_ILP3;
-    }}
-    return;
-  case 6: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6,
-      u7 MAYBE_UNUSED, u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG6(j);
-      ALG_ILP1 ALG_IL6A ALG_IL6B ALG_ILP2 ALG_IL6A ALG_IL6C ALG_ILP3;
-    }}
-    return;
-  case 7: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7,
-      u8 MAYBE_UNUSED, u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG7(j);
-      ALG_ILP1 ALG_IL7A ALG_IL7B ALG_ILP2 ALG_IL7A ALG_IL7C ALG_ILP3;
-    }}
-    return;
-  case 8: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8,
-      u9 MAYBE_UNUSED;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG8(j);
-      ALG_ILP1 ALG_IL8A ALG_IL8B ALG_ILP2 ALG_IL8A ALG_IL8C ALG_ILP3;
-    }}
-    return;
-#pragma GCC diagnostic warning "-Wuninitialized"			
-  case 9: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG9(j);
-      ALG_ILP1 ALG_IL9A ALG_IL9B ALG_ILP2 ALG_IL9A ALG_IL9C ALG_ILP3;
-    }}
-    return;
-  default: {
-    __m128d u[d+1];
-    ALG_INIT_SCALE_ADD_UN_A_TT;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALGD(j);
-      ALG_ILP1 ALG_ILD ALG_ILP2 ALG_ILD ALG_ILP3D;
-    }}
-    return;
-  }
-}
-#undef ALG_IL0A
-#undef ALG_IL1A
-#undef ALG_IL2A
-#undef ALG_IL3A
-#undef ALG_IL4A
-#undef ALG_IL5A
-#undef ALG_IL6A
-#undef ALG_IL7A
-#undef ALG_IL8A
-#undef ALG_IL9A
-#undef ALG_IL1B
-#undef ALG_IL2B
-#undef ALG_IL3B
-#undef ALG_IL4B
-#undef ALG_IL5B
-#undef ALG_IL6B
-#undef ALG_IL7B
-#undef ALG_IL8B
-#undef ALG_IL9B
-#undef ALG_IL1C
-#undef ALG_IL2C
-#undef ALG_IL3C
-#undef ALG_IL4C
-#undef ALG_IL5C
-#undef ALG_IL6C
-#undef ALG_IL7C
-#undef ALG_IL8C
-#undef ALG_IL9C
-#undef ALG_ILD
-#undef ALG_ILP1
-#undef ALG_ILP0
-#undef ALG_ILP2
-#undef ALG_ILP3
-#undef ALG_ILP3D
-#endif
-#endif
-#endif
-
-/**************** 4: HAVE_SSE2, !ALG_LAZY, !ALG_RAT *************************/
-#ifdef HAVE_SSE2
-#ifndef ALG_LAZY
-#ifndef ALG_RAT
-
-/* Full initialization of the algebraics with SSE. 32bits compatible.
-   No so slow! About x6 slower than the best. */
-void init_alg_norms_bucket_region (unsigned char *S,
-				   unsigned char *xS MAYBE_UNUSED, unsigned int j,
-				   sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg;
-  __m128d two = _mm_set1_pd(2.0);
-  
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  switch(d) {
-  case 0: {
-    ALG_INIT_SCALE_ADD_UN_A;
-    memset(S-Idiv2,inttruncfastlog2(fabs(alg->fijd[0]),*(double *)&add,*(double *)&scale),(Idiv2<<1)*(ej-j));
-  }
-    return;
-  case 1: {
-    __m128d g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG1(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G1;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G1;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G1;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G1;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 2: {
-    __m128d g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG2(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G2;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G2;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G2;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G2;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 3: {
-    __m128d g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG3(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G3;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G3;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G3;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G3;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 4: {
-    __m128d g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG4(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G4;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G4;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G4;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G4;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 5: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG5(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G5;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G5;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G5;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G5;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 6: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG6(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 2) {
-	G6;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G6;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G6;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G6;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 7: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG7(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G7;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G7;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G7;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G7;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 8: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG8(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G8;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G8;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G8;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G8;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  case 9: {
-    __m128d g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG9(j);
-      g = h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	G9;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G9;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G9;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	G9;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  default: {
-    __m128d g, h, u[d+1];
-    ALG_INIT_SCALE_ADD_UN_A;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALGD(j);
-      h = _mm_set_pd(1. - Idiv2, (double) -Idiv2);
-      for (ih = -Idiv2; ih < Idiv2;) {
-	GD;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	GD;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	GD;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-	GD;
-	w16itruncfastlog2fabs (g, add, scale, S, ih, un); g = h =_mm_add_pd (h, two); ih += 2;
-      }}}
-    return;
-  }
-}
-#endif
-#endif
-#endif
-
-/************************* undef of all SSE define *****************************/
-#ifdef HAVE_SSE2
-#undef TSTZXMM
+  } /* End of the big switch of the SSE version - and end of the function */
 #undef _MM_SHUFFLE_EPI32
-#undef INITALG0
-#undef INITALG1
-#undef INITALG2
-#undef INITALG3
-#undef INITALG4
-#undef INITALG5
-#undef INITALG6
-#undef INITALG7
-#undef INITALG8
-#undef INITALG9
-#undef INITALGD
-#undef G1
-#undef G2
-#undef G3
-#undef G4
-#undef G5
-#undef G6
-#undef G7
-#undef G8
-#undef G9
-#undef GD
 #undef ALG_INIT_SCALE_ADD_UN_A
-#undef ALG_INIT_SCALE_ADD_UN_A_TT
-#endif
-/******************** end of undef of all SSE #define ************************/
 
-/***************** Beginning of all non SSE #define **************************/
-/* I cannot do a #ifndef HAVE_SSE here because the 7th algorithm is faster   */
-/* than its SSE version, 3th algorithm. So 7th is the default => all these   */
-/* defines may be used with a SSE machine.                                   */
-/*****************************************************************************/
-/* #ifdef HAVE_SSE2 */ 
+#else /* !HAVE_GCC_STYLE_AMD64_INLINE_ASM, end of SSE version of the function */
 
-#define INITALG0 uu0=0x0101010101010101*inttruncfastlog2(fabs(alg->fijd[0]),add,scale)
-
-#define INITALG1(A) do {			\
-    u1 = alg->fijd[1]    ;			\
-    u0 = alg->fijd[0] * ((double) (A));		\
-  } while(0)
- 
-#define INITALG2(A) do {			\
-    u2 = alg->fijd[2]    ; h  = ((double) (A));	\
-    u1 = alg->fijd[1] * h; h *= h;		\
-    u0 = alg->fijd[0] * h;			\
-  } while(0)
- 
-#define INITALG3(A) do {			 \
-    u3 = alg->fijd[3]    ; h  = ((double) (A));	 \
-    u2 = alg->fijd[2] * h; g  = h * h;		 \
-    u1 = alg->fijd[1] * g; g *= h;		 \
-    u0 = alg->fijd[0] * g;			 \
-  } while(0)
- 
-#define INITALG4(A) do {			 \
-    u4 = alg->fijd[4]    ; h  = ((double) (A));	 \
-    u3 = alg->fijd[3] * h; g  = h * h;		 \
-    u2 = alg->fijd[2] * g; g *= h;		 \
-    u1 = alg->fijd[1] * g; g *= h;		 \
-    u0 = alg->fijd[0] * g;			 \
-  } while(0)
- 
-#define INITALG5(A) do {			 \
-    u5 = alg->fijd[5]    ; h  = ((double) (A));	 \
-    u4 = alg->fijd[4] * h; g  = h * h;		 \
-    u3 = alg->fijd[3] * g; g *= h;		 \
-    u2 = alg->fijd[2] * g; g *= h;		 \
-    u1 = alg->fijd[1] * g; g *= h;		 \
-    u0 = alg->fijd[0] * g;			 \
-  } while(0)
- 
-#define INITALG6(A) do {				\
-    u6 = alg->fijd[6]    ; h  = ((double) (A));		\
-    u5 = alg->fijd[5] * h; g  = h * h;			\
-    u4 = alg->fijd[4] * g; g *= h;			\
-    u3 = alg->fijd[3] * g; g *= h;			\
-    u2 = alg->fijd[2] * g; g *= h;			\
-    u1 = alg->fijd[1] * g; g *= h;			\
-    u0 = alg->fijd[0] * g;				\
-  } while(0)
- 
-#define INITALG7(A) do {				\
-    u7 = alg->fijd[7]    ; h  = ((double) (A));		\
-    u6 = alg->fijd[6] * h; g  = h * h;			\
-    u5 = alg->fijd[5] * g; g *= h;			\
-    u4 = alg->fijd[4] * g; g *= h;			\
-    u3 = alg->fijd[3] * g; g *= h;			\
-    u2 = alg->fijd[2] * g; g *= h;			\
-    u1 = alg->fijd[1] * g; g *= h;			\
-    u0 = alg->fijd[0] * g;				\
-  } while(0)
- 
-#define INITALG8(A) do {				\
-    u8 = alg->fijd[8]    ; h  = ((double) (A));		\
-    u7 = alg->fijd[7] * h; g  = h * h;			\
-    u6 = alg->fijd[6] * g; g *= h;			\
-    u5 = alg->fijd[5] * g; g *= h;			\
-    u4 = alg->fijd[4] * g; g *= h;			\
-    u3 = alg->fijd[3] * g; g *= h;			\
-    u2 = alg->fijd[2] * g; g *= h;			\
-    u1 = alg->fijd[1] * g; g *= h;			\
-    u0 = alg->fijd[0] * g;				\
-  } while(0)
- 
-#define INITALG9(A) do {				\
-    u9 = alg->fijd[9]    ; h  = ((double) (A));		\
-    u8 = alg->fijd[8] * h; g  = h * h;			\
-    u7 = alg->fijd[7] * g; g *= h;			\
-    u6 = alg->fijd[6] * g; g *= h;			\
-    u5 = alg->fijd[5] * g; g *= h;			\
-    u4 = alg->fijd[4] * g; g *= h;			\
-    u3 = alg->fijd[3] * g; g *= h;			\
-    u2 = alg->fijd[2] * g; g *= h;			\
-    u1 = alg->fijd[1] * g; g *= h;			\
-    u0 = alg->fijd[0] * g;				\
-  } while(0)
- 
-#define INITALGD(A)				\
-  poly_scale(u, alg->fijd, d, (double) (A))
- 
-#define ABSG1 g=fabs(u0+h*u1)
- 
-#define ABSG2 g=fabs(u0+h*(u1+h*u2))
- 
-#define ABSG3 g=fabs(u0+h*(u1+h*(u2+h*u3)))
- 
-#define ABSG4 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*u4))))
- 
-#define ABSG5 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*u5)))))
- 
-#define ABSG6 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*u6))))))
- 
-#define ABSG7 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*u7)))))))
- 
-#define ABSG8 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*u8))))))))
- 
-#define ABSG9 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*(u8+h*u9)))))))))
- 
-#define ABSGD g=u[d]; for(unsigned int k=d;--k!=UINT_MAX;g=g*h+u[k]); g=fabs(g)
- 
+  /* Initialisation of the double data for the non SSE version. */
 #define ALG_INIT_SCALE_ADD_UN const double		\
-    scale = alg->scale * (1./0x100000),			\
-    add = 0x3FF00000 - GUARD / scale,			\
-    un MAYBE_UNUSED = 1.
- 
-/* Careful! non SSE t and SSE tt are not the same formula, but the
-   same use. */
-#define ALG_INIT_SCALE_ADD_UN_T						\
-  ALG_INIT_SCALE_ADD_UN;						\
-  uint64_t t = (si->sides[RATIONAL_SIDE]->bound < 255 ?			\
-		((si->sides[RATIONAL_SIDE]->bound+1)>>1):127)*0x0101010101010101
-
-/* #endif !HAVE_SSE2 */
-/**************** End of used non SSE #define *****************************/
-
-/**************** 5: !HAVE_SSE2, ALG_LAZY, ALG_RAT ************************/
-#ifndef HAVE_SSE2
-#ifdef ALG_LAZY
-#ifdef ALG_RAT
-/* Smart initialization of the algebraics. In one test, 8 bytes of
-   the rationals are tested. If one is > rat->bound, computes the
-   central initialization value and duplicates it 8 times, and writes it.
-   At the beginning, all are initialised to 255.
-   2nd fastest initialization, but maybe the smartest.
-   Non SSE version, 32bits compatible.
-   
-   NOTA : the SSE and non SSE versions differs!
-   
-   NB: the void *tg is mandatory, because x86 cannot transfer without
-   memory a xmm register in a general register. And for this, gcc
-   needs dedicated memory: it doesn't use the stack!
-
-   NB2: 2 possibilities:
-   1. The code sets h before the for (ih = -Idiv2...) and increase h
-   with a in the loop.
-   2. The code sets h only when EIGHT_BYTES_TEST is true -> a int to
-   double conversion is needed.
-   On my machine, same time for the both codes. So, I prefer don't use
-   a, because the limited floating register number.
-*/
-void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS, unsigned int j,
-				  sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg;
-
-  /* True if one byte of the uint64_t *(xS + ih) are ~ >
-     si->sides[RATIONAL_SIDE]->bound */
-#define EIGHT_BYTES_TEST				\
-  ((((*(uint64_t *)&xS[ih]) >> 1)			\
-    & 0x7F7F7F7F7F7F7F7F) - t) & 0x8080808080808080
-
-  memset (S, 255, (Idiv2<<1) * ej);
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  xS += Idiv2;
+	un MAYBE_UNUSED = 1.,				\
+	scale = alg->scale * (1./0x100000),		\
+        add = 0x3FF00000 - GUARD / scale
+	
+  /* This function is only a big switch in fact */
   switch (d) {
   case 0: {
-    uint64_t uu0;
-    ALG_INIT_SCALE_ADD_UN_T;
-    INITALG0;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  *(uint64_t *)&S[ih] = uu0;
-	}}}
-    return;
-  case 1 : {
-    double g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG1(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG1; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 2 : {
-    double g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG2(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG2; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 3 : {
-    double g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG3(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG3; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 4 : {
-    double g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG4(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG4; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 5 : {
-    double g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG5(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG5; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 6 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG6(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG6; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 7 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG7(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG7; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 8 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG8(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG8; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  case 9 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALG9(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSG9; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  default : {
-    double g, h, u[d+1];
-    ALG_INIT_SCALE_ADD_UN_T;
-    for (; j < ej; j++, S += (Idiv2<<1), xS += (Idiv2<<1)) {
-      INITALGD(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8)
-	if (UNLIKELY(EIGHT_BYTES_TEST)) {
-	  h = (double) (ih + 3);
-	  ABSGD; g += un;
-	  uint64truncfastlog2(g,add,scale,S,ih);
-	}}}
-    return;
-  }
-}
-#endif
-#endif
-#endif
-
-/**************** 6: !HAVE_SSE2, ALG_LAZY, !ALG_RAT ***********************/
-#ifndef HAVE_SSE2
-#ifdef ALG_LAZY
-#ifndef ALG_RAT
-/* Smart initialization of the algebraics. Computes the central initialization
-   value of a box of (horizontail=8,vertical=p) and propagates it in the box.
-   8 is locked by the code and p is the minimum of VERT_NORM_STRIDE (#define, = 4)
-   and ej, with ej = 2^(LOG_BUCKET_REGION-si->conf->logI).
-   So, the fastest code is for logI <= 14.
-   It's the fastest initialization of the algebraics. Non SSE version. */
-void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS MAYBE_UNUSED, unsigned int j,
-				  sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg,
-    p = ej < VERT_NORM_STRIDE ? ej : VERT_NORM_STRIDE;
-
-#define FILL_OTHER_LINES do {						\
-    if (LIKELY(p > 1)) {						\
-      unsigned char *mS = S + Idiv2;					\
-      S -= Idiv2;							\
-      for (unsigned int k = 1; k < p; k++, mS += (Idiv2<<1))		\
-	memcpy (mS, S, (Idiv2<<1));					\
-      S = mS + Idiv2;							\
-      j += p;								\
-    }									\
-    else do {								\
-	S += (Idiv2<<1);						\
-	j++;								\
-      } while(0);							\
-  } while(0)
-
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  switch (d) {
-  case 0: {
-    unsigned int uu0;
     ALG_INIT_SCALE_ADD_UN;
-    INITALG0;
-    memset(S - Idiv2, uu0, (Idiv2 << 1) * (ej - j));
+    memset(S - Idiv2, 0x0101010101010101 * inttruncfastlog2(fabs(alg->fijd[0]),add,scale),
+	   (Idiv2 << 1) * (ej - j));
   }
     return;
   case 1 : {
     double g, h, u0, u1;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG1(j + (p >> 1));
+      u1 = alg->fijd[1];			
+      u0 = alg->fijd[0] * ((double) (j + (p >> 1)));
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG1; g += un;
+	g = fabs(u0+h*u1);
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2103,10 +811,13 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG2(j + (p >> 1));
+      u2 = alg->fijd[2]    ; h  = ((double) (j + (p >> 1)));
+      u1 = alg->fijd[1] * h; h *= h;
+      u0 = alg->fijd[0] * h;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG2; g += un;
+	g = fabs(u0+h*(u1+h*u2));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2116,10 +827,14 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG3(j + (p >> 1));
+      u3 = alg->fijd[3]    ; h  = ((double) (j + (p >> 1)));
+      u2 = alg->fijd[2] * h; g  = h * h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG3; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*u3)));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2129,10 +844,15 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG4(j + (p >> 1));
-       h = (double) (3 - Idiv2);
-       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG4; g += un;
+      u4 = alg->fijd[4]    ; h  = ((double) (j + (p >> 1)));
+      u3 = alg->fijd[3] * h; g  = h * h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
+      h = (double) (3 - Idiv2);
+      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*u4))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2142,10 +862,16 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4, u5;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG5(j + (p >> 1));
+      u5 = alg->fijd[5]    ; h  = ((double) (j + (p >> 1)));
+      u4 = alg->fijd[4] * h; g  = h * h;
+      u3 = alg->fijd[3] * g; g *= h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG5; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*u5)))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2155,10 +881,17 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4, u5, u6;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG6(j + (p >> 1));
+      u6 = alg->fijd[6]    ; h  = ((double) (j + (p >> 1)));
+      u5 = alg->fijd[5] * h; g  = h * h;
+      u4 = alg->fijd[4] * g; g *= h;
+      u3 = alg->fijd[3] * g; g *= h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG6; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*u6))))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2168,10 +901,18 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4, u5, u6, u7;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG7(j + (p >> 1));
+      u7 = alg->fijd[7]    ; h  = ((double) (j + (p >> 1)));
+      u6 = alg->fijd[6] * h; g  = h * h;
+      u5 = alg->fijd[5] * g; g *= h;
+      u4 = alg->fijd[4] * g; g *= h;
+      u3 = alg->fijd[3] * g; g *= h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG7; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*u7)))))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2181,10 +922,19 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG8(j + (p >> 1));
+      u8 = alg->fijd[8]    ; h  = ((double) (j + (p >> 1)));
+      u7 = alg->fijd[7] * h; g  = h * h;
+      u6 = alg->fijd[6] * g; g *= h;
+      u5 = alg->fijd[5] * g; g *= h;
+      u4 = alg->fijd[4] * g; g *= h;
+      u3 = alg->fijd[3] * g; g *= h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG8; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*u8))))))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2194,10 +944,20 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALG9(j + (p >> 1));
+      u9 = alg->fijd[9]    ; h  = ((double) (j + (p >> 1)));
+      u8 = alg->fijd[8] * h; g  = h * h;
+      u7 = alg->fijd[7] * g; g *= h;
+      u6 = alg->fijd[6] * g; g *= h;
+      u5 = alg->fijd[5] * g; g *= h;
+      u4 = alg->fijd[4] * g; g *= h;
+      u3 = alg->fijd[3] * g; g *= h;
+      u2 = alg->fijd[2] * g; g *= h;
+      u1 = alg->fijd[1] * g; g *= h;
+      u0 = alg->fijd[0] * g;
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSG9; g += un;
+	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*(u8+h*u9)))))))));
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
@@ -2207,436 +967,21 @@ void init_alg_norms_bucket_region(unsigned char *S,
     double g, h, u[d];
     ALG_INIT_SCALE_ADD_UN;
     while (j < ej) {
-      INITALGD(j + (p >> 1));
+      poly_scale(u, alg->fijd, d, (double) (j + (p >> 1)));
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	ABSGD; g += un;
+	g = u[d]; for (unsigned int k = d; --k != UINT_MAX; g = g*h+u[k]); g = fabs(g);
+	g += un;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
       FILL_OTHER_LINES;
     }}
     return;
-  }
-}
-#undef FILL_OTHER_LINES
-#endif
-#endif
-#endif
-
-/********** 7: !(HAVE_SSE2 & x86-64), !ALG_LAZY, ALG_RAT **************/
-/* Active by default: SSE code slower */
-#if !defined(NOTDEFINED) /* !defined(__x86_64) || !defined(HAVE_SSE2) */
-#ifndef ALG_LAZY
-#ifdef ALG_RAT
-/* Smart initialization of the algebraics : only if the corresponding
-   rationnal is < rat->bound, other 255 (by first memset), so ~ x 22 less
-   computation; but requires of course many tests. Without SSE.
-   NB: this procedure is used if !ALG_LAZY, ALG_RAT & !x86-64. */
-void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS, unsigned int j,
-				  sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg;
-  uint64_t m;
-  uint8_t ratbound = si->sides[RATIONAL_SIDE]->bound;
-
-#define ALG0(A) if (UNLIKELY((uint8_t) m <= ratbound))	\
-    S[ih+A]=(uint8_t)uu0
-#define ALG1(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG1; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG2(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG2; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG3(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG3; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG4(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG4; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG5(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG5; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG6(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG6; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG7(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG7; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG8(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG8; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALG9(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSG9; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-#define ALGD(A) if (UNLIKELY((uint8_t) m <= ratbound)) do {	\
-      h = ((double) (ih + A));					\
-      ABSGD; g += un;						\
-      S[ih+A]=inttruncfastlog2(g,add,scale); } while(0)
-
-  memset (S, 255, (Idiv2<<1) * ej);
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  xS += Idiv2;
-  switch (d) {
-  case 0 : {
-    uint8_t uu0;
-    ALG_INIT_SCALE_ADD_UN;
-    INITALG0;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG0(0); m >>= 8; ALG0(1); m >>= 8; ALG0(2); m >>= 8; ALG0(3); m >>= 8; 
-	ALG0(4); m >>= 8; ALG0(5); m >>= 8; ALG0(6); m >>= 8; ALG0(7); 
-      }}}
-    return;
-  case 1 : {
-    double g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG1(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG1(0); m >>= 8; ALG1(1); m >>= 8; ALG1(2); m >>= 8; ALG1(3); m >>= 8; 
-	ALG1(4); m >>= 8; ALG1(5); m >>= 8; ALG1(6); m >>= 8; ALG1(7); 
-      }}}
-    return;
-  case 2 : {
-    double g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG2(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG2(0); m >>= 8; ALG2(1); m >>= 8; ALG2(2); m >>= 8; ALG2(3); m >>= 8; 
-	ALG2(4); m >>= 8; ALG2(5); m >>= 8; ALG2(6); m >>= 8; ALG2(7); 
-      }}}
-    return;
-  case 3 : {
-    double g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG3(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG3(0); m >>= 8; ALG3(1); m >>= 8; ALG3(2); m >>= 8; ALG3(3); m >>= 8; 
-	ALG3(4); m >>= 8; ALG3(5); m >>= 8; ALG3(6); m >>= 8; ALG3(7); 
-      }}}
-    return;
-  case 4 : {
-    double g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG4(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG4(0); m >>= 8; ALG4(1); m >>= 8; ALG4(2); m >>= 8; ALG4(3); m >>= 8; 
-	ALG4(4); m >>= 8; ALG4(5); m >>= 8; ALG4(6); m >>= 8; ALG4(7); 
-      }}}
-    return;
-  case 5 : {
-    double g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG5(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG5(0); m >>= 8; ALG5(1); m >>= 8; ALG5(2); m >>= 8; ALG5(3); m >>= 8; 
-	ALG5(4); m >>= 8; ALG5(5); m >>= 8; ALG5(6); m >>= 8; ALG5(7); 
-      }}}
-    return;
-  case 6 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG6(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG6(0); m >>= 8; ALG6(1); m >>= 8; ALG6(2); m >>= 8; ALG6(3); m >>= 8; 
-	ALG6(4); m >>= 8; ALG6(5); m >>= 8; ALG6(6); m >>= 8; ALG6(7); 
-      }}}
-    return;
-  case 7 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG7(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG7(0); m >>= 8; ALG7(1); m >>= 8; ALG7(2); m >>= 8; ALG7(3); m >>= 8; 
-	ALG7(4); m >>= 8; ALG7(5); m >>= 8; ALG7(6); m >>= 8; ALG7(7); 
-      }}}
-    return;
-  case 8 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG8(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG8(0); m >>= 8; ALG8(1); m >>= 8; ALG8(2); m >>= 8; ALG8(3); m >>= 8; 
-	ALG8(4); m >>= 8; ALG8(5); m >>= 8; ALG8(6); m >>= 8; ALG8(7); 
-      }}}
-    return;
-  case 9 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6 ,u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALG9(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALG9(0); m >>= 8; ALG9(1); m >>= 8; ALG9(2); m >>= 8; ALG9(3); m >>= 8; 
-	ALG9(4); m >>= 8; ALG9(5); m >>= 8; ALG9(6); m >>= 8; ALG9(7); 
-      }}}
-    return;
-  default : {
-    double g, h, u[d+1];
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), xS += (Idiv2<<1), j++) {
-      INITALGD(j);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8) {
-	m = *(uint64_t *)&xS[ih];
-	ALGD(0); m >>= 8; ALGD(1); m >>= 8; ALGD(2); m >>= 8; ALGD(3); m >>= 8; 
-	ALGD(4); m >>= 8; ALGD(5); m >>= 8; ALGD(6); m >>= 8; ALGD(7); 
-      }}}
-  }
-#undef ALG0
-#undef ALG1
-#undef ALG2
-#undef ALG3
-#undef ALG4
-#undef ALG5
-#undef ALG6
-#undef ALG7
-#undef ALG8
-#undef ALG9
-#undef ALGD
-}
-#endif
-#endif
-#endif
-
-/**************** 8: !HAVE_SSE2, !ALG_LAZY, !ALG_RAT ************************/
-#ifndef HAVE_SSE2
-#ifndef ALG_LAZY
-#ifndef ALG_RAT
-/* Full initialization of the algebraics without SSE. Slowest */
-void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS MAYBE_UNUSED, unsigned int j,
-				  sieve_info_ptr si)
-{
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  ssize_t ih, Idiv2 = (si->I >> 1);
-  unsigned int ej = 1U << (LOG_BUCKET_REGION - si->conf->logI),
-    d = si->cpoly->alg->deg;
-  
-#define ALG1(A)	do {				\
-    ABSG1; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG2(A)	do {				\
-    ABSG2; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG3(A)	do {				\
-    ABSG3; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG4(A)	do {				\
-    ABSG4; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG5(A)	do {				\
-    ABSG5; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG6(A)	do {				\
-    ABSG6; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG7(A)	do {				\
-    ABSG7; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG8(A)	do {				\
-    ABSG8; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALG9(A)	do {				\
-    ABSG9; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-#define ALGD(A)	do {				\
-    ABSGD; g += un;				\
-    (&S[ih])[A]=inttruncfastlog2(g,add,scale);	\
-  } while (0)
-
-  j *= ej;
-  ej += j;
-  S += Idiv2;
-  switch (d) {
-  case 0 : {
-    unsigned int uu0;
-    ALG_INIT_SCALE_ADD_UN;
-    INITALG0;
-    memset(S - Idiv2, uu0, (Idiv2 << 1) * (ej - j));
-  }
-    return;
-  case 1 : {
-    double g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG1(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG1(0); h++; ALG1(1); h++; ALG1(2); h++; ALG1(3); h++;
-      }}}
-    return;
-  case 2 : {
-    double g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG2(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG2(0); h++; ALG2(1); h++; ALG2(2); h++; ALG2(3); h++;
-      }}}
-    return;
-  case 3 : {
-    double g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG3(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG3(0); h++; ALG3(1); h++; ALG3(2); h++; ALG3(3); h++;
-      }}}
-    return;
-  case 4 : {
-    double g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG4(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG4(0); h++; ALG4(1); h++; ALG4(2); h++; ALG4(3); h++;
-      }}}
-    return;
-  case 5 : {
-    double g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG5(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG5(0); h++; ALG5(1); h++; ALG5(2); h++; ALG5(3); h++;
-      }}}
-    return;
-  case 6 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG6(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG6(0); h++; ALG6(1); h++; ALG6(2); h++; ALG6(3); h++;
-      }}}
-    return;
-  case 7 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG7(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG7(0); h++; ALG7(1); h++; ALG7(2); h++; ALG7(3); h++;
-      }}}
-    return;
-  case 8 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG8(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG8(0); h++; ALG8(1); h++; ALG8(2); h++; ALG8(3); h++;
-      }}}
-    return;
-  case 9 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALG9(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALG9(0); h++; ALG9(1); h++; ALG9(2); h++; ALG9(3); h++;
-      }}}
-    return;
-  default : {
-    double g, h, u[d+1];
-    ALG_INIT_SCALE_ADD_UN;
-    for (; j < ej; S += (Idiv2<<1), j++) {
-      INITALGD(j);
-      h = (double) -Idiv2;
-      for (ih = -Idiv2; ih < Idiv2; ih += 4) {
-	ALGD(0); h++; ALGD(1); h++; ALGD(2); h++; ALGD(3); h++;
-      }}}
-    return;
-  }
-#undef ALG1
-#undef ALG2
-#undef ALG3
-#undef ALG4
-#undef ALG5
-#undef ALG6
-#undef ALG7
-#undef ALG8
-#undef ALG9
-#undef ALGD
-}
-#endif
-#endif
-#endif
-
-/********************* Undef of all non SSE defines ********************/
-#undef INITALG0
-#undef INITALG1
-#undef INITALG2
-#undef INITALG3
-#undef INITALG4
-#undef INITALG5
-#undef INITALG6
-#undef INITALG7
-#undef INITALG8
-#undef INITALG9
-#undef INITALGD
-#undef ABSG1
-#undef ABSG2
-#undef ABSG3
-#undef ABSG4
-#undef ABSG5
-#undef ABSG6
-#undef ABSG7
-#undef ABSG8
-#undef ABSG9
-#undef ABSGD
+  } /* End of the big switch of the non SSE version - and end of the function */
 #undef ALG_INIT_SCALE_ADD_UN
-#undef ALG_INIT_SCALE_ADD_UN_T
-/***************** end of undef of all non SSE defines *****************/
-/********* End of the 8 procedures init_alg_norms_bucket_region ********/
+#endif /* End of !HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+#undef FILL_OTHER_LINES
+} /* True end of the function (finally!) */
 
 /* return max |g(x)| for x in (0, s) where s can be negative,
    and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
