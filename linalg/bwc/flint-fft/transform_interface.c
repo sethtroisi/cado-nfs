@@ -46,7 +46,7 @@
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
-#define DEBUG_FFT
+#define xxxDEBUG_FFT
 
 /* This is copied from mul_fft_main.c ; given the size of the tuning
  * table for this code, there's no bloat danger */
