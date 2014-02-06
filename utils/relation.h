@@ -48,7 +48,6 @@ extern char * d64toa16 (char *p, int64_t m);
 
 
 extern void fprint_relation(FILE *file, relation_t * rel, const char *);
-extern void fprint_relation_raw (FILE *file, relation_t * rel);
 
 /* FIXME: The following interface still strongly relies on the fact that
  * the rational side is [0] and the algebraic side is [1] */

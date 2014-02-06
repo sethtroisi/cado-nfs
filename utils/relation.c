@@ -235,49 +235,6 @@ fprint_relation (FILE *file, relation_t * rel, const char *prefix)
   fwrite (buf, sizeof(*buf), p - buf, file);
 }
 
-/* same as fprint_relation, but assumes all exponents are > 0 */
-void
-fprint_relation_raw (FILE *file, relation_t * rel)
-{
-  char buf[1<<10], *p, *op;
-  size_t lg;
-  int i, j;
-  
-  p = d64toa10(buf, rel->a);
-  *p++ = ',';
-  p = u64toa10(p, rel->b);
-  *p++ = ':';
-  for (i = 0; i < rel->nb_rp; ++i)
-    {
-      ASSERT (rel->rp[i].e);
-      op = p;
-      p = u64toa16 (p, rel->rp[i].p);
-      *p++ = ',';
-      lg = (p - op);
-      for (j = 0; j < rel->rp[i].e - 1; j++)
-	{
-	  memcpy (p, op, lg);
-	  p += lg;
-	}
-    }
-  p[-1] = ':';
-  for (i = 0; i < rel->nb_ap; ++i)
-    {
-      ASSERT (rel->ap[i].e);
-      op = p;
-      p = u64toa16 (p, rel->ap[i].p);
-      *p++ = ',';
-      lg = (p - op);
-      for (j = 0; j < rel->ap[i].e - 1; j++)
-        {
-          memcpy (p, op, lg);
-          p += lg;
-        }
-    }
-  p[-1] = '\n';
-  fwrite (buf, sizeof(*buf), p - buf, file);
-}
-
 static int rat_prime_cmp(rat_prime_t * a, rat_prime_t * b)
 {
     return (b->p < a->p) - (a->p < b->p);
