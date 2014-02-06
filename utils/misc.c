@@ -215,12 +215,6 @@ strlcpy(char *dst, const char *src, const size_t size)
 }
 #endif
 
-void strlcpy_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcpy(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
-
 #ifndef HAVE_STRLCAT
 size_t
 strlcat(char *dst, const char *src, const size_t size)
