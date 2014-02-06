@@ -30,7 +30,6 @@ typedef __modul_poly_struct modul_poly_t[1];
  * the stored values */
 int modul_poly_roots (residueul_t *, mpz_t*, int, modulusul_t);
 int modul_poly_roots_ulong  (unsigned long*, mpz_t*, int, modulusul_t);
-int modul_poly_roots_int64 (int64_t*,       mpz_t*, int, modulusul_t);
 
 /* used in polyselect/rootsieve.c */
 void modul_poly_init (modul_poly_t, int);
