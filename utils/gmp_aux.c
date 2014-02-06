@@ -73,7 +73,7 @@ mpz_fits_int64_p (mpz_srcptr z)
 void
 mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 {
-  if (sizeof (unsigned long) == 8)
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_mul_ui (a, b, (unsigned long) c);
   else
     {
@@ -81,6 +81,21 @@ mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
       mpz_init (d);
       mpz_set_uint64 (d, c);
       mpz_mul (a, b, d);
+      mpz_clear (d);
+    }
+}
+
+void
+mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    mpz_submul_ui (a, b, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      mpz_submul (a, b, d);
       mpz_clear (d);
     }
 }

@@ -75,8 +75,8 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
         h = M[i][j] / g;
         g = M[j][j] / g;
         /* f[i] <- g*f[i] - h*f[j] */
-        mpz_mul_ui (f[i], f[i], g);
-        mpz_submul_ui (f[i], f[j], h);
+        mpz_mul_uint64 (f[i], f[i], g);
+        mpz_submul_uint64 (f[i], f[j], h);
         for (k = j; k <= t; k++)
           M[i][k] = g * M[i][k] - h * M[j][k];
       }
