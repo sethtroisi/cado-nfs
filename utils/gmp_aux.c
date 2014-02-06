@@ -101,6 +101,21 @@ mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 }
 
 void
+mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    mpz_divexact_ui (a, b, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      mpz_divexact (a, b, d);
+      mpz_clear (d);
+    }
+}
+
+void
 mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
   if (sizeof (long) == 8)

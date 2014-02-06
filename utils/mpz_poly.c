@@ -88,7 +88,7 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
       /* f[i] = f[i] - M[i][j] * f[j] */
       mpz_submul_ui (f[i], f[j], M[i][j]);
     ASSERT (mpz_divisible_ui_p (f[i], M[i][i]));
-    mpz_divexact_ui (f[i], f[i], M[i][i]);
+    mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
 }
 

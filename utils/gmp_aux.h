@@ -27,6 +27,7 @@ extern uint64_t mpz_get_uint64 (mpz_srcptr);
 extern int64_t mpz_get_int64 (mpz_srcptr);
 extern void mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
 extern void mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
+extern void mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
 extern void mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern void mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
 extern int mpz_fits_int64_p(mpz_srcptr);
