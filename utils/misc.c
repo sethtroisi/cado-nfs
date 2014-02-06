@@ -241,12 +241,6 @@ strlcat(char *dst, const char *src, const size_t size)
 }
 #endif
 
-void strlcat_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcat(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
-
 /* Return a NULL-terminated list of file names read from filename.
    Empty lines and comment lines (starting with '#') are skipped.
    If basepath != NULL, it is used as path before each read filename

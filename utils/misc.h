@@ -50,7 +50,6 @@ size_t strlcpy(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused
 #ifndef HAVE_STRLCAT
 size_t strlcat(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused_result__));
 #endif
-void strlcat_check(char *dst, const char *src, size_t size);
 
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
