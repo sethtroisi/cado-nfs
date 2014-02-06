@@ -33,6 +33,8 @@ BASENAME="${BASENAME%%.*}"
 
 # Output files
 TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXXXX`
+# Make temp direcotry world-readable for easier debugging
+chmod a+rx "${TMPDIR}"
 FB="${TMPDIR}/${BASENAME}.roots"
 RELS="${TMPDIR}/${BASENAME}.rels"
 
