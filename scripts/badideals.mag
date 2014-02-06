@@ -651,11 +651,13 @@ fff := Factorization(d : ECMLimit:=100, MPQSLimit:=0);
 BadPrimes := [ x[1] : x in fff | x[2] gt 1];
 
     /* This is only the debug part. Won't go in C */
+/*
     OK:=Order([LeadingCoefficient(f)*alpha]);
     for p in BadPrimes do OK := pMaximalOrder(OK, p); end for;
     OK`Maximal := true;
     K`MaximalOrder := OK;
     J:=ideal<OK|ideal<OK|1,alpha>^-1>;
+*/
 
 FacBadPrimes := [];
 
