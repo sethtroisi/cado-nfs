@@ -53,7 +53,7 @@ mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
 static void
 mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 #define MAX_T 13
-  uint64_t M[MAX_T+1][MAX_T+1], g, h;
+  uint64_t M[MAX_T+1][MAX_T+1], g, h, Mtt;
   int i, j, k;
   mpz_t f0[MAX_T+1];
 
@@ -69,6 +69,7 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
   for (i = 0; i <= t; i++)
     for (j = 0; j <= t; j++)
       M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
+  Mtt = M[t][t];
 
   /* forward Gauss: zero the under-diagonal coefficients while going down */
   for (i = 1; i <= t; i++)
@@ -93,6 +94,9 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
       mpz_submul_ui (f[i], f[j], M[i][j]);
     if (mpz_divisible_ui_p (f[i], M[i][i]) == 0)
       {
+        fprintf (stderr, "Mtt=%" PRIu64 "\n", Mtt);
+        gmp_fprintf (stderr, "f[%d]=%Zd M[%d][%d]=%" PRIu64 "\n", i, f[i],
+                     i, i, M[i][i]);
         for (i = 0; i <= t; i++)
           gmp_fprintf (stderr, "f[%d]=%Zd\n", i, f0[i]);
       }
