@@ -4,8 +4,6 @@
 #include <limits.h>
 #include <math.h>               /* ceil */
 
-/* #undef HAVE_SSE2 */ /* Only for tests */ 
-
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
 #elif defined(HAVE_SSSE3)
@@ -29,7 +27,7 @@
    Add & scale are need to compute o'=f(log2(i)) where f is an affine function.
 */
 static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
-#ifdef HAVE_SSE2
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
             "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
@@ -56,7 +54,7 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
    2 P-instructions (1 cycle).
 */
 static inline void uint64truncfastlog2(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
-#ifdef HAVE_SSE2
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
             "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
@@ -74,7 +72,7 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 #endif
 }
 
-#ifdef HAVE_SSE2
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 /* These functions are for the SSE2 init algebraics.
    I prefer use X86 ASM directly and avoid intrinsics because the trick of
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
