@@ -194,7 +194,7 @@ char * derived_filename(const char * prefix, const char * what, const char * ext
 }
 
 
-void chomp(char *s) {
+static void chomp(char *s) {
     char *p;
     if (s && (p = strrchr(s, '\n')) != NULL)
         *p = '\0';
