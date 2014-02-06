@@ -4,14 +4,25 @@ QQ:=Rationals();
 ZP<x>:=PolynomialAlgebra(ZZ);
 ZPH:=PolynomialRing(ZZ,2);
 
-lines := Split(Read(polyfile));
-f := ZP!0;
-for l in lines do
-    if l[1] ne "c" then continue; end if;
-    e := StringToInteger(l[2]);
-    c := StringToInteger(Split(l, " ")[2]);
-    f +:= c*x^e;
-end for;
+// When DEBUG is assigned, it is possible to load this file and debug
+// the explicitly given polynomial that follows:
+if assigned DEBUG then
+    f := 840*x^5-16210*x^4+2610983*x^3-2560484269*x^2-34656366009*x+253976285986533;
+    ell := 42;
+    badfile := "";
+    badinfofile := "";
+    polyfile := "";
+    mainp := "";
+else
+    lines := Split(Read(polyfile));
+    f := ZP!0;
+    for l in lines do
+        if l[1] ne "c" then continue; end if;
+        e := StringToInteger(l[2]);
+        c := StringToInteger(Split(l, " ")[2]);
+        f +:= c*x^e;
+    end for;
+end if;
 
 SBAD := "";
 SBADINFO := "";
@@ -624,7 +635,6 @@ end function;
 
 
 
-
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -643,6 +653,8 @@ function NormalizeProjectiveElement(uv, pk)
         return pk + Integers()!v;
     end if;
 end function;
+
+if not assigned DEBUG then
 
 K<alpha>:=NumberField(f);
 
@@ -834,30 +846,37 @@ for pf in FacBadPrimes do
     end for;
 end for;
 
-fprintf badfile, SBAD;
-fprintf badinfofile, SBADINFO;
+if assigned DEBUG then
+    printf SBAD;
+    printf SBADINFO;
+else
+    fprintf badfile, SBAD;
+    fprintf badinfofile, SBADINFO;
 
-ell := StringToInteger(ell);
+    ell := StringToInteger(ell);
 
-if ell eq 0 then
-    p := StringToInteger(mainp);
-    fff := Factorization(p-1);
-    ell := fff[#fff][1];
+    if ell eq 0 then
+        p := StringToInteger(mainp);
+        fff := Factorization(p-1);
+        ell := fff[#fff][1];
+    end if;
+
+    lcm := 1;
+    ff := Factorization(f, GF(ell));
+    for f in ff do
+        lcm := LCM(lcm, ell^Degree(f[1])-1);
+    end for;
+
+    nr := #Roots(f, RealField());
+    nc := Degree(f)-nr;
+    assert IsEven(nc);
+
+    SetColumns(0);
+    printf "ell %o\n", ell;
+    printf "smexp %o\n", lcm;
+    printf "nmaps %o\n", nr + (nc div 2) -1;
+
+    exit;
 end if;
 
-lcm := 1;
-ff := Factorization(f, GF(ell));
-for f in ff do
-    lcm := LCM(lcm, ell^Degree(f[1])-1);
-end for;
-
-nr := #Roots(f, RealField());
-nc := Degree(f)-nr;
-assert IsEven(nc);
-
-SetColumns(0);
-printf "ell %o\n", ell;
-printf "smexp %o\n", lcm;
-printf "nmaps %o\n", nr + (nc div 2) -1;
-
-exit;
+end if;
