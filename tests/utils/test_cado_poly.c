@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <time.h>
+#include "tests_common.h"
 #include "cado_poly.h"
 
 void
@@ -33,13 +34,10 @@ test_cado_poly_set ()
 }
 
 int
-main (int argc, char *argv[])
+main (int argc, const char *argv[])
 {
-  long int seed;
-
-  seed = (argc >= 2) ? atoi (argv[1]) : time (NULL);
-  fprintf (stderr, "Using random seed=%ld\n", seed);
-  srand48 (seed);
+  tests_common_cmdline(&argc, &argv, 0);
   test_cado_poly_set ();
+  tests_common_clear();
   exit (EXIT_SUCCESS);
 }
