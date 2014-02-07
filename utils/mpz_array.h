@@ -170,20 +170,6 @@ void clear_uint32_array(uint32_array_t* array);
 #define reset_uint32_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
 
    /**
-    * \brief Resizes the allocated memory of an <tt>uint32_array_t</tt>.
-    *
-    * Resizes the storage available to an <tt>uint32_array_t</tt> to make room
-    * for \c alloced integers, while preserving its content. If \c alloced is
-    * less than the length of the array, then obviously some of its content
-    * will be lost.
-    *
-    * \param[in] alloced The new maximum length of the \c uint32_array_t to
-    *                    resize.
-    * \param[in] array A pointer to the \c uint32_array_t to resize.
-    */
-void resize_uint32_array(uint32_array_t* const array, uint32_t alloced);
-
-   /**
     * \brief Appends a \c uint32_t to an <tt>uint32_array_t</tt>.
     *
     * Appends the \c uint32_t integer \c to_append to <tt>array</tt>.
@@ -402,20 +388,6 @@ void clear_mpz_array(mpz_array_t* array);
     * \param[in] array A pointer to the <tt>mpz_array_t</tt> to clear.
     */
 #define reset_mpz_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
-
-   /**
-    * \brief Resizes the allocated memory of an <tt>mpz_array_t</tt>.
-    *
-    * Resizes the storage available to an <tt>mpz_array_t</tt> to make room
-    * for \c alloced integers, while preserving its content. If \c alloced is
-    * less than the length of the array, then obviously some of its content
-    * will be freed and lost.
-    *
-    * \param[in] alloced The new maximum length of the \c mpz_array_t to
-    *                    resize.
-    * \param[in] array A pointer to the \c mpz_array_t to resize.
-    */
-void resize_mpz_array(mpz_array_t* const array, uint32_t alloced);
 
    /**
     * \brief Swaps two <tt>mpz_array_t</tt>'s contents.

@@ -4,8 +4,7 @@
 #include <time.h>
 #include <assert.h>
 #include "mpz_poly.h"
-
-gmp_randstate_t state;
+#include "tests_common.h"
 
 /* put random coefficients of k bits in a polynomial (already initialized) */
 static void
@@ -138,16 +137,10 @@ test_polymodF_mul ()
 }
 
 int
-main (int argc, char *argv[])
+main (int argc, const char *argv[])
 {
-  long int seed;
-
-  seed = (argc >= 2) ? atoi (argv[1]) : time (NULL);
-  fprintf (stderr, "Using random seed=%ld\n", seed);
-  srand48 (seed);
-  gmp_randinit_default (state);
-  gmp_randseed_ui (state, seed);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED);
   test_polymodF_mul ();
-  gmp_randclear (state);
+  tests_common_clear();
   exit (EXIT_SUCCESS);
 }

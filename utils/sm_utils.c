@@ -28,15 +28,20 @@ compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
   }
 }
 
+/* Assume nSM > 0 */
 void
 print_sm (FILE *f, mpz_poly_t SM, int nSM)
 {
-  for(int j=0; j<nSM; j++)
+  if (0 > SM->deg)
+    fprintf(f, "0");
+  else
+    gmp_fprintf(f, "%Zu", SM->coeff[0]);
+  for(int j = 1; j < nSM; j++)
   {
     if (j > SM->deg)
-      fprintf(f, "0 ");
+      fprintf(f, " 0");
     else
-      gmp_fprintf(f, "%Zu ", SM->coeff[j]);
+      gmp_fprintf(f, " %Zu", SM->coeff[j]);
   }
   fprintf(f, "\n");
 }

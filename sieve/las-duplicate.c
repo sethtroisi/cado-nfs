@@ -293,8 +293,8 @@ sq_finds_relation(const unsigned long sq, const int sq_side,
   mpz_set_ui (BLPrat, si->conf->sides[RATIONAL_SIDE]->lim);
   mpz_mul_2exp (BLPrat, BLPrat, si->conf->sides[RATIONAL_SIDE]->lpb); /* fb bound * lp bound */
   for(int side = 0 ; side < 2 ; side++) {
-      f[side] = alloc_mpz_array (8);
-      m[side] = alloc_uint32_array (8);
+      f[side] = alloc_mpz_array (1);
+      m[side] = alloc_uint32_array (1);
   }
 
 #if 0

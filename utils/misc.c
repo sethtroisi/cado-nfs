@@ -194,7 +194,7 @@ char * derived_filename(const char * prefix, const char * what, const char * ext
 }
 
 
-void chomp(char *s) {
+static void chomp(char *s) {
     char *p;
     if (s && (p = strrchr(s, '\n')) != NULL)
         *p = '\0';
@@ -240,12 +240,6 @@ strlcat(char *dst, const char *src, const size_t size)
   return dst_len + src_len;
 }
 #endif
-
-void strlcat_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcat(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
 
 /* Return a NULL-terminated list of file names read from filename.
    Empty lines and comment lines (starting with '#') are skipped.

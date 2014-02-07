@@ -61,7 +61,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d,
                     global_E_pqueue->u[i], global_E_pqueue->v[i]);
-    optimize_aux (Fuv, guv, 0, 0, CIRCULAR);
+    optimize_aux (Fuv, guv, 0, 0);
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
     if (ave_MurphyE > best_E) {
@@ -220,7 +220,7 @@ ropt ( ropt_poly_t poly,
 
 
 /**
- * Called by polyselect2 or polyselect2l.
+ * Called by polyselect2l.
  */
 void
 ropt_polyselect ( mpz_t *f,

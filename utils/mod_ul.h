@@ -269,6 +269,8 @@ modul_clearmod (modulusul_t m MAYBE_UNUSED)
 
 
 /* Functions for residues */
+static inline void
+modul_neg (residueul_t, const residueul_t, const modulusul_t);
 
 /* Initialises a residue_t type and sets it to zero */
 MAYBE_UNUSED
@@ -347,6 +349,24 @@ modul_set_int_reduced (residueul_t r, const modintul_t s,
 {
   ASSERT (s[0] < m[0]);
   r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_set_uint64 (residueul_t r, const uint64_t s, const modulusul_t m)
+{
+  r[0] = s % m[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_set_int64 (residueul_t r, const int64_t s, const modulusul_t m)
+{
+  r[0] = llabs(s) % m[0];
+  if (s < 0)
+    modul_neg(r, r, m);
 }
 
 

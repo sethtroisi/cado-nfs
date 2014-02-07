@@ -79,7 +79,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   fprintf(stdout, "\n# Building relation-sets\n");
   for(uint64_t i = 0 ; i < *small_nrows ; i++)
   {
-    ret = fscanf(ix, "%ld", &len_relset); 
+    ret = fscanf(ix, "%" SCNu64 "", &len_relset);
     ASSERT_ALWAYS(ret == 1 && len_relset < MAX_LEN_RELSET);
 
     for (uint64_t k = 0 ; k < len_relset ; k++)

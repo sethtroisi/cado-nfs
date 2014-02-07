@@ -1,22 +1,15 @@
-# The SRCFILE parameter to this macro is the file name of the source file to
-# build. The LIBRARIES parameter is any libraries that should be linked in.
-# Any additional parameters are added to the command line of the test
-# executable that gets run.
-macro(build_and_run_test SRCFILE LIBRARIES)
-
-    # The name of the binary executable is equal to the name of the source
-    # file, minus the extension
-    get_filename_component (DSTFILE "${SRCFILE}" NAME_WE)
-
+macro(build_test DSTFILE SRCFILE LIBRARIES)
     # Add a build target for the test binary
     add_executable("${DSTFILE}" "${SRCFILE}")
     target_link_libraries("${DSTFILE}" ${LIBRARIES})
+endmacro(build_test)
 
+macro(run_test NAME DSTFILE)
     # This add_test() call causes the ctest program to be called on the
     # current source and binary directories. The ctest program then builds
     # the DSTFILE binary by calling cmake (which we suppress here) and make,
     # and then runs DSTFILE
-    add_test ("${DSTFILE}" "${CMAKE_CTEST_COMMAND}"
+    add_test ("${NAME}" "${CMAKE_CTEST_COMMAND}"
               # Specify the source and build directories for the Cmake/make
               # steps that gets executed by CTest (except we suppress the
               # CMake step in this CTest run, but we still have to specify the
@@ -67,10 +60,39 @@ macro(build_and_run_test SRCFILE LIBRARIES)
 
               # And finally the binary that should be run as the actual test
               --test-command "${DSTFILE}" ${ARGN})
+endmacro(run_test NAME DSTFILE)
+
+# The SRCFILE parameter to this macro is the file name of the source file to
+# build. The LIBRARIES parameter is any libraries that should be linked in.
+# Any additional parameters are added to the command line of the test
+# executable that gets run.
+macro(build_and_run_test SRCFILE LIBRARIES)
+    # The name of the binary executable is equal to the name of the source
+    # file, minus the extension
+    get_filename_component (DSTFILE "${SRCFILE}" NAME_WE)
+
+    build_test ("${DSTFILE}" "${SRCFILE}" "${LIBRARIES}")
+    # The name of the test here is the same as the name of the test
+    # executable file
+    run_test ("${DSTFILE}" "${DSTFILE}" ${ARGN})
 endmacro(build_and_run_test)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
-add_library (tests STATIC test_iter.c)
+add_library (tests STATIC test_iter.c tests_common.c)
+target_link_libraries (tests gmp)
+
+build_test(test_tests_common test_tests_common.c tests)
+run_test(tests_common_1 test_tests_common)
+run_test(tests_common_2 test_tests_common -seed)
+run_test(tests_common_3 test_tests_common -seed 1)
+set_tests_properties(tests_common_3 PROPERTIES PASS_REGULAR_EXPRESSION "Using random seed=1")
+run_test(tests_common_4 test_tests_common -seed a)
+run_test(tests_common_5 test_tests_common -seed "")
+set_tests_properties(tests_common_2 tests_common_4 tests_common_5 PROPERTIES WILL_FAIL 1)
+run_test(tests_common_6 test_tests_common -iter 10)
+set_tests_properties(tests_common_6 PROPERTIES PASS_REGULAR_EXPRESSION "Using 10 iterations")
 
 add_subdirectory (utils)
 add_subdirectory (sieve)
+add_subdirectory (polyselect)
+add_subdirectory (filter)

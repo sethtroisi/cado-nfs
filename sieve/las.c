@@ -2765,8 +2765,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     const unsigned long nr_lines = 1U << (LOG_BUCKET_REGION - si->conf->logI);
 
     for(int side = 0 ; side < 2 ; side++) {
-        f[side] = alloc_mpz_array (8);
-        m[side] = alloc_uint32_array (8);
+        f[side] = alloc_mpz_array (1);
+        m[side] = alloc_uint32_array (1);
 
         factor_list_init(&factors[side]);
         mpz_init (norm[side]);

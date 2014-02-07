@@ -105,7 +105,7 @@ test_sm (FILE * datafile)
       gmp_fscanf (datafile, " %Zi", tmp);
       mpz_poly_setcoeff(SM, i, tmp);
     }
-    
+
     char c = ' ';
     ret = fscanf(datafile, "%c", &c);
     ASSERT_ALWAYS (ret == 1 && c == '\n');
@@ -119,8 +119,6 @@ test_sm (FILE * datafile)
     mpz_poly_init (Dc, degF);
     if (len_relset == 1 && e[0] == 1 && nb_test_single_rel % FREQ == 0)
     {
-      fprintf (stderr, "AAA\n");
-      mpz_poly_fprintf(stderr, F);
       nb_test_single_rel++;
       mpz_poly_getcoeff_wrapper (tmp, 0, ab_polys[r[0]]);
       a = mpz_get_si (tmp);

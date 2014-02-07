@@ -121,9 +121,10 @@ print_warning_size ()
     a,b:h_1,h_2,...,h_k
    with a (signed) and b (unsigned) written in hexa and
    and i_1 ... i_k (hexadecimal) are the indices of the ideals
+
+    The function add a column of 1 if necessary, the added column is always
+    column 0.
 */
-//TODO take care of bad ideals and add a col of 1 if necessary (added column is
-//always 0)
 static inline void
 print_relation (FILE * file, earlyparsed_relation_srcptr rel)
 {
