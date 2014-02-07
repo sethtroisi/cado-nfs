@@ -60,7 +60,7 @@ macro(run_test NAME DSTFILE)
 
               # And finally the binary that should be run as the actual test
               --test-command "${DSTFILE}" ${ARGN})
-endmacro(run_test)
+endmacro(run_test NAME DSTFILE)
 
 # The SRCFILE parameter to this macro is the file name of the source file to
 # build. The LIBRARIES parameter is any libraries that should be linked in.
@@ -89,6 +89,8 @@ set_tests_properties(tests_common_3 PROPERTIES PASS_REGULAR_EXPRESSION "Using ra
 run_test(tests_common_4 test_tests_common -seed a)
 run_test(tests_common_5 test_tests_common -seed "")
 set_tests_properties(tests_common_2 tests_common_4 tests_common_5 PROPERTIES WILL_FAIL 1)
+run_test(tests_common_6 test_tests_common -iter 10)
+set_tests_properties(tests_common_6 PROPERTIES PASS_REGULAR_EXPRESSION "Using 10 iterations")
 
 add_subdirectory (utils)
 add_subdirectory (sieve)

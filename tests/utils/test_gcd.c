@@ -58,12 +58,12 @@ cmp_mpz_gcd_ui64(const uint64_t a, const uint64_t b, const uint64_t g)
 }
 
 void
-test_gcd_int64 (void)
+test_gcd_int64 (const unsigned long iter)
 {
   int64_t a, b, g;
-  int i;
+  unsigned long i;
   
-  for (i = 0; i < 200000; i++)
+  for (i = 0; i < iter; i++)
     {
       a = (i == 0 || i == 1) ? 0 : random_int64 ();
       b = (i == 0 || i == 2) ? 0 : random_int64 ();
@@ -73,12 +73,12 @@ test_gcd_int64 (void)
 }
 
 void
-test_gcd_uint64 (void)
+test_gcd_uint64 (const unsigned long iter)
 {
   uint64_t a, b, g;
-  int i;
+  unsigned long i;
   
-  for (i = 0; i < 200000; i++)
+  for (i = 0; i < iter; i++)
     {
       a = (i == 0 || i == 1) ? 0 : random_uint64 ();
       b = (i == 0 || i == 2) ? 0 : random_uint64 ();
@@ -88,13 +88,13 @@ test_gcd_uint64 (void)
 }
 
 void
-test_gcd_ul (void)
+test_gcd_ul (const unsigned long iter)
 {
   unsigned long a, b, g;
-  int i;
+  unsigned long i;
 
   assert (sizeof(unsigned long) <= sizeof(uint64_t));
-  for (i = 0; i < 200000; i++)
+  for (i = 0; i < iter; i++)
     {
       a = (unsigned long) (i == 0 || i == 1) ? 0 : random_uint64 ();
       b = (unsigned long) (i == 0 || i == 2) ? 0 : random_uint64 ();
@@ -112,10 +112,10 @@ test_bin_gcd_int64_safe_ab (const int64_t a, const int64_t b)
 }
 
 void
-test_bin_gcd_int64_safe (void)
+test_bin_gcd_int64_safe (const unsigned long iter)
 {
   test_iter_t iter_a, iter_b;
-  int i;
+  unsigned long i;
 
   test_iter_init(iter_a, 100, test_iter_int64_next);
   while (!test_iter_isdone(iter_a)) {
@@ -129,7 +129,7 @@ test_bin_gcd_int64_safe (void)
     }
   }
 
-  for (i = 0; i < 200000; i++)
+  for (i = 0; i < iter; i++)
     {
       int64_t a = (i == 0 || i == 1) ? 0 : random_int64 ();
       int64_t b = (i == 0 || i == 2) ? 0 : random_int64 ();
@@ -140,11 +140,13 @@ test_bin_gcd_int64_safe (void)
 int
 main (int argc, const char *argv[])
 {
-  tests_common_cmdline(&argc, &argv, PARSE_SEED);
-  test_gcd_int64 ();
-  test_gcd_uint64 ();
-  test_gcd_ul ();
-  test_bin_gcd_int64_safe ();
+  unsigned long iter = 200000;
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_get_iter(&iter);
+  test_gcd_int64 (iter);
+  test_gcd_uint64 (iter);
+  test_gcd_ul (iter);
+  test_bin_gcd_int64_safe (iter);
   tests_common_clear();
   exit (EXIT_SUCCESS);
 }

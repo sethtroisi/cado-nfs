@@ -65,11 +65,11 @@ int main(int argc, char **argv) {
                 mod_get_ul(o, pp), mod_getmod_ul (pp), k);
       } else {
         /* Slow but reliable test */
+        mod_pow_ul (pow, o, k, pp);
+        ASSERT_ALWAYS (mod_is1(pow, pp));
         for (unsigned long i = 1; i < k; i++) {
           mod_pow_ul (pow, o, i, pp);
           ASSERT_ALWAYS (!mod_is1(pow, pp));
-          mod_pow_ul (pow, o, k, pp);
-          ASSERT_ALWAYS (mod_is1(pow, pp));
         }
       }
     }
