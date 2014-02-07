@@ -720,6 +720,9 @@ tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
+tests/sieve/ecm/CMakeLists.txt
+tests/sieve/ecm/pm1test.inp
+tests/sieve/ecm/test_testbench.sh
 tests/polyselect/CMakeLists.txt
 tests/polyselect/polysel.sh
 tests/filter/CMakeLists.txt
