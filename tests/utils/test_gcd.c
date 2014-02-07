@@ -6,18 +6,7 @@
 #include "macros.h"
 #include "gmp_aux.h"
 #include "test_iter.h"
-
-int64_t
-random_int64 (void)
-{
-  return (mrand48 () << 32) + mrand48 ();
-}
-
-int64_t
-random_uint64 (void)
-{
-  return (lrand48 () << 33) + (lrand48 () << 2) + (lrand48 () & 3);
-}
+#include "tests_common.h"
 
 static void
 cmp_mpz_gcd_i64(const int64_t a, const int64_t b, const int64_t g)
@@ -149,13 +138,9 @@ test_bin_gcd_int64_safe (void)
 }
 
 int
-main (int argc, char *argv[])
+main (int argc, const char *argv[])
 {
-  long int seed;
-
-  seed = (argc >= 2) ? atoi (argv[1]) : time (NULL);
-  fprintf (stderr, "Using random seed=%ld\n", seed);
-  srand48 (seed);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED);
   test_gcd_int64 ();
   test_gcd_uint64 ();
   test_gcd_ul ();

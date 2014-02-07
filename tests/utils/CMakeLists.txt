@@ -1,6 +1,6 @@
 build_and_run_test(test_strlcat.c utils)
 build_and_run_test(test_strlcpy.c utils)
-build_and_run_test(test_double_poly.c utils)
+build_and_run_test(test_double_poly.c "utils;tests")
 build_and_run_test(test_gmp_aux.c utils)
 build_and_run_test(test_gcd.c "utils;tests")
 build_and_run_test(test_getprime.c utils)
