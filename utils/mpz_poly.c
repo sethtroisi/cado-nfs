@@ -53,23 +53,22 @@ mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
 static void
 mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 #define MAX_T 13
-  uint64_t M[MAX_T+1][MAX_T+1], g, h, Mtt;
+  uint64_t M[MAX_T+1][MAX_T+1], g, h;
   int i, j, k;
-  mpz_t f0[MAX_T+1];
+  int bug = t == 12 && sizeof (long) == 4;
 
   ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
                                  and similarly for all intermediate
                                  computations on M[i][j]. This avoids the
                                  use of mpz_t to store the M[i][j]. */
 
-  for (i = 0; i <= t; i++)
-    mpz_init_set (f0[i], f[i]);
-
   /* initialize M[i][j] = i^j */
   for (i = 0; i <= t; i++)
     for (j = 0; j <= t; j++)
-      M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
-  Mtt = M[t][t];
+      {
+        M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
+        if (bug) printf ("M[%d][%d]=%" PRIu64 "\n", i, j, M[i][j]);
+      }
 
   /* forward Gauss: zero the under-diagonal coefficients while going down */
   for (i = 1; i <= t; i++)
@@ -77,13 +76,21 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
       if (M[i][j] != 0)
       {
         g = gcd_uint64 (M[i][j], M[j][j]);
+        if (bug) printf ("i=%d j=%d g=%" PRIu64 "\n", i, j, g);
         h = M[i][j] / g;
+        if (bug) printf ("h=%" PRIu64 "\n", h);
         g = M[j][j] / g;
+        if (bug) printf ("g=%" PRIu64 "\n", g);
         /* f[i] <- g*f[i] - h*f[j] */
         mpz_mul_uint64 (f[i], f[i], g);
+        if (bug) gmp_printf ("f[i]=%Zd\n", f[i]);
         mpz_submul_uint64 (f[i], f[j], h);
+        if (bug) gmp_printf ("f[i]=%Zd\n", f[i]);
         for (k = j; k <= t; k++)
-          M[i][k] = g * M[i][k] - h * M[j][k];
+          {
+            M[i][k] = g * M[i][k] - h * M[j][k];
+            if (bug) printf ("M[%d][%d]=%" PRIu64 "\n", i, k, M[i][k]);
+          }
       }
 
   /* now zero upper-diagonal coefficients while going up */
@@ -92,20 +99,9 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
     for (j = i + 1; j <= t; j++)
       /* f[i] = f[i] - M[i][j] * f[j] */
       mpz_submul_ui (f[i], f[j], M[i][j]);
-    if (mpz_divisible_ui_p (f[i], M[i][i]) == 0)
-      {
-        fprintf (stderr, "Mtt=%" PRIu64 "\n", Mtt);
-        gmp_fprintf (stderr, "f[%d]=%Zd M[%d][%d]=%" PRIu64 "\n", i, f[i],
-                     i, i, M[i][i]);
-        for (i = 0; i <= t; i++)
-          gmp_fprintf (stderr, "f[%d]=%Zd\n", i, f0[i]);
-      }
     ASSERT (mpz_divisible_ui_p (f[i], M[i][i]));
     mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
-
-  for (i = 0; i <= t; i++)
-    mpz_clear (f0[i]);
 }
 
 /* Generic Toom-Cook implementation: stores in f[0..r+s] the coefficients
