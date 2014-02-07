@@ -86,10 +86,7 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
   {
     for (j = i + 1; j <= t; j++)
       /* f[i] = f[i] - M[i][j] * f[j] */
-      mpz_submul_ui (f[i], f[j], M[i][j]);
-    if (mpz_divisible_uint64_p (f[i], M[i][i]) == 0)
-      gmp_fprintf (stderr, "f[%d]=%Zd M[%d][%d]=%" PRIu64 "\n",
-                   i, f[i], i, i, M[i][i]);
+      mpz_submul_uint64 (f[i], f[j], M[i][j]);
     ASSERT (mpz_divisible_uint64_p (f[i], M[i][i]));
     mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
