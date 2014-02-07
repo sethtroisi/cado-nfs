@@ -106,8 +106,6 @@ test_sm (FILE * datafile)
       mpz_poly_setcoeff(SM, i, tmp);
     }
 
-    print_sm (stdout, SM, nbSM);
-    
     char c = ' ';
     ret = fscanf(datafile, "%c", &c);
     ASSERT_ALWAYS (ret == 1 && c == '\n');
