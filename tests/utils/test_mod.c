@@ -728,12 +728,10 @@ tests_mod_jacobi (int iter)
 
 int main(int argc, const char **argv)
 {
-  int iter = 10000;
+  unsigned long iter = 10000;
 
-  tests_common_cmdline(&argc, &argv, PARSE_SEED);
-
-  if (argc > 1)
-    iter = atoi (argv[1]);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_get_iter(&iter);
 
   printf ("Testing mod_intmod()\n");
   tests_mod_intmod (iter);
