@@ -2,6 +2,7 @@
 #define	CADO_TYPEDEFS_H_
 
 #include <inttypes.h>
+#include "ularith.h" /* NEEDED for LONG_BIT (32 or 64) */
 
 /* data type to store the (p,r) values */
 #ifndef __SIZEOF_P_R_VALUES__
@@ -21,8 +22,8 @@
 #error "__SIZEOF_INDEX__ should be smaller or equal to __SIZEOF_P_R_VALUES__"
 #endif
 
-#if __SIZEOF_P_R_VALUES__ > __SIZEOF_LONG__
-#error "__SIZEOF_P_R_VALUES__ cannot be greater than __SIZEOF_LONG__"
+#if (__SIZEOF_P_R_VALUES__ * 8) > LONG_BIT
+#error "__SIZEOF_P_R_VALUES__ cannot be greater than LONG_BIT / 8"
 #endif
 
 #if __SIZEOF_P_R_VALUES__ == 4
