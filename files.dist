@@ -719,6 +719,11 @@ tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
 tests/polyselect/CMakeLists.txt
 tests/polyselect/polysel.sh
+tests/filter/CMakeLists.txt
+tests/filter/testsm.sh
+tests/filter/testsm.p59.poly
+tests/filter/testsm.p59.purged.gz
+tests/filter/testsm.p59.index.gz
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c
