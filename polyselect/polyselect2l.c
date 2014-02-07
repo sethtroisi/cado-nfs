@@ -17,7 +17,7 @@
 #include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
-#include "implicit_mpz_poly.h"
+#include "mpz_poly.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
@@ -505,7 +505,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     } // raw and sopt only ?
 
     /* check that the algebraic polynomial has content 1, otherwise skip it */
-    mp_poly_content (t, f, d);
+    mpz_poly_content (t, F);
     if (mpz_cmp_ui (t, 1) != 0)
       goto skip;
 

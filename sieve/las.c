@@ -15,7 +15,6 @@
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
-#include "implicit_mpz_poly.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -187,8 +186,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     double tfb;
     /* TODO should these go into siever_config or not ? */
     int pow_lim[2] = {0,0};
-    param_list_parse_int(pl, "rpowlim", &pow_lim[RATIONAL_SIDE]);
-    param_list_parse_int(pl, "apowlim", &pow_lim[ALGEBRAIC_SIDE]);
+    param_list_parse_int(pl, "powlim0", &pow_lim[RATIONAL_SIDE]);
+    param_list_parse_int(pl, "powlim1", &pow_lim[ALGEBRAIC_SIDE]);
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
 
     if (fbcfilename != NULL) {
@@ -906,17 +905,17 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
     int seen = 1;
     seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
-    seen &= param_list_parse_ulong (pl, "rlim",    &(sc->sides[RATIONAL_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpbr",    &(sc->sides[RATIONAL_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfbr",    &(sc->sides[RATIONAL_SIDE]->mfb));
-    seen &= param_list_parse_double(pl, "rlambda", &(sc->sides[RATIONAL_SIDE]->lambda));
-    seen &= param_list_parse_ulong (pl, "alim",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
-    seen &= param_list_parse_int   (pl, "lpba",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
-    seen &= param_list_parse_int   (pl, "mfba",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
-    seen &= param_list_parse_double(pl, "alambda", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
+    seen &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
+    seen &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
+    seen &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
+    seen &= param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
+    seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
+    seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
+    seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
+    seen &= param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
     if (!seen) {
-        fprintf(stderr, "Error: options -I, -rlim, -lpbr, -mfbr, -rlambda,"
-                " -alim, -lpba, -mfba, -alambda are mandatory.\n");
+        fprintf(stderr, "Error: options -I, -lim0, -lpb0, -mfb0, -lambda0,"
+                " -lim1, -lpb1, -mfb1, -lambda1 are mandatory.\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
         exit(EXIT_FAILURE);
@@ -3479,7 +3478,13 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds_thread ();
-            init_rat_norms_bucket_region(S[side], i, si);
+            if (si->cpoly->rat->deg == 1)
+                init_rat_norms_bucket_region(S[side], i, si);
+            else {
+                // FIXME: Now that the second parameter of init_alg_norms
+                // is always ignored, we should remove it.
+                init_alg_norms_bucket_region(S[side], NULL, i, si);
+            }
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
@@ -3745,6 +3750,15 @@ print_stats (FILE *file, char* fmt, ...)
 
 static void declare_usage(param_list pl)
 {
+  param_list_usage_header(pl,
+  "In the names and in the descriptions of the parameters, below there are often\n"
+  "aliases corresponding to the convention that 0 is the rational side and 1\n"
+  "is the algebraic side. If the two sides are algebraic, then the word\n"
+  "'rational' just means the side number 0. Note also that for a rational\n"
+  "side, the factor base is recomputed on the fly (or cached), and there is\n"
+  "no need to provide a fb0 parameter.\n"
+  );
+
   param_list_decl_usage(pl, "poly", "polynomial file");
   param_list_decl_usage(pl, "fb0",   "factor base file on the rational side");
   param_list_decl_usage(pl, "fb1",   "(alias fb) factor base file on the algebraic side");
@@ -3759,16 +3773,16 @@ static void declare_usage(param_list pl)
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
   param_list_decl_usage(pl, "skew", "(alias S) skewness");
-  param_list_decl_usage(pl, "rlim", "rational factor base bound");
-  param_list_decl_usage(pl, "alim", "algebraic factor base bound");
-  param_list_decl_usage(pl, "lpbr", "set rational large prime bound to 2^lpbr");
-  param_list_decl_usage(pl, "lpba", "set algebraic large prime bound to 2^lpba");
-  param_list_decl_usage(pl, "mfbr", "set rational cofactor bound 2^mfbr");
-  param_list_decl_usage(pl, "mfba", "set algebraic cofactor bound 2^mfba");
-  param_list_decl_usage(pl, "rlambda", "rational lambda value");
-  param_list_decl_usage(pl, "alambda", "algebraic lambda value");
-  param_list_decl_usage(pl, "rpowlim", "limit on powers on rat side");
-  param_list_decl_usage(pl, "apowlim", "limit on powers on alg side");
+  param_list_decl_usage(pl, "lim0", "(alias rlim) rational factor base bound");
+  param_list_decl_usage(pl, "lim1", "(alias alim) algebraic factor base bound");
+  param_list_decl_usage(pl, "lpb0", "(alias lpbr) set rational large prime bound to 2^lpb0");
+  param_list_decl_usage(pl, "lpb1", "(alias lpba) set algebraic large prime bound to 2^lpb1");
+  param_list_decl_usage(pl, "mfb0", "(alias mfbr) set rational cofactor bound 2^mfb0");
+  param_list_decl_usage(pl, "mfb1", "(alias mfba) set algebraic cofactor bound 2^mfb1");
+  param_list_decl_usage(pl, "lambda0", "(alias rlambda) rational lambda value");
+  param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
+  param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
+  param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
 
@@ -3812,6 +3826,16 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-dup", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
     param_list_configure_alias(pl, "-fb1", "-fb");
+    param_list_configure_alias(pl, "-lim0", "-rlim");
+    param_list_configure_alias(pl, "-lim1", "-alim");
+    param_list_configure_alias(pl, "-lpb0", "-lpbr");
+    param_list_configure_alias(pl, "-lpb1", "-lpba");
+    param_list_configure_alias(pl, "-mfb0", "-mfbr");
+    param_list_configure_alias(pl, "-mfb1", "-mfba");
+    param_list_configure_alias(pl, "-lambda0", "-rlambda");
+    param_list_configure_alias(pl, "-lambda1", "-alambda");
+    param_list_configure_alias(pl, "-powlim0", "-rpowlim");
+    param_list_configure_alias(pl, "-powlim1", "-apowlim");
 
     argv++, argc--;
     for( ; argc ; ) {

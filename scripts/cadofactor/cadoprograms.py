@@ -771,7 +771,7 @@ class MagmaLinalg(Program):
     name = binary
     subdir = "scripts"
     def __init__(self,
-                 gorder: Parameter("ell"),
+                 ell: Parameter(),
                  nmaps: Parameter(),
                  sparsemat: Parameter(),
                  sm: Parameter(),
@@ -814,7 +814,7 @@ class SM(Program):
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
-                 gorder: Parameter(),
+                 ell: Parameter("gorder"),
                  smexp: Parameter(),
                  nmaps: Parameter("nsm") = None,
                  threads: Parameter("mt") = None,
@@ -826,7 +826,7 @@ class ReconstructLog(Program):
     name = binary
     subdir = "filter"
     def __init__(self, *,
-                 gorder: Parameter(),
+                 ell: Parameter("gorder"),
                  smexp: Parameter(),
                  ker: Parameter("log"),
                  dlog: Parameter("out"),

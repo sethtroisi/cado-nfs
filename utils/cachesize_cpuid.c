@@ -145,7 +145,8 @@ void init_cache_data(cache_data_t *data) {
   data->L3_size = -1; 		
 }
 
-void print_cache_data(cache_data_t *data) {
+static void
+print_cache_data(cache_data_t *data) {
   if (data->L1Data_size != -1) printf("L1Data_size (KB) = %d\n", data->L1Data_size);  	
   if (data->L1Data_assoc != -1) printf("L1Data_assoc = %d\n", data->L1Data_assoc);
   if (data->L1Data_line != -1) printf("L1Data_line (B) = %d\n", data->L1Data_line);  	
@@ -410,7 +411,7 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
 }
 
 
-int
+static int
 print_intel_cache (int verbose)
 {
   uint32_t res[4];
@@ -446,7 +447,7 @@ print_intel_cache (int verbose)
 }
 
 
-int print_amd_cache(int verbose) {
+static int print_amd_cache(int verbose) {
   uint32_t res[4];
   cpuid(res, 0x80000000);
   if (res[0] < 0x80000005) {

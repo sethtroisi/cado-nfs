@@ -687,6 +687,7 @@ utils/barrier.h
 utils/bit_vector.c
 utils/bit_vector.h
 utils/cachesize_cpuid.c
+utils/cachesize_cpuid.h
 utils/cachesize_guess.c
 utils/cado-endian.h
 utils/cado_poly.c
@@ -712,6 +713,7 @@ tests/utils/test_cado_poly.c
 tests/utils/test_getprime.c
 tests/utils/test_memusage.c
 tests/utils/test_mpz_poly.c
+tests/utils/test_cache.c
 tests/test_iter.c
 tests/test_iter.h
 tests/tests_common.h
@@ -769,8 +771,6 @@ utils/modul_poly.c
 utils/modul_poly.h
 utils/mpz_array.c
 utils/mpz_array.h
-utils/implicit_mpz_poly.c
-utils/implicit_mpz_poly.h
 utils/params.c
 utils/params.h
 utils/mpz_poly.c

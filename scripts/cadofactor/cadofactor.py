@@ -83,6 +83,11 @@ if __name__ == '__main__':
         else:
             print(" ".join(factors))
     else:
+        p = int(factors[0])
+        ell = int(factors[1])
+        log2 = int(factors[2])
+        log3 = int(factors[3])
+        print(p,ell,log2,log3)
         print("The logarithms of the factor base elements are in %s" %
                 tasksparams["workdir"] + os.sep + tasksparams["name"] +
                 ".reconstructlog.dlog")

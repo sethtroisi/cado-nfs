@@ -17,3 +17,4 @@ build_and_run_test(test_sm_utils.c utils ${CMAKE_CURRENT_SOURCE_DIR}/test_sm_uti
 build_and_run_test(test_mpz_poly.c "utils;tests")
 build_and_run_test(test_cado_poly.c "utils;tests")
 build_and_run_test(test_relation.c "utils;tests")
+build_and_run_test(test_cache.c "utils")

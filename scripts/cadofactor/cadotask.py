@@ -2815,7 +2815,7 @@ class LinAlgDLPTask(Task):
             p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
                                    ker=kerfile,
                                    sm=smfile,
-                                   gorder=gorder,
+                                   ell=gorder,
                                    nmaps=nmaps,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -3191,8 +3191,7 @@ class SMTask(Task):
         return (cadoprograms.SM,)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames,
-            {"gorder": None, "smexp": None})
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -3217,7 +3216,7 @@ class SMTask(Task):
                     self.make_std_paths(cadoprograms.SM.name)
             p = cadoprograms.SM(poly=polyfilename,
                     purged=purgedfilename, index=indexfilename,
-                    gorder=gorder, smexp=smexp,
+                    ell=gorder, smexp=smexp,
                     nmaps=nmaps,
                     out=smfilename,
                     stdout=str(stdoutpath),
@@ -3283,7 +3282,7 @@ class ReconstructLogTask(Task):
                     purged=purgedfilename,
                     renumber=renumberfilename,
                     dlog=dlogfilename,
-                    gorder=gorder, smexp=smexp,
+                    ell=gorder, smexp=smexp,
                     nmaps=nmaps,
                     partial=True,
                     ker=kerfilename,
@@ -3304,7 +3303,24 @@ class ReconstructLogTask(Task):
     
     def get_dlog_filename(self):
         return self.get_state_filename("dlog")
-
+    
+    def get_log2log3(self):
+        filename = self.get_state_filename("dlog").get_wdir_relative()
+        fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
+        log2 = None
+        log3 = None
+        myfile = open(fullfile, "rb")
+        data = myfile.read()
+        for line in data.splitlines():
+            match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+            if match:
+                log2 = match.group(2)
+            match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+            if match:
+                log3 = match.group(2)
+            if log2 != None and log3 != None:
+                return [ log2, log3 ]
+        raise Exception("Could not find log2 and log3 in %s" % filename)
 
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
     """ Starts HTTP server """
@@ -3859,7 +3875,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             return None
 
         if self.params["dlp"]:
-            return 1
+            return [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
         else:
             return self.sqrt.get_factors()
     

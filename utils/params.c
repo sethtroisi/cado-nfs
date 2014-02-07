@@ -19,6 +19,7 @@ void param_list_init(param_list pl)
     pl->ndocs = 0;
     pl->docs = (param_list_doc *) malloc(pl->ndocs_alloc *
             sizeof(param_list_doc));
+    pl->usage_hdr = NULL;
     pl->alloc = 16;
     pl->p = (parameter *) malloc(pl->alloc * sizeof(parameter));
     pl->consolidated = 1;
@@ -34,6 +35,7 @@ void param_list_init(param_list pl)
 
 void param_list_clear(param_list pl)
 {
+    free(pl->usage_hdr);
     for(int i = 0 ; i < pl->ndocs ; i++) {
         free(pl->docs[i]->key);
         free(pl->docs[i]->doc);
@@ -54,6 +56,12 @@ void param_list_clear(param_list pl)
     free(pl->switches);
     memset(pl, 0, sizeof(pl[0]));
 }
+
+void param_list_usage_header(param_list pl, const char * hdr)
+{
+    pl->usage_hdr = strdup(hdr);
+}
+
 
 void param_list_decl_usage(param_list pl, const char * key, const char * doc)
 {
@@ -83,6 +91,8 @@ void param_list_print_usage(param_list pl, const char * argv0, FILE *f)
 {
     if (argv0 != NULL)
         fprintf(f, "Usage: %s <parameters>\n", argv0);
+    if (pl->usage_hdr != NULL)
+        fputs(pl->usage_hdr, f);
     fprintf(f, "The available parameters are the following:\n");
     char whites[20];
     for (int i = 0; i < 20; ++i)
