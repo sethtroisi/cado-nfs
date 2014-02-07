@@ -59,16 +59,6 @@ char * search_real_exec_in_path(const char *executable, char *real_path);
  */
 int set_antebuffer_path (const char *executable_filename, const char *path_antebuffer);
 
-/* Set a static variable in gzip.c, used to tune the calls to the
- * antebuffer binary to use that buffer size. The argument to this
- * function if the log to base 2 of the desired buffer size. The default
- * is 24, hence 16MB.
- *
- * This is a configuration function which must be called at most once,
- * and in a monothreaded context.
- */
-void set_antebuffer_buffer_size(int bufsize);
-
 /* There are of course scores of existing basename() codes accessible,
  * starting with POSIX basename. However we fear posible inconsistencies
  * here, so we stick to a simple-and-stupid version, whose specification

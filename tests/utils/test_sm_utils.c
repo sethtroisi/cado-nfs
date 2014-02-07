@@ -105,6 +105,8 @@ test_sm (FILE * datafile)
       gmp_fscanf (datafile, " %Zi", tmp);
       mpz_poly_setcoeff(SM, i, tmp);
     }
+
+    print_sm (stdout, SM, nbSM);
     
     char c = ' ';
     ret = fscanf(datafile, "%c", &c);

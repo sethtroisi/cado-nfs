@@ -717,6 +717,8 @@ tests/test_iter.h
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
+tests/polyselect/CMakeLists.txt
+tests/polyselect/polysel.sh
 utils/gcd.c
 utils/gcd.h
 utils/getprime.c

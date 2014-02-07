@@ -349,6 +349,7 @@ modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulusul_t p)
     }
 }
 
+#if 0
 void
 modul_poly_out (FILE *fp, modul_poly_t f, modulusul_t p)
 {
@@ -363,6 +364,7 @@ modul_poly_out (FILE *fp, modul_poly_t f, modulusul_t p)
       fprintf (fp, ";\n");
     }
 }
+#endif
 
 /* returns f(x) mod p */
 void modul_poly_eval (residueul_t r, modul_poly_t f, residueul_t x, modulusul_t p)
@@ -634,22 +636,6 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
     free(pr);
     return n;
 }
-
-int
-modul_poly_roots_int64 (int64_t *r, mpz_t *f, int d, modulusul_t p)
-{
-    residueul_t *pr;
-    int i, n;
-
-    pr = malloc(d * sizeof(residueul_t));
-    n = modul_poly_roots(pr,f,d,p);
-    for(i = 0 ; i < n ; i++) {
-      r[i] = modul_getmod_ul (pr[i]);
-    }
-    free(pr);
-    return n;
-}
-
 
 int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
 {

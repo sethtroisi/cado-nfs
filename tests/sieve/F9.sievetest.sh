@@ -6,7 +6,9 @@ SRCDIR="$1"
 BINDIR="$2"
 SOURCE_TEST_DIR="`dirname "$0"`"
 
-REFERENCE_SHA1="5ecca4127483d68d1b3cab3c62c8f6ff1ab371af"
+REFERENCE_SHA1="4266839b0e56b317e423d40e1dac228e9fd5924e"
+# The Git revision that created the REFERENCE_SHA1 hash
+REFERENCE_REVISION="45213c6c07ea44e0c2e01b8b995df70d2e87443c"
 
 rlim=2300000
 alim=1200000
@@ -22,6 +24,6 @@ q0=1200000
 q1=1200200
 
 export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 q1
-"${SOURCE_TEST_DIR}"/sievetest.sh "${SRCDIR}/params/F9.poly" "${BINDIR}" "${REFERENCE_SHA1}" || exit 1
+"${SOURCE_TEST_DIR}"/sievetest.sh "${SRCDIR}/params/F9.poly" "${BINDIR}" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" || exit 1
 
 exit 0
