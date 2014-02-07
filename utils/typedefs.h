@@ -4,29 +4,41 @@
 #include <inttypes.h>
 
 /* data type to store the (p,r) values */
-#ifndef p_r_values_size
-#define p_r_values_size 32
+#ifndef __SIZEOF_P_R_VALUES__
+#define __SIZEOF_P_R_VALUES__ 4
+#elif __SIZEOF_P_R_VALUES__ != 4 && __SIZEOF_P_R_VALUES__ != 8
+#error "Defined constant __SIZEOF_P_R_VALUES__ should be 4 or 8"
 #endif
 
 /* data type to store the renumber table */
-#ifndef index_size
-#define index_size 32
+#ifndef __SIZEOF_INDEX__
+#define __SIZEOF_INDEX__ 4
+#elif __SIZEOF_INDEX__ != 4 && __SIZEOF_INDEX__ != 8
+#error "Defined constant __SIZEOF_INDEX__ should be 4 or 8"
 #endif
 
-#if p_r_values_size == 32
+#if __SIZEOF_INDEX__ > __SIZEOF_P_R_VALUES__
+#error "__SIZEOF_INDEX__ should be smaller or equal to __SIZEOF_P_R_VALUES__"
+#endif
+
+#if __SIZEOF_P_R_VALUES__ > __SIZEOF_LONG__
+#error "__SIZEOF_P_R_VALUES__ cannot be greater than __SIZEOF_LONG__"
+#endif
+
+#if __SIZEOF_P_R_VALUES__ == 4
 #define p_r_values_t uint32_t
 #define PRpr PRIx32
-#else
+#else /* __SIZEOF_P_R_VALUES__ == 8 */
 #define p_r_values_t uint64_t
 #define PRpr PRIx64
 #endif
 
-#if index_size == 32
+#if __SIZEOF_INDEX__ == 4
 #define index_t uint32_t
 #define PRid PRIu32
 #define PRxid PRIx32
 #define SCNid SCNu32
-#else
+#else /* __SIZEOF_INDEX__ == 8 */
 #define index_t uint64_t
 #define PRid PRIu64
 #define PRxid PRIx64
