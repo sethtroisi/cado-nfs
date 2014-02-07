@@ -17,7 +17,7 @@
 #include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
-#include "implicit_mpz_poly.h"
+#include "mpz_poly.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE

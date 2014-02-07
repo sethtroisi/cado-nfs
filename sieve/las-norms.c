@@ -18,7 +18,6 @@
 #include "las-debug.h"
 #include "las-norms.h"
 #include "utils.h"
-#include "implicit_mpz_poly.h"
 #include "portability.h"
 
 /* Input: i, double. i >= 0 needed!

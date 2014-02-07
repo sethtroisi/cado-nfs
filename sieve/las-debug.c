@@ -11,7 +11,6 @@
 #include "las-types.h"
 #include "las-debug.h"
 #include "las-coordinates.h"
-#include "implicit_mpz_poly.h"
 #include "portability.h"
 
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))

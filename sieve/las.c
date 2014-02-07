@@ -15,7 +15,6 @@
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
-#include "implicit_mpz_poly.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
