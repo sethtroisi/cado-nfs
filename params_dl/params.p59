@@ -10,8 +10,10 @@ name = p59
 
 ## The "dlp" flag tells the main script that we want to do dlog
 dlp = true
-## N is the prime modulo which we want dlogs.
+## N is the prime modulo which we want dlogs and gorder is the prime
+## factor of N-1 modulo which the computations are done.
 #  N = 53236943330228380237618624445646085674945074907141464418703
+#  gorder = 46188898894770668459
 
 ## Standard stuff; uncomment and edit according to your config.
 #slaves.nrclients=2
