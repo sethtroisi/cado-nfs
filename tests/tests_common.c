@@ -6,6 +6,7 @@
 #include <time.h>
 #include "tests_common.h"
 
+static int rng_state_inited = 0;
 gmp_randstate_t state;
 
 /* Return non-zero iff |d2| is in the interval |d1| * (1 +- err_margin) */
@@ -57,5 +58,16 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
     srand48 (seed);
     gmp_randinit_default (state);
     gmp_randseed_ui (state, seed);
+    rng_state_inited = 1;
+  }
+}
+
+/* Clean up, free any memory that may have been allocated */
+void
+tests_common_clear()
+{
+  if (rng_state_inited) {
+    gmp_randclear (state);
+    rng_state_inited = 0;
   }
 }

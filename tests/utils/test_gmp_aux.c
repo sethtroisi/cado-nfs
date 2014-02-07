@@ -316,6 +316,6 @@ main (int argc, const char *argv[])
   test_ulong_nextprime ();
   test_nbits ();
   test_mpz_ndiv_q ();
-  gmp_randclear (state);
+  tests_common_clear ();
   exit (EXIT_SUCCESS);
 }

@@ -6,6 +6,7 @@
 #include <gmp.h>
 #include <time.h>
 #include "portability.h"
+#include "tests_common.h"
 #include ARITHMETIC
 
 
@@ -725,24 +726,14 @@ tests_mod_jacobi (int iter)
 }
 
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
   int iter = 10000;
-  /* Seed RNG with nr of seconds since epoch */
-  int seed = time (NULL);
 
-  if (argc > 2 && argv[1][0] == '-' && argv[1][1] == 's') {
-    /* Use specified seed */
-    seed = atoi (argv[2]);
-    ASSERT_ALWAYS(seed >= 0);
-    argc -= 2;
-    argv += 2;
-  }
+  tests_common_cmdline(&argc, &argv, PARSE_SEED);
+
   if (argc > 1)
     iter = atoi (argv[1]);
-
-  printf ("Using seed = %d\n", seed);
-  srand ((unsigned int) seed);
 
   printf ("Testing mod_intmod()\n");
   tests_mod_intmod (iter);
@@ -770,5 +761,6 @@ int main(int argc, char **argv)
   tests_mod_inv (iter);
   printf ("Testing mod_jacobi()\n");
   tests_mod_jacobi (iter);
+  tests_common_clear();
   return 0;
 }

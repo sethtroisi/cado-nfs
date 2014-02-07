@@ -145,5 +145,6 @@ main (int argc, const char *argv[])
   test_gcd_uint64 ();
   test_gcd_ul ();
   test_bin_gcd_int64_safe ();
+  tests_common_clear();
   exit (EXIT_SUCCESS);
 }

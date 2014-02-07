@@ -38,5 +38,6 @@ main (int argc, const char *argv[])
 {
   tests_common_cmdline(&argc, &argv, 0);
   test_cado_poly_set ();
+  tests_common_clear();
   exit (EXIT_SUCCESS);
 }
