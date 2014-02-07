@@ -25,8 +25,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <float.h>  /* for DBL_MAX */
 #include <string.h>
 
-#define MAX_DEGREE 6
-
 #define DEFAULT_INCR 60 /* we want a positive integer with many divisors,
                            other values are 210, 2310, 30030, 510510, 9699690,
                            223092870 */

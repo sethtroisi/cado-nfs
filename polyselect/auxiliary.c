@@ -191,6 +191,34 @@ L2_lognorm_d (double_poly_srcptr p, double s)
       n = n * 0.00043828022511018320850; /* Pi/7168 */
       return 0.5 * log(n / (s * s * s * s * s * s));
     }
+  else if (d == 7)
+    {
+      double a7, a6, a5, a4, a3, a2, a1, a0;
+
+      a7 = a[7] * s * s * s * s * s * s * s;
+      a6 = a[6] * s * s * s * s * s * s;
+      a5 = a[5] * s * s * s * s * s;
+      a4 = a[4] * s * s * s * s;
+      a3 = a[3] * s * s * s;
+      a2 = a[2] * s * s;
+      a1 = a[1] * s;
+      a0 = a[0];
+      /* use circular integral (Sage code):
+         var('r,s,t,y')
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=7; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         (s^d*v).expand().collect(pi)
+      */
+      n = 429.0*(a0*a0+a7*a7) + 33.0*(a1*a1+a6*a6) + 66.0*(a0*a2+a5*a7)
+        + 9*(a2*a2+a5*a5) + 18*(a1*a3+a0*a4+a4*a6+a3*a7) + 5*(a3*a3+a4*a4)
+        + 10*(a2*a4+a1*a5+a3*a5+a0*a6+a2*a6+a1*a7);
+      n = n * 0.000191747598485705154; /* Pi/16384 */
+      return 0.5 * log(n / (s * s * s * s * s * s * s));
+    }
   else
     {
       fprintf (stderr, "L2norm not yet implemented for degree %u\n", d);
@@ -609,7 +637,7 @@ L2_skewness_derivative (mpz_poly_ptr f, int prec)
 {
   double_poly_t ff, df;
   double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
-    s1, s2, s3, s4, s5, s6;
+    s1, s2, s3, s4, s5, s6, s7;
   unsigned int d = f->deg;
 #ifdef DEBUG_SKEW
   int count = 0;
@@ -622,14 +650,87 @@ L2_skewness_derivative (mpz_poly_ptr f, int prec)
   double_poly_set_mpz_poly (ff, f);
   fd = ff->coeff;
   dfd = df->coeff;
-  if (d == 6)
+  if (d == 7)
     {
       /* Sage code:
+         var('r,s,t,y')
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=7; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (16384*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^8).expand().collect(s)
+         3003*a7^2*s^14 + 165*a6^2*s^12 + 330*a5*a7*s^12 + 27*a5^2*s^10
+         + 54*a4*a6*s^10 + 54*a3*a7*s^10 + 5*a4^2*s^8 + 10*a3*a5*s^8
+         + 10*a2*a6*s^8 + 10*a1*a7*s^8 - 5*a3^2*s^6 - 10*a2*a4*s^6
+         - 10*a1*a5*s^6 - 10*a0*a6*s^6 - 27*a2^2*s^4 - 54*a1*a3*s^4
+         - 54*a0*a4*s^4 - 165*a1^2*s^2 - 330*a0*a2*s^2 - 3003*a0^2
+      */
+      dfd[7] = 3003.0 * fd[7] * fd[7];
+      dfd[6] = 165.0 * (fd[6] * fd[6] + 2.0 * fd[5] * fd[7]);
+      dfd[5] = 27.0 * (fd[5]*fd[5] + 2.0*fd[4]*fd[6] + 2.0*fd[3]*fd[7]);
+      dfd[4] = 5.0*(fd[4]*fd[4]+2.0*fd[3]*fd[5]+2.0*fd[2]*fd[6]+2.0*fd[1]*fd[7]);
+      dfd[3] = 5.0*(fd[3]*fd[3]+2.0*fd[2]*fd[4]+2.0*fd[1]*fd[5]+2.0*fd[0]*fd[6]);
+      dfd[2] = 27.0 * (fd[2]*fd[2] + 2.0*fd[1]*fd[3] + 2.0*fd[0]*fd[4]);
+      dfd[1] = 165.0 * (fd[1]*fd[1] + 2.0*fd[0]*fd[2]);
+      dfd[0] = 3003 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          s6 = s3 * s3; /* s^12 */
+          s7 = s6 * s1; /* s^14 */
+          nc = dfd[7] * s7 + dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[3] * s3 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+          count ++;
+#endif
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;
+          s2 = s1 * s1;
+          s3 = s2 * s1;
+          s4 = s2 * s2;
+          s5 = s4 * s1;
+          s6 = s3 * s3;
+          s7 = s6 * s1;
+
+          nc = dfd[7] * s7 + dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[3] * s3 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+          count ++;
+#endif
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
+  else if (d == 6)
+    {
+      /* Sage code:
+         var('r,s,t,y')
          R.<x> = PolynomialRing(ZZ)
          S.<a> = InfinitePolynomialRing(R)
          d=6; f = SR(sum(a[i]*x^i for i in range(d+1)))
          F = expand(f(x=x/y)*y^d)
-         var('r,s,t')
          F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
          v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
          v = (7168*v/pi).expand()
@@ -3322,7 +3423,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
      and we want to force f[d-3] to be small. */
   if (d == 6)
   {
-    mpz_t k, r[3], f_copy[MAX_DEGREE], g0_copy, best_k;
+    mpz_t k, r[3], f_copy[MAXDEGREE], g0_copy, best_k;
     int i, j, n;
     long l, best_l = LONG_MAX;
     mpz_poly_t h;

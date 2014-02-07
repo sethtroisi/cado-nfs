@@ -220,7 +220,7 @@ ropt ( ropt_poly_t poly,
 
 
 /**
- * Called by polyselect2 or polyselect2l.
+ * Called by polyselect2l.
  */
 void
 ropt_polyselect ( mpz_t *f,

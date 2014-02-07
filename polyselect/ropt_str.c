@@ -345,8 +345,8 @@ ropt_poly_init ( ropt_poly_t poly )
   mpz_init (poly->m);
 
   /* fx, gx holds pre-computed values f(r), g(r) where 0 <= r < p. */
-  poly->f = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
-  poly->g = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
+  poly->f = (mpz_t*) malloc ((MAXDEGREE + 1) * sizeof (mpz_t));
+  poly->g = (mpz_t*) malloc ((MAXDEGREE + 1) * sizeof (mpz_t));
   (poly->fx) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
   (poly->gx) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
   (poly->numerator) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
@@ -359,7 +359,7 @@ ropt_poly_init ( ropt_poly_t poly )
     exit(1);
   }
 
-  for (i = 0; i <= MAX_DEGREE; i++) {
+  for (i = 0; i <= MAXDEGREE; i++) {
     mpz_init (poly->f[i]);
     mpz_init (poly->g[i]);
   }
@@ -418,7 +418,7 @@ ropt_poly_setup ( ropt_poly_t poly )
 
   mpz_init (t);
   /* degree */
-  for ( (poly->d) = MAX_DEGREE; 
+  for ( (poly->d) = MAXDEGREE; 
         (poly->d) > 0 && mpz_cmp_ui ((poly->f[poly->d]), 0) == 0;
         poly->d -- );
 
@@ -471,7 +471,7 @@ ropt_poly_free ( ropt_poly_t poly )
     mpz_clear(poly->numerator[i]);
   }
 
-  for (i = 0; i <= MAX_DEGREE; i++) {
+  for (i = 0; i <= MAXDEGREE; i++) {
     mpz_clear (poly->f[i]);
     mpz_clear (poly->g[i]);
   }
