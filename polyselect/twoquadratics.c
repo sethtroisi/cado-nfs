@@ -9,6 +9,9 @@
 #include "rho.h"
 #include "portability.h"
 
+double area=AREA;
+double bound_f=BOUND_F;
+double bound_g=BOUND_G;
 
 //print a floating point GMP number using scientific notation
 //strangely this function doesn't seem to be implemented in GMP
@@ -615,11 +618,15 @@ void expo(mpf_t x, mpf_t z) {
 void notation(mpf_t note, mpz_t a[3], mpz_t b[3], mpf_t norme) {
 
     mpf_t alpha_a;
-    double aa = get_alpha(a, 2, 2000);
+    mpz_poly_t ff;
+    ff->deg = 2;
+    ff->coeff = a;
+    double aa = get_alpha(ff, 2000);
     mpf_init_set_d(alpha_a, aa);
 
     mpf_t alpha_b;
-    double bb = get_alpha(b, 2, 2000);
+    ff->coeff = b;
+    double bb = get_alpha(ff, 2000);
     mpf_init_set_d(alpha_b, bb);
 
     mpf_t X;
@@ -766,12 +773,16 @@ twoquadratics (mpz_t N, unsigned long int k)
     gmp_printf ("a = %Zd + %Zd * X + %Zd * X^2 \n", a0[0], a0[1], a0[2]);
     gmp_printf ("b = %Zd + %Zd * X + %Zd * X^2 \n\n", b0[0], b0[1], b0[2]);
 
+    mpz_poly_t ff;
+    ff->deg=2;
     printf ("note = ");
     printscientific(note0);
     gmp_printf ("\ns0 = %Ff\n", s0);
-    double aaa = get_alpha(a0, 2, 2000);
+    ff->coeff=a0;
+    double aaa = get_alpha(ff, 2000);
     printf ("alpha(a) = %f\n", aaa);
-    double bbb = get_alpha(b0, 2, 2000);
+    ff->coeff=b0;
+    double bbb = get_alpha(ff, 2000);
     printf ("alpha(b) = %f\n", bbb);
     normeL2(s0, no, a0, b0);
     printf ("norme = ");

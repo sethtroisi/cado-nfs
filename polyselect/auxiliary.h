@@ -73,8 +73,6 @@ void print_cadopoly_fg (FILE*, mpz_t*, int, mpz_t*, mpz_t);
 double print_cadopoly (FILE*, cado_poly);
 void print_cadopoly_extra (FILE*, cado_poly, int, char**, double);
 double print_poly_fg (mpz_poly_ptr, mpz_t*, mpz_t, int);
-void print_nonlinear_poly_info ( mpz_t*, mpz_t*, unsigned int,
-                                 unsigned int, int);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, mpz_t, mpz_t, mpz_t, unsigned int);

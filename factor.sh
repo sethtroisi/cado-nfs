@@ -247,11 +247,6 @@ rc=$?
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
-    if $dlp ; then
-        # print ell, logs of 2 and 3
-        grep ell $t/*magma-nmbrthry-wrapper.sh.stdout*
-        awk '/ 2 0 rat/ {print "log2 " $NF} / 3 0 rat/ {print "log3 "$NF}' $t/*.reconstructlog.dlog
-    fi
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi
