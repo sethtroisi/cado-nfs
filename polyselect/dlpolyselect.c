@@ -28,6 +28,9 @@ const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 #define swap(x, y) { long _tmp = (x); (x) = (y); (y) = _tmp; }
 #define mpz_swap_n(x, y) { mpz_t *_tmp = (x); (x) = (y); (y) = _tmp; }
 
+double area=AREA;
+double bound_f=BOUND_F;
+double bound_g=BOUND_G;
 
 /* This uses Paul Zimmermann implementaion. I kept the header here:
 
@@ -617,7 +620,7 @@ polygen_JL_f ( mpz_t n,
             continue;
 
         /* find roots */
-        nr = poly_roots_mpz (rf, f, d, n);
+        nr = mpz_poly_roots_mpz (rf, f, d, n);
         if (nr > 0)
             break;
     }
