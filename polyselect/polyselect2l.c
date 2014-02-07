@@ -176,7 +176,7 @@ print_poly_info ( mpz_t *f,
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
 
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
   if (d == 6) {
     mpz_set_d (k2, skew);
@@ -185,8 +185,8 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k1, 1);
     mpz_mul_ui (k0, k1, (unsigned long) skew);
     rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew2, DEFAULT_L2_METHOD);
+    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew2);
     exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
     mpz_neg (k2, k2);
     mpz_neg (k1, k1);
@@ -200,8 +200,8 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k1, 1);
     mpz_mul_ui (k0, k1, (unsigned long) skew);
     rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew2, DEFAULT_L2_METHOD);
+    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew2);
     exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
     mpz_neg (k1, k1);
     mpz_neg (k0, k0);
@@ -210,8 +210,8 @@ print_poly_info ( mpz_t *f,
   }
   
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
 
@@ -394,21 +394,21 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_set (gold[0], g[0]);
 
   /* old lognorm */
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
 
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
     mpz_set (adz, f[3]);
     mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c3 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c3 = L2_lognorm (F, skewtmp);
     mpz_set (f[3], adz);
     mpz_set (adz, f[4]);
     mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c4 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c4 = L2_lognorm (F, skewtmp);
     mpz_set (f[4], adz);
   }
 
@@ -447,8 +447,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     opt_found ++;
     optimize (F, g, 0, 1);
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
     if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
@@ -482,16 +482,16 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       else {
         unsigned long alim = 2000;
         long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
         mpz_neg (g[0], m);
         /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0, CIRCULAR);
+        optimize_aux (F, g, 0, 0);
       }
 #else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0, CIRCULAR);
+      optimize_aux (F, g, 0, 0);
 #endif
 
 #ifdef MAX_THREADS
@@ -509,8 +509,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     if (mpz_cmp_ui (t, 1) != 0)
       goto skip;
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
@@ -780,21 +780,21 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_set (gold[0], g[0]);
 
   /* old lognorm */
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
 
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
     mpz_set (tmp, f[3]);
     mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c3 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c3 = L2_lognorm (F, skewtmp);
     mpz_set (f[3], tmp);
     mpz_set (tmp, f[4]);
     mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c4 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c4 = L2_lognorm (F, skewtmp);
     mpz_set (f[4], tmp);
   }
 
@@ -834,8 +834,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     opt_found ++;
     optimize (F, g, 0, 1);
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
     if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
@@ -869,16 +869,16 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       else {
         unsigned long alim = 2000;
         long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
         mpz_neg (g[0], m);
         /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0, CIRCULAR);
+        optimize_aux (F, g, 0, 0);
       }
 #else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0, CIRCULAR);
+      optimize_aux (F, g, 0, 0);
 #endif
 
 #ifdef MAX_THREADS
@@ -891,8 +891,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     } // raw and sopt only ?
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);

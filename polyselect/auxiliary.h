@@ -31,11 +31,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
                            other values are 210, 2310, 30030, 510510, 9699690,
                            223092870 */
 
-/* differents methods for the L2 norm */
-#define RECTANGULAR 0
-#define CIRCULAR 1
-#define DEFAULT_L2_METHOD CIRCULAR
-
 #define SKEWNESS_DEFAULT_PREC 10
 
 /* prime bounds for the computation of alpha */
@@ -65,11 +60,11 @@ extern double bound_f, bound_g, area;
 extern "C" {
 #endif
 
-double L2_lognorm (mpz_poly_ptr, double, int);
-double L2_skewness (mpz_poly_ptr, int, int);
+double L2_lognorm (mpz_poly_ptr, double);
+double L2_skewness (mpz_poly_ptr, int);
 double L2_skewness_old (mpz_poly_ptr, int, int);
-double L2_skewness_Newton (mpz_poly_ptr, int, int);
-double L2_skewness_derivative (mpz_poly_ptr, int, int);
+double L2_skewness_Newton (mpz_poly_ptr, int);
+double L2_skewness_derivative (mpz_poly_ptr, int);
 
 /* alpha */
 double special_val0 (mpz_poly_ptr, unsigned long);
@@ -89,12 +84,12 @@ void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, mpz_t, mpz_t, mpz_t, unsigned int);
 double rotate (mpz_poly_ptr, unsigned long, mpz_t, mpz_t, long*, long*, int,
-               int, int);
-long translate (mpz_poly_ptr, mpz_t*, mpz_t, mpz_t, int, int);
+               int);
+long translate (mpz_poly_ptr, mpz_t*, mpz_t, mpz_t, int);
 void optimize (mpz_poly_ptr, mpz_t*, int, int);
-void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation, int method);
-void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int method);
-void rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
+void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation);
+void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose);
+void rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose);
 void do_translate_z (mpz_poly_ptr f, mpz_t *g, mpz_t k);
 void content_poly (mpz_t g, mpz_poly_ptr);
 void eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);

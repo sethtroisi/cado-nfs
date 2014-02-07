@@ -226,9 +226,9 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
 void
 double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q)
 {
-  unsigned int d = p->deg, i;
+  unsigned int d = q->deg, i;
 
-  ASSERT_ALWAYS (d == (unsigned int) q->deg);
   for (i = 0; i <= d; i++)
     p->coeff[i] = mpz_get_d (q->coeff[i]);
+  p->deg = d;
 }

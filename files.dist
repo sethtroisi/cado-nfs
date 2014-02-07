@@ -716,6 +716,7 @@ tests/test_iter.c
 tests/test_iter.h
 tests/tests_common.h
 tests/tests_common.c
+tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
