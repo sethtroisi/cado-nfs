@@ -60,9 +60,6 @@ extern "C" {
 
 double L2_lognorm (mpz_poly_ptr, double);
 double L2_skewness (mpz_poly_ptr, int);
-double L2_skewness_old (mpz_poly_ptr, int, int);
-double L2_skewness_Newton (mpz_poly_ptr, int);
-double L2_skewness_derivative (mpz_poly_ptr, int);
 
 /* alpha */
 double special_val0 (mpz_poly_ptr, unsigned long);
@@ -83,7 +80,6 @@ long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, mpz_t, mpz_t, mpz_t, unsigned int);
 double rotate (mpz_poly_ptr, unsigned long, mpz_t, mpz_t, long*, long*, int,
                int);
-long translate (mpz_poly_ptr, mpz_t*, mpz_t, mpz_t, int);
 void optimize (mpz_poly_ptr, mpz_t*, int, int);
 void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation);
 void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose);
@@ -96,29 +92,6 @@ void eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
 #ifdef __cplusplus
 }
 #endif
-
-/********************* data structures for first phase ***********************/
-
-typedef struct {
-  /* the linear polynomial is b*x-m, with lognorm logmu */
-  mpz_t b;
-  mpz_t m;
-  double logmu;
-} m_logmu_t;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-m_logmu_t* m_logmu_init (unsigned long);
-void m_logmu_clear (m_logmu_t*, unsigned long);
-int m_logmu_insert (m_logmu_t*, unsigned long, unsigned long*, mpz_t, mpz_t,
-                    double, char*);
-
-#ifdef __cplusplus
-}
-#endif
-
 
 #endif	/* POLYSELECT_AUXILIARY_H_ */
 
