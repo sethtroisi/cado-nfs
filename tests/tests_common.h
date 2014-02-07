@@ -2,8 +2,11 @@
 #define TESTS_COMMON_H
 
 #include <stdint.h>
+#include <gmp.h>
 
 #define PARSE_SEED 1
+
+extern gmp_randstate_t state;
 
 int cmp_double(double, double, double);
 int64_t random_int64 ();

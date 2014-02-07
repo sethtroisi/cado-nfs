@@ -3,8 +3,7 @@
 #include <time.h>
 #include "gmp_aux.h"
 #include "macros.h"
-
-gmp_randstate_t state;
+#include "tests_common.h"
 
 static void
 test_mpz_set_uint64 ()
@@ -303,15 +302,9 @@ test_mpz_ndiv_q ()
 }
 
 int
-main (int argc, char *argv[])
+main (int argc, const char *argv[])
 {
-  long int seed;
-
-  seed = (argc >= 2) ? atoi (argv[1]) : time (NULL);
-  fprintf (stderr, "Using random seed=%ld\n", seed);
-  srand48 (seed);
-  gmp_randinit_default (state);
-  gmp_randseed_ui (state, seed);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED);
   test_mpz_set_uint64 ();
   test_mpz_set_int64 ();
   test_mpz_get_uint64 ();

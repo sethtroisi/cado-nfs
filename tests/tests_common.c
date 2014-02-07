@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 #include "tests_common.h"
+
+gmp_randstate_t state;
 
 /* Return non-zero iff |d2| is in the interval |d1| * (1 +- err_margin) */
 int
@@ -27,6 +30,7 @@ random_uint64 ()
 void
 tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
 {
+  long seed = time (NULL);
   while (1) {
     if ((flags & PARSE_SEED) != 0 && (*argc) > 1 && 
         strcmp("-seed", (*argv)[1]) == 0) {
@@ -35,18 +39,23 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
         exit(EXIT_FAILURE);
       }
       char * endptr;
-      long seed = strtol((*argv)[2], &endptr, 10);
+      seed = strtol((*argv)[2], &endptr, 10);
       if ((*argv)[2][0] == '\0' || endptr[0] != '\0') {
         fprintf (stderr, "Invalid value \"%s\" given for -seed parameter\n",
                  (*argv)[2]);
         exit(EXIT_FAILURE);
       }
-      printf ("Using random seed=%ld\n", seed);
-      srand48 (seed);
       *argc -= 2;
       *argv += 2;
     } else {
       break;
     }
+
+  }
+  if ((flags & PARSE_SEED) != 0) {
+    printf ("Using random seed=%ld\n", seed);
+    srand48 (seed);
+    gmp_randinit_default (state);
+    gmp_randseed_ui (state, seed);
   }
 }
