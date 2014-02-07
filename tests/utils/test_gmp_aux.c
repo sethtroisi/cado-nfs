@@ -84,14 +84,14 @@ test_mpz_set_int64 ()
 }
 
 void
-test_mpz_get_uint64 ()
+test_mpz_get_uint64 (const unsigned long iter)
 {
   uint64_t q, r;
   mpz_t z;
-  int i;
+  unsigned long i;
 
   mpz_init (z);
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       q = i & 3; /* two bits */
       q = (q << 31) + lrand48 (); /* 33 bits */
@@ -105,14 +105,14 @@ test_mpz_get_uint64 ()
 }
 
 void
-test_mpz_get_int64 ()
+test_mpz_get_int64 (const unsigned long iter)
 {
   int64_t q, r;
   mpz_t z;
-  int i;
+  unsigned long i;
 
   mpz_init (z);
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       q = mrand48 (); /* [-2^31, 2^31] */
       q = (q << 32) + mrand48 (); /* 63 bits */
@@ -151,17 +151,17 @@ test_mpz_fits_int64_p ()
 }
 
 void
-test_mpz_mul_uint64 ()
+test_mpz_mul_uint64 (const unsigned long iter)
 {
   mpz_t a, b, aa, cc;
   uint64_t c;
-  int i;
+  unsigned long i;
 
   mpz_init (a);
   mpz_init (b);
   mpz_init (aa);
   mpz_init (cc);
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       mpz_urandomb (b, state, 128);
       c = i & 3;
@@ -180,17 +180,17 @@ test_mpz_mul_uint64 ()
 }
 
 void
-test_mpz_mul_int64 ()
+test_mpz_mul_int64 (const unsigned long iter)
 {
   mpz_t a, b, aa, cc;
   int64_t c;
-  int i;
+  unsigned long i;
 
   mpz_init (a);
   mpz_init (b);
   mpz_init (aa);
   mpz_init (cc);
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       mpz_urandomb (b, state, 128);
       c = mrand48 ();
@@ -208,17 +208,17 @@ test_mpz_mul_int64 ()
 }
 
 void
-test_mpz_addmul_int64 ()
+test_mpz_addmul_int64 (const unsigned long iter)
 {
   mpz_t a, b, aa, cc;
   int64_t c;
-  int i;
+  unsigned long i;
 
   mpz_init (a);
   mpz_init (b);
   mpz_init (aa);
   mpz_init (cc);
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       mpz_urandomb (b, state, 128);
       c = mrand48 ();
@@ -237,13 +237,13 @@ test_mpz_addmul_int64 ()
 
 /* this function tests both ulong_nextprime and ulong_isprime */
 void
-test_ulong_nextprime ()
+test_ulong_nextprime (const unsigned long iter)
 {
   unsigned long q, r, s;
-  int i;
+  unsigned long i;
 
   q = lrand48 () % 300000000;
-  for (i = 0; i < 10000 && q < 300000000; i++)
+  for (i = 0; i < iter && q < 300000000; i++)
     {
       for (s = q + 1; s != 0 && ulong_isprime (s) == 0; s++);
       r = ulong_nextprime (q);
@@ -272,17 +272,17 @@ test_nbits ()
 }
 
 void
-test_mpz_ndiv_q ()
+test_mpz_ndiv_q (const unsigned long iter)
 {
   mpz_t q, n, d, t;
-  int i;
+  unsigned long i;
 
   mpz_init (q);
   mpz_init (n);
   mpz_init (d);
   mpz_init (t);
 
-  for (i = 0; i < 1000000; i++)
+  for (i = 0; i < iter; i++)
     {
       mpz_urandomb (n, state, 128);
       do mpz_urandomb (d, state, 64); while (mpz_cmp_ui (d, 0) == 0);
@@ -304,18 +304,20 @@ test_mpz_ndiv_q ()
 int
 main (int argc, const char *argv[])
 {
-  tests_common_cmdline(&argc, &argv, PARSE_SEED);
+  unsigned long iter = 1000000;
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_get_iter(&iter);
   test_mpz_set_uint64 ();
   test_mpz_set_int64 ();
-  test_mpz_get_uint64 ();
-  test_mpz_get_int64 ();
+  test_mpz_get_uint64 (iter);
+  test_mpz_get_int64 (iter);
   test_mpz_fits_int64_p ();
-  test_mpz_mul_uint64 ();
-  test_mpz_mul_int64 ();
-  test_mpz_addmul_int64 ();
-  test_ulong_nextprime ();
-  test_nbits ();
-  test_mpz_ndiv_q ();
+  test_mpz_mul_uint64 (iter);
+  test_mpz_mul_int64 (iter);
+  test_mpz_addmul_int64 (iter);
+  test_ulong_nextprime (iter / 10);
+  test_nbits (iter);
+  test_mpz_ndiv_q (iter);
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
