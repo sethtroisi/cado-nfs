@@ -5,6 +5,7 @@
 #include <math.h>
 #include "macros.h"
 #include "double_poly.h"
+#include "tests_common.h"
 
 
 /* Parse a space-separated string as polynomial coefficients.
@@ -46,11 +47,6 @@ parse_poly(double_poly_ptr poly, const char *str)
     double_poly_init (poly, n - 1);
   }
   parse_poly_str(poly, str);
-}
-
-int cmp_double(const double d1, const double d2, const double err_margin)
-{
-  return fabs(d1) * (1. - err_margin) <= fabs(d2) && fabs(d2) <= fabs(d1) * (1. + err_margin);
 }
 
 void 

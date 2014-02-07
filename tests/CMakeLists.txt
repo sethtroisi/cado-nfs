@@ -70,7 +70,19 @@ macro(build_and_run_test SRCFILE LIBRARIES)
 endmacro(build_and_run_test)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
-add_library (tests STATIC test_iter.c)
+add_library (tests STATIC test_iter.c tests_common.c)
+
+add_executable(test_tests_common test_tests_common.c)
+target_link_libraries (test_tests_common tests)
+
+
+add_test(tests_common_1 test_tests_common)
+add_test(tests_common_2 test_tests_common -seed)
+add_test(tests_common_3 test_tests_common -seed 1)
+set_tests_properties(tests_common_3 PROPERTIES PASS_REGULAR_EXPRESSION "Using random seed=1")
+add_test(tests_common_4 test_tests_common -seed a)
+add_test(tests_common_5 test_tests_common -seed "")
+set_tests_properties(tests_common_2 tests_common_4 tests_common_5 PROPERTIES WILL_FAIL 1)
 
 add_subdirectory (utils)
 add_subdirectory (sieve)
