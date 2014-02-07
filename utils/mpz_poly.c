@@ -55,7 +55,6 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 #define MAX_T 13
   uint64_t M[MAX_T+1][MAX_T+1], g, h;
   int i, j, k;
-  int bug = t == 12 && sizeof (long) == 4;
 
   ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
                                  and similarly for all intermediate
@@ -65,10 +64,7 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
   /* initialize M[i][j] = i^j */
   for (i = 0; i <= t; i++)
     for (j = 0; j <= t; j++)
-      {
-        M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
-        if (bug) printf ("M[%d][%d]=%" PRIu64 "\n", i, j, M[i][j]);
-      }
+      M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
 
   /* forward Gauss: zero the under-diagonal coefficients while going down */
   for (i = 1; i <= t; i++)
@@ -76,21 +72,13 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
       if (M[i][j] != 0)
       {
         g = gcd_uint64 (M[i][j], M[j][j]);
-        if (bug) printf ("i=%d j=%d g=%" PRIu64 "\n", i, j, g);
         h = M[i][j] / g;
-        if (bug) printf ("h=%" PRIu64 "\n", h);
         g = M[j][j] / g;
-        if (bug) printf ("g=%" PRIu64 "\n", g);
         /* f[i] <- g*f[i] - h*f[j] */
         mpz_mul_uint64 (f[i], f[i], g);
-        if (bug) gmp_printf ("f[i]=%Zd\n", f[i]);
         mpz_submul_uint64 (f[i], f[j], h);
-        if (bug) gmp_printf ("f[i]=%Zd\n", f[i]);
         for (k = j; k <= t; k++)
-          {
-            M[i][k] = g * M[i][k] - h * M[j][k];
-            if (bug) printf ("M[%d][%d]=%" PRIu64 "\n", i, k, M[i][k]);
-          }
+          M[i][k] = g * M[i][k] - h * M[j][k];
       }
 
   /* now zero upper-diagonal coefficients while going up */
@@ -99,7 +87,7 @@ mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
     for (j = i + 1; j <= t; j++)
       /* f[i] = f[i] - M[i][j] * f[j] */
       mpz_submul_ui (f[i], f[j], M[i][j]);
-    ASSERT (mpz_divisible_ui_p (f[i], M[i][i]));
+    ASSERT (mpz_divisible_uint64_p (f[i], M[i][i]));
     mpz_divexact_uint64 (f[i], f[i], M[i][i]);
   }
 }

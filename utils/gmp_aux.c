@@ -115,6 +115,24 @@ mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
     }
 }
 
+int
+mpz_divisible_uint64_p (mpz_t a, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    return mpz_divisible_ui_p (a, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      int ret;
+
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      ret = mpz_divisible_p (a, d);
+      mpz_clear (d);
+      return ret;
+    }
+}
+
 void
 mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
