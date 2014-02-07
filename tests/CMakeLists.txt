@@ -2,7 +2,7 @@ macro(build_test DSTFILE SRCFILE LIBRARIES)
     # Add a build target for the test binary
     add_executable("${DSTFILE}" "${SRCFILE}")
     target_link_libraries("${DSTFILE}" ${LIBRARIES})
-endmacro(build_and_run_test)
+endmacro(build_test)
 
 macro(run_test NAME DSTFILE)
     # This add_test() call causes the ctest program to be called on the
