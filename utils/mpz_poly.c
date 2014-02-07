@@ -49,7 +49,11 @@ mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
 }
 
 /* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
-   put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_T. */
+   put in f[0]...f[t] the coefficients of f. Assumes t <= MAX_T.
+
+   In the square root, with an algebraic polynomial of degree d,
+   we have to multiply polynomials of degree d-1, thus we have t=2(d-1).
+*/
 static void
 mpz_poly_mul_tc_interpolate (mpz_t *f, int t) {
 #define MAX_T 13
@@ -117,24 +121,24 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 
   /* first store g(i)*h(i) in f[i] for 0 <= i <= t */
   for (i = 0; i <= t; i++)
-  {
-    /* f[i] <- g(i) */
-    mpz_set (f[i], g[r]);
-    for (j = r - 1; j >= 0; j--)
     {
-      mpz_mul_ui (f[i], f[i], i);
-      mpz_add (f[i], f[i], g[j]);
+      /* f[i] <- g(i) */
+      mpz_set (f[i], g[r]);
+      for (j = r - 1; j >= 0; j--)
+        {
+          mpz_mul_ui (f[i], f[i], i);
+          mpz_add (f[i], f[i], g[j]);
+        }
+      /* tmp <- h(i) */
+      mpz_set (tmp, h[s]);
+      for (j = s - 1; j >= 0; j--)
+        {
+          mpz_mul_ui (tmp, tmp, i);
+          mpz_add (tmp, tmp, h[j]);
+        }
+      /* f[i] <- g(i)*h(i) */
+      mpz_mul (f[i], f[i], tmp);
     }
-    /* tmp <- h(i) */
-    mpz_set (tmp, h[s]);
-    for (j = s - 1; j >= 0; j--)
-    {
-      mpz_mul_ui (tmp, tmp, i);
-      mpz_add (tmp, tmp, h[j]);
-    }
-    /* f[i] <- g(i)*h(i) */
-    mpz_mul (f[i], f[i], tmp);
-  }
 
   mpz_poly_mul_tc_interpolate (f, t);
 
@@ -1714,4 +1718,18 @@ void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i
     }
   mpz_abs (v, v); /* avoids problems with negative norms */
   mpz_clear (jpow);
+}
+
+/* put in c the content of f */
+void
+mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
+{
+  int i;
+  mpz_t *f = F->coeff;
+  int d = F->deg;
+
+  mpz_set (c, f[0]);
+  for (i = 1; i <= d; i++)
+    mpz_gcd (c, c, f[i]);
+  mpz_abs (c, c);
 }

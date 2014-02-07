@@ -771,8 +771,6 @@ utils/modul_poly.c
 utils/modul_poly.h
 utils/mpz_array.c
 utils/mpz_array.h
-utils/implicit_mpz_poly.c
-utils/implicit_mpz_poly.h
 utils/params.c
 utils/params.h
 utils/mpz_poly.c

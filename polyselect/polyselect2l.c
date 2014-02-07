@@ -505,7 +505,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     } // raw and sopt only ?
 
     /* check that the algebraic polynomial has content 1, otherwise skip it */
-    mp_poly_content (t, f, d);
+    mpz_poly_content (t, F);
     if (mpz_cmp_ui (t, 1) != 0)
       goto skip;
 
