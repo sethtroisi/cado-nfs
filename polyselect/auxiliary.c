@@ -43,8 +43,12 @@ int MAX_k = 16;
 /************************* norm and skewness *********************************/
 
 /* Same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients.
-   Returns 1/2*log(int(int(F^2(r cos(t) s,r sin(t))*r/s^d, r=0..1), t=0..2*Pi))
-   (circular method).
+   Returns 1/2*log(int(int(F(r*cos(t)*s,r*sin(t))^2*r/s^d, r=0..1), t=0..2*Pi))
+   (circular method). Cf Remark 3.2 in Kleinjung paper, Math. of Comp., 2006.
+
+   Maple code for degree 2:
+   f:=x->a2*x^2+a1*x+a0: d:=degree(f(x),x):
+   int(int((f(s*cos(t)/sin(t))*(r*sin(t))^d)^2*r/s^d, r=0..1), t=0..2*Pi);
  */
 static double
 L2_lognorm_d (double_poly_srcptr p, double s)
@@ -53,24 +57,24 @@ L2_lognorm_d (double_poly_srcptr p, double s)
   double *a = p->coeff;
   unsigned int d = p->deg;
 
-  /* coefficients for degree 2 to 10:
-    sage: [[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]] for d in [2..10]]
-
-    [[4/5, 4/9, 4/5],
-     [4/7, 4/15, 4/15, 4/7],
-     [4/9, 4/21, 4/25, 4/21, 4/9],
-     [4/11, 4/27, 4/35, 4/35, 4/27, 4/11],
-     [4/13, 4/33, 4/45, 4/49, 4/45, 4/33, 4/13],
-     [4/15, 4/39, 4/55, 4/63, 4/63, 4/55, 4/39, 4/15],
-     [4/17, 4/45, 4/65, 4/77, 4/81, 4/77, 4/65, 4/45, 4/17],
-     [4/19, 4/51, 4/75, 4/91, 4/99, 4/99, 4/91, 4/75, 4/51, 4/19],
-     [4/21, 4/57, 4/85, 4/105, 4/117, 4/121, 4/117, 4/105, 4/85, 4/57, 4/21]]
-
-     (to be multiplied by the coefficients of the even part of the square
-     of the de-skewed polynomial)
-   */
-
-  if (d == 2)
+  if (d == 1)
+  {
+    double a1, a0;
+    a1 = a[1] * s;
+    a0 = a[0];
+    /* use circular integral (Sage code):
+       var('a1,a0,x,y,r,s,t')
+       f = a1*x+a0
+       F = expand(f(x=x/y)*y)
+       F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+       v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+       (s*v).expand().collect(pi)
+    */
+    n = a0 * a0 + a1 * a1;
+    n = n * 0.785398163397448310; /* Pi/4 */
+    return 0.5 * log (n / s);
+  }
+  else if (d == 2)
   {
     double a2, a1, a0;
     a2 = a[2] * s * s;
