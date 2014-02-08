@@ -35,10 +35,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define ALPHA_BOUND_SMALL  100
 #define ALPHA_BOUND       2000
 
-/* parameters for Murphy's E-value */
-#define BOUND_F 1e7
-#define BOUND_G 5e6
-#define AREA    1e16
 #define MURPHY_K 1000
 
 extern double bound_f, bound_g, area;

@@ -8,7 +8,7 @@ set (ropt_sources
   ropt_tree.c ropt_arith.c ropt_io.c ropt_stage1.c ropt_stage2.c
   )
 
-add_library(polyselect_common ${CADO_SHARED} auxiliary.c rootsieve.c rho.c murphyE.c)
+add_library(polyselect_common ${CADO_SHARED} auxiliary.c rootsieve.c rho.c murphyE.c area.c)
 add_executable (polyselect2l polyselect2l.c polyselect2l_str.c polyselect2l_arith.c ${ropt_sources})
 
 # the utils library already includes -lgmp and -lm

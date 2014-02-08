@@ -5,8 +5,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
-
-double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
+#include "area.h"
 
 static void usage_and_die(char *argv0) {
     fprintf(stderr, "usage: %s [-area a] [-Bf b] [-Bg c] poly j k\n", argv0);

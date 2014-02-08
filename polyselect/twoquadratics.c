@@ -8,10 +8,7 @@
 #include "rootsieve.h"
 #include "rho.h"
 #include "portability.h"
-
-double area=AREA;
-double bound_f=BOUND_F;
-double bound_g=BOUND_G;
+#include "area.h"
 
 //print a floating point GMP number using scientific notation
 //strangely this function doesn't seem to be implemented in GMP

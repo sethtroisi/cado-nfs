@@ -529,6 +529,8 @@ params/parameters.F9
 params/F9.poly
 polyselect/CMakeLists.txt
 polyselect/Makefile
+polyselect/area.c
+polyselect/area.h
 polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/murphyE.c
@@ -727,6 +729,7 @@ tests/sieve/ecm/pm1test.inp
 tests/sieve/ecm/test_testbench.sh
 tests/polyselect/CMakeLists.txt
 tests/polyselect/polysel.sh
+tests/polyselect/test_auxiliary.c
 tests/filter/CMakeLists.txt
 tests/filter/testsm.sh
 tests/filter/testsm.p59.poly
