@@ -133,7 +133,7 @@
 #include "murphyE.h"
 #include "ropt.h"
 #include "portability.h"
-
+#include "area.h"
 
 /**
  * Usage

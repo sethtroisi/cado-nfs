@@ -27,8 +27,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
-
-double bound_f = BOUND_F, bound_g = BOUND_G, area = AREA;
+#include "area.h"
 
 #define MAX_LINE_LENGTH 1024
 

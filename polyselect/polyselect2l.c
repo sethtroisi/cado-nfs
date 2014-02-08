@@ -18,6 +18,7 @@
 #include "polyselect2l.h"
 #include "portability.h"
 #include "mpz_poly.h"
+#include "area.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
@@ -49,7 +50,6 @@ static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
-double area, bound_f, bound_g;
 
 /* read-write global variables */
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion

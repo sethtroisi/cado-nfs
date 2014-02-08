@@ -529,6 +529,8 @@ params/parameters.F9
 params/F9.poly
 polyselect/CMakeLists.txt
 polyselect/Makefile
+polyselect/area.c
+polyselect/area.h
 polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/murphyE.c
