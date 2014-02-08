@@ -15,6 +15,7 @@
 
 #include "cado.h"
 #include "auxiliary.h"
+#include "area.h"
 #include "utils.h"
 #include "portability.h"
 #include "murphyE.h"
@@ -525,11 +526,11 @@ print_nonlinear_poly_info ( mpz_t *f,
     gg->deg = dg;
     gg->coeff = g;
 
-    skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu[0] = L2_lognorm (ff, skew[0], DEFAULT_L2_METHOD);
+    skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
+    logmu[0] = L2_lognorm (ff, skew[0]);
     alpha[0] = get_alpha (ff, ALPHA_BOUND);
-    skew[1] = L2_skewness (gg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu[1] = L2_lognorm (gg, skew[0], DEFAULT_L2_METHOD);
+    skew[1] = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
+    logmu[1] = L2_lognorm (gg, skew[0]);
     alpha[1] = get_alpha (gg, ALPHA_BOUND);
 
     if (format == 1) {
