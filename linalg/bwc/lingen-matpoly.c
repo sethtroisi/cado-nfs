@@ -92,6 +92,14 @@ void matpoly_fill_random(abdst_field ab MAYBE_UNUSED, matpoly_ptr a, unsigned in
     abvec_random(ab, a->x, a->m*a->n*size, rstate);
 }
 
+int matpoly_cmp(abdst_field ab MAYBE_UNUSED, matpoly_srcptr a, matpoly_srcptr b)
+{
+    ASSERT_ALWAYS(a->n == b->n);
+    ASSERT_ALWAYS(a->m == b->m);
+    if (a->size != b->size) return (a->size > b->size) - (b->size > a->size);
+    return abvec_cmp(ab, a->x, b->x, a->m*a->n*a->size);
+}
+
 
 /* polymat didn't have a proper add(), which is somewhat curious */
 void matpoly_add(abdst_field ab,
@@ -292,4 +300,20 @@ void matpoly_mp(abdst_field ab, matpoly b, matpoly a, matpoly c)/*{{{*/
 }/*}}}*/
 
 
+void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src)
+{
+    if (!matpoly_check_pre_init(dst))
+        matpoly_clear(ab, dst);
+    matpoly_init(ab, dst, src->m, src->n, src->size);
+    dst->size = src->size;
 
+    for(unsigned int i = 0 ; i < src->m ; i++) {
+        for(unsigned int j = 0 ; j < src->n ; j++) {
+            for(unsigned int k = 0 ; k < src->size ; k++) {
+                abset(ab,
+                        matpoly_coeff(dst, i, j, k),
+                        polymat_coeff_const(src, i, j, k));
+            }
+        }
+    }
+}

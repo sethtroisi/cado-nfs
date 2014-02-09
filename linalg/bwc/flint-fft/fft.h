@@ -318,6 +318,9 @@ void fft_convolution(mp_limb_t ** ii, mp_limb_t ** jj, slong depth,
 
 
 
+#define xxxDEBUG_FFT
+#define TIME_FFT
+
 struct fft_transform_info {
     mp_bitcnt_t bits1;
     mp_bitcnt_t bits2;
@@ -333,6 +336,12 @@ struct fft_transform_info {
     mp_bitcnt_t ks_coeff_bits;  /* This is used only for kronecker substitution */
     mp_bitcnt_t minwrap;        /* zero when no wraparound wanted */
     int alg;            /* alg==1: use matrix fourier algorithm */
+#ifdef  TIME_FFT
+    struct {
+        int n;
+        double t;
+    } dft, conv, ift;
+#endif
 };
 
 /* The transform data is provided as an opaque void* pointer ; in reality

@@ -251,13 +251,13 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 8)
+set(plingen_prime_nwords 1)
 
 if(WITH_MPIR)
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
     add_executable(test-flint test-flint.c)
-    target_link_libraries(test-flint flint-fft ${gmp_libname})
+    target_link_libraries(test-flint flint-fft utils ${gmp_libname})
 endif(WITH_MPIR)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)

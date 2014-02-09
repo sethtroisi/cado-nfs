@@ -21,6 +21,8 @@ typedef struct matpoly_s matpoly[1];
 typedef struct matpoly_s * matpoly_ptr;
 typedef const struct matpoly_s * matpoly_srcptr;
 
+#include "lingen-polymat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,8 +33,10 @@ void matpoly_zero(abdst_field ab, matpoly_ptr p);
 void matpoly_clear(abdst_field ab, matpoly_ptr p);
 void matpoly_fill_random(abdst_field ab MAYBE_UNUSED, matpoly_ptr a, unsigned int size, gmp_randstate_t rstate);
 void matpoly_swap(matpoly_ptr a, matpoly_ptr b);
+int matpoly_cmp(abdst_field ab MAYBE_UNUSED, matpoly_srcptr a, matpoly_srcptr b);
 static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
 static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src);
 
 
 
@@ -74,6 +78,13 @@ static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j
 }
 static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     return *matpoly_part(p,i,j,k);
+}
+static inline const abelt * matpoly_part_const(matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    ASSERT_ALWAYS(p->size);
+    return (const abelt*)p->x+(i*p->n+j)*p->alloc+k;
+}
+static inline absrc_elt matpoly_coeff_const(matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return *matpoly_part_const(p,i,j,k);
 }
 /* }}} */
 

@@ -36,49 +36,6 @@
 
 using namespace std;
 
-/* {{{ cutoff_array. Should be merged with polymat_cutoff_info, maybe */
-/* This is just an array, but compressed as a cut-off list should be */
-struct cutoff_array {
-    vector<pair<unsigned int, unsigned int> > x;
-    cutoff_array(pair<unsigned int, unsigned int> base = make_pair(1,0)) {
-        x.push_back(base);
-    }
-    int push(unsigned int n, unsigned int winner) {
-        if (winner == x.back().second) return n - x.back().first;
-        x.push_back(make_pair(n, winner));
-        return 0;
-    }
-    /* XXX this is really horrible and must be removed */
-    void export_to_cutoff_info(polymat_cutoff_info * dst) const {
-        dst->cut = x.back().first;
-        dst->subdivide = x.back().first;
-        dst->table_size = x.size();
-        dst->table = (unsigned int (*)[2]) realloc(dst->table,
-                dst->table_size * sizeof(unsigned int[2]));
-        // cout << "cutoffs for kara:";
-        for(unsigned int v = 0 ; v < dst->table_size ; v++) {
-            if (x[v].second == 1 && x[v].first < dst->subdivide) {
-                dst->subdivide = x[v].first;
-            }
-            dst->table[v][0] = x[v].first;
-            dst->table[v][1] = x[v].second;
-            // cout << " " << x[v].first << " " << x[v].second << ",";
-        };
-        // cout <<"\n";
-    }
-
-    friend ostream& operator<<(ostream& o, cutoff_array const& A);
-};
-ostream& operator<<(ostream& o, cutoff_array const& A) {
-    o << "{";
-    for(auto y : A.x) {
-        o << " { " << y.first << ", " << y.second << " },";
-    }
-    o << " }";
-    return o;
-}
-/* }}} */
-
 struct timer_rusage {
     inline double operator()() const { return seconds(); }
 };
@@ -102,7 +59,6 @@ struct cutoff_finder {
     double enough_time;
     double scale;
     int stable_cutoff_break;
-    cutoff_array cutoffs;
     unsigned int ntests;
     int stable;
     vector<double> benches;
@@ -110,8 +66,8 @@ struct cutoff_finder {
     vector<pair<unsigned int, pair<vector<double>, int> > > all_results;
     map<int, string> method_names;
 
-    cutoff_finder(unsigned int ntests, unsigned int min_length = 1)
-        : cutoffs(make_pair(min_length, 0)),
+    cutoff_finder(unsigned int ntests)
+        :
         ntests(ntests),
         benches(ntests),
         meaningful(ntests, true)
@@ -166,13 +122,11 @@ struct cutoff_finder {
         all_results.push_back(make_pair(k,
                     make_pair(benches, best)));
 
-        if (cutoffs.x.empty() || best != cutoffs.x.back().second) {
+        if (all_results.empty() || best != all_results.back().second.second) {
             stable = 0;
         } else {
             stable++;
         }
-
-        cutoffs.push(k, best);
 
         vector<bool> was_meaningful = meaningful;
 
@@ -210,19 +164,6 @@ struct cutoff_finder {
         return s.str();
     }
 
-    cutoff_array const& result() const { return cutoffs; }
-    /*
-    void export_to_cutoff_info(polymat_cutoff_info* dst, pair<unsigned int, int> final_step)
-    {
-        cutoffs.export_to_cutoff_info(dst, final_step);
-    }
-    void export_to_cutoff_info(polymat_cutoff_info* dst)
-    {
-        cutoffs.export_to_cutoff_info(dst);
-    }
-    */
-
-
     template<typename T = T0>
     struct small_bench {
         cutoff_finder const& dad;
@@ -247,6 +188,65 @@ struct cutoff_finder {
     template<typename T = T0>
     small_bench<T> micro_bench(int i) {
         return small_bench<T>(*this, benches[i]);
+    }
+
+    /* This is really limited to karatsuba-like cuttofs. It's ugly */
+    vector<pair<unsigned int, int>> export_kara_cutoff_data(struct polymat_cutoff_info * dst)
+    {
+        /* This size will eventually feed the ->subdivide field for the
+         * cutoff info */
+        unsigned int first_kara_size = UINT_MAX;
+
+        /* This size will eventually feed the ->cut field for the
+         * cutoff info. For sizes above this, we will _always_ use
+         * karatsuba. */
+        unsigned int first_alwayskara_size = UINT_MAX;
+
+        vector<pair<unsigned int, int>> steps;
+        steps.push_back(make_pair(1,0));
+
+        for(auto it : all_results) {
+            unsigned int size = it.first;
+            auto const& benches(it.second.first);
+            int best = it.second.second;
+            /* In case fft wins, we invent something which will use
+             * karatsuba still */
+            if (best > 1) best = benches[1] < benches[0];
+            if (steps.empty() || best != steps.back().second) {
+                steps.push_back(make_pair(size, best));
+                if (best == 1 && size < first_kara_size)
+                    first_kara_size = size;
+                /* assign it multiple times */
+                first_alwayskara_size = size;
+            }
+        }
+        dst->cut = first_alwayskara_size;
+        dst->subdivide = first_kara_size;
+        dst->table_size = steps.size();
+        dst->table = (unsigned int (*)[2]) realloc(dst->table,
+                dst->table_size * sizeof(unsigned int[2]));
+        for(unsigned int v = 0 ; v < dst->table_size ; v++) {
+            dst->table[v][0] = steps[v].first;
+            dst->table[v][1] = steps[v].second;
+        };
+        return steps;
+    }
+    vector<pair<unsigned int, int>> export_kara_cutoff_data_force_kara_now(struct polymat_cutoff_info * dst, unsigned int size)
+    {
+        vector<double> allz(ntests);
+        all_results.push_back(make_pair(size, make_pair(allz, 1)));
+        vector<pair<unsigned int, int>> x = export_kara_cutoff_data(dst);
+        all_results.pop_back();
+        return x;
+    }
+    static string print_result(vector<pair<unsigned int, int>> const& tab) {
+        ostringstream s;
+        s << "{";
+        for(auto y : tab) {
+            s << " { " << y.first << ", " << y.second << " },";
+        }
+        s << " }";
+        return s.str();
     }
 
 };
@@ -275,7 +275,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 #define FINDER_NMETHODS 3
 #endif  /* HAVE_MPIR */
 
-    cutoff_finder<timer_rusage> finder(FINDER_NMETHODS, 1);
+    cutoff_finder<timer_rusage> finder(FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
     finder.set_method_name(2, "matpoly-kronecker-schönhage");
@@ -299,16 +299,28 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     cout << "\n";
     cout << "# Note: for input length k within plingen, we use mcoeffs,k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
 
+    unsigned int min_bench = 2000 * m / (m+n);
+
     /* Note: we are benching degree k, but the degree we are
      * interested in for pi is k*m/(m+n) */
-    for(unsigned int k = 2 ; !finder.done() ; k=finder.next_length(k)) {
-        polymat pi, piL, piR;
+    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+        polymat pi, piref, piL, piR;
+        matpoly xpi, xpiref, xpiL, xpiR;
         polymat_init(ab, piL, m+n, m+n, k);
         polymat_init(ab, piR, m+n, m+n, k);
         polymat_init(ab, pi, m+n, m+n, 2*k-1);
+        polymat_init(ab, piref, m+n, m+n, 2*k-1);
         polymat_fill_random(ab, piL, k, rstate);
         polymat_fill_random(ab, piR, k, rstate);
+        
+        /* of course we know the allocation needs, but we'll lazy-allocate
+         * here, to save ram */
+        matpoly_init(ab, xpiL, 0, 0, 0);
+        matpoly_init(ab, xpiR, 0, 0, 0);
+        matpoly_init(ab, xpi, 0, 0, 0);
+        matpoly_init(ab, xpiref, 0, 0, 0);
 
+        ostringstream extra_info;
 
         if (finder.still_meaningful_to_test(0)) {
             /* disable kara for a minute */
@@ -318,6 +330,12 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
                 polymat_mul(ab, pi, piL, piR);
                 x.pop();
             }
+            if (piref->size == 0) {
+                polymat_swap(pi, piref);
+                fprintf(stderr, "BASIS0\n");
+            } else if (polymat_cmp(ab, pi, piref) != 0) {
+                fprintf(stderr, "MISMATCH0!\n");
+            }
         }
 
         if (finder.still_meaningful_to_test(1)) {
@@ -326,24 +344,47 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
              * karatsuba one or more times in the recursive calls depending
              * on what has been measured as best so far.
              */
-            cutoff_array tmp_cutoffs = finder.cutoffs;
-            tmp_cutoffs.push(k, 1);
-            tmp_cutoffs.export_to_cutoff_info(improved);
+            finder.export_kara_cutoff_data_force_kara_now(improved, k);
             polymat_set_mul_kara_cutoff(improved, NULL);
             for(auto x = finder.micro_bench(1); x; ++x) {
                 x.push();
                 polymat_mul(ab, pi, piL, piR);
                 x.pop();
             }
+            if (piref->size == 0) {
+                polymat_swap(pi, piref);
+                fprintf(stderr, "BASIS1\n");
+            } else if (polymat_cmp(ab, pi, piref) != 0) {
+                fprintf(stderr, "MISMATCH1!\n");
+            }
         }
+
+        /* don't exaggerate our memory requirements */
+        matpoly_set_polymat(ab, xpiL, piL);
+        polymat_clear(ab, piL);
+        matpoly_set_polymat(ab, xpiR, piR);
+        polymat_clear(ab, piR);
+        matpoly_set_polymat(ab, xpiref, piref);
+        polymat_clear(ab, piref);
+        matpoly_init(ab, xpi, m+n, m+n, 2*k-1);
+        polymat_clear(ab, pi);
+
+        /* we should make the effort of converting polymat to matpoly,
+         * right ? */
 
         if (finder.still_meaningful_to_test(2)) {
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
             for(auto x = finder.micro_bench(2); x; ++x) {
                 x.push();
-                matpoly_mul(ab, (matpoly_ptr) pi, (matpoly_ptr) piL, (matpoly_ptr) piR);
+                matpoly_mul(ab, xpi, xpiL, xpiR);
                 x.pop();
+            }
+            if (xpiref->size == 0) {
+                matpoly_swap(xpi, xpiref);
+                fprintf(stderr, "BASIS2\n");
+            } else if (matpoly_cmp(ab, xpi, xpiref) != 0) {
+                fprintf(stderr, "MISMATCH2!\n");
             }
         }
 
@@ -354,26 +395,49 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             mpz_init(p);
             abfield_characteristic(ab, p);
             struct fft_transform_info fti[1];
-            fft_get_transform_info_fppol(fti, p, piL->size, piR->size, piL->n);
+            fft_get_transform_info_fppol(fti, p, xpiL->size, xpiR->size, xpiL->n);
+            int s = 0;
             for(auto x = finder.micro_bench(3); x; ++x) {
                 x.push();
-                matpoly_ft_init(ab, tpiL, piL->m, piL->n, fti);
-                matpoly_ft_init(ab, tpiR, piR->m, piR->n, fti);
-                matpoly_ft_init(ab, tpi, piL->m, piR->n, fti);
-                matpoly_ft_dft(ab, tpiL, (matpoly_ptr) piL, fti);
-                matpoly_ft_dft(ab, tpiR, (matpoly_ptr) piR, fti);
+                matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
+                matpoly_ft_init(ab, tpiR, xpiR->m, xpiR->n, fti);
+                matpoly_ft_init(ab, tpi, xpiL->m, xpiR->n, fti);
+                matpoly_ft_dft(ab, tpiL, xpiL, fti);
+                matpoly_ft_dft(ab, tpiR, xpiR, fti);
                 matpoly_ft_mul(ab, tpi, tpiL, tpiR, fti);
-                matpoly_ft_ift(ab, (matpoly_ptr) pi, tpi, fti);
+                matpoly_ft_ift(ab, xpi, tpi, fti);
                 matpoly_ft_clear(ab, tpiL, fti);
                 matpoly_ft_clear(ab, tpiR, fti);
                 matpoly_ft_clear(ab, tpi,  fti);
                 x.pop();
+                s++;
             }
             mpz_clear(p);
+            if (xpiref->size == 0) {
+                matpoly_swap(xpi, xpiref);
+            } else if (matpoly_cmp(ab, xpi, xpiref) != 0) {
+                fprintf(stderr, "MISMATCH3!\n");
+            }
+#ifdef  TIME_FFT
+            char msg[256];
+            snprintf(msg, sizeof(msg),
+                    " [depth %d, %d*%.2f dft %d*%.2f conv %d*%.2f ift]",
+                    (int) fti->depth,
+                    fti->dft.n/s, 1000*fti->dft.t/fti->dft.n,
+                    fti->conv.n/s, 1000*fti->conv.t/fti->conv.n,
+                    fti->ift.n/s, 1000*fti->ift.t/fti->ift.n);
+            extra_info << msg;
+            /* the following one-liner may be used to grab only
+             * fft-related data */
+    // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
+#endif
         }
 #endif
 
-        cout << (int) ((m+n)*k/m) << " " << finder.summarize_for_this_length(k) << "\n";
+        cout << (int) ((m+n)*k/m) <<
+            " " << finder.summarize_for_this_length(k)
+            << extra_info.str()
+            << "\n";
 
 #if 0
         printf("%d %1.6f %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttm, ttk/ttb);
@@ -386,15 +450,20 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         polymat_clear(ab, piL);
         polymat_clear(ab, piR);
         polymat_clear(ab, pi);
+        polymat_clear(ab, piref);
+        matpoly_clear(ab, xpiL);
+        matpoly_clear(ab, xpiR);
+        matpoly_clear(ab, xpi);
+        matpoly_clear(ab, xpiref);
     }
 
 
-    finder.cutoffs.export_to_cutoff_info(improved);
+    vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mul_kara_cutoff(improved, NULL);
 
     cout << "/* Cutoffs for "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products: */\n";
     cout << "#define MUL_CUTOFFS_" <<(m+n)<<"_"<<(m+n)<<"_"<<(m+n)
-        << " " << finder.result() << endl;
+        << " " << finder.print_result(table) << endl;
     gmp_randclear(rstate);
 
     polymat_cutoff_info_clear(always_basecase);

@@ -29,7 +29,7 @@ void matpoly_ft_init(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, unsigned int
     t->data = malloc(m * n * fft_alloc_sizes[0]);
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
-            size_t offset = (i*t->m+j) * fft_alloc_sizes[0];
+            size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
             fft_transform_prepare(tij, fti);
         }
@@ -62,7 +62,7 @@ void matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
-            size_t offset = (i*t->m+j) * fft_alloc_sizes[0];
+            size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
             abelt * aij = matpoly_part(a, i, j, 0);
             fft_do_dft_fppol(tij, (mp_limb_t *) aij, a->size, tt, fti, p);
@@ -84,7 +84,7 @@ void matpoly_ft_add(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
 
     for(unsigned int i = 0 ; i < t0->m ; i++) {
         for(unsigned int j = 0 ; j < t0->n ; j++) {
-            size_t offset = (i*t0->m+j) * fft_alloc_sizes[0];
+            size_t offset = (i*t0->n+j) * fft_alloc_sizes[0];
             void * t0ij = pointer_arith(t0->data, offset);
             void * t1ij = pointer_arith(t1->data, offset);
             void * uij  = pointer_arith(u->data, offset);
@@ -107,12 +107,12 @@ void matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
 
     for(unsigned int i = 0 ; i < t0->m ; i++) {
         for(unsigned int j = 0 ; j < t1->n ; j++) {
-            void * uij  = pointer_arith(u->data, (i*u->m+j) * tsize);
+            void * uij  = pointer_arith(u->data, (i*u->n+j) * tsize);
             memset(uij, 0, fft_alloc_sizes[0]);
             fft_transform_prepare(uij, fti);
             for(unsigned int k = 0 ; k < t0->n ; k++) {
-                void * t0ik = pointer_arith(t0->data, (i*t0->m+j) * tsize);
-                void * t1kj = pointer_arith(t1->data, (i*t1->m+j) * tsize);
+                void * t0ik = pointer_arith(t0->data, (i*t0->n+j) * tsize);
+                void * t1kj = pointer_arith(t1->data, (i*t1->n+j) * tsize);
                 fft_addmul(uij, t0ik, t1kj, tt, qt, fti);
             }
         }
@@ -145,7 +145,7 @@ void matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
-            size_t offset = (i*t->m+j) * fft_alloc_sizes[0];
+            size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
             abelt * aij = matpoly_part(a, i, j, 0);
             fft_do_ift_fppol((mp_limb_t *) aij, a->size, tij, tt, fti, p);
@@ -174,7 +174,7 @@ void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
-            size_t offset = (i*t->m+j) * fft_alloc_sizes[0];
+            size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
             abelt * aij = matpoly_part(a, i, j, 0);
             fft_do_ift_fppol_mp((mp_limb_t *) aij, a->size, tij, tt, fti, p, shift);

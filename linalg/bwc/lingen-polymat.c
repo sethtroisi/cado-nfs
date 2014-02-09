@@ -43,6 +43,15 @@ void polymat_cutoff_info_clear(struct polymat_cutoff_info * c)
     c->cut = UINT_MAX;
 }
 
+void polymat_cutoff_add_step(struct polymat_cutoff_info * c, unsigned int size, unsigned int alg)
+{
+    c->table = realloc(c->table, (c->table_size + 1) * sizeof(unsigned int [2]));
+    if (c->table) ASSERT_ALWAYS(size > c->table[c->table_size-1][0]);
+    c->table[c->table_size][0] = size;
+    c->table[c->table_size][1] = alg;
+    c->table_size++;
+}
+
 static void polymat_set_generic_cutoff(struct polymat_cutoff_info * slot, const struct polymat_cutoff_info * new_cutoff, struct polymat_cutoff_info * old_cutoff)
 {
     if (old_cutoff) {
@@ -87,7 +96,7 @@ int polymat_cutoff_get_alg_b(const struct polymat_cutoff_info * cutoff, unsigned
 
 int polymat_cutoff_get_subdivide_ub(const struct polymat_cutoff_info * cutoff, unsigned int s0, unsigned int s1)
 {
-    return MIN(s0, s1) >= cutoff->subdivide;
+    return cutoff->table != NULL && MIN(s0, s1) >= cutoff->subdivide;
 }
 
 /*}}}*/
@@ -182,6 +191,14 @@ void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned in
     ASSERT_ALWAYS(size <= a->alloc);
     a->size = size;
     abvec_random(ab, a->x, a->m*a->n*size, rstate);
+}
+
+int polymat_cmp(abdst_field ab MAYBE_UNUSED, polymat_srcptr a, polymat_srcptr b)
+{
+    ASSERT_ALWAYS(a->n == b->n);
+    ASSERT_ALWAYS(a->m == b->m);
+    if (a->size != b->size) return (a->size > b->size) - (b->size > a->size);
+    return abvec_cmp(ab, a->x, b->x, a->m*a->n*a->size);
 }
 
 
@@ -863,3 +880,20 @@ void polymat_addmp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
     polymat_mp_raw(ab, b, 0, a, 0, a->size, c, 0, c->size, 0, 1);
 }/*}}}*/
 
+void polymat_set_matpoly(abdst_field ab MAYBE_UNUSED, polymat_ptr dst, matpoly_srcptr src)
+{
+    if (!polymat_check_pre_init(dst))
+        polymat_clear(ab, dst);
+    polymat_init(ab, dst, src->m, src->n, src->size);
+    dst->size = src->size;
+
+    for(unsigned int i = 0 ; i < src->m ; i++) {
+        for(unsigned int j = 0 ; j < src->n ; j++) {
+            for(unsigned int k = 0 ; k < src->size ; k++) {
+                abset(ab,
+                        polymat_coeff(dst, i, j, k),
+                        matpoly_coeff_const(src, i, j, k));
+            }
+        }
+    }
+}

@@ -40,13 +40,12 @@
 #include "fft.h"
 #include "ulong_extras.h"
 #include "fft_tuning.h"
+#include "timing.h"
 
 #ifndef iceildiv
 /* unfortunately this fails miserably if x+y-1 overflows */
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
-
-#define xxxDEBUG_FFT
 
 /* This is copied from mul_fft_main.c ; given the size of the tuning
  * table for this code, there's no bloat danger */
@@ -308,8 +307,7 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
     } else {
         fti->trunc0 = 4 * n;
     }
-
-    fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
+    // fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
 }
 
 void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc)
@@ -355,6 +353,10 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
 {
     /* The maximum number of summands is MIN(n1, n2) */
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * FLINT_MIN(n1, n2));
+    /* It is a limitation of the current code that we want at least 4096
+     * bits for the product. */
+    if ((n1+n2)*cbits < 4096)
+        cbits=iceildiv(4096, n1+n2);
     fft_get_transform_info(fti, n1 * cbits, n2 * cbits, nacc);
     fti->ks_coeff_bits = cbits;
 }
@@ -843,6 +845,9 @@ static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info 
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/before_dft.m", y, fti);
 #endif
+#ifdef TIME_FFT
+    fti->dft.t -= seconds();
+#endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
     mp_limb_t ** ptrs = (mp_limb_t **) y;
@@ -891,12 +896,19 @@ static void fft_do_dft_backend(void * y, void * temp, struct fft_transform_info 
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/after_dft.m", y, fti);
 #endif
+#ifdef TIME_FFT
+    fti->dft.t += seconds();
+    fti->dft.n++;
+#endif
 }
 
 static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info * fti)
 {
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/before_ift.m", y, fti);
+#endif
+#ifdef TIME_FFT
+    fti->ift.t -= seconds();
 #endif
     mp_size_t n = 1 << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -944,6 +956,10 @@ static void fft_do_ift_backend(void * y, void * temp, struct fft_transform_info 
     }
 #ifdef DEBUG_FFT
     fft_debug_print_ft("/tmp/after_ift.m", y, fti);
+#endif
+#ifdef TIME_FFT
+    fti->ift.t += seconds();
+    fti->ift.n++;
 #endif
 }
 /* }}} */
@@ -1076,6 +1092,9 @@ void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, str
 
 void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti)
 {
+#ifdef TIME_FFT
+    fti->conv.t -= seconds();
+#endif
     /* See mul_truncate_sqrt2 */
     mp_size_t nw = fti->w << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1128,6 +1147,10 @@ void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_i
             }
         }
     }
+#ifdef TIME_FFT
+    fti->conv.t += seconds();
+    fti->conv.n++;
+#endif
 }
 
 static __inline__
@@ -1227,6 +1250,9 @@ void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti)
 
 void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti)
 {
+#ifdef TIME_FFT
+    fti->conv.t -= seconds();
+#endif
     /* See mul_truncate_sqrt2 */
     mp_size_t nw = fti->w << fti->depth;
     mp_size_t rsize0 = fti_rsize0(fti);
@@ -1284,6 +1310,10 @@ void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struc
             }
         }
     }
+#ifdef TIME_FFT
+    fti->conv.t += seconds();
+    fti->conv.n++;
+#endif
 }
 
 
