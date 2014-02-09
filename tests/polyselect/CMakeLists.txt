@@ -3,6 +3,7 @@ add_test(test_polsel3 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINAR
 add_test(test_polsel4 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 4 1000 1000 10)
 add_test(test_polsel5 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 5 1000 1000 10)
 add_test(test_polsel6 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 6 1000 1000 10)
+add_test(test_polsel7 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 7 1000 1000 10)
 add_executable(test_auxiliary test_auxiliary.c)
 target_link_libraries(test_auxiliary utils tests polyselect_common)
 run_test(test_auxiliary test_auxiliary)
