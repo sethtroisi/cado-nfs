@@ -87,7 +87,12 @@ if __name__ == '__main__':
         ell = int(factors[1])
         log2 = int(factors[2])
         log3 = int(factors[3])
-        print(p,ell,log2,log3)
-        print("The logarithms of the factor base elements are in %s" %
+        assert (p-1) % ell == 0
+        assert pow(3, log2*((p-1) // ell), p) == pow(2, log3*((p-1) // ell), p)
+        print("p = " + str(p))
+        print("ell = " + str(ell))
+        print("log2 = " + str(log2))
+        print("log3 = " + str(log3))
+        print("The other logarithms of the factor base elements are in %s" %
                 tasksparams["workdir"] + os.sep + tasksparams["name"] +
                 ".reconstructlog.dlog")
