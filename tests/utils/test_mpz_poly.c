@@ -52,7 +52,7 @@ test_polymodF_mul ()
   int d1, d2, d;
   mpz_poly_t F, T, U;
   polymodF_t P1, P2, Q, P1_saved;
-  int k = 1 + (lrand48 () % 128), count = 0;
+  int k = 2 + (lrand48 () % 128), count = 0;
   mpz_t c;
 
   mpz_poly_init (T, -1);
@@ -62,7 +62,7 @@ test_polymodF_mul ()
     {
       mpz_poly_init (F, d);
       mpz_poly_init (Q->p, d-1);
-      mpz_poly_random (F, d, k);
+      do mpz_poly_random (F, d, k); while (F->deg == -1);
       for (d1 = 1; d1 <= 10; d1++)
         {
           mpz_poly_init (P1->p, d1);
