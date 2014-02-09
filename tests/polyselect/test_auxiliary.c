@@ -84,8 +84,11 @@ test_L2_lognorm (void)
   mpz_poly_clear (p);
 }
 
+/* t=0: generate polynomial with skewness < 1
+   t=1: generate polynomial with skewness > 1
+   t=2: generate random polynomial */
 void
-test_L2_skewness (void)
+test_L2_skewness (int t)
 {
   mpz_poly_t p;
   int d, i;
@@ -93,11 +96,26 @@ test_L2_skewness (void)
   int prec = 10;
 
   mpz_poly_init (p, MAXDEGREE);
-  mpz_set_ui (p->coeff[0], lrand48 ());
-  mpz_set_ui (p->coeff[1], lrand48 ());
+  if (t == 0)
+    mpz_set_ui (p->coeff[0], 1);
+  else if (t == 1)
+    mpz_set_ui (p->coeff[0], 4294967295UL);
+  else
+    mpz_set_ui (p->coeff[0], lrand48 ());
   for (d = 1; d <= 7; d++)
     {
-      mpz_set_ui (p->coeff[d], lrand48 ());
+      if ((t == 0 || t == 1) && d > 1)
+        mpz_set_ui (p->coeff[d-1], 1);
+      if (t == 0)
+        mpz_set_ui (p->coeff[d], 4294967295UL);
+      else if (t == 1)
+        mpz_set_ui (p->coeff[0], 1);
+      else
+        {
+          do
+            mpz_set_ui (p->coeff[d], lrand48 ());
+          while (mpz_cmp_ui (p->coeff[d], 0) == 0);
+        }
       p->deg = d;
       s = L2_skewness (p, prec);
       n = L2_lognorm (p, s);
@@ -135,7 +153,9 @@ main (int argc, const char *argv[])
 {
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
   test_L2_lognorm ();
-  test_L2_skewness ();
+  test_L2_skewness (0);
+  test_L2_skewness (1);
+  test_L2_skewness (2);
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
