@@ -638,6 +638,7 @@ sieve/ecm/prac_bc.c
 sieve/ecm/prac_bc.h
 sieve/ecm/stage2.c
 sieve/ecm/stage2.h
+sieve/ecm/testbench.c
 sieve/fb.c
 sieve/fb.h
 sieve/freerel.c
@@ -803,6 +804,7 @@ tests/utils/testbase-rootfinder.quick
 tests/utils/testmpz-rootfinder.quick
 tests/utils/test_sm_utils.c
 tests/utils/test_sm_utils.data
+tests/utils/test_relation.c
 utils/timing.cpp
 utils/timing.h
 utils/typedefs.h

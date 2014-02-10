@@ -1,7 +1,4 @@
 
-add_executable(testbench testbench.c)
-target_link_libraries(testbench facul utils m)
-
 add_executable(issmooth issmooth.c)
 target_link_libraries(issmooth gmp)
 

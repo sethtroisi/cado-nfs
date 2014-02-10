@@ -27,8 +27,8 @@
 # variant_facul(facul_doit ul)
 
 # Useful for debugging: disables optimization for facul() and facul_doit_*()
-# which makes # tracing program flow easier, but does not slow down the 
-# arithmetic in pm1_*(), pp1_*(), ecm_*() 
+# which makes tracing program flow easier, but does not slow down the
+# arithmetic in pm1_*(), pp1_*(), ecm_*()
 # set_property(SOURCE facul.c PROPERTY COMPILE_FLAGS "-O0 -g")
 # set_property(SOURCE facul_doit_ul.c PROPERTY COMPILE_FLAGS "-O0 -g")
 # set_property(SOURCE facul_doit_15ul.c PROPERTY COMPILE_FLAGS "-O0 -g")
@@ -55,5 +55,8 @@ add_library(facul
         facul_doit_mpz.c
         stage2.c prac_bc.c
 	makeplan.c facul.c)
+
+add_executable(testbench testbench.c)
+target_link_libraries(testbench facul utils m)
 
 include(CMakeLists-nodist.txt OPTIONAL)
