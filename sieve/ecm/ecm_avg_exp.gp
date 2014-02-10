@@ -129,13 +129,14 @@ V_order (X, o) = {
     Xp = Chebyshev_V(po, X);
     while (Xp != 2, po *= p; j++; if (j == k, break); Xp = Chebyshev_V(p, Xp));
   );
+  if (po == 1 && X != 2, error("V_order: point order computed as 1, but X != 2"));
   return (po);
 }
 
 
 list_pp1_order (pmin, pmax, res, mod, verbose) =
 {
-  local (p, o, d);
+  local (p, o, po);
 
   p = nextprime (pmin);
   n = 0;
@@ -208,7 +209,7 @@ ecmtorsion12(n,p,verbose) = {
   a = (t2 - 1)/(t2 + 3);
   /* Avoid a=0 */
   if (a == 0, 
-    error ("a == ", a);
+    return(0);
   );
 
   A = (-3*a^4 - 6*a^2 + 1)/(4*a^3);
@@ -365,7 +366,7 @@ ecm_printorder (parameterization, parameter, p) =
 }
 
 
-/* Count those prime in [pmin, pmax] where the starting point
+/* Count those primes in [pmin, pmax] where the starting point
    on the elliptic curve with Brent-Suyama (parameterization=0)
    or Montgomery torsion 12 (parameterization=1)
    parameterization has order which is B1,B2-smooth. 
