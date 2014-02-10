@@ -63,7 +63,6 @@ test_usp ()
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
-  exit (1);
 
   mpz_init (u);
   mpz_set_ui (u, 1);
