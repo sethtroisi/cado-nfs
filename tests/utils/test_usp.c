@@ -64,6 +64,91 @@ test_usp ()
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
 
+  /* polynomial (x-1)*(x-2)*(x-3) */
+  mpz_set_si (p[0], -6);
+  mpz_set_si (p[1], 11);
+  mpz_set_si (p[2], -6);
+  mpz_set_si (p[3], 1);
+  n = numberOfRealRoots (p, 3, 0, 0, NULL);
+  assert (n == 3);
+
+  /* polynomial (x-1)*(x-2)*(x-3)*(x-4) */
+  mpz_set_si (p[0], 24);
+  mpz_set_si (p[1], -50);
+  mpz_set_si (p[2], 35);
+  mpz_set_si (p[3], -10);
+  mpz_set_si (p[4], 1);
+  n = numberOfRealRoots (p, 4, 0, 0, NULL);
+  assert (n == 4);
+
+  /* polynomial (x-1)*(x-2)*(x-3)*(x-4)*(x-5) */
+  mpz_set_si (p[0], -120);
+  mpz_set_si (p[1], 274);
+  mpz_set_si (p[2], -225);
+  mpz_set_si (p[3], 85);
+  mpz_set_si (p[4], -15);
+  mpz_set_si (p[5], 1);
+  n = numberOfRealRoots (p, 5, 0, 0, NULL);
+  assert (n == 5);
+
+  /* polynomial (x-1)*(x-2)*(x-3)*(x-4)*(x-5)*(x-6) */
+  mpz_set_si (p[0], 720);
+  mpz_set_si (p[1], -1764);
+  mpz_set_si (p[2], 1624);
+  mpz_set_si (p[3], -735);
+  mpz_set_si (p[4], 175);
+  mpz_set_si (p[5], -21);
+  mpz_set_si (p[6], 1);
+  n = numberOfRealRoots (p, 6, 0, 0, NULL);
+  assert (n == 6);
+
+  /* polynomial 2*(x-1)*(x-2)*(x-3/2) */
+  mpz_set_si (p[0], -6);
+  mpz_set_si (p[1], 13);
+  mpz_set_si (p[2], -9);
+  mpz_set_si (p[3], 2);
+  n = numberOfRealRoots (p, 3, 0, 0, NULL);
+  assert (n == 3);
+
+  /* polynomial 8*(x-1)*(x-2)*(x-3/2)*(x-5/4) */
+  mpz_set_si (p[0], 30);
+  mpz_set_si (p[1], -89);
+  mpz_set_si (p[2], 97);
+  mpz_set_si (p[3], -46);
+  mpz_set_si (p[4], 8);
+  n = numberOfRealRoots (p, 4, 0, 0, NULL);
+  assert (n == 4);
+
+  /* polynomial 2*(x-1)*(x-3/2)*(x-2)*(x-3)*(x-4) */
+  mpz_set_si (p[0], -72);
+  mpz_set_si (p[1], 198);
+  mpz_set_si (p[2], -205);
+  mpz_set_si (p[3], 100);
+  mpz_set_si (p[4], -23);
+  mpz_set_si (p[5], 2);
+  n = numberOfRealRoots (p, 5, 0, 0, NULL);
+  assert (n == 5);
+
+  mpz_set_si (p[0], -3);
+  mpz_set_si (p[1], 2);
+  n = numberOfRealRoots (p, 1, 0, 0, NULL);
+  assert (n == 1);
+
+  /* 2*(x-17)*(x-17/5) */
+  mpz_set_si (p[0], 595);
+  mpz_set_si (p[1], -69);
+  mpz_set_si (p[2], 2);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
+  assert (n == 2);
+
+  /* 2000*x^3 - 35000*x^2 + 2*x - 35 */
+  mpz_set_si (p[0], -35);
+  mpz_set_si (p[1], 2);
+  mpz_set_si (p[2], -35000);
+  mpz_set_si (p[3], 2000);
+  n = numberOfRealRoots (p, 3, 0, 0, NULL);
+  assert (n == 1);
+
   mpz_init (u);
   mpz_set_ui (u, 1);
   mpz_mul_2exp (u, u, 127);

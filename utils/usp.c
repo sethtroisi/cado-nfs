@@ -212,7 +212,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
 
 #ifdef DEBUG
    gmp_printf ("looking at interval %Zd/2^%d..%Zd/2^%d\n", a, m, b, m);
-   printf ("up=%d\n", up);
+   printf ("up=%d va=%d vb=%d\n", up, va, vb);
 #endif
    if (va * vb == 2 * (up % 2) - 1)
      up--;
@@ -233,7 +233,13 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    smi = signValue (mi, lmi, n, p);
    if (smi == 0)
      { /* rational root at mi */
-       int le, ri;
+       int le, ri, i, n0 = n;
+       mpz_t *q;
+       /* we cannot divide in-place, otherwise we will modify the input
+          polynomial for the rest of the algorithm */
+       q = malloc ((n + 1) * sizeof (mpz_t));
+       for (i = 0; i <= n0; i++)
+         mpz_init_set (q[i], p[i]);
        while (smi == 0)
          {
 #ifdef DEBUG
@@ -242,23 +248,27 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            printf ("/2^%d\n", lmi);
 #endif
            printInt (mi, lmi, mi, lmi, nroots, R);
-           divide (mi, lmi, n, p);
+           divide (mi, lmi, n, q);
+           n --;
 #ifdef DEBUG
            printf ("new input polynomial is ");
-           printPol (p, n);
+           printPol (q, n);
 #endif
-           smi = signValue (mi, lmi, n, p);
+           smi = signValue (mi, lmi, n, q);
          }
        if (lmi > m)
          {
            mpz_mul_2exp (a, a, 1);
            mpz_mul_2exp (b, b, 1);
          }
-       le = usp (a, mi, lmi, n, signValue (a, lmi, n, p),
-                 signValue (mi, lmi, n, p), n, nroots, p, r, verbose, R);
-       ri = usp (mi, b, lmi, n, signValue (mi, lmi, n, p),
-                 signValue (b, lmi, n, p), n, nroots, p, r, verbose, R);
+       le = usp (a, mi, lmi, n, signValue (a, lmi, n, q),
+                 signValue (mi, lmi, n, q), n, nroots, q, r, verbose, R);
+       ri = usp (mi, b, lmi, n, signValue (mi, lmi, n, q),
+                 signValue (b, lmi, n, q), n, nroots, q, r, verbose, R);
        mpz_clear (mi);
+       for (i = 0; i <= n0; i++)
+         mpz_clear (q[i]);
+       free (q);
        return 1 + le + ri;
    }
    if (va * smi < 0)
