@@ -3,7 +3,8 @@
 #include "polyselect/rho.h"
 #include "tests_common.h"
 
-int
+/* check relative error is less than emax */
+static int
 check_num (double x, double y, double emax)
 {
   double e = fabs (x - y) / fabs (y);
@@ -16,10 +17,30 @@ check_num (double x, double y, double emax)
   return 1;
 }
 
+/* check absolute error is less than emax */
+static int
+check_num_abs (double x, double y, double emax)
+{
+  double e = fabs (x - y);
+
+  if (e > emax)
+    {
+      printf ("expected %.16e, got %.16e (abs. error %e)\n", y, x, e);
+      return 0;
+    }
+  return 1;
+}
+
 void
 test_rho (void)
 {
   double x, y;
+
+  y = dickman_rho (-0.5);
+  assert (y == 0.0);
+
+  y = dickman_rho (0.0);
+  assert (y == 1.0);
 
   x = drand48 ();
   y = dickman_rho (x);
@@ -68,7 +89,7 @@ test_rho (void)
   check_num (y, 6.07650960951011e-19, 4.9e-8);
 
   y = dickman_rho (15.6);
-  check_num (y, 6.08381226695129e-21, 4.9e-8);
+  check_num_abs (y, 6.08381226695129e-21, 3.5e-21);
 }
 
 int

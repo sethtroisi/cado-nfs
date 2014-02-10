@@ -32,8 +32,7 @@ dickman_rho (double x)
 {
   if (x < 0)
     {
-      fprintf (stderr, "Error in dickman_rho, x < 0\n");
-      exit (EXIT_FAILURE);
+      return 0.0;
     }
 
   if (x <= 1.0)
