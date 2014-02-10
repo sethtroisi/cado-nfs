@@ -411,7 +411,10 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
       mpz_set_ui (a, 0);
       printInt (a, 0, a, 0, &nroots, Roots);
       while (mpz_cmp_ui (p[0], 0) == 0)
-        divide (a, 0, n, p);
+        {
+          divide (a, 0, n, p);
+          n--;
+        }
     }
   if (T != 0.0)
     T = log (T - 0.5) / log (2.0);
