@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-TESTBENCH="$1"
+BINDIR="$1"
+TESTBENCH="$1/sieve/ecm/testbench"
 INPUTFILE="$2"
 shift 2
 
@@ -8,6 +9,9 @@ REQUIRED_OUTPUT="`mktemp`"
 INPUTNUMBERS="`mktemp`"
 sed "s/ *#.*$//" < "${INPUTFILE}" | grep . > "${REQUIRED_OUTPUT}" || exit 1
 cat "${REQUIRED_OUTPUT}" | tr " " "*" | bc >> "${INPUTNUMBERS}" || exit 1
+
+cd $BINDIR
+make testbench
 
 ACTUAL_OUTPUT="`mktemp`"
 "${TESTBENCH}" -inp "${INPUTNUMBERS}" "$@" >> "${ACTUAL_OUTPUT}"
