@@ -738,11 +738,7 @@ L2_skewness (mpz_poly_ptr f, int prec)
         }
     }
   else if (d == 1)
-    {
-      a = b = fd[0] / fd[1];
-      if (a < 0)
-        a = b = -a;
-    }
+    a = b = (fd[0] / fd[1] >= 0) ? fd[0] / fd[1] : -fd[0] / fd[1];
   else
     {
       fprintf (stderr, "L2_skewness not yet implemented for degree %d\n", d);

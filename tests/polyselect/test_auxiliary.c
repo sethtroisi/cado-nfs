@@ -101,7 +101,7 @@ test_L2_skewness (int t)
   else if (t == 1)
     mpz_set_ui (p->coeff[0], 4294967295UL);
   else
-    mpz_set_ui (p->coeff[0], lrand48 ());
+    mpz_set_ui (p->coeff[0], mrand48 ());
   for (d = 1; d <= 7; d++)
     {
       if ((t == 0 || t == 1) && d > 1)
@@ -113,7 +113,7 @@ test_L2_skewness (int t)
       else
         {
           do
-            mpz_set_ui (p->coeff[d], lrand48 ());
+            mpz_set_ui (p->coeff[d], mrand48 ());
           while (mpz_cmp_ui (p->coeff[d], 0) == 0);
         }
       p->deg = d;

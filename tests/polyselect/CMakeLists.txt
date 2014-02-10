@@ -7,3 +7,4 @@ add_test(test_polsel7 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINAR
 add_executable(test_auxiliary test_auxiliary.c)
 target_link_libraries(test_auxiliary utils tests polyselect_common)
 run_test(test_auxiliary test_auxiliary)
+build_and_run_test(test_rho.c "polyselect_common;tests")
