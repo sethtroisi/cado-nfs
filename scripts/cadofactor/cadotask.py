@@ -3319,6 +3319,7 @@ class ReconstructLogTask(Task):
             if match:
                 log3 = match.group(2)
             if log2 != None and log3 != None:
+                myfile.close()
                 return [ log2, log3 ]
         raise Exception("Could not find log2 and log3 in %s" % filename)
 

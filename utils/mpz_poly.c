@@ -903,7 +903,8 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
   mpz_poly_t prd;
   int v;
 
-  mpz_poly_init (prd, P1->p->deg + P2->p->deg);
+  /* beware: if P1 and P2 are zero, P1->p->deg + P2->p->deg = -2 */
+  mpz_poly_init (prd, (P1->p->deg == -1) ? -1 : P1->p->deg + P2->p->deg);
 
   ASSERT_ALWAYS(mpz_poly_normalized_p (P1->p));
   ASSERT_ALWAYS(mpz_poly_normalized_p (P2->p));

@@ -340,9 +340,6 @@ L2_skewness (mpz_poly_ptr f, int prec)
   double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
     s1, s2, s3, s4, s5, s6, s7;
   unsigned int d = f->deg;
-#ifdef DEBUG_SKEW
-  int count = 0;
-#endif
 
   double_poly_init (ff, d);
   double_poly_init (df, d);
@@ -378,10 +375,24 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[2] = 27.0 * (fd[2]*fd[2] + 2.0*fd[1]*fd[3] + 2.0*fd[0]*fd[4]);
       dfd[1] = 165.0 * (fd[1]*fd[1] + 2.0*fd[0]*fd[2]);
       dfd[0] = 3003 * fd[0] * fd[0];
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[7] + dfd[6] + dfd[5] + dfd[4] - dfd[3] - dfd[2] - dfd[1]
+        - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          s6 = s3 * s3; /* s^12 */
+          s7 = s6 * s1; /* s^14 */
+          nc = dfd[7] * s7 + dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[3] * s3 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
@@ -393,10 +404,8 @@ L2_skewness (mpz_poly_ptr f, int prec)
           s7 = s6 * s1; /* s^14 */
           nc = dfd[7] * s7 + dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
             - dfd[3] * s3 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
-#ifdef DEBUG_SKEW
-          count ++;
-#endif
         }
+      while (nc < 0);
 
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
@@ -415,9 +424,6 @@ L2_skewness (mpz_poly_ptr f, int prec)
 
           nc = dfd[7] * s7 + dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
             - dfd[3] * s3 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
-#ifdef DEBUG_SKEW
-          count ++;
-#endif
           if (nc > 0)
             b = c;
           else
@@ -450,10 +456,21 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
       dfd[1] = 6.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
       dfd[0] = 99.0 * fd[0] * fd[0] ;
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[6] + dfd[5] + dfd[4] - dfd[2] - dfd[1] - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          s6 = s5 * s1; /* s^12 */
+          nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
@@ -463,10 +480,8 @@ L2_skewness (mpz_poly_ptr f, int prec)
           s6 = s5 * s1; /* s^12 */
           nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
             - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
-#ifdef DEBUG_SKEW
-          count ++;
-#endif
         }
+      while (nc < 0);
 
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
@@ -483,9 +498,6 @@ L2_skewness (mpz_poly_ptr f, int prec)
 
           nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
             - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
-#ifdef DEBUG_SKEW
-          count ++;
-#endif
           if (nc > 0)
             b = c;
           else
@@ -512,10 +524,21 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[2] = 2.0 * (fd[0] * fd[4] + fd[1] * fd[3]) + fd[2] * fd[2];
       dfd[1] = 7.0 * (2.0 * fd[0] * fd[2] + fd[1] * fd[1]);
       dfd[0] = 105.0 * fd[0] * fd[0];
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[5] + dfd[4] + dfd[3] - dfd[2] - dfd[1] - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          nc = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
@@ -526,6 +549,7 @@ L2_skewness (mpz_poly_ptr f, int prec)
           nc = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
             - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
         }
+      while (nc < 0);
 
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
@@ -565,10 +589,19 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[3] = 2.0 * fd[2] * fd[4] + fd[3] * fd[3];
       dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
       dfd[0] = 14.0 * fd[0] * fd[0];
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[4] + dfd[3] - dfd[1] - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          nc = dfd[4] * s4 + dfd[3] * s3 - dfd[1] * s1 - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
@@ -577,6 +610,7 @@ L2_skewness (mpz_poly_ptr f, int prec)
           s4 = s2 * s2; /* s^8 */
           nc = dfd[4] * s4 + dfd[3] * s3 - dfd[1] * s1 - dfd[0];
         }
+      while (nc < 0);
 
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
@@ -614,10 +648,18 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[2] = 2.0 * fd[1] * fd[3] + fd[2] * fd[2];
       dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
       dfd[0] = 15.0 * fd[0] * fd[0];
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[3] + dfd[2] - dfd[1] - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          nc = dfd[3] * s3 + dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
@@ -625,6 +667,7 @@ L2_skewness (mpz_poly_ptr f, int prec)
           s3 = s2 * s1; /* s^6 */
           nc = dfd[3] * s3 + dfd[2] * s2 - dfd[1] * s1 - dfd[0];
         }
+      while (nc < 0);
 
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
@@ -646,11 +689,11 @@ L2_skewness (mpz_poly_ptr f, int prec)
   else if (d == 2)
     {
       /* Sage code:
+         var('r,s,t,y')
          R.<x> = PolynomialRing(ZZ)
          S.<a> = InfinitePolynomialRing(R)
          d=2; f = SR(sum(a[i]*x^i for i in range(d+1)))
          F = expand(f(x=x/y)*y^d)
-         var('r,s,t')
          F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
          v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
          v = (24*v/pi).expand()
@@ -660,17 +703,24 @@ L2_skewness (mpz_poly_ptr f, int prec)
       dfd[2] = 6.0 * fd[2] * fd[2];
       dfd[1] = 0.0;
       dfd[0] = 6.0 * fd[0] * fd[0];
-      nc = -1.0;
       s = 1.0;
+      nc = dfd[2] + dfd[1] - dfd[0];
       /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-      while (nc < 0)
+      while (nc > 0)
+        {
+          s = 0.5 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          nc = dfd[2] * s2 + dfd[1] - dfd[0];
+        }
+      do
         {
           s = 2.0 * s;
           s1 = s * s;   /* s^2 */
           s2 = s1 * s1; /* s^4 */
           nc = dfd[2] * s2 + dfd[1] - dfd[0];
         }
-
+      while (nc < 0);
       /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
       a = (s == 2.0) ? 1.0 : 0.5 * s;
       b = s;
@@ -687,14 +737,13 @@ L2_skewness (mpz_poly_ptr f, int prec)
             a = c;
         }
     }
+  else if (d == 1)
+    a = b = (fd[0] / fd[1] >= 0) ? fd[0] / fd[1] : -fd[0] / fd[1];
   else
     {
-      fprintf (stderr, "L2_skewness_derivative not yet implemented for degree %d\n", d);
+      fprintf (stderr, "L2_skewness not yet implemented for degree %d\n", d);
       exit (1);
     }
-#ifdef DEBUG_SKEW
-  printf ("evaluation derivative test: %d", count);
-#endif
   s = (a + b) * 0.5;
 
   double_poly_clear (ff);
@@ -723,11 +772,7 @@ L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
   mpz_init (c);
   mpz_init (nc);
 
-//#define DEBUG_SKEW
   int i;
-#ifdef DEBUG_SKEW
-  int count = 0;
-#endif
 
   if (d == 6) {
     mpz_t df[d+1];
@@ -805,10 +850,6 @@ L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
       mpz_sub (nc, nc, s1);
       mpz_sub (nc, nc, df[0]);
 
-#ifdef DEBUG_SKEW
-      count ++;
-      fprintf (stderr, "count: %d\n", count);
-#endif
     }
 
     /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
@@ -838,10 +879,6 @@ L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
       mpz_sub (nc, nc, s1);
       mpz_sub (nc, nc, df[0]);
 
-#ifdef DEBUG_SKEW
-      count ++;
-#endif
-
       if (mpz_cmp_ui (nc, 0) > 0)
         mpz_set (b, c);
       else
@@ -857,10 +894,6 @@ L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
     fprintf (stderr, "L2_skewness_derivative_mp not yet implemented for degree %d\n", d);
     exit (1);
   }
-
-#ifdef DEBUG_SKEW
-  printf ("evaluation derivative test: %d", count);
-#endif
 
   mpz_add (s, a, b);
   mpz_cdiv_q_2exp (skewness, s, 1);
