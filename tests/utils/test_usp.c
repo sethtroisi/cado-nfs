@@ -24,27 +24,27 @@ test_usp ()
   /* polynomial x+1 */
   mpz_set_ui (p[0], 1);
   mpz_set_ui (p[1], 1);
-  n = numberOfRealRoots (p, 1, 2, 0, NULL);
+  n = numberOfRealRoots (p, 1, 0, 0, NULL);
   assert (n == 1);
 
   /* polynomial x-1 */
   mpz_set_si (p[0], -1);
   mpz_set_ui (p[1], 1);
-  n = numberOfRealRoots (p, 1, 2, 0, NULL);
+  n = numberOfRealRoots (p, 1, 0, 0, NULL);
   assert (n == 1);
 
   /* polynomial x^2+1 */
   mpz_set_si (p[0], 1);
   mpz_set_ui (p[1], 0);
   mpz_set_ui (p[2], 1);
-  n = numberOfRealRoots (p, 2, 2, 0, NULL);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 0);
 
   /* polynomial x^2-1 */
   mpz_set_si (p[0], -1);
   mpz_set_ui (p[1], 0);
   mpz_set_ui (p[2], 1);
-  n = numberOfRealRoots (p, 2, 2, 0, NULL);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
 
   mpz_init (u);
@@ -59,7 +59,7 @@ test_usp ()
         }
       if (mpz_cmp_ui (p[d], 0) == 0)
         mpz_set_ui (p[d], 1);
-      n = numberOfRealRoots (p, d, 1000, 0, NULL);
+      n = numberOfRealRoots (p, d, 0, 0, NULL);
       assert (0 <= n && n <= d);
     }
 
@@ -68,7 +68,7 @@ test_usp ()
   mpz_urandomb (p[1], state, 2048);
   mpz_urandomb (p[2], state, 2048);
   mpz_urandomb (p[3], state, 2048);
-  n = numberOfRealRoots (p, 3, 1000, 0, NULL);
+  n = numberOfRealRoots (p, 3, 0, 0, NULL);
   assert (0 <= n && n <= 3);
 
   for (i = 0; i < MAX_DEGREE; i++)
