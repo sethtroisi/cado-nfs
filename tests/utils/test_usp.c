@@ -11,15 +11,25 @@ test_usp ()
 {
   mpz_t p[MAX_DEGREE], u;
   int n, i, d;
+  root_struct R[1];
 
   for (i = 0; i < MAX_DEGREE; i++)
     mpz_init (p[i]);
 
+  mpz_init (R[0].a);
+  mpz_init (R[0].b);
+
   /* polynomial x */
   mpz_set_ui (p[0], 0);
   mpz_set_ui (p[1], 1);
-  n = numberOfRealRoots (p, 1, 2, 1, NULL);
+  n = numberOfRealRoots (p, 1, 2, 1, R);
   assert (n == 1);
+  /* check [a/2^ka, b/2^kb] contains root 0 */
+  assert (mpz_cmp_ui (R[0].a, 0) <= 0);
+  assert (0 <= mpz_cmp_ui (R[0].b, 0));
+
+  mpz_clear (R[0].a);
+  mpz_clear (R[0].b);
 
   /* polynomial x+1 */
   mpz_set_ui (p[0], 1);
@@ -46,6 +56,14 @@ test_usp ()
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
+
+  /* polynomial x^2-2*x+1 */
+  mpz_set_si (p[0], 2);
+  mpz_set_si (p[1], -3);
+  mpz_set_ui (p[2], 1);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
+  assert (n == 2);
+  exit (1);
 
   mpz_init (u);
   mpz_set_ui (u, 1);

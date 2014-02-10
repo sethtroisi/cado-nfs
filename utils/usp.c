@@ -163,6 +163,41 @@ signValue (mpz_t a, int k, int n, mpz_t *p)
   return ret;
 }
 
+#ifdef DEBUG
+static void
+printQ (mpz_t a, int k)
+{
+  mpz_t w;
+
+  mpz_init (w);
+  mpz_out_str (stdout, 10, a);
+  if (k > 0)
+    {
+      /* printf ("/%d",1<<k); may overflow */
+      mpz_set_ui (w, 1);
+      mpz_mul_2exp (w, w, k);
+      printf ("/");
+      mpz_out_str (stdout, 10, w);
+    }
+  mpz_clear (w);
+}
+
+static void
+printPol (mpz_t *p, int n)
+{
+  int i;
+
+  for (i = 0; i <= n; i++)
+    {
+      if (i > 0 && mpz_cmp_ui (p[i], 0) >= 0)
+        printf ("+");
+      printQ (p[i], 0);
+      printf ("*x^%d", i);
+    }
+  printf ("\n");
+}
+#endif
+
 /* returns number of real roots (isolated) in a/2^m..b/2^m of polynomial
    p[0]+p[1]*x+...+p[n]*x^n
    r[0..n] is an auxiliary array.
@@ -176,11 +211,8 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    mpz_t mi, u, v, w;
 
 #ifdef DEBUG
-   printf ("looking at interval a/2^%d..b/2^%d for a=", m, m); 
-   mpz_out_str (stdout, 10, a);
-   printf (" and b=");
-   mpz_out_str (stdout, 10, b);
-   putchar ('\n');
+   gmp_printf ("looking at interval %Zd/2^%d..%Zd/2^%d\n", a, m, b, m);
+   printf ("up=%d\n", up);
 #endif
    if (va * vb == 2 * (up % 2) - 1)
      up--;
@@ -346,41 +378,6 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    mpz_clear (mi);
    return c;
 }
-
-#ifdef DEBUG
-static void
-printQ (mpz_t a, int k)
-{
-  mpz_t w;
-
-  mpz_init (w);
-  mpz_out_str (stdout, 10, a);
-  if (k > 0)
-    {
-      /* printf ("/%d",1<<k); may overflow */
-      mpz_set_ui (w, 1);
-      mpz_mul_2exp (w, w, k);
-      printf ("/");
-      mpz_out_str (stdout, 10, w);
-    }
-  mpz_clear (w);
-}
-
-static void
-printPol (mpz_t *p, int n)
-{
-  int i;
-
-  for (i = 0; i <= n; i++)
-    {
-      if (i > 0 && mpz_cmp_ui (p[i], 0) >= 0)
-        printf ("+");
-      printQ (p[i], 0);
-      printf ("*x^%d", i);
-    }
-  printf ("\n");
-}
-#endif
 
 /* return the number of real roots of the polynomial p[0]+p[1]*x+...+p[n]*x^n
    Assume p[n] is not zero.
