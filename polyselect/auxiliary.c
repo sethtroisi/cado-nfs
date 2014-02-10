@@ -57,6 +57,8 @@ L2_lognorm_d (double_poly_srcptr p, double s)
   double *a = p->coeff;
   unsigned int d = p->deg;
 
+  ASSERT_ALWAYS(1 <= d && d <= 7);
+
   if (d == 1)
   {
     double a1, a0;
@@ -193,7 +195,7 @@ L2_lognorm_d (double_poly_srcptr p, double s)
       n = n * 0.00043828022511018320850; /* Pi/7168 */
       return 0.5 * log(n / (s * s * s * s * s * s));
     }
-  else if (d == 7)
+  else /* d == 7 */
     {
       double a7, a6, a5, a4, a3, a2, a1, a0;
 
@@ -220,11 +222,6 @@ L2_lognorm_d (double_poly_srcptr p, double s)
         + 10*(a2*a4+a1*a5+a3*a5+a0*a6+a2*a6+a1*a7);
       n = n * 0.000191747598485705154; /* Pi/16384 */
       return 0.5 * log(n / (s * s * s * s * s * s * s));
-    }
-  else
-    {
-      fprintf (stderr, "L2norm not yet implemented for degree %u\n", d);
-      exit (1);
     }
 }
 
@@ -340,6 +337,8 @@ L2_skewness (mpz_poly_ptr f, int prec)
   double s = 0.0, a = 0.0, b = 0.0, c, nc, *fd, *dfd,
     s1, s2, s3, s4, s5, s6, s7;
   unsigned int d = f->deg;
+
+  ASSERT_ALWAYS(1 <= d && d <= 7);
 
   double_poly_init (ff, d);
   double_poly_init (df, d);
@@ -737,13 +736,9 @@ L2_skewness (mpz_poly_ptr f, int prec)
             a = c;
         }
     }
-  else if (d == 1)
+  else /* d == 1 */
     a = b = (fd[0] / fd[1] >= 0) ? fd[0] / fd[1] : -fd[0] / fd[1];
-  else
-    {
-      fprintf (stderr, "L2_skewness not yet implemented for degree %d\n", d);
-      exit (1);
-    }
+
   s = (a + b) * 0.5;
 
   double_poly_clear (ff);
@@ -1558,8 +1553,7 @@ rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1,
   *K1 = -*K0;
 
   /* now try negative j: -1, -3, -7, ... */
-  for (i++; exp_alpha[i] != DBL_MAX && rotate_area (*K0, *K1, *J0, -*J0)
-   < max_area; i++, *J0 = 2 * *J0 - 1)
+  for (i++; exp_alpha[i] != DBL_MAX && rotate_area (*K0, *K1, *J0, -*J0) < max_area; i++, *J0 = 2 * *J0 - 1)
     {
       j0 = rotate_aux (f->coeff, b, m, j0, *J0, 1);
       lognorm = L2_lognorm (f, L2_skewness (f, SKEWNESS_DEFAULT_PREC));

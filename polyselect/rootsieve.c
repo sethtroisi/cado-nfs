@@ -174,6 +174,7 @@ update_table (mpz_t *f, int d, mpz_t m, mpz_t b, double *A, long K0, long K1,
   modul_poly_clear (fpn);
 }
 
+#if 0 /* not used in the current code */
 #define average_valuation_affine special_val0
 
 /* Computes the contribution at p of the alpha value of f (projective part
@@ -213,3 +214,4 @@ alpha_p_projective (mpz_t *f, int d, mpz_t disc, unsigned long p)
 	* log ((double) p) / (double) (p - 1);
     }
 }
+#endif
