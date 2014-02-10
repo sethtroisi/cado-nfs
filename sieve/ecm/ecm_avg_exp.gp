@@ -138,27 +138,6 @@ list_pp1_order (pmin, pmax, res, mod, verbose) =
  *                      Functions for ECM                       *
  ****************************************************************/
 
-/* Determine the order of the point P on E. 
-   The order of E must be given as a parameter */
-pointorder(E,P,o)={
-  local(f, i, e);
-  if (ellpow(E, P, o) != [0],
-    error("Supplied order is not a multiple of point's order");
-  );
-  f = factorint(o)~;
-  
-  /* For each prime, try if decreasing the exponent of that prime
-     still produces a multiple of the point's order */
-  e = o;
-  for (i = 1, length(f),             /* For each prime */
-    while(e % f[1,i] == 0 && ellpow(E, P, e / f[1,i]) == [0], 
-      e /= f[1,i];
-    );
-  );
-  return (e);
-}
-
-
 /* Generate an elliptic curve E, using the parameterization for
    ratinal torsion 12 from Montgomery's thesis.
    Also generates a starting point.
@@ -357,8 +336,8 @@ ecm_printorder (parameterization, parameter, p) =
   if (EP == 0, print (p, " 0 0 0"); return);
   E = EP[1];
   P = EP[2];
-  o = ellsea (E, p);
-  po = pointorder (E, P, o);
+  o = p + 1 - ellap (E);
+  po = ellorder (E, P, o);
   print (p, " ", o, " ", po, " ", o / po);
 }
 
@@ -446,7 +425,7 @@ ecm_dist_exp(parameterization,s,pmin,pmax,r,m) = {
         );
         if (EP != 0,
           n++;
-          o = ellsea(EP[1],p); 
+          o = p + 1 - ellap(EP[1]); 
           p2[min (valuation(o,2)+1, len)]++; 
           p3[min (valuation(o,3)+1, len)]++; 
           p5[min (valuation(o,5)+1, len)]++; 
@@ -479,7 +458,5 @@ ecm_avg_exp(d) = {
 
 /* Computes the order of the curve, the order of the starting point and
    the index of the starting point for curves with Montgomery torsion 12 
-n=0;v=vector(20);forprime(p=100000, 200000, EP=ecmtorsion12(2, p); E=EP[1]; P=EP[2]; o=ellsea(E,p); po = pointorder(E,P,o); n++; v[valuation(o/po,2)+1]++; print(p, ": ", o, " / ", po, " = ", o/po));
+n=0;v=vector(20);forprime(p=100000, 200000, EP=ecmtorsion12(2, p); E=EP[1]; P=EP[2]; o=p + 1 - ellap(E); po = ellorder(E,P,o); n++; v[valuation(o/po,2)+1]++; print(p, ": ", o, " / ", po, " = ", o/po));
 */
-
-
