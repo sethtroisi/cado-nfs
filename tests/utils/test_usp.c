@@ -63,6 +63,14 @@ test_usp ()
       assert (0 <= n && n <= d);
     }
 
+  /* check with large coefficients */
+  mpz_urandomb (p[0], state, 2048);
+  mpz_urandomb (p[1], state, 2048);
+  mpz_urandomb (p[2], state, 2048);
+  mpz_urandomb (p[3], state, 2048);
+  n = numberOfRealRoots (p, 3, 1000, 0, NULL);
+  assert (0 <= n && n <= 3);
+
   for (i = 0; i < MAX_DEGREE; i++)
     mpz_clear (p[i]);
   mpz_clear (u);

@@ -88,7 +88,7 @@ ln2 (mpz_t a)
    double r;
 
    l = mpz_sizeinbase (a, 2);
-   if (l <= 1000)
+   if (l <= 1024) /* a fits in a double */
      r = log (fabs (mpz_get_d (a))) / log (2.0);
    else
      {
