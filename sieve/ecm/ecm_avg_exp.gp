@@ -76,17 +76,40 @@ list_smooth (B1, B2, pmin, pmax, c, r, m, v) =
 
 /* Compute value of i-th Chebyshev polynomial defined by
    V_i(x+1/x) = x^i + 1/x^i */
-Chebyshev(i,X) = {
-  local(n); 
-  if (i == 0, return (2)); 
-  if (i == 1, return(X)); 
-  if(i % 2 == 0, return (Chebyshev (i/2, X)^2-2));
-  if(i % 3 == 0, n = Chebyshev (i/3, X); return (n^3 - 3 * n));
-  if(i % 5 == 0, n = Chebyshev (i/5, X); return (n^5 - 5 * n^3 + 5*n));
-  if(i % 7 == 0, n = Chebyshev (i/7, X); return (n^7 - 7*n^5 + 14*n^3 - 7*n));
-  return (Chebyshev ((i+1)/2, X) * Chebyshev ((i-1)/2, X) - X)
-}
 
+Chebyshev_V(i,X) = { 
+  local (bitlen, j, k, t1, t2);
+  if (i < 0, return(Chebyshev_V(-i,X)));
+  if (i == 0, return(2)); 
+  if (i == 1, return(X)); 
+  if(i % 2 == 0, return (Chebyshev_V (i/2, X)^2-2));
+  if(i % 3 == 0, return (Chebyshev_V (i/3, X^3 - 3*X)));
+
+  bitlen = truncate(log(i) / log(2)) + 1;
+  if (2^bitlen < i,
+    bitlen++;
+  );
+  if (2^bitlen < i,
+    /* This shouldn't happen */
+    error("bitlen ", bitlen, "still too small for ", i);
+  );
+  if (bittest(i, bitlen - 1) == 0,
+    error("MSB (bit ", bitlen - 1, ") of ", i, " is unset?");
+  );
+  t1 = X;       /* V_1(X) */
+  t2 = X^2 - 2; /* V_2(X) */
+  for (j = 2, bitlen, 
+    k = bitlen - j; /* k = bitlen-2, ..., 0 */
+    if (bittest(i, k),
+      t1 = t1 * t2 - X;
+      t2 = t2^2 - 2;
+    ,
+      t2 = t1 * t2 - X;
+      t1 = t1^2 - 2;
+    );
+  );
+  return(t1);
+}
 
 /* Determine the order of X in F_p[sqrt(X^2-4)]
    It divides p-1 or p+1, depending on whether X^2-4 is a QR mod p or not */
@@ -95,7 +118,7 @@ V_order (X, o) = {
   if (X == 0, return 4);
   m = lift(X) + lift(-X);
   if (o == 0, o=m-kronecker (lift(X)^2-4, m));
-  /* if (Chebyshev(o,X) != 2, error("V_order: group order should be ", o, " but isn't")); */
+  /* if (Chebyshev_V(o,X) != 2, error("V_order: group order should be ", o, " but isn't")); */ 
   f = factorint (o)~;
   po = o;
   for (i = 1, length(f), 
@@ -103,8 +126,8 @@ V_order (X, o) = {
     k = f[2,i];
     po /= p^k; /* All p's removed */
     j = 0;
-    Xp = Chebyshev(po, X);
-    while (Xp != 2, po *= p; j++; if (j == k, break); Xp = Chebyshev(p, Xp));
+    Xp = Chebyshev_V(po, X);
+    while (Xp != 2, po *= p; j++; if (j == k, break); Xp = Chebyshev_V(p, Xp));
   );
   return (po);
 }
