@@ -365,11 +365,6 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
        mpz_init (aa);
        if (k == n+1)
          up = 2;
-       if (up == 2 && smi * va < 0)
-         {
-           if (verbose)
-             printf ("***************\n");
-         }
        if (lmi > m)
          mpz_mul_2exp (aa, a, 1);
        else
