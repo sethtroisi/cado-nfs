@@ -130,8 +130,11 @@ divide (mpz_t a, int k, int n, mpz_t *p)
 
 /* isolating interval is [a/2^ka, b/2^kb] */
 static void
-printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, root_struct *R)
+printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, root_struct *R,
+          int verbose)
 {
+  if (verbose)
+    gmp_printf ("isolated root in [%Zd/2^%d, %Zd/2^%d]\n", a, ka, b, kb);
   if (R != NULL)
     {
       mpz_set (R[*nroots].a, a);
@@ -221,7 +224,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
      return 0;
    else if (up == 1)
      {
-       printInt (a, m, b, m, nroots, R);
+       printInt (a, m, b, m, nroots, R, verbose);
        return 1;
      }
    mpz_init (mi);
@@ -248,7 +251,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            mpz_out_str (stdout, 10, mi);
            printf ("/2^%d\n", lmi);
 #endif
-           printInt (mi, lmi, mi, lmi, nroots, R);
+           printInt (mi, lmi, mi, lmi, nroots, R, verbose);
            divide (mi, lmi, n, q);
            n --;
 #ifdef DEBUG
@@ -276,8 +279,8 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
      {
        if (up == 2)
          {
-           printInt (a, m, mi, lmi, nroots, R);
-           printInt (mi, lmi, b, m, nroots, R);
+           printInt (a, m, mi, lmi, nroots, R, verbose);
+           printInt (mi, lmi, b, m, nroots, R, verbose);
            mpz_clear (mi);
            return 2;
          }
@@ -363,7 +366,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
           c = 2 and k=n+1 */
      }
    if (c == 1)
-     printInt (a, m, b, m, nroots, R);
+     printInt (a, m, b, m, nroots, R, verbose);
    else if (c > 1)
      {
        mpz_t aa;
@@ -412,7 +415,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
   if (mpz_cmp_ui (p[0], 0) == 0) /* root at 0 */
     {
       mpz_set_ui (a, 0);
-      printInt (a, 0, a, 0, &nroots, Roots);
+      printInt (a, 0, a, 0, &nroots, Roots, verbose);
       while (mpz_cmp_ui (p[0], 0) == 0)
         {
           divide (a, 0, n, p);

@@ -163,6 +163,15 @@ test_usp ()
   n = numberOfRealRoots (p, 3, 0, 0, NULL);
   assert (n == 1);
 
+  /* 33*x^4-124*x^3+137*x^2-32*x-11 */
+  mpz_set_si (p[0], -11);
+  mpz_set_si (p[1], -32);
+  mpz_set_si (p[2], 137);
+  mpz_set_si (p[3], -124);
+  mpz_set_si (p[4], 33);
+  n = numberOfRealRoots (p, 4, 0, 0, NULL);
+  assert (n == 4);
+
   mpz_init (u);
   mpz_set_ui (u, 1);
   mpz_mul_2exp (u, u, 127);
