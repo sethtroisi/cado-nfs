@@ -21,4 +21,3 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 void update_table (mpz_t*, int, mpz_t, mpz_t, double*, long, long,
 		   unsigned long, double);
-double alpha_p_projective (mpz_t*, int, mpz_t, unsigned long);
