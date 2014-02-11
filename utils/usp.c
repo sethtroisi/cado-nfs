@@ -64,6 +64,7 @@ B) to use within another program: compile without -DMAIN, the main function
 #include <gmp.h>
 #include "usp.h"
 #include "portability.h"
+#include "macros.h"
 
 /* #define DEBUG */
 
@@ -333,12 +334,14 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    d = n-1;
    for (c = k = s = 0; k <= n && c < 2; k++)
      {
+       /* invariant: all signs in r[0]..r[n-(d+1)] are equal */
        while (d > k && sign (r[n-d]) * last >= 0)
          d--;
        if (d < k)
          {
-           if (k > 0 && sign (r[n-k]) * s < 0)
-             c++;
+           /* d+1 <= k, thus all signs in r[0]..r[n-k] are equal,
+              thus only one more sign change is possible */
+           c += (sign (r[n-k]) * s < 0);
            k = n;
          }
        else
@@ -346,15 +349,18 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            for (i = n-1; i >= k; i--)
              mpz_add (r[n-i], r[n-i], r[n-i-1]);
            i = mpz_cmp_ui (r[n-k], 0);
-           if (k > 0 && (s * i) < 0)
+           if (s * i < 0)
              {
                c++;
-               if (va *vb > 0)
+               if (va * vb > 0)
                  c = 2;
              }
            if (i != 0)
              s = i; /* s is the last sign */
          }
+       /* when k=n-1 here and c=1, necessarily va * vb < 0, otherwise
+          we would have c>=2 already, thus when we exit we cannot have
+          c = 2 and k=n+1 */
      }
    if (c == 1)
      printInt (a, m, b, m, nroots, R);
@@ -363,8 +369,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
        mpz_t aa;
 
        mpz_init (aa);
-       if (k == n+1)
-         up = 2;
+       ASSERT(k <= n);
        if (lmi > m)
          mpz_mul_2exp (aa, a, 1);
        else
@@ -402,11 +407,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
   r = (mpz_t*) malloc ((n+1) * sizeof (mpz_t));
   for (i = 0; i <= n; i++)
     mpz_init (r[i]);
-  if (mpz_cmp_ui (p[n], 0) == 0)
-    {
-      fprintf (stderr, "Error: leading coefficient is zero\n");
-      exit (1);
-    }
+  ASSERT_ALWAYS(mpz_cmp_ui (p[n], 0) != 0);
   nroots = 0; /* initialize number of roots found */
   if (mpz_cmp_ui (p[0], 0) == 0) /* root at 0 */
     {
@@ -430,18 +431,14 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
         {
           if (mpz_cmp_ui (p[n-i], 0))
             {
+              /* for i=1, we get ln2 (p[n-1]) - pn, which is always
+                 larger than C = ln2 (p[n-1]) - pn - log2 (n) */
               x = (ln2 (p[n-i]) - pn) / (double) i;
               if (x > T)
                 T = x;
             }
         }
       T += 1.0;
-      if (C > T)
-        {
-          x = C;
-          C = T;
-          T = x;
-        }
       T = T + log (1 + exp ((C - T) / log (2.0))) / log (2.0);
     }
   i = 1 + (int) T;

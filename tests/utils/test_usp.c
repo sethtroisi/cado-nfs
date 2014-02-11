@@ -57,9 +57,23 @@ test_usp ()
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
 
-  /* polynomial x^2-2*x+1 */
+  /* polynomial x^2-3*x+2 */
   mpz_set_si (p[0], 2);
   mpz_set_si (p[1], -3);
+  mpz_set_ui (p[2], 1);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
+  assert (n == 2);
+
+  /* polynomial x^2-2*x+2 */
+  mpz_set_si (p[0], 2);
+  mpz_set_si (p[1], -2);
+  mpz_set_ui (p[2], 1);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
+  assert (n == 0);
+
+  /* polynomial x^2+1000*x+2 */
+  mpz_set_si (p[0], 2);
+  mpz_set_si (p[1], 1000);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
   assert (n == 2);
