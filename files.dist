@@ -727,8 +727,16 @@ tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
 tests/sieve/ecm/CMakeLists.txt
-tests/sieve/ecm/pm1test.inp
+tests/sieve/ecm/ecm_10_100_1000_test.inp
+tests/sieve/ecm/ecm_11_100_1000_test.inp
+tests/sieve/ecm/ecmm12_2_100_1000_test.inp
+tests/sieve/ecm/ecmm12_4_100_1000_test.inp
+tests/sieve/ecm/ecmm16_1_100_1000_test.inp
+tests/sieve/ecm/pm1_2_100_1000_test.inp
+tests/sieve/ecm/pp1_27_100_1000_test.inp
+tests/sieve/ecm/pp1_65_100_1000_test.inp
 tests/sieve/ecm/test_testbench.sh
+tests/sieve/ecm/make_tests.sh
 tests/polyselect/CMakeLists.txt
 tests/polyselect/polysel.sh
 tests/polyselect/test_auxiliary.c

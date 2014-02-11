@@ -1,2 +1,8 @@
-# Tests for the P-1 algorithm.
-add_test(test_pm1 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/pm1test.inp" -q -vf -vcf -pm1 100 1000)
+add_test(test_pm1 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/pm1_2_100_1000_test.inp" -q -vf -vcf -pm1 100 1000)
+add_test(test_pp1_27 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/pp1_27_100_1000_test.inp" -q -vf -vcf -pp1_27 100 1000)
+add_test(test_pp1_65 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/pp1_65_100_1000_test.inp" -q -vf -vcf -pp1_65 100 1000)
+add_test(test_ecm_10 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/ecm_10_100_1000_test.inp" -q -vf -vcf -ecm 100 1000 10)
+add_test(test_ecm_11 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/ecm_11_100_1000_test.inp" -q -vf -vcf -ecm 100 1000 11)
+add_test(test_ecmm12_2 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/ecmm12_2_100_1000_test.inp" -q -vf -vcf -ecmm12 100 1000 2)
+add_test(test_ecmm12_3 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/ecmm12_4_100_1000_test.inp" -q -vf -vcf -ecmm12 100 1000 4)
+add_test(test_ecmm16_1 "${CMAKE_CURRENT_SOURCE_DIR}/test_testbench.sh" "${CADO_NFS_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/ecmm16_1_100_1000_test.inp" -q -vf -vcf -ecmm16 100 1000 1)

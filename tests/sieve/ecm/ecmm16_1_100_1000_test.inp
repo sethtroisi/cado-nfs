@@ -1,0 +1,19 @@
+# Created with: find_test_combinations(100, 1000, 1, 4, 40, 10000)
+10099 16319 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor (order=8168, lpf=1021)
+10009 16319 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor (order=8168, lpf=1021)
+10009 10099 # one B1,B2-smooth factor (order=313, lpf=313), one B1-smooth factor (order=2556, lpf=71)
+10093 10159 #  # Two B1,B2-smooth factors with LPF in differnet giant-steps (order=1284, lpf=107),  (order=2524, lpf=631)
+10099 850613 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor (order=212208, lpf=4421)
+10009 858233 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor (order=107376, lpf=2237)
+10099 55743138301 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor (order=3981654736, lpf=248853421)
+10009 56244375413 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor (order=9374059840, lpf=352939)
+10099 3653182309874197 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor (order=913295582187504, lpf=149818829099)
+10009 3686031386494099 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor (order=1843015639184376, lpf=38561143)
+10099 15690298547235238656014261 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor
+10009 15831384257021548125395941 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor
+10099 16847329781212915311584048293483207 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor
+10009 16998819408579201891466410602046607 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor
+10099 33694659562425830623168096586965943 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor
+10009 33997638817158403782932821204093231 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor
+10099 159118530969302928561437973298461491486503910662718372009 # one B1-smooth factor (order=2556, lpf=71), one non-smooth cofactor
+10009 160549310046856856383451103241199180989329902466059829953 # one B1,B2-smooth factor (order=313, lpf=313), one non-smooth cofactor
