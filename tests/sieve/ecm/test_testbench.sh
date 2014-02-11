@@ -21,7 +21,7 @@ ACTUAL_OUTPUT="`mktemp`"
 if ! cmp "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}"
 then
   echo "testbench produced output in file \"${ACTUAL_OUTPUT}\", but expected result as in \"${REQUIRED_OUTPUT}\", input numbers are in \"${INPUTNUMBERS}\""
-  diff "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}"
+  # diff "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}"
   exit 1
 fi
 
