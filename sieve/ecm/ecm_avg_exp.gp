@@ -698,6 +698,17 @@ find_test_combinations(B1, B2, param, method, minq=40, minp=10000) = {
   );
 }
 
+print_orders(pmin, pmax, param, method) = {
+  local(p);
+  p = nextprime(pmin);
+  while (p <= pmax,
+    o = get_order(p, param, method);
+    print(o[1], " ", o[1], " ", o[3]);
+    p = nextprime(p+1);
+  );
+}
+
+
 
 /* Computes the order of the curve, the order of the starting point and
    the index of the starting point for curves with Montgomery torsion 12 
