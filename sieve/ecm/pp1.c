@@ -7,7 +7,7 @@
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef PP1_BACKTRACKING
 /* Default is "yes." Set to 0 for "no." */
-#define PP1_BACKTRACKING 0
+#define PP1_BACKTRACKING 1
 #endif
 
 static inline void
