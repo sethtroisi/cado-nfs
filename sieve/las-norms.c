@@ -72,11 +72,11 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 }
 
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-/* These functions are for the SSE2 init algebraics.
+/* This function is for the SSE2 init algebraics.
    I prefer use X86 ASM directly and avoid intrinsics because the trick of
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
    compute their log2).
-   CAREFUL! These functions adds (1., 1.) to i to avoid negative value in the
+   CAREFUL! This function adds (1., 1.) to i to avoid negative value in the
    exposant (numbers < 1.) !
 */
 static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
@@ -96,34 +96,6 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
 	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
-}
-
-static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
-  __asm__ __volatile__ (
-	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
-	   "psrlq     $0x01,    %0       \n"
-	   "addpd     %1,       %0       \n"
-	   "shufps    $0xED,    %0,    %0\n"
-	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i):"x"(un));
-  i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
-  addr[decal] = (uint8_t) _mm_cvttsd_si32(i);
-  i = _mm_unpackhi_pd(i,i);
-  (&addr[decal])[1] = (uint8_t) _mm_cvttsd_si32(i);
-}
-
-static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal1, ssize_t decal2, __m128d un) {
-  __asm__ __volatile__ (
-	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
-	   "psrlq     $0x01,    %0       \n"
-	   "addpd     %1,       %0       \n"
-	   "shufps    $0xED,    %0,    %0\n"
-	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i):"x"(un));	   
-  i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
-  addr[decal1] = (uint8_t) _mm_cvttsd_si32(i);
-  i = _mm_unpackhi_pd(i,i);
-  addr[decal2] = (uint8_t) _mm_cvttsd_si32(i);
 }
 #endif
 
