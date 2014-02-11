@@ -423,7 +423,7 @@ int main (int argc, char **argv)
 	  
 	  total++;
 	  if (do_pointorder)
-	    print_pointorder (i, po_sigma, po_parameterization, verbose);
+	    print_pointorder (i, po_sigma, po_parameterization, printfactors);
           else
 	    {
               mpz_mul_ui (N, cof, i);
