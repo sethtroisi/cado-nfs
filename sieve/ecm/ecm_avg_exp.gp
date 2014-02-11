@@ -578,12 +578,21 @@ find_duplicate_lfp(v, mino) = {
    in the order of the starting element for the factoring method satisfies
    minlpf <= lpf <= maxlpf, or if maxlpf == 0, minlpf <= lpf. */
 find_lpf_in_range(minp, minlpf, maxlpf, param, method) = {
-  local(p, o);
+  local(p, o, verbose);
+  verbose=0;
+  if(maxlpf != 0 && minlpf > maxlpf, error("minlpf=", minlpf, " > maxlpf=", maxlpf));
+  if (verbose, 
+    printf ("# find_lpf_in_range(%d, %d, %d, %d, %d)\n",
+            minp, minlpf, maxlpf, param, method);
+  );
   p = nextprime(minp);
   while(1,
     o = get_order(p, param, method);
     if(o != 0 && minlpf <= o[4] && (maxlpf == 0 || o[4] <= maxlpf),
       return(o);
+    );
+    if (verbose,
+      print("For p=", p , ", received o=", o);
     );
     p = nextprime(p + 1);
   );
@@ -643,35 +652,49 @@ print_numbers(p1, p2, s1, s2, c) =
 }
 
 
-find_test_combinations(B1, B2, param, method, minq=40) = {
+find_test_combinations(B1, B2, param, method, minq=40, minp=10000) = {
   local(p, q, verbose);
+  printf("# Created with: find_test_combinations(%d, %d, %d, %d, %d, %d)\n", 
+         B1, B2, param, method, minq, minp);
   verbose = 0;
   /* Composite number < 2^32 */
   /* A B1-smooth factor */
-  p1 = find_lpf_in_range(1000, minq, B1, param, method);
+  p1 = find_lpf_in_range(minp, minq, B1, param, method);
   /* A non-smooth cofactor */
   q = find_lpf_in_range(10000, B2+1, 0, param, method);
   print_numbers(p1, q, "one B1-smooth factor", "one non-smooth cofactor");
 
   /* A B1, B2-smooth factor, but not B1-smooth */
-  p2 = find_B1_B2_smooth(10000, B1, B2, param, method);
+  p2 = find_B1_B2_smooth(minp, B1, B2, param, method);
   print_numbers(p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor");
 
   /* A B1 and a B1,B2-smooth factor */
   print_numbers(p1, p2, "one B1-smooth factor", "one B1,B2-smooth factor");
 
   /* Find two B1-smooth factors with different power of 2 in the order */
-  p3 = p1;
-  while (valuation(p1[3], 2) == (valuation(p3[3], 2)),
-    p3 = find_lpf_in_range(p3[1] + 1, minq, B1, param, method);
+  /* Backtracking does not work reliably for ECM as in the addition chain with
+     a point of small order, an addition may be used incorrectly where a
+     doubling would be required, causing a zero coordinate before a backtracking
+     checkpoint is reached. */
+  if (method < 2,
+    p3 = p1;
+    while (valuation(p1[3], 2) == (valuation(p3[3], 2)),
+      p3 = find_lpf_in_range(p3[1] + 1, minq, B1, param, method);
+    );
+    print_numbers(p1, p3, " # Two B1-smooth factors with different power of 2 in the order", "");
   );
-  print_numbers(p1, p3, " # Two B1-smooth factors with different power of 2 in the order", "");
+
+  q1 = find_lpf_in_range(minp, B1, B1+50, param, method);
+  q2 = find_lpf_in_range(minp, q1[4] + 500, B2, param, method);
+  print_numbers(q1, q2, " # Two B1,B2-smooth factors with LPF in differnet giant-steps", "");
 
   v = [33, 49, 65, 97, 127, 128, 200];
   for (i = 1, length(v),
     /* A non-smooth cofactor such that the product is >2^v[i] */
     q = find_lpf_in_range(floor(2^v[i] / p1[1]), B2+1, 0, param, method);
     print_numbers(p1, q, "one B1-smooth factor", "one non-smooth cofactor");
+    q = find_lpf_in_range(floor(2^v[i] / p2[1]), B2+1, 0, param, method);
+    print_numbers(p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor");
   );
 }
 
