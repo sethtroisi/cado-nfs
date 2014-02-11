@@ -3648,9 +3648,12 @@ static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
   for (unsigned int i = 0; i < n ; ++i) {
     thread_side_data_ptr ts;
     ts = thrs[i]->sides[RATIONAL_SIDE];
-    clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+    /* if there is no special-q in the interval, the arrays are not malloced */
+    if (ts->BA.bucket_write != NULL)
+      clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
     ts = thrs[i]->sides[ALGEBRAIC_SIDE];
-    clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+    if (ts->BA.bucket_write != NULL)
+      clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
   }
 }/*}}}*/
 
@@ -4118,8 +4121,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         qt0 = seconds() - qt0;
         las_report_accumulate_threads_and_display(las, si, report, thrs, qt0);
-
-        /* thread_buckets_free(thrs, las->nb_threads); */
 
         trace_per_sq_clear(si);
 
