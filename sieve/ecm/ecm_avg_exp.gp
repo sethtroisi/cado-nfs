@@ -644,7 +644,7 @@ print_numbers(p1, p2, s1, s2, c) =
     t1 = s2;
     t2 = s1;
   );
-  print1(q1[1], " ", q2[1]);
+  print1(q1[1]*q2[1], " ", q1[1], " ", q2[1]);
   if (c > 0,
     print1(" ", c);
   );
