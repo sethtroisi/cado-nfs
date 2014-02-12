@@ -164,7 +164,8 @@ mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
-/* returns the smallest prime > q, guaranteed correct for q < 300M */
+/* returns the smallest prime p, q < p <= ULONG_MAX, or 0 if no such prime
+   exists. guaranteed correct for q < 300M */
 unsigned long
 ulong_nextprime (unsigned long q)
 {
@@ -178,8 +179,12 @@ ulong_nextprime (unsigned long q)
   do
     {
       mpz_nextprime (p, p);
-      ASSERT_ALWAYS (mpz_fits_ulong_p (p));
-      q = mpz_get_ui (p);
+      if (mpz_fits_ulong_p (p))
+        q = mpz_get_ui (p);
+      else {
+        q = 0;
+        break;
+      }
       for (i = 0; q > s[i]; i++);
     }
   while (q == s[i]);

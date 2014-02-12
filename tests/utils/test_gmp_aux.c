@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <stdint.h>
 #include <time.h>
+#include <limits.h>
 #include "gmp_aux.h"
 #include "macros.h"
 #include "tests_common.h"
@@ -251,6 +252,7 @@ test_ulong_nextprime (const unsigned long iter)
         abort ();
       q = r;
     }
+  assert(ulong_nextprime (ULONG_MAX) == 0);
 }
 
 void
