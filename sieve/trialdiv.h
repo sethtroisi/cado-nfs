@@ -6,7 +6,9 @@
 
 /* The maximum number of words in the numbers to be trial-divided.
    The $l$ value from the thesis text is equal to TRIALDIV_MAXLEN - 1 */
+#ifndef TRIALDIV_MAXLEN
 #define TRIALDIV_MAXLEN 6
+#endif
 
 typedef struct {
   unsigned long p;
