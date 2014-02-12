@@ -165,8 +165,8 @@ invmod_redc_32(uint32_t a, uint32_t b) {
   
   // Here a and b are odd, and a < b
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-#define T1 "sub %0,%1\n tzcnt %1,%5\n add %2,%3\n shr %%cl,%1\n add %%cl,%4\n shl %%cl,%2\n cmp %0,%1\n "
-#define T2 "sub %1,%0\n tzcnt %0,%5\n add %3,%2\n shr %%cl,%0\n add %%cl,%4\n shl %%cl,%3\n cmp %1,%0\n "
+#define T1 "sub %0,%1\n " /* tzcnt */ "rep; bsf %1,%5\n add %2,%3\n shr %%cl,%1\n add %%cl,%4\n shl %%cl,%2\n cmp %0,%1\n "
+#define T2 "sub %1,%0\n " /* tzcnt */ "rep; bsf %0,%5\n add %3,%2\n shr %%cl,%0\n add %%cl,%4\n shl %%cl,%3\n cmp %1,%0\n "
   __asm__ ( ".balign 8\n 0:\n"						\
 	    T1 " je 9f\n jb  1f\n"					\
 	    T1 " je 9f\n jb  1f\n"					\
@@ -277,8 +277,8 @@ invmod_redc_64(uint64_t a, uint64_t b)
   
   // Here a and b are odd, and a < b
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-#define T1 "sub %0,%1\n tzcnt %1,%5\n add %2,%3\n shr %%cl,%1\n add %%cl,%4\n shl %%cl,%2\n cmp %0,%1\n "
-#define T2 "sub %1,%0\n tzcnt %0,%5\n add %3,%2\n shr %%cl,%0\n add %%cl,%4\n shl %%cl,%3\n cmp %1,%0\n "
+#define T1 "sub %0,%1\n " /* tzcnt */ "rep; bsf %1,%5\n add %2,%3\n shr %%cl,%1\n add %%cl,%4\n shl %%cl,%2\n cmp %0,%1\n "
+#define T2 "sub %1,%0\n " /* tzcnt */ "rep; bsf %0,%5\n add %3,%2\n shr %%cl,%0\n add %%cl,%4\n shl %%cl,%3\n cmp %1,%0\n "
   __asm__ ( ".balign 8\n 0:\n"						\
 	    T1 " je 9f\n jb  1f\n"					\
 	    T1 " je 9f\n jb  1f\n"					\
