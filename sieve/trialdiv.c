@@ -16,11 +16,16 @@
 unsigned long
 trialdiv_get_max_p()
 {
-  if (TRIALDIV_MAXLEN == 1)
-    return ULONG_MAX;
+  /* With if(TRIALDIV_MAXLEN == 1) here, gcc complains about a division of zero
+     in ULONG_MAX / (TRIALDIV_MAXLEN - 1), so have to use preprocessor to get
+     gcc to shut up */
+#if TRIALDIV_MAXLEN == 1
+  return FBPRIME_MAX;
+#else
   double s = sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1));
   ASSERT(s >= 1.);
-  return (unsigned long)s - 1;
+  return MIN((unsigned long)s - 1, FBPRIME_MAX);
+#endif
 }
 
 static void
