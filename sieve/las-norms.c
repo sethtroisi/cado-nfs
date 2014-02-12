@@ -417,7 +417,7 @@ poly_scale (double *u, const double *t, unsigned int d, double h)
   } while (0)
 
 void init_alg_norms_bucket_region(unsigned char *S,
-				  unsigned char *xS MAYBE_UNUSED, unsigned int j,
+				  unsigned int j,
 				  sieve_info_ptr si)
 {
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
