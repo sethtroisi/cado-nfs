@@ -165,8 +165,9 @@ static void sieve_info_init_trialdiv(sieve_info_ptr si, int side)/*{{{*/
      * called, so that the only primes which are still in s->fb are the
      * trial-divided ones */
     sieve_side_info_ptr s = si->sides[side];
-    s->trialdiv_primes = fb_extract_bycost (s->fb, si->bucket_thresh,
-            si->td_thresh);
+    unsigned long pmax = MIN((unsigned long) si->bucket_thresh,
+                             trialdiv_get_max_p());
+    s->trialdiv_primes = fb_extract_bycost (s->fb, pmax, si->td_thresh);
     int n;
     for (n = 0; s->trialdiv_primes[n] != FB_END; n++);
     int skip2 = n > 0 && s->trialdiv_primes[0] == 2;
