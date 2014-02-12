@@ -81,15 +81,12 @@ test_trialdiv (int n, unsigned long iter)
   mpz_t N;
   trialdiv_divisor_t *d;
   fbprime_t f[1];
-  unsigned long p, g[1], i, pmax, sh;
+  unsigned long p, g[1], i, pmax;
   size_t s;
   int ret;
 
   mpz_init (N);
-  /* p should be <= 1920767766 = floor(sqrt(2^64/5)) on 64-bit computers,
-     and <= 29308 = floor(sqrt(2^32/5)) on 32-bit computers */
-  pmax = sizeof(unsigned long) == 4 ? 29303 : 1920767699;
-  sh = sizeof(unsigned long) == 4 ? 16 : 0;
+  pmax = trialdiv_get_max_p();
   for (i = 0; i < iter; i++)
     {
       if (i == 0)
@@ -98,7 +95,7 @@ test_trialdiv (int n, unsigned long iter)
         p = pmax;
       else
         {
-          do p = ulong_nextprime (lrand48 () >> sh); while (p > pmax || p < 3);
+          do p = ulong_nextprime (lrand48 () % pmax); while (p > pmax || p < 3);
         }
       f[0] = p;
       d = trialdiv_init (f, 1);
@@ -107,9 +104,10 @@ test_trialdiv (int n, unsigned long iter)
       ret = mpz_divisible_ui_p (N, p);
       s = trialdiv (g, N, d, 1);
       assert (s <= 2); /* s can be max_div+1, i.e., 2 */
-      if (ret)
+      if (ret) {
         assert (s >= 1);
-      else
+        assert (g[0] == p);
+      } else
         assert (s == 0);
 
       /* now test a case where it should divide */
