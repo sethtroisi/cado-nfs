@@ -39,7 +39,7 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         item.pk = p;
         for (int i = 1; i < k; ++i)
             item.pk *= p;
-        if (rk < item.pk)
+        if ((p_r_values_t) rk < item.pk)
             item.r = item.rk % p;
         else {
             long x = item.rk-item.pk;
