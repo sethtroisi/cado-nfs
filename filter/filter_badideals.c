@@ -25,11 +25,11 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         if (str[0] == '#' || str[0] == '\n')
             continue;
         errno = 0;
-        long p = strtol(str, &ptr, 10);
+        p_r_values_t p = strtoul(str, &ptr, 10);
         ASSERT_ALWAYS(errno == 0);
-        long k = strtol(ptr, &nptr, 10);
+        unsigned long k = strtoul(ptr, &nptr, 10);
         ASSERT_ALWAYS(errno == 0);
-        long rk = strtol(nptr, &ptr, 10);
+        p_r_values_t rk = strtoul(nptr, &ptr, 10);
         ASSERT_ALWAYS(errno == 0);
 
         badid_info_struct_t item;
@@ -37,12 +37,12 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         item.k = k;
         item.rk = rk;
         item.pk = p;
-        for (int i = 1; i < k; ++i)
+        for (unsigned int i = 1; i < k; ++i)
             item.pk *= p;
-        if ((p_r_values_t) rk < item.pk)
+        if (rk < item.pk)
             item.r = item.rk % p;
         else {
-            long x = item.rk-item.pk;
+            p_r_values_t x = item.rk-item.pk;
             item.r = p + (x % p);
         }
         item.ncol = 0;
