@@ -97,6 +97,7 @@ test_trialdiv (int n, unsigned long iter)
         {
           do p = ulong_nextprime (lrand48 () % pmax); while (p > pmax || p < 3);
         }
+      ASSERT_ALWAYS(p % 2UL == 1UL);
       f[0] = p;
       d = trialdiv_init (f, 1);
 
