@@ -11,8 +11,10 @@ test_cado_poly_set ()
   cado_poly_init (p);
   cado_poly_init (q);
 
+  const double s = 3.1415;
+
   mpz_set_ui (q->n, 123456789);
-  q->skew = 3.1415;
+  q->skew = s;
   q->pols[0]->deg = 1;
   mpz_set_ui (q->pols[0]->coeff[0], 17);
   mpz_set_ui (q->pols[0]->coeff[1], 42);
@@ -23,7 +25,7 @@ test_cado_poly_set ()
   cado_poly_set (p, q);
 
   ASSERT_ALWAYS (mpz_cmp_ui (p->n, 123456789) == 0);
-  ASSERT_ALWAYS (p->skew == 3.1415);
+  ASSERT_ALWAYS (p->skew == s);
   ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[0], 17) == 0);
   ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[1], 42) == 0);
   ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[0], 59) == 0);
