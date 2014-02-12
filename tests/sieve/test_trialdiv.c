@@ -91,13 +91,14 @@ test_trialdiv (int n, unsigned long iter)
     {
       if (i == 0)
         p = 3;
-      else if (i == 1)
-        p = pmax;
-      else
-        {
+      else if (i == 1) {
+        /* Find largest prime <= pmax */
+        unsigned long r;
+        for (r = pmax, p = 0; p == 0 || p > pmax; r -= 2)
+          p = ulong_nextprime (r);
+      } else {
           do p = ulong_nextprime (lrand48 () % pmax); while (p > pmax || p < 3);
-        }
-      ASSERT_ALWAYS(p % 2UL == 1UL);
+      }
       f[0] = p;
       d = trialdiv_init (f, 1);
 
@@ -115,6 +116,7 @@ test_trialdiv (int n, unsigned long iter)
       mpz_add_ui (N, N, p - mpz_fdiv_ui (N, p));
       s = trialdiv (g, N, d, 1);
       assert (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
+      assert (g[0] == p);
     }
   mpz_clear (N);
 }
