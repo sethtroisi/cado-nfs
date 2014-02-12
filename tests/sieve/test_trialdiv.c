@@ -112,7 +112,9 @@ test_trialdiv (int n, unsigned long iter)
         ASSERT_ALWAYS (s == 0);
 
       /* now test a case where it should divide */
-      mpz_add_ui (N, N, p - mpz_fdiv_ui (N, p));
+      mpz_sub_ui (N, N, mpz_fdiv_ui (N, p));
+      if (mpz_sgn(N) == 0)
+        mpz_set_ui(N, p);
       s = trialdiv (g, N, d, 1);
       ASSERT_ALWAYS (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
       ASSERT_ALWAYS (g[0] == p);
