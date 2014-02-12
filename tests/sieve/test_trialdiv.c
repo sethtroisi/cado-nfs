@@ -36,7 +36,7 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
   mpz_init(N);
   while (!feof(stdin)) {
     size_t t, i;
-    mp_bitcnt_t bit;
+    unsigned long bit; /* old versions of GMP do not have mp_bitcnt_t */
     
     if (mpz_inp_str (N, stdin, 10) == 0)
       break;
