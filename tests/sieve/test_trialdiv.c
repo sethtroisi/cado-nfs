@@ -257,12 +257,8 @@ int main (int argc, const char **argv)
     }
 
   /* random tests */
-  test_trialdiv (1, iter);
-  test_trialdiv (2, iter);
-  test_trialdiv (3, iter);
-  test_trialdiv (4, iter);
-  test_trialdiv (5, iter);
-  test_trialdiv (6, iter);
+  for (int i = 1; i <= TRIALDIV_MAXLEN; i++)
+    test_trialdiv (i, iter);
 
   tests_common_clear();
   exit (EXIT_SUCCESS);
