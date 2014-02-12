@@ -582,7 +582,6 @@ polygen_JL_f ( mpz_t n,
     rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
 
     /* find irreducible polynomial f */
-    srand(time(NULL));
     while (1)
     {
         fint[d] = ad;
@@ -748,7 +747,7 @@ polygen_JL ( mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -n xxx -df xxx -dg xxx -ad xxx\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx\n");
     exit (1);
 }
 
@@ -800,25 +799,26 @@ main (int argc, char *argv[])
 
     if (mpz_cmp_ui (N, 0) <= 0) {
         fprintf (stderr, "Error, missing input number (-N option)\n");
-        exit (1);
+        usage ();
     }
 
     if (df == 0) {
         fprintf (stderr, "Error, error degree (-df option)\n");
-        exit (1);
+        usage ();
     }
 
     if (dg == 0 || dg >= df) {
         fprintf (stderr, "Error, missing or error degree (-dg option)\n");
         fprintf (stderr, "       only support dg < df.\n");
-        exit (1);
+        usage ();
     }
 
     if (ad <= 0) {
         fprintf (stderr, "Error, need ad > 0 (-ad option)\n");
-        exit (1);
+        usage (); 
     }
 
+    srand(time(NULL));
     unsigned int bound = 1000;
     unsigned int c = 0;
     while (c < bound*bound) {
