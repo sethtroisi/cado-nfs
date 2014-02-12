@@ -6,11 +6,22 @@
 #endif
 #include <stdlib.h>
 #include <limits.h>
+#include <math.h>
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
 #include "portability.h"
 
+
+unsigned long
+trialdiv_get_max_p()
+{
+  if (TRIALDIV_MAXLEN == 1)
+    return ULONG_MAX;
+  double s = sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1));
+  ASSERT(s >= 1.);
+  return (unsigned long)s - 1;
+}
 
 static void
 trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
@@ -19,11 +30,8 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
   int i;
 #endif
   ASSERT (p % 2UL == 1UL);
-  /* Test that p^2 does not overflow an unsigned long */
-  ASSERT (TRIALDIV_MAXLEN == 1 || p < (1UL << (LONG_BIT / 2)));
   /* Test that p < sqrt (word_base / (TRIALDIV_MAXLEN - 1)) */
-  ASSERT (TRIALDIV_MAXLEN == 1 || 
-	  p * p < ULONG_MAX / (TRIALDIV_MAXLEN - 1));
+  ASSERT (p <= trialdiv_get_max_p());
   d->p = p;
 #if TRIALDIV_MAXLEN > 1
   if (p == 1UL)

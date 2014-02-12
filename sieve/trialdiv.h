@@ -23,6 +23,9 @@ extern "C" {
 size_t trialdiv (unsigned long *, mpz_t, const trialdiv_divisor_t *,
 		 const size_t);
 
+/* Get the largest candidate factor that can be trial divided */
+unsigned long trialdiv_get_max_p();
+
 /* Initialise a trialdiv_divisor_t array with the primes stored in an 
    fbprime_t array. Allocates memory. */
 trialdiv_divisor_t *trialdiv_init (const fbprime_t *, const unsigned int);
