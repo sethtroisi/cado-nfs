@@ -81,21 +81,24 @@ test_trialdiv (int n, unsigned long iter)
   mpz_t N;
   trialdiv_divisor_t *d;
   fbprime_t f[1];
-  unsigned long p, g[1], i;
+  unsigned long p, g[1], i, pmax, sh;
   size_t s;
   int ret;
 
   mpz_init (N);
+  /* p should be <= 1920767766 = floor(sqrt(2^64/5)) on 64-bit computers,
+     and <= 29308 = floor(sqrt(2^32/5)) on 32-bit computers */
+  pmax = sizeof(unsigned long) == 4 ? 29303 : 1920767699;
+  sh = sizeof(unsigned long) == 4 ? 16 : 0;
   for (i = 0; i < iter; i++)
     {
-      /* p should be <= 1920767766 */
       if (i == 0)
         p = 3;
       else if (i == 1)
-        p = 1920767699;
+        p = pmax;
       else
         {
-          do p = ulong_nextprime (lrand48 ()); while (p > 1920767766UL);
+          do p = ulong_nextprime (lrand48 () >> sh); while (p > pmax || p < 3);
         }
       f[0] = p;
       d = trialdiv_init (f, 1);
@@ -129,6 +132,7 @@ int main (int argc, const char **argv)
   double usrtime;
   int verbose = 0, input = 0;
   unsigned long iter = 10000;
+
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
 
