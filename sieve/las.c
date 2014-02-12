@@ -3485,6 +3485,13 @@ void * process_bucket_region(thread_data_ptr th)
                 // is always ignored, we should remove it.
                 init_alg_norms_bucket_region(S[side], NULL, i, si);
             }
+            // Invalidate the first row except (1,0)
+            if (!i) {
+                int pos10 = 1+((si->I)>>1);
+                unsigned char n10 = S[side][pos10];
+                memset(S[side], 255, si->I);
+                S[side][pos10] = n10;
+            }
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))

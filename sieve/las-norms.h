@@ -20,7 +20,7 @@ init_norms (sieve_info_ptr si, int side);
 /* Initialize lognorms on the rational side for the bucket_region
  * number N.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
- * not coprime, except for the line j=0.
+ * not coprime.
  */
 void
 init_rat_norms_bucket_region (unsigned char *S, unsigned int N, sieve_info_ptr si);

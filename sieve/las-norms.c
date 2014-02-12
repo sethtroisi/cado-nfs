@@ -105,7 +105,6 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
  * not coprime, except for the line j=0.
  */
 void init_rat_norms_bucket_region(unsigned char *S,
-                                 /* no condition array here ! */
                                  unsigned int j,
                                  sieve_info_ptr si)
 {
@@ -138,14 +137,6 @@ void init_rat_norms_bucket_region(unsigned char *S,
   j1 = (1U << j1) + j;
   u0j = u0 * j;
   d0_init = rat->cexp2[((unsigned int)GUARD) - 1U];
-  if (!j) {
-    // compute only the norm for i = 1. Everybody else is 255.
-    memset(S, 255, halfI<<1);
-    S[halfI + 1] = inttruncfastlog2 (fabs(u1), add, scale);
-    S+= halfI<<1;
-    j++;
-    u0j += u0;
-  }
   for( ; j < j1 ; j++, u0j += u0) {
 #ifdef CHECK_INIT_RAT
     unsigned char *cS = S + halfI;
