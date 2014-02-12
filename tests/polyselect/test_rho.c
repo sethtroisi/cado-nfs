@@ -37,14 +37,14 @@ test_rho (void)
   double x, y;
 
   y = dickman_rho (-0.5);
-  assert (y == 0.0);
+  ASSERT_ALWAYS (y == 0.0);
 
   y = dickman_rho (0.0);
-  assert (y == 1.0);
+  ASSERT_ALWAYS (y == 1.0);
 
   x = drand48 ();
   y = dickman_rho (x);
-  assert (y == 1.0);
+  ASSERT_ALWAYS (y == 1.0);
 
   y = dickman_rho (1.1);
   check_num (y, 0.904689820195675, 1.2e-9);

@@ -1,8 +1,8 @@
 #include "cado.h"
+#include "macros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <assert.h>
 #include "mpz_poly.h"
 #include "tests_common.h"
 
@@ -13,8 +13,8 @@ mpz_poly_random (mpz_poly_t f, int d, int k)
   int i;
   mpz_t u;
 
-  assert (k > 0);
-  assert (d < f->alloc);
+  ASSERT_ALWAYS (k > 0);
+  ASSERT_ALWAYS (d < f->alloc);
   mpz_init_set_ui (u, 1);
   mpz_mul_2exp (u, u, k - 1); /* u = 2^(k-1) */
   for (i = 0; i <= d; i++)
@@ -33,7 +33,7 @@ mpz_poly_mul_xk (mpz_poly_t f, int k)
 {
   int i;
 
-  assert (k >= 0);
+  ASSERT_ALWAYS (k >= 0);
 
   if (k == 0)
     return;
@@ -94,7 +94,7 @@ test_polymodF_mul ()
                   P1->v = 0;
                 }
               /* check that Q->p = lc(F)^Q->v * P1 * P1 mod F */
-              assert (Q->p->deg < F->deg);
+              ASSERT_ALWAYS (Q->p->deg < F->deg);
               mpz_poly_mul (T, P1->p, P2->p);
               mpz_pow_ui (c, F->coeff[F->deg], Q->v);
               mpz_poly_mul_mpz (T, T, c);
@@ -117,13 +117,13 @@ test_polymodF_mul ()
                   /* multiply U by x^(T->deg - F->deg) */
                   mpz_poly_mul_xk (U, T->deg - F->deg);
                   mpz_poly_sub (T, T, U);
-                  assert (T->deg < oldd);
+                  ASSERT_ALWAYS (T->deg < oldd);
                 }
               if (T->deg != -1)
                 {
                   printf ("count=%d\n", count);
                 }
-              assert (T->deg == -1);
+              ASSERT_ALWAYS (T->deg == -1);
               mpz_poly_clear (P2->p);
             }
           mpz_poly_clear (P1->p);

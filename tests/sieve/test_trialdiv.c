@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <assert.h>
 #include <sys/time.h>
 #include "sieve/trialdiv.h"
 #include "utils.h"
@@ -58,7 +57,7 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
       continue;
     }
     t = trialdiv (factors, N, d, max_div);
-    assert (t <= max_div);
+    ASSERT_ALWAYS (t <= max_div);
 
     if (verbose) {
       for (i = 0; i < bit; i++) {
@@ -105,18 +104,18 @@ test_trialdiv (int n, unsigned long iter)
       mpz_urandomb (N, state, n * mp_bits_per_limb);
       ret = mpz_divisible_ui_p (N, p);
       s = trialdiv (g, N, d, 1);
-      assert (s <= 2); /* s can be max_div+1, i.e., 2 */
+      ASSERT_ALWAYS (s <= 2); /* s can be max_div+1, i.e., 2 */
       if (ret) {
-        assert (s >= 1);
-        assert (g[0] == p);
+        ASSERT_ALWAYS (s >= 1);
+        ASSERT_ALWAYS (g[0] == p);
       } else
-        assert (s == 0);
+        ASSERT_ALWAYS (s == 0);
 
       /* now test a case where it should divide */
       mpz_add_ui (N, N, p - mpz_fdiv_ui (N, p));
       s = trialdiv (g, N, d, 1);
-      assert (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
-      assert (g[0] == p);
+      ASSERT_ALWAYS (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
+      ASSERT_ALWAYS (g[0] == p);
     }
   mpz_clear (N);
 }
@@ -208,7 +207,7 @@ int main (int argc, const char **argv)
 	  mpz_tdiv_q (t1, N, pk);
 	  mpz_tdiv_q (t2, M, pk);
 	  mpz_sub (t2, t2, t1);
-	  assert (mpz_fits_ulong_p (t2));
+	  ASSERT_ALWAYS (mpz_fits_ulong_p (t2));
 	  expect += mpz_get_ui (t2);
 	} while (mpz_sgn (t2) != 0);
     }

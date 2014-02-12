@@ -252,7 +252,7 @@ test_ulong_nextprime (const unsigned long iter)
         abort ();
       q = r;
     }
-  assert(ulong_nextprime (ULONG_MAX) == 0);
+  ASSERT_ALWAYS(ulong_nextprime (ULONG_MAX) == 0);
 }
 
 void

@@ -1,7 +1,6 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <math.h>
 #include "macros.h"
 #include "double_poly.h"
@@ -24,7 +23,7 @@ parse_poly_str (double_poly_ptr poly, const char *str)
     if (sscanf(next, "%lf", &coeff) != 1)
       break;
     if (poly) {
-      assert((unsigned int) i <= poly->deg);
+      ASSERT_ALWAYS((unsigned int) i <= poly->deg);
       poly->coeff[i] = coeff;
     }
     i++;
@@ -125,10 +124,10 @@ test_double_poly_set (void)
   s->coeff[1] = 17.0;
   s->coeff[2] = 42.0;
   double_poly_set (r, s);
-  assert (r->deg == 2);
-  assert (r->coeff[0] == -1.0);
-  assert (r->coeff[1] == 17.0);
-  assert (r->coeff[2] == 42.0);
+  ASSERT_ALWAYS (r->deg == 2);
+  ASSERT_ALWAYS (r->coeff[0] == -1.0);
+  ASSERT_ALWAYS (r->coeff[1] == 17.0);
+  ASSERT_ALWAYS (r->coeff[2] == 42.0);
   double_poly_clear (s);
   double_poly_clear (r);
 }
@@ -151,7 +150,7 @@ test_double_poly_eval (void)
       s->deg = deg;
       v = double_poly_eval (s, 2.0);
       w = 2.0 * w + s->coeff[deg];
-      assert (v == w);
+      ASSERT_ALWAYS (v == w);
     }
   double_poly_clear (s);
 }
@@ -170,11 +169,11 @@ test_double_poly_derivative (void)
   f->coeff[0] = 17.0;
   f->coeff[1] = 42.0;
   double_poly_derivative (df, f);
-  assert (df->deg == 0 && df->coeff[0] == 42.0);
+  ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 42.0);
 
   f->deg = 0;
   double_poly_derivative (df, f);
-  assert (df->deg == 0 && df->coeff[0] == 0.0);
+  ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 0.0);
 
   double_poly_clear (f);
   double_poly_clear (df);
@@ -192,12 +191,12 @@ test_double_poly_revert (void)
   f->coeff[1] = 2.0;
   f->coeff[2] = 3.0;
   double_poly_revert (f);
-  assert (f->coeff[0] == 3.0 && f->coeff[1] == 2.0 && f->coeff[2] == 1.0);
+  ASSERT_ALWAYS (f->coeff[0] == 3.0 && f->coeff[1] == 2.0 && f->coeff[2] == 1.0);
 
   /* now with degree 1 */
   f->deg = 1;
   double_poly_revert (f);
-  assert (f->coeff[0] == 2.0 && f->coeff[1] == 3.0);
+  ASSERT_ALWAYS (f->coeff[0] == 2.0 && f->coeff[1] == 3.0);
 
   double_poly_clear (f);
 }
@@ -241,7 +240,7 @@ test_double_poly_set_mpz_poly (void)
   mpz_set_si (q->coeff[0], -3);
   q->deg = 2;
   double_poly_set_mpz_poly (p, q);
-  assert (p->deg == 2 && p->coeff[2] == 17.0 && p->coeff[1] == -42.0 &&
+  ASSERT_ALWAYS (p->deg == 2 && p->coeff[2] == 17.0 && p->coeff[1] == -42.0 &&
           p->coeff[0] == -3.0);
   double_poly_clear (p);
   mpz_poly_clear (q);

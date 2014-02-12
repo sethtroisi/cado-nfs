@@ -93,13 +93,13 @@ test_gcd_ul (const unsigned long iter)
   unsigned long a, b, g;
   unsigned long i;
 
-  assert (sizeof(unsigned long) <= sizeof(uint64_t));
+  ASSERT_ALWAYS (sizeof(unsigned long) <= sizeof(uint64_t));
   for (i = 0; i < iter; i++)
     {
       a = (unsigned long) (i == 0 || i == 1) ? 0 : random_uint64 ();
       b = (unsigned long) (i == 0 || i == 2) ? 0 : random_uint64 ();
       g = gcd_ul (a, b);
-      ASSERT(sizeof(unsigned long) <= sizeof(uint64_t));
+      ASSERT_ALWAYS(sizeof(unsigned long) <= sizeof(uint64_t));
       cmp_mpz_gcd_ui64(a, b, g);
     }
 }

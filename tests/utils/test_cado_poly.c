@@ -22,12 +22,12 @@ test_cado_poly_set ()
 
   cado_poly_set (p, q);
 
-  assert (mpz_cmp_ui (p->n, 123456789) == 0);
-  assert (p->skew == 3.1415);
-  assert (mpz_cmp_ui (p->pols[0]->coeff[0], 17) == 0);
-  assert (mpz_cmp_ui (p->pols[0]->coeff[1], 42) == 0);
-  assert (mpz_cmp_ui (p->pols[1]->coeff[0], 59) == 0);
-  assert (mpz_cmp_ui (p->m, 3613) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->n, 123456789) == 0);
+  ASSERT_ALWAYS (p->skew == 3.1415);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[0], 17) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[1], 42) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[0], 59) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->m, 3613) == 0);
 
   cado_poly_clear (p);
   cado_poly_clear (q);

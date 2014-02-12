@@ -34,10 +34,9 @@
 #include "cado.h"
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 #include "misc.h"
 
-#define PEGASUS_TEST_ASSERT(X) assert(X)
+#define PEGASUS_TEST_ASSERT(X) ASSERT_ALWAYS(X)
 #define Strlcat strlcat
 
 int main()

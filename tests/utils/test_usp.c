@@ -23,10 +23,10 @@ test_usp ()
   mpz_set_ui (p[0], 0);
   mpz_set_ui (p[1], 1);
   n = numberOfRealRoots (p, 1, 2, 1, R);
-  assert (n == 1);
+  ASSERT_ALWAYS (n == 1);
   /* check [a/2^ka, b/2^kb] contains root 0 */
-  assert (mpz_cmp_ui (R[0].a, 0) <= 0);
-  assert (0 <= mpz_cmp_ui (R[0].b, 0));
+  ASSERT_ALWAYS (mpz_cmp_ui (R[0].a, 0) <= 0);
+  ASSERT_ALWAYS (0 <= mpz_cmp_ui (R[0].b, 0));
 
   mpz_clear (R[0].a);
   mpz_clear (R[0].b);
@@ -35,48 +35,48 @@ test_usp ()
   mpz_set_ui (p[0], 1);
   mpz_set_ui (p[1], 1);
   n = numberOfRealRoots (p, 1, 0, 0, NULL);
-  assert (n == 1);
+  ASSERT_ALWAYS (n == 1);
 
   /* polynomial x-1 */
   mpz_set_si (p[0], -1);
   mpz_set_ui (p[1], 1);
   n = numberOfRealRoots (p, 1, 0, 0, NULL);
-  assert (n == 1);
+  ASSERT_ALWAYS (n == 1);
 
   /* polynomial x^2+1 */
   mpz_set_si (p[0], 1);
   mpz_set_ui (p[1], 0);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 0);
+  ASSERT_ALWAYS (n == 0);
 
   /* polynomial x^2-1 */
   mpz_set_si (p[0], -1);
   mpz_set_ui (p[1], 0);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 2);
+  ASSERT_ALWAYS (n == 2);
 
   /* polynomial x^2-3*x+2 */
   mpz_set_si (p[0], 2);
   mpz_set_si (p[1], -3);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 2);
+  ASSERT_ALWAYS (n == 2);
 
   /* polynomial x^2-2*x+2 */
   mpz_set_si (p[0], 2);
   mpz_set_si (p[1], -2);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 0);
+  ASSERT_ALWAYS (n == 0);
 
   /* polynomial x^2+1000*x+2 */
   mpz_set_si (p[0], 2);
   mpz_set_si (p[1], 1000);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 2);
+  ASSERT_ALWAYS (n == 2);
 
   /* polynomial (x-1)*(x-2)*(x-3) */
   mpz_set_si (p[0], -6);
@@ -84,7 +84,7 @@ test_usp ()
   mpz_set_si (p[2], -6);
   mpz_set_si (p[3], 1);
   n = numberOfRealRoots (p, 3, 0, 0, NULL);
-  assert (n == 3);
+  ASSERT_ALWAYS (n == 3);
 
   /* polynomial (x-1)*(x-2)*(x-3)*(x-4) */
   mpz_set_si (p[0], 24);
@@ -93,7 +93,7 @@ test_usp ()
   mpz_set_si (p[3], -10);
   mpz_set_si (p[4], 1);
   n = numberOfRealRoots (p, 4, 0, 0, NULL);
-  assert (n == 4);
+  ASSERT_ALWAYS (n == 4);
 
   /* polynomial (x-1)*(x-2)*(x-3)*(x-4)*(x-5) */
   mpz_set_si (p[0], -120);
@@ -103,7 +103,7 @@ test_usp ()
   mpz_set_si (p[4], -15);
   mpz_set_si (p[5], 1);
   n = numberOfRealRoots (p, 5, 0, 0, NULL);
-  assert (n == 5);
+  ASSERT_ALWAYS (n == 5);
 
   /* polynomial (x-1)*(x-2)*(x-3)*(x-4)*(x-5)*(x-6) */
   mpz_set_si (p[0], 720);
@@ -114,7 +114,7 @@ test_usp ()
   mpz_set_si (p[5], -21);
   mpz_set_si (p[6], 1);
   n = numberOfRealRoots (p, 6, 0, 0, NULL);
-  assert (n == 6);
+  ASSERT_ALWAYS (n == 6);
 
   /* polynomial 2*(x-1)*(x-2)*(x-3/2) */
   mpz_set_si (p[0], -6);
@@ -122,7 +122,7 @@ test_usp ()
   mpz_set_si (p[2], -9);
   mpz_set_si (p[3], 2);
   n = numberOfRealRoots (p, 3, 0, 0, NULL);
-  assert (n == 3);
+  ASSERT_ALWAYS (n == 3);
 
   /* polynomial 8*(x-1)*(x-2)*(x-3/2)*(x-5/4) */
   mpz_set_si (p[0], 30);
@@ -131,7 +131,7 @@ test_usp ()
   mpz_set_si (p[3], -46);
   mpz_set_si (p[4], 8);
   n = numberOfRealRoots (p, 4, 0, 0, NULL);
-  assert (n == 4);
+  ASSERT_ALWAYS (n == 4);
 
   /* polynomial 2*(x-1)*(x-3/2)*(x-2)*(x-3)*(x-4) */
   mpz_set_si (p[0], -72);
@@ -141,19 +141,19 @@ test_usp ()
   mpz_set_si (p[4], -23);
   mpz_set_si (p[5], 2);
   n = numberOfRealRoots (p, 5, 0, 0, NULL);
-  assert (n == 5);
+  ASSERT_ALWAYS (n == 5);
 
   mpz_set_si (p[0], -3);
   mpz_set_si (p[1], 2);
   n = numberOfRealRoots (p, 1, 0, 0, NULL);
-  assert (n == 1);
+  ASSERT_ALWAYS (n == 1);
 
   /* 2*(x-17)*(x-17/5) */
   mpz_set_si (p[0], 595);
   mpz_set_si (p[1], -69);
   mpz_set_si (p[2], 2);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
-  assert (n == 2);
+  ASSERT_ALWAYS (n == 2);
 
   /* 2000*x^3 - 35000*x^2 + 2*x - 35 */
   mpz_set_si (p[0], -35);
@@ -161,7 +161,7 @@ test_usp ()
   mpz_set_si (p[2], -35000);
   mpz_set_si (p[3], 2000);
   n = numberOfRealRoots (p, 3, 0, 0, NULL);
-  assert (n == 1);
+  ASSERT_ALWAYS (n == 1);
 
   /* 33*x^4-124*x^3+137*x^2-32*x-11 */
   mpz_set_si (p[0], -11);
@@ -170,7 +170,7 @@ test_usp ()
   mpz_set_si (p[3], -124);
   mpz_set_si (p[4], 33);
   n = numberOfRealRoots (p, 4, 0, 0, NULL);
-  assert (n == 4);
+  ASSERT_ALWAYS (n == 4);
 
   mpz_init (u);
   mpz_set_ui (u, 1);
@@ -185,7 +185,7 @@ test_usp ()
       if (mpz_cmp_ui (p[d], 0) == 0)
         mpz_set_ui (p[d], 1);
       n = numberOfRealRoots (p, d, 0, 0, NULL);
-      assert (0 <= n && n <= d);
+      ASSERT_ALWAYS (0 <= n && n <= d);
     }
 
   /* check with large coefficients */
@@ -194,7 +194,7 @@ test_usp ()
   mpz_urandomb (p[2], state, 2048);
   mpz_urandomb (p[3], state, 2048);
   n = numberOfRealRoots (p, 3, 0, 0, NULL);
-  assert (0 <= n && n <= 3);
+  ASSERT_ALWAYS (0 <= n && n <= 3);
 
   for (i = 0; i < MAX_DEGREE; i++)
     mpz_clear (p[i]);
