@@ -208,8 +208,7 @@ int main (int argc, const char **argv)
 	  mpz_tdiv_q (t1, N, pk);
 	  mpz_tdiv_q (t2, M, pk);
 	  mpz_sub (t2, t2, t1);
-	  if (!mpz_fits_ulong_p (t2))
-	    abort ();
+	  assert (mpz_fits_ulong_p (t2));
 	  expect += mpz_get_ui (t2);
 	} while (mpz_sgn (t2) != 0);
     }

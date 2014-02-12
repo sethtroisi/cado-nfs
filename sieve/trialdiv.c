@@ -204,8 +204,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 #if VERBOSE
       gmp_printf ("s = %d, N = %Zd, ", s, N);
 #endif
-      if (s > TRIALDIV_MAXLEN)
-        abort ();
+      ASSERT_ALWAYS (s <= TRIALDIV_MAXLEN);
       if (s == 1)
         {
 	  mp_limb_t t = mpz_getlimbn (N, 0);
