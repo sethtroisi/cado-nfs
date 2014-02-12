@@ -4,11 +4,8 @@
 #include <limits.h>
 #include <assert.h>
 #include <sys/time.h>
-#include "ularith.h"
-#include "modredc_ul.h"
-#include "trialdiv.h"
-#include "getprime.h"
-#include "portability.h"
+#include "sieve/trialdiv.h"
+#include "utils.h"
 
 void
 trialdiv_stdinput(const unsigned long pmax, const int verbose)

@@ -666,7 +666,6 @@ sieve/las-unsieve.h
 sieve/las.c
 sieve/makefb.c
 sieve/makefb.sage
-sieve/test_trialdiv.c
 sieve/trialdiv.c
 sieve/trialdiv.h
 sqrt/CMakeLists.txt
@@ -726,6 +725,7 @@ tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
 tests/sieve/sievetest.sh
+tests/sieve/test_trialdiv.c
 tests/sieve/ecm/CMakeLists.txt
 tests/sieve/ecm/test_factor_ecm_10_100_1000.inp
 tests/sieve/ecm/test_factor_ecm_11_100_1000.inp
