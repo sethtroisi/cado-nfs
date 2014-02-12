@@ -1638,13 +1638,29 @@ typedef const struct thread_data_s * thread_data_srcptr;
 /**************************************************************************
  * Global DEFINEs for fill_in_buckets, fill_in_k_buckets, fill_in_m_buckets 
  **************************************************************************/
-#ifdef SKIP_GCD3
-#define FILL_BUCKET_SKIP_GCD3()				\
-  && (!is_divisible_3_u32 (i + I) ||			\
-      !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
+
+/* Do we test for co-primality of i,j before writing a bucket update?
+   With SKIP_GCD_UV, we test that gcd(u,v) = 1, where (i,j)~ = M_p (u,v)~.
+   Without SKIP_GCD_UV, but with SKIP_GCD3, we test whether 3 | gcd(i,j).
+   With neither defined, we don't test except for the hard-coded test of
+   2 | gcd(i,j) */
+
+// #define SKIP_GCD_UV 1
+
+#ifdef SKIP_GCD_UV
+    #define INCREASE_UV(uv) do {(uv)++;} while(0)
+    #define PROBABLY_COPRIME_IJ(u,v) (gcd_ul(u, v) == 1)
 #else
-#define FILL_BUCKET_SKIP_GCD3()
+    #define INCREASE_UV(uv) do {} while(0)
+    #ifdef SKIP_GCD3
+    #define PROBABLY_COPRIME_IJ(u,v)			\
+         (!is_divisible_3_u32 (i + I) ||			\
+          !is_divisible_3_u32 ((uint32_t) (x >> logI)))			
+    #else
+    #define PROBABLY_COPRIME_IJ(u,v) 1
+    #endif
 #endif
+
 
 #ifdef TRACE_K								
 #define FILL_BUCKET_TRACE_K(X) do {					\
@@ -1670,8 +1686,14 @@ typedef const struct thread_data_s * thread_data_srcptr;
 #endif
 
 #define FILL_BUCKET_INC_X() do {					\
-    if (i >= bound1) x += inc_a;					\
-    if (i < bound0)  x += inc_c;					\
+    if (i >= bound1) {							\
+      x += inc_a;							\
+      INCREASE_UV(u);							\
+    }									\
+    if (i < bound0) {							\
+      x += inc_c;							\
+      INCREASE_UV(v);							\
+    }									\
   } while (0)
 /************************************************************************/
 
@@ -1726,7 +1748,6 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint32_t maskI = I-1;
     const uint64_t even_mask = (1ULL << logI) | 1ULL;
     const uint64_t IJ = ((uint64_t) si->J) << logI;
-
     /* Special cases */
     if (UNLIKELY((!r) || (r >= p))) {
       if (r > p) /* should only happen for lattice-sieved prime powers,
@@ -1778,6 +1799,9 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
     uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
+#ifdef SKIP_GCD_UV
+    unsigned long u = 0, v = 0;
+#endif
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
 #else
@@ -1794,8 +1818,8 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	/***************************************************************/
 #define FILL_BUCKET() do {						\
 	  unsigned int i = x & maskI;					\
-	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
-		     FILL_BUCKET_SKIP_GCD3()				\
+	  if (LIKELY((MOD2_CLASSES_BS || (x & even_mask))		\
+	             && PROBABLY_COPRIME_IJ(u,v)			\
 		     )) FILL_BUCKET_HEART();				\
 	  FILL_BUCKET_INC_X();						\
 	} while (0)
@@ -1927,6 +1951,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
     uint64_t x = 1ULL << (logI-1);
     uint32_t i = x;
+#ifdef SKIP_GCD_UV
+    unsigned long u = 0, v = 0;
+#endif
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
 #else
@@ -1943,8 +1970,8 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	/**********************************************************************/
 #define FILL_K_BUCKET() do {						\
 	  unsigned int i = x & maskI;					\
-	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
-		     FILL_BUCKET_SKIP_GCD3()				\
+	  if (LIKELY((MOD2_CLASSES_BS || (x & even_mask))		\
+	             && PROBABLY_COPRIME_IJ(u,v)			\
 		     )) FILL_K_BUCKET_HEART();				\
 	  FILL_BUCKET_INC_X();						\
 	} while (0)
@@ -2147,6 +2174,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     const uint64_t inc_a = plattice_a(&pli, si), inc_c = plattice_c(&pli, si);
     uint64_t x = 1ULL << (si->conf->logI-1);
     uint32_t i = x;
+#ifdef SKIP_GCD_UV
+    unsigned long u = 0, v = 0;
+#endif
     FILL_BUCKET_INC_X();
     if (x >= IJ) continue;
 #else
@@ -2163,8 +2193,8 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	/***************************************************************/
 #define FILL_M_BUCKET() do {						\
 	  unsigned int i = x & maskI;					\
-	  if (LIKELY(MOD2_CLASSES_BS || (x & even_mask)			\
-		     FILL_BUCKET_SKIP_GCD3()				\
+	  if (LIKELY((MOD2_CLASSES_BS || (x & even_mask))		\
+	             && PROBABLY_COPRIME_IJ(u,v)			\
 		     )) FILL_M_BUCKET_HEART();				\
 	  FILL_BUCKET_INC_X();						\
 	} while (0)
