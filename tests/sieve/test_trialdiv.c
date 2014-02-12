@@ -6,6 +6,8 @@
 #include <sys/time.h>
 #include "sieve/trialdiv.h"
 #include "utils.h"
+#include "test_iter.h"
+#include "tests_common.h"
 
 void
 trialdiv_stdinput(const unsigned long pmax, const int verbose)
@@ -17,7 +19,7 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
   unsigned long p;
   const size_t max_div = 32;
   mpz_t N;
-  
+
   for (p = getprime(1UL); p <= pmax; p = getprime(1UL))
     nr_primes++;
   primes = malloc (nr_primes * sizeof (fbprime_t));
@@ -72,8 +74,50 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
   trialdiv_clear (d);
 }
 
+/* performs iter random tests with a cofactor of n limbs */
+void
+test_trialdiv (int n, unsigned long iter)
+{
+  mpz_t N;
+  trialdiv_divisor_t *d;
+  fbprime_t f[1];
+  unsigned long p, g[1], i;
+  size_t s;
+  int ret;
 
-int main (int argc, char **argv)
+  mpz_init (N);
+  for (i = 0; i < iter; i++)
+    {
+      /* p should be <= 1920767766 */
+      if (i == 0)
+        p = 3;
+      else if (i == 1)
+        p = 1920767699;
+      else
+        {
+          do p = ulong_nextprime (lrand48 ()); while (p > 1920767766UL);
+        }
+      f[0] = p;
+      d = trialdiv_init (f, 1);
+
+      mpz_urandomb (N, state, n * mp_bits_per_limb);
+      ret = mpz_divisible_ui_p (N, p);
+      s = trialdiv (g, N, d, 1);
+      assert (s <= 2); /* s can be max_div+1, i.e., 2 */
+      if (ret)
+        assert (s >= 1);
+      else
+        assert (s == 0);
+
+      /* now test a case where it should divide */
+      mpz_add_ui (N, N, p - mpz_fdiv_ui (N, p));
+      s = trialdiv (g, N, d, 1);
+      assert (1 <= s && s <= 2); /* s can be max_div+1, i.e., 2 */
+    }
+  mpz_clear (N);
+}
+
+int main (int argc, const char **argv)
 {
   fbprime_t *primes;
   trialdiv_divisor_t *d;
@@ -84,7 +128,10 @@ int main (int argc, char **argv)
   mpz_t M, N, pk, t1, t2;
   double usrtime;
   int verbose = 0, input = 0;
-  
+  unsigned long iter = 10000;
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_get_iter(&iter);
+
   while (1) {
     if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'v')
       {
@@ -206,5 +253,15 @@ int main (int argc, char **argv)
       printf ("Error: did not find the expected number of divisors!\n");
       exit (EXIT_FAILURE);
     }
-  return 0;
+
+  /* random tests */
+  test_trialdiv (1, iter);
+  test_trialdiv (2, iter);
+  test_trialdiv (3, iter);
+  test_trialdiv (4, iter);
+  test_trialdiv (5, iter);
+  test_trialdiv (6, iter);
+
+  tests_common_clear();
+  exit (EXIT_SUCCESS);
 }

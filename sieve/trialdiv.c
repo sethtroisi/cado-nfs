@@ -37,16 +37,6 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
   d->plim = ULONG_MAX / p;
 }
 
-/* Trial division for integers with 1 unsigned long */
-static inline int
-trialdiv_div1 (const unsigned long *n, const trialdiv_divisor_t *d)
-{
-#ifdef __GNUC__
-  __asm__ ("# trialdiv_div1");
-#endif
-  return n[0] * d->pinv <= d->plim;
-}
-
 /* Trial division for integers with 2 unsigned long */
 static inline int
 trialdiv_div2 (const unsigned long *n, const trialdiv_divisor_t *d)
@@ -190,7 +180,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 	  const size_t max_div)
 {
   size_t n = 0;
-  
+
 #if TRIALDIV_MAXLEN > 6
 #error trialdiv not implemented for input sizes of more than 6 words
 #endif
