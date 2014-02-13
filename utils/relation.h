@@ -39,9 +39,8 @@ extern "C" {
 // Relation I/O
 extern void relation_init(relation_t *rel);
 extern void relation_clear(relation_t *rel);
-//extern unsigned long findroot(long a, unsigned long b, unsigned long p);
-p_r_values_t findroot (int64_t a, uint64_t b, p_r_values_t p);
-extern void computeroots(relation_t * rel);
+p_r_values_t relation_compute_r (int64_t a, uint64_t b, p_r_values_t p);
+extern void relation_compute_all_r (relation_t * rel);
 extern char * u64toa16 (char *p, uint64_t m);
 extern char * u64toa10 (char *p, uint64_t m);
 extern char * d64toa10 (char *p, int64_t m);

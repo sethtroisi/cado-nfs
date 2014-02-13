@@ -70,7 +70,7 @@ void relation_copy (relation_t *s, relation_t * r)
 /* We use the fact that sizeof(p_r_values_t) < sizeof(unsigned long).
    So we can use mod_initmod_ul function and mod_get_ul without risk. */
 p_r_values_t
-findroot (int64_t a, uint64_t b, p_r_values_t p)
+relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)
 {
   int inv;
   unsigned long root;
@@ -111,14 +111,14 @@ findroot (int64_t a, uint64_t b, p_r_values_t p)
 
 // root = p if we don't know the result (p divides leading coeff)
 void
-computeroots (relation_t *rel)
+relation_compute_all_r (relation_t *rel)
 {
   unsigned long r;
   int i;
 
   for (i = 0; i < rel->nb_ap; ++i)
     {
-      r = findroot (rel->a, rel->b, rel->ap[i].p);
+      r = relation_compute_r (rel->a, rel->b, rel->ap[i].p);
       rel->ap[i].r = r;
   }
 }
