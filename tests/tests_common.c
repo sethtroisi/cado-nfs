@@ -67,7 +67,7 @@ parse_ul(unsigned long *result, const char *s)
 void
 tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
 {
-  long seed;
+  long seed = 0;
 
   if ((flags & PARSE_SEED) != 0)
     seed = time (NULL);
