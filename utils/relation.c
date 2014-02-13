@@ -78,25 +78,31 @@ findroot (int64_t a, uint64_t b, p_r_values_t p)
   residueul_t r, t, pa, br;
 
   modul_initmod_ul (m, p);
-  modul_init (pa, m);
-  modul_init (r, m);
   modul_init (t, m);
   modul_init (br, m);
 
-  modul_set_int64 (pa, a, m); /* Does reduction mod p */
   modul_set_uint64 (br, b, m); /* Does reduction mod p */
-  inv = modul_inv(t, br, m);
-  if (inv)
+  if (p & 1UL)
+    inv = modul_inv_odd(t, br, m);
+  else
+    inv = modul_inv_powerof2(t, br, m);
+  if (inv) /* if inv = 1 then t = 1/b mod p */
   {
+    modul_init (pa, m);
+    modul_init (r, m);
+
+    modul_set_int64 (pa, a, m); /* Does reduction mod p */
+
     modul_mul(r, t, pa, m);
     root = modul_get_ul (r, m);
+
+    modul_clear (pa, m); /* No-ops. Here for the sake of pedantry */
+    modul_clear (r, m);
   }
-  else
+  else /* if inv = 0 then p divides b */
     root = p;
   
-  modul_clear (pa, m); /* No-ops. Here for the sake of pedantry */
-  modul_clear (r, m);
-  modul_clear (t, m);
+  modul_clear (t, m); /* No-ops. Here for the sake of pedantry */
   modul_clear (br, m);
   modul_clearmod (m);
   return root;
