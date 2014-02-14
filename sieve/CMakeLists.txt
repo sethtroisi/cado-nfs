@@ -16,6 +16,8 @@ add_executable (las las.c fb.c trialdiv.c
     las-qlattice.c las-descent-helpers.cpp)
 target_link_libraries (las facul utils ${pthread_libs})
 
+add_library (libtrialdiv trialdiv.c)
+
 add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)
 
