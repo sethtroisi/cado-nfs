@@ -1,4 +1,4 @@
-#!/usr/bin/env bash                                                             
+#!/usr/bin/env bash
 BINDIR="$1"
 DEGREE="$2"
 P="$3"
