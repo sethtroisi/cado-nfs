@@ -46,7 +46,7 @@ FBC="${TMPDIR}/${BASENAME}.fbc"
 # then use the cache file created above
 "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q1" -out "${RELS}" -fbc "${FBC}" || exit 1
 
-SHA1=`grep -v "^#" "${RELS}" | sort -n | sha1sum`
+SHA1=`grep -v "^#" "${RELS}" | sort -n | sha1sum` || exit 1
 SHA1="${SHA1%% *}"
 if [ "${SHA1}" != "${REFERENCE_SHA1}" ]
 then
