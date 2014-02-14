@@ -2733,7 +2733,7 @@ static const unsigned int checksum_prime = 4294967291; /* < 2^32 */
 
 /* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
    but using modul_*() to handle sums >= 2^32 correctly. */
-unsigned int
+static unsigned int
 combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
 {
     modulusul_t m;
@@ -2753,7 +2753,7 @@ combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
     return checksum;
 }
 
-unsigned int
+static unsigned int
 bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
 {
     mpz_t mb;
