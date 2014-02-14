@@ -53,7 +53,12 @@ then
   SHA1BIN=sha1
 fi
 
-SHA1=`grep -v "^#" "${RELS}" | sort -n | sha1sum` || exit 1
+# Try to make sort produce some well-defined ordering on the integers
+export LC_ALL=C
+export LANG=C
+export LANGUAGE=C
+
+SHA1=`grep -v "^#" "${RELS}" | sort -n | ${SHA1BIN}` || exit 1
 SHA1="${SHA1%% *}"
 if [ "${SHA1}" != "${REFERENCE_SHA1}" ]
 then
