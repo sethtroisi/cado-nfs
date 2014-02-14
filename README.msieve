@@ -30,7 +30,7 @@ or msieve.
     See check_rels -h for others options.
 
 3) Create a parameterfile for the Python script: see, in the scripts/cadofactor
-directory, the files 'parameters' and 'REAMDE'. In the README file, read
+directory, the files 'parameters' and 'README'. In the README file, read
 thoroughly the section on importing polynomial file and importing relations.
 
 4) run the cadofactor.py script (where $CADO is the CADO-NFS directory):
