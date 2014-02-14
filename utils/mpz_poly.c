@@ -1578,13 +1578,17 @@ static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
   return 0;
 }
 
-/* Solve f(x)=0 (mod p), where p is a prime. Return nr. */
+/* Solve f(x)=0 (mod p), where p is a prime. Return the number of roots.
+   Assume d (the degree of f) is at least 1.
+ */
 int
 mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
 {
   int nr;
   mpz_t tmp;
   mpz_poly_t mpz_poly_fp, mpz_poly_f, g, h;
+
+  ASSERT(d >= 1);
 
   mpz_init (tmp);
   mpz_poly_init (mpz_poly_fp, d);
