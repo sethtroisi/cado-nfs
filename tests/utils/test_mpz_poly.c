@@ -194,7 +194,7 @@ int
 main (int argc, const char *argv[])
 {
   unsigned long iter = 500;
-  tests_common_cmdline(&argc, &argv, PARSE_SEED);
+  tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
   test_polymodF_mul ();
   test_mpz_poly_roots_mpz (iter);
