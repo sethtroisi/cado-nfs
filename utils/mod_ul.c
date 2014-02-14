@@ -122,19 +122,24 @@ static unsigned long even_inv_lookup_table[128] = {
   121, 227, 5, 47, 49, 91, 125, 231, 105, 83, 117, 31, 33, 203, 237, 215, 89,
   195, 229, 15, 17, 59, 93, 199, 73, 51, 85, 255 } ;
 
-/* Faster modul_inv for the case where m = 2^k with k <= 8 */
+/* Faster modul_inv for the case where m = 2^k */
 int
 modul_inv_powerof2 (residue_t r, const residue_t A, const modulus_t m)
 {
   unsigned long x = m[0], y = A[0];
 
-  ASSERT(!(x & (x-1)) && !(x >> 9)); /* x must be a power of 2 <= 2^8 */
+  ASSERT (!(x & (x-1))); /* assert that x is a power of 2 */
   ASSERT (y < x);
   if (!(y & 1UL))
     return 0;
   else
   {
-    r[0] = even_inv_lookup_table[(y-1) >> 1] & (x-1);
+    if (!(x >> 4)) /* x = 2, 4 or 8 */
+      r[0] = y;
+    else if (!(x >> 9)) /* x = 16, 32, 64, 128, 256 */
+      r[0] = even_inv_lookup_table[(y-1) >> 1] & (x-1);
+    else
+      mod_inv (r, A, m);
     return 1;
   }
 }
