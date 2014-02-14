@@ -234,9 +234,9 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
           abort();
         }
 #endif
-        r = (p_r_values_t) findroot(rel->a, rel->b, pr[i].p);
+        r = (p_r_values_t) relation_compute_r (rel->a, rel->b, pr[i].p);
 #else
-        r = (p_r_values_t) findroot_ffs(rel->a, rel->b, pr[i].p);
+        r = (p_r_values_t) ffs_relation_compute_r (rel->a, rel->b, pr[i].p);
 #endif
       }
       else

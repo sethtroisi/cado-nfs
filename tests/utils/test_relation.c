@@ -17,7 +17,7 @@ mpz_compute_r (mpz_t a, mpz_t b, mpz_t p)
  }
 
 int
-test_findroot (unsigned int nb)
+test_compute_r (unsigned int nb)
 {
   int err = 0;
   mpz_t tp, ta, tb;
@@ -31,14 +31,25 @@ test_findroot (unsigned int nb)
     uint64_t b;
     unsigned long p;
 
-    mpz_set_ui (tp, lrand48());
-    mpz_nextprime(tp, tp);
-    p = mpz_get_ui (tp);
+    /* 5% of tests are for the case where p = 2^k */
+    if (i % 20 == 0)
+    {
+      unsigned int exp = (lrand48() & 0x0000001FUL);
+      exp = (exp == 0) ? 1 : exp;
+      p = 1UL << exp;
+      mpz_set_ui (tp, p);
+    }
+    else
+    {
+      mpz_set_ui (tp, lrand48());
+      mpz_nextprime(tp, tp);
+      p = mpz_get_ui (tp);
+    }
 
     a = random_int64 ();
     /* 5% of tests are for the case where b = 0 mod p (with b > 0)
      * We do not need to test for free relations as they never go throught
-     * findroot
+     * relation_compute_r
      */
     if (i < (nb / 20))
       b = lrand48() * p;
@@ -47,7 +58,7 @@ test_findroot (unsigned int nb)
     mpz_set_int64 (ta, a);
     mpz_set_uint64 (tb, b);
 
-    unsigned long r = findroot (a, b, p);
+    unsigned long r = relation_compute_r (a, b, p);
 
     unsigned long r2 = mpz_compute_r (ta, tb, tp);
     if (r != r2)
@@ -63,7 +74,7 @@ test_findroot (unsigned int nb)
   return err;
 }
 
-int test_computeroots (unsigned int nb)
+int test_compute_all_r (unsigned int nb)
 {
   int err = 0;
   relation_t t1[1], t2[1];
@@ -96,7 +107,7 @@ int test_computeroots (unsigned int nb)
     }
 
     relation_copy (t2, t1);
-    computeroots (t1);
+    relation_compute_all_r (t1);
 
     for (uint8_t k = 0; k < t2->nb_ap; k++)
     {
@@ -195,8 +206,8 @@ main (int argc, const char *argv[])
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
 
-  err += test_findroot (iter);
-  err += test_computeroots (iter / 10);
+  err += test_compute_r (iter);
+  err += test_compute_all_r (iter / 10);
   err += test_conversion (iter);
 
   if (err)
