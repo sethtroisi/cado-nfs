@@ -1,4 +1,4 @@
-#!/usr/bin/env bash                                                             
+#!/usr/bin/env bash
 
 # The main functions to compute SM are tested in utils/test_sm_utils.
 # This test is here to check that the multi-threaded and mono-threaded versions
