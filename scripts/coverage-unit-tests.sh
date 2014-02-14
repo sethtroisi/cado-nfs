@@ -2,6 +2,8 @@
 
 set -e
 
+: ${REVISION=HEAD}
+: ${REPO=git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git}
 : ${WEBDIR=$HOME/.webdir}
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`
 export CADO_DEBUG=1
@@ -25,13 +27,15 @@ PATH="$HOME/bin:$PATH"
 
 cd $DIR
 
-git clone git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git src
+git clone $REPO src
 SOURCETREE=src
 
 cp $LOCALFILE "$SOURCETREE/local.sh"
 
 CADO_DIST_ARCHIVE_NAME=cado-nfs
 export CADO_DIST_ARCHIVE_NAME
+
+(cd $SOURCETREE ; echo "Checking out revision $(git rev-parse $REVISION)" ; git checkout -b local $REVISION)
 
 # first build a tarball
 make -C $SOURCETREE dist
@@ -69,7 +73,7 @@ fi
 maketest | tee $DIR/make-test.txt
 
 # find . -name 'test_*.gcda' -print0 | xargs -0 -r rm
-find $(find $DIR/$CADO_DIST_ARCHIVE_NAME/build -type d -name tests) -name '*.gcda' -print0 | xargs -0 -r rm
+find $(find $DIR/$CADO_DIST_ARCHIVE_NAME/build -type d -name tests) -name 'test*.gcda' -print0 | xargs -0 -r rm
 
 
 cd $DIR/$CADO_DIST_ARCHIVE_NAME
@@ -92,5 +96,5 @@ EOF
 chmod 755 $DIR/genhtml
 $DIR/genhtml --html-epilog $DIR/epilog.html  -o $WEBDIR/cado-unit-tests/ $DIR/cado-nfs.info
 cp $DIR/make-test.txt $WEBDIR/cado-unit-tests
-rm -rf $DIR $F
+[ "$NOWIPE" ] || rm -rf $DIR $F
 
