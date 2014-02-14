@@ -31,9 +31,20 @@ test_compute_r (unsigned int nb)
     uint64_t b;
     unsigned long p;
 
-    mpz_set_ui (tp, lrand48());
-    mpz_nextprime(tp, tp);
-    p = mpz_get_ui (tp);
+    /* 5% of tests are for the case where p = 2^k */
+    if (i % 20 == 0)
+    {
+      unsigned int exp = (lrand48() & 0x0000001FUL);
+      exp = (exp == 0) ? 1 : exp;
+      p = 1UL << exp;
+      mpz_set_ui (tp, p);
+    }
+    else
+    {
+      mpz_set_ui (tp, lrand48());
+      mpz_nextprime(tp, tp);
+      p = mpz_get_ui (tp);
+    }
 
     a = random_int64 ();
     /* 5% of tests are for the case where b = 0 mod p (with b > 0)
