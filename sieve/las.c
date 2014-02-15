@@ -2733,7 +2733,7 @@ static const unsigned int checksum_prime = 4294967291; /* < 2^32 */
 
 /* Combine two checksums. Simply (checksum+checksum2) % checksum_prime,
    but using modul_*() to handle sums >= 2^32 correctly. */
-unsigned int
+static unsigned int
 combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
 {
     modulusul_t m;
@@ -2753,7 +2753,7 @@ combine_checksum(const unsigned int checksum1, const unsigned int checksum2)
     return checksum;
 }
 
-unsigned int
+static unsigned int
 bucket_checksum(const unsigned char *bucket, const unsigned int prev_checksum)
 {
     mpz_t mb;
@@ -3181,11 +3181,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             mpz_set_ui(q, p);
             /* Beware, cpoly->m mod p would be wrong ! */
             /* This can't work on 32-bits */
-            mpz_set_ui(rho, findroot (winner->a, winner->b, p));
+            mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
             gmp_fprintf(las->output, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
             las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
         }
-        computeroots(winner);
+        relation_compute_all_r(winner);
         for(int i = 0 ; i < winner->nb_ap ; i++) {
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;

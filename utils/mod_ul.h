@@ -896,6 +896,8 @@ int modul_sprp (const residueul_t, const modulusul_t);
 int modul_sprp2 (const modulusul_t);
 int modul_isprime (const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
+int modul_inv_odd (residueul_t, const residueul_t, const modulusul_t);
+int modul_inv_powerof2 (residueul_t, const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
 
 #endif  /* MOD_UL_H */

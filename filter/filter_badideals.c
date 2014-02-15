@@ -65,46 +65,27 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
     fclose(file);
 }
 
-static unsigned long divmod(long a, long b, unsigned long m)
+static inline p_r_values_t
+compute_r_wrapper (int64_t x, int64_t y, p_r_values_t p)
 {
-    int sig=0;
-    if (a<0) {
-        sig = 1;
-        a = -a;
-    }
-    if (b<0) {
-        sig = 1-sig;
-        b = -b;
-    }
-    modulusul_t mm;
-    residueul_t aa, bb;
-    modul_initmod_ul(mm, m);
-    modul_init(aa, mm); modul_init(bb, mm);
-    modul_set_ul(aa, a, mm);
-    modul_set_ul(bb, b, mm);
-    modul_inv(bb, bb, mm);
-    modul_mul(aa, aa, bb, mm);
-    a = modul_get_ul(aa, mm);
-    modul_clear(aa, mm); modul_clear(bb, mm);
-    modul_clearmod(mm);
-    if (sig) {
-        a = (m-a);
-        if (a == (long)m)
-            a = 0;
-    }
-    return a;
+  if (y < 0)
+  {
+    p_r_values_t r = relation_compute_r (x, (uint64_t) (-y), p);
+    return (r == 0) ? r : p - r;
+  }
+  else
+    return relation_compute_r (x, (uint64_t) y, p);
 }
 
-
 void
-handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
-        unsigned long p, MAYBE_UNUSED int e, allbad_info_t info)
+handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
+                   allbad_info_t info)
 {
     p_r_values_t r;
     if ((b % p) == 0)
-        r = p+divmod(b,a,p);
+        r = p + compute_r_wrapper (b, a, p);
     else
-        r = divmod(a,b,p);
+        r = compute_r_wrapper (a, b, p);
     for(int i = 0; i < info->n; ++i) {
         if (p != info->badid_info[i].p)
             continue;
@@ -113,9 +94,9 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
         p_r_values_t rk;
         p_r_values_t pk = info->badid_info[i].pk;
         if ((b % p) == 0)
-            rk = pk+divmod(b,a,pk);
+            rk = pk + compute_r_wrapper (b, a, pk);
         else
-            rk = divmod(a,b,pk);
+            rk = compute_r_wrapper (a, b, pk);
         if (rk != info->badid_info[i].rk)
             continue;
         for (unsigned int j = 0; j < info->badid_info[i].ncol; ++j) {
