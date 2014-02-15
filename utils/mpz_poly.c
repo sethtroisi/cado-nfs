@@ -26,16 +26,6 @@
    ----------------- */
 
 
-/* normalize h so that h->coeff[deg(h)] <> 0 mod p */
-static void
-mpz_poly_normalize_modp (mpz_poly_t h, const mpz_t p)
-{
-  int dh = h->deg;
-  while (dh >= 0 && mpz_divisible_p (h->coeff[dh],p))
-    dh --;
-  h->deg = dh;
-}
-
 /* Return f=g*h, where g has degree r, and h has degree s. */
 static int
 mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
@@ -746,9 +736,12 @@ void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_
   mpz_clear(tmp);
 }
 
-/* q=divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
+/* q=divexact(h, f) mod p, f not necessarily monic.
+   Assumes lc(h) <> 0 mod p.
+   Clobbers h. */
 static void
-mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mpz_t p) {
+mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f,
+                   const mpz_t p) {
   int i, d = f->deg, dh = h->deg;
   mpz_t t, aux;
 
@@ -757,6 +750,7 @@ mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mpz_t p
   ASSERT (d >= 0);
   ASSERT (dh >= 0);
   ASSERT (dh >= d);
+  ASSERT (mpz_divisible_p (h->coeff[dh], p) == 0);
 
   mpz_poly_realloc (q, dh + 1 - d);
   q->deg = dh - d;
@@ -785,7 +779,7 @@ mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mpz_t p
     }
     dh --;
   }
-  mpz_poly_normalize_modp (q, p);
+  /* since lc(h) <> 0 mod p, q is normalized */
 
   mpz_clear (t);
   mpz_clear (aux);
