@@ -124,7 +124,7 @@ void mul_truncate_sqrt2(mp_ptr r1, mp_srcptr i1, mp_size_t n1,
     }
 
     flint_mpn_zero(r1, r_limbs);
-    fft_combine_bits(r1, ii, j1 + j2 - 1, bits1, limbs, r_limbs);
+    fft_addcombine_bits(r1, ii, j1 + j2 - 1, bits1, limbs, r_limbs);
 
     flint_free(ii);
     if (i1 != i2)

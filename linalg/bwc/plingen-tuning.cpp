@@ -264,18 +264,13 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
-    /* arguments to the ctor:
-     * 3 : we are benching 3 methods (numbered 0, 1, 2)
-     * 1 : size makes sense only for >=1
-     */
-    /* TODO: support multiple values in my cutoff table finder ? */
 #ifdef HAVE_MPIR
-#define FINDER_NMETHODS 4
+#define TUNE_MUL_FINDER_NMETHODS 4
 #else  /* HAVE_MPIR */
-#define FINDER_NMETHODS 3
+#define TUNE_MUL_FINDER_NMETHODS 3
 #endif  /* HAVE_MPIR */
 
-    cutoff_finder<timer_rusage> finder(FINDER_NMETHODS);
+    cutoff_finder<timer_rusage> finder(TUNE_MUL_FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
     finder.set_method_name(2, "matpoly-kronecker-schönhage");
@@ -289,21 +284,32 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_init(always_basecase);
     polymat_cutoff_info_init(improved);
 
-    cout << "# Tuning "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products\n";
-    /* Beware, k is a length, not a degree. Hence length 1 clearly makes
-     * no sense */
+    cout << "# Tuning "
+                << (m+n)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" products\n";
+
     cout << "# inputlength, ncoeffs";
     for(unsigned int i = 0 ; i < finder.ntests ; i++) {
         cout << ", " << finder.method_name(i);
     }
     cout << "\n";
-    cout << "# Note: for input length k within plingen, we use mcoeffs,k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+    cout << "# Note: for input length k within plingen,"
+        << " we use ncoeffs=k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+    /* input length k means we consider the pi polynomial which is
+     * created by k successive steps. So this mulitplication, in effect,
+     * occurs at the end of a recursive procedure of length 2k, which
+     * collects the pi matrices of its two child calls.
+     */
 
+    /* make sure we don't stop the bench absurdly early. We set the bench
+     * as input_length \approx 2000 */
     unsigned int min_bench = 2000 * m / (m+n);
 
-    /* Note: we are benching degree k, but the degree we are
-     * interested in for pi is k*m/(m+n) */
+    /* Beware, k is the length of piL, not a degree. Hence length 1
+     * clearly makes no sense */
     for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+        unsigned int input_length = (m+n) * k / m;
         polymat pi, piref, piL, piR;
         matpoly xpi, xpiref, xpiL, xpiR;
         polymat_init(ab, piL, m+n, m+n, k);
@@ -440,18 +446,10 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         }
 #endif
 
-        cout << (int) ((m+n)*k/m) <<
-            " " << finder.summarize_for_this_length(k)
+        cout << input_length
+            << " " << finder.summarize_for_this_length(k)
             << extra_info.str()
             << "\n";
-
-#if 0
-        printf("%d %1.6f %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttm, ttk/ttb);
-
-        int best = 0;
-        if (ttk < ttb) { best++; if (ttm < ttk) best++; }
-        finder.new_winner(k, best); /* < : kara wins: 1 */
-#endif
 
         polymat_clear(ab, piL);
         polymat_clear(ab, piR);
@@ -467,7 +465,10 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mul_kara_cutoff(improved, NULL);
 
-    cout << "/* Cutoffs for "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" products: */\n";
+    cout << "/* Cutoffs for "
+                << (m+n)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" products: */\n";
     cout << "#define MUL_CUTOFFS_" <<(m+n)<<"_"<<(m+n)<<"_"<<(m+n)
         << " " << finder.print_result(table) << endl;
     gmp_randclear(rstate);
@@ -476,17 +477,24 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
-#if 0
 void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
-    /* arguments to the ctor:
-     * 2 : we are benching 2 methods
-     * 1 : size makes sense only for >=1
-     */
-    cutoff_finder<timer_rusage> finder(2, 1);
+#ifdef HAVE_MPIR
+#define TUNE_MP_FINDER_NMETHODS 4
+#else  /* HAVE_MPIR */
+#define TUNE_MP_FINDER_NMETHODS 3
+#endif  /* HAVE_MPIR */
+
+    cutoff_finder<timer_rusage> finder(TUNE_MP_FINDER_NMETHODS);
+    finder.set_method_name(0, "polymat-basecase");
+    finder.set_method_name(1, "polymat-karatsuba");
+    finder.set_method_name(2, "matpoly-kronecker-schönhage");
+#ifdef  HAVE_MPIR
+    finder.set_method_name(3, "matpoly-ft-kronecker-schönhage-caching");
+#endif
 
     polymat_cutoff_info always_basecase[1];
     polymat_cutoff_info improved[1];
@@ -494,67 +502,220 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_init(always_basecase);
     polymat_cutoff_info_init(improved);
 
-    /* Beware, k is a length, not a degree. Hence length 1 clearly makes
-     * no sense */
-    for(unsigned int k = 2 ; !finder.done() ; k=finder.next_length(k)) {
-        /* For a 2\ell lingen call, we need a MP which is
-         *
-         * (2-n/(m+n))\ell times m/(m+n)\ell --> \ell
-         *
-         * The small argument is m/(m+n)\ell. It's the degree of piL here.
-         * The corresponding degree for E, or the interesting fragment of
-         * it, is:
-         *   (2-n/(m+n))\ell = (2m+n)/(m+n)\ell = (2+n/m)*k
-         *
-         * while the result gives has length \ell = (1+n/m)*k
-         *
+    cout << "# Tuning "
+                << (m)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" middle-products\n";
+
+    cout << "# inputlength, ncoeffs";
+    for(unsigned int i = 0 ; i < finder.ntests ; i++) {
+        cout << ", " << finder.method_name(i);
+    }
+    cout << "\n";
+
+    cout << "# Note: for input length k within plingen, "
+         << " we use MP((1+m/(m+n))k,m/(m+n)k)->k"
+         << " = MP("    <<1+(double)m/(m+n)<<"*k"
+                        <<", "
+                        <<(double)m/(m+n)<<"*k"
+                        << ")\n";
+    /* we use the same semantics as for testing the product. input length
+     * k means we want to count how it takes to do the required MP with
+     * the pi matrix which has been computed after k successive steps.
+     * IOW, this is what happens at the middle of a recursive procedure
+     * on length 2k. In terms of degrees, this will be:
+     *     2k times m/(m+n)k --> k  *BUT*...
+     * we want coefficients [k..2k[ ; but then, the contribution from the
+     * first (k-m/(m+n)k) coefficients is useless. Therefore, we rewrite
+     * the polynomial lengths as:
+     *      (1+m/(m+n))k times m/(m+n)k --> k
+     */
+
+    /* make sure we don't stop the bench absurdly early. We set the bench
+     * as input_length \approx 2000 */
+    unsigned int min_bench = 2000 * m / (m+n);
+
+    /* Beware, k is a length of piL, not a degree. Hence length 1 clearly
+     * makes no sense */
+    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+        unsigned int input_length = (m+n) * k / m;
+        /* MP(degree a, degree b) -> degree b-a
+         *    length la=a+1, length lb=b+1 -> length b-a+1 = lb-la+1
+         * we do want lc=input_length, we have set la=k, whence lb =
+         * k+input_length-1
          */
-        /* Note: we are benching degree k, but the degree we are
-         * interested in for ER is k*m/(m+n) */
-        polymat ER, E, piL;
-        polymat_init(ab, E, m, m+n, 2*k + n*k/m - 1);
+        unsigned int E_length = k + input_length - 1;
+        polymat ER, E, piL, ERref;
+        matpoly xER, xE, xpiL, xERref;
+        polymat_init(ab, E, m, m+n, E_length);
         polymat_init(ab, piL, m+n, m+n, k);
-        polymat_init(ab, ER, m, m+n, k + n*k/m);
-        polymat_fill_random(ab, E, 2*k + n*k/m - 1, rstate);
+        polymat_init(ab, ER, m, m+n, input_length);
+        polymat_init(ab, ERref, m, m+n, input_length);
+        polymat_fill_random(ab, E, E_length, rstate);
         polymat_fill_random(ab, piL, k, rstate);
-        double ttb;
-        /* disable kara for a minute */
-        polymat_set_mp_kara_cutoff(always_basecase, NULL);
-        for(auto x = finder.micro_bench(ttb); x; ++x) {
-            x.push();
-            polymat_mp(ab, ER, E, piL);
-            x.pop();
+
+        matpoly_init(ab, xE, m, m+n, E_length);
+        matpoly_init(ab, xpiL, m+n, m+n, k);
+        matpoly_init(ab, xER, m, m+n, input_length);
+        matpoly_init(ab, xERref, m, m+n, input_length);
+
+        ostringstream extra_info;
+
+        if (finder.still_meaningful_to_test(0)) {
+            /* disable kara for a minute */
+            polymat_set_mp_kara_cutoff(always_basecase, NULL);
+            for(auto x = finder.micro_bench(0); x; ++x) {
+                x.push();
+                polymat_mp(ab, ER, E, piL);
+                x.pop();
+            }
+            if (ERref->size == 0) {
+                polymat_swap(ER, ERref);
+                // fprintf(stderr, "BASIS0\n");
+            } else if (polymat_cmp(ab, ER, ERref) != 0) {
+                fprintf(stderr, "MISMATCH0!\n");
+            }
         }
 
-        double ttk;
-        /* This yields exactly *one* kara recursion step */
-        finder.export_to_cutoff_info(improved, k);
-        polymat_set_mp_kara_cutoff(improved, NULL);
-        for(auto x = finder.micro_bench(ttk); x; ++x) {
-            x.push();
-            polymat_mp(ab, ER, E, piL);
-            x.pop();
+        if (finder.still_meaningful_to_test(1)) {
+            /* This temporarily sets the cutoff table to enable karatsuba for
+             * length >=k (hence for this test) at least, possibly using
+             * karatsuba one or more times in the recursive calls depending
+             * on what has been measured as best so far.
+             */
+            finder.export_kara_cutoff_data_force_kara_now(improved, k);
+            polymat_set_mp_kara_cutoff(improved, NULL);
+            for(auto x = finder.micro_bench(1); x; ++x) {
+                x.push();
+                polymat_mp(ab, ER, E, piL);
+                x.pop();
+            }
+            if (ERref->size == 0) {
+                polymat_swap(ER, ERref);
+                // fprintf(stderr, "BASIS1\n");
+            } else if (polymat_cmp(ab, ER, ERref) != 0) {
+                fprintf(stderr, "MISMATCH1!\n");
+            }
         }
-        printf("%d %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttk/ttb);
-        finder.new_winner(k, ttk < ttb); /* < : kara wins: 1 */
+
+        /* don't exaggerate our memory requirements */
+        matpoly_set_polymat(ab, xpiL, piL);
+        polymat_clear(ab, piL);
+        matpoly_set_polymat(ab, xE, E);
+        polymat_clear(ab, E);
+        if (ERref->size) {
+            matpoly_set_polymat(ab, xERref, ERref);
+        }
+        polymat_clear(ab, ERref);
+        matpoly_init(ab, xER, m, m+n, input_length);
+        polymat_clear(ab, ER);
+
+        /* we should make the effort of converting polymat to matpoly,
+         * right ? */
+
+        if (finder.still_meaningful_to_test(2)) {
+            /* The matpoly layer is just completetly different -- and gets
+             * faster quite early on... */
+            for(auto x = finder.micro_bench(2); x; ++x) {
+                x.push();
+                matpoly_mp(ab, xER, xE, xpiL);
+                x.pop();
+            }
+            if (xERref->size == 0) {
+                matpoly_swap(xER, xERref);
+                // fprintf(stderr, "BASIS2\n");
+            } else if (matpoly_cmp(ab, xER, xERref) != 0) {
+                fprintf(stderr, "MISMATCH2!\n");
+            }
+        }
+
+#ifdef HAVE_MPIR
+        if (finder.still_meaningful_to_test(3)) {
+            matpoly_ft tER, tpiL, tE;
+            mpz_t p;
+            mpz_init(p);
+            abfield_characteristic(ab, p);
+            struct fft_transform_info fti[1];
+            fft_get_transform_info_fppol_mp(fti, p, xpiL->size, xE->size, xpiL->m);
+            int s = 0;
+            matpoly_clear(ab, xER);
+            matpoly_init(ab, xER, m, m+n, input_length);
+            for(auto x = finder.micro_bench(3); x; ++x) {
+                x.push();
+                matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
+                matpoly_ft_init(ab, tE, xE->m, xE->n, fti);
+                matpoly_ft_init(ab, tER, xE->m, xpiL->n, fti);
+                matpoly_ft_dft(ab, tE, xE, fti);
+                matpoly_ft_dft(ab, tpiL, xpiL, fti);
+                /* length E_length * length k ==> length input_length
+                 * with E_length = input_length + k - 1
+                 *
+                 * we'll shift by k-1 coefficients, because k is the
+                 * smallest length
+                 */
+                matpoly_ft_mul(ab, tER, tE, tpiL, fti);
+                xER->size = input_length;
+                ASSERT_ALWAYS(xER->size <= xER->alloc);
+                matpoly_ft_ift_mp(ab, xER, tER, k-1, fti);
+                matpoly_ft_clear(ab, tpiL, fti);
+                matpoly_ft_clear(ab, tE, fti);
+                matpoly_ft_clear(ab, tER,  fti);
+                x.pop();
+                s++;
+            }
+            mpz_clear(p);
+            if (xERref->size == 0) {
+                matpoly_swap(xER, xERref);
+            } else if (matpoly_cmp(ab, xER, xERref) != 0) {
+                fprintf(stderr, "MISMATCH3!\n");
+            }
+#ifdef  TIME_FFT
+            char msg[256];
+            snprintf(msg, sizeof(msg),
+                    " [depth %d, %d*%.2f dft %d*%.2f conv %d*%.2f ift]",
+                    (int) fti->depth,
+                    fti->dft.n/s, 1000*fti->dft.t/fti->dft.n,
+                    fti->conv.n/s, 1000*fti->conv.t/fti->conv.n,
+                    fti->ift.n/s, 1000*fti->ift.t/fti->ift.n);
+            extra_info << msg;
+            /* the following one-liner may be used to grab only
+             * fft-related data */
+    // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
+#endif
+        }
+#endif
+
+        cout << input_length
+            << " " << finder.summarize_for_this_length(k)
+            << extra_info.str()
+            << "\n";
 
         polymat_clear(ab, E);
         polymat_clear(ab, piL);
         polymat_clear(ab, ER);
+        polymat_clear(ab, ERref);
+        matpoly_clear(ab, xE);
+        matpoly_clear(ab, xpiL);
+        matpoly_clear(ab, xER);
+        matpoly_clear(ab, xERref);
     }
 
-    finder.export_to_cutoff_info(improved);
+    vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mp_kara_cutoff(improved, NULL);
 
-    cout << "/* Cutoffs for "<<(m+n)<<"*"<<(m+n)<<"*"<<(m+n)<<" middle products: */\n";
-    cout << "#define MP_CUTOFFS_" <<(m+n)<<"_"<<(m+n)<<"_"<<(m+n)
-        << " " << finder.result() << endl;
+    cout << "/* Cutoffs for "
+                << (m)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" middle-products */\n";
+    cout << "#define MP_CUTOFFS_" <<m<<"_"<<(m+n)<<"_"<<(m+n)
+        << " " << finder.print_result(table) << endl;
     gmp_randclear(rstate);
 
     polymat_cutoff_info_clear(always_basecase);
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
+#if 0
 void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigned int m1, unsigned int n1, MPI_Comm comm)/*{{{*/
 {
     int rank;
@@ -649,6 +810,7 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
+    plingen_tune_mp(ab, m, n);
     plingen_tune_mul(ab, m, n);
 
 #if 0

@@ -164,7 +164,7 @@ void _fft_mulmod_2expp1(mp_limb_t * r1, mp_limb_t * i1, mp_limb_t * i2,
     }
 
     flint_mpn_zero(r1, r_limbs + 1);
-    fft_combine_bits(r1, ii, 2 * n - 1, bits1, limbs + 1, r_limbs + 1);
+    fft_addcombine_bits(r1, ii, 2 * n - 1, bits1, limbs + 1, r_limbs + 1);
 
     /* 
      * as the negacyclic convolution has effectively done subtractions some

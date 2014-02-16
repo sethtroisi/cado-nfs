@@ -363,6 +363,9 @@ void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p,
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc)
 {
     mp_bitcnt_t cbits = 2 * mpz_sizeinbase(p, 2) + FLINT_CLOG2(nacc * nmin);
+    /* See above */
+    if (nmax*cbits < 4096)
+        cbits=iceildiv(4096, nmax);
     fft_get_transform_info_mulmod(fti,
             nmin * cbits,
             nmax * cbits,
@@ -642,7 +645,7 @@ void fft_combine_fppol(mp_limb_t * x, mp_size_t cx, void * y, struct fft_transfo
     mp_limb_t * xtemp = malloc(nxtemp * sizeof(mp_limb_t));
     mpn_zero(xtemp, nxtemp);
     /* TODO: remove this middle man, and read directly from ptrs */
-    fft_combine_bits(xtemp, ptrs, fti->trunc0, fti->bits, rsize0, nxtemp);
+    fft_addcombine_bits(xtemp, ptrs, fti->trunc0, fti->bits, rsize0, nxtemp);
     mp_size_t ksspan = (fti->ks_coeff_bits / FLINT_BITS + 2);
     mp_limb_t * temp = malloc((2*ksspan+1) * sizeof(mp_limb_t));
 
@@ -752,7 +755,7 @@ void fft_combine_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, struct fft_tran
     mp_limb_t * xtemp = malloc(nxtemp * sizeof(mp_limb_t));
     mpn_zero(xtemp, nxtemp);
     /* TODO: remove this middle man, and read directly from ptrs */
-    fft_combine_bits(xtemp, ptrs, fti->trunc0, fti->bits, rsize0, nxtemp);
+    fft_addcombine_bits(xtemp, ptrs, fti->trunc0, fti->bits, rsize0, nxtemp);
 
     mp_size_t nmin = fti->bits1 / fti->ks_coeff_bits - 1;
     mp_size_t nmax = bxtemp / fti->ks_coeff_bits - 1;
@@ -996,7 +999,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
     fft_do_ift_backend(y, temp, fti);
     mpn_zero(x, nx);
     if (!fti->minwrap) {
-        fft_combine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
+        fft_addcombine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
         return;
     }
 
@@ -1006,7 +1009,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
     /* we want at least (4*n-1)*bits+n*w bits in the output zone */
     mp_bitcnt_t need = (4*n-1)*fti->bits+n*w;
     assert(nx >= (mp_size_t) iceildiv(need, FLINT_BITS));
-    fft_combine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
+    fft_addcombine_bits(x, y, fti->trunc0, fti->bits, rsize0, nx);
     /* bits above 4*n*fti->bits need to wrap around */
     mp_bitcnt_t outneed = need - 4*n*fti->bits;
     mp_size_t outneedlimbs = iceildiv(outneed, FLINT_BITS);
@@ -1046,7 +1049,8 @@ void fft_do_ift_fppol_mp(mp_limb_t * x, mp_size_t cx, void * y, void * temp, str
     mp_size_t nbigtemp = fft_get_mulmod_output_minlimbs(fti);
     mp_limb_t * bigtemp = malloc(nbigtemp * sizeof(mp_limb_t));
     mp_size_t rsize0 = fti_rsize0(fti);
-    fft_combine_bits(bigtemp, y, fti->trunc0, fti->bits, rsize0, nbigtemp);
+    mpn_zero(bigtemp, nbigtemp);
+    fft_addcombine_bits(bigtemp, y, fti->trunc0, fti->bits, rsize0, nbigtemp);
 
     mp_size_t np = mpz_size(p);
     mp_size_t nx = cx * np;

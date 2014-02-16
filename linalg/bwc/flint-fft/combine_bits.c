@@ -80,7 +80,7 @@ void fft_combine_limbs(mp_limb_t * res, mp_limb_t ** poly, slong length,
  * of the polynomial.
  * 
  */
-void fft_combine_bits(mp_limb_t * res, mp_limb_t ** poly, slong length,
+void fft_addcombine_bits(mp_limb_t * res, mp_limb_t ** poly, slong length,
 		      mp_bitcnt_t bits, mp_size_t output_limbs,
 		      mp_size_t total_limbs)
 {

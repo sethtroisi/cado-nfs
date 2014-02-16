@@ -96,10 +96,9 @@ void matpoly_ft_add(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
 void matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti)
 {
     /* Recall that this is for polynomials ! */
-    ASSERT_ALWAYS(t0->m == t1->m);
-    ASSERT_ALWAYS(t0->n == t1->n);
+    ASSERT_ALWAYS(t0->n == t1->m);
     ASSERT_ALWAYS(t0->m == u->m);
-    ASSERT_ALWAYS(t0->n == u->n);
+    ASSERT_ALWAYS(t1->n == u->n);
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);

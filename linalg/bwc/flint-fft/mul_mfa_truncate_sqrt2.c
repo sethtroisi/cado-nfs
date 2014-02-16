@@ -110,7 +110,7 @@ void mul_mfa_truncate_sqrt2(mp_ptr r1, mp_srcptr i1, mp_size_t n1,
     ifft_mfa_truncate_sqrt2_outer(ii, n, w, &t1, &t2, &s1, sqrt, trunc);
 
     flint_mpn_zero(r1, r_limbs);
-    fft_combine_bits(r1, ii, j1 + j2 - 1, bits1, limbs, r_limbs);
+    fft_addcombine_bits(r1, ii, j1 + j2 - 1, bits1, limbs, r_limbs);
 
     flint_free(ii);
     if (i1 != i2)
