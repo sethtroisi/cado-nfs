@@ -96,8 +96,10 @@ void matpoly_ft_add(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
 void matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct fft_transform_info * fti)
 {
     /* Recall that this is for polynomials ! */
-    ASSERT_ALWAYS(t0->m == t1->m && t0->m == u->m);
-    ASSERT_ALWAYS(t0->n == t1->n && t0->n == u->n);
+    ASSERT_ALWAYS(t0->m == t1->m);
+    ASSERT_ALWAYS(t0->n == t1->n);
+    ASSERT_ALWAYS(t0->m == u->m);
+    ASSERT_ALWAYS(t0->n == u->n);
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
@@ -111,8 +113,8 @@ void matpoly_ft_mul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft_pt
             memset(uij, 0, fft_alloc_sizes[0]);
             fft_transform_prepare(uij, fti);
             for(unsigned int k = 0 ; k < t0->n ; k++) {
-                void * t0ik = pointer_arith(t0->data, (i*t0->n+j) * tsize);
-                void * t1kj = pointer_arith(t1->data, (i*t1->n+j) * tsize);
+                void * t0ik = pointer_arith(t0->data, (i*t0->n+k) * tsize);
+                void * t1kj = pointer_arith(t1->data, (k*t1->n+j) * tsize);
                 fft_addmul(uij, t0ik, t1kj, tt, qt, fti);
             }
         }
@@ -127,6 +129,8 @@ void matpoly_ft_sub(abdst_field ab, matpoly_ft_ptr t0, matpoly_ft_ptr t1, struct
 
 void matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_transform_info * fti)
 {
+    /* the caller must allocate first by himself ! */
+    ASSERT_ALWAYS(!matpoly_check_pre_init(a));
     /* Recall that this is for polynomials ! */
     ASSERT_ALWAYS(t->m == a->m);
     ASSERT_ALWAYS(t->n == a->n);

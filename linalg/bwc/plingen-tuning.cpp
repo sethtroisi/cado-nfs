@@ -332,7 +332,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             }
             if (piref->size == 0) {
                 polymat_swap(pi, piref);
-                fprintf(stderr, "BASIS0\n");
+                // fprintf(stderr, "BASIS0\n");
             } else if (polymat_cmp(ab, pi, piref) != 0) {
                 fprintf(stderr, "MISMATCH0!\n");
             }
@@ -353,7 +353,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             }
             if (piref->size == 0) {
                 polymat_swap(pi, piref);
-                fprintf(stderr, "BASIS1\n");
+                // fprintf(stderr, "BASIS1\n");
             } else if (polymat_cmp(ab, pi, piref) != 0) {
                 fprintf(stderr, "MISMATCH1!\n");
             }
@@ -364,7 +364,9 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         polymat_clear(ab, piL);
         matpoly_set_polymat(ab, xpiR, piR);
         polymat_clear(ab, piR);
-        matpoly_set_polymat(ab, xpiref, piref);
+        if (piref->size) {
+            matpoly_set_polymat(ab, xpiref, piref);
+        }
         polymat_clear(ab, piref);
         matpoly_init(ab, xpi, m+n, m+n, 2*k-1);
         polymat_clear(ab, pi);
@@ -382,7 +384,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             }
             if (xpiref->size == 0) {
                 matpoly_swap(xpi, xpiref);
-                fprintf(stderr, "BASIS2\n");
+                // fprintf(stderr, "BASIS2\n");
             } else if (matpoly_cmp(ab, xpi, xpiref) != 0) {
                 fprintf(stderr, "MISMATCH2!\n");
             }
@@ -397,6 +399,8 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             struct fft_transform_info fti[1];
             fft_get_transform_info_fppol(fti, p, xpiL->size, xpiR->size, xpiL->n);
             int s = 0;
+            matpoly_clear(ab, xpi);
+            matpoly_init(ab, xpi, m+n, m+n, xpiL->size + xpiR->size - 1);
             for(auto x = finder.micro_bench(3); x; ++x) {
                 x.push();
                 matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
@@ -405,6 +409,8 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
                 matpoly_ft_dft(ab, tpiL, xpiL, fti);
                 matpoly_ft_dft(ab, tpiR, xpiR, fti);
                 matpoly_ft_mul(ab, tpi, tpiL, tpiR, fti);
+                xpi->size = xpiL->size + xpiR->size - 1;
+                ASSERT_ALWAYS(xpi->size <= xpi->alloc);
                 matpoly_ft_ift(ab, xpi, tpi, fti);
                 matpoly_ft_clear(ab, tpiL, fti);
                 matpoly_ft_clear(ab, tpiR, fti);
