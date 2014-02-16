@@ -239,6 +239,7 @@ void * tx;
 void * ty;
 void * tz;
 void * tt;
+void * qt;
 
 static void alloc_everything()
 {
@@ -252,6 +253,7 @@ static void free_everything() {
     free(ty);
     free(tz);
     free(tt);
+    free(qt);
     free(x);
     free(y);
     free(z);
@@ -261,6 +263,7 @@ static void prepare_transforms() {
     tx = malloc(fft_alloc_sizes[0]);
     ty = malloc(fft_alloc_sizes[0]);
     tz = malloc(fft_alloc_sizes[0]);
+    qt = malloc(fft_alloc_sizes[1]);
     tt = malloc(MAX(fft_alloc_sizes[1], fft_alloc_sizes[2]));
     fft_transform_prepare(tx, fti);
     fft_transform_prepare(ty, fti);
@@ -296,7 +299,7 @@ int test_mul(gmp_randstate_t rstate) /*{{{*/
     fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
     int zbits = xbits + ybits;
 
-    fft_get_transform_info(fti, xbits, ybits, 3);
+    fft_get_transform_info(fti, xbits, ybits, 4);
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
@@ -334,7 +337,7 @@ int test_mulmod(gmp_randstate_t rstate) /*{{{*/
     fprintf(stderr, "xbits:=%d; ybits:=%d;\n", xbits, ybits);
 
     int wrap = gmp_urandomm_ui(rstate, 128);
-    fft_get_transform_info_mulmod(fti, xbits, ybits, 3, ybits + wrap);
+    fft_get_transform_info_mulmod(fti, xbits, ybits, 4, ybits + wrap);
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
@@ -376,7 +379,7 @@ int test_mul_fppol(gmp_randstate_t rstate) /*{{{*/
     fprintf(stderr, "cx:=%d; cy:=%d; bits_of_p:=%zu;\n", cx, cy, mpz_sizeinbase(p, 2));
     cz = cx + cy - 1;
 
-    fft_get_transform_info_fppol(fti, p, cx, cy, 3);
+    fft_get_transform_info_fppol(fti, p, cx, cy, 5);
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
@@ -394,6 +397,9 @@ int test_mul_fppol(gmp_randstate_t rstate) /*{{{*/
     fft_do_dft_fppol(ty, y, cy, tt, fti, p); do_renames("dft", "P1");
     fft_mul(tz, tx, ty, tt, fti);
     fft_add(tz, tz, tz, fti);
+    /* P0 is always smaller than P1, so the product P0^2 fits within the
+     * requested transform length */
+    fft_addmul(tz, tx, tx, tt, qt, fti);
     fft_add(tz, tz, tx, fti);
     fft_add(tz, tz, ty, fti);
     fft_do_ift_fppol(z, cz, tz, tt, fti, p); do_renames("ift", "P2");
@@ -426,7 +432,7 @@ int test_mp_fppol(gmp_randstate_t rstate)/*{{{*/
     fprintf(stderr, "/* MP(degree %d, degree %d) -> degree %d */\n",
             cx - 1, cy - 1, cz - 1);
 
-    fft_get_transform_info_fppol_mp(fti, p, cx, cy, 3);
+    fft_get_transform_info_fppol_mp(fti, p, cx, cy, 4);
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     fti_disp(fti);
 
@@ -583,9 +589,9 @@ elif check eq "test_mul_fppol" then
     zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
     Q0 eq Polynomial(R,Intseq(zP0,2^fti_bits));
     Q1 eq Polynomial(R,Intseq(zP1,2^fti_bits));
-    Q2:=(2*Q0*Q1+Q0+Q1) mod (T^(4*n)-1);
+    Q2:=(2*Q0*Q1+Q0^2+Q0+Q1) mod (T^(4*n)-1);
     Q2 eq cQ2;
-    P2 eq 2*P0*P1+P0+P1;
+    P2 eq 2*P0*P1+P0^2+P0+P1;
 elif check eq "test_mp_fppol" then
     zP0:=Evaluate(ChangeRing(P0,Z),2^fti_ks_coeff_bits);
     zP1:=Evaluate(ChangeRing(P1,Z),2^fti_ks_coeff_bits);
