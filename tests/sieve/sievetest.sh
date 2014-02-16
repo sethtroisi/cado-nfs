@@ -46,7 +46,19 @@ FBC="${TMPDIR}/${BASENAME}.fbc"
 # then use the cache file created above
 "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q1" -out "${RELS}" -fbc "${FBC}" || exit 1
 
-SHA1=`grep -v "^#" "${RELS}" | sort -n | sha1sum`
+
+SHA1BIN=sha1sum
+if ! echo | "$SHA1BIN" > /dev/null 2>&1
+then
+  SHA1BIN=sha1
+fi
+
+# Try to make sort produce some well-defined ordering on the integers
+export LC_ALL=C
+export LANG=C
+export LANGUAGE=C
+
+SHA1=`grep -v "^#" "${RELS}" | sort -n | ${SHA1BIN}` || exit 1
 SHA1="${SHA1%% *}"
 if [ "${SHA1}" != "${REFERENCE_SHA1}" ]
 then

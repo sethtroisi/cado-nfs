@@ -41,6 +41,10 @@ void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
   ASSERT_ALWAYS(n == c->n);
   for (i = 0; i < iceildiv(n, BV_BITS); i++)
     b->p[i] = ~c->p[i];
+  /* For the last byte, put the bits to 0 if the bitmap count does not
+   * correspond to an integer number of words */
+  if (n & (BV_BITS - 1))
+    b->p[n >> LN2_BV_BITS] &= (((bv_t) 1) << (n & (BV_BITS - 1))) - 1;
 }
 
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
@@ -66,10 +70,12 @@ int bit_vector_clearbit(bit_vector_ptr b, size_t pos)
     return (val & mask) != 0;
 }
 
+/* return old value */
 int bit_vector_flipbit(bit_vector_ptr b, size_t pos)
 {
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
-    bv_t val = b->p[pos >> LN2_BV_BITS] ^= mask;
+    bv_t val = b->p[pos >> LN2_BV_BITS];
+    b->p[pos >> LN2_BV_BITS] ^= mask;
     return (val & mask) != 0;
 }
 
