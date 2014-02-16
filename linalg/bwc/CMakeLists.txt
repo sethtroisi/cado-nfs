@@ -71,7 +71,7 @@ endforeach(v)
 
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v p_1 p_2 p_3 p_4 p_8)
+    foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
@@ -185,11 +185,9 @@ CONFIGURE_MATMUL_LIB(u64k2     , sliced)
 CONFIGURE_MATMUL_LIB(u64k1     , threaded)
 CONFIGURE_MATMUL_LIB(u64k2     , threaded)
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-CONFIGURE_MATMUL_LIB(p_1       , basicp)
-CONFIGURE_MATMUL_LIB(p_2       , basicp)
-CONFIGURE_MATMUL_LIB(p_3       , basicp)
-CONFIGURE_MATMUL_LIB(p_4       , basicp)
-CONFIGURE_MATMUL_LIB(p_8       , basicp)
+    foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
+     CONFIGURE_MATMUL_LIB(${v} , basicp)
+    endforeach(v)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 
 if(NOT BUILD_DYNAMICALLY_LINKABLE_BWC)
@@ -251,8 +249,6 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 1)
-
 if(WITH_MPIR)
     file(GLOB flint_fft_files flint-fft/*.c)
     add_library(flint-fft ${flint_fft_files})
@@ -261,34 +257,35 @@ if(WITH_MPIR)
 endif(WITH_MPIR)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-set(plingen_sources
-                bw-common.c
-                bw-common-mpi.c
-                plingen.c
-                plingen-tuning.cpp
-                lingen-matpoly.c
-                lingen-bigmatpoly.c
-                lingen-polymat.c
-                lingen-bigpolymat.c
-                mpfq/abase_p_${plingen_prime_nwords}.c
-    )
+    foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
+    set(plingen_${v}_sources
+                    bw-common.c
+                    bw-common-mpi.c
+                    plingen.c
+                    plingen-tuning.cpp
+                    lingen-matpoly.c
+                    lingen-bigmatpoly.c
+                    lingen-polymat.c
+                    lingen-bigpolymat.c
+                    mpfq/abase_${v}.c
+        )
+    if(WITH_MPIR)
+    set(plingen_${v}_sources ${plingen_${v}_sources} lingen-matpoly-ft.c)
+    endif(WITH_MPIR)
 
-if(WITH_MPIR)
-set(plingen_sources ${plingen_sources} lingen-matpoly-ft.c)
-endif(WITH_MPIR)
+    add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
+    set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
-add_executable(plingen EXCLUDE_FROM_ALL ${plingen_sources})
-set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
-
-if(WITH_MPIR)
-target_link_libraries(plingen flint-fft ${gmp_libname} utils)
-else(WITH_MPIR)
-target_link_libraries(plingen ${gmp_libname} utils)
-endif(WITH_MPIR)
-set_target_properties(plingen PROPERTIES
-    COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
-    LINK_FLAGS "--mpi"
-    )
+    if(WITH_MPIR)
+    target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
+    else(WITH_MPIR)
+    target_link_libraries(plingen_${v} ${gmp_libname} utils)
+    endif(WITH_MPIR)
+    set_target_properties(plingen_${v} PROPERTIES
+        COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
+        LINK_FLAGS "--mpi"
+        )
+    endforeach(v)
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 
