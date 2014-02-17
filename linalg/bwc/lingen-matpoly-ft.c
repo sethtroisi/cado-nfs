@@ -242,3 +242,59 @@ void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned
     free(tt);
 }
 
+
+
+void matpoly_mul_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, unsigned int adj)/*{{{*/
+{
+    matpoly_ft tc, ta, tb;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    struct fft_transform_info fti[1];
+    fft_get_transform_info_fppol(fti, p, a->size, b->size, a->n);
+    if (adj != UINT_MAX) {
+        fft_transform_info_adjust_depth(fti, adj);
+    }
+    matpoly_clear(ab, c);
+    matpoly_init(ab, c, a->m, b->n, a->size + b->size - 1);
+    matpoly_ft_init(ab, ta, a->m, a->n, fti);
+    matpoly_ft_init(ab, tb, b->m, b->n, fti);
+    matpoly_ft_init(ab, tc, a->m, b->n, fti);
+    matpoly_ft_dft(ab, ta, a, fti);
+    matpoly_ft_dft(ab, tb, b, fti);
+    matpoly_ft_mul(ab, tc, ta, tb, fti);
+    c->size = a->size + b->size - 1;
+    ASSERT_ALWAYS(c->size <= c->alloc);
+    matpoly_ft_ift(ab, c, tc, fti);
+    matpoly_ft_clear(ab, ta, fti);
+    matpoly_ft_clear(ab, tb, fti);
+    matpoly_ft_clear(ab, tc,  fti);
+    mpz_clear(p);
+}/*}}}*/
+void matpoly_mp_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, unsigned int adj)/*{{{*/
+{
+    matpoly_ft tc, ta, tb;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    struct fft_transform_info fti[1];
+    fft_get_transform_info_fppol_mp(fti, p, MIN(a->size, b->size), MAX(a->size, b->size), a->n);
+    if (adj != UINT_MAX) {
+        fft_transform_info_adjust_depth(fti, adj);
+    }
+    matpoly_clear(ab, c);
+    matpoly_init(ab, c, a->m, b->n, MAX(a->size, b->size) - MIN(a->size, b->size) + 1);
+    matpoly_ft_init(ab, ta, a->m, a->n, fti);
+    matpoly_ft_init(ab, tb, b->m, b->n, fti);
+    matpoly_ft_init(ab, tc, a->m, b->n, fti);
+    matpoly_ft_dft(ab, ta, a, fti);
+    matpoly_ft_dft(ab, tb, b, fti);
+    matpoly_ft_mul(ab, tc, ta, tb, fti);
+    c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
+    ASSERT_ALWAYS(c->size <= c->alloc);
+    matpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti);
+    matpoly_ft_clear(ab, ta, fti);
+    matpoly_ft_clear(ab, tb, fti);
+    matpoly_ft_clear(ab, tc,  fti);
+    mpz_clear(p);
+}/*}}}*/

@@ -6,6 +6,25 @@
 #include "lingen-matpoly-ft.h"
 #include "lingen-bigmatpoly-ft.h"
 
+/* This is the interface for doing products of polynomial matrices by
+ * caching transforms, and transferring them over MPI. There are
+ * currently two pitfalls.
+ *
+ * 1/ we have no streaming of computations and communications. This means
+ * two things. First, communication/computation overlap can be
+ * beneficial: while transforms of rows on the left term of a product are
+ * computed (assuming transforms of the right term are ready), it is
+ * possible to communicate the already computed row transforms. A second
+ * point is that if we manage to get these computed soon, then there is
+ * no need to keep them in memory. Such an approach would make it
+ * possible to reduce the overall memory footprint.
+ *
+ * 2/ we are transferring full-length transforms, while it would 
+ * be sufficient to transfer the truncated transforms of course.
+ */
+
+
+
 /* {{{  init/zero/clear interface for bigmatpoly_ft */
 matpoly_ft_ptr bigmatpoly_ft_my_cell(bigmatpoly_ft_ptr p)
 {

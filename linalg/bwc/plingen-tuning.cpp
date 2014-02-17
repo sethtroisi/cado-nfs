@@ -33,6 +33,36 @@
 #include <iostream>
 #include <sstream>
 
+/* This is the simple C-type cutoff table which is used down the line by
+ * C programs */
+
+typedef struct {
+    unsigned int k;     /* this is the number of coefficients (length) of
+                         * pi.  Admittedly,  it is slightly bogus to have
+                         * this as a main variable.  Length [k] for pi
+                         * corresponds to an "input length" of [k*(m+n)/m].
+                         * In the MP case, this means that E has length
+                         * [input_length+k-1], and the output E_right has
+                         * length [input_length]. */
+    unsigned int choice;        /* semantics vary. For FFT-based stuff,
+                                 * this is the depth reduction from the
+                                 * flit default.
+                                 */
+} * cutoff_list;
+
+/* cutoff list *ALWAYS* finish with UINT_MAX, UINT_MAX */
+unsigned int cutoff_list_get(cutoff_list cl, unsigned int k)
+{
+    if (!cl) return 0;
+    if (k < cl->k) return 0;
+    for( ; k >= cl->k ; cl++);
+    return (--cl)->choice;
+}
+
+
+/* The -B argument may be used to request printing of timing results at
+ * least up to this input length */
+unsigned int bench_atleast_uptothis = 0;
 
 using namespace std;
 
@@ -157,10 +187,11 @@ struct cutoff_finder {
 
         vector<bool> was_meaningful = meaningful;
 
-        /* try to discard those which are slow */
-        for(int i = 0 ; i < ntests ; i++) {
+        /* try to discard those which are slow. We live on the assumption
+         * that the higher-numbered strategies win eventually, therefore
+         * we don't discard them if [best] is smaller currently */
+        for(int i = 0 ; i < best ; i++) {
             /* already dead ? */
-            if (i==best) continue;
             if (!meaningful[i]) continue;
 
             /* for how long has it been slow ? */
@@ -224,6 +255,20 @@ struct cutoff_finder {
     }
 
     /* This is really limited to karatsuba-like cuttofs. It's ugly */
+    vector<pair<unsigned int, int>> export_best_table()
+    {
+        vector<pair<unsigned int, int>> steps;
+        steps.push_back(make_pair(1,0));
+
+        for(auto it : all_results) {
+            unsigned int size = it.first;
+            int best = it.second.second;
+            if (steps.empty() || best != steps.back().second) {
+                steps.push_back(make_pair(size, best));
+            }
+        }
+        return steps;
+    }
     vector<pair<unsigned int, int>> export_kara_cutoff_data(struct polymat_cutoff_info * dst)
     {
         /* This size will eventually feed the ->subdivide field for the
@@ -293,7 +338,7 @@ struct cutoff_finder {
  */
 
 #ifdef HAVE_MPIR
-void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
+void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, cutoff_list *cl_out)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -301,17 +346,18 @@ void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{
 
     typedef timer_rdtsc timer_t;
 
-    cutoff_finder<timer_t> finder(7);
-    finder.slowness_ratio = 1000;
-    finder.age_slow_discard = 5;
+    int nadjs=7;
+    cutoff_finder<timer_t> finder(nadjs);
+    finder.slowness_ratio = 1.2;
+    // finder.age_slow_discard = 5;
     finder.enough_time = 2.0;
     finder.minimum_time = 0.00001;
     finder.enough_repeats = 100;
     finder.scale = 1.01;
 
-    for(int i = 0 ; i < 7 ; i++) {
+    for(int i = 0 ; i < nadjs ; i++) {
         ostringstream o;
-        o << "depth_adj=" << -i;
+        o << "depth_adj=" << nadjs-1-i;
         finder.set_method_name(i, o.str());
     }
 
@@ -328,7 +374,9 @@ void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{
     cout << "# Note: for input length k within plingen,"
         << " we use ncoeffs=k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
 
-    unsigned int min_bench = 2000 * m / (m+n);
+    /* This is for forcing the bench to run until a large length. This is
+     * unnecessary here */
+    unsigned int min_bench = 0;
 
     /* Beware, k is the length of piL, not a degree. Hence length 1
      * clearly makes no sense */
@@ -352,19 +400,22 @@ void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{
 
         ostringstream extra_info;
 
-        for(int adj = 0 ; adj < 7 ; adj++) {
+        for(int index = 0 ; index < nadjs ; index++) {
             struct fft_transform_info fti[1];
             fft_get_transform_info_fppol(fti, p, k, k, m+n);
             fft_transform_info_set_first_guess(fti);
-            if (adj >= fti->depth) {
-                finder.benches[adj] = 999999999;
+            if (index == 0) {
+                extra_info << "(from " << fti->depth << ")";
+            }
+            if (nadjs-1-index >= fti->depth) {
+                finder.benches[index] = 999999999;
                 continue;
             }
-            if (fti->depth >= 11 && adj > 0) {
-                finder.benches[adj] = 999999999;
+            if (fti->depth >= 11 && index > 0) {
+                finder.benches[index] = 999999999;
                 continue;
             }
-            fft_transform_info_adjust_depth(fti, adj);
+            fft_transform_info_adjust_depth(fti, nadjs-1-index);
 
             size_t fft_alloc_sizes[3];
             fft_get_transform_allocs(fft_alloc_sizes, fti);
@@ -375,7 +426,7 @@ void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{
             tB = malloc(fft_alloc_sizes[0]);
             tC = malloc(fft_alloc_sizes[0]);
 
-            for(auto x = finder.micro_bench(adj); x; ++x) {
+            for(auto x = finder.micro_bench(index); x; ++x) {
                 typedef cutoff_finder<timer_t>::small_bench<timer_t> bt;
 
                 double t_dftA=0;
@@ -428,12 +479,199 @@ void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{
             << "\n";
     }
 
+    vector<pair<unsigned int, int>> table = finder.export_best_table();
+
+    for(auto& x : table) x.second = nadjs-1-x.second;
+
+    cout << "/* FFT depth adjustments for "
+                << (m)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" products */\n";
+    cout << "#define MUL_FTI_DEPTH_ADJ_" <<m+n<<"_"<<(m+n)<<"_"<<(m+n)
+        << " " << finder.print_result(table) << endl;
+
+    if (cl_out) {
+        *cl_out = (cutoff_list) malloc((table.size()+1)*sizeof(**cl_out));
+        for(unsigned int i = 0 ; i < table.size(); i++) {
+            (*cl_out)[i].k = table[i].first;
+            (*cl_out)[i].choice = table[i].second;
+        }
+        (*cl_out)[table.size()].k      = UINT_MAX;
+        (*cl_out)[table.size()].choice = UINT_MAX;
+    }
+
+    gmp_randclear(rstate);
+}/*}}}*/
+void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, cutoff_list * cl_out)/*{{{*/
+{
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+
+    typedef timer_rdtsc timer_t;
+
+    int nadjs=7;
+    cutoff_finder<timer_t> finder(nadjs);
+    finder.slowness_ratio = 1.2;
+    // finder.age_slow_discard = 5;
+    finder.enough_time = 2.0;
+    finder.minimum_time = 0.00001;
+    finder.enough_repeats = 100;
+    finder.scale = 1.01;
+
+    for(int i = 0 ; i < nadjs ; i++) {
+        ostringstream o;
+        o << "depth_adj=" << nadjs-1-i;
+        finder.set_method_name(i, o.str());
+    }
+
+    cout << "# Tuning FFT depth adjustment for"
+                << " m=" << m
+                << ", n=" << n
+                << "\n";
+
+    cout << "# Timings reported in " << timer_t::timer_unit() << "\n";
+    cout << "# inputlength, ncoeffs, various depth adjustments";
+    cout << "\n";
+
+    /* for multiplication */
+    cout << "# Note: for input length k within plingen,"
+        << " we use ncoeffs=k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+
+    /* This is for forcing the bench to run until a large length. This is
+     * unnecessary here */
+    unsigned int min_bench = 0;
+
+    /* Beware, k is the length of piL, not a degree. Hence length 1
+     * clearly makes no sense */
+    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+        unsigned int input_length = (m+n) * k / m;
+
+        unsigned int E_length = k + input_length - 1;
+
+        abvec   A,   B,   C;
+        void  *tA, *tB, *tC;
+
+        mpz_t p;
+        mpz_init(p);
+        abfield_characteristic(ab, p);
+
+        abvec_init(ab, &A, E_length);
+        abvec_init(ab, &B, k);
+        abvec_init(ab, &C, input_length);
+        
+        abvec_random(ab, A, k, rstate);
+        abvec_random(ab, B, k, rstate);
+        abvec_set_zero(ab, C, k);
+
+        ostringstream extra_info;
+
+        for(int index = 0 ; index < nadjs ; index++) {
+            struct fft_transform_info fti[1];
+            fft_get_transform_info_fppol_mp(fti, p, k, E_length, m+n);
+            fft_transform_info_set_first_guess(fti);
+            if (index == 0) {
+                extra_info << "(from " << fti->depth << ")";
+            }
+            if (nadjs-1-index >= fti->depth) {
+                finder.benches[index] = 999999999;
+                continue;
+            }
+            if (fti->depth >= 11 && index > 0) {
+                finder.benches[index] = 999999999;
+                continue;
+            }
+            fft_transform_info_adjust_depth(fti, nadjs-1-index);
+
+            size_t fft_alloc_sizes[3];
+            fft_get_transform_allocs(fft_alloc_sizes, fti);
+            void * tt = malloc(fft_alloc_sizes[2]);
+            void * qt = malloc(fft_alloc_sizes[1]);
+
+            tA = malloc(fft_alloc_sizes[0]);
+            tB = malloc(fft_alloc_sizes[0]);
+            tC = malloc(fft_alloc_sizes[0]);
+
+            for(auto x = finder.micro_bench(index); x; ++x) {
+                typedef cutoff_finder<timer_t>::small_bench<timer_t> bt;
+
+                double t_dftA=0;
+                for(auto y = bt(finder, t_dftA); y; ++y) {
+                    fft_transform_prepare(tA, fti);
+                    y.push();
+                    fft_do_dft_fppol(tA, (mp_limb_t*)A, E_length, qt, fti, p);
+                    y.pop();
+                }
+                x.inject(t_dftA, m*(m+n));
+
+                double t_dftB=0;
+                for(auto y = bt(finder, t_dftB); y; ++y) {
+                    fft_transform_prepare(tB, fti);
+                    y.push();
+                    fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
+                    y.pop();
+                }
+                x.inject(t_dftB, (m+n)*(m+n));
+
+                double t_conv=0;
+                for(auto y = bt(finder, t_conv); y; ++y) {
+                    fft_transform_prepare(tC, fti);
+                    fft_zero(tC, fti);
+                    y.push();
+                    fft_addmul(tC, tA, tB, tt, qt, fti);
+                    y.pop();
+                }
+                x.inject(t_conv, m*(m+n)*(m+n));
+
+                double t_iftC=0;
+                for(auto y = bt(finder, t_conv); y; ++y) {
+                    fft_transform_prepare(tC, fti);
+                    y.push();
+                    fft_do_ift_fppol_mp((mp_limb_t*)C, input_length, tC, qt, fti, p, k-1);
+                    y.pop();
+                }
+                x.inject(t_iftC, m*(m+n));
+            }
+            free(tA);
+            free(tB);
+            free(tC);
+        }
+
+        mpz_clear(p);
+
+        cout << input_length
+            << " " << finder.summarize_for_this_length(k)
+            << extra_info.str()
+            << "\n";
+    }
+
+    vector<pair<unsigned int, int>> table = finder.export_best_table();
+
+    for(auto& x : table) x.second = nadjs-1-x.second;
+
+    cout << "/* FFT depth adjustments for "
+                << (m)<<"*"<<(m+n)
+                <<" times "
+                << (m+n)<<"*"<<(m+n)<<" middle-products */\n";
+    cout << "#define MP_FTI_DEPTH_ADJ_" <<m<<"_"<<(m+n)<<"_"<<(m+n)
+        << " " << finder.print_result(table) << endl;
+
+    if (cl_out) {
+        *cl_out = (cutoff_list) malloc((table.size()+1)*sizeof(**cl_out));
+        for(unsigned int i = 0 ; i < table.size(); i++) {
+            (*cl_out)[i].k = table[i].first;
+            (*cl_out)[i].choice = table[i].second;
+        }
+        (*cl_out)[table.size()].k = UINT_MAX;
+        (*cl_out)[table.size()].choice = UINT_MAX;
+    }
+
     gmp_randclear(rstate);
 }/*}}}*/
 #endif  /* HAVE_MPIR */
 
 
-void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
+void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -478,7 +716,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 
     /* make sure we don't stop the bench absurdly early. We set the bench
      * as input_length \approx 2000 */
-    unsigned int min_bench = 2000 * m / (m+n);
+    unsigned int min_bench = bench_atleast_uptothis * m / (m+n);
 
     /* Beware, k is the length of piL, not a degree. Hence length 1
      * clearly makes no sense */
@@ -572,6 +810,13 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 
 #ifdef HAVE_MPIR
         if (finder.still_meaningful_to_test(3)) {
+            unsigned int adj = cutoff_list_get(cl, k);
+            {
+                ostringstream o;
+                o << "matpoly-ft-kronecker-schönhage-caching@adj" << adj;
+                finder.set_method_name(3, o.str());
+            }
+#if 0
             matpoly_ft tpi, tpiL, tpiR;
             mpz_t p;
             mpz_init(p);
@@ -599,11 +844,19 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
                 s++;
             }
             mpz_clear(p);
+#else
+            for(auto x = finder.micro_bench(3); x; ++x) {
+                x.push();
+                matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj);
+                x.pop();
+            }
+#endif
             if (xpiref->size == 0) {
                 matpoly_swap(xpi, xpiref);
             } else if (matpoly_cmp(ab, xpi, xpiref) != 0) {
                 fprintf(stderr, "MISMATCH3!\n");
             }
+#if 0
 #ifdef  TIME_FFT
             char msg[256];
             snprintf(msg, sizeof(msg),
@@ -616,6 +869,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             /* the following one-liner may be used to grab only
              * fft-related data */
     // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
+#endif
 #endif
         }
 #endif
@@ -651,7 +905,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
-void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
+void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -707,7 +961,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 
     /* make sure we don't stop the bench absurdly early. We set the bench
      * as input_length \approx 2000 */
-    unsigned int min_bench = 2000 * m / (m+n);
+    unsigned int min_bench = bench_atleast_uptothis * m / (m+n);
 
     /* Beware, k is a length of piL, not a degree. Hence length 1 clearly
      * makes no sense */
@@ -805,6 +1059,14 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 
 #ifdef HAVE_MPIR
         if (finder.still_meaningful_to_test(3)) {
+            unsigned int adj = UINT_MAX;
+            if (cl) {
+                adj = cutoff_list_get(cl, k);
+                ostringstream o;
+                o << "matpoly-ft-kronecker-schönhage-caching@adj" << adj;
+                finder.set_method_name(3, o.str());
+            }
+#if 0
             matpoly_ft tER, tpiL, tE;
             mpz_t p;
             mpz_init(p);
@@ -838,11 +1100,18 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
                 s++;
             }
             mpz_clear(p);
+#endif
+            for(auto x = finder.micro_bench(3); x; ++x) {
+                x.push();
+                matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj);
+                x.pop();
+            }
             if (xERref->size == 0) {
                 matpoly_swap(xER, xERref);
             } else if (matpoly_cmp(ab, xER, xERref) != 0) {
                 fprintf(stderr, "MISMATCH3!\n");
             }
+#if 0
 #ifdef  TIME_FFT
             char msg[256];
             snprintf(msg, sizeof(msg),
@@ -855,6 +1124,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             /* the following one-liner may be used to grab only
              * fft-related data */
     // perl -ne '/^\d+\s(\d+).*depth (\d+).*\*([\d\.]+)\sdft.*\*([\d\.]+)\sconv.*\*([\d\.]+)\sift/ && print "$1 $2 $3 $4 $5\n";' 
+#endif
 #endif
         }
 #endif
@@ -970,6 +1240,8 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     int mpi[2] = {1,1};
     int rank;
 
+    param_list_parse_uint(pl, "B", &bench_atleast_uptothis);
+
     MPI_Comm_rank(comm, &rank);
 
     mpz_init(p);
@@ -984,9 +1256,14 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
-    plingen_tune_fti_depth(ab, m, n);
-    plingen_tune_mul(ab, m, n);
-    plingen_tune_mp(ab, m, n);
+    /* XXX BUG: with depth adjustment==0 early on, we get check failures.
+     * Must investigate */
+    cutoff_list cl_mul = NULL;
+    cutoff_list cl_mp = NULL;
+    plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
+    plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
+    plingen_tune_mp(ab, m, n, cl_mp);
+    plingen_tune_mul(ab, m, n, cl_mul);
 
 #if 0
     /* This should normally be reasonably quick, and running it every

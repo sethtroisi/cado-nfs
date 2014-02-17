@@ -37,6 +37,15 @@ void matpoly_ft_addmul(abdst_field ab, matpoly_ft_ptr u, matpoly_ft_ptr t0, matp
 void matpoly_ft_ift(abdst_field ab, matpoly_ptr p, matpoly_ft_ptr t, struct fft_transform_info * fti);
 void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr p, matpoly_ft_ptr t, unsigned int shift, struct fft_transform_info * fti);
 
+
+/* In a way, this is the only real API exported by this module */
+void matpoly_mul_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, unsigned int adj);
+static inline void matpoly_mul_caching(abdst_field ab, matpoly c, matpoly a, matpoly b) { matpoly_mul_caching_adj(ab, c, a, b, UINT_MAX); }
+
+void matpoly_mp_caching_adj(abdst_field ab, matpoly c, matpoly a, matpoly b, unsigned int adj);
+static inline void matpoly_mp_caching(abdst_field ab, matpoly c, matpoly a, matpoly b) { matpoly_mp_caching_adj(ab, c, a, b, UINT_MAX); }
+
+
 #ifdef __cplusplus
 }
 #endif
