@@ -17,7 +17,8 @@
  * possible to communicate the already computed row transforms. A second
  * point is that if we manage to get these computed soon, then there is
  * no need to keep them in memory. Such an approach would make it
- * possible to reduce the overall memory footprint.
+ * possible to reduce the overall memory footprint. The place to fix this
+ * is to modify the control flow in bigmatpoly_mul_caching_adj
  *
  * 2/ we are transferring full-length transforms, while it would 
  * be sufficient to transfer the truncated transforms of course.
@@ -285,3 +286,62 @@ void bigmatpoly_ft_ift_mp(abdst_field ab, bigmatpoly_ptr a, bigmatpoly_ft_ptr ta
 {
     matpoly_ft_ift_mp(ab, bigmatpoly_my_cell(a), bigmatpoly_ft_my_cell(ta), shift, fti);
 }
+
+void bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, unsigned int adj)/*{{{*/
+{
+    bigmatpoly_ft tc, ta, tb;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    struct fft_transform_info fti[1];
+    fft_get_transform_info_fppol(fti, p, a->size, b->size, a->n);
+    if (adj != UINT_MAX) {
+        fft_transform_info_adjust_depth(fti, adj);
+    }
+    bigmatpoly_clear(ab, c);
+    bigmatpoly_ptr model = a;
+    bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
+    bigmatpoly_init(ab, c, model, a->m, b->n, a->size + b->size - 1);
+    bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
+    bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
+    bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
+    bigmatpoly_ft_dft(ab, ta, a, fti);
+    bigmatpoly_ft_dft(ab, tb, b, fti);
+    bigmatpoly_ft_mul(ab, tc, ta, tb, fti);
+    c->size = a->size + b->size - 1;
+    bigmatpoly_ft_ift(ab, c, tc, fti);
+    bigmatpoly_ft_clear(ab, ta, fti);
+    bigmatpoly_ft_clear(ab, tb, fti);
+    bigmatpoly_ft_clear(ab, tc,  fti);
+    mpz_clear(p);
+}/*}}}*/
+
+void bigmatpoly_mp_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b, unsigned int adj)/*{{{*/
+{
+    bigmatpoly_ft tc, ta, tb;
+    mpz_t p;
+    mpz_init(p);
+    abfield_characteristic(ab, p);
+    struct fft_transform_info fti[1];
+    fft_get_transform_info_fppol_mp(fti, p, MIN(a->size, b->size), MAX(a->size, b->size), a->n);
+    if (adj != UINT_MAX) {
+        fft_transform_info_adjust_depth(fti, adj);
+    }
+    bigmatpoly_clear(ab, c);
+    bigmatpoly_ptr model = a;
+    bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
+    bigmatpoly_init(ab, c, model, a->m, b->n, MAX(a->size, b->size) - MIN(a->size, b->size) + 1);
+    bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
+    bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
+    bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
+    bigmatpoly_ft_dft(ab, ta, a, fti);
+    bigmatpoly_ft_dft(ab, tb, b, fti);
+    bigmatpoly_ft_mul(ab, tc, ta, tb, fti);
+    c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
+    bigmatpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti);
+    bigmatpoly_ft_clear(ab, ta, fti);
+    bigmatpoly_ft_clear(ab, tb, fti);
+    bigmatpoly_ft_clear(ab, tc,  fti);
+    mpz_clear(p);
+}/*}}}*/
+

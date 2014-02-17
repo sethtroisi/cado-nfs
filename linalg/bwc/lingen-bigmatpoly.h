@@ -9,17 +9,19 @@
 /* This defines an MPI-shared polynomial matrix type */
 
 struct bigmatpoly_s {
-    unsigned int m;     /* total number of rows */
-    unsigned int n;     /* total number of cols */
+    /* XXX the first four fields must be compatible with bigmatpoly_ft_s */
     unsigned int m1;      /* number of block rows, index i */
     unsigned int n1;      /* number of block cols, index j */
+    MPI_Comm row;        /* size == n1 */
+    MPI_Comm col;        /* size == m1 */
+
+    unsigned int m;     /* total number of rows */
+    unsigned int n;     /* total number of cols */
     /* The following three are also in cells */
     unsigned int m0;      /* number of rows per block */
     unsigned int n0;      /* number of cols per block */
     size_t size;
     matpoly * cells;
-    MPI_Comm row;       /* size == n */
-    MPI_Comm col;       /* size == m */
 };
 typedef struct bigmatpoly_s bigmatpoly[1];
 typedef struct bigmatpoly_s * bigmatpoly_ptr;

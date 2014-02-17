@@ -3,47 +3,43 @@
 set -e
 set -x
 
+# various configuration variables.
+
+m=8 n=4
+prime=4148386731260605647525186547488842396461625774241327567978137
+Mh=1; Mv=1;
+Th=2; Tv=2;
+wordsize=64
+mats=$HOME/Local/mats
+if ! [ -d $mats ] ; then mats=/local/rsa768/mats; fi
+# XXX note that $wdir is wiped out by this script !
+wdir=/tmp/bwcp
+
+Nh=$((Mh*Th))
+Nv=$((Mv*Tv))
+mpi=${Mh}x${Mv}
+thr=${Th}x${Tv}
+mpi_njobs_lingen=$((Nh*Nv))
+mpi_njobs_other=$((Mh*Mv))
+nwords=$(echo "1+l($prime)/l(2)/$wordsize"| bc -l | cut -d. -f1)
+bits_per_coeff=$((nwords*$wordsize))
+
 top=`dirname $0`/../..
+
+# build the software. This is optional, really. The only thing is that
+# it's so easy to mess with the location of the binaries that building it
+# by ourselves looks like a reasonable thing to do, for this illustrative
+# script.
+
 export DEBUG=1
 export MPI=1
 make -s -C $top -j 4
-make -s -C $top -j 4 plingen
+make -s -C $top -j 4 plingen_p_$nwords
 eval `make -s -C $top show`
 bins=$top/$build_tree/linalg/bwc
-mats=$HOME/Local/mats
-if ! [ -d $mats ] ; then
-    mats=/local/rsa768/mats
-fi
 
-wdir=/tmp/bwcp
 if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
-
-m=8 n=4
-
-Mh=1; Mv=1;
-Th=2; Tv=2;
-Nh=$((Mh*Th))
-Nv=$((Mv*Tv))
-
-mpi=${Mh}x${Mv}
-thr=${Th}x${Tv}
-
-mpi_njobs_lingen=$((Nh*Nv))
-mpi_njobs_other=$((Mh*Mv))
-
-prime=4148386731260605647525186547488842396461625774241327567978137
-bits_per_coeff=256
-
-if ! echo "$prime-2^$bits_per_coeff" | bc | grep -q '^-' ; then
-    echo "2^bits_per_coeff must be above the prime" >&2
-    echo "Please fix $0" >&2
-    exit 1
-elif echo "$prime-2^($bits_per_coeff-64)" | bc | grep -q '^-' ; then
-    echo "2^(bits_per_coeff-64) must be below the prime" >&2
-    echo "Please fix $0" >&2
-    exit 1
-fi
 
 # The test matrix may be created by:
 #
@@ -143,7 +139,7 @@ done
 
 afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
 
-mpirun -n $mpi_njobs_lingen $bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
+mpirun -n $mpi_njobs_lingen $bins/plingen_p_$nwords lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
 
 ln $wdir/$afile.gen $wdir/F
 

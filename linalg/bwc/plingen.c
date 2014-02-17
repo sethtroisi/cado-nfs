@@ -30,6 +30,17 @@
 #include "plingen.h"
 #include "plingen-tuning.h"
 
+/* Call tree for methods within this program:
+ *
+ * bw_biglingen_single  [complete data on master node]
+ * |->bw_biglingen_collective  when need to go collective
+ *     |<--> bw_lingen_bigrecursive , loops to bw_biglingen_collective
+ *     \->bw_biglingen_single     when it makes sense to do this locally again
+ * \->bw_lingen                   when computation can be done locally
+ *    |<->bw_lingen_recursive
+ *    |->bw_lingen_basecase
+ *
+ */
 static unsigned int display_threshold = 10;
 static int with_timings = 0;
 
@@ -498,6 +509,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
      * all coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
 
+    // fprintf(stderr, "Enter %s\n", __func__);
     /* declare an lazy-alloc all matrices */
     matpoly E_left;
     matpoly pi_left;
@@ -516,6 +528,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     if (done) {
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
+        // fprintf(stderr, "Leave %s\n", __func__);
         return 1;
     }
 
@@ -534,6 +547,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     matpoly_clear(ab, pi_left);
     matpoly_clear(ab, pi_right);
 
+    // fprintf(stderr, "Leave %s\n", __func__);
     return done;
 }/*}}}*/
 
@@ -547,6 +561,7 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     int rank;
     MPI_Comm_rank(bm->world, &rank);
 
+    // fprintf(stderr, "Enter %s\n", __func__);
     /* XXX I think we have to start with something large enough to get
      * all coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
@@ -568,6 +583,7 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     if (done) {
         bigmatpoly_swap(pi_left, pi);
         bigmatpoly_clear(ab, pi_left);
+        // fprintf(stderr, "Leave %s\n", __func__);
         return 1;
     }
 
@@ -586,6 +602,7 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     bigmatpoly_clear(ab, pi_left);
     bigmatpoly_clear(ab, pi_right);
 
+    // fprintf(stderr, "Leave %s\n", __func__);
     return done;
 }/*}}}*/
 
@@ -596,14 +613,17 @@ static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta
     ASSERT_ALWAYS(rank == 0);
     ASSERT_ALWAYS(E->size < bm->lingen_mpi_threshold);
 
+    // fprintf(stderr, "Enter %s\n", __func__);
+    int done;
     if (E->size < bm->lingen_threshold) {
         bm->t_basecase -= seconds();
-        int res = bw_lingen_basecase(bm, pi, E, delta);
+        done = bw_lingen_basecase(bm, pi, E, delta);
         bm->t_basecase += seconds();
-        return res;
     } else {
-        return bw_lingen_recursive(bm, pi, E, delta);
+        done = bw_lingen_recursive(bm, pi, E, delta);
     }
+    // fprintf(stderr, "Leave %s\n", __func__);
+    return done;
 }/*}}}*/
 
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
@@ -615,6 +635,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
     unsigned int b = m + n;
     int done;
 
+    // fprintf(stderr, "Enter %s\n", __func__);
     if (E->size >= bm->lingen_mpi_threshold)  {
         done = bw_lingen_bigrecursive(bm, pi, E, delta);
     } else {
@@ -633,6 +654,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         matpoly_clear(ab, spi);
         matpoly_clear(ab, sE);
     }
+    // fprintf(stderr, "Leave %s\n", __func__);
 
     return done;
 }/*}}}*/
@@ -650,6 +672,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     int go_mpi = 0;
     go_mpi = E->size >= bm->lingen_mpi_threshold;
 
+    // fprintf(stderr, "Enter %s\n", __func__);
     if (!go_mpi) {
         int rank;
         MPI_Comm_rank(bm->world, &rank);
@@ -678,6 +701,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         bigmatpoly_clear(ab, xpi);
         bigmatpoly_clear_model(model);
     }
+    // fprintf(stderr, "Leave %s\n", __func__);
     return done;
 }/*}}}*/
 
@@ -1077,7 +1101,7 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
                         break;
                     }
 		    fprintf(stderr,
-			    "Parse error in %s while reading coefficient (%d,%d,%d)\n",
+			    "Parse error in %s while reading coefficient (%d,%d,%d) (forgot --ascii?)\n",
 			    input_file, i, j, k);
 		    exit(1);
 		}
@@ -1089,6 +1113,44 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
     fclose(f);
     printf("Using A(X) div X in order to consider Y as starting point\n");
     A->size = k - 1;
+} /* }}} */
+
+void set_random_input(bmstatus_ptr bm, matpoly A, unsigned int length) /* {{{ */
+{
+    dims * d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    abdst_field ab = d->ab;
+
+    matpoly_init(ab, A, m, n, length);
+    A->size = length;
+
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    for(unsigned int k = 0 ; k < length ; k++) {
+	for (unsigned int i = 0; i < m ; i++) {
+	    for (unsigned int j = 0; j < n ; j++) {
+                abdst_elt x = matpoly_coeff(A, i, j, k);
+                abrandom(ab, x, rstate);
+            }
+        }
+    }
+
+    /* we force an existing generator. This will be a fairly trivial one,
+     * but that's not really an issue as far as I can tell */
+    if (length > 20) {
+        for(unsigned int k = length-10 ; k < length ; k++) {
+            for (unsigned int i = 0; i < m ; i++) {
+                for (unsigned int j = 0; j < n ; j++) {
+                    absrc_elt x = matpoly_coeff(A, i, (j*1009)%n, k - (length - 10));
+                    abdst_elt y = matpoly_coeff(A, i, j, k);
+                    abset(ab, y, x);
+                }
+            }
+        }
+    }
+
+    gmp_randclear(rstate);
 } /* }}} */
 
 
@@ -1125,6 +1187,7 @@ int main(int argc, char *argv[])
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
+    unsigned int random_length = 0;
 
 
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -1146,6 +1209,8 @@ int main(int argc, char *argv[])
 
     info_init_timer();
 
+    param_list_parse_uint(pl, "random-input-with-length", &random_length);
+
     const char * afile = param_list_lookup_string(pl, "afile");
 
     if (bw->m == -1) {
@@ -1156,7 +1221,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "no n value set\n");
 	exit(1);
     }
-    if (!tune && !afile) {
+    if (!tune && !(afile || random_length)) {
         fprintf(stderr, "No afile provided\n");
         exit(1);
     }
@@ -1277,11 +1342,16 @@ int main(int argc, char *argv[])
     if (rank == 0) { /* {{{ Read A, compute F0 and E, and keep only E */
         matpoly A;
         matpoly_init(ab, A, 0, 0, 0);
-        printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
-        read_data_for_series(bm, A, afile, ascii);
 
-        printf("Read %zu+1=%zu iterations",
-                A->size, A->size+ 1);
+        if (!random_length) {
+            printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
+            read_data_for_series(bm, A, afile, ascii);
+
+            printf("Read %zu+1=%zu iterations",
+                    A->size, A->size+ 1);
+        } else {
+            set_random_input(bm, A, random_length);
+        }
         if (bw->end || bw->start) {
             printf(" (bw parameters: expect %u)",
                     bw->end - bw->start);
@@ -1327,11 +1397,15 @@ int main(int argc, char *argv[])
             matpoly f_red;
             matpoly_init(ab, f_red, 0, 0, 0);
             compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
-            char * f_filename;
-            int rc = asprintf(&f_filename, "%s.gen", afile);
-            ASSERT_ALWAYS(rc >= 0);
-            write_f(bm, f_filename, f_red, delta, ascii);
-            free(f_filename);
+            if (random_length) {
+                fprintf(stderr, "Not writing result for random data\n");
+            } else {
+                char * f_filename;
+                int rc = asprintf(&f_filename, "%s.gen", afile);
+                ASSERT_ALWAYS(rc >= 0);
+                write_f(bm, f_filename, f_red, delta, ascii);
+                free(f_filename);
+            }
             matpoly_clear(ab, f_red);
         } else {
             fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
