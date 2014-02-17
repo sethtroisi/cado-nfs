@@ -1,5 +1,5 @@
-#ifndef BIGmatpoly_H_
-#define BIGmatpoly_H_
+#ifndef BIGMATPOLY_H_
+#define BIGMATPOLY_H_
 
 #include "abase.h"
 #include "lingen-matpoly.h"
@@ -68,4 +68,4 @@ static inline matpoly_ptr bigmatpoly_cell(bigmatpoly_ptr p, unsigned int i, unsi
 }
 #endif
 
-#endif	/* BIGmatpoly_H_ */
+#endif	/* BIGMATPOLY_H_ */

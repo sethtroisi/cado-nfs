@@ -270,7 +270,10 @@ if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
                     mpfq/abase_${v}.c
         )
     if(WITH_MPIR)
-    set(plingen_${v}_sources ${plingen_${v}_sources} lingen-matpoly-ft.c)
+    set(plingen_${v}_sources
+        ${plingen_${v}_sources}
+        lingen-matpoly-ft.c
+        lingen-bigmatpoly-ft.c)
     endif(WITH_MPIR)
 
     add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})

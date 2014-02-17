@@ -1042,3 +1042,5 @@ scripts/magma-nmbrthry-wrapper.sh
 filter/filter_badideals.c
 linalg/bwc/lingen-matpoly-ft.h
 linalg/bwc/lingen-matpoly-ft.c
+linalg/bwc/lingen-bigmatpoly-ft.c
+linalg/bwc/lingen-bigmatpoly-ft.h
