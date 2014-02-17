@@ -36,11 +36,36 @@
 
 using namespace std;
 
+#ifdef  HAVE_GCC_STYLE_AMD64_INLINE_ASM
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
+struct timer_rdtsc {
+    inline double operator()() const {
+        uint64_t c = cputicks();
+        return c/1.0e9;
+    }
+    static const char * timer_unit() { return "Gccyc"; }
+};
+#endif
+
+
 struct timer_rusage {
     inline double operator()() const { return seconds(); }
+    static const char * timer_unit() { return "seconds (rusage)"; }
 };
 struct timer_wct {
     inline double operator()() const { return wct_seconds(); }
+    static const char * timer_unit() { return "seconds (wct)"; }
 };
 /* It is important, when doing MPI benches, that we use this algorithm */
 struct timer_wct_synchronized {
@@ -65,6 +90,8 @@ struct cutoff_finder {
     vector<bool> meaningful;
     vector<pair<unsigned int, pair<vector<double>, int> > > all_results;
     map<int, string> method_names;
+        double slowness_ratio;
+        int age_slow_discard;
 
     cutoff_finder(unsigned int ntests)
         :
@@ -79,6 +106,8 @@ struct cutoff_finder {
         scale = 1.1;
         stable_cutoff_break = 4;
         stable = 0;
+        slowness_ratio = 2;
+        age_slow_discard = 5;
     }
 
     inline void set_method_name(int k, string const& s) {
@@ -111,8 +140,6 @@ struct cutoff_finder {
 
     string summarize_for_this_length(unsigned int k)
     {
-        const double slowness_ratio = 2;
-        const int age_slow_discard = 5;
         std::ostringstream comments;
         int best = -1;
         for(int i = 0 ; i < ntests ; i++) {
@@ -131,8 +158,9 @@ struct cutoff_finder {
         vector<bool> was_meaningful = meaningful;
 
         /* try to discard those which are slow */
-        for(int i = 0 ; i < best ; i++) {
+        for(int i = 0 ; i < ntests ; i++) {
             /* already dead ? */
+            if (i==best) continue;
             if (!meaningful[i]) continue;
 
             /* for how long has it been slow ? */
@@ -169,9 +197,10 @@ struct cutoff_finder {
         cutoff_finder const& dad;
         double& tfinal;
         double tt;
+        double pushed_tt;
         int n;
         explicit small_bench(cutoff_finder const& dad, double& t) :
-            dad(dad), tfinal(t) {tt=n=0;}
+            dad(dad), tfinal(t) {pushed_tt=tt=n=0;}
         inline operator int() {
             if (tt < dad.enough_time) {
                 if (tt < dad.minimum_time || n < dad.enough_repeats)
@@ -181,8 +210,12 @@ struct cutoff_finder {
             return 0;
         }
         inline small_bench& operator++() { n++; return *this; }
-        inline void pop() { tt += T()(); }
-        inline void push() { tt -= T()(); }
+        inline void pop(int weight = 1) {
+            double x = T()();
+            tt += weight * (x - pushed_tt);
+        }
+        inline void inject(double t, int weight = 1) { tt += weight*t; }
+        inline void push() { pushed_tt = T()(); }
     };
 
     template<typename T = T0>
@@ -258,6 +291,147 @@ struct cutoff_finder {
  * polymat_mul_kara_threshold
  * polymat_mp_kara_threshold
  */
+
+#ifdef HAVE_MPIR
+void plingen_tune_fti_depth(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
+{
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+
+    typedef timer_rdtsc timer_t;
+
+    cutoff_finder<timer_t> finder(7);
+    finder.slowness_ratio = 1000;
+    finder.age_slow_discard = 5;
+    finder.enough_time = 2.0;
+    finder.minimum_time = 0.00001;
+    finder.enough_repeats = 100;
+    finder.scale = 1.01;
+
+    for(int i = 0 ; i < 7 ; i++) {
+        ostringstream o;
+        o << "depth_adj=" << -i;
+        finder.set_method_name(i, o.str());
+    }
+
+    cout << "# Tuning FFT depth adjustment for"
+                << " m=" << m
+                << ", n=" << n
+                << "\n";
+
+    cout << "# Timings reported in " << timer_t::timer_unit() << "\n";
+    cout << "# inputlength, ncoeffs, various depth adjustments";
+    cout << "\n";
+
+    /* for multiplication */
+    cout << "# Note: for input length k within plingen,"
+        << " we use ncoeffs=k*m/(m+n) = "<<(double)m/(m+n)<<"*k\n";
+
+    unsigned int min_bench = 2000 * m / (m+n);
+
+    /* Beware, k is the length of piL, not a degree. Hence length 1
+     * clearly makes no sense */
+    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+        unsigned int input_length = (m+n) * k / m;
+
+        abvec   A,   B,   C;
+        void  *tA, *tB, *tC;
+
+        mpz_t p;
+        mpz_init(p);
+        abfield_characteristic(ab, p);
+
+        abvec_init(ab, &A, k);
+        abvec_init(ab, &B, k);
+        abvec_init(ab, &C, 2*k-1);
+        
+        abvec_random(ab, A, k, rstate);
+        abvec_random(ab, B, k, rstate);
+        abvec_set_zero(ab, C, 2*k-1);
+
+        ostringstream extra_info;
+
+        for(int adj = 0 ; adj < 7 ; adj++) {
+            struct fft_transform_info fti[1];
+            fft_get_transform_info_fppol(fti, p, k, k, m+n);
+            fft_transform_info_set_first_guess(fti);
+            if (adj >= fti->depth) {
+                finder.benches[adj] = 999999999;
+                continue;
+            }
+            if (fti->depth >= 11 && adj > 0) {
+                finder.benches[adj] = 999999999;
+                continue;
+            }
+            fft_transform_info_adjust_depth(fti, adj);
+
+            size_t fft_alloc_sizes[3];
+            fft_get_transform_allocs(fft_alloc_sizes, fti);
+            void * tt = malloc(fft_alloc_sizes[2]);
+            void * qt = malloc(fft_alloc_sizes[1]);
+
+            tA = malloc(fft_alloc_sizes[0]);
+            tB = malloc(fft_alloc_sizes[0]);
+            tC = malloc(fft_alloc_sizes[0]);
+
+            for(auto x = finder.micro_bench(adj); x; ++x) {
+                typedef cutoff_finder<timer_t>::small_bench<timer_t> bt;
+
+                double t_dftA=0;
+                for(auto y = bt(finder, t_dftA); y; ++y) {
+                    fft_transform_prepare(tA, fti);
+                    y.push();
+                    fft_do_dft_fppol(tA, (mp_limb_t*)A, k, qt, fti, p);
+                    y.pop();
+                }
+                x.inject(t_dftA, (m+n)*(m+n));
+
+                double t_dftB=0;
+                for(auto y = bt(finder, t_dftB); y; ++y) {
+                    fft_transform_prepare(tB, fti);
+                    y.push();
+                    fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
+                    y.pop();
+                }
+                x.inject(t_dftB, (m+n)*(m+n));
+
+                double t_conv=0;
+                for(auto y = bt(finder, t_conv); y; ++y) {
+                    fft_transform_prepare(tC, fti);
+                    fft_zero(tC, fti);
+                    y.push();
+                    fft_addmul(tC, tA, tB, tt, qt, fti);
+                    y.pop();
+                }
+                x.inject(t_conv, (m+n)*(m+n)*(m+n));
+
+                double t_iftC=0;
+                for(auto y = bt(finder, t_conv); y; ++y) {
+                    fft_transform_prepare(tC, fti);
+                    y.push();
+                    fft_do_ift_fppol((mp_limb_t*)C, 2*k-1, tC, qt, fti, p);
+                    y.pop();
+                }
+                x.inject(t_iftC, (m+n)*(m+n));
+            }
+            free(tA);
+            free(tB);
+            free(tC);
+        }
+
+        mpz_clear(p);
+
+        cout << input_length
+            << " " << finder.summarize_for_this_length(k)
+            << extra_info.str()
+            << "\n";
+    }
+
+    gmp_randclear(rstate);
+}/*}}}*/
+#endif  /* HAVE_MPIR */
+
 
 void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
 {
@@ -810,8 +984,9 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
-    plingen_tune_mp(ab, m, n);
+    plingen_tune_fti_depth(ab, m, n);
     plingen_tune_mul(ab, m, n);
+    plingen_tune_mp(ab, m, n);
 
 #if 0
     /* This should normally be reasonably quick, and running it every

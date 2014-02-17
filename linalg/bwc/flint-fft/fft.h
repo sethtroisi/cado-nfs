@@ -386,6 +386,8 @@ struct fft_transform_info {
 
 void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc);
 void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t xbits, mp_bitcnt_t ybits, unsigned int nacc, mp_bitcnt_t minwrap);
+void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned int adj);
+void fft_transform_info_set_first_guess(struct fft_transform_info * fti);
 void fft_get_transform_allocs(size_t sizes[3], struct fft_transform_info * fti);
 void fft_transform_prepare(void * x, struct fft_transform_info * fti);
 void fft_do_dft(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti);
@@ -393,6 +395,7 @@ void fft_do_ift(mp_limb_t * x, mp_size_t nx, void * y, void * temp, struct fft_t
 void fft_mul(void * z, void * y0, void * y1, void * temp, struct fft_transform_info * fti);
 void fft_addmul(void * z, void * y0, void * y1, void * temp, void * qtemp, struct fft_transform_info * fti);
 void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti);
+void fft_zero(void * z, struct fft_transform_info * fti);
 void fft_get_transform_info_fppol(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t n1, mp_size_t n2, unsigned int nacc);
 void fft_get_transform_info_fppol_mp(struct fft_transform_info * fti, mpz_srcptr p, mp_size_t nmin, mp_size_t nmax, unsigned int nacc);
 void fft_do_dft_fppol(void * y, mp_limb_t * x, mp_size_t nx, void * temp, struct fft_transform_info * fti, mpz_srcptr p);

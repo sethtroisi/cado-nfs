@@ -134,21 +134,21 @@ static unsigned long firstwrap(mp_size_t j1, mp_size_t j2, mp_bitcnt_t bits, mp_
     }
 }
 
-void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_bitcnt_t minwrap)
+/* set the depth, w, and bits fields to something at least reasonable */
+void fft_transform_info_set_first_guess(struct fft_transform_info * fti)
 {
-    mp_size_t off, depth = 6;
+    mp_bitcnt_t bits1 = fti->bits1;
+    mp_bitcnt_t bits2 = fti->bits2;
+    unsigned int nacc = fti->nacc;
+    mp_bitcnt_t minwrap = fti->minwrap;
+
+    mp_size_t depth = 6;
     mp_size_t w = 1;
     mp_size_t n = ((mp_size_t) 1 << depth);
     unsigned int log_nacc = FLINT_CLOG2(nacc);
     mp_bitcnt_t bits = (n * w - (depth + 1) - log_nacc) / 2;
     mp_size_t j1 = iceildiv(bits1, bits);
     mp_size_t j2 = iceildiv(bits2, bits);
-
-    memset(fti, 0, sizeof(*fti));
-    fti->bits1 = bits1;
-    fti->bits2 = bits2;
-    fti->nacc = nacc;
-    fti->minwrap = minwrap;
 
     if (minwrap == 0)
         minwrap = bits1 + bits2;
@@ -196,6 +196,46 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
     assert(2*bits + (depth + 1) + log_nacc <= (mp_bitcnt_t) n*w);
     assert(w==1 || w==2);
 
+    fti->depth = depth;
+    fti->w = w;
+    fti->bits = bits;
+}
+
+/* This provides a mechanism to adjust the fft depth int the direction of
+ * a shorter transform, with a larger base ring (that is, [adj] is
+ * subtracted from the transform depth).
+ *
+ * Of course, this changes fti incompatibly: data which has been computed
+ * with fti as it was before is not compatible with this new fti, and the
+ * fti methods corresponding to the new objects may not operate on
+ * objects which were taken care of (or just allocated) through the old
+ * fti object.
+ */
+void fft_transform_info_adjust_depth(struct fft_transform_info * fti, unsigned int adj)
+{
+    fft_transform_info_set_first_guess(fti);
+
+    ASSERT_ALWAYS(adj < fti->depth);
+
+    mp_bitcnt_t bits1 = fti->bits1;
+    mp_bitcnt_t bits2 = fti->bits2;
+    unsigned int nacc = fti->nacc;
+    mp_bitcnt_t minwrap = fti->minwrap;
+
+    mp_bitcnt_t bits = fti->bits;
+    mp_size_t depth = fti->depth;
+    mp_size_t w = fti->w;
+    unsigned int log_nacc = FLINT_CLOG2(nacc);
+
+    mp_size_t off;
+    mp_size_t n = ((mp_size_t) 1 << depth);
+
+    mp_size_t j1 = iceildiv(bits1, bits);
+    mp_size_t j2 = iceildiv(bits2, bits);
+
+    if (minwrap == 0)
+        minwrap = bits1 + bits2;
+    
     /* We want to work in R=Z/(2^(wn)+1) (for a start, w=1 or 2).
      *
      * There, sqrt(2)^w is a 4n-th root of unity.
@@ -217,7 +257,7 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
     if (depth < 11) {
 	mp_size_t wadj = 1;
 
-	off = fft_tuning_table[depth - 6][w - 1];	/* adjust n and w */
+	off = adj;	/* adjust n and w */
 	depth -= off;
 	n = ((mp_size_t) 1 << depth);
 	w *= ((mp_size_t) 1 << (2 * off));
@@ -308,6 +348,29 @@ void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t 
         fti->trunc0 = 4 * n;
     }
     // fprintf(stderr, "/* DEPTH = %zu, ALG = %d */\n", fti->depth, fti->alg);
+}
+
+void fft_get_transform_info_mulmod(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc, mp_bitcnt_t minwrap)
+{
+
+    memset(fti, 0, sizeof(*fti));
+    fti->bits1 = bits1;
+    fti->bits2 = bits2;
+    fti->nacc = nacc;
+    fti->minwrap = minwrap;
+
+    fft_transform_info_set_first_guess(fti);
+
+    mp_size_t depth = fti->depth;
+    mp_size_t w = fti->w;
+
+    if (depth < 11) {
+        fft_transform_info_adjust_depth(fti, fft_tuning_table[depth - 6][w - 1]);
+    } else {
+        /* adjust_depth is unused for MFA */
+        fft_transform_info_adjust_depth(fti, 0);
+    }
+
 }
 
 void fft_get_transform_info(struct fft_transform_info * fti, mp_bitcnt_t bits1, mp_bitcnt_t bits2, unsigned int nacc)
@@ -1203,6 +1266,15 @@ void mpn_addmod_2expp1(mp_limb_t * z, mp_limb_t * x, mp_limb_t * y, mp_size_t li
         memset(z, ~0, limbs * sizeof(mp_limb_t));
         z[limbs] = 0;
     }
+}
+
+void fft_zero(void * z, struct fft_transform_info * fti)
+{
+    mp_limb_t ** ptrs = (mp_limb_t **) z;
+    mp_size_t n = 1 << fti->depth;
+    mp_size_t rsize0 = fti_rsize0(fti);
+    mp_limb_t * area = ptrs[0];
+    mpn_zero(area, (4*n+2) * (rsize0 + 1));
 }
 
 void fft_add(void * z, void * y0, void * y1, struct fft_transform_info * fti)
