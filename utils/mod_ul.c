@@ -111,16 +111,13 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t m)
   return 1;
 }
 
-/* even_inv_lookup_table[i] is 1/(2*i+1) mod 256 */
-static unsigned long even_inv_lookup_table[128] = {
-  1, 171, 205, 183, 57, 163, 197, 239, 241, 27, 61, 167, 41, 19, 53, 223, 225,
-  139, 173, 151, 25, 131, 165, 207, 209, 251, 29, 135, 9, 243, 21, 191, 193,
-  107, 141, 119, 249, 99, 133, 175, 177, 219, 253, 103, 233, 211, 245, 159, 161,
-  75, 109, 87, 217, 67, 101, 143, 145, 187, 221, 71, 201, 179, 213, 127, 129,
-  43, 77, 55, 185, 35, 69, 111, 113, 155, 189, 39, 169, 147, 181, 95, 97, 11,
-  45, 23, 153, 3, 37, 79, 81, 123, 157, 7, 137, 115, 149, 63, 65, 235, 13, 247,
-  121, 227, 5, 47, 49, 91, 125, 231, 105, 83, 117, 31, 33, 203, 237, 215, 89,
-  195, 229, 15, 17, 59, 93, 199, 73, 51, 85, 255 } ;
+/* even_inv_lookup_table[i] is 1/(2*i+1) mod 128 */
+static unsigned long even_inv_lookup_table[64] = {
+  1, 43, 77, 55, 57, 35, 69, 111, 113, 27, 61, 39, 41, 19, 53, 95, 97, 11, 45,
+  23, 25, 3, 37, 79, 81, 123, 29, 7, 9, 115, 21, 63, 65, 107, 13, 119, 121, 99,
+  5, 47, 49, 91, 125, 103, 105, 83, 117, 31, 33, 75, 109, 87, 89, 67, 101, 15,
+  17, 59, 93, 71, 73, 51, 85, 127 } ;
+
 
 /* Faster modul_inv for the case where m = 2^k */
 int
@@ -136,10 +133,26 @@ modul_inv_powerof2 (residue_t r, const residue_t A, const modulus_t m)
   {
     if (!(x >> 4)) /* x = 2, 4 or 8 */
       r[0] = y;
-    else if (!(x >> 9)) /* x = 16, 32, 64, 128, 256 */
+    else if (!(x >> 8)) /* x = 16, 32, 64, or 128 */
       r[0] = even_inv_lookup_table[(y-1) >> 1] & (x-1);
     else
-      mod_inv (r, A, m);
+    {
+      modulusul_t m2;
+      residueul_t B;
+      unsigned long h = x >> (ularith_ctz(x) >> 1);
+      modul_initmod_ul (m2, h);
+      modul_init_noset0 (B, m2);
+      modul_set_ul_reduced (B, (y & (h-1)), m2);
+
+      modul_inv_powerof2 (r, B, m2);
+      unsigned long t = (r[0] * r[0]) & (x-1);
+      t = (t * y) & (x-1);
+      r[0] = (r[0] << 1) & (x-1);
+      r[0] = (r[0] - t) & (x-1);
+
+      modul_clear (B, m2);
+      modul_clearmod (m2);
+    }
     return 1;
   }
 }
