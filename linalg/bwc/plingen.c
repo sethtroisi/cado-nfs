@@ -23,6 +23,10 @@
 
 #include "lingen-bigmatpoly.h"
 
+#ifdef HAVE_MPIR
+#include "lingen-bigmatpoly-ft.h"
+#endif
+
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
 #include "bw-common-mpi.h"
@@ -44,6 +48,12 @@
 static unsigned int display_threshold = 10;
 static int with_timings = 0;
 
+#ifdef HAVE_MPIR
+static int caching = 1;
+#else
+static int caching = 0;
+#endif
+
 struct bmstatus_s {
     dims d[1];
     unsigned int t;
@@ -51,6 +61,7 @@ struct bmstatus_s {
 
     double t_basecase;
     double t_mp;
+    double t_mul;
 
     unsigned int lingen_threshold;
     unsigned int lingen_mpi_threshold;
@@ -293,7 +304,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, inv);
                 fprintf(stderr, "\n");
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
@@ -428,7 +439,7 @@ void print_info_mp(unsigned int t, matpoly_ptr A, matpoly_ptr B)
         char buf2[16];
         size_disp(Memusage2(), buf1);
         size_disp(PeakMemusage(), buf2);
-        printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu\n",
+        printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu",
                 wct_seconds() - start_time, buf1, buf2,
                 t,
                 A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
@@ -446,7 +457,7 @@ void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)
         char buf2[16];
         size_disp(Memusage2(), buf1);
         size_disp(PeakMemusage(), buf2);
-        printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu\n",
+        printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu",
                 wct_seconds() - start_time, buf1, buf2,
                 t,
                 A->size, B->size, A->size + B->size - 1);
@@ -467,13 +478,15 @@ void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
         char buf2[16];
         size_disp(Memusage2(), buf1);
         size_disp(PeakMemusage(), buf2);
-        printf("[%.3f %s %s] t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+        printf("[%.3f %s %s] t=%u, MPI-MP%s(%zu, %zu) --> %zu",
                 wct_seconds() - start_time, buf1, buf2,
                 t,
+                caching?"-caching":"",
                 A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
     } else {
-        printf("t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+        printf("t=%u, MPI-MP%s(%zu, %zu) --> %zu\n",
                 t,
+                caching?"-caching":"",
                 A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
     }
 }
@@ -488,13 +501,15 @@ void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
         char buf2[16];
         size_disp(Memusage2(), buf1);
         size_disp(PeakMemusage(), buf2);
-        printf("[%.3f %s %s] t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+        printf("[%.3f %s %s] t=%u, MPI-MUL%s(%zu, %zu) --> %zu",
                 wct_seconds() - start_time, buf1, buf2,
                 t,
+                caching?"-caching":"",
                 A->size, B->size, A->size + B->size - 1);
     } else {
-        printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+        printf("t=%u, MPI-MUL%s(%zu, %zu) --> %zu\n",
                 t,
+                caching?"-caching":"",
                 A->size, B->size, A->size + B->size - 1);
     }
 }
@@ -504,6 +519,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
+    double tt;
 
     /* XXX I think we have to start with something large enough to get
      * all coefficients of E_right correct */
@@ -532,18 +548,22 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         return 1;
     }
 
-    bm->t_mp -= seconds();
+    tt = seconds();
     matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     if (E->size > display_threshold) print_info_mp(bm->t, E, pi_left);
     matpoly_mp(ab, E_right, E, pi_left);
-    bm->t_mp += seconds();
+    tt = seconds() - tt;
+    if (with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    bm->t_mp += tt;
     done = bw_lingen(bm, pi_right, E_right, delta);
     matpoly_clear(ab, E_right);
 
-    bm->t_mp -= seconds();
+    tt = seconds();
     if (E->size > display_threshold) print_info_mul(bm->t, pi_left, pi_right);
     matpoly_mul(ab, pi, pi_left, pi_right);
-    bm->t_mp += seconds();
+    tt = seconds() - tt;
+    if (with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    bm->t_mul += tt;
     matpoly_clear(ab, pi_left);
     matpoly_clear(ab, pi_right);
 
@@ -557,6 +577,7 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
+    double tt;
 
     int rank;
     MPI_Comm_rank(bm->world, &rank);
@@ -588,17 +609,29 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     }
 
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    bm->t_mp -= seconds();
+    tt = wct_seconds();
     if (E->size > display_threshold) print_info_mpi_mp(bm->t, E, pi_left);
-    bigmatpoly_mp(ab, E_right, E, pi_left);
-    bm->t_mp += seconds();
+    if (caching) {
+        bigmatpoly_mp_caching(ab, E_right, E, pi_left);
+    } else {
+        bigmatpoly_mp(ab, E_right, E, pi_left);
+    }
+    tt = wct_seconds() - tt;
+    if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    bm->t_mp = tt;
     done = bw_biglingen_collective(bm, pi_right, E_right, delta);
     bigmatpoly_clear(ab, E_right);
 
-    bm->t_mp -= seconds();
+    tt = wct_seconds();
     if (E->size > display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right);
-    bigmatpoly_mul(ab, pi, pi_left, pi_right);
-    bm->t_mp += seconds();
+    if (caching) {
+        bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
+    } else {
+        bigmatpoly_mul(ab, pi, pi_left, pi_right);
+    }
+    tt = wct_seconds() - tt;
+    if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    bm->t_mul += tt;
     bigmatpoly_clear(ab, pi_left);
     bigmatpoly_clear(ab, pi_right);
 
@@ -776,7 +809,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
 		if (k * n > m + 40) {
 		    printf("The choice of starting vectors was bad. "
 			   "Cannot find %u independent cols within A\n", m);
-		    exit(1);
+		    exit(EXIT_FAILURE);
 		}
 		continue;
 	    }
@@ -792,7 +825,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, tmp);
                 fprintf(stderr, "\n");
-                exit(1);
+                exit(EXIT_FAILURE);
             }
             abneg(ab, tmp, tmp);
             for(unsigned int i = 0 ; i < m ; i++) {
@@ -813,7 +846,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
     if (r != m) {
 	printf("This amount of data is insufficient. "
 	       "Cannot find %u independent cols within A\n", m);
-	exit(1);
+	exit(EXIT_FAILURE);
     }
 
     unsigned int t0 = exponents[r - 1] + 1;
@@ -1103,7 +1136,7 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
 		    fprintf(stderr,
 			    "Parse error in %s while reading coefficient (%d,%d,%d) (forgot --ascii?)\n",
 			    input_file, i, j, k);
-		    exit(1);
+		    exit(EXIT_FAILURE);
 		}
 	    }
 	}
@@ -1159,7 +1192,7 @@ void usage()
     fprintf(stderr, "Usage: ./plingen [options, to be documented]\n");
     fprintf(stderr,
 	    "General information about bwc optiosn is in the README file\n");
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 void bmstatus_init(bmstatus_ptr bm, unsigned int m, unsigned int n)/*{{{*/
@@ -1210,25 +1243,33 @@ int main(int argc, char *argv[])
     info_init_timer();
 
     param_list_parse_uint(pl, "random-input-with-length", &random_length);
+    param_list_parse_int(pl, "caching", &caching);
 
     const char * afile = param_list_lookup_string(pl, "afile");
 
     if (bw->m == -1) {
 	fprintf(stderr, "no m value set\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     }
     if (bw->n == -1) {
 	fprintf(stderr, "no n value set\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     }
     if (!tune && !(afile || random_length)) {
         fprintf(stderr, "No afile provided\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if (!param_list_lookup_string(pl, "prime")) {
 	fprintf(stderr, "no prime set\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     }
+
+#ifndef HAVE_MPIR
+    if (caching) {
+        fprintf(stderr, "--caching=1 only supported with MPIR\n");
+        exit(EXIT_FAILURE);
+    }
+#endif
 
     bmstatus_init(bm, bw->m, bw->n);
 
@@ -1250,6 +1291,7 @@ int main(int argc, char *argv[])
     bm->lingen_threshold = 10;
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
+    param_list_parse_uint(pl, "display-threshold", &(display_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
 #if defined(FAKEMPI_H_)
     bm->lingen_mpi_threshold = UINT_MAX;
@@ -1269,7 +1311,7 @@ int main(int argc, char *argv[])
 #ifdef  FAKEMPI_H_
         if (mpi[0]*mpi[1] > 1) {
             fprintf(stderr, "non-trivial option mpi= can't be used with fakempi. Please do an MPI-enabled build (MPI=1)\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 #endif
         int thr[2] = {1,1};
@@ -1413,6 +1455,7 @@ int main(int argc, char *argv[])
 
         printf("t_basecase = %.2f\n", bm->t_basecase);
         printf("t_mp = %.2f\n", bm->t_mp);
+        printf("t_mul = %.2f\n", bm->t_mul);
         free(delta);
         matpoly_clear(ab, pi);
         free(fdesc);

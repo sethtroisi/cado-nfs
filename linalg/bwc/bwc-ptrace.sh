@@ -3,17 +3,30 @@
 set -e
 set -x
 
-# various configuration variables.
+# various configuration variables. environment can be used to override
+# them
 
-m=8 n=4
-prime=4148386731260605647525186547488842396461625774241327567978137
-Mh=1; Mv=1;
-Th=2; Tv=2;
+: ${m=8}
+: ${n=4}
+: ${prime=4148386731260605647525186547488842396461625774241327567978137}
+: ${Mh=1}
+: ${Mv=1}
+: ${Th=2}
+: ${Tv=2}
+: ${random_matrix_size=1000}
+# there is no random_matrix_coeffs_per_row ; see random_matrix.c
+: ${random_matrix_maxcoeff=10}
+: ${random_matrix_minkernel=10}
 wordsize=64
-mats=$HOME/Local/mats
-if ! [ -d $mats ] ; then mats=/local/rsa768/mats; fi
+: ${mats=$HOME/Local/mats}
+: ${matsfallback=/local/rsa768/mats}
 # XXX note that $wdir is wiped out by this script !
-wdir=/tmp/bwcp
+: ${wdir=/tmp/bwcp}
+: ${buildopts="MPI=1 DEBUG=1"}
+: ${shuffle=1}
+: ${nomagma=}
+
+
 
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
@@ -31,13 +44,15 @@ top=`dirname $0`/../..
 # by ourselves looks like a reasonable thing to do, for this illustrative
 # script.
 
-export DEBUG=1
-export MPI=1
-make -s -C $top -j 4
-make -s -C $top -j 4 plingen_p_$nwords
-eval `make -s -C $top show`
-bins=$top/$build_tree/linalg/bwc
+if ! [ "$bindir" ] ; then
+    eval "export $buildopts"
+    make -s -C $top -j 4
+    make -s -C $top -j 4 plingen_p_$nwords
+    eval `make -s -C $top show`
+    bindir=$top/$build_tree/linalg/bwc
+fi
 
+if ! [ -d $mats ] ; then mats=$matsfallback; fi
 if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
@@ -49,11 +64,11 @@ mkdir $wdir
 
 # -c 10 imposes a bound on the coefficients.
 
-$bins/random_matrix  1000 -c 10 --kright 10 > $mats/t1000p.txt
-matrix_txt=$mats/t1000p.txt
-matrix=$mats/t1000p.bin
+$bindir/random_matrix  ${random_matrix_size} -c ${random_matrix_maxcoeff} --kright ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
+matrix_txt=$mats/t${random_matrix_size}p.txt
+matrix=$mats/t${random_matrix_size}p.bin
 
-$bins/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
+$bindir/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
 
 nullspace=right
 interval=50
@@ -71,7 +86,7 @@ else
     shuffle_option="noshuffle=1"
 fi
 
-$bins/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/ --withcoeffs
+$bindir/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/ --withcoeffs
 
 if [ $(ls $wdir/`basename $matrix .bin`.${Nh}x${Nv}.*.bin | wc -l) != 1 ] ; then
     echo "Weird -- should have only one balancing file as output." >&2
@@ -103,10 +118,10 @@ done
 
 # ys=0..1 here is really a hack. It merely has to match the version
 # which is used in production.
-$bins/bwc.pl dispatch $common save_submatrices=1 ys=0..1
+$bindir/bwc.pl dispatch $common save_submatrices=1 ys=0..1
 
 if [ $n -eq 1 ] ; then
-    $bins/bwc.pl prep   $common
+    $bindir/bwc.pl prep   $common
     ln -s Y.0 $wdir/V0-1.0
 else
     # Otherwise prep won't work. Let's be stupid.
@@ -124,22 +139,22 @@ else
     # TODO: create Y, too.
 fi
 
-$bins/bwc.pl secure  $common interval=$interval
-$bins/bwc.pl secure  $common interval=1
-# [ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
-# [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=$interval end=$interval ys=0..1 skip_online_checks=1
-$bins/bwc.pl krylov  $common interval=1 end=$interval ys=0..1 skip_online_checks=1
+$bindir/bwc.pl secure  $common interval=$interval
+$bindir/bwc.pl secure  $common interval=1
+# [ "$?" = 0 ] && $bindir/bwc.pl :ysplit $common splits=$all_splits
+# [ "$?" = 0 ] && $bindir/bwc.pl krylov  $common interval=$interval end=$interval ys=0..1 skip_online_checks=1
+$bindir/bwc.pl krylov  $common interval=1 end=$interval ys=0..1 skip_online_checks=1
 rm -f $wdir/A*
 j0=0
 while [ $j0 -lt $n ] ; do
     let j1=$j0+1
-    $bins/bwc.pl krylov  $common interval=$interval ys=$j0..$j1
+    $bindir/bwc.pl krylov  $common interval=$interval ys=$j0..$j1
     j0=$j1
 done
 
-afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
+afile=$($bindir/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
 
-mpirun -n $mpi_njobs_lingen $bins/plingen_p_$nwords lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
+mpirun -n $mpi_njobs_lingen $bindir/plingen_p_$nwords lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
 
 ln $wdir/$afile.gen $wdir/F
 
@@ -147,12 +162,12 @@ ln $wdir/$afile.gen $wdir/F
 # stored as the transpose of the reversal of the F in A*F=G+O(X^t).
 
 # Note that the transpose was absent in commits 4f7d835 and earlier.
-$bins/split wdir=$wdir m=$m n=$n splits=$all_splits     \
+$bindir/split wdir=$wdir m=$m n=$n splits=$all_splits     \
     ifile=F ofile-fmt=F.%u-%u --binary-ratio $((bits_per_coeff/8))/1
 j0=0
 while [ $j0 -lt $n ] ; do
     let j1=$j0+1
-    $bins/split wdir=$wdir m=$m n=$n splits=$all_splits     \
+    $bindir/split wdir=$wdir m=$m n=$n splits=$all_splits     \
         ifile=F.${j0}-${j1} ofile-fmt=F.sols%u-%u.${j0}-${j1} \
         --binary-ratio $((bits_per_coeff/8))/1
     j0=$j1
@@ -170,26 +185,30 @@ done
 j0=0
 while [ $j0 -lt $n ] ; do
     let j1=$j0+1
-    $bins/bwc.pl mksol  $common interval=$interval ys=$j0..$j1 nsolvecs=1
+    $bindir/bwc.pl mksol  $common interval=$interval ys=$j0..$j1 nsolvecs=1
     j0=$j1
 done
 
-$bins/bwc.pl gather  $common interval=$interval nsolvecs=1 || :
+$bindir/bwc.pl gather  $common interval=$interval nsolvecs=1 || :
 
 set +x
 
-# [ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
+# [ "$?" = 0 ] && $bindir/bwc.pl acollect    $common -- --remove-old
 # 
 # 
 # 
 # # set +e
-# # $bins/bench  --nmax 1000 --prime $prime --nbys 1 --impl basicp  -- $matrix
+# # $bindir/bench  --nmax 1000 --prime $prime --nbys 1 --impl basicp  -- $matrix
 # 
 mdir=$wdir
 
 split=${Nh}x${Nv}
 b=`basename $matrix .bin`
 c=$b.$split.$checksum
+
+if [ "$nomagma" ] ; then
+    exit 0
+fi
 
 cmd=`dirname $0`/convert_magma.pl
 

@@ -206,7 +206,7 @@ static void bigmatpoly_ft_allgather_row(abdst_field ab, bigmatpoly_ft_ptr a, str
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, irank, k);
-        MPI_Bcast(data->data, data->m * data->n * tsize, abmpi_datatype(ab), k, a->row);
+        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->row);
     }
 
     /* and now all nodes on the row import the cells from their friends */
@@ -233,7 +233,7 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->m1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, k, jrank);
-        MPI_Bcast(data->data, data->m * data->n * tsize, abmpi_datatype(ab), k, a->col);
+        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->col);
     }
 
     /* and now all nodes on the row import the cells from their friends */
@@ -279,11 +279,13 @@ void bigmatpoly_ft_dft(abdst_field ab, bigmatpoly_ft_ptr ta, bigmatpoly_ptr a, s
 
 void bigmatpoly_ft_ift(abdst_field ab, bigmatpoly_ptr a, bigmatpoly_ft_ptr ta, struct fft_transform_info * fti)
 {
+    bigmatpoly_set_size(a, a->size);
     matpoly_ft_ift(ab, bigmatpoly_my_cell(a), bigmatpoly_ft_my_cell(ta), fti);
 }
 
 void bigmatpoly_ft_ift_mp(abdst_field ab, bigmatpoly_ptr a, bigmatpoly_ft_ptr ta, unsigned int shift, struct fft_transform_info * fti)
 {
+    bigmatpoly_set_size(a, a->size);
     matpoly_ft_ift_mp(ab, bigmatpoly_my_cell(a), bigmatpoly_ft_my_cell(ta), shift, fti);
 }
 
