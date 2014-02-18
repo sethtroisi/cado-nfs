@@ -330,6 +330,37 @@ struct cutoff_finder {
 };
 /* }}} */
 
+double last_hup = 0;
+int hup_caught = 0;
+
+void sighandler(int sig MAYBE_UNUSED)
+{
+    double t = wct_seconds();
+    if (t < last_hup + 0.5) {
+        fprintf(stderr, "Interrupt twice in half a second; exiting\n");
+        exit(1);
+    }
+    last_hup = wct_seconds();
+    hup_caught++;
+}
+
+
+void catch_control_signals()
+{
+    struct sigaction sa[1];
+    memset(sa, 0, sizeof(sa));
+    sa->sa_handler = sighandler;
+    sigaction(SIGHUP, sa, NULL);
+    sigaction(SIGINT, sa, NULL);
+
+    /* 
+     * should play sigprocmask and friends
+    sigset_t sset[1];
+    sigemptyset(sset);
+    sigaddset(sset, SIGHUP);
+    */
+}
+
 /* This code will first try to bench the basic operations (first
  * local; global are later) of middle product E*pi and product pi*pi.
  * The goal is to see where is the good value for the thresholds:
@@ -361,7 +392,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
         finder.set_method_name(i, o.str());
     }
 
-    cout << "# Tuning FFT depth adjustment for"
+    cout << "# Tuning FFT depth adjustment (mul) for"
                 << " m=" << m
                 << ", n=" << n
                 << "\n";
@@ -380,7 +411,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
 
     /* Beware, k is the length of piL, not a degree. Hence length 1
      * clearly makes no sense */
-    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+    for(unsigned int k = 2 ; !hup_caught && (k < min_bench || !finder.done()) ; k=finder.next_length(k)) {
         unsigned int input_length = (m+n) * k / m;
 
         abvec   A,   B,   C;
@@ -478,6 +509,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
             << extra_info.str()
             << "\n";
     }
+    hup_caught = 0;
 
     vector<pair<unsigned int, int>> table = finder.export_best_table();
 
@@ -525,7 +557,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
         finder.set_method_name(i, o.str());
     }
 
-    cout << "# Tuning FFT depth adjustment for"
+    cout << "# Tuning FFT depth adjustment (mp) for"
                 << " m=" << m
                 << ", n=" << n
                 << "\n";
@@ -544,7 +576,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 
     /* Beware, k is the length of piL, not a degree. Hence length 1
      * clearly makes no sense */
-    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+    for(unsigned int k = 2 ; !hup_caught && (k < min_bench || !finder.done()) ; k=finder.next_length(k)) {
         unsigned int input_length = (m+n) * k / m;
 
         unsigned int E_length = k + input_length - 1;
@@ -644,6 +676,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
             << extra_info.str()
             << "\n";
     }
+    hup_caught = 0;
 
     vector<pair<unsigned int, int>> table = finder.export_best_table();
 
@@ -720,7 +753,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
 
     /* Beware, k is the length of piL, not a degree. Hence length 1
      * clearly makes no sense */
-    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+    for(unsigned int k = 2 ; !hup_caught && (k < min_bench || !finder.done()) ; k=finder.next_length(k)) {
         unsigned int input_length = (m+n) * k / m;
         polymat pi, piref, piL, piR;
         matpoly xpi, xpiref, xpiL, xpiR;
@@ -888,6 +921,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
         matpoly_clear(ab, xpi);
         matpoly_clear(ab, xpiref);
     }
+    hup_caught = 0;
 
 
     vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
@@ -965,7 +999,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 
     /* Beware, k is a length of piL, not a degree. Hence length 1 clearly
      * makes no sense */
-    for(unsigned int k = 2 ; k < min_bench || !finder.done() ; k=finder.next_length(k)) {
+    for(unsigned int k = 2 ; !hup_caught && (k < min_bench || !finder.done()) ; k=finder.next_length(k)) {
         unsigned int input_length = (m+n) * k / m;
         /* MP(degree a, degree b) -> degree b-a
          *    length la=a+1, length lb=b+1 -> length b-a+1 = lb-la+1
@@ -1143,6 +1177,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
         matpoly_clear(ab, xER);
         matpoly_clear(ab, xERref);
     }
+    hup_caught = 0;
 
     vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mp_kara_cutoff(improved, NULL);
@@ -1239,6 +1274,11 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     int thr[2] = {1,1};
     int mpi[2] = {1,1};
     int rank;
+
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
+
+    catch_control_signals();
 
     param_list_parse_uint(pl, "B", &bench_atleast_uptothis);
 
