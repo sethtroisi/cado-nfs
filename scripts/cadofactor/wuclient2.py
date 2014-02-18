@@ -2,7 +2,6 @@
 
 import sys
 import os
-import fcntl
 import errno
 import stat
 import optparse
@@ -35,6 +34,79 @@ from string import Template
 from io import BytesIO
 from workunit import Workunit
 import ssl
+
+
+
+# File locking functions are specific to Unix/Windows/MacOS platforms.
+# The FileLock class is an Interface with static methods.
+def fileno(f):
+    """ Return file descriptor of f, or f if it is already an int """
+    return f if isinstance(f, int) else f.fileno()
+
+if os.name == "nt":
+    import msvcrt
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Lock a file """
+            # How do you get shared locks under Windows? There is a Python
+            # for Windows extension available at
+            # http://sourceforge.net/projects/pywin32/files/?source=navbar
+            # which offers many functions from the Win32 API, including file
+            # locking, but it is a binary extension for Python, and you have
+            # to choose the exact right package for your Python version and
+            # platform... can't be imported just like that.
+            # The msvcrt.locking function appears to support only one kind
+            # of locking, i.e., an exclusive lock. This mostly defeats the
+            # purpose of locking here, as we want to prevent clients from
+            # reading files that another client is currently downloading.
+            if not exclusive:
+                # Don't have shared lock - bail out. FIXME
+                return
+            # Lock one byte from the start of the file
+            mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK
+            pos = f.tell()
+            f.seek(0)
+            msvcrt.locking(fileno(f), mode, 1)
+            f.seek(pos)
+        @staticmethod
+        def unlock(f):
+            """ Unlock a file """
+            # Unlock one byte from the start of the file
+            pos = f.tell()
+            f.seek(0)
+            msvcrt.locking(fileno(f), msvcrt.LK_UNLCK, 1)
+            f.seek(pos)
+elif os.name == "posix":
+    import fcntl
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Lock a file
+            
+            If exclusive is True, lock for exclusive (a.k.a "write") access,
+            otherwise lock for shared (a.k.a. "read") access.
+            If blocking is False, don't block in case of already-locked
+            file, but raise IOError with EACCES or EAGAIN (depending on OS).
+            """
+            mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+            mode |= 0 if blocking else fcntl.LOCK_NB
+            fcntl.flock(fileno(f), mode)
+        @staticmethod
+        def unlock(f):
+            """ Unlock a file """
+            fcntl.flock(fileno(f), fcntl.LOCK_UN)
+else:
+    # No file locking. FIXME: What about MacOS?
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Do nothing """
+            pass
+        @staticmethod
+        def unlock(f):
+            """ Do nothing """
+            pass
 
 # In Python 3.0, 3.1, 3.2.x < 3.2.4, 3.3.x < 3.3.1, use a fixed BytesGenerator
 # which accepts a bytes input. The fact that the BytesGenerator in these Python
@@ -408,23 +480,22 @@ class SharedFile(object):
                 self.existed = True
                 self.wait_until_positive_filesize(filename)
                 self.file = open(filename, "r+b")
-                self.fd = self.file.fileno()
-                fcntl.flock(self.fd, fcntl.LOCK_SH)
+                FileLock.lock(self.file)
                 return
             else:
                 raise
         self.existed = False
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        FileLock.lock(fd, exclusive=True)
         self.file = os.fdopen(fd, "r+b")
 
     def close():
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        FileLock.unlock(self.file)
         self.file.close() # This should also close the fd
 
     def delete():
         if self.existed:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            FileLock.unlock(self.file)
+            FileLock.lock(self.file, exclusive=True)
         try:
             os.remove(self.filename)
         except OSError as err:
@@ -461,7 +532,7 @@ def open_exclusive(filename):
     """ Open a file and get an exclusive lock on it """
     fileobj = open(filename, "r+")
     try:
-        fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        FileLock.lock(fileobj, exclusive=True, blocking=False)
     except IOError as err:
         if err.errno == errno.EACCES or err.errno == errno.EAGAIN:
             fileobj.close()
@@ -471,7 +542,7 @@ def open_exclusive(filename):
 
 def close_exclusive(fileobj):
     """ Close a file, releasing any held lock on it """
-    fcntl.flock(fileobj, fcntl.LOCK_UN)
+    FileLock.unlock(fileobj)
     fileobj.close()
 
 def run_command(command, print_error=False):
@@ -869,10 +940,10 @@ class WorkunitClient(object):
                 return
             else:
                 raise
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        FileLock.lock(fd, exclusive=True)
         outfile = os.fdopen(fd, "wb")
         shutil.copyfileobj (request, outfile)
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        FileLock.unlock(fd)
         outfile.close() # This should also close the fd
         request.close()
     
@@ -939,8 +1010,8 @@ class WorkunitClient(object):
             # Try to lock the file once to be sure that download has finished
             # if another wuclient is doing the downloading
             with open(dlpath) as file_to_lock:
-                fcntl.flock(file_to_lock, fcntl.LOCK_SH)
-                fcntl.flock(file_to_lock, fcntl.LOCK_UN)
+                FileLock.lock(file_to_lock)
+                FileLock.unlock(file_to_lock)
             
             if filename in dict(self.workunit.get("EXECFILE", [])):
                 mode = os.stat(dlpath).st_mode
@@ -1025,13 +1096,13 @@ class WorkunitClient(object):
         # the file but before it gets the exclusive lock
         WorkunitClient.wait_until_positive_filesize(filename)
         infile = open(filename, "rb")
-        fcntl.flock(infile, fcntl.LOCK_SH)
+        FileLock.lock(infile)
         
         data = infile.read(blocksize)
         while data:
             sha1hash.update(data)
             data = infile.read(blocksize)
-        fcntl.flock(infile, fcntl.LOCK_UN)
+        FileLock.unlock(infile)
         infile.close()
         filesum = sha1hash.hexdigest()
         if checksum is None:
