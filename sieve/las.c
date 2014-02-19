@@ -99,9 +99,6 @@ double cof_fails[2][256] = {{0},{0}};
    it's done with only one or two instructions */
 static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 16, 16, 16, 16, 16 };
 
-/* Test if entry x in bucket region n is divisible by p */
-void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
-		       sieve_info_srcptr si, int side);
 static int 
 factor_leftover_norm (mpz_t n,
                       mpz_array_t* const factors,
