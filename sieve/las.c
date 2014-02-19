@@ -1202,6 +1202,55 @@ int las_todo_feed(las_info_ptr las, param_list pl)
 }
 /* }}} */
 
+/* Only when tracing. This function gets called once per
+ * special-q only. Here we compute the two norms corresponding to
+ * the traced (a,b) pair, and start by dividing out the special-q
+ * from the one where it should divide */
+void init_trace_k(sieve_info_srcptr si, param_list pl)
+{
+    struct trace_ab_t ab;
+    struct trace_ij_t ij;
+    struct trace_Nx_t Nx;
+    int have_trace_ab = 0, have_trace_ij = 0, have_trace_Nx = 0;
+
+    const char *abstr = param_list_lookup_string(pl, "traceab");
+    if (abstr != NULL) {
+        if (sscanf(abstr, "%"SCNd64",%"SCNu64, &ab.a, &ab.b) == 2)
+            have_trace_ab = 1;
+        else {
+            fprintf (stderr, "Invalid value for parameter: -traceab %s\n",
+                     abstr);
+            exit (EXIT_FAILURE);
+        }
+    }
+
+    const char *ijstr = param_list_lookup_string(pl, "traceij");
+    if (ijstr != NULL) {
+        if (sscanf(ijstr, "%d,%u", &ij.i, &ij.j) == 2) {
+            have_trace_ij = 1;
+        } else {
+            fprintf (stderr, "Invalid value for parameter: -traceij %s\n",
+                     ijstr);
+            exit (EXIT_FAILURE);
+        }
+    }
+
+    const char *Nxstr = param_list_lookup_string(pl, "traceNx");
+    if (Nxstr != NULL) {
+        if (sscanf(Nxstr, "%u,%u", &Nx.N, &Nx.x) == 2)
+            have_trace_Nx = 1;
+        else {
+            fprintf (stderr, "Invalid value for parameter: -traceNx %s\n",
+                     Nxstr);
+            exit (EXIT_FAILURE);
+        }
+    }
+
+    trace_per_sq_init(si, have_trace_Nx ? &Nx : NULL,
+        have_trace_ab ? &ab : NULL, 
+        have_trace_ij ? &ij : NULL);
+}
+
 /*******************************************************************/
 /********        Walking in p-lattices                    **********/
 
@@ -3828,6 +3877,9 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+  param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
+  param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
+  param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
@@ -4069,11 +4121,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
-        /* Only when tracing. This function gets called once per
-         * special-q only. Here we compute the two norms corresponding to
-         * the traced (a,b) pair, and start by dividing out the special-q
-         * from the one where it should divide */
-        trace_per_sq_init(si);
+        init_trace_k(si, pl);
 
         /* WARNING. We're filling the report info for thread 0 for
          * ttbuckets_fill, while in fact the cost is over all threads.
