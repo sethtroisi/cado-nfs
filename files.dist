@@ -726,6 +726,7 @@ tests/tests_common.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/F9.sievetest.sh
+tests/sieve/F9.tracektest.sh
 tests/sieve/sievetest.sh
 tests/sieve/test_trialdiv.c
 tests/sieve/ecm/CMakeLists.txt

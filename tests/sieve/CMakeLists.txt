@@ -2,14 +2,16 @@
 # to stay compatible with older versions
 
 # Build makefb and las before running check
-add_dependencies(check makefb las)
+add_dependencies(check makefb las las_tracek)
 
 # Get paths to the makefb and las binaries and store in variables
 # makefb_path and las_path, resp.
 get_property(makefb_path TARGET makefb PROPERTY LOCATION)
 get_property(las_path TARGET las PROPERTY LOCATION)
+get_property(las_tracek_path TARGET las_tracek PROPERTY LOCATION)
 
 add_test(F9_sievetest "${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh" "${makefb_path}" "${las_path}" "${CADO_NFS_SOURCE_DIR}")
+add_test(F9_tracektest "${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh" "${makefb_path}" "${las_tracek_path}" "${CADO_NFS_SOURCE_DIR}")
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
