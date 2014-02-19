@@ -1,6 +1,7 @@
 #ifndef LAS_DEBUG_H_
 #define LAS_DEBUG_H_
 
+#include <limits.h>
 #include <stdint.h>
 
 #include "las-config.h"
@@ -77,7 +78,7 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
 static inline void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w MAYBE_UNUSED)
 {
 #ifdef CHECK_UNDERFLOW
-  if (*S + (unsigned int) logp > (unsigned char) ~0)
+  if (*S > UCHAR_MAX - logp)
     sieve_increase_underflow_trap(S, logp, w);
 #endif  /* CHECK_UNDERFLOW */
     *S += logp;
