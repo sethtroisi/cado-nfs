@@ -1,3 +1,6 @@
+# Build polyselect2l before running check
+add_dependencies(check polyselect2l)
+
 add_test(test_polsel2 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 2 1000 100 8)
 add_test(test_polsel3 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 3 1000 500 10)
 add_test(test_polsel4 "${CMAKE_CURRENT_SOURCE_DIR}/polysel.sh" "${CADO_NFS_BINARY_DIR}" 4 1000 1000 10)

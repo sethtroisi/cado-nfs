@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 
 # Input files. First parameter is the polynomial file to use, second is root of the build directory, third is the expected SHA1 value
-POLY="$1"
-BINDIR="$2"
-REFERENCE_SHA1="$3"
-REFERENCE_REVISION="$4"
+MAKEFB="$1"
+LAS="$2"
+POLY="$3"
+REFERENCE_SHA1="$4"
+REFERENCE_REVISION="$5"
 
-if [[ -z "${BINDIR}" || ! -d "${BINDIR}" ]]
+if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
 then
-  echo "Build directory ${BINDIR} is not a directory" >&2
+  echo "Makefb binary ${MAKEFB} is not a executable file" >&2
+  exit 1
+fi
+
+if [[ -z "${LAS}" || ! -x "${LAS}" ]]
+then
+  echo "Las binary ${LAS} is not a executable file" >&2
   exit 1
 fi
 
@@ -24,11 +31,6 @@ then
   exit 1
 fi
 
-MAKEFB="${BINDIR}/sieve/makefb"
-cd ${BINDIR}
-make makefb
-LAS="${BINDIR}/sieve/las"
-make las
 BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
 
