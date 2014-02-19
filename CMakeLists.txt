@@ -39,7 +39,7 @@ enable_testing()
 # Also allow testing with "make check", but building all required
 # dependencies (las for the sieve test, etc.) as well. We also add the
 # "verbose" command line option here to get more meaningful output
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V)
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V $(ARGS))
 
 #####################################################################
 # Get some overrides from the environment.
