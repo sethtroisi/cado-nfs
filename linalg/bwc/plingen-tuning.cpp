@@ -33,6 +33,7 @@
 #include <iostream>
 #include <sstream>
 
+/* interface to C programs for list of cutoffs we compute *//*{{{*/
 /* This is the simple C-type cutoff table which is used down the line by
  * C programs */
 
@@ -58,7 +59,7 @@ unsigned int cutoff_list_get(cutoff_list cl, unsigned int k)
     for( ; k >= cl->k ; cl++);
     return (--cl)->choice;
 }
-
+/*}}}*/
 
 /* The -B argument may be used to request printing of timing results at
  * least up to this input length */
@@ -66,6 +67,7 @@ unsigned int bench_atleast_uptothis = 0;
 
 using namespace std;
 
+/* timer backends *//*{{{*/
 #ifdef  HAVE_GCC_STYLE_AMD64_INLINE_ASM
 static inline uint64_t cputicks()
 {
@@ -105,13 +107,70 @@ struct timer_wct_synchronized {
         return d;
     }
 };
+/*}}}*/
 
-/* {{{ cutoff_finder and its child small_bench */
-template<typename T0 = timer_rusage>
-struct cutoff_finder {
+/* how do we do one single measurements ? We'll do it many times, but how
+ * long ? Here is the place for making the corresponding choices.
+ */
+struct measurement_choice {
     int enough_repeats;
     double minimum_time;
     double enough_time;
+    measurement_choice() {
+        /* defaults */
+        enough_repeats = 1000;
+        minimum_time = 0.5;
+        enough_time = 1.0;
+    }
+};
+
+template<typename T>
+struct small_bench {
+    measurement_choice mc;
+    double& tfinal;
+    double last_starting_tt;
+    /* accumulated_time so far. Can be increased either with
+     * - add_since_last() (which resets our timer)
+     * - set_since_last() (which does not)
+     * - inject() (which does not either, since we do not care about our
+     *   own timer in this case).
+     */
+    double tt;
+
+    int n;
+    explicit small_bench(double& t, measurement_choice mc = measurement_choice()) : mc(mc), tfinal(t) {tt=n=0;reset();}
+    /* are we done ? when we are, we set tfinal to the average value. */
+    inline int done() {
+        if (tt < mc.enough_time) {
+            if (tt < mc.minimum_time && n < mc.enough_repeats)
+                return 0;
+        }
+        // fprintf(stderr, "%.2f %d\n", tt, n);
+        tfinal = tt / n;
+        return 1;
+    }
+    inline small_bench& operator++() { n++; return *this; }
+    inline void reset() { last_starting_tt = T()(); }
+    /* adds to tt the time since the last timer reset, and resets the
+     * timer.  */
+    inline void add_since_last(int weight = 1) { 
+        double now = T()();
+        tt += weight * (now - last_starting_tt);
+        last_starting_tt = now;
+    }
+    /* *sets* tt to the time since the last timer reset. Do not reset the
+     * timer.  */
+    inline void set_since_last(int weight = 1) { 
+        double now = T()();
+        tt = weight * (now - last_starting_tt);
+    }
+    inline void inject(double t, int weight = 1) { tt += weight*t; }
+};
+
+/* {{{ cutoff_finder and its child small_bench */
+template<typename Timer_backend = timer_rusage>
+struct cutoff_finder {
+    measurement_choice mc;
     double scale;
     int stable_cutoff_break;
     unsigned int ntests;
@@ -123,16 +182,14 @@ struct cutoff_finder {
         double slowness_ratio;
         int age_slow_discard;
 
-    cutoff_finder(unsigned int ntests)
+    cutoff_finder(unsigned int ntests, measurement_choice mc = measurement_choice())
         :
+        mc(mc),
         ntests(ntests),
         benches(ntests),
         meaningful(ntests, true)
     {
         /* Fill defaults */
-        enough_repeats = 1000;
-        minimum_time = 0.5;
-        enough_time = 1.0;
         scale = 1.1;
         stable_cutoff_break = 4;
         stable = 0;
@@ -199,6 +256,10 @@ struct cutoff_finder {
             for( ; age_slow < all_results.size() ; age_slow++) {
                 vector<double> const& these(all_results[all_results.size()-1-age_slow].second.first);
                 int best_there = all_results[all_results.size()-1-age_slow].second.second;
+                /* do not discard this method if a less advanced one is
+                 * still alive.
+                 */
+                if (best_there < i) break;
                 /* not so slow */
                 if (these[i] <= these[best_there] * slowness_ratio) break;
             }
@@ -223,35 +284,11 @@ struct cutoff_finder {
         return s.str();
     }
 
-    template<typename T = T0>
-    struct small_bench {
-        cutoff_finder const& dad;
-        double& tfinal;
-        double tt;
-        double pushed_tt;
-        int n;
-        explicit small_bench(cutoff_finder const& dad, double& t) :
-            dad(dad), tfinal(t) {pushed_tt=tt=n=0;}
-        inline operator int() {
-            if (tt < dad.enough_time) {
-                if (tt < dad.minimum_time || n < dad.enough_repeats)
-                    return 1;
-            }
-            tfinal = tt / n;
-            return 0;
-        }
-        inline small_bench& operator++() { n++; return *this; }
-        inline void pop(int weight = 1) {
-            double x = T()();
-            tt += weight * (x - pushed_tt);
-        }
-        inline void inject(double t, int weight = 1) { tt += weight*t; }
-        inline void push() { pushed_tt = T()(); }
-    };
-
-    template<typename T = T0>
-    small_bench<T> micro_bench(int i) {
-        return small_bench<T>(*this, benches[i]);
+    small_bench<Timer_backend> micro_bench(int i) {
+        return small_bench<Timer_backend>(benches[i], mc);
+    }
+    small_bench<Timer_backend> micro_bench(int i, measurement_choice mc1) {
+        return small_bench<Timer_backend>(benches[i], mc1);
     }
 
     /* This is really limited to karatsuba-like cuttofs. It's ugly */
@@ -375,15 +412,20 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
 
-    typedef timer_rdtsc timer_t;
+    typedef timer_rusage timer_t;
 
     int nadjs=7;
-    cutoff_finder<timer_t> finder(nadjs);
-    finder.slowness_ratio = 1.2;
+    measurement_choice mc;
+    mc.enough_time = 2.0;
+    mc.minimum_time = 0.1;
+    mc.enough_repeats = 100;
+
+    measurement_choice mcout = mc;
+    mcout.enough_repeats = 2;
+
+    cutoff_finder<timer_t> finder(nadjs, mcout);
+    finder.slowness_ratio = 1.4;
     // finder.age_slow_discard = 5;
-    finder.enough_time = 2.0;
-    finder.minimum_time = 0.00001;
-    finder.enough_repeats = 100;
     finder.scale = 1.01;
 
     for(int i = 0 ; i < nadjs ; i++) {
@@ -457,43 +499,39 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
             tB = malloc(fft_alloc_sizes[0]);
             tC = malloc(fft_alloc_sizes[0]);
 
-            for(auto x = finder.micro_bench(index); x; ++x) {
-                typedef cutoff_finder<timer_t>::small_bench<timer_t> bt;
+            for(auto x = finder.micro_bench(index); !x.done(); ++x) {
+                typedef small_bench<timer_t> bt;
 
                 double t_dftA=0;
-                for(auto y = bt(finder, t_dftA); y; ++y) {
+                for(auto y = bt(t_dftA, mc); !y.done(); ++y) {
                     fft_transform_prepare(tA, fti);
-                    y.push();
                     fft_do_dft_fppol(tA, (mp_limb_t*)A, k, qt, fti, p);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_dftA, (m+n)*(m+n));
 
                 double t_dftB=0;
-                for(auto y = bt(finder, t_dftB); y; ++y) {
+                for(auto y = bt(t_dftB, mc); !y.done(); ++y) {
                     fft_transform_prepare(tB, fti);
-                    y.push();
                     fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_dftB, (m+n)*(m+n));
 
                 double t_conv=0;
-                for(auto y = bt(finder, t_conv); y; ++y) {
+                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_zero(tC, fti);
-                    y.push();
                     fft_addmul(tC, tA, tB, tt, qt, fti);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_conv, (m+n)*(m+n)*(m+n));
 
                 double t_iftC=0;
-                for(auto y = bt(finder, t_conv); y; ++y) {
+                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
-                    y.push();
                     fft_do_ift_fppol((mp_limb_t*)C, 2*k-1, tC, qt, fti, p);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_iftC, (m+n)*(m+n));
             }
@@ -540,15 +578,21 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
 
-    typedef timer_rdtsc timer_t;
+    typedef timer_rusage timer_t;
 
     int nadjs=7;
-    cutoff_finder<timer_t> finder(nadjs);
-    finder.slowness_ratio = 1.2;
+    measurement_choice mc;
+    mc.enough_time = 2.0;
+    mc.minimum_time = 0.05;
+    mc.enough_repeats = 25;
+
+    measurement_choice mcout = mc;
+    mcout.enough_repeats = 2;
+    mc.enough_time = 1.0;
+
+    cutoff_finder<timer_t> finder(nadjs, mcout);
+    finder.slowness_ratio = 1.4;
     // finder.age_slow_discard = 5;
-    finder.enough_time = 2.0;
-    finder.minimum_time = 0.00001;
-    finder.enough_repeats = 100;
     finder.scale = 1.01;
 
     for(int i = 0 ; i < nadjs ; i++) {
@@ -624,43 +668,39 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
             tB = malloc(fft_alloc_sizes[0]);
             tC = malloc(fft_alloc_sizes[0]);
 
-            for(auto x = finder.micro_bench(index); x; ++x) {
-                typedef cutoff_finder<timer_t>::small_bench<timer_t> bt;
+            for(auto x = finder.micro_bench(index); !x.done(); ++x) {
+                typedef small_bench<timer_t> bt;
 
                 double t_dftA=0;
-                for(auto y = bt(finder, t_dftA); y; ++y) {
+                for(auto y = bt(t_dftA, mc); !y.done(); ++y) {
                     fft_transform_prepare(tA, fti);
-                    y.push();
                     fft_do_dft_fppol(tA, (mp_limb_t*)A, E_length, qt, fti, p);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_dftA, m*(m+n));
 
                 double t_dftB=0;
-                for(auto y = bt(finder, t_dftB); y; ++y) {
+                for(auto y = bt(t_dftB, mc); !y.done(); ++y) {
                     fft_transform_prepare(tB, fti);
-                    y.push();
                     fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_dftB, (m+n)*(m+n));
 
                 double t_conv=0;
-                for(auto y = bt(finder, t_conv); y; ++y) {
+                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_zero(tC, fti);
-                    y.push();
                     fft_addmul(tC, tA, tB, tt, qt, fti);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_conv, m*(m+n)*(m+n));
 
                 double t_iftC=0;
-                for(auto y = bt(finder, t_conv); y; ++y) {
+                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
-                    y.push();
                     fft_do_ift_fppol_mp((mp_limb_t*)C, input_length, tC, qt, fti, p, k-1);
-                    y.pop();
+                    y.set_since_last();
                 }
                 x.inject(t_iftC, m*(m+n));
             }
@@ -776,10 +816,9 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
         if (finder.still_meaningful_to_test(0)) {
             /* disable kara for a minute */
             polymat_set_mul_kara_cutoff(always_basecase, NULL);
-            for(auto x = finder.micro_bench(0); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(0); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
-                x.pop();
+                x.set_since_last();
             }
             if (piref->size == 0) {
                 polymat_swap(pi, piref);
@@ -797,10 +836,9 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
              */
             finder.export_kara_cutoff_data_force_kara_now(improved, k);
             polymat_set_mul_kara_cutoff(improved, NULL);
-            for(auto x = finder.micro_bench(1); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(1); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
-                x.pop();
+                x.set_since_last();
             }
             if (piref->size == 0) {
                 polymat_swap(pi, piref);
@@ -828,10 +866,9 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
         if (finder.still_meaningful_to_test(2)) {
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
-            for(auto x = finder.micro_bench(2); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(2); !x.done(); ++x) {
                 matpoly_mul(ab, xpi, xpiL, xpiR);
-                x.pop();
+                x.set_since_last();
             }
             if (xpiref->size == 0) {
                 matpoly_swap(xpi, xpiref);
@@ -859,8 +896,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             int s = 0;
             matpoly_clear(ab, xpi);
             matpoly_init(ab, xpi, m+n, m+n, xpiL->size + xpiR->size - 1);
-            for(auto x = finder.micro_bench(3); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
                 matpoly_ft_init(ab, tpiR, xpiR->m, xpiR->n, fti);
                 matpoly_ft_init(ab, tpi, xpiL->m, xpiR->n, fti);
@@ -873,15 +909,14 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
                 matpoly_ft_clear(ab, tpiL, fti);
                 matpoly_ft_clear(ab, tpiR, fti);
                 matpoly_ft_clear(ab, tpi,  fti);
-                x.pop();
+                x.set_since_last();
                 s++;
             }
             mpz_clear(p);
 #else
-            for(auto x = finder.micro_bench(3); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj);
-                x.pop();
+                x.set_since_last();
             }
 #endif
             if (xpiref->size == 0) {
@@ -1026,10 +1061,9 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
         if (finder.still_meaningful_to_test(0)) {
             /* disable kara for a minute */
             polymat_set_mp_kara_cutoff(always_basecase, NULL);
-            for(auto x = finder.micro_bench(0); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(0); !x.done(); ++x) {
                 polymat_mp(ab, ER, E, piL);
-                x.pop();
+                x.set_since_last();
             }
             if (ERref->size == 0) {
                 polymat_swap(ER, ERref);
@@ -1047,10 +1081,9 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
              */
             finder.export_kara_cutoff_data_force_kara_now(improved, k);
             polymat_set_mp_kara_cutoff(improved, NULL);
-            for(auto x = finder.micro_bench(1); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(1); !x.done(); ++x) {
                 polymat_mp(ab, ER, E, piL);
-                x.pop();
+                x.set_since_last();
             }
             if (ERref->size == 0) {
                 polymat_swap(ER, ERref);
@@ -1078,10 +1111,9 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
         if (finder.still_meaningful_to_test(2)) {
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
-            for(auto x = finder.micro_bench(2); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(2); !x.done(); ++x) {
                 matpoly_mp(ab, xER, xE, xpiL);
-                x.pop();
+                x.set_since_last();
             }
             if (xERref->size == 0) {
                 matpoly_swap(xER, xERref);
@@ -1110,8 +1142,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             int s = 0;
             matpoly_clear(ab, xER);
             matpoly_init(ab, xER, m, m+n, input_length);
-            for(auto x = finder.micro_bench(3); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
                 matpoly_ft_init(ab, tE, xE->m, xE->n, fti);
                 matpoly_ft_init(ab, tER, xE->m, xpiL->n, fti);
@@ -1130,15 +1161,14 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
                 matpoly_ft_clear(ab, tpiL, fti);
                 matpoly_ft_clear(ab, tE, fti);
                 matpoly_ft_clear(ab, tER,  fti);
-                x.pop();
+                x.set_since_last();
                 s++;
             }
             mpz_clear(p);
 #endif
-            for(auto x = finder.micro_bench(3); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj);
-                x.pop();
+                x.set_since_last();
             }
             if (xERref->size == 0) {
                 matpoly_swap(xER, xERref);
@@ -1231,19 +1261,17 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
 
         double ttloc;
         if (rank == 0) {
-            for(auto x = finder.micro_bench<timer_wct>(ttloc); x; ++x) {
-                x.push();
+            for(auto x = finder.micro_bench<timer_wct>(ttloc); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
-                x.pop();
+                x.set_since_last();
             }
         }
         MPI_Bcast(&ttloc, 1, MPI_DOUBLE, 0, comm);
 
         double ttmpi;
-        for(auto x = finder.micro_bench<timer_wct_synchronized>(ttmpi); x; ++x) {
-            x.push();
+        for(auto x = finder.micro_bench<timer_wct_synchronized>(ttmpi); !x.done(); ++x) {
             bigpolymat_mul(ab, bpi, bpiL, bpiR);
-            x.pop();
+            x.set_since_last();
         }
         if (rank == 0)
             printf("%d %1.6f %1.6f %1.1f\n", k, ttloc, ttmpi, ttmpi/ttloc);
@@ -1274,13 +1302,13 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     int thr[2] = {1,1};
     int mpi[2] = {1,1};
     int rank;
+    int catchsig=0;
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
-    catch_control_signals();
-
     param_list_parse_uint(pl, "B", &bench_atleast_uptothis);
+    param_list_parse_int(pl, "catchsig", &catchsig);
 
     MPI_Comm_rank(comm, &rank);
 
@@ -1296,6 +1324,8 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
+    if (catchsig)
+        catch_control_signals();
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
      * Must investigate */
     cutoff_list cl_mul = NULL;

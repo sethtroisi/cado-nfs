@@ -1361,6 +1361,7 @@ int main(int argc, char *argv[])
     /* plingen tuning accepts some arguments. We look them up so as to
      * avoid failures down the line */
     param_list_lookup_string(pl, "B");
+    param_list_lookup_string(pl, "catchsig");
 
     if (param_list_warn_unused(pl))
 	usage();
