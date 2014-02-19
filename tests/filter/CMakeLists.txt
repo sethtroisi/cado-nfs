@@ -1,1 +1,7 @@
-add_test(testsm "${CMAKE_CURRENT_SOURCE_DIR}/testsm.sh" "${CADO_NFS_SOURCE_DIR}" "${CADO_NFS_BINARY_DIR}")
+# Build sm before running check
+add_dependencies(check sm)
+
+# Get path to the sm binary and store in variable sm_path
+get_property(sm_path TARGET sm PROPERTY LOCATION)
+
+add_test(testsm "${CMAKE_CURRENT_SOURCE_DIR}/testsm.sh" "${sm_path}")
