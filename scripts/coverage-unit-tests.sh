@@ -60,8 +60,7 @@ cat > $DIR/epilog.html <<EOF
 <p style="text-align: center;">See also the <a href="./@basedir@/make-test.txt">test results</a></p>
 EOF
 maketest() {
-export CTEST_OUTPUT_ON_FAILURE=yes
-if make -j8 test $EXTRA_MAKETEST_ARGS; then
+if make -j8 check ; then
     :
 else
     cat > $DIR/epilog.html <<EOF
