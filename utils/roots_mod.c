@@ -166,7 +166,9 @@ enumeratediv (enumeratediv_t *r)
 
 
 /* Return in o a k-th primitive root of unity modulo p, and in b a residue 
-   that is a q-th non-power for each q|k. Assumes that k | p-1. */
+   that is a q-th non-power for each q|k.
+   Assumes that k | p-1 and k >= 2.
+*/
 void
 omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp) 
 {
@@ -178,11 +180,7 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
   unsigned long c = k;
   unsigned int i, ndiv;
 
-  ASSERT (k > 0);
-  if (k == 1) {
-    mod_set1 (o, pp);
-    return;
-  }
+  ASSERT (k >= 2);
   
   pprime = (p-1) / k;
   ASSERT (pprime * k == p-1);
@@ -341,7 +339,7 @@ tonelli_shanks5(residue_t *rr, int d, uint64_t n, const modulus_t pp)
   return k;
 }
 
-
+/* put in rr a square root of aa mod pp */
 static void
 one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
 {
@@ -397,6 +395,8 @@ one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
       mod_div5 (cc, cc, pp);
       c /= 5;
     }
+    /* the smallest pp for which c is divisible by 11 is pp=293
+       (with aa=59) */
     while (c % 11 == 0) {
       mod_div11 (xx, xx, pp);
       mod_div11 (cc, cc, pp);
@@ -416,6 +416,8 @@ one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
   mod_clear (two, pp);
 }
 
+/* given n roots of x^(d/2) = a (mod p) at rr[d/2], ..., rr[d/2 + n - 1],
+   finds all (2n) roots of x^d = a (mod p) in rr[0], ..., rr[2n-1] */
 static int
 roots2_V (residue_t *rr, int d, uint64_t n, const modulus_t pp)
 {
@@ -664,7 +666,9 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
 /************************** r-th roots ***************************************/
 
 /* Put in rop a r-th root of delta (mod p), assuming one exists,
-   using the algorithm from Table 4 in reference [1]. */
+   using the algorithm from Table 4 in reference [1].
+   Assume r >= 2.
+*/
 static void
 one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
 {
@@ -691,7 +695,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   for (s = (p - 1) / r, t = 1, rt = r; (s % r) == 0; s /= r, t++, rt *= r);
 
 #if 1
-  omega(c, a, rt, pp);
+  omega (c, a, rt, pp);
   mod_pow_ul (a, c, rt/r, pp);
 #else  
   for (i = 2; i < p; i++)
@@ -761,7 +765,7 @@ is_rth_power (residue_t a, uint64_t r, modulus_t pp)
   return ret;
 }
 
-/* Roots of x^d = a (mod p), assuming d is not divisible by 2 nor 3.
+/* Roots of x^d = a (mod p), assuming d >= 5 is not divisible by 2 nor 3.
    (This code works in fact for d divisible by 3 too, if one starts by r = 3
    in the loop below.) */
 static int
@@ -770,6 +774,10 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
   uint64_t r, n, i, j, k;
   const uint64_t p = mod_getmod_ul (pp);
   residue_t z, *rr0;
+
+  ASSERT (d >= 5);
+  ASSERT ((d % 2) != 0);
+  ASSERT ((d % 3) != 0);
 
   /* first find the smallest prime r dividing d (r can be d) */
   for (r = 5; d % r; r += 2);
