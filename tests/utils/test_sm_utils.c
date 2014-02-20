@@ -18,7 +18,7 @@ mpz_poly_getcoeff_wrapper (mpz_t res, int i, const mpz_poly_t f)
 }
 
 
-/* Return number of error */
+/* Return number of errors */
 int
 test_sm (FILE * datafile)
 {

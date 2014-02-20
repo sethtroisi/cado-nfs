@@ -44,12 +44,6 @@ poly_roots_ulong (unsigned long *r, mpz_t *f, int d, unsigned long p)
     return n;
 }
 
-int poly_roots_long(long * r, mpz_t * f, int d, unsigned long p)
-{
-    FATAL_ERROR_CHECK(p >= LONG_MAX, "Cannot use poly_roots_long here");
-    return poly_roots_ulong((unsigned long *) r, f, d, p);
-}
-
 int
 poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
 {
