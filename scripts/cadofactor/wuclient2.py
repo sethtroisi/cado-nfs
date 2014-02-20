@@ -554,10 +554,11 @@ def run_command(command, print_error=False):
     """
     logging.info ("Running %s",
             command if isinstance(command, str) else " ".join(command))
+    close_fds = os.name != "nt"
     child = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
-                             close_fds=True)
+                             close_fds=close_fds)
     (stdout, stderr) = child.communicate()
 
     if print_error and child.returncode != 0:
@@ -609,10 +610,11 @@ class WorkunitProcessor(object):
                 renice_func = None
 
             # Run the command
+            close_fds = os.name != "nt"
             child = subprocess.Popen(command, shell=True, 
                                      stdout = subprocess.PIPE, 
                                      stderr = subprocess.PIPE, 
-                                     close_fds = True,
+                                     close_fds = close_fds,
                                      preexec_fn = renice_func)
 
             # If we receive SIGTERM (the default signal for "kill") while a
