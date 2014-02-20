@@ -146,7 +146,8 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
 
   // Here y and x are odd, and y < x
   do {
-    /* Here, y and x are odd, 0 < y < x, u is odd and v is even */
+    /* Here, y and x are odd, 0 < y <= x, u is odd and v is even
+       (the case y=x might happen only after the first iteration) */
     do {
       x -= y; v += u;
       lsh = ularith_ctz(x);
@@ -155,14 +156,15 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
       t += lsh;
       u <<= lsh;
     } while (x > y); /* ~50% branch taken :( */
-    /* Here, y and x are odd, 0 < x =< y, u is even and v is odd */
+    /* Here, either x = 0, otherwise y and x are odd, 0 < x <= y,
+       u is even and v is odd */
 
     /* x is the one that got reduced, test if we're done */
 
     if (x <= 1)
       break;
 
-    /* Here, y and x are odd, 0 < x < y, u is even and v is odd */
+    /* Here, y and x are odd, 0 < x <= y, u is even and v is odd */
     do {
       y -= x; u += v;
       lsh = ularith_ctz(y);
@@ -171,9 +173,13 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
       t += lsh;
       v <<= lsh;
     } while (x < y); /* about 50% branch taken :( */
-    /* Here, y and x are odd, 0 < y =< x, u is odd and v is even */
+    /* Here, either y = 0, otherwise y and x are odd, 0 < y <= x,
+       u is odd and v is even */
+
     /* y is the one that got reduced, test if we're done */
   } while (y > 1);
+
+  /* when we exit, only one of x and y can be <= 1 */
 
   if ((x & y) == 0UL) /* Non-trivial GCD */
     return 0;
