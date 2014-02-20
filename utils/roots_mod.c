@@ -473,9 +473,12 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
     }
 
   /* case p = 1 (mod 4). */ 
+#if 0
   if (0)
     k = tonelli_shanks (rr, d, n, pp);
-  else if (p % 8 == 5)
+  else
+#endif
+  if (p % 8 == 5)
     k = tonelli_shanks5 (rr, d, n, pp);
   else
     k = roots2_V (rr, d, n, pp);
