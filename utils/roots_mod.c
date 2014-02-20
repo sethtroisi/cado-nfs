@@ -624,8 +624,7 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   /* find the roots of x^(d/3) = a (mod p) */
   n = mod_roots (rr + 2 * (d / 3), aa, d / 3, pp);
 
-  if (n == 0)
-    return n;
+  ASSERT(n > 0);
 
   if ((p % 3) == 1)
     {
@@ -667,7 +666,7 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
 
 /* Put in rop a r-th root of delta (mod p), assuming one exists,
    using the algorithm from Table 4 in reference [1].
-   Assume r >= 2.
+   Assume r >= 2 and p = 1 (mod r).
 */
 static void
 one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
@@ -676,15 +675,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   const uint64_t p = mod_getmod_ul (pp);
   uint64_t i, j, s, t, alpha, rt;
 
-  /* when p-1 is not divisible by r, there is exactly one root */
-  if (((p - 1) % r) != 0)
-    {
-      for (i = 1; (i * (p - 1) + 1) % r != 0; i++);
-      mod_pow_ul (rop, delta, (i * (p - 1) + 1) / r, pp);
-      return;
-    }
-
-  /* now p-1 is divisible by r */
+  ASSERT((p - 1) % r == 0);
 
   mod_init (a, pp);
   mod_init (b, pp);
@@ -819,10 +810,11 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
     }
   for (i = k = 0; i < n; i++)
     {
+#ifndef NDEBUG
       /* check rr0[i] is a r-th power */
       mod_pow_ul (rr[k], rr0[i], (p - 1) / r, pp);
-      if (mod_is1 (rr[k], pp) == 0)
-        continue;
+      ASSERT(mod_is1 (rr[k], pp));
+#endif
       /* get one r-th root */
       one_rth_root (rr[k], r, rr0[i], pp);
       for (j = 1, k++; j < r; j++, k++)
@@ -913,14 +905,9 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       }
       sort_roots (r, n);
 #ifndef NDEBUG
-      for (i = 1; i < n; i++) {
-        /* Check for dupes */
-        if (r[i-1] >= r[i]) {
-          fprintf (stderr, "%" PRIu64 "^(1/%d) (mod %" PRIu64 "), r[%d]: %" PRIu64 " >= r[%d]: %" PRIu64 "\n", 
-                   a, d, p, i-1, r[i-1], i, r[i]);
-          ASSERT(r[i-1] < r[i]);
-        }
-      }
+      /* Check for duplicates */
+      for (i = 1; i < n; i++)
+        ASSERT(r[i-1] < r[i]);
 #endif
 
       for (i = 0; i < d; i++)
