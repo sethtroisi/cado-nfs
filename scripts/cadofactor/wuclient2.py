@@ -39,9 +39,6 @@ import ssl
 
 # File locking functions are specific to Unix/Windows/MacOS platforms.
 # The FileLock class is an Interface with static methods.
-def fileno(f):
-    """ Return file descriptor of f, or f if it is already an int """
-    return f if isinstance(f, int) else f.fileno()
 
 if os.name == "nt":
     import msvcrt
@@ -63,19 +60,26 @@ if os.name == "nt":
             if not exclusive:
                 # Don't have shared lock - bail out. FIXME
                 return
+            else:
+                # For now, do nothing, until I figure out file locking under
+                # Windows
+                return
             # Lock one byte from the start of the file
             mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK
             pos = f.tell()
             f.seek(0)
-            msvcrt.locking(fileno(f), mode, 1)
+            msvcrt.locking(f.fileno(), mode, 1)
             f.seek(pos)
         @staticmethod
         def unlock(f):
             """ Unlock a file """
             # Unlock one byte from the start of the file
+            # For now, do nothing, until I figure out file locking under
+            # Windows
+            return
             pos = f.tell()
             f.seek(0)
-            msvcrt.locking(fileno(f), msvcrt.LK_UNLCK, 1)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
             f.seek(pos)
 elif os.name == "posix":
     import fcntl
@@ -91,11 +95,11 @@ elif os.name == "posix":
             """
             mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
             mode |= 0 if blocking else fcntl.LOCK_NB
-            fcntl.flock(fileno(f), mode)
+            fcntl.flock(f.fileno(), mode)
         @staticmethod
         def unlock(f):
             """ Unlock a file """
-            fcntl.flock(fileno(f), fcntl.LOCK_UN)
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 else:
     # No file locking. FIXME: What about MacOS?
     class FileLock(object):
@@ -485,8 +489,8 @@ class SharedFile(object):
             else:
                 raise
         self.existed = False
-        FileLock.lock(fd, exclusive=True)
         self.file = os.fdopen(fd, "r+b")
+        FileLock.lock(self.file, exclusive=True)
 
     def close():
         FileLock.unlock(self.file)
@@ -942,10 +946,10 @@ class WorkunitClient(object):
                 return
             else:
                 raise
-        FileLock.lock(fd, exclusive=True)
         outfile = os.fdopen(fd, "wb")
+        FileLock.lock(outfile, exclusive=True)
         shutil.copyfileobj (request, outfile)
-        FileLock.unlock(fd)
+        FileLock.unlock(outfile)
         outfile.close() # This should also close the fd
         request.close()
     
