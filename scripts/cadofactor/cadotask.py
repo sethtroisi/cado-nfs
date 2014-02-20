@@ -1703,10 +1703,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def stat_formats(self):
         return (
-            ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
-                ", max bucket fill: {stats_max_bucket_fill[0]}"],
-            ["Total CPU time: {stats_total_cpu_time[0]}s"],
-            ["Total time: {stats_total_time[0]}s"],
+            ["Average J: {stats_avg_J[0]:g} for {stats_avg_J[1]:d} special-q",
+                ", max bucket fill: {stats_max_bucket_fill[0]:g}"],
+            ["Total CPU time: {stats_total_cpu_time[0]:g}s"],
+            ["Total time: {stats_total_time[0]:g}s"],
         )
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
