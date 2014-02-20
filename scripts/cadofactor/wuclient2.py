@@ -855,7 +855,10 @@ class WorkunitClient(object):
         contain special characters, like accents.
         """
         if sys.version_info[0] == 3:
-            return conn.info().get_content_charset()
+            charset = conn.info().get_content_charset()
+            if charset is None:
+                charset = "latin-1"
+            return charset
         else:
             encoding = "latin-1" # Default value
             for item in conn.info().getplist():
