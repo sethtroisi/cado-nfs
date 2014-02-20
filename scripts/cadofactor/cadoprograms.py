@@ -903,6 +903,8 @@ class WuClient(Program):
                  arch: Parameter(prefix='--') = None,
                  certsha1: Parameter(prefix='--') = None,
                  **kwargs):
+        if os.name == "nt":
+            kwargs.setdefault("runprefix", "python3.exe")
         super().__init__(locals(), **kwargs)
 
 class SSH(Program):

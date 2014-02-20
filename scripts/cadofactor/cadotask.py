@@ -1838,7 +1838,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             if filename in self.get_output_filenames():
                 self.logger.info("Re-scanning file %s", filename)
                 nrels = self.get_nrels() - self.get_nrels(filename)
-                self.state.update({"rels_found": nrels})
+                self.state.update({"rels_found": nrels}, commit=False)
                 self.forget_output_filenames([filename], commit=True)
             self.add_file(filename)
 
@@ -2357,10 +2357,11 @@ class PurgeTask(Task):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels })
+            update = {"purgedfile": purgedfile.get_wdir_relative(),
+                      "input_nrels": input_nrels }
             if self.params["dlp"]:
-                self.state.update({"relsdelfile": relsdelfile.get_wdir_relative() })
+                to_update["relsdelfile"] = relsdelfile.get_wdir_relative()
+            self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
