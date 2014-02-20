@@ -49,81 +49,66 @@
 
 #include "cado.h"
 #include <stdlib.h>
-#include "mpz_array.h"
 
+#include "mpz_array.h"
+#include "macros.h"
+
+/* Note: this routine is only used in append_mpz_to_array, with
+   alloced = array->alloced + ELONGATION, thus alloced >= array->alloced.
+   Since the initial allocation has always alloced > 0, and alloced cannot
+   decrease, we have array->alloced > 0. */
 //-----------------------------------------------------------------------------
-static void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
-    if (alloced < array->alloced) {
-        //
-        // Don't forget to free the memory used by the mpz_t's that will be
-        // discarded in case the new size is less than the original!
-        //
-        // _WARNING_: Since version 1.2, the mpz_t array given by array->data
-        //            is fully mpz_init'ed once and for all. Consequently
-        //            array->data has to be mpz_clear'ed from alloced to
-        //            array->alloced (and not just up to array->length as in
-        //            older versions).
-        //
-        for (uint32_t i = alloced; i < array->alloced; i++) {
-            mpz_clear(array->data[i]);
-        }
-        array->length = alloced;
-    }
-    if (array->alloced > 0) {
-        array->data = realloc(array->data, alloced * sizeof(mpz_t));
-    } else {
-        array->data = malloc(alloced * sizeof(mpz_t));
-    }
+static void resize_mpz_array (mpz_array_t* const array, uint32_t alloced) {
+    ASSERT(array->alloced > 0);
+    array->data = realloc (array->data, alloced * sizeof(mpz_t));
     //
     // _WARNING_: Since version 1.2, the mpz_t array given by array->data is
     //            fully mpz_init'ed once and for all!
     //
-    for (uint32_t i = array->alloced; i < alloced; i++) {
-        mpz_init(array->data[i]);
-    }
+    for (uint32_t i = array->alloced; i < alloced; i++)
+      mpz_init (array->data[i]);
     array->alloced = alloced;
 }
 
 //-----------------------------------------------------------------------------
-void append_mpz_to_array(mpz_array_t* array, const mpz_t to_append) {
-    if (array->length >= array->alloced) {
-        resize_mpz_array(array, array->length + ELONGATION);
-    }
+void append_mpz_to_array (mpz_array_t* array, const mpz_t to_append) {
+    if (array->length >= array->alloced)
+      /* necessarily array->length = array->alloced in this case */
+      resize_mpz_array (array, array->length + ELONGATION);
     //
     // _WARNING_: Since version 1.2, the mpz_t array given by array->data is
     //            fully mpz_init'ed once and for all!
     //
-    mpz_set(array->data[array->length], to_append);
+    mpz_set (array->data[array->length], to_append);
     array->length++;
 }
 
-//-----------------------------------------------------------------------------
-void resize_uint32_array(uint32_array_t* array, uint32_t alloced) {
+/* this routine is only called from append_uint32_to_array, with
+   alloced = array->length + ELONGATION = array->alloced + ELONGATION.
+   Since the initial allocation has always alloced > 0, and alloced cannot
+   decrease, we have array->alloced > 0. */
+static void resize_uint32_array (uint32_array_t* array, uint32_t alloced) {
 
-    if (alloced < array->length) {
-        array->length = alloced;
-    }
-    if (array->alloced > 0) {
-        array->data = realloc(array->data, alloced * sizeof(uint32_t));
-    } else {
-        array->data = malloc(alloced * sizeof(uint32_t));
-    }
+    ASSERT(array->alloced > 0);
+    array->data = realloc (array->data, alloced * sizeof(uint32_t));
     array->alloced = alloced;
 }
 
 //-----------------------------------------------------------------------------
-void append_uint32_to_array(uint32_array_t* array, const uint32_t to_append) {
-    if (array->length >= array->alloced) {
-        resize_uint32_array(array, array->length + ELONGATION);
-    }
+void append_uint32_to_array (uint32_array_t* array, const uint32_t to_append) {
+    if (array->length >= array->alloced)
+      /* necessarily array->length = array->alloced here */
+      resize_uint32_array (array, array->length + ELONGATION);
     array->data[array->length] = to_append;
     array->length++;
 }
 
 //-----------------------------------------------------------------------------
-mpz_array_t* alloc_mpz_array(uint32_t length) {
+mpz_array_t* alloc_mpz_array (uint32_t length) {
 
     mpz_array_t* array = malloc(sizeof(mpz_array_t));
+
+    ASSERT(length > 0);
 
     array->alloced = length;
     array->length  = 0U;
@@ -142,20 +127,21 @@ mpz_array_t* alloc_mpz_array(uint32_t length) {
 }
 
 //-----------------------------------------------------------------------------
-uint32_array_t* alloc_uint32_array(uint32_t length) {
+uint32_array_t* alloc_uint32_array (uint32_t length) {
 
     uint32_array_t* array = malloc(sizeof(uint32_array_t));
+
+    ASSERT(length > 0);
 
     array->alloced = length;
     array->length  = 0U;
 
 #if USE_CALLOC_MEMSET
-    array->data = calloc(array->alloced, sizeof(uint32_t));
+    array->data = calloc (array->alloced, sizeof(uint32_t));
 #else
-    array->data = malloc(array->alloced * sizeof(uint32_t));
-    for (uint32_t i = 0U; i < array->alloced; i++) {
-        array->data[i] = 0U;
-    }
+    array->data = malloc (array->alloced * sizeof(uint32_t));
+    for (uint32_t i = 0U; i < array->alloced; i++)
+      array->data[i] = 0U;
 #endif
 
     return array;
