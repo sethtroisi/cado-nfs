@@ -9,6 +9,7 @@
 #include "tests_common.h"
 #include "mpz_poly.h"
 #include "macros.h"
+#include "gmp_aux.h"
 
 int cmp(mpz_t * a, mpz_t * b)
 {
@@ -23,7 +24,7 @@ void
 test (int d, const char *pp, const char *ff[], int nroots)
 {
   mpz_t p, *f, *r, v;
-  int i, n;
+  int i, n, n0, n1;
   mpz_poly_t F;
 
   mpz_init (p);
@@ -52,7 +53,14 @@ test (int d, const char *pp, const char *ff[], int nroots)
         }
       mpz_init (r[i]);
     }
+  n0 = poly_roots (NULL, f, d, p);
+  if (mpz_sizeinbase (p, 2) <= 64)
+    {
+      n1 = poly_roots_uint64 (NULL, f, d, mpz_get_uint64 (p));
+      ASSERT_ALWAYS(n1 == n0);
+    }
   n = poly_roots (r, f, d, p);
+  ASSERT_ALWAYS(n == n0);
   if (nroots != -1)
     ASSERT_ALWAYS(n == nroots);
   for (i = 0; i < n; i++)
@@ -78,7 +86,7 @@ main (int argc, const char *argv[])
     const char* test0[] = {"4294967291", "1", "0", "-3"};
     const char* test1[] = {"18446744073709551557", "1", "2", "3", "5"};
     const char* test2[] = {"18446744073709551629", "1", "-1", "7", "-1"};
-    unsigned long iter = 500;
+    unsigned long iter = 300;
 
     tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
     tests_common_get_iter (&iter);
