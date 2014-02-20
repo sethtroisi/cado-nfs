@@ -164,6 +164,11 @@ class Sha1Cache(object):
 
 sha1cache = Sha1Cache()
 
+if os.name == "nt":
+    defaultsuffix = ".exe"
+else:
+    defaultsuffix = None
+
 class Program(object, metaclass=InspectType):
     ''' Base class that represents programs of the CADO suite
 
@@ -227,7 +232,8 @@ class Program(object, metaclass=InspectType):
 
     path = '.'
     subdir = ""
-    paramnames = ("execpath", "execsubdir", "execbin", "runprefix")
+    paramnames = ("execpath", "execsubdir", "execbin", "execsuffix",
+        "runprefix")
     # These should be abstract properties, but we want to reference them as
     # class attributes, which properties can't. Ergo dummy variables
     binary = None
@@ -241,7 +247,8 @@ class Program(object, metaclass=InspectType):
     def __init__(self, options, stdin = None,
                  stdout = None, append_stdout = False, stderr = None,
                  append_stderr = False, background = False, execpath = None,
-                 execsubdir = None, execbin = None, runprefix=None):
+                 execsubdir = None, execbin = None, execsuffix=defaultsuffix,
+                 runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
         from the cadoaprams.Parameters instance parameters.
 
@@ -304,7 +311,7 @@ class Program(object, metaclass=InspectType):
         # calling os.path.isfile() multiple times
         path = str(execpath or self.path)
         subdir = str(execsubdir or self.subdir)
-        binary = str(execbin or self.binary)
+        binary = str(execbin or self.binary) + (execsuffix or "")
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
         if execsubfile != execfile and os.path.isfile(execsubfile):
@@ -903,6 +910,8 @@ class WuClient(Program):
                  arch: Parameter(prefix='--') = None,
                  certsha1: Parameter(prefix='--') = None,
                  **kwargs):
+        if os.name == "nt":
+            kwargs.setdefault("runprefix", "python3.exe")
         super().__init__(locals(), **kwargs)
 
 class SSH(Program):

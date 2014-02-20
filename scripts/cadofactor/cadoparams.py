@@ -35,8 +35,6 @@ import cadologger
 
 logger = logging.getLogger("Parameters")
 
-parse_array = []
-
 def BoolParam(value):
     """
     >>> BoolParam(True)
@@ -66,70 +64,6 @@ class Parameters(object):
     # all parameters have been accessed, so that a warning can be printed
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
-    
-    old_key_map =  {
-        "alambda": "tasks.sieve.alambda",
-        "alim": "alim",
-        "bindir": "tasks.execpath",
-        "bwc_interleaving": "tasks.linalg.bwc.interleaving", 
-        "bwc_interval": "tasks.linalg.bwc.interval",
-        "bwc_mm_impl": None, # This parameter seems to be gone
-        "bwc_mn": "tasks.linalg.bwc.mn",
-        "bwc_shuffled_product": "tasks.linalg.bwc.shuffled_product",
-        "bwmt": "tasks.linalg.bwc.threads",
-        "bwstrat": "tasks.filter.merge.forbw",
-        "checkrange": None,
-        "coverNmax": "tasks.merge.coverNmax",
-        "degree": "tasks.polyselect.degree",
-        "delay": None,
-        "dup_rm": "tasks.filter.duplicates2.rm",
-        "excesspurge": "excesspurge",
-        "filterlastrels": None, # FIXME: implement this behaviour
-        "firstcheck": "tasks.sieve.rels_wanted",
-        "hosts": None, # FIXME: how to implement this
-        "I": "tasks.sieve.I",
-        "keep": "tasks.filter.merge.keep",
-        "keeppurge": "tasks.filter.purge.keep",
-        "keeprelfiles": None,
-        "linalg" : None, # Should we allow different linalg packages?
-        "lpba": "lpba",
-        "lpbr": "lpbr",
-        "machines": None, # FIXME: how to handle this?
-        "maxlevel": "tasks.filter.maxlevel",
-        "mfba": "tasks.sieve.mfba",
-        "mfbr": "tasks.sieve.mfbr",
-        "mpi": None, # FIXME: Implement this
-        "n": "N",
-        "name": "name",
-        "nchar": "tasks.linalg.characters.nchar",
-        "nkermax": None, # FIXME: implement this
-        "nslices_log": "tasks.filter.nslices_log",
-        "nthchar": "tasks.linalg.characters.threads",
-        "poly_max_threads": "tasks.polyselect.threads", 
-        "parallel": None, # We (currently) always use client/server
-        "polsel_admax": "tasks.polyselect.admax",
-        "polsel_admin": "tasks.polyselect.admin",
-        "polsel_adrange": "tasks.polyselect.adrange",
-        "polsel_delay": None,
-        "polsel_incr": "tasks.polyselect.incr",
-        "polsel_nice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
-        "polsel_nq": "tasks.polyselect.nq",
-        "polsel_P": "tasks.polyselect.P",
-        "qmin": "tasks.sieve.qmin",
-        "qrange": "tasks.sieve.qrange",
-        "ratio": "tasks.filter.ratio",
-        "ratq": "tasks.sieve.ratq",
-        "rlambda": "tasks.sieve.rlambda",
-        "rlim": "rlim",
-        "scriptpath": "slaves.scriptpath",
-        "serveraddress": "server.address",
-        "sieve_max_threads": "tasks.sieve.threads",
-        "sievenice": "slaves.niceness", # polsel_nice and sievenice overwrite each other
-        "slaves": "slaves.hostnames",
-        "skip": "tasks.purge.skip",
-        "wdir": "tasks.workdir",
-        "expected_factorization": None
-    }
     
     key_types = {
         "admin": int,
@@ -391,18 +325,6 @@ class Parameters(object):
             else:
                 dic[key] = self._subst_reference(path, key, dic[key])
     
-    def translate_old_key(self, key):
-        """ If key is in the translation table, translate it.
-        """
-        # If allow_new is True, we allow new-style parameters to occur, too,
-        # simply by not translating anything that does not occur in the
-        # translation table.
-        allow_new = True
-        if allow_new:
-            return self.old_key_map.get(key, key)
-        else:
-            return self.old_key_map[key]
-
     def _convert_one_type(self, path, key, orig_value):
         """ If a particular data type is registered in for this parameter,
         convert its value to that type, otherwise return the value unchanged.
@@ -441,31 +363,27 @@ class Parameters(object):
             else:
                 dic[key] = self._convert_one_type(path, key, dic[key])
 
-    def parseline(self, line, old_format):
-        (line2, comment) = line.split('#', 1) if '#' in line else (line, None)
+    def parseline(self, line):
+        line2 = line.split('#', 1)[0] if '#' in line else line
         line2 = line2.strip()
         if not line2:
-            return (None, None, comment, None)
+            return (None, None)
         if not '=' in line2:
             raise Exception('Invalid line, missing "=": %s' % line)
         # Which one is worse?
         # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
         (key, value) = (s.strip() for s in line2.split('=', 1))
-        oldkey = None
-        if old_format:
-            oldkey = key
-            key = self.translate_old_key(key)
-            if key is None:
-                value = None
-        return (key, value, comment, oldkey)
+        return (key, value)
 
-    def readparams(self, infile, old_format = False):
+    def readparams(self, infile):
         """ 
         Read configuration file lines from infile, which must be an iterable.
         An open file handle, or an array of strings, work.
         
         >>> p = Parameters()
-        >>> p.readparams(DEFAULTS_OLD, True)
+        >>> p.readparams(["tasks.sieve.rels_wanted = 1", \
+                          "tasks.polyselect.degree=5", \
+                          "tasks.polyselect.incr =60"])
         >>> p.data["tasks"]["sieve"]["rels_wanted"]
         1
         >>> p.myparams(["degree", "incr"], "tasks.polyselect") == \
@@ -474,9 +392,8 @@ class Parameters(object):
         """
         for line in infile:
             line = line.strip('\n')
-            (key ,value, comment, oldkey) = self.parseline(line, old_format)
-            # print ("%s = %s # %s", (key ,value, comment))
-            parse_array.append((key ,value, comment, oldkey))
+            (key ,value) = self.parseline(line)
+            # print ("%s = %s # %s", (key ,value))
             if key is None:
                 continue
             value = self.subst_env_var(key, value)
@@ -484,19 +401,11 @@ class Parameters(object):
         self._subst_references(self.data, [])
         self._convert_types(self.data, [])
 
-    def read_old_defaults(self):
-        """ Read the DEFAULTS_OLD parameter table to set default values as they
-        were set by the Perl script, as some of the old parameter files may
-        assume those defaults being effective.
-        """
-        logger.debug("Reading old default parameters table")
-        self.readparams(DEFAULTS_OLD, True)
-
-    def readfile(self, filename, old_format = False):
+    def readfile(self, filename):
         """ Read parameters from a file """
         logger.debug("Reading parameter file %s", filename)
         with open(filename, "r") as handle:
-            self.readparams(handle, old_format)
+            self.readparams(handle)
 
     def __str_internal__(self):
         ''' Returns all entries of the dictionary dic as key=sep strings
@@ -609,126 +518,8 @@ class UseParameters(metaclass=abc.ABCMeta):
         super().__init__(*args, **kwargs)
 
 
-DEFAULTS_OLD = (
-    # global
-    #'wdir         = undef',
-    #'bindir      = undef',
-    #'name         = undef',
-    #'machines     = undef',
-    #'n                = undef',
-    'parallel     = 0',
-
-    # polyselect using Kleinjung's algorithm
-    'degree         = 5',
-    'polsel_nq      = 1000',
-    'polsel_incr    = 60',
-    # 'polsel_admin   = 0', # 0 is default anyway
-    #'polsel_admax   = undef',
-    'polsel_adrange = 1e7',
-    'polsel_delay   = 120',
-    #'polsel_P       = undef',
-    'polsel_nice    = 10',
-
-    # sieve
-    'rlim         = 8000000',
-    'alim         = 8000000',
-    'lpbr         = 29',
-    'lpba         = 29',
-    'mfbr         = 58',
-    'mfba         = 58',
-    'rlambda      = 2.3',
-    'alambda      = 2.3',
-    'I            = 13',
-    'qmin         = 12000000',
-    'qrange       = 1000000',
-    'checkrange   = 1',
-    'firstcheck   = 1',
-
-    'delay        = 120',
-    'sievenice    = 19',
-    'keeprelfiles = 0',
-    'sieve_max_threads = 2',
-    # 'poly_max_threads = 1', # 1 is the default anyway
-    # 'ratq	 = 0', # 0 is the default anyway
-
-    # filtering
-    # 'skip         = -1', # should be about bwc_mn - 32
-    # 'keep         = -1', # should be 128 + skip
-    'keeppurge    = 208', # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
-    'maxlevel     = 15',
-    'ratio        = 1.5',
-    'bwstrat      = 3',
-    'coverNmax    = 100',
-    # 'nslices_log  = 1', # 1 is the default anyway
-    'filterlastrels = 1',
-    # 'dup_rm = $on_mingw', # Give -rm parameter to dup2 when on MinGW
-
-    # linalg
-    'linalg       = bwc',
-    'bwmt         = 2',
-    'mpi          = 0',
-    'hosts	 = ""',
-    'bwc_interval = 1000',
-    'bwc_mm_impl = bucket',
-    'bwc_interleaving = 0',
-    # bwc_mn should be 64 or 128
-    'bwc_mn       = 64',
-    # shuffled product is expected to be better in most cases', at least
-    # when we use MPI. Since it is the preferred communication algorithm
-    # for large runs', we prefer to force its use also for mid-range
-    # examples.
-    'bwc_shuffled_product = 1',
-
-    # characters
-    'nkermax      = 30',
-    'nchar        = 50',
-    'nthchar      = 2',
-
-    # holy grail
-    #'expected_factorization = undef',
-
-    # logfile
-    #'logfile = undef',
-)
-
 if __name__ == "__main__":
     import sys
     if len(sys.argv) == 1:
         import doctest
         doctest.testmod()
-    elif len(sys.argv) == 2:
-        argsold = True
-        paramfile = sys.argv[1]
-        parameters = Parameters()
-        if argsold:
-            parameters.read_old_defaults()
-        parameters.readfile(paramfile, old_format = argsold)
-        
-        # Keep only the last occurence of each key. First reverse
-        parse_array.reverse()
-        # Now keep only the first occurence of each key
-        keys_seen = set()
-        filtered = []
-        for (key, value, comment, oldkey) in parse_array:
-            # We keep entries without an oldkey, as those correspond to comment
-            # or blank lines in the input file, which we try to preserve.
-            # This is also why we use two arrays instead of an OrderedDict.
-            # Lines with an oldkey that maps to None are discarded.
-            keep = oldkey is None or not (key is None or key in keys_seen)
-            if False:
-                print("%skeeping %s=%s #%s /%s" %
-                      ("" if keep else "not ", key, value, comment, oldkey) )
-            keys_seen.add(key)
-            if keep:
-                filtered.append((key, value, comment, oldkey))
-        
-        # Revert again to original order
-        filtered.reverse()
-        
-        for (key ,value, comment, oldkey) in filtered:
-            output = []
-            if not key is None:
-                output.append("%s = %s" % (key, value))
-            if not comment is None:
-                output.append("#%s" % comment)
-            print("\t\t".join(output))

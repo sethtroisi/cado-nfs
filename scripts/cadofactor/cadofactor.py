@@ -17,8 +17,6 @@ if __name__ == '__main__':
                         "INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
     parser.add_argument("--filelog", help="Log file logging level, e.g., "
                         "INFO/COMMAND/DEBUG", default="DEBUG", metavar="LEVEL")
-    parser.add_argument("--old", help="Use old parameter file format",
-                        action="store_true")
     parser.add_argument("parameters", help="A file with the parameters to use")
     parser.add_argument("options", metavar="OPTION", help="An option as in "
                         "parameter file (format: key=value)", nargs="*")
@@ -28,10 +26,8 @@ if __name__ == '__main__':
     filelvlname = args.filelog
     
     parameters = cadoparams.Parameters()
-    if args.old:
-        parameters.read_old_defaults()
-    parameters.readfile(paramfile, old_format = args.old)
-    parameters.readparams(args.options, old_format = args.old)
+    parameters.readfile(paramfile)
+    parameters.readparams(args.options)
     tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())

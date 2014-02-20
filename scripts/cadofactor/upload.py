@@ -125,13 +125,14 @@ def do_upload(dbfilename, uploaddir, inputfp=sys.stdin, output=sys.stdout,
             # not allow overriding this with a parameter. We change the mode
             # to 666 & ~umask.
 
-            # The os.umask() function gets the old umask *and* sets a new one,
-            # so we have to call it twice to avoid changing it :(
-            umask = os.umask(0o022)
-            os.umask(umask)
-            filemode = 0o666 & ~umask
-            diag(1, "Setting %s to mode %o" % (filename, filemode))
-            os.fchmod(filedesc, filemode)
+            if os.name != "nt":
+                # The os.umask() function gets the old umask *and* sets a new
+                # one, so we have to call it twice to avoid changing it :(
+                umask = os.umask(0o022)
+                os.umask(umask)
+                filemode = 0o666 & ~umask
+                diag(1, "Setting %s to mode %o" % (filename, filemode))
+                os.fchmod(filedesc, filemode)
             
             filetype = fileitem.headers.get("filetype", None)
             if not filetype is None:

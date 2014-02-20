@@ -883,7 +883,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             cmd_line = message.get_command_line(command_nr)
             if cmd_line:
                 self.logger.error("Command line was: %s", cmd_line)
-            stderr = message.read_stderr(command_nr).decode('ascii')
+            stderr = message.read_stderr(command_nr)
             stderrfilename = message.get_stderrfile(command_nr)
             if stderrfilename:
                 stderrmsg = " (stored in file %s)" % stderrfilename
@@ -919,8 +919,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     def filter_notification(self, message):
         wuid = message.get_wu_id()
         rc = message.get_exitcode(0)
-        stdout = message.read_stdout(0).decode("ascii")
-        stderr = message.read_stderr(0).decode("ascii")
+        stdout = message.read_stdout(0)
+        stderr = message.read_stderr(0)
         output_files = message.get_output_files()
         self.logger.message("%s: Received notification for wuid=%s, rc=%d, "
                             "output_files=[%s]",
@@ -1606,7 +1606,7 @@ class FreeRelTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            stderr = message.read_stderr(0).decode("ascii")
+            stderr = message.read_stderr(0).decode("utf-8")
             update = self.parse_file(stderr.splitlines())
             update["freerelfilename"] = freerelfilename.get_wdir_relative()
             update["renumberfilename"] = renumberfilename.get_wdir_relative()
@@ -1703,10 +1703,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def stat_formats(self):
         return (
-            ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
-                ", max bucket fill: {stats_max_bucket_fill[0]}"],
-            ["Total CPU time: {stats_total_cpu_time[0]}s"],
-            ["Total time: {stats_total_time[0]}s"],
+            ["Average J: {stats_avg_J[0]:g} for {stats_avg_J[1]:d} special-q",
+                ", max bucket fill: {stats_max_bucket_fill[0]:g}"],
+            ["Total CPU time: {stats_total_cpu_time[0]:g}s"],
+            ["Total time: {stats_total_time[0]:g}s"],
         )
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
@@ -1838,7 +1838,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             if filename in self.get_output_filenames():
                 self.logger.info("Re-scanning file %s", filename)
                 nrels = self.get_nrels() - self.get_nrels(filename)
-                self.state.update({"rels_found": nrels})
+                self.state.update({"rels_found": nrels}, commit=False)
                 self.forget_output_filenames([filename], commit=True)
             self.add_file(filename)
 
@@ -2351,16 +2351,17 @@ class PurgeTask(Task):
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         message = self.submit_command(p, "")
-        stdout = message.read_stdout(0).decode('ascii')
-        stderr = message.read_stderr(0).decode('ascii')
+        stdout = message.read_stdout(0).decode('utf-8')
+        stderr = message.read_stderr(0).decode('utf-8')
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels })
+            update = {"purgedfile": purgedfile.get_wdir_relative(),
+                      "input_nrels": input_nrels }
             if self.params["dlp"]:
-                self.state.update({"relsdelfile": relsdelfile.get_wdir_relative() })
+                to_update["relsdelfile"] = relsdelfile.get_wdir_relative()
+            self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2733,7 +2734,7 @@ class NmbrthryTask(Task):
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
 
-        stdout = message.read_stdout(0).decode("ascii")
+        stdout = message.read_stdout(0).decode("utf-8")
         update = {}
         for line in stdout.splitlines():
             match = re.match(r'ell (\d+)', line)
@@ -3553,19 +3554,19 @@ class StartClientsTask(Task):
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
             if stdout:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if stderr:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         match = None
         if not stdout is None:
-            match = re.match(r"PID: (\d+)", stdout.decode("ascii"))
+            match = re.match(r"PID: (\d+)", stdout.decode("utf-8"))
         if not match:
             self.logger.warning("Client did not print PID")
             if not stdout is None:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if not stderr is None:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         self.used_ids[clientid] = True
         self.pids[clientid] = int(match.group(1))
@@ -3584,9 +3585,9 @@ class StartClientsTask(Task):
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
                 if stdout:
-                    self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                    self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
                 if stderr:
-                    self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                    self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
                 # Assume that the client is already dead and remove it from
                 # the list of running clients
                 del(self.pids[clientid])
