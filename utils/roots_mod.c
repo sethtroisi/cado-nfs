@@ -230,9 +230,10 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
 
 /************************** square roots *************************************/
 
+#if 0 /* unused currently */
 /* Uses Tonelli-Shanks, more precisely Algorithm from Table 1 in [1] */
 static int
-tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
+tonelli_shanks (residue_t *rr, int d, uint64_t n, const modulus_t pp)
 {
   uint64_t q, s, i, j, k = 0, l;
   residue_t aa, hh, delta, dd, bb, zz;
@@ -295,7 +296,7 @@ tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
 
   return k;
 }
-
+#endif
 
 /* Tonelli-shanks for the case pp == 5 (mod 8).
    In this case we know that 2 is a QNR. */
