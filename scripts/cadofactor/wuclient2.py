@@ -1022,7 +1022,8 @@ class WorkunitClient(object):
                 FileLock.lock(file_to_lock)
                 FileLock.unlock(file_to_lock)
             
-            if filename in dict(self.workunit.get("EXECFILE", [])):
+            if os.name != "nt" and \
+                    filename in dict(self.workunit.get("EXECFILE", [])):
                 mode = os.stat(dlpath).st_mode
                 if mode & stat.S_IXUSR == 0:
                     logging.info ("Setting executable flag for %s", dlpath)
