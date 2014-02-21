@@ -2747,7 +2747,7 @@ class NmbrthryTask(Task):
             if match:
                 update["nmaps"] = match.group(1)
         update["badinfofile"] = badinfofile.get_wdir_relative()
-        update["badfile"] = badfile.get_wdir_relative()}
+        update["badfile"] = badfile.get_wdir_relative()
         
         if not "ell" in update:
             raise Exception("Stdout does not give ell")
