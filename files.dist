@@ -708,6 +708,8 @@ utils/fix-endianness.c
 utils/fix-endianness.h
 utils/double_poly.c
 utils/double_poly.h
+utils/mpz_vector.h
+utils/mpz_vector.c
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
