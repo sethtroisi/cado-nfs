@@ -56,8 +56,8 @@ test (int d, const char *pp, const char *ff[], int nroots)
   if (sizeof(long)==4)
     {
       gmp_printf ("Testing polynomial of degree %d modulo p=%Zd:", d, p);
-      for (i = 0; i <= d; i++)
-        gmp_printf (" %Zd*x^%d", f[i], d - i);
+      for (i = d; i >= 0; i--)
+        gmp_printf (" %Zd*x^%d", f[i], i);
       printf ("\n");
       fflush (stdout);
     }
