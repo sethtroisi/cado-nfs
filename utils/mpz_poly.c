@@ -228,21 +228,24 @@ mpz_poly_normalized_p (const mpz_poly_t f) {
 }
 
 /* Allocate a polynomial that can contain 'd+1' coefficients and set to zero.
-   We allow d=-1.
+   We allow d < 0, which is equivalent to d = -1.
  */
 void mpz_poly_init(mpz_poly_t f, int d) {
-  int i;
-  f->alloc = d+1;
   f->deg = -1;
-  if (d == -1)
+  if (d < 0)
+  {
+    f->alloc = 0;
     f->coeff = (mpz_t *) NULL;
+  }
   else
-    {
-      f->coeff = (mpz_t *) malloc ((d+1)*sizeof(mpz_t));
-      ASSERT (f->coeff != NULL);
-    }
-  for (i = 0; i <= d; ++i)
-    mpz_init(f->coeff[i]);
+  {
+    int i;
+    f->alloc = d+1;
+    f->coeff = (mpz_t *) malloc ((d+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (i = 0; i <= d; ++i)
+      mpz_init(f->coeff[i]);
+  }
 }
 
 
