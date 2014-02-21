@@ -58,6 +58,7 @@ poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
         mpz_t pp;
 
         mpz_init (pp);
+        mpz_set_uint64 (pp, p);
         if (r == NULL)
           n = mpz_poly_roots_mpz (NULL, f, d, pp);
         else
