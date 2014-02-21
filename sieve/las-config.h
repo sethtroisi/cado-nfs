@@ -82,6 +82,9 @@
  * context, augments the scope of the tracking here by performing a
  * divisibility test on each sieve update. This is obviously very
  * expensive, but provides nice checking.
+ *
+ * Another useful tool for debugging is the sieve-area checksums that get
+ * printed with verbose output (-v) enabled.
  */
 #define xxxTRACK_CODE_PATH
 #define xxxWANT_ASSERT_EXPENSIVE
