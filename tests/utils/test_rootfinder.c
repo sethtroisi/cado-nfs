@@ -53,36 +53,13 @@ test (int d, const char *pp, const char *ff[], int nroots)
         }
       mpz_init (r[i]);
     }
-  if (sizeof(long)==4)
-    {
-      gmp_printf ("Testing polynomial of degree %d modulo p=%Zd:", d, p);
-      for (i = d; i >= 0; i--)
-        gmp_printf (" %Zd*x^%d", f[i], i);
-      printf ("\n");
-      fflush (stdout);
-    }
   n0 = poly_roots (NULL, f, d, p);
-  if (sizeof(long)==4)
-    {
-      printf ("n0=%d\n", n0);
-      fflush (stdout);
-    }
   if (mpz_sizeinbase (p, 2) <= 64)
     {
       n1 = poly_roots_uint64 (NULL, f, d, mpz_get_uint64 (p));
-      if (sizeof(long)==4)
-        {
-          printf ("n1=%d\n", n1);
-          fflush (stdout);
-        }
       ASSERT_ALWAYS(n1 == n0);
     }
   n = poly_roots (r, f, d, p);
-  if (sizeof(long)==4)
-    {
-      printf ("n=%d\n", n);
-      fflush (stdout);
-    }
   ASSERT_ALWAYS(n == n0);
   if (nroots != -1)
     ASSERT_ALWAYS(n == nroots);

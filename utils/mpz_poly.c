@@ -1610,11 +1610,6 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
   /* If r is NULL, we only return the number of roots. */
   if (r != NULL && nr > 0)
   {
-    if (sizeof(long)==4)
-      {
-        printf ("call mpz_poly_cantor_zassenhaus\n");
-        fflush (stdout);
-      }
     int n MAYBE_UNUSED = mpz_poly_cantor_zassenhaus (r, mpz_poly_fp, p, 0);
     ASSERT (n == nr);
   }

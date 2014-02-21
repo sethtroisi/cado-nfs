@@ -57,16 +57,10 @@ poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
       {
         mpz_t pp;
 
-        if (sizeof (long) == 4) printf ("poly_roots_uint64\n");
         mpz_init (pp);
         mpz_set_uint64 (pp, p);
-        if (sizeof (long) == 4) gmp_printf ("pp=%Zd\n", pp);
         if (r == NULL)
-          {
-            if (sizeof (long) == 4) printf ("enter mpz_poly_roots_mpz\n");
-            n = mpz_poly_roots_mpz (NULL, f, d, pp);
-            if (sizeof (long) == 4) printf ("exit, n=%d\n", n);
-          }
+          n = mpz_poly_roots_mpz (NULL, f, d, pp);
         else
           {
             mpz_t *rr;
