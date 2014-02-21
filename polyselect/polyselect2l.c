@@ -1098,7 +1098,7 @@ collision_on_p ( header_t header,
             }
         }
 #ifdef DEBUG_POLYSELECT2L
-      fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+      fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
       fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1332,8 +1332,8 @@ collision_on_each_sq ( header_t header,
     }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", milliseconds () - st);
-  fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
+  fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
@@ -1746,7 +1746,7 @@ gmp_collision_on_p ( header_t header,
   }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+  fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1816,7 +1816,7 @@ gmp_collision_on_each_sq ( header_t header,
   } // next p
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n",
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n",
 	   milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
