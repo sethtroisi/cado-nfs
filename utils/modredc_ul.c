@@ -119,6 +119,10 @@ modredcul_inv (residueredcul_t r, const residueredcul_t A,
   return 1;
 }
 
+
+// #undef ASSERT_EXPENSIVE
+// #define ASSERT_EXPENSIVE ASSERT
+
 /* same as modredcul_inv, but for classical representation (not Montgomery) */
 int
 modredcul_intinv (residueredcul_t r, const residueredcul_t A,
@@ -142,13 +146,16 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
   lsh = ularith_ctz(y);
   y >>= lsh;
   t += lsh;
-  /* v <<= lsh; ??? v is 0 here */
 
-  // Here y and x are odd, and y < x
   do {
-    /* Here, y and x are odd, 0 < y <= x, u is odd and v is even
-       (the case y=x might happen only after the first iteration) */
+    /* Here, x and y are odd, 0 < y < x, u is odd and v is even */
+    ASSERT_EXPENSIVE(y % 2 == 1);
+    ASSERT_EXPENSIVE(u % 2 == 1);
+    ASSERT_EXPENSIVE(v % 2 == 0);
+    ASSERT_EXPENSIVE(0 < y);
+    ASSERT_EXPENSIVE(y < x);
     do {
+      ASSERT_EXPENSIVE(x % 2 == 1);
       x -= y; v += u;
       lsh = ularith_ctz(x);
       ASSERT_EXPENSIVE (lsh > 0);
@@ -156,16 +163,22 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
       t += lsh;
       u <<= lsh;
     } while (x > y); /* ~50% branch taken :( */
-    /* Here, either x = 0, otherwise y and x are odd, 0 < x <= y,
-       u is even and v is odd */
 
     /* x is the one that got reduced, test if we're done */
+    /* Here, x and y are odd, 0 < x <= y, u is even and v is odd */
+    ASSERT_EXPENSIVE(0 < x);
+    ASSERT_EXPENSIVE(x <= y);
+    ASSERT_EXPENSIVE(x % 2 == 1);
+    ASSERT_EXPENSIVE(y % 2 == 1);
+    ASSERT_EXPENSIVE(u % 2 == 0);
+    ASSERT_EXPENSIVE(v % 2 == 1);
 
-    if (x <= 1)
+    if (x == y)
       break;
 
-    /* Here, y and x are odd, 0 < x <= y, u is even and v is odd */
+    /* Here, x and y are odd, 0 < x < y, u is even and v is odd */
     do {
+      ASSERT_EXPENSIVE(y % 2 == 1);
       y -= x; u += v;
       lsh = ularith_ctz(y);
       ASSERT_EXPENSIVE (lsh > 0);
@@ -173,23 +186,22 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
       t += lsh;
       v <<= lsh;
     } while (x < y); /* about 50% branch taken :( */
-    /* Here, either y = 0, otherwise y and x are odd, 0 < y <= x,
-       u is odd and v is even */
+    /* Here, x and y are odd, 0 < y <= x, u is odd and v is even */
 
     /* y is the one that got reduced, test if we're done */
-  } while (y > 1);
+  } while (x != y);
 
-  /* when we exit, only one of x and y can be <= 1 */
+  /* when we exit, x == y */
+  ASSERT_EXPENSIVE(x == y);
 
-  if ((x & y) == 0UL) /* Non-trivial GCD */
+  if (x > 1UL) /* Non-trivial GCD */
     return 0;
 
-  if (y != 1)
+  if (u % 2 == 0)
     {
-      /* So x is the one that reached 1.
-	 We maintained ya == u2^t (mod m) and xa = -v2^t (mod m).
-	 So 1/a = -v2^t.
-       */
+      /* We exited the loop after reducing x */
+      /* We maintained ya == u2^t (mod m) and xa = -v2^t (mod m).
+	 So 1/a = -v2^t. */
       u = m[0].m - v;
       /* Now 1/a = u2^t */
     }
