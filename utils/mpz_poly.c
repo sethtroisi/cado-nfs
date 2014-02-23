@@ -769,29 +769,30 @@ mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f,
   mpz_clear (aux);
 }
 
-/* Set f=g/2 (mod m). */
+/* Set f=g/2 (mod m), where f might equal g.
+   Assumes m is odd. */
 void mpz_poly_div_2_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_t m)
 {
   int i;
-  mpz_t aux;
 
-  mpz_init (aux);
+  ASSERT_ALWAYS(mpz_scan1 (m, 0) == 0);
+
+  mpz_poly_realloc (f, g->deg + 1);
+
   for (i = g->deg; i >= 0; --i)
-  {
-    if (mpz_scan1 (g->coeff[i], 0) == 0)
     {
-      mpz_add (aux, g->coeff[i], m);
-      mpz_div_2exp (aux, aux, 1);
+      if (mpz_scan1 (g->coeff[i], 0) == 0)
+        {
+          mpz_add (f->coeff[i], g->coeff[i], m);
+          mpz_div_2exp (f->coeff[i], f->coeff[i], 1);
+        }
+      else
+        mpz_div_2exp (f->coeff[i], g->coeff[i], 1);
+      mpz_mod (f->coeff[i], f->coeff[i], m);
     }
-    else
-      mpz_div_2exp (aux, g->coeff[i], 1);
-    mpz_mod(aux, aux, m);
-    mpz_poly_setcoeff(f, i, aux);
-  }
-  mpz_clear (aux);
 }
 
-/* Set res=f(x) */
+/* Set res=f(x). Assumes res and x are different variables. */
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
   int i, d;
   d = f->deg;
@@ -806,13 +807,14 @@ void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
   }
 }
 
-/* Set res=f(x) (mod m) */
+/* Set res=f(x) (mod m).  Assume res and x are different variables. */
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m)
 {
     mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
 }
 
+/* Set res=f(x) (mod m).  Assume res and x are different variables. */
 void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m, const mpz_t mx) {
   int i, d;
