@@ -257,11 +257,7 @@ mpz_poly_realloc (mpz_poly_t f, int nc)
   if (f->alloc < nc)
     {
       f->coeff = (mpz_t*) realloc (f->coeff, nc * sizeof (mpz_t));
-      if (f->coeff == NULL)
-        {
-          fprintf (stderr, "Error, not enough memory\n");
-          exit (1);
-        }
+      FATAL_ERROR_CHECK (f->coeff == NULL, "not enough memory");
       for (i = f->alloc; i < nc; i++)
         mpz_init (f->coeff[i]);
       f->alloc = nc;
@@ -330,49 +326,31 @@ void mpz_poly_set_zero(mpz_poly_t f) {
 }
 
 /* Set mpz_t coefficient for the i-th term. */
-void mpz_poly_setcoeff(mpz_poly_t f, int i, const mpz_t z) {
-  int j;
-  if (i >= f->alloc) {
-    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
-    for (j = f->alloc; j <= i; ++j)
-      mpz_init(f->coeff[j]);
-    f->alloc = i+1;
-  }
-  mpz_set(f->coeff[i], z);
+void mpz_poly_setcoeff (mpz_poly_t f, int i, const mpz_t z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set (f->coeff[i], z);
   if (i >= f->deg)
-    mpz_poly_cleandeg(f, i);
+    mpz_poly_cleandeg (f, i);
 }
 
 /* Set int64 coefficient for the i-th term. */
-void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z) {
-  int j;
-  if (i >= f->alloc) {
-    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
-    for (j = f->alloc; j <= i; ++j)
-      mpz_init(f->coeff[j]);
-    f->alloc = i+1;
-  }
-  mpz_set_int64(f->coeff[i], z);
+void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_int64 (f->coeff[i], z);
   if (i >= f->deg)
-    mpz_poly_cleandeg(f, i);
+    mpz_poly_cleandeg (f, i);
 }
 
 
 /* Set signed int coefficient for the i-th term. */
-void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z) {
-  int j;
-  if (i >= f->alloc) {
-    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
-    for (j = f->alloc; j <= i; ++j)
-      mpz_init(f->coeff[j]);
-    f->alloc = i+1;
-  }
-  mpz_set_si(f->coeff[i], z);
+void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_si (f->coeff[i], z);
   if (i >= f->deg)
-    mpz_poly_cleandeg(f, i);
+    mpz_poly_cleandeg (f, i);
 }
 
 /* Get coefficient for the i-th term. */
@@ -380,10 +358,10 @@ void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f) {
   // The code below will work anyway,
   // this assert is better called a warning.
   ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i );
-  if(i > f->deg)
-    mpz_set_ui(res,0);
+  if (i > f->deg)
+    mpz_set_ui (res,0);
   else
-    mpz_set(res,f->coeff[i]);
+    mpz_set (res,f->coeff[i]);
 }
 
 /* Copy f to g, where g must be initialized (but there is no need it has
@@ -398,7 +376,8 @@ void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f) {
 
 
 /* -------------------------------------------------------------------------- */
-/* return 0 if f and g are equal, non-zero otherwise */
+/* return 0 if f and g are equal, non-zero otherwise
+   Assumes f and g are normalized */
 int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
 {
   int i;
@@ -406,12 +385,13 @@ int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
   if (f->deg != g->deg)
     return 1;
 
-  if (f->deg == -1)
-    return 0;
+  /* now both degrees are equal, the following code is ok also when
+     f->deg = g->deg = -1 */
 
   for (i = 0; i <= f->deg; i++)
     if (mpz_cmp (f->coeff[i], g->coeff[i]))
       return 1; /* f and g differ */
+
   return 0;
 }
 /* -------------------------------------------------------------------------- */

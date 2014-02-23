@@ -229,6 +229,44 @@ test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
     }
 }
 
+void
+test_mpz_poly_fprintf (void)
+{
+  mpz_poly_t f, g;
+  mpz_t c;
+  int res;
+
+  mpz_poly_init (f, 1);
+  mpz_poly_init (g, 1);
+  mpz_init (c);
+
+  f->deg = -1;
+  mpz_poly_fprintf (stdout, f);
+  mpz_poly_getcoeff (c, 0, f);
+  ASSERT_ALWAYS (mpz_cmp_ui (c, 0) == 0);
+
+  f->deg = 0;
+  mpz_set_ui (f->coeff[0], 17);
+  mpz_poly_fprintf (stdout, f);
+
+  mpz_poly_setcoeff_int64 (f, 1, 42);
+  mpz_poly_fprintf (stdout, f);
+
+  mpz_poly_setcoeff_si (f, 2, -3);
+  mpz_poly_fprintf (stdout, f);
+
+  mpz_poly_copy (g, f);
+  res = mpz_poly_cmp (f, g);
+  ASSERT_ALWAYS (res == 0);
+  mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1);
+  res = mpz_poly_cmp (f, g);
+  ASSERT_ALWAYS (res != 0);
+
+  mpz_poly_clear (f);
+  mpz_poly_clear (g);
+  mpz_clear (c);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -238,6 +276,7 @@ main (int argc, const char *argv[])
   test_polymodF_mul ();
   test_mpz_poly_roots_mpz (iter);
   test_mpz_poly_sqr_mod_f_mod_mpz (iter);
+  test_mpz_poly_fprintf ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
