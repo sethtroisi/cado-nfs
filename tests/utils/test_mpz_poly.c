@@ -307,16 +307,16 @@ test_mpz_poly_div_2_mod_mpz ()
   mpz_t m;
 
   mpz_init_set_ui (m, 17);
-  mpz_poly_init (f, 3);
-  mpz_set_si (f->coeff[0], 1);
-  mpz_set_si (f->coeff[1], -2);
-  mpz_set_si (f->coeff[2], -3);
-  mpz_set_si (f->coeff[3], 4);
+  mpz_poly_init (f, -1);
+  mpz_poly_setcoeff_si (f, 0, 1);
+  mpz_poly_setcoeff_si (f, 1, -2);
+  mpz_poly_setcoeff_si (f, 2, -3);
+  mpz_poly_setcoeff_si (f, 3, 4);
   mpz_poly_div_2_mod_mpz (f, f, m);
-  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[0], 9));
-  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[1], 16));
-  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[2], 7));
-  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[3], 2));
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[0], 9) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[1], 16) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[2], 7) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[3], 2) == 0);
   mpz_poly_clear (f);
   mpz_clear (m);
 }
