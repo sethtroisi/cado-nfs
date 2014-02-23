@@ -1,4 +1,4 @@
-/**
+/*
    These files (mpz_poly.*) implement arithmetics of polynomials whose
    coefficients are in multiprecision integers (using mpz_t from GNU MP).
    We use them in sqrt/algsqrt.c to represent rings of integers.
@@ -698,9 +698,10 @@ mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
   mpz_clear (tmp);
 }
 
-/* 
-   computes q, r such that f = q*g + r mod p, with deg(r) < deg(g) and p in mpz_t
-   q and r must be allocated!                                   
+/*
+   computes q, r such that f = q*g + r mod p, with deg(r) < deg(g)
+   and p in mpz_t
+   q and r must be allocated!
 */
 void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p)
 {
@@ -969,7 +970,8 @@ mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t
 }
 
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
-   Return the degree of the remainder. */
+   Return the degree of the remainder.
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 int
 mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
                     const mpz_t invm)
@@ -1054,8 +1056,9 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
 }
 
 
-// Q = P1*P2 mod f, mod m
-// f is the original algebraic polynomial (non monic but small coefficients)
+/* Q = P1*P2 mod f, mod m
+   f is the original algebraic polynomial (non monic but small coefficients)
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 void
 mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
                         const mpz_poly_t f, const mpz_t m, const mpz_t invm)
@@ -1078,8 +1081,9 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
   mpz_poly_clear(R);
 }
 
-// Q = P^2 mod f, mod m
-// f is the original algebraic polynomial (non monic but small coefficients)
+/* Q = P^2 mod f, mod m
+   f is the original algebraic polynomial (non monic but small coefficients)
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 void
 mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
                         const mpz_t m, const mpz_t invm)
@@ -1093,7 +1097,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
 
   /* Fast squaring in 2d1+1 squares, i.e., 2d-1 squares.
      For d=5, this gives 9 squares. */
-  mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
+  d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
 
   // reduce mod f
   d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
@@ -1194,7 +1198,8 @@ void barrett_init (mpz_ptr invm, mpz_srcptr m)
   mpz_tdiv_q (invm, invm, m);
 }
 
-/* a <- b mod m */
+/* a <- b mod m
+   Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
 {
   size_t k = mpz_size (m), sizeb, l;
@@ -1442,7 +1447,7 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
 
   mpz_poly_init(q, d->deg);
   mpz_poly_init(tmp, d->deg + gg->deg);
-    
+
   while (gg->deg >= 0)
     {
 
@@ -1458,7 +1463,7 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
       mpz_poly_mul(tmp, q, vv);
       mpz_poly_sub_mod_mpz(v, v, tmp, p);
       mpz_poly_swap (v, vv);
- 
+
       /* now deg(f) < deg(g): swap f and g */
       mpz_poly_swap (d, gg);
     }
@@ -1530,7 +1535,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
     mpz_divexact_ui (aux, aux, 2);
     mpz_poly_power_mod_f_mod_mpz (h, q, f, aux, p);
     mpz_poly_sub_ui (h, 1);
-    
+
     /* q = gcd(f,h) */
     mpz_poly_copy(q, f);
     mpz_poly_gcd_mpz (q, h, p);
@@ -1623,7 +1628,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
   /* Sort the roots */
   if (r && nr)
     qsort(r, nr, sizeof(mpz_t), (sortfunc_t) &mpz_poly_coeff_cmp);
-  
+
   return nr;
 }
 

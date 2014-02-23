@@ -190,6 +190,45 @@ test_mpz_poly_roots_mpz (unsigned long iter)
   mpz_clear (res);
 }
 
+void
+test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
+{
+  while (iter--)
+    {
+      mpz_poly_t Q, P, f;
+      mpz_t m, invm;
+      int k = 2 + (lrand48 () % 127);
+      int d = 1 + (lrand48 () % 7);
+
+      mpz_init (m);
+      do mpz_urandomb (m, state, k); while (mpz_tstbit (m, 0) == 0);
+      mpz_poly_init (f, d);
+      mpz_init (invm);
+      while (1)
+        {
+          mpz_poly_random (f, d, k);
+          if (f->deg < d)
+            continue;
+          mpz_gcd (invm, m, f->coeff[d]);
+          if (mpz_cmp_ui (invm, 1) == 0)
+            break;
+        }
+      barrett_init (invm, m);
+      mpz_poly_init (P, d - 1);
+      if (iter)
+        mpz_poly_random (P, d - 1, k);
+      else
+        P->deg = -1; /* P=0 */
+      mpz_poly_init (Q, d - 1);
+      mpz_poly_sqr_mod_f_mod_mpz (Q, P, f, m, invm);
+      mpz_poly_clear (f);
+      mpz_poly_clear (P);
+      mpz_poly_clear (Q);
+      mpz_clear (m);
+      mpz_clear (invm);
+    }
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -198,6 +237,7 @@ main (int argc, const char *argv[])
   tests_common_get_iter(&iter);
   test_polymodF_mul ();
   test_mpz_poly_roots_mpz (iter);
-  tests_common_clear();
+  test_mpz_poly_sqr_mod_f_mod_mpz (iter);
+  tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
