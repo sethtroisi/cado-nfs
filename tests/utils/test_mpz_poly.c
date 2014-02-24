@@ -315,6 +315,12 @@ test_mpz_poly_fprintf (void)
   mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
   ASSERT_ALWAYS (mpz_cmp_si (v[0], 7) == 0);
   ASSERT_ALWAYS (mpz_cmp_si (v[1], 0) == 0);
+  /* test with one zero polynomial */
+  g->deg = -1;
+  mpz_set_si (c, 3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 0) == 0);
 
   mpz_poly_clear (f);
   mpz_poly_clear (g);
