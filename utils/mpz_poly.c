@@ -1053,7 +1053,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
 
   mpz_poly_init(R, d);
 
-  mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+  d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
 
   // reduce mod f
   d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
