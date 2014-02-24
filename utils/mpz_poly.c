@@ -1109,7 +1109,7 @@ mpz_poly_power_mod_f_mod_ui (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t 
 
   if (mpz_cmp_ui(a, 0) == 0) {
     Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
+    mpz_poly_setcoeff_si (Q, 0, 1);
     return;
   }
 
