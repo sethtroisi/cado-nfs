@@ -2746,20 +2746,20 @@ class NmbrthryTask(Task):
             match = re.match(r'nmaps (\d+)', line)
             if match:
                 update["nmaps"] = match.group(1)
-        self.state.update(update)
+        update["badinfofile"] = badinfofile.get_wdir_relative()
+        update["badfile"] = badfile.get_wdir_relative()
         
-        if not "ell" in self.state.keys():
+        if not "ell" in update:
             raise Exception("Stdout does not give ell")
-        if not "smexp" in self.state.keys():
+        if not "smexp" in update:
             raise Exception("Stdout does not give smexp")
-        if not "nmaps" in self.state.keys():
+        if not "nmaps" in update:
             raise Exception("Stdout does not give nmaps")
         if not badfile.isfile():
             raise Exception("Output file %s does not exist" % badfile)
         if not badinfofile.isfile():
             raise Exception("Output file %s does not exist" % badinfofile)
-        update = {"badinfofile": badinfofile.get_wdir_relative(), 
-                "badfile": badfile.get_wdir_relative()}
+        # Update the state entries atomically
         self.state.update(update)
 
         self.logger.info("Will computing Dlog modulo %s", self.state["ell"])

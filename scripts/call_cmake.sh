@@ -85,6 +85,8 @@ export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
 export DISABLE_SHARED
 export NO_PYTHON_CHECK
+export NO_SSE
+export NO_INLINE_ASSEMBLY
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"

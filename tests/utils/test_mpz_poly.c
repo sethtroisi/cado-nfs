@@ -161,6 +161,14 @@ test_mpz_poly_roots_mpz (unsigned long iter)
   ASSERT_ALWAYS(mpz_cmp_ui (r[0], 2) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui (r[1], 16) == 0);
 
+  /* 9*x^2 + 6*x + 3 mod 3 */
+  mpz_set_si (f[2], 9);
+  mpz_set_si (f[1], 6);
+  mpz_set_si (f[0], 3);
+  mpz_set_ui (p, 3);
+  n = mpz_poly_roots_mpz (r, f, 2, p);
+  ASSERT_ALWAYS(n == 0);
+
   /* try random polynomials */
   for (i = 0; i < iter; i++)
     {
@@ -190,6 +198,198 @@ test_mpz_poly_roots_mpz (unsigned long iter)
   mpz_clear (res);
 }
 
+/* also exercises mpz_poly_mul */
+void
+test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
+{
+  while (iter--)
+    {
+      mpz_poly_t Q, P, f;
+      mpz_t m, invm;
+      int k = 2 + (lrand48 () % 127);
+      int d = 1 + (lrand48 () % 7);
+
+      mpz_init (m);
+      do mpz_urandomb (m, state, k); while (mpz_tstbit (m, 0) == 0);
+      mpz_poly_init (f, d);
+      mpz_init (invm);
+      while (1)
+        {
+          mpz_poly_random (f, d, k);
+          if (f->deg < d)
+            continue;
+          mpz_gcd (invm, m, f->coeff[d]);
+          if (mpz_cmp_ui (invm, 1) == 0)
+            break;
+        }
+      barrett_init (invm, m);
+      mpz_poly_init (P, d - 1);
+      if (iter)
+        mpz_poly_random (P, d - 1, k);
+      else
+        P->deg = -1; /* P=0 */
+      mpz_poly_init (Q, d - 1);
+      mpz_poly_sqr_mod_f_mod_mpz (Q, P, f, m, invm);
+      if (iter == 0)
+        ASSERT_ALWAYS(Q->deg == -1);
+      mpz_poly_mul_mod_f_mod_mpz (Q, P, P, f, m, invm);
+      if (iter == 0)
+        ASSERT_ALWAYS(Q->deg == -1);
+      mpz_poly_clear (f);
+      mpz_poly_clear (P);
+      mpz_poly_clear (Q);
+      mpz_clear (m);
+      mpz_clear (invm);
+    }
+}
+
+/* Also exercises mpz_poly_getcoeff, mpz_poly_setcoeff_int64,
+   mpz_poly_setcoeff_si, mpz_poly_cmp, mpz_poly_eval,
+   mpz_poly_eval_mod_mpz_barrett and mpz_poly_eval_several_mod_mpz_barrett */
+void
+test_mpz_poly_fprintf (void)
+{
+  mpz_poly_t f, g;
+  mpz_t c, v[2], m, invm;
+  int res;
+  mpz_poly_srcptr F[2];
+  mpz_ptr V[2];
+
+  mpz_poly_init (f, 1);
+  mpz_poly_init (g, 1);
+  F[0] = f;
+  F[1] = g;
+  V[0] = (mpz_ptr) v[0];
+  V[1] = (mpz_ptr) v[1];
+  mpz_init (c);
+  mpz_init (v[0]);
+  mpz_init (v[1]);
+  mpz_init_set_ui (m, 11);
+  mpz_init (invm);
+
+  barrett_init (invm, m);
+
+  f->deg = -1;
+  mpz_poly_fprintf (stdout, f);
+  mpz_poly_getcoeff (c, 0, f);
+  ASSERT_ALWAYS (mpz_cmp_ui (c, 0) == 0);
+  mpz_set_ui (c, 17);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 0) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 0) == 0);
+
+  f->deg = 0;
+  mpz_set_ui (f->coeff[0], 17); /* f = 17 */
+  mpz_poly_fprintf (stdout, f);
+  mpz_set_ui (c, 42);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 17) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 6) == 0);
+
+  mpz_poly_setcoeff_int64 (f, 1, 42); /* f = 42*x+17 */
+  mpz_poly_fprintf (stdout, f);
+  mpz_set_ui (c, 1);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 59) == 0);
+  mpz_set_si (c, -1);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], -25) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 8) == 0);
+
+  mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2+42*x+17 */
+  mpz_poly_fprintf (stdout, f);
+
+  mpz_poly_copy (g, f);
+  res = mpz_poly_cmp (f, g);
+  ASSERT_ALWAYS (res == 0);
+  mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1); /* g = -2*x^2+42*x+17 */
+  res = mpz_poly_cmp (f, g);
+  ASSERT_ALWAYS (res != 0);
+  mpz_set_si (c, 3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 1, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 4) == 0);
+  mpz_poly_setcoeff_si (g, g->deg + 1, 1); /* g = x^3-2*x^2+42*x+17 */
+  res = mpz_poly_cmp (f, g);
+  ASSERT_ALWAYS (res != 0);
+  mpz_set_si (c, -3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 1, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 7) == 0);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 7) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 0) == 0);
+  /* test with one zero polynomial */
+  g->deg = -1;
+  mpz_set_si (c, 3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 0) == 0);
+
+  mpz_poly_clear (f);
+  mpz_poly_clear (g);
+  mpz_clear (c);
+  mpz_clear (v[0]);
+  mpz_clear (v[1]);
+  mpz_clear (m);
+  mpz_clear (invm);
+}
+
+void
+test_mpz_poly_div_2_mod_mpz (void)
+{
+  mpz_poly_t f;
+  mpz_t m;
+
+  mpz_init_set_ui (m, 17);
+  mpz_poly_init (f, -1);
+  mpz_poly_setcoeff_si (f, 0, 1);
+  mpz_poly_setcoeff_si (f, 1, -2);
+  mpz_poly_setcoeff_si (f, 2, -3);
+  mpz_poly_setcoeff_si (f, 3, 4);
+  mpz_poly_div_2_mod_mpz (f, f, m);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[0], 9) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[1], -1) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[2], 7) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[3], 2) == 0);
+  mpz_poly_clear (f);
+  mpz_clear (m);
+}
+
+void
+test_mpz_poly_derivative (void)
+{
+  mpz_poly_t f, df;
+
+  mpz_poly_init (f, -1);
+  mpz_poly_init (df, 1);
+
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == -1);
+
+  mpz_poly_setcoeff_si (f, 0, 17); /* f = 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == -1);
+
+  mpz_poly_setcoeff_si (f, 1, 42); /* f = 42*x + 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[0], 42) == 0);
+
+  mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2 + 42*x + 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == 1);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[0], 42) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[1], -6) == 0);
+
+  mpz_poly_clear (f);
+  mpz_poly_clear (df);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -198,6 +398,10 @@ main (int argc, const char *argv[])
   tests_common_get_iter(&iter);
   test_polymodF_mul ();
   test_mpz_poly_roots_mpz (iter);
-  tests_common_clear();
+  test_mpz_poly_sqr_mod_f_mod_mpz (iter);
+  test_mpz_poly_fprintf ();
+  test_mpz_poly_div_2_mod_mpz ();
+  test_mpz_poly_derivative ();
+  tests_common_clear ();
   exit (EXIT_SUCCESS);
 }

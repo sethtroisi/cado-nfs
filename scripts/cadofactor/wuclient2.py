@@ -549,22 +549,52 @@ def close_exclusive(fileobj):
     FileLock.unlock(fileobj)
     fileobj.close()
 
-def run_command(command, print_error=False):
+def run_command(command, print_error=True, **kwargs):
     """ Run command, wait for it to finish, return exit status, stdout
     and stderr
 
     If print_error is True and the command exits with an non-zero exit code,
-    print stdout and stderr to the log.
+    print stdout and stderr to the log. If a KeyboardInterrupt exception
+    occurs while waiting for the command to finish, the command is
+    terminated.
     """
-    logging.info ("Running %s",
-            command if isinstance(command, str) else " ".join(command))
+    
+    command_str = command if isinstance(command, str) else " ".join(command)
+    
+    logging.info ("Running %s", command_str)
     close_fds = os.name != "nt"
     child = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
-                             close_fds=close_fds)
-    (stdout, stderr) = child.communicate()
+                             close_fds=close_fds,
+                             **kwargs)
 
+    # If we receive SIGTERM (the default signal for "kill") while a
+    # subprocess is running, we want to be able to terminate the
+    # subprocess, too, so that the system is not kepy busy with
+    # orphaned processes.
+    # Python installs by default a signal handler for SIGINT which
+    # raises the KeyboardInterrupt exception. This is convenient, as
+    # it lets us simply terminate the child in an exception handler.
+    # Thus we install the signal handler of SIGINT for SIGTERM as well,
+    # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+
+    sigint_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGTERM , sigint_handler)  
+
+    # Wait for command to finish executing, capturing stdout and stderr 
+    # in output tuple
+    try:
+        (stdout, stderr) = child.communicate()
+    except KeyboardInterrupt:
+        logging.critical("KeyboardInterrupt received, killing child "
+                         "process with PID %d", child.pid)
+        child.terminate()
+        raise # Re-raise KeyboardInterrupt to terminate wuclient.py
+    
+    # Un-install our handler and revert to the default handler
+    signal.signal(signal.SIGTERM , signal.SIG_DFL)
+    
     if print_error and child.returncode != 0:
         logging.error("Command resulted in exit code %d", child.returncode)
         if stdout:
@@ -603,8 +633,6 @@ class WorkunitProcessor(object):
             else:
                 paths["EXECDIR"] = self.settings["DLDIR"]
             command = Template(command).safe_substitute(paths)
-            logging.info ("Running command for workunit %s: %s", 
-                          self.workunit.get_id(), command)
 
             # If niceness command line parameter was set, call self.renice() 
             # in child process, before executing command
@@ -613,52 +641,15 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
-            # Run the command
-            close_fds = os.name != "nt"
-            child = subprocess.Popen(command, shell=True, 
-                                     stdout = subprocess.PIPE, 
-                                     stderr = subprocess.PIPE, 
-                                     close_fds = close_fds,
-                                     preexec_fn = renice_func)
+            (returncode, stdout, stderr) = run_command(command, shell=True,
+                    preexec_fn=renice_func)
 
-            # If we receive SIGTERM (the default signal for "kill") while a
-            # subprocess is running, we want to be able to terminate the
-            # subprocess, too, so that the system is not kepy busy with
-            # orphaned processes.
-            # Python installs by default a signal handler for SIGINT which
-            # raises the KeyboardInterrupt exception. This is convenient, as
-            # it lets us simply terminate the child in an exception handler.
-            # Thus we install the signal handler of SIGINT for SIGTERM as well,
-            # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+            self.stdio["stdout"].append(stdout)
+            self.stdio["stderr"].append(stderr)
 
-            sigint_handler = signal.getsignal(signal.SIGINT)
-            signal.signal(signal.SIGTERM , sigint_handler)  
-
-            # Wait for command to finish executing, capturing stdout and stderr 
-            # in output tuple
-            try:
-                (child_stdout, child_stderr) = child.communicate()
-            except KeyboardInterrupt:
-                logging.critical("KeyboardInterrupt received, killing child "
-                                 "process with PID %d", child.pid)
-                child.terminate()
-                raise # Re-raise KeyboardInterrupt to terminate wuclient.py
-            
-            # Un-install our handler and revert to the default handler
-            signal.signal(signal.SIGTERM , signal.SIG_DFL)
-            
-            self.stdio["stdout"].append(child_stdout)
-            self.stdio["stderr"].append(child_stderr)
-
-            if child.returncode != 0:
-                logging.error ("Command exited with exit code %s", 
-                               child.returncode) 
-                if self.stdio["stdout"][-1]:
-                    logging.error ("Stdout: %s", self.stdio["stdout"][-1]) 
-                if self.stdio["stderr"][-1]:
-                    logging.error ("Stderr: %s", self.stdio["stderr"][-1]) 
+            if returncode != 0:
                 self.failedcommand = counter
-                self.errorcode = child.returncode
+                self.errorcode = returncode
                 return False
             else:
                 logging.debug ("Command exited successfully")
@@ -874,7 +865,7 @@ class WorkunitClient(object):
         silent_wait=self.settings["SILENT_WAIT"]
         waiting_since = 0
         while True:
-            (rc, stdout, stderr) = run_command (command, print_error=True)
+            (rc, stdout, stderr) = run_command (command)
             if rc == 0:
                 return True
             if waiting_since == 0 or not silent_wait:
@@ -1214,13 +1205,13 @@ def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
 
 def try_wget():
     try:
-        return run_command(["wget", "-V"], print_error=True)[0] == 0
+        return run_command(["wget", "-V"])[0] == 0
     except OSError:
         return False
 
 def try_curl():
     try:
-        (rc, stdout, stderr) = run_command(["curl", "-V"], print_error=True)
+        (rc, stdout, stderr) = run_command(["curl", "-V"])
     except OSError:
         return False
     if rc != 0:

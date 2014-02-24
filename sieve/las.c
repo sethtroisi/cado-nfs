@@ -3850,7 +3850,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "q0",   "left bound of special-q range");
   param_list_decl_usage(pl, "q1",   "right bound of special-q range");
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
-  param_list_decl_usage(pl, "v",    "(switch) verbose mode");
+  param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
   param_list_decl_usage(pl, "mt",   "number of threads to use");
   param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
