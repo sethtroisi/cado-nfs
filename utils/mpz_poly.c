@@ -781,14 +781,13 @@ void mpz_poly_div_2_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_t m)
 
   for (i = g->deg; i >= 0; --i)
     {
-      if (mpz_scan1 (g->coeff[i], 0) == 0)
+      if (mpz_scan1 (g->coeff[i], 0) == 0) /* g[i] is odd */
         {
           mpz_add (f->coeff[i], g->coeff[i], m);
           mpz_div_2exp (f->coeff[i], f->coeff[i], 1);
         }
       else
         mpz_div_2exp (f->coeff[i], g->coeff[i], 1);
-      mpz_mod (f->coeff[i], f->coeff[i], m);
     }
 }
 
@@ -818,6 +817,7 @@ void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
 void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m, const mpz_t mx) {
   int i, d;
+
   d = f->deg;
   if (d == -1) {
     mpz_set_ui(res, 0);

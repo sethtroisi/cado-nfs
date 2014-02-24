@@ -231,19 +231,27 @@ test_mpz_poly_sqr_mod_f_mod_mpz (unsigned long iter)
     }
 }
 
-/* also exercises mpz_poly_getcoeff, mpz_poly_setcoeff_int64,
-   mpz_poly_setcoeff_si, mpz_poly_cmp and mpz_poly_eval */
+/* Also exercises mpz_poly_getcoeff, mpz_poly_setcoeff_int64,
+   mpz_poly_setcoeff_si, mpz_poly_cmp, mpz_poly_eval,
+   mpz_poly_eval_mod_mpz_barrett and mpz_poly_eval_several_mod_mpz_barrett */
 void
 test_mpz_poly_fprintf (void)
 {
   mpz_poly_t f, g;
-  mpz_t c, v, m, invm;
+  mpz_t c, v[2], m, invm;
   int res;
+  mpz_poly_srcptr F[2];
+  mpz_ptr V[2];
 
   mpz_poly_init (f, 1);
   mpz_poly_init (g, 1);
+  F[0] = f;
+  F[1] = g;
+  V[0] = (mpz_ptr) v[0];
+  V[1] = (mpz_ptr) v[1];
   mpz_init (c);
-  mpz_init (v);
+  mpz_init (v[0]);
+  mpz_init (v[1]);
   mpz_init_set_ui (m, 11);
   mpz_init (invm);
 
@@ -254,48 +262,61 @@ test_mpz_poly_fprintf (void)
   mpz_poly_getcoeff (c, 0, f);
   ASSERT_ALWAYS (mpz_cmp_ui (c, 0) == 0);
   mpz_set_ui (c, 17);
-  mpz_poly_eval (v, f, c);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 0) == 0);
-  mpz_poly_eval_mod_mpz_barrett (v, f, c, m, invm);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 0) == 0);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 0) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 0) == 0);
 
   f->deg = 0;
   mpz_set_ui (f->coeff[0], 17); /* f = 17 */
   mpz_poly_fprintf (stdout, f);
   mpz_set_ui (c, 42);
-  mpz_poly_eval (v, f, c);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 17) == 0);
-  mpz_poly_eval_mod_mpz_barrett (v, f, c, m, invm);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 6) == 0);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 17) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 6) == 0);
 
   mpz_poly_setcoeff_int64 (f, 1, 42); /* f = 42*x+17 */
   mpz_poly_fprintf (stdout, f);
   mpz_set_ui (c, 1);
-  mpz_poly_eval (v, f, c);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 59) == 0);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 59) == 0);
   mpz_set_si (c, -1);
-  mpz_poly_eval (v, f, c);
-  ASSERT_ALWAYS (mpz_cmp_si (v, -25) == 0);
-  mpz_poly_eval_mod_mpz_barrett (v, f, c, m, invm);
-  ASSERT_ALWAYS (mpz_cmp_ui (v, 8) == 0);
+  mpz_poly_eval (v[0], f, c);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], -25) == 0);
+  mpz_poly_eval_mod_mpz_barrett (v[0], f, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_ui (v[0], 8) == 0);
 
-  mpz_poly_setcoeff_si (f, 2, -3);
+  mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2+42*x+17 */
   mpz_poly_fprintf (stdout, f);
 
   mpz_poly_copy (g, f);
   res = mpz_poly_cmp (f, g);
   ASSERT_ALWAYS (res == 0);
-  mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1);
+  mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1); /* g = -2*x^2+42*x+17 */
   res = mpz_poly_cmp (f, g);
   ASSERT_ALWAYS (res != 0);
-  mpz_poly_setcoeff_si (g, g->deg + 1, 1);
+  mpz_set_si (c, 3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 1, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 6) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 4) == 0);
+  mpz_poly_setcoeff_si (g, g->deg + 1, 1); /* g = x^3-2*x^2+42*x+17 */
   res = mpz_poly_cmp (f, g);
   ASSERT_ALWAYS (res != 0);
+  mpz_set_si (c, -3);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 1, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 7) == 0);
+  mpz_poly_eval_several_mod_mpz_barrett (V, F, 2, c, m, invm);
+  ASSERT_ALWAYS (mpz_cmp_si (v[0], 7) == 0);
+  ASSERT_ALWAYS (mpz_cmp_si (v[1], 0) == 0);
 
   mpz_poly_clear (f);
   mpz_poly_clear (g);
   mpz_clear (c);
-  mpz_clear (v);
+  mpz_clear (v[0]);
+  mpz_clear (v[1]);
   mpz_clear (m);
   mpz_clear (invm);
 }
@@ -314,7 +335,7 @@ test_mpz_poly_div_2_mod_mpz ()
   mpz_poly_setcoeff_si (f, 3, 4);
   mpz_poly_div_2_mod_mpz (f, f, m);
   ASSERT_ALWAYS(mpz_cmp_si (f->coeff[0], 9) == 0);
-  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[1], 16) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (f->coeff[1], -1) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (f->coeff[2], 7) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (f->coeff[3], 2) == 0);
   mpz_poly_clear (f);
