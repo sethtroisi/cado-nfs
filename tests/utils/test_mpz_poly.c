@@ -340,7 +340,7 @@ test_mpz_poly_fprintf (void)
 }
 
 void
-test_mpz_poly_div_2_mod_mpz ()
+test_mpz_poly_div_2_mod_mpz (void)
 {
   mpz_poly_t f;
   mpz_t m;
@@ -360,6 +360,36 @@ test_mpz_poly_div_2_mod_mpz ()
   mpz_clear (m);
 }
 
+void
+test_mpz_poly_derivative (void)
+{
+  mpz_poly_t f, df;
+
+  mpz_poly_init (f, -1);
+  mpz_poly_init (df, 1);
+
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == -1);
+
+  mpz_poly_setcoeff_si (f, 0, 17); /* f = 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == -1);
+
+  mpz_poly_setcoeff_si (f, 1, 42); /* f = 42*x + 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[0], 42) == 0);
+
+  mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2 + 42*x + 17 */
+  mpz_poly_derivative (df, f);
+  ASSERT_ALWAYS(df->deg == 1);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[0], 42) == 0);
+  ASSERT_ALWAYS(mpz_cmp_si (df->coeff[1], -6) == 0);
+
+  mpz_poly_clear (f);
+  mpz_poly_clear (df);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -371,6 +401,7 @@ main (int argc, const char *argv[])
   test_mpz_poly_sqr_mod_f_mod_mpz (iter);
   test_mpz_poly_fprintf ();
   test_mpz_poly_div_2_mod_mpz ();
+  test_mpz_poly_derivative ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
