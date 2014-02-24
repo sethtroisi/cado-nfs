@@ -41,5 +41,6 @@
 #include "cado_popen.h"
 #include "sm_utils.h"
 #include "memalloc.h"
+#include "mpz_vector.h"
 
 #endif	/* CADO_UTILS_H_ */
