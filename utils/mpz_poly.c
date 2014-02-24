@@ -938,14 +938,8 @@ mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t
     }
     /* we can directly set the leading coefficient to 1 */
     mpz_set_ui (Q->coeff[Q->deg], 1);
-  } else {
-    if (mpz_cmp_ui(aux, 0) == 0)
+  } else { /* i=-1, thus P is identically zero modulo m */
       Q->deg = -1;
-    else {
-      Q->deg = 0;
-      mpz_set_ui(aux, 1);
-      mpz_poly_setcoeff(Q, 0, aux);
-    }
   }
   mpz_clear(aux);
   mpz_clear(aux2);
@@ -1568,7 +1562,7 @@ static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
 int
 mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
 {
-  int nr;
+  int nr = 0;
   mpz_t tmp;
   mpz_poly_t mpz_poly_fp, mpz_poly_f, g, h;
 
@@ -1583,6 +1577,8 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
   /* reduce f to monic and modulo p */
   mpz_poly_set (mpz_poly_f, f, d);
   mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_fp, mpz_poly_f, p);
+  if (mpz_poly_fp->deg <= 0)
+    goto clear_and_exit;
   /* h=x^p-x (mod mpz_poly_fp) */
   mpz_set_ui (tmp, 1UL);
   mpz_poly_setcoeff (g, 1, tmp);
@@ -1601,6 +1597,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
     ASSERT (n == nr);
   }
 
+ clear_and_exit:
   mpz_poly_clear(mpz_poly_fp);
   mpz_poly_clear(mpz_poly_f);
   mpz_poly_clear(g);

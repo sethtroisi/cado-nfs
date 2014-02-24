@@ -161,6 +161,14 @@ test_mpz_poly_roots_mpz (unsigned long iter)
   ASSERT_ALWAYS(mpz_cmp_ui (r[0], 2) == 0);
   ASSERT_ALWAYS(mpz_cmp_ui (r[1], 16) == 0);
 
+  /* 9*x^2 + 6*x + 3 mod 3 */
+  mpz_set_si (f[2], 9);
+  mpz_set_si (f[1], 6);
+  mpz_set_si (f[0], 3);
+  mpz_set_ui (p, 3);
+  n = mpz_poly_roots_mpz (r, f, 2, p);
+  ASSERT_ALWAYS(n == 0);
+
   /* try random polynomials */
   for (i = 0; i < iter; i++)
     {
