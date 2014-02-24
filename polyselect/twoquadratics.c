@@ -7,13 +7,15 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
+#include "area.h"
+#include "murphyE.h"
 
 typedef struct {
   cado_poly poly;
   mpz_t m;
   mpz_t p;  // common root is m/p mod N
   mpz_t skew;
-  double note;
+  double E;
 } cado_poly_extended_s;
 
 typedef cado_poly_extended_s cado_poly_extended[1];
@@ -26,7 +28,7 @@ cado_poly_extended_init (cado_poly_extended poly)
   mpz_init (poly->m);
   mpz_init (poly->p);
   mpz_init (poly->skew);
-  poly->note = 0.0;
+  poly->E = 0.0;
 }
 
 void
@@ -36,12 +38,25 @@ cado_poly_extended_clear (cado_poly_extended poly)
   mpz_clear (poly->m);
   mpz_clear (poly->p);
   mpz_clear (poly->skew);
-  poly->note = 0.0;
+  poly->E = 0.0;
+}
+
+void
+cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, mpz_t m,
+                mpz_t p, mpz_t skew)
+{
+  mpz_poly_set (poly->pols[0], f->coeff, f->deg);
+  mpz_poly_set (poly->pols[1], g->coeff, g->deg);
+  mpz_set (poly->n, N);
+  poly->skew = mpz_get_d (skew);
+  mpz_invert (poly->m, p, N);
+  mpz_mul (poly->m, poly->m, m);
+  mpz_mod (poly->m, poly->m, N);
 }
 
 void
 cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
-                        mpz_t N, mpz_t m, mpz_t p, mpz_t skew, double note)
+                        mpz_t N, mpz_t m, mpz_t p, mpz_t skew, double E)
 {
   mpz_poly_set (poly->poly->pols[0], f->coeff, f->deg);
   mpz_poly_set (poly->poly->pols[1], g->coeff, g->deg);
@@ -54,19 +69,13 @@ cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
   mpz_set (poly->m, m);
   mpz_set (poly->p, p);
   mpz_set (poly->skew, skew);
-  poly->note = note;
-}
-
-void
-cado_poly_extended_set_note (cado_poly_extended poly, double note)
-{
-  poly->note = note;
+  poly->E = E;
 }
 
 double
-cado_poly_extended_get_note (cado_poly_extended poly)
+cado_poly_extended_get_E (cado_poly_extended poly)
 {
-  return poly->note;
+  return poly->E;
 }
 
 void
@@ -86,7 +95,7 @@ cado_poly_extended_print (FILE *out, cado_poly_extended poly, char *pre)
   fprintf(out, "%sf1 = ", pre);
   mpz_poly_fprintf (out, f1);
 
-  fprintf (out, "%snote = %e\n", pre, poly->note);
+  fprintf (out, "%sE = %e\n", pre, poly->E);
   fprintf (out, "%salpha_f0 = %.2f\n", pre, get_alpha (f0, ALPHA_BOUND));
   fprintf (out, "%salpha_f1 = %.2f\n", pre, get_alpha (f1, ALPHA_BOUND));
   gmp_fprintf (out, "%sskewness = %Zd\n", pre, poly->skew);
@@ -340,20 +349,6 @@ void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
 }
 
 
-// note := exp(alpha(f)) * exp(alpha(g)) * sqrt(exp(norm(f)) * exp(norm(g)))
-static inline double
-notation (mpz_poly_t f, mpz_poly_t g)
-{
-  double alphaf = get_alpha (f, ALPHA_BOUND);
-  double alphag = get_alpha (g, ALPHA_BOUND);
-  double skewness = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-  double normf = L2_lognorm (f, skewness);
-  double normg = L2_lognorm (g, skewness);
-  return exp(alphaf + alphag + (normf + normg)/2);
-}
-
-
-
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "N", "input number (default c59)");
@@ -363,6 +358,13 @@ static void declare_usage(param_list pl)
                                         "(default (1/6)^(1/4) * m^(1/2))");
   param_list_decl_usage(pl, "v", "verbose output (print all polynomials)");
   param_list_decl_usage(pl, "q", "quiet output (print only best polynomials)");
+  char str[200];
+  snprintf (str, 200, "sieving area (default %.2e)", AREA);
+  param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
+  param_list_decl_usage(pl, "Bf", str);
+  snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
+  param_list_decl_usage(pl, "Bg", str);
 }
 
 static void usage (const char *argv, param_list pl)
@@ -412,6 +414,12 @@ main (int argc, char *argv[])
     abort();
   }
 
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
   if (!param_list_parse_mpz(pl, "minP", minP))
     mpz_set_ui (minP, 2);
   if (!param_list_parse_mpz(pl, "maxP", maxP))
@@ -450,7 +458,11 @@ main (int argc, char *argv[])
     usage (argv0, pl);
   param_list_print_command_line (stdout, pl);
 
-  gmp_printf("### N = %Zd\n", N);
+  if (verbose >= 0)
+  {
+    gmp_printf("### N = %Zd\n", N);
+    printf("### Bf = %.1e , Bg = %.1e , area = %.1e\n", bound_f, bound_g, area);
+  }
 
 /* Given an integer N and bounds on P, tests all pairs of polynomials
    with P such that minP < P <= maxP and print the pair having the best
@@ -458,12 +470,13 @@ main (int argc, char *argv[])
    prime number P which gave it
  */
   cado_poly_extended best_poly, poly;
+  cado_poly cur_poly;
   mpz_t P, sqrtN, r, m, skew_used;
   mpz_poly_t f, g;
 
   cado_poly_extended_init (best_poly);
   cado_poly_extended_init (poly);
-  cado_poly_extended_set_note (best_poly, DBL_MAX);
+  cado_poly_init (cur_poly);
   mpz_init(P);
   mpz_init(sqrtN);
   mpz_init(r);
@@ -495,12 +508,13 @@ main (int argc, char *argv[])
         // m is the first integer >= sqrtN such that m = r (mod P)
         compute_m (m, sqrtN, r, P);
         MontgomeryTwoQuadratics (f, g, skew_used, N, P, m, max_skewness);
-        double note = notation (f, g);
-        if(note < cado_poly_extended_get_note(best_poly))
-          cado_poly_extended_set (best_poly, f, g, N, m, P, skew_used, note);
+        cado_poly_set2 (cur_poly, f, g, N, P, m, skew_used);
+        double E = MurphyE (cur_poly, bound_f, bound_g, area, MURPHY_K);
+        if(E > cado_poly_extended_get_E(best_poly))
+          cado_poly_extended_set (best_poly, f, g, N, m, P, skew_used, E);
         if (verbose >= 1)
         {
-          cado_poly_extended_set (poly, f, g, N, m, P, skew_used, note);
+          cado_poly_extended_set (poly, f, g, N, m, P, skew_used, E);
           cado_poly_extended_print (stdout, poly, "# ");
         }
       }
@@ -521,6 +535,7 @@ main (int argc, char *argv[])
   mpz_poly_clear (f);
   mpz_poly_clear (g);
 
+  cado_poly_clear (cur_poly);
   cado_poly_extended_clear (poly);
   cado_poly_extended_clear (best_poly);
   mpz_clear (N);
