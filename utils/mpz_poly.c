@@ -1255,9 +1255,10 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
    Q[0] = P[0]
    ...
    With all coefficients of P[i] smaller than p^(K[l-i]-K[l-(i-1)]).
-   Assume K[l]=1, K[l-1]=2, ..., K[i] = 2*K[i+1] or 2*K[i+1]-2.
+   Assume K[l]=1, K[l-1]=2, ..., K[i] = 2*K[i+1] or 2*K[i+1]-1.
    P0 = P[0] + p*P[1] + p^2*P[2] + ... + p^K[1]*P[l] < p^K[0]
    The end of the list is P[l+1]=0.
+   Assume l > 0.
 */
 mpz_poly_t*
 mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
@@ -1266,6 +1267,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
   int k, i, j;
   mpz_t *pk;
 
+  ASSERT_ALWAYS (l > 0);
   ASSERT_ALWAYS (K[l] == 1);
 
   /* initialize pk[i] = p^K[l-i] for 0 <= i < l */
