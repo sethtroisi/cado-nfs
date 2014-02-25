@@ -112,18 +112,6 @@ cado_poly_extended_print (FILE *out, cado_poly_extended poly, char *pre)
 
 
 
-/* return 0 if gcd(a, b) != 1, return non-zero if a and b are coprime */
-int
-mpz_coprime_p (mpz_t a, mpz_t b)
-{
-  mpz_t g;
-  mpz_init(g);
-  mpz_gcd (g, a, b);
-  int ret = mpz_cmp_ui (g, 1);
-  mpz_clear(g);
-  return (ret == 0) ? 1 : 0;
-}
-
 /* Set m to the nearest integer to m0, such that
    m = r mod P, i.e. find the integer in [m-p/2,m+p/2] which is congruent to
    r modulo P.
@@ -250,11 +238,12 @@ mpz_msqrt (mpz_t r, mpz_t N, mpz_t P)
    The geometric progression is [c0, c1, c2] = [ p, m, (m^2-N)/p ]
    We start with a = [m, -p, 0] and b = [(m*t-c2)/P, -t, 1]
       where t = c2/m mod P
-   We compute a reduced basis of the lattice spanned by a and b with the
-   Lagrange algorithm.
+   We then compute a reduced basis of the lattice spanned by a and b with the
+   Lagrange algorithm using the maximun possible skewness (bound by maxS or
+   default value if maxS == 0 or maxS > default value).
  */
 void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
-                              mpz_t P, mpz_t m, mpz_t max_skewness)
+                              mpz_t P, mpz_t m, mpz_t maxS)
 {
   ASSERT_ALWAYS (mpz_coprime_p(P, N));
 
@@ -264,12 +253,10 @@ void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
   mpz_vector_init (reduced_a, 3);
   mpz_vector_init (reduced_b, 3);
 
-  mpz_t tmp, c2, t, max_skew, min_skew;
+  mpz_t tmp, c2, t;
   mpz_init(tmp);
   mpz_init(c2);
   mpz_init(t);
-  mpz_init(max_skew);
-  mpz_init(min_skew);
 
   // compute c2
   mpz_mul (tmp, m, m);
@@ -298,41 +285,13 @@ void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
   mpz_vector_setcoordinate (b, 1, tmp); // b[1] = -t
   mpz_vector_setcoordinate_ui (b, 2, 1); // b[2] = 1
 
-  /* Find the maximun value of skew for which LagrangeAlgo returns 2 polynomials
-   * of degree 2. By taking skew <= default_max_skew, we already know that the
-   * first polynomial (the one corresponding to a) will have degree 2, so we
-   * just check that b[2] != 0.
-   */
-  mpz_set_ui (min_skew, 1);
-  compute_default_max_skew (max_skew, m);
-  // Overwrite the maximum default value if max_skewness argument is greater
-  // than 0 and lesser than default value
-  if (mpz_cmp_ui(max_skewness, 0) > 0 && mpz_cmp(max_skewness, max_skew) < 0)
-    mpz_set (max_skew, max_skewness);
-
-  mpz_set (skew, max_skew);
-
-  do
-  {
-    // Perform Lagrange algorithm a and b
-    mpz_vector_Lagrange (reduced_a, reduced_b, a, b, skew);
-
-    if (mpz_vector_is_coordinate_zero (reduced_b, 2))
-      mpz_set (max_skew, skew);
-    else
-    {
-      mpz_sub (tmp, max_skew, skew);
-      if (mpz_cmp_ui (tmp, 1) == 0)
-      {
-        mpz_set (min_skew, skew);
-        mpz_set (max_skew, skew);
-      }
-      else
-        mpz_set (min_skew, skew);
-    }
-    mpz_add (skew, min_skew, max_skew);
-    mpz_tdiv_q_2exp (skew, skew, 1);
-  } while (mpz_cmp(min_skew, max_skew) < 0); // min_skew < max_skew
+  compute_default_max_skew (tmp, m);
+  /* Use maxS value if maxS argument is greater than 0 and lesser than default
+     value */
+  if (mpz_cmp_ui(maxS, 0) > 0 && mpz_cmp(maxS, tmp) < 0)
+    mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, maxS, 2);
+  else /* else call with the default maximum value */
+    mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, tmp, 2);
 
   mpz_vector_get_mpz_poly(f, reduced_a);
   mpz_vector_get_mpz_poly(g, reduced_b);
@@ -340,8 +299,6 @@ void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
   mpz_clear(tmp);
   mpz_clear(c2);
   mpz_clear(t);
-  mpz_clear(max_skew);
-  mpz_clear(min_skew);
   mpz_vector_clear (a);
   mpz_vector_clear (b);
   mpz_vector_clear (reduced_a);

@@ -63,6 +63,13 @@ mpz_vector_setcoordinate_ui (mpz_vector_t v, unsigned int i, unsigned int z)
   mpz_set_ui (v->c[i], z);
 }
 
+void
+mpz_vector_setcoordinate_uint64 (mpz_vector_t v, unsigned int i, uint64_t z)
+{
+  ASSERT_ALWAYS (i < v->dim);
+  mpz_set_uint64 (v->c[i], z);
+}
+
 int
 mpz_vector_is_coordinate_zero (mpz_vector_t v, unsigned int i)
 {
@@ -196,3 +203,52 @@ mpz_vector_Lagrange (mpz_vector_t a, mpz_vector_t b,
 }
 
 
+/* Find the maximun value of skewness for which mpz_vector_Lagrange returns 2
+  vectors with non-zero d-th coordinates (i.e. 2 corresponding polynomials of
+  degree d). This function assume:
+    - that it exists S such that for skew <= S, the two vectors have non-zero
+      d-th coordinates and for skew > S, this no more the case.
+    - that for skew < max_skewness, the smallest vector (reduced_a) has always
+      non-zero d-th coordinate (the functions compute_default_max_skew in
+      twoquadratics and twocubics should ensure that). So we only check
+      reduced_b[d] != 0
+
+  Output: reduced_a, reduced_b and skew_used.
+  Input: a, b, max_skewness and d.
+*/
+
+void
+mpz_vector_reduce_with_max_skew (mpz_vector_t reduced_a, mpz_vector_t reduced_b,
+                                 mpz_t skew_used, mpz_vector_t a,
+                                 mpz_vector_t b, mpz_t max_skewness, int d)
+{
+  mpz_t max_skew, min_skew, tmp;
+
+  mpz_init_set (max_skew, max_skewness);
+  mpz_init_set_ui (min_skew, 1);
+  mpz_init (tmp);
+
+  mpz_set (skew_used, max_skew);
+
+  do
+  {
+    // Perform Lagrange algorithm a and b
+    mpz_vector_Lagrange (reduced_a, reduced_b, a, b, skew_used);
+
+    if (mpz_vector_is_coordinate_zero (reduced_b, d))
+      mpz_set (max_skew, skew_used);
+    else
+    {
+      mpz_set (min_skew, skew_used);
+      mpz_sub (tmp, max_skew, min_skew);
+      if (mpz_cmp_ui (tmp, 1) == 0) /* if max_skew - min_skew == 1, then stop */
+        mpz_set (max_skew, skew_used);
+    }
+    mpz_add (skew_used, min_skew, max_skew);
+    mpz_tdiv_q_2exp (skew_used, skew_used, 1);
+  } while (mpz_cmp(min_skew, max_skew) < 0); // min_skew < max_skew
+
+  mpz_clear (max_skew);
+  mpz_clear (min_skew);
+  mpz_clear (tmp);
+}

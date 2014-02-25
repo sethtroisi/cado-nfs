@@ -21,6 +21,7 @@ void mpz_vector_swap (mpz_vector_t, mpz_vector_t);
 void mpz_vector_set (mpz_vector_t, mpz_vector_t);
 void mpz_vector_setcoordinate (mpz_vector_t, unsigned int, mpz_t);
 void mpz_vector_setcoordinate_ui (mpz_vector_t, unsigned int, unsigned int);
+void mpz_vector_setcoordinate_uint64 (mpz_vector_t, unsigned int, uint64_t);
 int mpz_vector_is_coordinate_zero (mpz_vector_t, unsigned int);
 
 /* Implementation of dot product and norm (skew and non-skew version) */
@@ -38,6 +39,8 @@ void mpz_vector_submul (mpz_vector_t r, mpz_t q, mpz_vector_t v);
 /* Lagrange algo to reduce lattice of rank 2 */
 void mpz_vector_Lagrange (mpz_vector_t, mpz_vector_t,
                           mpz_vector_t, mpz_vector_t, mpz_t);
+void mpz_vector_reduce_with_max_skew (mpz_vector_t, mpz_vector_t, mpz_t,
+                                      mpz_vector_t, mpz_vector_t, mpz_t, int);
 
 #ifdef __cplusplus
 }

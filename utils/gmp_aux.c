@@ -252,3 +252,15 @@ mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
   mpz_ndiv_qr (q, r, n, d);
   mpz_clear (r);
 }
+
+/* Return non-zero if a and b are coprime, else return 0 if gcd(a, b) != 1 */
+int
+mpz_coprime_p (mpz_t a, mpz_t b)
+{
+  mpz_t g;
+  mpz_init(g);
+  mpz_gcd (g, a, b);
+  int ret = mpz_cmp_ui (g, 1);
+  mpz_clear(g);
+  return (ret == 0) ? 1 : 0;
+}
