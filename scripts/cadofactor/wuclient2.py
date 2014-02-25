@@ -561,8 +561,20 @@ def run_command(command, print_error=True, **kwargs):
     
     command_str = command if isinstance(command, str) else " ".join(command)
     
+    if os.name == "nt":
+        # We need to call bash explicitly as the WU COMMAND assumes POSIX
+        # syntax which the Windows command line shell does not implement.
+        # Turn command into an array so that "bash -c" gets the WU command
+        # as a single parameter, i.e., we defer propery quoting command_str
+        # to to the subprocess module.
+        command = ["bash",  "-c", command_str]
+        command_str = " ".join(command)
+        close_fds = False
+    else:
+        close_fds = True
+
     logging.info ("Running %s", command_str)
-    close_fds = os.name != "nt"
+
     child = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
