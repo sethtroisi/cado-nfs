@@ -486,6 +486,46 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   mpz_poly_clear (f);
 }
 
+void
+test_barrett_mod (unsigned long iter)
+{
+  mpz_t m, invm, a, b, c;
+  unsigned long k;
+
+  mpz_init (m);
+  mpz_init (invm);
+  mpz_init (a);
+  mpz_init (b);
+  mpz_init (c);
+  while (iter--)
+    {
+      k = 2 + (lrand48 () % 128);
+      do mpz_urandomb (m, state, k); while (mpz_sizeinbase (m, 2) < k);
+      mpz_setbit (m, 0); /* make m odd */
+      barrett_init (invm, m);
+
+      mpz_urandomb (a, state, 2 * k);
+      barrett_mod (b, a, m, invm);
+      mpz_mod (c, a, m);
+      ASSERT_ALWAYS (mpz_cmp (b, c) == 0);
+
+      mpz_urandomb (a, state, 3 * k);
+      barrett_mod (b, a, m, invm);
+      mpz_mod (c, a, m);
+      ASSERT_ALWAYS (mpz_cmp (b, c) == 0);
+
+      mpz_urandomb (a, state, 4 * k);
+      barrett_mod (b, a, m, invm);
+      mpz_mod (c, a, m);
+      ASSERT_ALWAYS (mpz_cmp (b, c) == 0);
+    }
+  mpz_clear (m);
+  mpz_clear (invm);
+  mpz_clear (a);
+  mpz_clear (b);
+  mpz_clear (c);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -499,6 +539,7 @@ main (int argc, const char *argv[])
   test_mpz_poly_div_2_mod_mpz ();
   test_mpz_poly_derivative ();
   test_mpz_poly_power_mod_f_mod_ui ();
+  test_barrett_mod (iter);
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
