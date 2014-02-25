@@ -2284,7 +2284,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "alim": int, "rlim": int})
+            {"dlp": False, "alim": int, "rlim": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2317,9 +2317,10 @@ class PurgeTask(Task):
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
-        purgedfile = self.workdir.make_filename("purged.gz")
+        use_gz = ".gz" if self.params["gzip"] else ""
+        purgedfile = self.workdir.make_filename("purged" + use_gz)
         if self.params["dlp"]:
-            relsdelfile = self.workdir.make_filename("relsdel.gz")
+            relsdelfile = self.workdir.make_filename("relsdel" + use_gz)
         else:
             relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
