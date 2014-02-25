@@ -937,7 +937,7 @@ mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t
       mpz_poly_setcoeff(Q, i, aux);
     }
     /* we can directly set the leading coefficient to 1 */
-    mpz_set_ui (Q->coeff[Q->deg], 1);
+    mpz_poly_setcoeff_si (Q, Q->deg, 1);
   } else { /* i=-1, thus P is identically zero modulo m */
       Q->deg = -1;
   }
@@ -1137,7 +1137,7 @@ mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t
 
   if (mpz_cmp_ui(a, 0) == 0) {
     Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
+    mpz_poly_setcoeff_si (Q, 0, 1);
     return;
   }
 
@@ -1224,7 +1224,7 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
 
   if (mpz_cmp_ui(a, 0) == 0) {
     Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
+    mpz_poly_setcoeff_si (Q, 0, 1);
     return;
   }
 
