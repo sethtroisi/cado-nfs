@@ -252,9 +252,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%" PRId64 ") (%lu,%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%lu,%lld) (%lu,%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
 
@@ -593,11 +594,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
 #endif
@@ -635,9 +636,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%" PRIu32 ",%" PRId64 ") (%" PRIu32 ",%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%" PRIu32 ",%lld) (%" PRIu32 ",%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
   mpz_init (tmp);
@@ -974,11 +976,11 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
-                    logmu, ad, l, m, logmu0c3, logmu0c4);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
 #endif
