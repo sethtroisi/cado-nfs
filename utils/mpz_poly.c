@@ -1087,15 +1087,10 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
    Assumes df has been initialized with degree at least f->deg-1. */
 void mpz_poly_derivative(mpz_poly_t df, const mpz_poly_t f) {
   int n;
-  if (f->deg <= 0)
-    {
-      df->deg = -1;
-      return;
-    }
-  // at this point, f->deg >=1
-  df->deg = f->deg-1;
-  for(n=0; n<=f->deg-1; n++)
-    mpz_mul_si(df->coeff[n],f->coeff[n+1],n+1);
+
+  df->deg = (f->deg <= 0) ? -1 : f->deg - 1;
+  for (n = 0; n <= f->deg - 1; n++)
+    mpz_mul_si (df->coeff[n], f->coeff[n + 1], n + 1);
 }
 
 /* Q = P^a mod f, mod p (f is the algebraic polynomial, non monic) */
