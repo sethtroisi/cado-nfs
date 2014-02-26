@@ -16,11 +16,7 @@ alloc_long_array (int d)
   residueul_t *f;
 
   f = (residueul_t*) malloc (d * sizeof (residueul_t));
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, not enough memory\n");
-      exit (1);
-    }
+  FATAL_ERROR_CHECK (f == NULL, "not enough memory");
   return f;
 }
 
@@ -29,11 +25,7 @@ static residueul_t*
 realloc_long_array (residueul_t *f, int d)
 {
   f = (residueul_t*) realloc (f, d * sizeof (residueul_t));
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, not enough memory\n");
-      exit (1);
-    }
+  FATAL_ERROR_CHECK (f == NULL, "not enough memory");
   return f;
 }
 
@@ -151,7 +143,7 @@ modul_poly_swap (modul_poly_t f, modul_poly_t g)
 }
 
 /* h <- f*g mod p */
-void
+static void
 modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modulusul_t p) {
   int df = f->degree;
   int dg = g->degree;
@@ -402,7 +394,7 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 }
 
 /* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
-void
+static void
 modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul_t a,
 		     unsigned long e, modulusul_t p)
 {
@@ -459,7 +451,7 @@ modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
    Assumes p is odd, and deg(f) >= 1.
 */
 int
-modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int depth)
+modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   residueul_t a;
   modul_poly_t q, h, ff;
@@ -493,11 +485,11 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int
       ASSERT (dq >= 0);
       if (0 < dq && dq < d)
 	{
-	  n = modul_poly_cantor_zassenhaus (r, q, p, depth + 1);
+	  n = modul_poly_cantor_zassenhaus (r, q, p);
 	  ASSERT (n == dq);
 	  modul_poly_set (ff, f, p); /* modul_poly_divexact clobbers its 2nd arg */
 	  modul_poly_divexact (h, ff, q, p);
-	  m = modul_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
+	  m = modul_poly_cantor_zassenhaus (r + n, h, p);
 	  ASSERT (m == h->degree);
 	  n += m;
           break;
@@ -605,7 +597,7 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
    */
   if (r != NULL && df > 0)
     {
-      int n MAYBE_UNUSED = modul_poly_cantor_zassenhaus (r, fp, p, 0);
+      int n MAYBE_UNUSED = modul_poly_cantor_zassenhaus (r, fp, p);
       ASSERT (n == df);
     }
 
@@ -628,7 +620,8 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
     residueul_t * pr;
     int i, n;
 
-    pr = malloc(d * sizeof(residueul_t));
+    pr = malloc (d * sizeof(residueul_t));
+    FATAL_ERROR_CHECK (pr == NULL, "not enough memory");
     n = modul_poly_roots(pr,f,d,p);
     for(i = 0 ; i < n ; i++) {
         r[i] = modul_getmod_ul (pr[i]);

@@ -242,9 +242,9 @@ void mpz_poly_init(mpz_poly_t f, int d) {
     int i;
     f->alloc = d+1;
     f->coeff = (mpz_t *) malloc ((d+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
+    FATAL_ERROR_CHECK (f->coeff == NULL, "not enough memory");
     for (i = 0; i <= d; ++i)
-      mpz_init(f->coeff[i]);
+      mpz_init (f->coeff[i]);
   }
 }
 
@@ -421,10 +421,8 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
-    if (i <= h->deg) {
-      //ASSERT_ALWAYS(h->alloc >= h->deg+1);
-      mpz_add(z, z, h->coeff[i]);
-    }
+    if (i <= h->deg)
+      mpz_add (z, z, h->coeff[i]);
     mpz_poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
@@ -1262,6 +1260,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
 
   /* initialize pk[i] = p^K[l-i] for 0 <= i < l */
   pk = (mpz_t*) malloc (l * sizeof (mpz_t));
+  FATAL_ERROR_CHECK (pk == NULL, "not enough memory");
   mpz_init_set_ui (pk[0], p);
   for (i = 1; i < l; i++)
   {
@@ -1280,6 +1279,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
      ..., P[l] for p^K[1], and one for the end of list,
      thus l+2 polynomials */
   P = (mpz_poly_t*) malloc ((l + 2) * sizeof(mpz_poly_t));
+  FATAL_ERROR_CHECK (P == NULL, "not enough memory");
   for (i = 0; i < l + 2; i++)
     mpz_poly_init (P[i], P0->deg);
   /* P[l+1] is initialized to 0 by mpz_poly_init */
@@ -1618,6 +1618,7 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
   mpz_poly_set_deg(Fij, d);
 
   g = malloc ((d + 1) * sizeof (mpz_t));
+  FATAL_ERROR_CHECK (g == NULL, "not enough memory");
   for (k = 0; k <= d; k++)
     mpz_init (g[k]);
   mpz_init (f0);
