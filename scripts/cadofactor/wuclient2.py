@@ -553,7 +553,7 @@ def run_command(command, print_error=True, **kwargs):
     """ Run command, wait for it to finish, return exit status, stdout
     and stderr
 
-    If print_error is True and the command exits with an non-zero exit code,
+    If print_error is True and the command exits with a non-zero exit code,
     print stdout and stderr to the log. If a KeyboardInterrupt exception
     occurs while waiting for the command to finish, the command is
     terminated.
