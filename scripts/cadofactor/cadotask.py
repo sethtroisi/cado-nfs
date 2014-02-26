@@ -3484,6 +3484,20 @@ class StartClientsTask(Task):
         (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
+    def _add_cid(self, clientid, pid, host):
+        """ Add a client id atomically to both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.update({clientid: pid}, commit=False)
+        self.hosts.update({clientid: host}, commit=True)
+
+    def _del_cid(self, clientid):
+        """ Remove a client id atomically from both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.clear([clientid], commit=False)
+        self.hosts.clear([clientid], commit=True)
+    
     def launch_clients(self, server, certsha1=None):
         for host in self.hosts_to_launch:
             self.launch_one_client(host.strip(), server, certsha1=certsha1)
@@ -3504,8 +3518,7 @@ class StartClientsTask(Task):
                                  "launched this time, seems to have died. "
                                  "I'll forget about this client.",
                                  cid, self.hosts[cid], self.pids[cid])
-                del(self.hosts[cid])
-                del(self.pids[cid])
+                self._del_cid(cid)
     
     def make_unique_id(self, host):
         # Make a unique client id for host
@@ -3539,8 +3552,7 @@ class StartClientsTask(Task):
             else:
                 self.logger.info("Client %s on host %s with PID %d seems to have died",
                                  clientid, host, self.pids[clientid])
-                self.pids.clear([clientid], commit=False)
-                self.hosts.clear([clientid], commit=True)
+                self._del_cid(clientid)
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
         wuclient = cadoprograms.WuClient(server=server,
@@ -3570,8 +3582,7 @@ class StartClientsTask(Task):
                 self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         self.used_ids[clientid] = True
-        self.pids[clientid] = int(match.group(1))
-        self.hosts[clientid] = host
+        self._add_cid(clientid, int(match.group(1)), host)
 
     def kill_all_clients(self):
         # Need the list() to make a copy as dict will change in loop body
@@ -3580,8 +3591,7 @@ class StartClientsTask(Task):
             if rc == 0:
                 self.logger.info("Stopped client %s (Host %s, PID %d)",
                                  clientid, self.hosts[clientid], self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
             else:
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
@@ -3591,8 +3601,7 @@ class StartClientsTask(Task):
                     self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
                 # Assume that the client is already dead and remove it from
                 # the list of running clients
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
     
     def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]
