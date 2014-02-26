@@ -412,8 +412,9 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
 #define FILL_OTHER_LINES do {						\
     if (LIKELY(p > 1)) {						\
       unsigned char *mS = S + Idiv2;					\
+      unsigned int k = p - 1;						\
       S -= Idiv2;							\
-      for (unsigned int k = p; --k > 0; mS += I) aligned_medium_memcpy (mS, S, I); \
+      do { aligned_medium_memcpy (mS, S, I); mS += I; } while (--k);	\
       S = mS + Idiv2; j += p;						\
     }									\
     else { S += I; j++; }						\
@@ -736,8 +737,9 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
 
   /* Initialisation of the double data for the non SSE version. */
 #define ALG_INIT_SCALE_ADD_ONE						\
-  const double one MAYBE_UNUSED = 1., add;				\
-  scale *= (1./0x100000); add = ((double) 0x3FF00000) - GUARD / scale
+  const double one MAYBE_UNUSED = 1.;					\
+  scale *= (1./0x100000);						\
+  const double add = ((double) 0x3FF00000) - GUARD / scale
 	
   /* This function is only a big switch in fact */
   switch (d) {
