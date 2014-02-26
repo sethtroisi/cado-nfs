@@ -3422,7 +3422,7 @@ class StartClientsTask(Task):
         return (cadoprograms.WuClient,)
     @property
     def paramnames(self):
-        return {'hostnames': str, 'scriptpath': None, "nrclients": 1, "run": True}
+        return {'hostnames': str, 'scriptpath': None, "nrclients": None, "run": True}
     @property
     def param_nodename(self):
         return None
@@ -3454,7 +3454,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    self.params["nrclients"])
+                    int(self.params["nrclients"]))
 
     @staticmethod
     def make_multiplicity(names, multi):
