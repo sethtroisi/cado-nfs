@@ -1491,8 +1491,8 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
   {
     /* q=x+a */
     mpz_set_ui (aux, 1);
-    mpz_poly_setcoeff(q, 1, aux);
-    mpz_poly_setcoeff(q, 0, a);
+    mpz_poly_setcoeff (q, 1, aux);
+    mpz_poly_setcoeff (q, 0, a);
 
     /* h=(x+a)^((p-1)/2) mod (f, p) */
     mpz_sub_ui (aux, p, 1);
@@ -1501,7 +1501,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
     mpz_poly_sub_ui (h, 1);
 
     /* q = gcd(f,h) */
-    mpz_poly_copy(q, f);
+    mpz_poly_copy (q, f);
     mpz_poly_gcd_mpz (q, h, p);
     dq = q->deg;
     ASSERT (dq >= 0);
@@ -1521,9 +1521,8 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
       break;
     }
 
-    mpz_add_ui (a, a, 1);
-    if (mpz_cmp (a, p) > 0)
-      mpz_sub (a, a, p);
+    mpz_add_ui (a, a, 1); /* no need to reduce mod p, since it will be done
+                             in mpz_poly_power_mod_f_mod_mpz */
   }
 
   mpz_poly_clear (q);
