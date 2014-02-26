@@ -413,8 +413,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
     if (LIKELY(p > 1)) {						\
       unsigned char *mS = S + Idiv2;					\
       S -= Idiv2;							\
-      for (unsigned int k = 1; k < p; k++, mS += I)			\
-	memcpy (mS, S, I);						\
+      for (unsigned int k = p; --k > 0; mS += I) aligned_medium_memcpy (mS, S, I); \
       S = mS + Idiv2; j += p;						\
     }									\
     else { S += I; j++; }						\
