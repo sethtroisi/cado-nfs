@@ -1539,9 +1539,7 @@ clear_a:
 typedef int (*sortfunc_t) (const void *, const void *);
 
 static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
-  if (mpz_cmp(*a, *b) < 0) return -1;
-  if (mpz_cmp(*a, *b) > 0) return 1;
-  return 0;
+  return mpz_cmp(*a, *b) < 0 ? -1 : 1;
 }
 
 /* Solve f(x)=0 (mod p), where p is a prime. Return the number of roots.
