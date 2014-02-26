@@ -3539,8 +3539,8 @@ class StartClientsTask(Task):
             else:
                 self.logger.info("Client %s on host %s with PID %d seems to have died",
                                  clientid, host, self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self.pids.clear([clientid], commit=False)
+                self.hosts.clear([clientid], commit=True)
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
         wuclient = cadoprograms.WuClient(server=server,
