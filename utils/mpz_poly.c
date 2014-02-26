@@ -547,18 +547,8 @@ mpz_poly_mul (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     size_t sg, sh, s;
     mpz_init (G);
     mpz_init (H);
-    for (sg = 0, i = 0; i <= g->deg; i++)
-    {
-      s = mpz_sizeinbase (g->coeff[i], 2);
-      if (s > sg)
-        sg = s;
-    }
-    for (sh = 0, i = 0; i <= h->deg; i++)
-    {
-      s = mpz_sizeinbase (h->coeff[i], 2);
-      if (s > sh)
-        sh = s;
-    }
+    sg = mpz_poly_sizeinbase (g, g->deg, 2);
+    sh = mpz_poly_sizeinbase (h, h->deg, 2);
     /* the +1 accounts for a possible sign */
     for (s = sg + sh + 1, i = h->deg; i > 1; i = (i + 1) / 2, s++);
     mpz_set (G, g->coeff[g->deg]);
@@ -1356,6 +1346,7 @@ mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
   size_t S = 0, s;
   int i;
 
+  ASSERT_ALWAYS(d < f->alloc);
   for (i = 0; i <= d; i++)
   {
     s = mpz_sizeinbase (f->coeff[i], b);

@@ -558,12 +558,14 @@ test_barrett_mod (unsigned long iter)
   mpz_clear (c);
 }
 
+/* also test mpz_poly_base_modp_lift and mpz_poly_sizeinbase */
 void
 test_mpz_poly_base_modp_init (unsigned long iter)
 {
   int p, l, k, K[32], d, i;
   mpz_poly_t f, *P, g;
   mpz_t pk;
+  size_t s;
 
   mpz_poly_init (f, -1);
   mpz_poly_init (g, -1);
@@ -579,13 +581,15 @@ test_mpz_poly_base_modp_init (unsigned long iter)
       for (K[0] = k, l = 0; K[l] > 1; K[l+1] = (K[l] + 1) >> 1, l++);
       d = lrand48 () % 10;
       mpz_poly_random (f, d, (1 + (lrand48 () % 9)) * k);
+      s = mpz_poly_sizeinbase (f, d, 2);
+      for (i = 0; i <= d; i++)
+        ASSERT_ALWAYS(mpz_sizeinbase (f->coeff[i], 2) <= s);
       P = mpz_poly_base_modp_init (f, p, K, l);
       /* check f = P[0] + p^K[l]*P[1] + p^K[l-1]*P[2] + ... + p^K[1]*P[l] */
       for (i = 1; i <= l; i++)
         {
           mpz_ui_pow_ui (pk, p, K[l + 1 - i]);
-          mpz_poly_mul_mpz (P[i], P[i], pk);
-          mpz_poly_add (P[0], P[0], P[i]);
+          mpz_poly_base_modp_lift (P[0], P, i, pk);
         }
       ASSERT_ALWAYS(mpz_poly_cmp (f, P[0]) == 0);
       mpz_poly_base_modp_clear (P);
