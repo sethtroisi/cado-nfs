@@ -2361,7 +2361,7 @@ class PurgeTask(Task):
             update = {"purgedfile": purgedfile.get_wdir_relative(),
                       "input_nrels": input_nrels }
             if self.params["dlp"]:
-                to_update["relsdelfile"] = relsdelfile.get_wdir_relative()
+                update["relsdelfile"] = relsdelfile.get_wdir_relative()
             self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
