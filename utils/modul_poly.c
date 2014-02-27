@@ -77,7 +77,7 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
   int d = f->degree, i;
   residueul_t ilc;
 
-  if (modul_is1(f->coeff[d],p))
+  if (d < 0 || modul_is1 (f->coeff[d], p))
     return;
 
   modul_inv(ilc, f->coeff[d], p);
@@ -246,18 +246,18 @@ modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulusul_t p)
   modul_poly_normalize (h, p);
 }
 
-/* h <- g - 1 mod p */
-void
+/* h <- g - 1 mod p. Since g is (x+a)^((p-1)/2) mod (f,p), it cannot be 0,
+   since f is assumed to be squarefree (mod p). */
+static void
 modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, d = g->degree;
 
+  ASSERT_ALWAYS (d >= 0);
   /* g-1 has degree d if d >= 1, and degree 0 otherwise */
   modul_poly_realloc (h, ((d < 1) ? 0 : d) + 1);
   for (i = 0; i <= d; i++)
     modul_set(h->coeff[i], g->coeff[i], p);
-  for (i = d + 1; i <= 0; i++)
-    modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[0], h->coeff[0], 1, p);
   h->degree = (d < 0) ? 0 : d;
   modul_poly_normalize (h, p);
@@ -503,13 +503,11 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-int coeff_cmp(
+static int coeff_cmp(
         const unsigned long * a,
         const unsigned long * b)
 {
-    if (*a < *b) return -1;
-    if (*b < *a) return 1;
-    return 0;
+  return (*a < *b) ? -1 : 1;
 }
 
 #define ROOTS_MOD_THRESHOLD  43 /* if only the number of roots is needed */
@@ -617,6 +615,7 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
     residueul_t * pr;
     int i, n;
 
+    ASSERT_ALWAYS(d > 0);
     pr = malloc (d * sizeof(residueul_t));
     FATAL_ERROR_CHECK (pr == NULL, "not enough memory");
     n = modul_poly_roots(pr,f,d,p);
@@ -638,10 +637,8 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
   modul_poly_make_monic (fp, p);
   d = fp->degree;
 
-  if (d == 0)
-    return 1;
-
-  ASSERT (d > 0);
+  if (d <= 0)
+    return 1; /* we consider the zero polynomial is irreducible */
 
   modul_poly_init (g, 2 * d - 1);
   modul_poly_init (gmx, 2 * d - 1);
