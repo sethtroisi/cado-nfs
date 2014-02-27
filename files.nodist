@@ -42,6 +42,8 @@ polyselect/rotate.c
 polyselect/rotate_all.c
 polyselect/sopt.c
 polyselect/twoquadratics.c
+polyselect/twocubics.c
+polyselect/twocubics.h
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
