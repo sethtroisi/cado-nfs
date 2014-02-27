@@ -749,3 +749,4 @@ ComputeUnitsFromWrapper := procedure(polyfile,relsdir,purged,index,ficunits)
 end procedure;
 
 ComputeUnitsFromWrapper(polyfile,relsdir,purged,index,ficunits);
+exit;
