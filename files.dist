@@ -1004,3 +1004,4 @@ scripts/linalg.mag
 scripts/magma-linalg-wrapper.sh
 scripts/magma-nmbrthry-wrapper.sh
 filter/filter_badideals.c
+scripts/magma-sm-wrapper.sh

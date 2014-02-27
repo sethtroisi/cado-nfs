@@ -91,6 +91,17 @@ test_modul_poly_roots_ulong (unsigned long iter)
 
   for (i = 0; i <= MAXDEGREE; i++)
     mpz_init (f[i]);
+
+  /* hard-coded examples */
+  mpz_set_ui (f[0], 0);
+  mpz_set_ui (f[1], 0);
+  mpz_set_ui (f[2], 1);
+  d = 2;
+  modul_initmod_ul (p, 113);
+  n = modul_poly_roots_ulong (r, f, d, p);
+  ASSERT_ALWAYS(n == 1 && r[0] == 0);
+  modul_clearmod (p);
+
   while (iter--)
     {
       d = 1 + lrand48 () % (MAXDEGREE - 1);
