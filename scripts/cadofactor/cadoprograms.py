@@ -811,9 +811,9 @@ class BWC(Program):
         super().__init__(locals(), **kwargs)
 
 class SM(Program):
-    binary = "sm"
+    binary = "magma-sm-wrapper.sh"
     name = binary
-    subdir = "filter"
+    subdir = "scripts"
     def __init__(self, *,
                  poly: Parameter(),
                  purged: Parameter(),

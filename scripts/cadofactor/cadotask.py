@@ -3181,13 +3181,13 @@ class SqrtTask(Task):
         return N
 
 class SMTask(Task):
-    """ Computes Schirokauher Maps """
+    """ Computes Schirokauer Maps """
     @property
     def name(self):
         return "sm"
     @property
     def title(self):
-        return "Schirokauher Maps"
+        return "Schirokauer Maps"
     @property
     def programs(self):
         return (cadoprograms.SM,)
