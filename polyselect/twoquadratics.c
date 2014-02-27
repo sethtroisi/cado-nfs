@@ -98,6 +98,8 @@ cado_poly_extended_print (FILE *out, cado_poly_extended poly, char *pre)
   fprintf (out, "%sE = %e\n", pre, poly->E);
   fprintf (out, "%salpha_f0 = %.2f\n", pre, get_alpha (f0, ALPHA_BOUND));
   fprintf (out, "%salpha_f1 = %.2f\n", pre, get_alpha (f1, ALPHA_BOUND));
+  fprintf (out, "%sskew_f0 = %.2f\n", pre, L2_skewness (f0, SKEWNESS_DEFAULT_PREC));
+  fprintf (out, "%sskew_f1 = %.2f\n", pre, L2_skewness (f1, SKEWNESS_DEFAULT_PREC));
   gmp_fprintf (out, "%sskewness = %Zd\n", pre, poly->skew);
   fprintf (out, "%sL2_skew_norm_f0 = %.2f\n", pre, L2_lognorm (f0, s));
   fprintf (out, "%sL2_skew_norm_f1 = %.2f\n", pre, L2_lognorm (f1, s));
@@ -130,16 +132,11 @@ compute_m (mpz_t m, mpz_t m0, mpz_t r, mpz_t P)
   mpz_clear (t);
 }
 
-/* Compute maximun skewness, which in this case is (1/6)^(1/4) * m^(1/2).
-   We approximate (1/6)^(1/4) by 3124081/4889451 (the difference is less than
-   10^-14).
- */
+/* Compute maximun skewness, which in floor(N^(1/d^2)) */
 void
-compute_default_max_skew (mpz_t skew, mpz_t m)
+compute_default_max_skew (mpz_t skew, mpz_t N, int d)
 {
-  mpz_sqrt (skew, m);
-  mpz_mul_ui (skew, skew, 3124081);
-  mpz_tdiv_q_ui (skew, skew, 4889451);
+  mpz_root (skew, N, (unsigned long) d*d);
 }
 
 /* Returns the square root of N modulo P, using Tonelli-Shanks' algorithm.
@@ -239,8 +236,7 @@ mpz_msqrt (mpz_t r, mpz_t N, mpz_t P)
    We start with a = [m, -p, 0] and b = [(m*t-c2)/P, -t, 1]
       where t = c2/m mod P
    We then compute a reduced basis of the lattice spanned by a and b with the
-   Lagrange algorithm using the maximun possible skewness (bound by maxS or
-   default value if maxS == 0 or maxS > default value).
+   Lagrange algorithm using the maximun possible skewness (bound by maxS)
  */
 void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
                               mpz_t P, mpz_t m, mpz_t maxS)
@@ -285,13 +281,7 @@ void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
   mpz_vector_setcoordinate (b, 1, tmp); // b[1] = -t
   mpz_vector_setcoordinate_ui (b, 2, 1); // b[2] = 1
 
-  compute_default_max_skew (tmp, m);
-  /* Use maxS value if maxS argument is greater than 0 and lesser than default
-     value */
-  if (mpz_cmp_ui(maxS, 0) > 0 && mpz_cmp(maxS, tmp) < 0)
-    mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, maxS, 2);
-  else /* else call with the default maximum value */
-    mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, tmp, 2);
+  mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, maxS, 2);
 
   mpz_vector_get_mpz_poly(f, reduced_a);
   mpz_vector_get_mpz_poly(g, reduced_b);
@@ -312,7 +302,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "minP", "Use P > minP (default 2)");
   param_list_decl_usage(pl, "maxP", "Use P <= maxP (default nextprime(minP))");
   param_list_decl_usage(pl, "skewness", "maximun skewness possible "
-                                        "(default (1/6)^(1/4) * m^(1/2))");
+                                        "(default floor(N^(1/4))");
   param_list_decl_usage(pl, "v", "verbose output (print all polynomials)");
   param_list_decl_usage(pl, "q", "quiet output (print only best polynomials)");
   char str[200];
@@ -366,8 +356,8 @@ main (int argc, char *argv[])
     mpz_set_ui (max_skewness, 0);
   else if (mpz_cmp_ui (max_skewness, 1) < 0)
   {
-    gmp_fprintf(stderr, "Error, skewness (%Zd) should be greater or equal "
-                        "to 1\n", max_skewness);
+    gmp_fprintf(stderr, "Error, skewness (%Zd) should be positive\n",
+                         max_skewness);
     abort();
   }
 
@@ -420,6 +410,15 @@ main (int argc, char *argv[])
     gmp_printf("### N = %Zd\n", N);
     printf("### Bf = %.1e , Bg = %.1e , area = %.1e\n", bound_f, bound_g, area);
   }
+
+  /* Compute max_skewness: use max_skewness if max_skewness argument is greater
+     than 0 and lesser than default value */
+  mpz_t tmp;
+  mpz_init (tmp);
+  compute_default_max_skew (tmp, N, 2);
+  if (mpz_cmp_ui(max_skewness, 0) == 0 || mpz_cmp(max_skewness, tmp) > 0)
+    mpz_set (max_skewness, tmp);
+  mpz_clear (tmp);
 
 /* Given an integer N and bounds on P, tests all pairs of polynomials
    with P such that minP < P <= maxP and print the pair having the best
