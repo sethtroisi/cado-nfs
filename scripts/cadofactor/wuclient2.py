@@ -553,7 +553,7 @@ def run_command(command, print_error=True, **kwargs):
     """ Run command, wait for it to finish, return exit status, stdout
     and stderr
 
-    If print_error is True and the command exits with an non-zero exit code,
+    If print_error is True and the command exits with a non-zero exit code,
     print stdout and stderr to the log. If a KeyboardInterrupt exception
     occurs while waiting for the command to finish, the command is
     terminated.
@@ -561,8 +561,20 @@ def run_command(command, print_error=True, **kwargs):
     
     command_str = command if isinstance(command, str) else " ".join(command)
     
+    if os.name == "nt":
+        # We need to call bash explicitly as the WU COMMAND assumes POSIX
+        # syntax which the Windows command line shell does not implement.
+        # Turn command into an array so that "bash -c" gets the WU command
+        # as a single parameter, i.e., we defer propery quoting command_str
+        # to to the subprocess module.
+        command = ["bash",  "-c", command_str]
+        command_str = " ".join(command)
+        close_fds = False
+    else:
+        close_fds = True
+
     logging.info ("Running %s", command_str)
-    close_fds = os.name != "nt"
+
     child = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
@@ -625,14 +637,27 @@ class WorkunitProcessor(object):
                 return True
             else:
                 self.cleanup()
+        files = {}
+        
+        # To which directory do workunit files map?
+        dirs = {"FILE": self.settings["DLDIR"],
+                "EXECFILE": self.settings["BINDIR"] or self.settings["DLDIR"],
+                "RESULT": self.settings["WORKDIR"]}
+        
+        for key in dirs:
+            for (index, filename) in enumerate(self.workunit.get(key, [])):
+                if not isinstance(filename, str):
+                        filename = filename[0] # Drop checksum value
+                # index is 0-based, add 1 to make FILE1, FILE2, etc. 1-based
+                files["%s%d" % (key, index + 1)] = \
+                        os.path.join(dirs[key], filename)
+        print(files)
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             paths = {"DLDIR":self.settings["DLDIR"], 
-                     "WORKDIR":self.settings["WORKDIR"]}
-            if self.settings["BINDIR"]:
-                paths["EXECDIR"] = self.settings["BINDIR"]
-            else:
-                paths["EXECDIR"] = self.settings["DLDIR"]
+                     "WORKDIR":self.settings["WORKDIR"],
+                     "EXECDIR": dirs["EXECFILE"]}
             command = Template(command).safe_substitute(paths)
+            command = Template(command).safe_substitute(files)
 
             # If niceness command line parameter was set, call self.renice() 
             # in child process, before executing command

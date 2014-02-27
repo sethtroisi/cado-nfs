@@ -42,7 +42,7 @@ class Option(object, metaclass=abc.ABCMeta):
         prefix = '-'
 
     def __init__(self, arg=None, prefix=None, is_input_file=False,
-                 is_output_file = False, checktype = None):
+                 is_output_file=False, checktype=None):
         """ Define a mapping from a parameter name and value to command line
         parameters.
 
@@ -244,10 +244,10 @@ class Program(object, metaclass=InspectType):
     # attribute
     init_signature = None
 
-    def __init__(self, options, stdin = None,
-                 stdout = None, append_stdout = False, stderr = None,
-                 append_stderr = False, background = False, execpath = None,
-                 execsubdir = None, execbin = None, execsuffix=defaultsuffix,
+    def __init__(self, options, stdin=None,
+                 stdout=None, append_stdout=False, stderr=None,
+                 append_stderr=False, background=False, execpath=None,
+                 execsubdir=None, execbin=None, execsuffix=defaultsuffix,
                  runprefix=None):
         ''' Takes a dict of of command line options. Defaults are filled in
         from the cadoaprams.Parameters instance parameters.
@@ -403,7 +403,7 @@ class Program(object, metaclass=InspectType):
         return files
 
     def get_input_files(self):
-        input_files = self._get_files(is_output = False)
+        input_files = self._get_files(is_output=False)
         if isinstance(self.stdin, str):
             input_files.append(self.stdin)
         return input_files
@@ -412,7 +412,7 @@ class Program(object, metaclass=InspectType):
         """ Returns a list of output files, excluding files for stdout/stderr
         redirection.
         """
-        return self._get_files(is_output = True)
+        return self._get_files(is_output=True)
 
     def get_output_files(self):
         """ Returns a list of output files, including files for stdout/stderr
@@ -431,15 +431,15 @@ class Program(object, metaclass=InspectType):
         return [self.get_exec_file()]
 
     @staticmethod
-    def translate_path(filename, path = None):
+    def translate_path(filename, path=None):
         if not path:
             return filename
         else:
             return str(path).rstrip(os.sep) + os.sep + \
                     os.path.basename(str(filename))
 
-    def make_command_array(self, binpath = None, inputpath = None,
-                           outputpath = None):
+    def make_command_array(self, binpath=None, inputpath=None,
+                           outputpath=None):
         # Begin command line with program to execute
         command = []
         if not self.runprefix is None:
@@ -504,8 +504,8 @@ class Program(object, metaclass=InspectType):
         for filename in self.get_input_files():
             append_file(workunit, 'FILE', filename)
         append_file(workunit, 'EXECFILE', self.get_exec_file())
-        cmdline = self.make_command_line(binpath = "${EXECDIR}",
-            inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
+        cmdline = self.make_command_line(binpath="${EXECDIR}",
+            inputpath="${DLDIR}", outputpath="${WORKDIR}")
         workunit.append('COMMAND %s' % cmdline)
         for filename in self.get_output_files():
             workunit.append('RESULT %s' % os.path.basename(filename))
@@ -530,23 +530,23 @@ class Polyselect2l(Program):
                  P : Parameter(), 
                  N : Parameter(),
                  degree : Parameter(),
-                 verbose : Toggle("v") = None,
-                 quiet : Toggle("q") = None,
-                 sizeonly : Toggle("r") = None,
-                 threads : Parameter("t") = None,
-                 admin : Parameter() = None,
-                 admax : Parameter() = None,
-                 incr : Parameter() = None,
-                 nq : Parameter() = None,
-                 save : Parameter(is_output_file = True) = None,
-                 resume : Parameter(is_input_file = True) = None,
-                 maxtime : Parameter() = None,
-                 out : Parameter() = None,
-                 printdelay : Parameter("s") = None,
-                 area : Parameter() = None,
-                 Bf : Parameter() = None,
-                 Bg : Parameter() = None,
-                 keep: Parameter() = None,
+                 verbose : Toggle("v")=None,
+                 quiet : Toggle("q")=None,
+                 sizeonly : Toggle("r")=None,
+                 threads : Parameter("t")=None,
+                 admin : Parameter()=None,
+                 admax : Parameter()=None,
+                 incr : Parameter()=None,
+                 nq : Parameter()=None,
+                 save : Parameter(is_output_file=True)=None,
+                 resume : Parameter(is_input_file=True)=None,
+                 maxtime : Parameter()=None,
+                 out : Parameter()=None,
+                 printdelay : Parameter("s")=None,
+                 area : Parameter()=None,
+                 Bf : Parameter()=None,
+                 Bg : Parameter()=None,
+                 keep: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -565,10 +565,10 @@ class MakeFB(Program):
     subdir = "sieve"
 
     def __init__(self, *,
-                 poly: Parameter(is_input_file = True),
+                 poly: Parameter(is_input_file=True),
                  alim: Parameter(),
-                 maxbits: Parameter() = None,
-                 out: Parameter() = None,
+                 maxbits: Parameter()=None,
+                 out: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -586,15 +586,15 @@ class FreeRel(Program):
     name = binary
     subdir = "sieve"
     def __init__(self, *,
-                 poly: Parameter(is_input_file = True),
-                 renumber: Parameter(is_output_file = True),
+                 poly: Parameter(is_input_file=True),
+                 renumber: Parameter(is_output_file=True),
                  lpbr: Parameter(),
                  lpba: Parameter(),
-                 out: Parameter(is_output_file = True),
-                 badideals: Parameter(is_output_file = True) = None,
-                 pmin: Parameter() = None,
-                 pmax: Parameter() = None,
-                 dlp: Toggle("addfullcol") = None,
+                 out: Parameter(is_output_file=True),
+                 badideals: Parameter(is_output_file=True)=None,
+                 pmin: Parameter()=None,
+                 pmax: Parameter()=None,
+                 dlp: Toggle("addfullcol")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -604,31 +604,31 @@ class Las(Program):
     subdir = "sieve"
     def __init__(self,
                  I: Parameter(),
-                 poly: Parameter(is_input_file = True),
-                 factorbase: Parameter("fb", is_input_file = True),
+                 poly: Parameter(is_input_file=True),
+                 factorbase: Parameter("fb", is_input_file=True),
                  q0: Parameter(),
-                 q1: Parameter() = None,
-                 rho: Parameter() = None,
-                 tdthresh: Parameter() = None,
-                 bkthresh: Parameter() = None,
-                 rlim: Parameter() = None,
-                 alim: Parameter() = None,
-                 lpbr: Parameter() = None,
-                 lpba: Parameter() = None,
-                 mfbr: Parameter() = None,
-                 mfba: Parameter() = None,
-                 rlambda: Parameter() = None,
-                 alambda: Parameter() = None,
-                 skewness: Parameter("S") = None,
-                 verbose: Toggle("v") = None,
-                 out: Parameter(is_output_file = True) = None,
-                 threads: Parameter("mt") = None,
-                 ratq: Toggle() = None,
-                 stats_stderr: Toggle("stats-stderr") = None,
+                 q1: Parameter()=None,
+                 rho: Parameter()=None,
+                 tdthresh: Parameter()=None,
+                 bkthresh: Parameter()=None,
+                 rlim: Parameter()=None,
+                 alim: Parameter()=None,
+                 lpbr: Parameter()=None,
+                 lpba: Parameter()=None,
+                 mfbr: Parameter()=None,
+                 mfba: Parameter()=None,
+                 rlambda: Parameter()=None,
+                 alambda: Parameter()=None,
+                 skewness: Parameter("S")=None,
+                 verbose: Toggle("v")=None,
+                 out: Parameter(is_output_file=True)=None,
+                 threads: Parameter("mt")=None,
+                 ratq: Toggle()=None,
+                 stats_stderr: Toggle("stats-stderr")=None,
                  # Let's make fbcache neither input nor output file. It should
                  # not be distributed to clients, nor sent back to the server.
                  # It's a local temp file, but re-used between different runs.
-                 fbcache: Parameter("fbc") = None,
+                 fbcache: Parameter("fbc")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -638,16 +638,16 @@ class Duplicates1(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 *args: PositionalParameter(is_input_file = True),
+                 *args: PositionalParameter(is_input_file=True),
                  prefix : Parameter(),
-                 out: Parameter() = None,
-                 outfmt: Parameter() = None,
-                 bzip: Toggle("bz") = None,
-                 only: Parameter() = None,
-                 nslices_log: Parameter("n") = None,
-                 lognrels: Parameter() = None,
-                 filelist: Parameter(is_input_file = True) = None,
-                 basepath: Parameter() = None,
+                 out: Parameter()=None,
+                 outfmt: Parameter()=None,
+                 bzip: Toggle("bz")=None,
+                 only: Parameter()=None,
+                 nslices_log: Parameter("n")=None,
+                 lognrels: Parameter()=None,
+                 filelist: Parameter(is_input_file=True)=None,
+                 basepath: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -657,13 +657,13 @@ class Duplicates2(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 *args: PositionalParameter(is_input_file = True),
+                 *args: PositionalParameter(is_input_file=True),
                  rel_count: Parameter("nrels"),
-                 poly: Parameter(is_input_file = True),
-                 renumber: Parameter(is_input_file = True),
-                 filelist: Parameter(is_input_file = True) = None,
-                 badidealinfo: Parameter(is_input_file = True) = None,
-                 dlp: Toggle("dl") = None,
+                 poly: Parameter(is_input_file=True),
+                 renumber: Parameter(is_input_file=True),
+                 filelist: Parameter(is_input_file=True)=None,
+                 badidealinfo: Parameter(is_input_file=True)=None,
+                 dlp: Toggle("dl")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -672,23 +672,23 @@ class Purge(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 *args: PositionalParameter(is_input_file = True),
-                 out: Parameter(is_output_file = True),
-                 filelist: Parameter(is_input_file = True) = None,
-                 basepath: Parameter() = None,
-                 subdirlist: Parameter() = None,
-                 nrels: Parameter() = None,
-                 outdel: Parameter(is_output_file = True) = None,
-                 sos: Parameter(is_output_file = True) = None,
-                 keep: Parameter() = None,
-                 minindex: Parameter() = None,
-                 nprimes: Parameter() = None,
-                 raw: Toggle() = None,
-                 threads: Parameter("npthr") = None,
-                 inprel: Parameter(is_input_file = True) = None,
-                 outrel: Parameter(is_output_file = True) = None,
-                 npass: Parameter() = None,
-                 required_excess: Parameter() = None,
+                 *args: PositionalParameter(is_input_file=True),
+                 out: Parameter(is_output_file=True),
+                 filelist: Parameter(is_input_file=True)=None,
+                 basepath: Parameter()=None,
+                 subdirlist: Parameter()=None,
+                 nrels: Parameter()=None,
+                 outdel: Parameter(is_output_file=True)=None,
+                 sos: Parameter(is_output_file=True)=None,
+                 keep: Parameter()=None,
+                 minindex: Parameter()=None,
+                 nprimes: Parameter()=None,
+                 raw: Toggle()=None,
+                 threads: Parameter("npthr")=None,
+                 inprel: Parameter(is_input_file=True)=None,
+                 outrel: Parameter(is_output_file=True)=None,
+                 npass: Parameter()=None,
+                 required_excess: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -697,18 +697,18 @@ class Merge(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file = True),
-                 out: Parameter(is_output_file = True),
-                 maxlevel: Parameter() = None,
-                 keep: Parameter() = None,
-                 skip: Parameter() = None,
-                 forbw: Parameter() = None,
-                 ratio: Parameter() = None,
-                 coverNmax: Parameter() = None,
-                 nbmergemax: Parameter() = None,
-                 resume: Parameter() = None,
-                 mkztype: Parameter() = None,
-                 wmstmax: Parameter() = None,
+                 mat: Parameter(is_input_file=True),
+                 out: Parameter(is_output_file=True),
+                 maxlevel: Parameter()=None,
+                 keep: Parameter()=None,
+                 skip: Parameter()=None,
+                 forbw: Parameter()=None,
+                 ratio: Parameter()=None,
+                 coverNmax: Parameter()=None,
+                 nbmergemax: Parameter()=None,
+                 resume: Parameter()=None,
+                 mkztype: Parameter()=None,
+                 wmstmax: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -717,18 +717,18 @@ class MergeDLP(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file = True),
-                 out: Parameter(is_output_file = True),
-                 maxlevel: Parameter() = None,
-                 keep: Parameter() = None,
-                 skip: Parameter() = None,
-                 forbw: Parameter() = None,
-                 ratio: Parameter() = None,
-                 coverNmax: Parameter() = None,
-                 nbmergemax: Parameter() = None,
-                 resume: Parameter() = None,
-                 mkztype: Parameter() = None,
-                 wmstmax: Parameter() = None,
+                 mat: Parameter(is_input_file=True),
+                 out: Parameter(is_output_file=True),
+                 maxlevel: Parameter()=None,
+                 keep: Parameter()=None,
+                 skip: Parameter()=None,
+                 forbw: Parameter()=None,
+                 ratio: Parameter()=None,
+                 coverNmax: Parameter()=None,
+                 nbmergemax: Parameter()=None,
+                 resume: Parameter()=None,
+                 mkztype: Parameter()=None,
+                 wmstmax: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -738,11 +738,11 @@ class Replay(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 skip: Parameter() = None,
-                 purged: Parameter() = None,
-                 history: Parameter("his") = None,
-                 index: Parameter() = None,
-                 out: Parameter() = None,
+                 skip: Parameter()=None,
+                 purged: Parameter()=None,
+                 history: Parameter("his")=None,
+                 index: Parameter()=None,
+                 out: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -751,11 +751,11 @@ class ReplayDLP(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 purged: Parameter() = None,
-                 ideals: Parameter() = None,
-                 history: Parameter("his") = None,
-                 index: Parameter() = None,
-                 out: Parameter() = None,
+                 purged: Parameter()=None,
+                 ideals: Parameter()=None,
+                 history: Parameter("his")=None,
+                 index: Parameter()=None,
+                 out: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -768,7 +768,7 @@ class MagmaNmbrthry(Program):
                  N: Parameter("p"),
                  badidealinfo: Parameter("badinfofile"),
                  badideals: Parameter("badfile"),
-                 gorder: Parameter("ell") = None,
+                 gorder: Parameter("ell")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -782,7 +782,7 @@ class MagmaLinalg(Program):
                  nmaps: Parameter(),
                  sparsemat: Parameter(),
                  sm: Parameter(),
-                 ker: Parameter() = None,
+                 ker: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -791,24 +791,24 @@ class BWC(Program):
     name = "bwc"
     subdir = "linalg/bwc"
     def __init__(self,
-                 complete: Toggle(prefix=":") = None,
-                 wipeout: Toggle(prefix=":") = None,
-                 dryrun: Toggle("d") = None,
-                 verbose: Toggle("v") = None,
-                 mpi: ParameterEq() = None,
-                 threads: ParameterEq("thr") = None,
-                 mn: ParameterEq() = None,
-                 nullspace: ParameterEq() = None,
-                 interval: ParameterEq() = None,
-                 ys: ParameterEq() = None,
-                 matrix: ParameterEq() = None,
-                 wdir: ParameterEq() = None,
-                 mpiexec: ParameterEq() = None,
-                 hosts: ParameterEq() = None,
-                 hostfile: ParameterEq() = None,
-                 interleaving: ParameterEq() = None,
-                 shuffled_product: ParameterEq() = None,
-                 bwc_bindir: ParameterEq() = None,
+                 complete: Toggle(prefix=":")=None,
+                 wipeout: Toggle(prefix=":")=None,
+                 dryrun: Toggle("d")=None,
+                 verbose: Toggle("v")=None,
+                 mpi: ParameterEq()=None,
+                 threads: ParameterEq("thr")=None,
+                 mn: ParameterEq()=None,
+                 nullspace: ParameterEq()=None,
+                 interval: ParameterEq()=None,
+                 ys: ParameterEq()=None,
+                 matrix: ParameterEq()=None,
+                 wdir: ParameterEq()=None,
+                 mpiexec: ParameterEq()=None,
+                 hosts: ParameterEq()=None,
+                 hostfile: ParameterEq()=None,
+                 interleaving: ParameterEq()=None,
+                 shuffled_product: ParameterEq()=None,
+                 bwc_bindir: ParameterEq()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -823,8 +823,8 @@ class SM(Program):
                  out: Parameter(),
                  ell: Parameter("gorder"),
                  smexp: Parameter(),
-                 nmaps: Parameter("nsm") = None,
-                 threads: Parameter("mt") = None,
+                 nmaps: Parameter("nsm")=None,
+                 threads: Parameter("mt")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
  
@@ -843,7 +843,7 @@ class ReconstructLog(Program):
                  ideals: Parameter(),
                  relsdel: Parameter(),
                  nrels: Parameter(),
-                 partial: Toggle() = None,
+                 partial: Toggle()=None,
                  nmaps: Parameter("sm"),
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -862,8 +862,8 @@ class Characters(Program):
                  wfile: Parameter("ker"),
                  lpbr: Parameter(),
                  lpba: Parameter(),
-                 nchar: Parameter() = None,
-                 threads: Parameter("t") = None,
+                 nchar: Parameter()=None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -877,11 +877,11 @@ class Sqrt(Program):
                  purged: Parameter(),
                  index: Parameter(),
                  kernel: Parameter("ker"),
-                 dep: Parameter() = None,
-                 ab: Toggle() = None,
-                 rat: Toggle() = None,
-                 alg: Toggle() = None,
-                 gcd: Toggle() = None,
+                 dep: Parameter()=None,
+                 ab: Toggle()=None,
+                 rat: Toggle()=None,
+                 alg: Toggle()=None,
+                 gcd: Toggle()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -891,24 +891,24 @@ class WuClient(Program):
     subdir = "scripts/cadofactor"
     def __init__(self,
                  server: Parameter(prefix='--'),
-                 daemon: Toggle(prefix='--') = None,
-                 keepoldresult: Toggle(prefix='--') = None,
-                 nosha1check: Toggle(prefix='--') = None,
-                 dldir: Parameter(prefix='--') = None,
-                 workdir: Parameter(prefix='--') = None,
-                 bindir: Parameter(prefix='--') = None,
-                 clientid: Parameter(prefix='--') = None,
-                 basepath: Parameter(prefix='--') = None,
-                 getwupath: Parameter(prefix='--') = None,
-                 loglevel: Parameter(prefix='--') = None,
-                 postresultpath: Parameter(prefix='--') = None,
-                 downloadretry: Parameter(prefix='--') = None,
-                 logfile: Parameter(prefix='--') = None,
-                 debug: Parameter(prefix='--') = None,
-                 niceness: Parameter(prefix='--') = None,
-                 wu_filename: Parameter(prefix='--') = None,
-                 arch: Parameter(prefix='--') = None,
-                 certsha1: Parameter(prefix='--') = None,
+                 daemon: Toggle(prefix='--')=None,
+                 keepoldresult: Toggle(prefix='--')=None,
+                 nosha1check: Toggle(prefix='--')=None,
+                 dldir: Parameter(prefix='--')=None,
+                 workdir: Parameter(prefix='--')=None,
+                 bindir: Parameter(prefix='--')=None,
+                 clientid: Parameter(prefix='--')=None,
+                 basepath: Parameter(prefix='--')=None,
+                 getwupath: Parameter(prefix='--')=None,
+                 loglevel: Parameter(prefix='--')=None,
+                 postresultpath: Parameter(prefix='--')=None,
+                 downloadretry: Parameter(prefix='--')=None,
+                 logfile: Parameter(prefix='--')=None,
+                 debug: Parameter(prefix='--')=None,
+                 niceness: Parameter(prefix='--')=None,
+                 wu_filename: Parameter(prefix='--')=None,
+                 arch: Parameter(prefix='--')=None,
+                 certsha1: Parameter(prefix='--')=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "python3.exe")
@@ -921,13 +921,13 @@ class SSH(Program):
     def __init__(self,
                  host: PositionalParameter(),
                  *args: PositionalParameter(),
-                 compression: Toggle("C") = None,
-                 verbose: Toggle("v") = None,
-                 cipher: Parameter("c") = None,
-                 configfile: Parameter("F") = None,
-                 identity_file: Parameter("i") = None,
-                 login_name: Parameter("l") = None,
-                 port: Parameter("p") = None,
+                 compression: Toggle("C")=None,
+                 verbose: Toggle("v")=None,
+                 cipher: Parameter("c")=None,
+                 configfile: Parameter("F")=None,
+                 identity_file: Parameter("i")=None,
+                 login_name: Parameter("l")=None,
+                 port: Parameter("p")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -947,7 +947,7 @@ class Ls(Program):
     path = "/bin"
     def __init__(self,
                  *args : PositionalParameter(),
-                 long : Toggle('l') = None,
+                 long : Toggle('l')=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

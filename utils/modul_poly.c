@@ -16,11 +16,7 @@ alloc_long_array (int d)
   residueul_t *f;
 
   f = (residueul_t*) malloc (d * sizeof (residueul_t));
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, not enough memory\n");
-      exit (1);
-    }
+  FATAL_ERROR_CHECK (f == NULL, "not enough memory");
   return f;
 }
 
@@ -29,11 +25,7 @@ static residueul_t*
 realloc_long_array (residueul_t *f, int d)
 {
   f = (residueul_t*) realloc (f, d * sizeof (residueul_t));
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, not enough memory\n");
-      exit (1);
-    }
+  FATAL_ERROR_CHECK (f == NULL, "not enough memory");
   return f;
 }
 
@@ -85,7 +77,7 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
   int d = f->degree, i;
   residueul_t ilc;
 
-  if (modul_is1(f->coeff[d],p))
+  if (d < 0 || modul_is1 (f->coeff[d], p))
     return;
 
   modul_inv(ilc, f->coeff[d], p);
@@ -151,7 +143,7 @@ modul_poly_swap (modul_poly_t f, modul_poly_t g)
 }
 
 /* h <- f*g mod p */
-void
+static void
 modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modulusul_t p) {
   int df = f->degree;
   int dg = g->degree;
@@ -173,20 +165,17 @@ modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modul
 }
 
 
-/* h <- g^2 mod p, g and h must differ */
-void
+/* h <- g^2 mod p, g and h must differ. Since this function is only used in
+   modular exponentiation (x+a)^k mod (f,p), where f is irreducible, we
+   cannot have g = 0. */
+static void
 modul_poly_sqr (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, j, dg = g->degree;
   residueul_t *gc, *hc;
   residueul_t aux;
 
-  ASSERT (dg >= -1);
-  if (dg == -1) /* g is zero */
-    {
-      h->degree = -1;
-      return;
-    }
+  ASSERT_ALWAYS (dg >= 0);
   modul_poly_realloc (h, 2 * dg + 1);
   gc = g->coeff;
   hc = h->coeff;
@@ -257,18 +246,18 @@ modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulusul_t p)
   modul_poly_normalize (h, p);
 }
 
-/* h <- g - 1 mod p */
-void
+/* h <- g - 1 mod p. Since g is (x+a)^((p-1)/2) mod (f,p), it cannot be 0,
+   since f is assumed to be squarefree (mod p). */
+static void
 modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, d = g->degree;
 
+  ASSERT_ALWAYS (d >= 0);
   /* g-1 has degree d if d >= 1, and degree 0 otherwise */
   modul_poly_realloc (h, ((d < 1) ? 0 : d) + 1);
   for (i = 0; i <= d; i++)
     modul_set(h->coeff[i], g->coeff[i], p);
-  for (i = d + 1; i <= 0; i++)
-    modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[0], h->coeff[0], 1, p);
   h->degree = (d < 0) ? 0 : d;
   modul_poly_normalize (h, p);
@@ -402,7 +391,7 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 }
 
 /* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
-void
+static void
 modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul_t a,
 		     unsigned long e, modulusul_t p)
 {
@@ -459,7 +448,7 @@ modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
    Assumes p is odd, and deg(f) >= 1.
 */
 int
-modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int depth)
+modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   residueul_t a;
   modul_poly_t q, h, ff;
@@ -493,11 +482,11 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int
       ASSERT (dq >= 0);
       if (0 < dq && dq < d)
 	{
-	  n = modul_poly_cantor_zassenhaus (r, q, p, depth + 1);
+	  n = modul_poly_cantor_zassenhaus (r, q, p);
 	  ASSERT (n == dq);
 	  modul_poly_set (ff, f, p); /* modul_poly_divexact clobbers its 2nd arg */
 	  modul_poly_divexact (h, ff, q, p);
-	  m = modul_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
+	  m = modul_poly_cantor_zassenhaus (r + n, h, p);
 	  ASSERT (m == h->degree);
 	  n += m;
           break;
@@ -514,13 +503,11 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-int coeff_cmp(
+static int coeff_cmp(
         const unsigned long * a,
         const unsigned long * b)
 {
-    if (*a < *b) return -1;
-    if (*b < *a) return 1;
-    return 0;
+  return (*a < *b) ? -1 : 1;
 }
 
 #define ROOTS_MOD_THRESHOLD  43 /* if only the number of roots is needed */
@@ -605,7 +592,7 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
    */
   if (r != NULL && df > 0)
     {
-      int n MAYBE_UNUSED = modul_poly_cantor_zassenhaus (r, fp, p, 0);
+      int n MAYBE_UNUSED = modul_poly_cantor_zassenhaus (r, fp, p);
       ASSERT (n == df);
     }
 
@@ -628,7 +615,9 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
     residueul_t * pr;
     int i, n;
 
-    pr = malloc(d * sizeof(residueul_t));
+    ASSERT_ALWAYS(d > 0);
+    pr = malloc (d * sizeof(residueul_t));
+    FATAL_ERROR_CHECK (pr == NULL, "not enough memory");
     n = modul_poly_roots(pr,f,d,p);
     for(i = 0 ; i < n ; i++) {
         r[i] = modul_getmod_ul (pr[i]);
@@ -648,10 +637,8 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
   modul_poly_make_monic (fp, p);
   d = fp->degree;
 
-  if (d == 0)
-    return 1;
-
-  ASSERT (d > 0);
+  if (d <= 0)
+    return 1; /* we consider the zero polynomial is irreducible */
 
   modul_poly_init (g, 2 * d - 1);
   modul_poly_init (gmx, 2 * d - 1);

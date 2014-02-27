@@ -242,9 +242,9 @@ void mpz_poly_init(mpz_poly_t f, int d) {
     int i;
     f->alloc = d+1;
     f->coeff = (mpz_t *) malloc ((d+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
+    FATAL_ERROR_CHECK (f->coeff == NULL, "not enough memory");
     for (i = 0; i <= d; ++i)
-      mpz_init(f->coeff[i]);
+      mpz_init (f->coeff[i]);
   }
 }
 
@@ -421,10 +421,8 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
-    if (i <= h->deg) {
-      //ASSERT_ALWAYS(h->alloc >= h->deg+1);
-      mpz_add(z, z, h->coeff[i]);
-    }
+    if (i <= h->deg)
+      mpz_add (z, z, h->coeff[i]);
     mpz_poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
@@ -547,18 +545,8 @@ mpz_poly_mul (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
     size_t sg, sh, s;
     mpz_init (G);
     mpz_init (H);
-    for (sg = 0, i = 0; i <= g->deg; i++)
-    {
-      s = mpz_sizeinbase (g->coeff[i], 2);
-      if (s > sg)
-        sg = s;
-    }
-    for (sh = 0, i = 0; i <= h->deg; i++)
-    {
-      s = mpz_sizeinbase (h->coeff[i], 2);
-      if (s > sh)
-        sh = s;
-    }
+    sg = mpz_poly_sizeinbase (g, g->deg, 2);
+    sh = mpz_poly_sizeinbase (h, h->deg, 2);
     /* the +1 accounts for a possible sign */
     for (s = sg + sh + 1, i = h->deg; i > 1; i = (i + 1) / 2, s++);
     mpz_set (G, g->coeff[g->deg]);
@@ -1255,9 +1243,10 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
    Q[0] = P[0]
    ...
    With all coefficients of P[i] smaller than p^(K[l-i]-K[l-(i-1)]).
-   Assume K[l]=1, K[l-1]=2, ..., K[i] = 2*K[i+1] or 2*K[i+1]-2.
+   Assume K[l]=1, K[l-1]=2, ..., K[i] = 2*K[i+1] or 2*K[i+1]-1.
    P0 = P[0] + p*P[1] + p^2*P[2] + ... + p^K[1]*P[l] < p^K[0]
    The end of the list is P[l+1]=0.
+   Assume l > 0.
 */
 mpz_poly_t*
 mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
@@ -1266,10 +1255,12 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
   int k, i, j;
   mpz_t *pk;
 
+  ASSERT_ALWAYS (l > 0);
   ASSERT_ALWAYS (K[l] == 1);
 
   /* initialize pk[i] = p^K[l-i] for 0 <= i < l */
   pk = (mpz_t*) malloc (l * sizeof (mpz_t));
+  FATAL_ERROR_CHECK (pk == NULL, "not enough memory");
   mpz_init_set_ui (pk[0], p);
   for (i = 1; i < l; i++)
   {
@@ -1288,6 +1279,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
      ..., P[l] for p^K[1], and one for the end of list,
      thus l+2 polynomials */
   P = (mpz_poly_t*) malloc ((l + 2) * sizeof(mpz_poly_t));
+  FATAL_ERROR_CHECK (P == NULL, "not enough memory");
   for (i = 0; i < l + 2; i++)
     mpz_poly_init (P[i], P0->deg);
   /* P[l+1] is initialized to 0 by mpz_poly_init */
@@ -1354,6 +1346,7 @@ mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
   size_t S = 0, s;
   int i;
 
+  ASSERT_ALWAYS(d < f->alloc);
   for (i = 0; i <= d; i++)
   {
     s = mpz_sizeinbase (f->coeff[i], b);
@@ -1498,8 +1491,8 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
   {
     /* q=x+a */
     mpz_set_ui (aux, 1);
-    mpz_poly_setcoeff(q, 1, aux);
-    mpz_poly_setcoeff(q, 0, a);
+    mpz_poly_setcoeff (q, 1, aux);
+    mpz_poly_setcoeff (q, 0, a);
 
     /* h=(x+a)^((p-1)/2) mod (f, p) */
     mpz_sub_ui (aux, p, 1);
@@ -1508,7 +1501,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
     mpz_poly_sub_ui (h, 1);
 
     /* q = gcd(f,h) */
-    mpz_poly_copy(q, f);
+    mpz_poly_copy (q, f);
     mpz_poly_gcd_mpz (q, h, p);
     dq = q->deg;
     ASSERT (dq >= 0);
@@ -1528,9 +1521,8 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
       break;
     }
 
-    mpz_add_ui (a, a, 1);
-    if (mpz_cmp (a, p) > 0)
-      mpz_sub (a, a, p);
+    mpz_add_ui (a, a, 1); /* no need to reduce mod p, since it will be done
+                             in mpz_poly_power_mod_f_mod_mpz */
   }
 
   mpz_poly_clear (q);
@@ -1546,9 +1538,7 @@ clear_a:
 typedef int (*sortfunc_t) (const void *, const void *);
 
 static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
-  if (mpz_cmp(*a, *b) < 0) return -1;
-  if (mpz_cmp(*a, *b) > 0) return 1;
-  return 0;
+  return mpz_cmp(*a, *b) < 0 ? -1 : 1;
 }
 
 /* Solve f(x)=0 (mod p), where p is a prime. Return the number of roots.
@@ -1628,6 +1618,7 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
   mpz_poly_set_deg(Fij, d);
 
   g = malloc ((d + 1) * sizeof (mpz_t));
+  FATAL_ERROR_CHECK (g == NULL, "not enough memory");
   for (k = 0; k <= d; k++)
     mpz_init (g[k]);
   mpz_init (f0);
