@@ -380,12 +380,12 @@ class Program(object, metaclass=InspectType):
             )
 
     def _get_files(self, is_output):
-        """ Helper method to get a list of input/output files for this Program.
+        """ Helper method to get a set of input/output files for this Program.
         This method returns the list of filenames without considering files for
         stdio redirection. If "is_output" evaluates to True, the list of output
         files is generated, otherwise the list of input files.
         """
-        files = []
+        files = set()
         parameters = self.init_signature.args + self.init_signature.kwonlyargs
         if not self.init_signature.varargs is None:
             parameters.append(self.init_signature.varargs)
@@ -397,9 +397,9 @@ class Program(object, metaclass=InspectType):
                 if param == self.init_signature.varargs:
                     # vararg is a list; we need to convert each entry to string
                     # and append this list of strings to files
-                    files.extend(map(str, self.parameters[param]))
+                    files |= set(map(str, self.parameters[param]))
                 else:
-                    files.append(str(self.parameters[param]))
+                    files |= {str(self.parameters[param])}
         return files
 
     def get_input_files(self, with_stdio=True):
@@ -408,8 +408,8 @@ class Program(object, metaclass=InspectType):
         """
         input_files = self._get_files(is_output=False)
         if with_stdio and isinstance(self.stdin, str):
-            input_files.append(self.stdin)
-        return input_files
+            input_files |= {self.stdin}
+        return list(input_files)
 
     def get_output_files(self, with_stdio=True):
         """ Returns a list of output files. If with_stdio is True, includes
@@ -419,8 +419,8 @@ class Program(object, metaclass=InspectType):
         if with_stdio:
             for filename in (self.stdout, self.stderr):
                 if isinstance(filename, str):
-                    output_files.append(filename)
-        return output_files
+                    output_files |= {filename}
+        return list(output_files)
 
     def get_exec_file(self):
         return self.execfile
@@ -429,20 +429,17 @@ class Program(object, metaclass=InspectType):
         return [self.get_exec_file()]
 
     @staticmethod
-    def translate_path(filename, path=None):
-        if not path:
-            return filename
-        else:
-            return str(path).rstrip(os.sep) + os.sep + \
-                    os.path.basename(str(filename))
+    def translate_path(filename, filenametrans=None):
+        if not filenametrans is None and str(filename) in filenametrans:
+            return filenametrans[str(filename)]
+        return str(filename)
 
-    def make_command_array(self, binpath=None, inputpath=None,
-                           outputpath=None):
+    def make_command_array(self, filenametrans=None):
         # Begin command line with program to execute
         command = []
         if not self.runprefix is None:
             command.append(self.runprefix)
-        command.append(self.translate_path(self.get_exec_file(), binpath))
+        command.append(self.translate_path(self.get_exec_file(), filenametrans))
 
         # Add keyword command line parameters, then positional parameters
         parameters = self.init_signature.kwonlyargs + self.init_signature.args
@@ -455,9 +452,9 @@ class Program(object, metaclass=InspectType):
                 # translate it, e.g., for workunits
                 assert not (ann.is_input_file and ann.is_output_file)
                 if ann.is_input_file:
-                    value = self.translate_path(value, inputpath)
+                    value = self.translate_path(value, filenametrans)
                 elif ann.is_output_file:
-                    value = self.translate_path(value, outputpath)
+                    value = self.translate_path(value, filenametrans)
                 command += ann.map(value)
 
         # Add positional command line parameters
@@ -469,44 +466,54 @@ class Program(object, metaclass=InspectType):
                 command += ann.map(value)
         return command
 
-    def make_command_line(self, binpath=None, inputpath=None, outputpath=None):
+    def make_command_line(self, filenametrans=None):
         """ Make a shell command line for this program.
 
         If files are given for stdio redirection, the corresponding redirection
         tokens are added to the command line.
         """
-        cmdarr = self.make_command_array(binpath, inputpath, outputpath)
+        cmdarr = self.make_command_array(filenametrans=filenametrans)
         cmdline = " ".join(map(cadocommand.shellquote, cmdarr))
         if isinstance(self.stdin, str):
-            translated = self.translate_path(self.stdin, inputpath)
+            translated = self.translate_path(self.stdin,
+                                             filenametrans=filenametrans)
             cmdline += ' < ' + cadocommand.shellquote(translated)
         if isinstance(self.stdout, str):
             redir = ' >> ' if self.append_stdout else ' > '
-            translated = self.translate_path(self.stdout, outputpath)
+            translated = self.translate_path(self.stdout,
+                                             filenametrans=filenametrans)
             cmdline += redir + cadocommand.shellquote(translated)
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         elif isinstance(self.stderr, str):
             redir = ' 2>> ' if self.append_stderr else ' 2> '
-            translated = self.translate_path(self.stderr, outputpath)
+            translated = self.translate_path(self.stderr,
+                                             filenametrans=filenametrans)
             cmdline += redir + cadocommand.shellquote(translated)
         if self.background:
             cmdline += " &"
         return cmdline
 
     def make_wu(self, wuname):
-        def append_file(wu, key, filename):
+        filenametrans = {}
+        counters = {"FILE": 1, "EXECFILE": 1, "RESULT": 1}
+        def append_file(wu, key, filename, with_checksum=True):
+            assert not filename in filenametrans
+            filenametrans[filename] = "${%s%d}" % (key, counters[key])
+            counters[key] += 1
             wu.append('%s %s' % (key, os.path.basename(filename)))
-            wu.append('CHECKSUM %s' % sha1cache.get_sha1(filename))
+            if with_checksum:
+                wu.append('CHECKSUM %s' % sha1cache.get_sha1(filename))
+        
         workunit = ['WORKUNIT %s' % wuname]
         for filename in self.get_input_files():
-            append_file(workunit, 'FILE', filename)
-        append_file(workunit, 'EXECFILE', self.get_exec_file())
-        cmdline = self.make_command_line(binpath="${EXECDIR}",
-            inputpath="${DLDIR}", outputpath="${WORKDIR}")
-        workunit.append('COMMAND %s' % cmdline)
+            append_file(workunit, 'FILE', str(filename))
+        for filename in self.get_exec_files():
+            append_file(workunit, 'EXECFILE', str(filename))
         for filename in self.get_output_files():
-            workunit.append('RESULT %s' % os.path.basename(filename))
+            append_file(workunit, 'RESULT', str(filename), with_checksum=False)
+        cmdline = self.make_command_line(filenametrans=filenametrans)
+        workunit.append('COMMAND %s' % cmdline)
         workunit.append("") # Make a trailing newline
         return '\n'.join(workunit)
 
