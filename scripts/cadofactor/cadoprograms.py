@@ -816,6 +816,7 @@ class SM(Program):
     subdir = "scripts"
     def __init__(self, *,
                  poly: Parameter(),
+		 rels: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),

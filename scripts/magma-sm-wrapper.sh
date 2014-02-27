@@ -8,6 +8,8 @@ unset ELL
 unset SMEXP
 unset NMAPS
 unset MT
+## for units
+unset RELSDIR
 
 while [ -n "$1" ]
 do
@@ -43,6 +45,10 @@ do
   then
     MT="$2"
     shift 2
+  elif [ "$1" = "-rels" ]
+  then
+    RELSDIR="$2"
+    shift 2
   else
     echo "Unknown parameter: $1"
     exit 1
@@ -52,7 +58,16 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
+##### decide...!
+sm=false
+if $sm; then
+    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
+else
+## RELSDIR=....../p59.sieving.204000-205000.1_1jgx.gz
+## make it ....../p59
+    RELSDIR=`echo $RELSDIR | sed 's/\.sieving.*//'`
+    CMD="magma -b polyfile:=$POLY purged:=$PURGED index:=$INDEX ficunits:=$OUT relsdir:=$RELSDIR $DIR/nfsunits.mag" 
+fi
 
 echo $CMD
 

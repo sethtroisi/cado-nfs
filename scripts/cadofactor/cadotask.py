@@ -3206,6 +3206,7 @@ class SMTask(Task):
         if not "sm" in self.state:
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            sieverfilenames = self.send_request(Request.GET_SIEVER_FILENAMES)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -3216,7 +3217,7 @@ class SMTask(Task):
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(poly=polyfilename,
+            p = cadoprograms.SM(poly=polyfilename, rels=sieverfilenames[0],
                     purged=purgedfilename, index=indexfilename,
                     ell=gorder, smexp=smexp,
                     nmaps=nmaps,
