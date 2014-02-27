@@ -205,13 +205,10 @@ mpz_vector_Lagrange (mpz_vector_t a, mpz_vector_t b,
 
 /* Find the maximun value of skewness for which mpz_vector_Lagrange returns 2
   vectors with non-zero d-th coordinates (i.e. 2 corresponding polynomials of
-  degree d). This function assume:
-    - that it exists S such that for skew <= S, the two vectors have non-zero
-      d-th coordinates and for skew > S, this no more the case.
-    - that for skew < max_skewness, the smallest vector (reduced_a) has always
-      non-zero d-th coordinate (the functions compute_default_max_skew in
-      twoquadratics and twocubics should ensure that). So we only check
-      reduced_b[d] != 0
+  degree d).
+  This function assume that it exists S such that for skew <= S, the two
+  vectors have non-zero d-th coordinates and for skew > S, this no more
+  the case.
 
   Output: reduced_a, reduced_b and skew_used.
   Input: a, b, max_skewness and d.
@@ -235,7 +232,8 @@ mpz_vector_reduce_with_max_skew (mpz_vector_t reduced_a, mpz_vector_t reduced_b,
     // Perform Lagrange algorithm a and b
     mpz_vector_Lagrange (reduced_a, reduced_b, a, b, skew_used);
 
-    if (mpz_vector_is_coordinate_zero (reduced_b, d))
+    if (mpz_vector_is_coordinate_zero (reduced_a, d)
+        || mpz_vector_is_coordinate_zero (reduced_b, d))
       mpz_set (max_skew, skew_used);
     else
     {
