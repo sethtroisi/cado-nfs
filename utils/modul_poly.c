@@ -165,20 +165,17 @@ modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modul
 }
 
 
-/* h <- g^2 mod p, g and h must differ */
-void
+/* h <- g^2 mod p, g and h must differ. Since this function is only used in
+   modular exponentiation (x+a)^k mod (f,p), where f is irreducible, we
+   cannot have g = 0. */
+static void
 modul_poly_sqr (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, j, dg = g->degree;
   residueul_t *gc, *hc;
   residueul_t aux;
 
-  ASSERT (dg >= -1);
-  if (dg == -1) /* g is zero */
-    {
-      h->degree = -1;
-      return;
-    }
+  ASSERT_ALWAYS (dg >= 0);
   modul_poly_realloc (h, 2 * dg + 1);
   gc = g->coeff;
   hc = h->coeff;
