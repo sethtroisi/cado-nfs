@@ -847,7 +847,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.stderrfile = program.get_stderr()
             # stderr must be either in a string or in a file, but not both
             assert self.stderr is None or not self.stderrfile
-            self.output_files = program.get_regular_output_files()
+            self.output_files = program.get_output_files(with_stdio=False)
             self.cmd_line = cmd_line
             self.host = host
         def get_wu_id(self):
@@ -2361,7 +2361,7 @@ class PurgeTask(Task):
             update = {"purgedfile": purgedfile.get_wdir_relative(),
                       "input_nrels": input_nrels }
             if self.params["dlp"]:
-                to_update["relsdelfile"] = relsdelfile.get_wdir_relative()
+                update["relsdelfile"] = relsdelfile.get_wdir_relative()
             self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)

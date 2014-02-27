@@ -35,6 +35,7 @@ extern unsigned long ulong_nextprime (unsigned long);
 extern int ulong_isprime (unsigned long);
 extern void mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d);
 extern int mpz_divisible_uint64_p (mpz_t a, uint64_t c);
+extern int mpz_coprime_p (mpz_t a, mpz_t b);
 
 /* return the number of bits of p, counting from the least significant end */
 extern int nbits (uintmax_t p);

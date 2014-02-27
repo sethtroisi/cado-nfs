@@ -402,26 +402,24 @@ class Program(object, metaclass=InspectType):
                     files.append(str(self.parameters[param]))
         return files
 
-    def get_input_files(self):
+    def get_input_files(self, with_stdio=True):
+        """ Returns a list of input files to this Program instance. If
+        with_stdio is True, includes stdin if such redirection is used.
+        """
         input_files = self._get_files(is_output=False)
-        if isinstance(self.stdin, str):
+        if with_stdio and isinstance(self.stdin, str):
             input_files.append(self.stdin)
         return input_files
 
-    def get_regular_output_files(self):
-        """ Returns a list of output files, excluding files for stdout/stderr
-        redirection.
+    def get_output_files(self, with_stdio=True):
+        """ Returns a list of output files. If with_stdio is True, includes
+        files for stdout/stderr redirection if such redirection is used.
         """
-        return self._get_files(is_output=True)
-
-    def get_output_files(self):
-        """ Returns a list of output files, including files for stdout/stderr
-        redirection if such redirection is used
-        """
-        output_files = self.get_regular_output_files()
-        for filename in (self.stdout, self.stderr):
-            if isinstance(filename, str):
-                output_files.append(filename)
+        output_files = self._get_files(is_output=True)
+        if with_stdio:
+            for filename in (self.stdout, self.stderr):
+                if isinstance(filename, str):
+                    output_files.append(filename)
         return output_files
 
     def get_exec_file(self):

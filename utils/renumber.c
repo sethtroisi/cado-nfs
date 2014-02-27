@@ -600,7 +600,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     /* assert that p is below the large prime bound */
     unsigned long lpb = (side==RATIONAL_SIDE) ? renumber_info->lpbr :
                                                 renumber_info->lpba ;
-    if (p >> lpb)
+    if (((uint64_t) p) >> lpb)
     {
       fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%lu\n",
                        __func__, __LINE__, p, lpb);
