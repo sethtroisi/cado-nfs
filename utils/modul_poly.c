@@ -222,6 +222,11 @@ modul_poly_mul_x (modul_poly_t h, residueul_t a, modulusul_t p)
   residueul_t *hc;
   residueul_t aux;
 
+  if (d == -1) {
+    /* h(x) = 0, thus result is 0 */
+    return;
+  }
+
   modul_poly_realloc (h, d + 2); /* (x+a)*h has degree d+1, thus d+2 coeffs */
   hc = h->coeff;
   modul_set(hc[d + 1], hc[d], p);
