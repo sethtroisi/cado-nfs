@@ -142,6 +142,10 @@ class Parameters(object):
         >>> Parameters(d).myparams(keys={'a': int}, path='foo')
         {'a': 3}
 
+        Test converting to a non-mandatory explicit type
+        >>> Parameters(d).myparams(keys={'a': [int], 'x': [int]}, path='foo')
+        {'a': 3}
+
         Test converting if default value is bool
         >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': False}, path=[])
         {'foo': True}
@@ -182,6 +186,14 @@ class Parameters(object):
                         logger.critical("Parameter %s not found under path %s",
                             key, joinpath)
                         raise(KeyError)
+                elif type(keys[key]) is list:
+                    # If a list is given as the default value, its first
+                    # element must be a type and we interpret it as a non-
+                    # mandatory type: if the parameter exists in the parameter
+                    # file, it is cast to that type.
+                    target_type = keys[key][0]
+                    if not key in result:
+                        continue
                 else:
                     target_type = type(keys[key])
                     result.setdefault(key, keys[key])
@@ -192,7 +204,8 @@ class Parameters(object):
                 try:
                     result[key] = target_type(result[key])
                 except ValueError as e:
-                    logger.critical("Error while parsing parameter '%s': %s", key, str(e))
+                    logger.critical("Error while parsing parameter '%s': %s",
+                                    key, str(e))
                     raise
         return result
     
