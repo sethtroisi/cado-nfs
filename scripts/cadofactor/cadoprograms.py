@@ -355,9 +355,11 @@ class Program(object, metaclass=InspectType):
     def _filter_annotated_keys(cls, keys):
         """ From the list of keys given in "keys", return those that are
         parameters of the __init__() method of this class and annotated with an
-        Option instance. Returns a list of keys.
+        Option instance. Returns a list of keys, where order w.r.t. the input
+        keys is preserved.
         """
-        return list(cls._filter_annotated_options(keys).keys())
+        options = cls._get_option_annotations()
+        return [key for key in keys if key in options]
 
     @classmethod
     def get_accepted_keys(cls):
