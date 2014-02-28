@@ -823,11 +823,13 @@ class SM(Program):
     subdir = "scripts"
     def __init__(self, *,
                  poly: Parameter(),
+		 rels: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("gorder"),
                  smexp: Parameter(),
+                 explicit_units: Toggle()=None,
                  nmaps: Parameter("nsm")=None,
                  threads: Parameter("mt")=None,
                  **kwargs):
