@@ -6,6 +6,7 @@ import hashlib
 import logging
 import cadocommand
 import cadologger
+import cadoparams
 
 
 class InspectType(type):
@@ -76,6 +77,9 @@ class Option(object, metaclass=abc.ABCMeta):
         assert not self.defaultname is None
         return self.defaultname if self.arg is None else self.arg
 
+    def get_checktype(self):
+        return self.checktype
+
     def map(self, value):
         """ Public class that converts the Option instance into an array of
         strings with command line parameters. It also checks the type, if
@@ -114,6 +118,12 @@ class Toggle(Option):
     ''' Command line option that does not take a parameter.
     value is interpreted as a truth value, the option is either added or not
     '''
+    def __init__(self, arg=None, prefix=None, is_input_file=False,
+                 is_output_file=False):
+        """ Overridden constructor that hard-codes checktype=bool """
+        super().__init__(arg=arg, prefix=prefix, is_input_file=is_input_file,
+                 is_output_file=is_output_file, checktype=bool)
+
     def _map(self, value):
         if value is True:
             return [self.prefix + self.get_arg()]
@@ -333,12 +343,21 @@ class Program(object, metaclass=InspectType):
                 if isinstance(val, Option)}
 
     @classmethod
+    def _filter_annotated_options(cls, keys):
+        """ From the list of keys given in "keys", return those that are
+        parameters of the __init__() method of this class and annotated with an
+        Option instance. Returns a dictionary of key:Option-instance pairs.
+        """
+        options = cls._get_option_annotations()
+        return {key:options[key] for key in keys if key in options}
+
+    @classmethod
     def _filter_annotated_keys(cls, keys):
         """ From the list of keys given in "keys", return those that are
         parameters of the __init__() method of this class and annotated with an
-        Option instance.
+        Option instance. Returns a list of keys.
         """
-        return [key for key in keys if key in cls._get_option_annotations()]
+        return list(cls._filter_annotated_options(keys).keys())
 
     @classmethod
     def get_accepted_keys(cls):
@@ -354,9 +373,22 @@ class Program(object, metaclass=InspectType):
         """
         # The fact that we want to exclude varargs is why we need the inspect
         # info here.
-        parameters = cls._filter_annotated_keys(cls.init_signature.args +
-                                                cls.init_signature.kwonlyargs)
-        return parameters + list(Program.paramnames)
+        
+        # Get a map of keys to Option instances
+        parameters = cls._filter_annotated_options(
+            cls.init_signature.args + cls.init_signature.kwonlyargs)
+        
+        # Turn it into a map of keys to checktype
+        parameters = {key:parameters[key].get_checktype() for key in parameters}
+        
+        # Turn checktypes that are not None into one-element lists.
+        # The one-element list is treated by cadoparams.Parameters.myparams()
+        # as a non-mandatory typed parameter.
+        parameters = {key:None if checktype is None else [checktype]
+            for key,checktype in parameters.items()}
+        
+        return cadoparams.UseParameters.join_params(parameters,
+                                                    Program.paramnames)
 
     def get_stdout(self):
         return self.stdout
