@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <stdio.h>
 #include "bit_vector.h"
 #include "test_iter.h"
 #include "tests_common.h"
@@ -61,6 +62,34 @@ test_bit_vector (unsigned long iter)
     }
 }
 
+void
+test_bit_vector_read_from_file (void)
+{
+  char *s;
+  bit_vector b, c;
+  size_t n, i;
+
+  /* create a random bit vector */
+  n = 1 + (lrand48 () %  (3 * BV_BITS));
+  bit_vector_init (b, n);
+  for (i = 0; i < n; i++)
+    if (lrand48 () & 1)
+      bit_vector_flipbit (b, i);
+
+  s = tmpnam (NULL);
+  bit_vector_write_to_file (b, s);
+
+  bit_vector_init (c, n);
+  bit_vector_read_from_file (c, s);
+
+  /* check both vectors are equal */
+  for (i = 0; i < n; i++)
+    ASSERT_ALWAYS(bit_vector_getbit (b, i) == bit_vector_getbit (c, i));
+
+  bit_vector_clear (b);
+  bit_vector_clear (c);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -68,6 +97,7 @@ main (int argc, const char *argv[])
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter (&iter);
   test_bit_vector (iter);
+  test_bit_vector_read_from_file ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
