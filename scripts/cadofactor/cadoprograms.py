@@ -829,6 +829,7 @@ class SM(Program):
                  out: Parameter(),
                  ell: Parameter("gorder"),
                  smexp: Parameter(),
+                 explicit_units: Toggle()=None,
                  nmaps: Parameter("nsm")=None,
                  threads: Parameter("mt")=None,
                  **kwargs):

@@ -10,6 +10,7 @@ unset NMAPS
 unset MT
 ## for units
 unset RELSDIR
+EXPLICIT="no"
 
 while [ -n "$1" ]
 do
@@ -49,6 +50,10 @@ do
   then
     RELSDIR="$2"
     shift 2
+  elif [ "$1" = "-explicit_units" ]
+  then
+    EXPLICIT="yes"
+    shift 1
   else
     echo "Unknown parameter: $1"
     exit 1
@@ -58,9 +63,7 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-##### decide...!
-sm=false
-if $sm; then
+if [ $EXPLICIT == "no" ]; then
     CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
 else
 ## RELSDIR=....../p59.sieving.204000-205000.1_1jgx.gz
