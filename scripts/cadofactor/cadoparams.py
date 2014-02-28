@@ -101,6 +101,7 @@ class Parameters(object):
         "threaded": BoolParam,
         "only_registered": BoolParam,
         "run": BoolParam,
+        "explicit_units": BoolParam,
         "dlp": BoolParam
     }
 
