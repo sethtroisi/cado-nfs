@@ -1511,7 +1511,7 @@ class FactorBaseTask(Task):
             outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
-            self.progparams[0].setdefault("maxbits", int(self.params["I"]) - 1)
+            self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
                                     **self.progparams[0])
@@ -3423,7 +3423,7 @@ class StartClientsTask(Task):
         return (cadoprograms.WuClient,)
     @property
     def paramnames(self):
-        return {'hostnames': str, 'scriptpath': None, "nrclients": None, "run": True}
+        return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
     @property
     def param_nodename(self):
         return None
@@ -3455,7 +3455,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    int(self.params["nrclients"]))
+                   self.params["nrclients"])
 
     @staticmethod
     def make_multiplicity(names, multi):
