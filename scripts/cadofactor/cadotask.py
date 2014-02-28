@@ -1297,10 +1297,10 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.did_import = False
-        self.progparams[0].setdefault("area", 2**(2*self.params["I"]-1) \
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
                 * self.params["alim"])
-        self.progparams[0].setdefault("Bf", self.params["alim"])
-        self.progparams[0].setdefault("Bg", self.params["rlim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
     
     def run(self):
         self.logger.info("Starting")
