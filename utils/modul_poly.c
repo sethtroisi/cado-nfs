@@ -634,10 +634,8 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
 int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
 {
   modul_poly_t g, gmx, h;
-  int d, i;
-
+  int d, i, is_irreducible = 1;
   residueul_t zero;
-  modul_intinit(zero);
 
   modul_poly_make_monic (fp, p);
   d = fp->degree;
@@ -645,6 +643,7 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
   if (d <= 0)
     return 1; /* we consider the zero polynomial is irreducible */
 
+  modul_init(zero, p);
   modul_poly_init (g, 2 * d - 1);
   modul_poly_init (gmx, 2 * d - 1);
   modul_poly_init (h, 2 * d - 1);
@@ -669,13 +668,15 @@ int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
     modul_poly_set(h, fp, p);
     modul_poly_gcd (h, gmx, p);
 
-    if (h->degree > 0)
-      return 0;
+    if (h->degree > 0) {
+      is_irreducible = 0;
+      break;
+    }
   }
 
   modul_clear(zero,p);
   modul_poly_clear (g);
   modul_poly_clear (gmx);
   modul_poly_clear (h);
-  return 1;
+  return is_irreducible;
 }
