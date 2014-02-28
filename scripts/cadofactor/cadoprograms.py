@@ -15,6 +15,25 @@ class InspectType(type):
     inspect.getfullargspec()
     """
     def __init__(cls, name, bases, dct):
+        """
+        >>> def f(a:"A", b:"B"=1, *args:"*ARGS", c:"C", d:"D"=3, **kwargs:"**KWARGS"):
+        ...    pass
+        >>> i = inspect.getfullargspec(f)
+        >>> i.args
+        ['a', 'b']
+        >>> i.varargs
+        'args'
+        >>> i.varkw
+        'kwargs'
+        >>> i.defaults
+        (1,)
+        >>> i.kwonlyargs
+        ['c', 'd']
+        >>> i.kwonlydefaults
+        {'d': 3}
+        >>> i.annotations == {'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D', 'args': '*ARGS', 'kwargs': '**KWARGS'}
+        True
+        """
         super().__init__(name, bases, dct)
         # inspect.getfullargspec() produces an object with attributes:
         # args, varargs, kwonlyargs, annotations (among others)
@@ -23,12 +42,6 @@ class InspectType(type):
         # the list of the variable-length positional parameters (i.e., the name
         # of the * catch-all), and kwonlyargs contains a list of keyword-only
         # parameters.
-        # E.g.: def f(a:"A", b:"B"=1, *args:"*ARGS", c:"C", d:"D"=3,
-        #             **kwargs:"**KWARGS"):
-        # produces an object with attributes args=['a', 'b'], varargs='args',
-        # varkw='kwargs', defaults=(1,), kwonlyargs=['c', 'd'],
-        # kwonlydefaults={'d': 3}, annotations={'a': 'A', 'c': 'C', 'b': 'B',
-        # 'd': 'D', 'args': '*ARGS', 'kwargs': '**KWARGS'}
         cls.init_signature = inspect.getfullargspec(cls.__init__)
 
 
