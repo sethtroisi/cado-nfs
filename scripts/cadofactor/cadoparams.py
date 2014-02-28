@@ -122,11 +122,11 @@ class Parameters(object):
         then we assume that there is no default value and the key is mandatory;
         an error will be raised if it is not found in the parameter hierarchy.
         
-        >>> d = {'a':1,'b':2,'c':3,'foo':{'a':3},'bar':{'a':4,'baz':{'a':5}}}
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': 3, 'b': 2}
+        >>> d = {'a':'1','b':'2','c':'3','foo':{'a':'3'},'bar':{'a':'4','baz':{'a':'5'}}}
+        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': '3', 'b': '2'}
         True
         
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': 5, 'b': 2}
+        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': '5', 'b': '2'}
         True
 
         Test returning the default value of a parameter not provided in the
@@ -135,19 +135,19 @@ class Parameters(object):
         {'d': 1}
 
         Test converting to the same type as the default value
-        >>> Parameters(d).myparams(keys={'a': 'x'}, path='foo')
-        {'a': '3'}
+        >>> Parameters(d).myparams(keys={'a': 1}, path='foo')
+        {'a': 3}
         
         Test converting to an explicit type
-        >>> Parameters(d).myparams(keys={'a': str}, path='foo')
-        {'a': '3'}
+        >>> Parameters(d).myparams(keys={'a': int}, path='foo')
+        {'a': 3}
 
         Test converting if default value is bool
-        >>> Parameters({"foo": "yes"}).myparams(keys={"foo": False}, path=[])
+        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': False}, path=[])
         {'foo': True}
         
         Test converting if explicit type is bool
-        >>> Parameters({"foo": "yes"}).myparams(keys={"foo": bool}, path=[])
+        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': bool}, path=[])
         {'foo': True}
         '''
         # path can be an array of partial paths, i.e., each entry can contain
