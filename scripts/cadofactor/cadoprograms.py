@@ -579,26 +579,27 @@ class Polyselect2l(Program):
     subdir = "polyselect"
 
     def __init__(self, *,
-                 P : Parameter(), 
-                 N : Parameter(),
-                 degree : Parameter(),
+                 P : Parameter(checktype=int), 
+                 N : Parameter(checktype=int),
+                 degree : Parameter(checktype=int),
                  verbose : Toggle("v")=None,
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
-                 threads : Parameter("t")=None,
-                 admin : Parameter()=None,
-                 admax : Parameter()=None,
-                 incr : Parameter()=None,
-                 nq : Parameter()=None,
+                 threads : Parameter("t", checktype=int)=None,
+                 admin : Parameter()=None, # Semantically in int, polyselect2l
+                    # parses as double to allow scientific notation
+                 admax : Parameter()=None, # Idem
+                 incr : Parameter(checktype=int)=None,
+                 nq : Parameter(checktype=int)=None,
                  save : Parameter(is_output_file=True)=None,
                  resume : Parameter(is_input_file=True)=None,
-                 maxtime : Parameter()=None,
-                 out : Parameter()=None,
-                 printdelay : Parameter("s")=None,
-                 area : Parameter()=None,
-                 Bf : Parameter()=None,
-                 Bg : Parameter()=None,
-                 keep: Parameter()=None,
+                 maxtime : Parameter(checktype=float)=None,
+                 out : Parameter(is_output_file=True)=None,
+                 printdelay : Parameter("s", checktype=int)=None,
+                 area : Parameter(checktype=float)=None,
+                 Bf : Parameter(checktype=float)=None,
+                 Bg : Parameter(checktype=float)=None,
+                 keep: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -618,9 +619,10 @@ class MakeFB(Program):
 
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
-                 alim: Parameter(),
-                 maxbits: Parameter()=None,
-                 out: Parameter()=None,
+                 alim: Parameter(checktype=int),
+                 maxbits: Parameter(checktype=int)=None,
+                 out: Parameter(is_output_file=True)=None,
+                 side: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
