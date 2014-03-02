@@ -1,20 +1,19 @@
 /*
 Wrapper version, to be used with
-  magma -b polyfile:=$POLY relsdir:=$RELSDIR purged:=$PURGED index:=$INDEX ficunits:=$FICUNITS $DIR/nfsunits.mag
+  magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$ALGPR generators:=$GENERATORS purged:=$PURGED index:=$INDEX ficunits:=$FICUNITS ww:=true/false $DIR/nfsunits.mag
 */
 
 //
 // author: morain@lix.polytechnique.fr 
 //
 // Using units in SNFS-DL
-// version: 20140227.1200
+// version: 20140302.0900
 //
 
 QQ:=Rationals();
 QX<X>:=PolynomialRing(QQ);
 QXT<T>:=PolynomialRing(QX);
 
-// not activated (yet?)
 DLP_USE_UNITS_FLOAT:=true;
 RR:=RealField(50);
 RRY<Y>:=PolynomialRing(RR);
@@ -26,7 +25,9 @@ DLP_VERIFICATION:=false; // for expert debug mode only...
 
 // precompute all products of units^ex with |ex| <= bound.
 BuildSmallGroupTable := function(UK, bound)
-        printf "# BSGT --> %o at %o\n", UK, Cputime();		    
+        if DLP_DEBUG ge 2 then
+	    printf "# BSGT --> %o at %o\n", UK, Cputime();
+	end if;
 	G:=AssociativeArray();
 	if #UK eq 1 then
 	    for i:=-bound to bound do
@@ -41,7 +42,9 @@ BuildSmallGroupTable := function(UK, bound)
 		end for;
 	    end for;
 	end if;
-        printf "# <-- BSGT %o at %o\n", UK, Cputime();		    
+	if DLP_DEBUG ge 2 then
+ 	    printf "# <-- BSGT %o at %o\n", UK, Cputime();
+	end if;
 	return G;
 end function;
 
@@ -391,9 +394,9 @@ end procedure;
 
 // U = <G, rt, funits>
 // OUTPUT: epsab[a, b] = unit if factorization of a-b*alpha
-TreatFromDir := procedure(~FB, ~epsab, p, f, g, m, K, OK, U, prefix)
-	tmp:=prefix * ".units.listfiles";
-	cmd:="ls " * prefix * ".sieving* > " * tmp;
+TreatFromDir := procedure(~FB, ~epsab, p, f, g, m, K, OK, U, dir)
+	tmp:=dir * ".units.listfiles";
+	cmd:="ls " * dir * ".sieving* > " * tmp;
         System(cmd);
 	fd:=Open(tmp, "r");
 	nf:=0;
@@ -489,6 +492,100 @@ DLReadPurged := function(purged)
 	return ab;
 end function;
 
+// algpr contains lines "i p r" for algebraic primes (in hexa).
+// SIDE-EFFECT: fill in file 'generators' with generators.
+GeneratorsForPR := procedure(~GEN,p,K,OK,U,algpr,generators)
+	printf "# Extracting (p, r) from %o\n", algpr;
+	// first read algebraic ideals
+        fd:=POpen("gzip -dc " * algpr, "r");
+        fo:=POpen("gzip -c > " * generators, "w");
+	zero:=[0 : i in [1..Degree(K)-2]];
+	npr:=0;
+        while true do
+            s:=Gets(fd);
+            if IsEof(s) then break; end if;
+	    npr:=npr+1;
+	    if npr mod 10000 eq 0 then
+	        printf "# %o-th ideal at %o\n", npr, Cputime();
+	    end if;
+	    // s = "i p r"
+	    tmp:=Split(s, " ");
+	    i:=StringToInteger(tmp[1], 16);
+	    p:=StringToInteger(tmp[2], 16);
+	    r:=StringToInteger(tmp[3], 16);
+	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+	    ok,gp:=IsPrincipal(id);
+	    if not ok then error("Not principal"); end if;
+	    GEN[i]:=K!gp;
+	    tmp:=Eltseq(GEN[i]);
+	    fprintf fo, "%o", i;
+	    for j:=1 to #tmp do
+	        fprintf fo, " %o", tmp[j];
+	    end for;
+	    fprintf fo, "\n";
+	end while;
+end procedure;
+
+// TODO: blow up when denominators exist...!
+ReadGeneratorsForPR := procedure(~GEN, K, generators)
+	printf "# Reading generators for (p, r) from %o\n", generators;
+	t:=K.1;
+        fd:=POpen("gzip -dc " * generators, "r");
+	npr:=0;
+        while true do
+            s:=Gets(fd);
+            if IsEof(s) then break; end if;
+	    // s = "i x0 ... x_{deg-1}"
+	    tmp:=Split(s, " ");
+	    i:=StringToInteger(tmp[1]);
+	    x:=0;
+	    for j:=2 to #tmp do
+	        x:=x + StringToInteger(tmp[j]) * t^(j-2);
+	    end for;
+	    GEN[i]:=x;
+	end while;
+end procedure;
+
+// now read all ab pairs from purged, together with the ideal numbers
+// eps[(a, b)_i] <- unit for (a-b*theta) given its algebraic factorization.
+// All that matters is that index i.
+UnitsForPurged := procedure(~GEN,~epsab,p,f,g,m,K,OK,U,purged)
+	t:=K.1;
+        fd:=POpen("gzip -dc " * purged, "r");
+	s:=Gets(fd);
+	// read first line: s = "# 10807 37271 10805"
+	tmp:=Split(s, " ");
+	nr:=StringToInteger(tmp[2]);
+	lc:=StringToInteger(tmp[3]);
+	nc:=StringToInteger(tmp[4]);
+	printf "# nr = %o, lc = %o, nc = %o\n", nr, lc, nc;
+	iab:=0;
+	while true do
+	    s:=Gets(fd); if IsEof(s) then break; end if;
+	    // s = "-ad21b,8217:4,6,6,c,18,166,1c9,5f4,ad3,1fbc,14,8e,7e7,e23,8d73,0"
+	    tmp:=Split(s, ":");
+	    tmp2:=Split(tmp[1], ",");
+	    a:=StringToInteger(tmp2[1], 16);
+	    b:=StringToInteger(tmp2[2], 16);
+	    tmp2:=Split(tmp[2], ",");
+	    // among these, we have rational or algebraic primes
+	    prod:=1;
+	    for stri in tmp2 do
+	    	i:=StringToInteger(stri, 16);
+	        if not IsDefined(GEN, i) then continue; end if;
+//		printf "GEN[%o]=%o\n", i, GEN[i];
+		prod:=prod * GEN[i];
+	    end for;
+	    eta:=(a-b*t)/prod;
+	    if DLP_DEBUG ge 2 then
+	        printf "eta=%o => Norm=%o\n", eta, Norm(eta);
+	    end if;
+	    iab:=iab+1;
+	    epsab[iab]:=RecoverUnits(U, K, OK!eta);
+	    if epsab[iab] eq [] then error("No unit found"); end if;
+	end while;
+end procedure;
+
 // File XXX.index
 // ==============
 // 
@@ -546,6 +643,46 @@ DLProduceUnits := procedure(~mat, purged, index, rK, FB, epsab)
 		        printf "%o^e=%o^%o\n", ab[id], eta, e;
 		    end if;
 		end if;
+		// update units
+		for u:=1 to rK+1 do
+		    eps[u]:=eps[u] + e * eta[u];
+		end for;
+	    end for;
+	    if DLP_DEBUG ge 2 then
+	        printf "eps(R%o)=%o\n", i, eps;
+	    end if;
+	    // we don't care about the sign of eps...
+	    mat[i]:=eps[2..rK+1];
+	end while;
+end procedure;
+
+// epsab[i] = unit for (a, b)_i for i in index.
+DLProduceUnits2 := procedure(~mat, index, rK, epsab)
+        fd:=POpen("gzip -dc " * index, "r");
+	// read first line: small_nrows small_ncols
+	s:=Gets(fd);
+	tmp:=Split(s, " ");
+	nrows:=StringToInteger(tmp[1]);
+	small_ncols:=StringToInteger(tmp[2]);
+	printf "# small_nrows = %o, small_ncols = %o\n", nrows, small_ncols;
+	i:=0;
+	eps:=[0] cat [0 : j in [1..rK]];
+	while true do
+	    s:=Gets(fd); if IsEof(s) then break; end if;
+	    // s = "3 2c:-1 98:1 a7b:1"
+	    tmp:=Split(s, " ");
+	    nab:=StringToInteger(tmp[1]);
+	    i:=i+1;
+	    if i mod 10000 eq 0 then
+	        printf "## relation-set %o at %o\n", i, Cputime();
+	    end if;
+	    for	u:=1 to rK+1 do eps[u]:=0; end for;
+	    for k:=1 to nab do
+	        // tmp[k+1] = "2c:-1"
+		foo:=Split(tmp[k+1], ":");
+		id:=1 + StringToInteger(foo[1], 16);
+		e :=StringToInteger(foo[2]);
+		eta:=epsab[id];
 		// update units
 		for u:=1 to rK+1 do
 		    eps[u]:=eps[u] + e * eta[u];
@@ -639,7 +776,7 @@ DLReadSM := procedure(~M, sm, rK)
 	end while;	
 end procedure;
 
-UnitsWithParams := function(FB, epsab, G, gen_epsab, params)
+UnitsWithParams := function(FB, epsab, G, GEN, gen_epsab, params)
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
         if DLP_VERIFICATION then
 	    ell:=params["ell"];
@@ -652,6 +789,7 @@ UnitsWithParams := function(FB, epsab, G, gen_epsab, params)
 	rK:=U["rK"];
 	if gen_epsab then
 	    FB:=AssociativeArray();
+	    GEN:=AssociativeArray();
 	end if;
         if DLP_VERIFICATION then
 	    printf "# Reading small matrix\n";
@@ -671,19 +809,28 @@ UnitsWithParams := function(FB, epsab, G, gen_epsab, params)
 //	    ReadFactorBase(~FB, K, OK, U, fb, Degree(f));
 //	end if;
 
-        relsdir:=params["relsdir"];
+        purged:=params["purged"];
 	if gen_epsab then
 	    epsab:=AssociativeArray();
-	    TreatFromDir(~FB,~epsab,p,f,g,m,K,OK,U,relsdir);
-	    return FB,epsab,G; // OHHHHHHHHHHHHHHHH!
+	    if IsDefined(params, "relsdir") then
+	    	TreatFromDir(~FB,~epsab,p,f,g,m,K,OK,U,params["relsdir"]);
+	    elif IsDefined(params, "algpr") then
+	        GeneratorsForPR(~GEN,p,K,OK,U,
+				params["algpr"],params["generators"]);
+		UnitsForPurged(~GEN,~epsab,p,f,g,m,K,OK,U,purged);
+	    end if;
+	    return FB,epsab,G,GEN; // OHHHHHHHHHHHHHHHH!
 	else
 	    printf "# epsab already computed\n";
 	end if;
 
-        purged:=params["purged"];
 	index :=params["index"];
 	mat:=[];
-        DLProduceUnits(~mat, purged, index, #U["units"], FB, epsab);
+	if IsDefined(params, "relsdir") then
+ 	    DLProduceUnits(~mat, purged, index, #U["units"], FB, epsab);
+	else
+ 	    DLProduceUnits2(~mat, index, #U["units"], epsab);
+	end if;
 	nrows:=#mat;
 	// last two cols should be plenty of eps values...!
 	ficunits:=params["ficunits"];
@@ -704,7 +851,7 @@ end function;
 // ell:=63682780151674075656521332710720136307;
 // FB,epsab,G:=UnitsFromCADO("SNFS", "p59", ell, [], [], [], true);
 // UnitsFromCADO("SNFS", "p59", ell, FB, epsab, G, false);
-UnitsFromCADO := function(dir, name, ell, FB, epsab, G, gen_epsab)
+UnitsFromCADO := function(dir, name, ell, FB, epsab, G, GEN, gen_epsab)
         params:=AssociativeArray();
 	if DLP_VERIFICATION then
 	    params["ell"]:=ell;
@@ -720,33 +867,77 @@ UnitsFromCADO := function(dir, name, ell, FB, epsab, G, gen_epsab)
 	// params["fb"]:=dir * "/" * name * ".factorbase.roots.gz";
 
         // "p59"  ===> "SNFS/p59/p59.upload/p59"
- 	params["relsdir"]:=dir * "/" * name * ".upload/" * name;
+// 	params["relsdir"]:=dir * "/" * name * ".upload/" * name;
+	params["renumber"]:=dir * "/" * name * ".freerel.renumber.gz";
+	params["algpr"]:=dir * "/" * name * ".algpr.gz";
+	params["generators"]:=dir * "/" * name * ".generators.gz";
 	params["purged"]:=dir * "/" * name * ".purge.purged.gz";
 	params["index"]:=dir * "/" * name * ".merge.index.gz";
 	params["ficunits"]:=dir * "/" * name * ".units.units";
-	return UnitsWithParams(FB, epsab, G, gen_epsab, params);
+	return UnitsWithParams(FB, epsab, G, GEN, gen_epsab, params);
 end function;
 
 // ComputeUnits("SNFS", "p59", 63682780151674075656521332710720136307);
 // ComputeUnits("SNFS", "p60-2", 13);
 // ComputeUnits("SNFS", "p65d5", 13);
 ComputeUnits := procedure(dir, name, ell)
-	FB,epsab,G:=UnitsFromCADO(dir, name, ell, [], [], [], true);
-	UnitsFromCADO(dir, name, ell, FB, epsab, G, false);
+	FB,epsab,G,GEN:=UnitsFromCADO(dir, name, ell, [], [], [], [], true);
+	UnitsFromCADO(dir, name, ell, FB, epsab, G, GEN, false);
 end procedure;
 
-ComputeUnitsFromWrapper := procedure(polyfile,relsdir,purged,index,ficunits)
+// If generate = true, we must build algpr and generators.
+ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,purged,index,ficunits,generate)
         params:=AssociativeArray();
 
 	params["poly"]:=polyfile;
- 	params["relsdir"]:=relsdir;
+
+// 	params["relsdir"]:=relsdir;
+	params["renumber"]:=renumber;
+	params["algpr"]:=algpr;
+	params["generators"]:=generators;
+
 	params["purged"]:=purged;
 	params["index"]:=index;
 	params["ficunits"]:=ficunits;
 
-	FB,epsab,G:=UnitsWithParams([], [], [], true, params);
-	UnitsWithParams(FB, epsab, G, false, params);
+	FB:=[];
+	GEN:=AssociativeArray();
+	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
+	K<t>:=ext<QQ | f>;
+	OK:=MaximalOrder(K);
+	U:=AssociativeArray();
+	PrepareUnits(~U, ~G, K, OK, true);
+	U["grouptable"]:=G;
+	if generate then
+	    GeneratorsForPR(~GEN,p,K,OK,U,
+			    params["algpr"],params["generators"]);
+	else
+	    ReadGeneratorsForPR(~GEN, K, generators);
+	    epsab:=AssociativeArray();
+	    UnitsForPurged(~GEN,~epsab,p,f,g,m,K,OK,U,purged);
+	    UnitsWithParams(FB, epsab, G, GEN, false, params);
+	end if;
 end procedure;
 
-ComputeUnitsFromWrapper(polyfile,relsdir,purged,index,ficunits);
+// Simul("SNFS", "p59");
+Simul := procedure(dir, name)
+        // "p59"  ===> "SNFS/p59/"
+	dir:=dir * "/" * name;
+	poly:=dir * "/" * name * ".polyselect.poly";
+	renumber:=dir * "/" * name * ".freerel.renumber.gz";
+	algpr:=dir * "/" * name * ".algpr.gz";
+	generators:=dir * "/" * name * ".generators.gz";
+	purged:=dir * "/" * name * ".purge.purged.gz";
+	index:=dir * "/" * name * ".merge.index.gz";
+	ficunits:=dir * "/" * name * ".units.units";
+
+	printf "generate\n";
+	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,purged,
+				index,ficunits,true);
+	printf "compute units\n";
+	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,purged,
+				index,ficunits,false);
+end procedure;
+
+ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
 exit;

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 unset POLY
+unset RENUMBER
 unset PURGED
 unset INDEX
 unset OUT
@@ -17,6 +18,10 @@ do
   if [ "$1" = "-poly" ]
   then
     POLY="$2"
+    shift 2
+  elif [ "$1" = "-renumber" ]
+  then
+    RENUMBER="$2"
     shift 2
   elif [ "$1" = "-purged" ]
   then
@@ -64,12 +69,46 @@ done
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ $EXPLICIT == "no" ]; then
+
     CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
+
 else
-## RELSDIR=....../p59.sieving.204000-205000.1_1jgx.gz
-## make it ....../p59
-    RELSDIR=`echo $RELSDIR | sed 's/\.sieving.*//'`
-    CMD="magma -b polyfile:=$POLY purged:=$PURGED index:=$INDEX ficunits:=$OUT relsdir:=$RELSDIR $DIR/nfsunits.mag" 
+    # operates in 3 steps:
+    # 1. extract (p, r) ideals from $RENUMBER and put them in ...algpr.gz
+    # 2. from ...algpr.gz, compute a generator for each ideal and put it in
+    #    ...generators.gz
+    # 3. compute the unit contribution for each relation set from $INDEX
+    #
+    # algpr.gz and generators.gz should be computed only once and can be
+    # done in the meantime for instance.
+    #
+    # TODO: it might be possible to skip the algpr file (together with the
+    # debug_renumber prgm) by rewriting / using this more cleverly in C.
+
+    prgm=$DIR/../misc/debug_renumber
+
+    if [ ! -s $prgm ]; then echo "Please compile $prgm"; exit; fi
+
+    # guess names
+    algpr=`echo $RENUMBER | sed 's/freerel.renumber/algpr/'`
+    generators=`echo $RENUMBER | sed 's/freerel.renumber/generators/'`
+
+    if [ ! -s $algpr ]; then
+	echo "Building file $algpr using debug_renumber"
+	$prgm -poly $POLY -renumber $RENUMBER |\
+        grep alg | sed 's/alg side//' | sed 's/=/ /g' |\
+        awk '{print $2, $6, $8}' |\
+        gzip -c > $algpr
+    fi
+    if [ ! -s $generators ]; then
+	echo "Building file $generators using Magma"
+	CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=true $DIR/nfsunits.mag"
+	echo $CMD; $CMD
+    fi
+
+    echo "## Using magma to compute units (version 2)"
+    # results are put in $OUT
+    CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=false $DIR/nfsunits.mag"
 fi
 
 echo $CMD
