@@ -15,6 +15,25 @@ class InspectType(type):
     inspect.getfullargspec()
     """
     def __init__(cls, name, bases, dct):
+        """
+        >>> def f(a:"A", b:"B"=1, *args:"*ARGS", c:"C", d:"D"=3, **kwargs:"**KWARGS"):
+        ...    pass
+        >>> i = inspect.getfullargspec(f)
+        >>> i.args
+        ['a', 'b']
+        >>> i.varargs
+        'args'
+        >>> i.varkw
+        'kwargs'
+        >>> i.defaults
+        (1,)
+        >>> i.kwonlyargs
+        ['c', 'd']
+        >>> i.kwonlydefaults
+        {'d': 3}
+        >>> i.annotations == {'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D', 'args': '*ARGS', 'kwargs': '**KWARGS'}
+        True
+        """
         super().__init__(name, bases, dct)
         # inspect.getfullargspec() produces an object with attributes:
         # args, varargs, kwonlyargs, annotations (among others)
@@ -23,12 +42,6 @@ class InspectType(type):
         # the list of the variable-length positional parameters (i.e., the name
         # of the * catch-all), and kwonlyargs contains a list of keyword-only
         # parameters.
-        # E.g.: def f(a:"A", b:"B"=1, *args:"*ARGS", c:"C", d:"D"=3,
-        #             **kwargs:"**KWARGS"):
-        # produces an object with attributes args=['a', 'b'], varargs='args',
-        # varkw='kwargs', defaults=(1,), kwonlyargs=['c', 'd'],
-        # kwonlydefaults={'d': 3}, annotations={'a': 'A', 'c': 'C', 'b': 'B',
-        # 'd': 'D', 'args': '*ARGS', 'kwargs': '**KWARGS'}
         cls.init_signature = inspect.getfullargspec(cls.__init__)
 
 
@@ -566,26 +579,27 @@ class Polyselect2l(Program):
     subdir = "polyselect"
 
     def __init__(self, *,
-                 P : Parameter(), 
-                 N : Parameter(),
-                 degree : Parameter(),
+                 P : Parameter(checktype=int), 
+                 N : Parameter(checktype=int),
+                 degree : Parameter(checktype=int),
                  verbose : Toggle("v")=None,
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
-                 threads : Parameter("t")=None,
-                 admin : Parameter()=None,
-                 admax : Parameter()=None,
-                 incr : Parameter()=None,
-                 nq : Parameter()=None,
+                 threads : Parameter("t", checktype=int)=None,
+                 admin : Parameter()=None, # Semantically in int, polyselect2l
+                    # parses as double to allow scientific notation
+                 admax : Parameter()=None, # Idem
+                 incr : Parameter(checktype=int)=None,
+                 nq : Parameter(checktype=int)=None,
                  save : Parameter(is_output_file=True)=None,
                  resume : Parameter(is_input_file=True)=None,
-                 maxtime : Parameter()=None,
-                 out : Parameter()=None,
-                 printdelay : Parameter("s")=None,
-                 area : Parameter()=None,
-                 Bf : Parameter()=None,
-                 Bg : Parameter()=None,
-                 keep: Parameter()=None,
+                 maxtime : Parameter(checktype=float)=None,
+                 out : Parameter(is_output_file=True)=None,
+                 printdelay : Parameter("s", checktype=int)=None,
+                 area : Parameter(checktype=float)=None,
+                 Bf : Parameter(checktype=float)=None,
+                 Bg : Parameter(checktype=float)=None,
+                 keep: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -605,9 +619,10 @@ class MakeFB(Program):
 
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
-                 alim: Parameter(),
-                 maxbits: Parameter()=None,
-                 out: Parameter()=None,
+                 alim: Parameter(checktype=int),
+                 maxbits: Parameter(checktype=int)=None,
+                 out: Parameter(is_output_file=True)=None,
+                 side: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
