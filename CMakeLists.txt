@@ -217,18 +217,6 @@ set(CMAKE_CXX_COMPILER "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 set(CMAKE_C_LINKER_PREFERENCE "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 set(CMAKE_CXX_LINKER_PREFERENCE "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
 
-############################################################
-# Get a list of modified files in the working directory,
-# with their SHA1 sums, and write as a string constant to
-# modified_files.h
-
-add_custom_target(rebuild_modified_list ALL
-# OUTPUT modified_files.h
-    COMMAND ${CADO_NFS_SOURCE_DIR}/list_modified_files.sh >| ${CADO_NFS_BINARY_DIR}/modified_files.h
-    WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
-    COMMENT "Generating list of modified files in working tree"
-)
-
 #####################################################################
 # now the real stuff.
 
