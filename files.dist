@@ -18,6 +18,7 @@ cado_config_h.in
 cado_mpi_config_h.in
 portability.h
 typecast.h
+list_modified_files.sh
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
