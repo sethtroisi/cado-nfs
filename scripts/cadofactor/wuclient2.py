@@ -651,7 +651,6 @@ class WorkunitProcessor(object):
                 # index is 0-based, add 1 to make FILE1, FILE2, etc. 1-based
                 files["%s%d" % (key, index + 1)] = \
                         os.path.join(dirs[key], filename)
-        print(files)
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
             paths = {"DLDIR":self.settings["DLDIR"], 
                      "WORKDIR":self.settings["WORKDIR"],
