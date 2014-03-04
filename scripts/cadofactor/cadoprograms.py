@@ -99,7 +99,16 @@ class Option(object, metaclass=abc.ABCMeta):
         checktype was specified in the constructor.
         """
         if not self.checktype is None:
-            assert isinstance(value, self.checktype)
+            # If checktype is float, we allow both float and int as the type of
+            # value. Some programs accept parameters that are integers (such as
+            # admax) in scientific notation which is typed as floating point,
+            # thus we want to allow float parameters to be given in both
+            # integer and float typee, so that passing, e.g., admax as an int
+            # does not trip the assertion
+            if self.checktype is float:
+                assert isinstance(value, float) or isinstance(value, int)
+            else:
+                assert isinstance(value, self.checktype)
         return self._map(value)
 
     @abc.abstractmethod
@@ -586,7 +595,7 @@ class Polyselect2l(Program):
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
                  threads : Parameter("t", checktype=int)=None,
-                 admin : Parameter()=None, # Semantically in int, polyselect2l
+                 admin : Parameter()=None, # Semantically an int, polyselect2l
                     # parses as double to allow scientific notation
                  admax : Parameter()=None, # Idem
                  incr : Parameter(checktype=int)=None,
