@@ -631,6 +631,33 @@ class WorkunitProcessor(object):
     def renice(self):
         os.nice(int(self.settings["NICENESS"]))
 
+    @staticmethod
+    def is_executable(filename):
+        """ Test that the file exists and, if the stat object knows the
+        "executable by user" constant, that it is executable
+        """
+        return os.path.isfile(filename) and not (hasattr(stat, "S_IXUSR") and
+                (os.stat(filename).st_mode & stat.S_IXUSR) == 0)
+
+    @staticmethod
+    def find_binary(filename, searchpath):
+        """ Given a semicolon-separated search path, find the directory which
+        contains an executable "filename". If not found, return None.
+        """
+        # If filename contains any path information (e.g., "./foo"), then
+        # try only filename itself, like the shell does
+        if os.path.basename(filename) != filename:
+            return filename if WorkunitProcessor.is_executable(filename) \
+                    else None
+        for trydir in searchpath.split(";"):
+            # An empty directory name results in tryname == filename, so it
+            # will search in the current working directory, like the shell
+            # PATH does
+            tryname = os.path.join(trydir, filename)
+            if WorkunitProcessor.is_executable(tryname):
+                return tryname
+        return None
+
     def run_commands(self):
         if self.result_exists():
             if self.settings["KEEPOLDRESULT"]:
@@ -641,7 +668,6 @@ class WorkunitProcessor(object):
         
         # To which directory do workunit files map?
         dirs = {"FILE": self.settings["DLDIR"],
-                "EXECFILE": self.settings["BINDIR"] or self.settings["DLDIR"],
                 "RESULT": self.settings["WORKDIR"]}
         
         for key in dirs:
@@ -651,12 +677,20 @@ class WorkunitProcessor(object):
                 # index is 0-based, add 1 to make FILE1, FILE2, etc. 1-based
                 files["%s%d" % (key, index + 1)] = \
                         os.path.join(dirs[key], filename)
-        print(files)
+
+        key = "EXECFILE"
+        for (index, filename) in enumerate(self.workunit.get(key, [])):
+            if not isinstance(filename, str):
+                    filename = filename[0] # Drop checksum value
+            if self.settings["BINDIR"]:
+                binfile = self.find_binary(filename, self.settings["BINDIR"])
+                if binfile is None:
+                    raise Exception("Binary file %s not found" % filename)
+            else:
+                binfile = os.path.join(self.settings["DLDIR"], filename)
+            files["%s%d" % (key, index + 1)] = binfile
+        
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            paths = {"DLDIR":self.settings["DLDIR"], 
-                     "WORKDIR":self.settings["WORKDIR"],
-                     "EXECDIR": dirs["EXECFILE"]}
-            command = Template(command).safe_substitute(paths)
             command = Template(command).safe_substitute(files)
 
             # If niceness command line parameter was set, call self.renice() 

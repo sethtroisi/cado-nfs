@@ -11,6 +11,7 @@
 #include "macros.h"
 #include "misc.h"
 #include "portability.h"
+#include "modified_files.h"
 
 void param_list_init(param_list pl)
 {
@@ -932,11 +933,15 @@ int param_list_save_parameter(param_list pl, enum parameter_origin o,
 
 void print_command_line(FILE * stream, int argc, char * argv[])
 {
+    const char *modified_files = CADO_MODIFIED_FILES;
     /* print command line */
     fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
     for (int i = 1; i < argc; i++)
         fprintf (stream, " %s", argv[i]);
     fprintf (stream, "\n");
+    if (strlen(modified_files) > 1)
+      fprintf (stream, "# List of modified files in working directory and "
+               "their SHA1 sum:\n%s", modified_files);
 #ifdef  __GNUC__
     fprintf (stream, "# Compiled with gcc " __VERSION__ "\n");
 

@@ -237,6 +237,7 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 
 ############################################################
 
+
 set(package_basename ${CADO_DIST_ARCHIVE_NAME})
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
 set(example_subdir share/${package_basename}/examples)
