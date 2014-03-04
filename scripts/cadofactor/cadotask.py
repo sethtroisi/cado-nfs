@@ -714,6 +714,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # A list of classes of Programs which this tasks uses
         pass
     @abc.abstractproperty
+    def progparam_override(self):
+        # A list of lists of program parameters that get overridden by the
+        # Task, such as admin for polyselect2l. Specifying these overridden
+        # parameters here lets cadofactor print a warning message when the
+        # user tries to supply them in the parameter file. Not specifying
+        # them here may also lead to a program abort, when a parameter is
+        # specified both in the progparams dictionary (as extracted via
+        # .myparams()) and as a direct parameter as supplied by the Task.
+        pass
+    @abc.abstractproperty
     def paramnames(self):
         # Parameters that all tasks use
         return self.join_params(super().paramnames, 
@@ -741,9 +751,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
-        for prog in self.programs:
+        for prog, override in zip(self.programs, self.progparam_override):
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
+            for param in set(override) & set(progparams):
+                self.logger.warn('Parameter "%s" for program "%s" is '
+                                 'generated at run time and cannot be '
+                                 'supplied through the parameter file',
+                                 param, prog.name)
+                del(progparams[param])
+            
             self.progparams.append(progparams)
         # FIXME: whether to init workdir or not should not be controlled via
         # presence of a "workdir" parameter, but by class definition
@@ -1190,6 +1207,14 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     def programs(self):
         return (cadoprograms.Polyselect2l,)
     @property
+    def progparam_override(self):
+        # admin and admax are special, which is a bit ugly: these parameters
+        # to the Polyselect2l constructor are supplied by the task, but the
+        # task has itself admin, admax parameters, which specify the total
+        # size of the search range. Thus we don't include admin, admax here,
+        # or PolyselTask would incorrectly warn about them not being used.
+        return [[]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "adrange": int, "admin": 0, "admax": int, "import": None,
@@ -1468,6 +1493,9 @@ class FactorBaseTask(Task):
     def programs(self):
         return (cadoprograms.MakeFB,)
     @property
+    def progparam_override(self):
+        return [["poly", "out"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True, "I": int})
 
@@ -1541,6 +1569,9 @@ class FreeRelTask(Task):
     @property
     def programs(self):
         return (cadoprograms.FreeRel,)
+    @property
+    def progparam_override(self):
+        return [["poly", "renumber", "badideals", "out"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"dlp": False, "gzip": True})
@@ -1659,6 +1690,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def programs(self):
         return (cadoprograms.Las,)
+    @property
+    def progparam_override(self):
+        return [["q0", "q1", "poly", "factorbase", "out", "stats_stderr"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -1893,6 +1927,9 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def programs(self):
         return (cadoprograms.Duplicates1,)
     @property
+    def progparam_override(self):
+        return [["filelist", "prefix", "out"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
     _stat_conversions = (
@@ -2109,6 +2146,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def programs(self):
         return (cadoprograms.Duplicates2,)
     @property
+    def progparam_override(self):
+        return [["poly", "rel_count", "badidealinfo", "renumber", "filelist"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
@@ -2281,6 +2321,9 @@ class PurgeTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Purge,)
+    @property
+    def progparam_override(self):
+        return [["nrels", "out", "minindex", "outdel", "nprimes", "filelist"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
@@ -2529,6 +2572,10 @@ class MergeDLPTask(Task):
     def programs(self):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
+    def progparam_override(self):
+        return [["mat", "out", "keep"],
+            ["purged", "ideals", "history", "index", "out"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
     
@@ -2624,6 +2671,9 @@ class MergeTask(Task):
     def programs(self):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
+    def progparam_override(self):
+        return [["mat", "out"], ["purged", "history", "index"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
             {"skip": None, "keep": None, "gzip": True})
@@ -2708,6 +2758,9 @@ class NmbrthryTask(Task):
     @property
     def programs(self):
         return (cadoprograms.MagmaNmbrthry,)
+    @property
+    def progparam_override(self):
+        return [["poly", "badidealinfo", "badideals"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -2795,6 +2848,9 @@ class LinAlgDLPTask(Task):
     def programs(self):
         return (cadoprograms.MagmaLinalg,)
     @property
+    def progparam_override(self):
+        return [["sparsemat", "ker", "sm", "ell", "nmaps"]]
+    @property
     def paramnames(self):
         return super().paramnames
     
@@ -2849,6 +2905,9 @@ class LinAlgTask(Task, HasStatistics):
     @property
     def programs(self):
         return (cadoprograms.BWC,)
+    @property
+    def progparam_override(self):
+        return [["complete", "matrix",  "wdir", "nullspace"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -2956,6 +3015,9 @@ class CharactersTask(Task):
     def programs(self):
         return (cadoprograms.Characters,)
     @property
+    def progparam_override(self):
+        return [["poly", "purged", "index", "wfile", "out", "heavyblock"]]
+    @property
     def paramnames(self):
         return super().paramnames
 
@@ -3009,6 +3071,10 @@ class SqrtTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Sqrt,)
+    @property
+    def progparam_override(self):
+        return [["ab", "poly", "purged", "index", "kernel", "prefix", "rat",
+                 "alg", "gcd", "dep"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"N": int})
@@ -3192,6 +3258,10 @@ class SMTask(Task):
     def programs(self):
         return (cadoprograms.SM,)
     @property
+    def progparam_override(self):
+        return [["poly", "renumber", "purged", "index", "ell", "smexp",
+                 "nmaps", "out"]]
+    @property
     def paramnames(self):
         return super().paramnames
 
@@ -3250,6 +3320,10 @@ class ReconstructLogTask(Task):
     @property
     def programs(self):
         return (cadoprograms.ReconstructLog,)
+    @property
+    def progparam_override(self):
+        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
+                 "nmaps", "partial", "ker", "ideals", "relsdel", "nrels"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3421,6 +3495,9 @@ class StartClientsTask(Task):
     @property
     def programs(self):
         return (cadoprograms.WuClient,)
+    @property
+    def progparam_override(self):
+        return [["clientid", "certsha1"]]
     @property
     def paramnames(self):
         return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
