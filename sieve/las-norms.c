@@ -148,19 +148,10 @@ void init_rat_norms_bucket_region(unsigned char *S,
     d0 = d0_init;
     d1 = rac - d0 * rac;
     /* g sign is mandatory at the beginning of the line intialization.
-       If g ~= 0, the sign of g is not significant; so the sign of g
-       is the sign of u1 (g+u1 is the next g value). CAREFUL:
-       g ~== 0 is coded g + u0j == u0j. It's possible it's not suffisant;
-       in this case, the right test will be g >= fabs(u0j)*(1./(1ULL<<51)) */
-    /* Bug #16388 :
-       u0 = 5.19229685853482763e+33, u1 = 4.27451782396958897e+33.
-       So, u0j = 8.75421250348971938e+36, rac = -2.04800000000000000e+03.
-       At the beginning, int_i = -2048, so the true value of g is 0.
-       In fact, the computed value of g is 1.18059162071741130e+21.
-       And u0j + g = 8.75421250348972056e+36; so u0j + g != u0j.
-       => This test is false!
-       => We have to use the slower but correct test,
-       fabs(g) * (double) (((uint64_t) 1)<<51) >= fabs(u0j).
+       The sign of g is not significant if
+       fabs(g) * (double) (((uint64_t) 1)<<51) < fabs(u0j)
+       In this case, the sign of g is the sign of u1, because g+u1
+       is the next g value.
     */
     if (LIKELY(fabs(g) * (double) (((uint64_t) 1)<<51) >= fabs(u0j)))
       if (signbit(g)) {
@@ -392,7 +383,7 @@ poly_scale (double *u, const double *t, unsigned int d, double h)
 {
   double hpow;
   u[d] = t[d];
-  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
+  for (hpow = h; d--; hpow *= h) u[d] = t[d] * hpow;
 }
 
 /* Smart initialization of the algebraics. Computes the central
@@ -408,7 +399,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
   
 /* Macro to fill the others lines, used on SSE and non SSE versions.
    The first line is now OK; this macro copies it on the
-   VERT_NORM_STRIDE-1 next lines. */
+   VERT_NORM_STRIDE-1 next lines. p is always >= 1. */
 #define FILL_OTHER_LINES do {						\
     if (LIKELY(p > 1)) {						\
       unsigned char *mS = S + Idiv2;					\
@@ -499,7 +490,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
       _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
       u0 = _mm_unpacklo_pd(u0,u0);
       _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u0 = _mm_unpacklo_pd(u2,u2);
+      u2 = _mm_unpacklo_pd(u2,u2);
       h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
 	g = h;
@@ -722,7 +713,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, unsigned int j, si
       h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 16) {
 	g = u[d];
-	for (unsigned int k = d; --k != UINT_MAX; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	for (unsigned int k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
 	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
 	h = _mm_add_pd(h, _sixteen);
       }
@@ -1249,7 +1240,6 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   poly->deg = si->cpoly->pols[ALGEBRAIC_SIDE]->deg;
   poly->coeff = si->sides[ALGEBRAIC_SIDE]->fijd;
   alg->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
-
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 

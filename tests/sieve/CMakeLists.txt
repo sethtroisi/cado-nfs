@@ -25,6 +25,13 @@ macro (add_trialdiv_test MAXLEN)
   run_test(test_trialdiv${MAXLEN} test_trialdiv${MAXLEN})
 endmacro(add_trialdiv_test)
 
+macro (add_init_alg_norms_bucket_region)
+  add_executable(test_init_alg_norms_bucket_region test_init_alg_norms_bucket_region.c)
+  set_property(TARGET test_init_alg_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
+  target_link_libraries(test_init_alg_norms_bucket_region utils tests)
+  run_test(test_init_alg_norms_bucket_region test_init_alg_norms_bucket_region)
+endmacro(add_init_alg_norms_bucket_region)
+
 # Try specific TRIALDIV_MAXLEN from 1 to 6
 add_trialdiv_test(1)
 add_trialdiv_test(2)
@@ -32,5 +39,7 @@ add_trialdiv_test(3)
 add_trialdiv_test(4)
 add_trialdiv_test(5)
 add_trialdiv_test(6)
+
+add_init_alg_norms_bucket_region()
 
 add_subdirectory (ecm)
