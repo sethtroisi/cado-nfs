@@ -40,6 +40,6 @@ add_trialdiv_test(4)
 add_trialdiv_test(5)
 add_trialdiv_test(6)
 
-add_init_alg_norms_bucket_region()
+# add_init_alg_norms_bucket_region()
 
 add_subdirectory (ecm)
