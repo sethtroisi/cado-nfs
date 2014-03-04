@@ -26,9 +26,7 @@ set (sources_io
 # won't be PHONY so that it would not be run again if modified_files.h already
 # exists
 add_custom_target(renew_modified_files
-    COMMAND "${CADO_NFS_SOURCE_DIR}/scripts/list_modified_files.sh" "${CMAKE_CURRENT_BINARY_DIR}/modified_files_new.h"
-    COMMAND cmake -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/modified_files_new.h" "${CMAKE_CURRENT_BINARY_DIR}/modified_files.h"
-    COMMAND cmake -E remove -f "${CMAKE_CURRENT_BINARY_DIR}/modified_files_new.h"
+    COMMAND "${CADO_NFS_SOURCE_DIR}/scripts/list_modified_files.sh" "${CMAKE_CURRENT_BINARY_DIR}/modified_files.h"
     WORKING_DIRECTORY "${CADO_NFS_SOURCE_DIR}"
     COMMENT "Generating list of modified files in working tree"
 )

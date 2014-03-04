@@ -17,4 +17,11 @@ function list_modified() {
   echo '"'
 }
 
-list_modified >| "$OUTPUT_FILE"
+TEMPFILE="`mktemp`"
+list_modified >> "$TEMPFILE"
+if ! [ -f "$OUTPUT_FILE" ] || ! cmp -s "$TEMPFILE" "$OUTPUT_FILE"
+then
+  rm -f "$OUTPUT_FILE"
+  cp "$TEMPFILE" "$OUTPUT_FILE"
+fi
+rm -f "$TEMPFILE"
