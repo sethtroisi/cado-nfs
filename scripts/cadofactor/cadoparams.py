@@ -65,49 +65,10 @@ class Parameters(object):
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
     
-    key_types = {
-        "admin": int,
-        "admax": int,
-        "adrange": int,
-        "qmin": int,
-        "qmax": int,
-        "qrange": int,
-        "maxwu": int,
-        "alim": int,
-        "rlim": int,
-        "rels_wanted": int,
-        "nslices_log": int,
-        "lognrels": int,
-        "skip": int,
-        "N": int,
-        "nrclients": int,
-        "threads": int,
-        "port": int,
-        "verbose": BoolParam,
-        "rm": BoolParam,
-        "quite": BoolParam,
-        "sizeonly": BoolParam,
-        "nopowers": BoolParam,
-        "ratq": BoolParam,
-        "bzip": BoolParam,
-        "raw": BoolParam,
-        "complete": BoolParam,
-        "wipeout": BoolParam,
-        "dryrun": BoolParam,
-        "keepoldresult": BoolParam,
-        "nosha1check": BoolParam,
-        "compression": BoolParam,
-        "ssl": BoolParam,
-        "threaded": BoolParam,
-        "only_registered": BoolParam,
-        "run": BoolParam,
-        "explicit_units": BoolParam,
-        "dlp": BoolParam
-    }
-
     def __init__(self, *args, **kwargs):
         self.data = dict(*args, **kwargs)
         self._have_read_defaults = False
+        self.key_types = {}
     
     def myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
@@ -198,16 +159,10 @@ class Parameters(object):
                 else:
                     target_type = type(keys[key])
                     result.setdefault(key, keys[key])
-                # BoolType is special, we use BoolParam for the conversion
-                if target_type is bool:
-                    target_type = BoolParam
+                
                 # Convert type
-                try:
-                    result[key] = target_type(result[key])
-                except ValueError as e:
-                    logger.critical("Error while parsing parameter '%s': %s",
-                                    key, str(e))
-                    raise
+                result[key] = self._convert_one_type(splitpath, key,
+                                                     result[key], target_type)
         return result
     
     @staticmethod
@@ -339,43 +294,102 @@ class Parameters(object):
             else:
                 dic[key] = self._subst_reference(path, key, dic[key])
     
-    def _convert_one_type(self, path, key, orig_value):
-        """ If a particular data type is registered in for this parameter,
-        convert its value to that type, otherwise return the value unchanged.
-        If the dataype is int, and the characters 'e' or '.' occur in the value,
-        we convert to float first to convert scientific notation.
+    @staticmethod
+    def _cast_to_int(value):
+        """ Return value cast to int
+        
+        If we can't cast to int directly, try going through float first to
+        parse scientific notation
+        
+        >>> Parameters._cast_to_int("1")
+        1
+        >>> Parameters._cast_to_int("1x")
+        Traceback (most recent call last):
+        ValueError: invalid literal for int() with base 10: '1x'
+        >>> Parameters._cast_to_int("1.5e4")
+        15000
+        >>> Parameters._cast_to_int("1.05e1")
+        Traceback (most recent call last):
+        ValueError: Value 1.05e1 cannot be converted to int without loss
         """
-        # If this value was converted before, don't try to convert again, as
-        # the code below assumes it is a str
-        if not isinstance(orig_value, str):
-            return orig_value
+        try:
+            return int(value)
+        except ValueError as e:
+            try:
+                floatvalue = float(value)
+                if float(int(floatvalue)) == floatvalue:
+                    return int(floatvalue)
+            except ValueError:
+                # If that didn't work either, raise the original cast-to-int
+                # exception
+                raise e
+        raise ValueError("Value %s cannot be converted to int without loss"
+                         % value)
+    
+    def _convert_one_type(self, path, key, orig_value, datatype,
+                          fatal_keytype=False):
+        """ Convert orig_value to type datatype
+        
+        For datatype=None, return orig_value unchanged.
+        For datatype=bool, use BoolParam for the conversion.
+        For datatype=int, try converting to float first if necessary to parse
+        scientific notation.
+        Add datatype to key_types, and check for conflict.
+        
+        >>> p = Parameters({})
+        
+        >>> p._convert_one_type([], "foo", "1", int)
+        1
+        
+        >>> p._convert_one_type([], "bar", "1", bool)
+        True
+        
+        >>> p._convert_one_type([], "foo", "1x", int)
+        Traceback (most recent call last):
+        ValueError: Cannot convert value 1x for parameter foo to type int: invalid literal for int() with base 10: '1x'
+        
+        >>> p._convert_one_type([], "foo", "1", bool, fatal_keytype=True)
+        Traceback (most recent call last):
+        Exception: Conflicting type request for parameter foo: previously used with type int, now bool
+        """
         param = ".".join(path + [key])
         # print ("Trying to convert param=%s, value=%s" % (param, orig_value))
-        datatype = self.key_types.get(key, None)
-        value = orig_value
         if datatype is None:
             return value
-        if datatype is int and ("e" in value or "." in value):
-            value = float(value)
-            if float(int(value)) != value:
-                raise ValueError("Value %s for parameter %s cannot be "
-                                 "converted to int without loss"
-                                 % (orig_value, param))
+
+        if datatype is int:
+            castfunction = self._cast_to_int
+        # bool Type is special, we use BoolParam for the conversion
+        elif datatype is bool:
+            castfunction = BoolParam
+        else:
+            castfunction = datatype
+        
         try:
-            value = datatype(value)
+            value = castfunction(orig_value)
             # print ("Converted param=%s, value=%r to %r, type %s" %
             #       (param, orig_value, value, datatype.__name__))
         except ValueError as err:
-            ValueError("Cannot convert value %s for parameter %s to type %s"
-                       % (value, param, datatype.__name__))
+            raise ValueError("Cannot convert value %s for parameter %s to type "
+                             "%s: %s" % (orig_value, param, datatype.__name__,
+                                         err))
+
+        if key in self.key_types:
+            if not datatype is self.key_types[key]:
+                if fatal_keytype:
+                    raise Exception("Conflicting type request for parameter "
+                             "%s: previously used with type %s, now %s" %
+                             (param, self.key_types[key].__name__,
+                             datatype.__name__))
+                logger.error("Conflicting type request for parameter "
+                             "%s: previously used with type %s, now %s",
+                             param, self.key_types[key].__name__,
+                             datatype.__name__)
+        else:
+            self.key_types[key] = datatype
+
         return value
 
-    def _convert_types(self, dic, path):
-        for key in dic:
-            if isinstance(dic[key], dict):
-                self._convert_types(dic[key], path + [key])
-            else:
-                dic[key] = self._convert_one_type(path, key, dic[key])
 
     def parseline(self, line):
         line2 = line.split('#', 1)[0] if '#' in line else line
@@ -399,7 +413,7 @@ class Parameters(object):
                           "tasks.polyselect.degree=5", \
                           "tasks.polyselect.incr =60"])
         >>> p.data["tasks"]["sieve"]["rels_wanted"]
-        1
+        '1'
         >>> p.myparams(["degree", "incr"], "tasks.polyselect") == \
         {'incr': '60', 'degree': '5'}
         True
@@ -413,7 +427,6 @@ class Parameters(object):
             value = self.subst_env_var(key, value)
             self._insertkey(key, value)
         self._subst_references(self.data, [])
-        self._convert_types(self.data, [])
 
     def readfile(self, filename):
         """ Read parameters from a file """
