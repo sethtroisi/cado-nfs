@@ -61,10 +61,15 @@ void *contiguous_malloc(const size_t size)
     return NULL;
   }
 
-#ifdef HAVE_MMAP
+#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
   /* Try to mmap a large page, if we haven't already */
   if (largepages == NULL) {
-    largepages = mmap (NULL, LARGE_PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
+#ifdef MAP_ANONYMOUS
+    const int anon = MAP_ANONYMOUS;
+#else
+    const int anon = MAP_ANON;
+#endif
+    largepages = mmap (NULL, LARGE_PAGE_SIZE, PROT_READ|PROT_WRITE, anon | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
     if (largepages != MAP_FAILED) {
       largepage_size = LARGE_PAGE_SIZE;
       printf ("# mmap-ed large page at %p\n", largepages);
