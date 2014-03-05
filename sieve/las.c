@@ -3648,7 +3648,7 @@ void * process_bucket_region(thread_data_ptr th)
         thread_side_data_ptr ts = th->sides[side];
         free(ts->ssdpos);
         free(ts->rsdpos);
-        free_aligned(S[side], BUCKET_REGION + MEMSET_MIN, 16);
+        free_pagealigned(S[side], BUCKET_REGION + MEMSET_MIN);
     }
 
     return NULL;
