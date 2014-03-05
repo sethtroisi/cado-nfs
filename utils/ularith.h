@@ -85,6 +85,18 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
 #endif
 }
 
+/* Let a = a1 + 2^k * a2, b = b1 + 2^k * b2, where k is number of bits
+   in an unsigned long. Return 1 if a > b, and 0 if a <= b. */
+static inline int
+ularith_gt_2ul_2ul(unsigned long, unsigned long,
+                   unsigned long, unsigned long) ATTRIBUTE((const));
+static inline int
+ularith_gt_2ul_2ul(const unsigned long a1, const unsigned long a2,
+                   const unsigned long b1, const unsigned long b2)
+{
+  return a2 > b2 || (a2 == b2 && a1 > b1);
+}
+
 /* Add an unsigned long to two unsigned longs with carry propagation from 
    low word (r1) to high word (r2). Any carry out from high word is lost. */
 
@@ -183,7 +195,8 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   unsigned long u1 = *r1 + a1, u2 = *r2 + a2;
   if (u1 < *r1)
     u2++;
-  cy = (u2 < *r2) ? 1 : 0;
+  /* Overflow occurred iff the sum is smaller than one of the summands */
+  cy = ularith_gt_2ul_2ul(a1, a2, u1, u2);
   *r1 = u1;
   *r2 = u2;
 #endif
@@ -291,9 +304,9 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
     : "cc");
 #else
   unsigned long u1 = *r1 - a1, u2 = *r2 - a2;
-  if (u1 > *r1)
+  if (a1 > *r1)
     u2--;
-  cy = (u2 > *r2) ? 1 : 0;
+  cy = ularith_gt_2ul_2ul(a1, a2, *r1, *r2);
   *r1 = u1;
   *r2 = u2;
 #endif
@@ -326,7 +339,7 @@ ularith_sub_ul_ul_ge (unsigned long *r, const unsigned long a)
     : "cc");
 #else
   t -= a;
-  if (t < *r)
+  if (*r >= a)
     *r = t;
 #endif
 }
@@ -359,12 +372,10 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
     : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
     : "cc");
 #else
-  t1 -= a1;
-  t2 -= a2 + (t1 > *r1);
-  if (t2 <= *r2)
+  if (!ularith_gt_2ul_2ul(a1, a2, *r1, *r2))
     {
-      *r1 = t1;
-      *r2 = t2;
+      *r1 = t1 - a1;
+      *r2 = t2 - a2 - (a1 > t1);
     }
 #endif
 }

@@ -37,8 +37,13 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if true; then
 CMD="magma ell:=$ELL nmaps:=$NMAPS sparsefile:=$SPARSE smfile:=$SM kerfile:=$KER $DIR/linalg.mag"
 
 echo $CMD
 
 $CMD
+
+else
+$HOME/Cnt/ChengWang/cravate/NTL/bin/x86_64/linalg4catrel -ell $ELL -sparse $SPARSE -sm $SM -mode sparse -nthreads 2 > $KER
+fi

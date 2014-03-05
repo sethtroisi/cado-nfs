@@ -252,9 +252,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%" PRId64 ") (%lu,%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%lu,%lld) (%lu,%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
 
@@ -593,11 +594,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
 #endif
@@ -635,9 +636,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%" PRIu32 ",%" PRId64 ") (%" PRIu32 ",%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%" PRIu32 ",%lld) (%" PRIu32 ",%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
   mpz_init (tmp);
@@ -974,11 +976,11 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
-                    logmu, ad, l, m, logmu0c3, logmu0c4);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
 #endif
@@ -1098,7 +1100,7 @@ collision_on_p ( header_t header,
             }
         }
 #ifdef DEBUG_POLYSELECT2L
-      fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+      fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
       fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1332,8 +1334,8 @@ collision_on_each_sq ( header_t header,
     }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", milliseconds () - st);
-  fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
+  fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
@@ -1746,7 +1748,7 @@ gmp_collision_on_p ( header_t header,
   }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+  fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1816,7 +1818,7 @@ gmp_collision_on_each_sq ( header_t header,
   } // next p
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n",
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n",
 	   milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif

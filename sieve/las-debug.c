@@ -20,92 +20,89 @@
 /* The trivial calls for when TRACE_K is *not* defined are inlines in
  * las-debug.h */
 
-#ifndef TRACE_K
-#if defined(TRACE_AB) || defined(TRACE_IJ) || defined(TRACE_Nx)
-#warning "TRACE_(AB|IJ|Nx) values are ignored unless TRACE_K is defined"
-#endif
-#endif
-
 
 /* recall that TRACE_K requires TRACK_CODE_PATH ; so we may safely use
  * all where_am_I types here */
 
-#ifdef TRACE_K
-
-#if defined(TRACE_AB) + defined(TRACE_IJ) + defined(TRACE_Nx) != 1
-#error "when TRACE_K is defined, exactly one of TRACE_(AB|IJ|Nx) must be defined"
-#endif
-
-#ifdef  TRACE_Nx
-struct trace_Nx_t trace_Nx = TRACE_Nx;
-#else
 struct trace_Nx_t trace_Nx = { 0, UINT_MAX};
-#endif
-
-#ifdef TRACE_AB
-struct trace_ab_t trace_ab = TRACE_AB;
-#else
 struct trace_ab_t trace_ab = { 0, 0 };
-#endif
-
-#ifdef  TRACE_IJ
-struct trace_ij_t trace_ij = TRACE_IJ;
-#else
 struct trace_ij_t trace_ij = { 0, UINT_MAX, };
-#endif
 
 /* two norms of the traced (a,b) pair */
 mpz_t traced_norms[2];
 
-/* This fills all the trace_* structures from the main one. Which
- * structure is the main structure depends on which among the TRACE_*
- * flags has been defined */
-void trace_per_sq_init(sieve_info_srcptr si MAYBE_UNUSED)
+/* This fills all the trace_* structures from the main one. The main
+ * structure is the one for which a non-NULL pointer is passed.
+ */
+void trace_per_sq_init(sieve_info_srcptr si, const struct trace_Nx_t *Nx,
+                       const struct trace_ab_t *ab,
+                       const struct trace_ij_t *ij)
 {
-#if     defined(TRACE_AB)
-    /* can possibly fall outside the q-lattice. We have to check for it */
-    if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
-        IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-    } else {
-        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
-        trace_ij.i=0;
-        trace_ij.j=UINT_MAX;
-        trace_Nx.N=0;
-        trace_Nx.x=UINT_MAX;
+#ifndef TRACE_K
+    if (Nx != NULL || ab != NULL || ij != NULL) {
+        fprintf (stderr, "Error, relation tracing requested but this siever "
+                 "was compiled without TRACE_K.\n");
+        exit(EXIT_FAILURE);
     }
-#elif   defined(TRACE_IJ)
-    IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
-    IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-#elif   defined(TRACE_Nx)
-    NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
-    IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+    return;
 #endif
+    /* At most one of the three coordinates must be specified */
+    ASSERT_ALWAYS((Nx != NULL) + (ab != NULL) + (ij != NULL) <= 1);
+
+    if (ab != NULL) {
+      trace_ab = *ab;
+      /* can possibly fall outside the q-lattice. We have to check for it */
+      if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
+          IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
+      } else {
+          fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced "
+                  "is outside of the current q-lattice\n",
+                  trace_ab.a, trace_ab.b);
+          trace_ij.i=0;
+          trace_ij.j=UINT_MAX;
+          trace_Nx.N=0;
+          trace_Nx.x=UINT_MAX;
+      }
+    } else if (ij != NULL) {
+        trace_ij = *ij;
+        IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+        IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
+    } else if (Nx != NULL) {
+        trace_Nx = *Nx;
+        NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
+        IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+    }
 
     if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
-        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
+        fprintf(stderr, "# Relation (%" PRId64 ",%" PRIu64 ") to be traced is "
+                "outside of the current (i,j)-rectangle (j=%u)\n",
+                trace_ab.a, trace_ab.b, trace_ij.j);
         trace_ij.i=0;
         trace_ij.j=UINT_MAX;
         trace_Nx.N=0;
         trace_Nx.x=UINT_MAX;
     }
     if (trace_ij.i || trace_ij.j < UINT_MAX) {
-        fprintf(stderr, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") (i,j)=(%d,%u), (N,x)=(%u,%u)\n",
-                trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N, trace_Nx.x);
+        fprintf(stderr, "# Tracing relation (a,b)=(%" PRId64 ",%" PRIu64 ") "
+                "(i,j)=(%d,%u), (N,x)=(%u,%u)\n",
+                trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N,
+                trace_Nx.x);
     }
 
     for(int side = 0 ; side < 2 ; side++) {
         mpz_init(traced_norms[side]);
-        mpz_poly_homogeneous_eval_siui(traced_norms[side], si->sides[side]->fij,
-                trace_ij.i, trace_ij.j);
+        mpz_poly_homogeneous_eval_siui(traced_norms[side], 
+                si->sides[side]->fij, trace_ij.i, trace_ij.j);
     }
 }
 
 void trace_per_sq_clear(sieve_info_srcptr si MAYBE_UNUSED)
 {
     for(int side = 0 ; side < 2 ; side++)
-        mpz_init(traced_norms[side]);
+        mpz_clear(traced_norms[side]);
 }
 
+#ifdef TRACE_K
 int test_divisible(where_am_I_ptr w)
 {
     /* we only check divisibility for the given (N,x) value */

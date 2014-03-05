@@ -6,6 +6,7 @@ LAS="$2"
 POLY="$3"
 REFERENCE_SHA1="$4"
 REFERENCE_REVISION="$5"
+shift 5
 
 if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
 then
@@ -25,7 +26,10 @@ then
   exit 1
 fi
 
-if [[ -z "$rlim" || -z "$alim" || -z "$lpbr" || -z "$lpba" || -z "$maxbits" || -z "$mfbr" || -z "$mfba" || -z "$rlambda" || -z "$alambda" || -z "$I" || -z "$q0" || -z "$q1" ]]
+
+if [[ -z "$rlim" || -z "$alim" || -z "$lpbr" || -z "$lpba" || -z "$maxbits" \
+      || -z "$mfbr" || -z "$mfba" || -z "$rlambda" || -z "$alambda" || -z "$I" \
+      || -z "$q0" || ( -z "$q1" && -z "$rho" ) ]]
 then
   echo "Required shell environment variable not set" >&2
   exit 1
@@ -42,11 +46,20 @@ FB="${TMPDIR}/${BASENAME}.roots"
 RELS="${TMPDIR}/${BASENAME}.rels"
 FBC="${TMPDIR}/${BASENAME}.fbc"
 
+if [ -n "$q1" ]
+then
+  end=("-q1" "$q1")
+fi
+if [ -n "$rho" ]
+then
+  end=("-rho" "$rho")
+fi
+
 "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 # first exercise the -fbc command-line option to create a cache file
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" || exit 1
+"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 # then use the cache file created above
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q1" -out "${RELS}" -fbc "${FBC}" || exit 1
+"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 
 
 SHA1BIN=sha1sum

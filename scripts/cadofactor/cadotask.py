@@ -714,6 +714,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # A list of classes of Programs which this tasks uses
         pass
     @abc.abstractproperty
+    def progparam_override(self):
+        # A list of lists of program parameters that get overridden by the
+        # Task, such as admin for polyselect2l. Specifying these overridden
+        # parameters here lets cadofactor print a warning message when the
+        # user tries to supply them in the parameter file. Not specifying
+        # them here may also lead to a program abort, when a parameter is
+        # specified both in the progparams dictionary (as extracted via
+        # .myparams()) and as a direct parameter as supplied by the Task.
+        pass
+    @abc.abstractproperty
     def paramnames(self):
         # Parameters that all tasks use
         return self.join_params(super().paramnames, 
@@ -741,9 +751,16 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
-        for prog in self.programs:
+        for prog, override in zip(self.programs, self.progparam_override):
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
+            for param in set(override) & set(progparams):
+                self.logger.warn('Parameter "%s" for program "%s" is '
+                                 'generated at run time and cannot be '
+                                 'supplied through the parameter file',
+                                 param, prog.name)
+                del(progparams[param])
+            
             self.progparams.append(progparams)
         # FIXME: whether to init workdir or not should not be controlled via
         # presence of a "workdir" parameter, but by class definition
@@ -847,7 +864,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.stderrfile = program.get_stderr()
             # stderr must be either in a string or in a file, but not both
             assert self.stderr is None or not self.stderrfile
-            self.output_files = program.get_regular_output_files()
+            self.output_files = program.get_output_files(with_stdio=False)
             self.cmd_line = cmd_line
             self.host = host
         def get_wu_id(self):
@@ -883,7 +900,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             cmd_line = message.get_command_line(command_nr)
             if cmd_line:
                 self.logger.error("Command line was: %s", cmd_line)
-            stderr = message.read_stderr(command_nr).decode('ascii')
+            stderr = message.read_stderr(command_nr)
             stderrfilename = message.get_stderrfile(command_nr)
             if stderrfilename:
                 stderrmsg = " (stored in file %s)" % stderrfilename
@@ -919,8 +936,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     def filter_notification(self, message):
         wuid = message.get_wu_id()
         rc = message.get_exitcode(0)
-        stdout = message.read_stdout(0).decode("ascii")
-        stderr = message.read_stderr(0).decode("ascii")
+        stdout = message.read_stdout(0)
+        stderr = message.read_stderr(0)
         output_files = message.get_output_files()
         self.logger.message("%s: Received notification for wuid=%s, rc=%d, "
                             "output_files=[%s]",
@@ -1190,6 +1207,14 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     def programs(self):
         return (cadoprograms.Polyselect2l,)
     @property
+    def progparam_override(self):
+        # admin and admax are special, which is a bit ugly: these parameters
+        # to the Polyselect2l constructor are supplied by the task, but the
+        # task has itself admin, admax parameters, which specify the total
+        # size of the search range. Thus we don't include admin, admax here,
+        # or PolyselTask would incorrectly warn about them not being used.
+        return [[]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "adrange": int, "admin": 0, "admax": int, "import": None,
@@ -1297,10 +1322,10 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.did_import = False
-        self.progparams[0].setdefault("area", 2**(2*self.params["I"]-1) \
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
                 * self.params["alim"])
-        self.progparams[0].setdefault("Bf", self.params["alim"])
-        self.progparams[0].setdefault("Bg", self.params["rlim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
     
     def run(self):
         self.logger.info("Starting")
@@ -1468,6 +1493,9 @@ class FactorBaseTask(Task):
     def programs(self):
         return (cadoprograms.MakeFB,)
     @property
+    def progparam_override(self):
+        return [["poly", "out"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True, "I": int})
 
@@ -1511,7 +1539,7 @@ class FactorBaseTask(Task):
             outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
-            self.progparams[0].setdefault("maxbits", int(self.params["I"]) - 1)
+            self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
                                     **self.progparams[0])
@@ -1541,6 +1569,9 @@ class FreeRelTask(Task):
     @property
     def programs(self):
         return (cadoprograms.FreeRel,)
+    @property
+    def progparam_override(self):
+        return [["poly", "renumber", "badideals", "out"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"dlp": False, "gzip": True})
@@ -1606,7 +1637,7 @@ class FreeRelTask(Task):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            stderr = message.read_stderr(0).decode("ascii")
+            stderr = message.read_stderr(0).decode("utf-8")
             update = self.parse_file(stderr.splitlines())
             update["freerelfilename"] = freerelfilename.get_wdir_relative()
             update["renumberfilename"] = renumberfilename.get_wdir_relative()
@@ -1660,6 +1691,9 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def programs(self):
         return (cadoprograms.Las,)
     @property
+    def progparam_override(self):
+        return [["q0", "q1", "poly", "factorbase", "out", "stats_stderr"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int, 
@@ -1703,10 +1737,10 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def stat_formats(self):
         return (
-            ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
-                ", max bucket fill: {stats_max_bucket_fill[0]}"],
-            ["Total CPU time: {stats_total_cpu_time[0]}s"],
-            ["Total time: {stats_total_time[0]}s"],
+            ["Average J: {stats_avg_J[0]:g} for {stats_avg_J[1]:d} special-q",
+                ", max bucket fill: {stats_max_bucket_fill[0]:g}"],
+            ["Total CPU time: {stats_total_cpu_time[0]:g}s"],
+            ["Total time: {stats_total_time[0]:g}s"],
         )
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
@@ -1838,7 +1872,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             if filename in self.get_output_filenames():
                 self.logger.info("Re-scanning file %s", filename)
                 nrels = self.get_nrels() - self.get_nrels(filename)
-                self.state.update({"rels_found": nrels})
+                self.state.update({"rels_found": nrels}, commit=False)
                 self.forget_output_filenames([filename], commit=True)
             self.add_file(filename)
 
@@ -1892,6 +1926,9 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     @property
     def programs(self):
         return (cadoprograms.Duplicates1,)
+    @property
+    def progparam_override(self):
+        return [["filelist", "prefix", "out"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
@@ -2109,6 +2146,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def programs(self):
         return (cadoprograms.Duplicates2,)
     @property
+    def progparam_override(self):
+        return [["poly", "rel_count", "badidealinfo", "renumber", "filelist"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
@@ -2282,9 +2322,12 @@ class PurgeTask(Task):
     def programs(self):
         return (cadoprograms.Purge,)
     @property
+    def progparam_override(self):
+        return [["nrels", "out", "minindex", "outdel", "nprimes", "filelist"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "alim": int, "rlim": int})
+            {"dlp": False, "alim": int, "rlim": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -2317,9 +2360,10 @@ class PurgeTask(Task):
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
-        purgedfile = self.workdir.make_filename("purged.gz")
+        use_gz = ".gz" if self.params["gzip"] else ""
+        purgedfile = self.workdir.make_filename("purged" + use_gz)
         if self.params["dlp"]:
-            relsdelfile = self.workdir.make_filename("relsdel.gz")
+            relsdelfile = self.workdir.make_filename("relsdel" + use_gz)
         else:
             relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
@@ -2351,16 +2395,17 @@ class PurgeTask(Task):
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         message = self.submit_command(p, "")
-        stdout = message.read_stdout(0).decode('ascii')
-        stderr = message.read_stderr(0).decode('ascii')
+        stdout = message.read_stdout(0).decode('utf-8')
+        stderr = message.read_stderr(0).decode('utf-8')
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels })
+            update = {"purgedfile": purgedfile.get_wdir_relative(),
+                      "input_nrels": input_nrels }
             if self.params["dlp"]:
-                self.state.update({"relsdelfile": relsdelfile.get_wdir_relative() })
+                update["relsdelfile"] = relsdelfile.get_wdir_relative()
+            self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2527,6 +2572,10 @@ class MergeDLPTask(Task):
     def programs(self):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
+    def progparam_override(self):
+        return [["mat", "out", "keep"],
+            ["purged", "ideals", "history", "index", "out"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
     
@@ -2622,6 +2671,9 @@ class MergeTask(Task):
     def programs(self):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
+    def progparam_override(self):
+        return [["mat", "out"], ["purged", "history", "index"]]
+    @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
             {"skip": None, "keep": None, "gzip": True})
@@ -2707,6 +2759,9 @@ class NmbrthryTask(Task):
     def programs(self):
         return (cadoprograms.MagmaNmbrthry,)
     @property
+    def progparam_override(self):
+        return [["poly", "badidealinfo", "badideals"]]
+    @property
     def paramnames(self):
         return super().paramnames
     
@@ -2733,7 +2788,7 @@ class NmbrthryTask(Task):
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
 
-        stdout = message.read_stdout(0).decode("ascii")
+        stdout = message.read_stdout(0).decode("utf-8")
         update = {}
         for line in stdout.splitlines():
             match = re.match(r'ell (\d+)', line)
@@ -2745,20 +2800,20 @@ class NmbrthryTask(Task):
             match = re.match(r'nmaps (\d+)', line)
             if match:
                 update["nmaps"] = match.group(1)
-        self.state.update(update)
+        update["badinfofile"] = badinfofile.get_wdir_relative()
+        update["badfile"] = badfile.get_wdir_relative()
         
-        if not "ell" in self.state.keys():
+        if not "ell" in update:
             raise Exception("Stdout does not give ell")
-        if not "smexp" in self.state.keys():
+        if not "smexp" in update:
             raise Exception("Stdout does not give smexp")
-        if not "nmaps" in self.state.keys():
+        if not "nmaps" in update:
             raise Exception("Stdout does not give nmaps")
         if not badfile.isfile():
             raise Exception("Output file %s does not exist" % badfile)
         if not badinfofile.isfile():
             raise Exception("Output file %s does not exist" % badinfofile)
-        update = {"badinfofile": badinfofile.get_wdir_relative(), 
-                "badfile": badfile.get_wdir_relative()}
+        # Update the state entries atomically
         self.state.update(update)
 
         self.logger.info("Will computing Dlog modulo %s", self.state["ell"])
@@ -2792,6 +2847,9 @@ class LinAlgDLPTask(Task):
     @property
     def programs(self):
         return (cadoprograms.MagmaLinalg,)
+    @property
+    def progparam_override(self):
+        return [["sparsemat", "ker", "sm", "ell", "nmaps"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -2847,6 +2905,9 @@ class LinAlgTask(Task, HasStatistics):
     @property
     def programs(self):
         return (cadoprograms.BWC,)
+    @property
+    def progparam_override(self):
+        return [["complete", "matrix",  "wdir", "nullspace"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -2954,6 +3015,9 @@ class CharactersTask(Task):
     def programs(self):
         return (cadoprograms.Characters,)
     @property
+    def progparam_override(self):
+        return [["poly", "purged", "index", "wfile", "out", "heavyblock"]]
+    @property
     def paramnames(self):
         return super().paramnames
 
@@ -3007,6 +3071,10 @@ class SqrtTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Sqrt,)
+    @property
+    def progparam_override(self):
+        return [["ab", "poly", "purged", "index", "kernel", "prefix", "rat",
+                 "alg", "gcd", "dep"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"N": int})
@@ -3179,16 +3247,20 @@ class SqrtTask(Task):
         return N
 
 class SMTask(Task):
-    """ Computes Schirokauher Maps """
+    """ Computes Schirokauer Maps """
     @property
     def name(self):
         return "sm"
     @property
     def title(self):
-        return "Schirokauher Maps"
+        return "Schirokauer Maps"
     @property
     def programs(self):
         return (cadoprograms.SM,)
+    @property
+    def progparam_override(self):
+        return [["poly", "renumber", "purged", "index", "ell", "smexp",
+                 "nmaps", "out"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3204,6 +3276,8 @@ class SMTask(Task):
         if not "sm" in self.state:
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
+            badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -3214,7 +3288,8 @@ class SMTask(Task):
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(poly=polyfilename,
+            p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
+	      	    badidealinfo=badidealinfofilename,
                     purged=purgedfilename, index=indexfilename,
                     ell=gorder, smexp=smexp,
                     nmaps=nmaps,
@@ -3247,6 +3322,10 @@ class ReconstructLogTask(Task):
     @property
     def programs(self):
         return (cadoprograms.ReconstructLog,)
+    @property
+    def progparam_override(self):
+        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
+                 "nmaps", "partial", "ker", "ideals", "relsdel", "nrels"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3419,8 +3498,11 @@ class StartClientsTask(Task):
     def programs(self):
         return (cadoprograms.WuClient,)
     @property
+    def progparam_override(self):
+        return [["clientid", "certsha1"]]
+    @property
     def paramnames(self):
-        return {'hostnames': str, 'scriptpath': None, "nrclients": 1, "run": True}
+        return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
     @property
     def param_nodename(self):
         return None
@@ -3452,7 +3534,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    self.params["nrclients"])
+                   self.params["nrclients"])
 
     @staticmethod
     def make_multiplicity(names, multi):
@@ -3482,6 +3564,20 @@ class StartClientsTask(Task):
         (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
+    def _add_cid(self, clientid, pid, host):
+        """ Add a client id atomically to both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.update({clientid: pid}, commit=False)
+        self.hosts.update({clientid: host}, commit=True)
+
+    def _del_cid(self, clientid):
+        """ Remove a client id atomically from both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.clear([clientid], commit=False)
+        self.hosts.clear([clientid], commit=True)
+    
     def launch_clients(self, server, certsha1=None):
         for host in self.hosts_to_launch:
             self.launch_one_client(host.strip(), server, certsha1=certsha1)
@@ -3502,8 +3598,7 @@ class StartClientsTask(Task):
                                  "launched this time, seems to have died. "
                                  "I'll forget about this client.",
                                  cid, self.hosts[cid], self.pids[cid])
-                del(self.hosts[cid])
-                del(self.pids[cid])
+                self._del_cid(cid)
     
     def make_unique_id(self, host):
         # Make a unique client id for host
@@ -3537,8 +3632,7 @@ class StartClientsTask(Task):
             else:
                 self.logger.info("Client %s on host %s with PID %d seems to have died",
                                  clientid, host, self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
         wuclient = cadoprograms.WuClient(server=server,
@@ -3553,23 +3647,22 @@ class StartClientsTask(Task):
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
             if stdout:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if stderr:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         match = None
         if not stdout is None:
-            match = re.match(r"PID: (\d+)", stdout.decode("ascii"))
+            match = re.match(r"PID: (\d+)", stdout.decode("utf-8"))
         if not match:
             self.logger.warning("Client did not print PID")
             if not stdout is None:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if not stderr is None:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         self.used_ids[clientid] = True
-        self.pids[clientid] = int(match.group(1))
-        self.hosts[clientid] = host
+        self._add_cid(clientid, int(match.group(1)), host)
 
     def kill_all_clients(self):
         # Need the list() to make a copy as dict will change in loop body
@@ -3578,19 +3671,17 @@ class StartClientsTask(Task):
             if rc == 0:
                 self.logger.info("Stopped client %s (Host %s, PID %d)",
                                  clientid, self.hosts[clientid], self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
             else:
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
                 if stdout:
-                    self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                    self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
                 if stderr:
-                    self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                    self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
                 # Assume that the client is already dead and remove it from
                 # the list of running clients
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
     
     def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]

@@ -41,16 +41,13 @@ void IJTox(unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
     *x = i + (si->I)*j + (si->I>>1);
 }
 
-#if defined(TRACE_AB) || defined(TRACE_IJ)
 void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
 {
     IJTox(x, i, j, si);
     *N = *x >> LOG_BUCKET_REGION;
     *x &= ((1 << LOG_BUCKET_REGION) - 1);
 }
-#endif
 
-#if defined(TRACE_IJ) || defined(TRACE_Nx) || defined(CHECK_UNDERFLOW)
 void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
        sieve_info_srcptr si)
 {
@@ -68,7 +65,6 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
         *b = -t;
       }
 }
-#endif
 
 int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
