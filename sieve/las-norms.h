@@ -8,31 +8,25 @@
 extern "C" {
 #endif
 
-/*  initializing norms */
+/* initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
-void
-init_norms (sieve_info_ptr si, int side);
-
+void init_norms (sieve_info_ptr si, int side);
 
 /*  initialize norms for bucket regions */
 /* Initialize lognorms on the rational side for the bucket_region
- * number N.
+ * number J.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
  * not coprime.
  */
-void
-init_rat_norms_bucket_region (unsigned char *S, unsigned int N, sieve_info_ptr si);
+void init_rat_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si);
 
 /* Initialize lognorms on the algebraic side for the bucket
- * number N.
+ * number J.
  * Case GCD(i,j)!=1 gets 255.
  */
-void
-init_alg_norms_bucket_region (unsigned char *alg_S, 
-                              unsigned int N, 
-                              sieve_info_ptr si);
+void init_alg_norms_bucket_region (unsigned char *alg_S, uint32_t J, sieve_info_ptr si);
 
 /* This prepares the auxiliary data which is used by
  * init_rat_norms_bucket_region and init_alg_norms_bucket_region
