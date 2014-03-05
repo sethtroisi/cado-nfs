@@ -2,6 +2,7 @@
 
 unset POLY
 unset RENUMBER
+unset BADIDEALINFO
 unset PURGED
 unset INDEX
 unset OUT
@@ -22,6 +23,10 @@ do
   elif [ "$1" = "-renumber" ]
   then
     RENUMBER="$2"
+    shift 2
+  elif [ "$1" = "-badidealinfo" ]
+  then
+    BADIDEALINFO="$2"
     shift 2
   elif [ "$1" = "-purged" ]
   then
@@ -96,19 +101,19 @@ else
     if [ ! -s $algpr ]; then
 	echo "Building file $algpr using debug_renumber"
 	$prgm -poly $POLY -renumber $RENUMBER |\
-        grep alg | sed 's/alg side//' | sed 's/=/ /g' |\
+        grep " alg " | sed 's/alg side//' | sed 's/=/ /g' |\
         awk '{print $2, $6, $8}' |\
         gzip -c > $algpr
     fi
     if [ ! -s $generators ]; then
 	echo "Building file $generators using Magma"
-	CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=true $DIR/nfsunits.mag"
+	CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=true $DIR/nfsunits.mag"
 	echo $CMD; $CMD
     fi
 
     echo "## Using magma to compute units (version 2)"
     # results are put in $OUT
-    CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=false $DIR/nfsunits.mag"
+    CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=false $DIR/nfsunits.mag"
 fi
 
 echo $CMD

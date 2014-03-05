@@ -3277,6 +3277,7 @@ class SMTask(Task):
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
+            badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -3288,6 +3289,7 @@ class SMTask(Task):
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
             p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
+	      	    badidealinfo=badidealinfofilename,
                     purged=purgedfilename, index=indexfilename,
                     ell=gorder, smexp=smexp,
                     nmaps=nmaps,
