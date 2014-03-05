@@ -3673,9 +3673,9 @@ static thread_data * thread_data_alloc(las_info_ptr las, int n)/*{{{*/
         for (int side = 0; side < 2; side++) {
           thread_side_data_ptr ts = thrs[i]->sides[side];
           // printf ("# Allocating thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          ts->bucket_region = (unsigned char *) malloc_pagealigned(BUCKET_REGION + MEMSET_MIN);
+          ts->bucket_region = (unsigned char *) contiguous_malloc(BUCKET_REGION + MEMSET_MIN);
         }
-        thrs[i]->SS = malloc_pagealigned(BUCKET_REGION);
+        thrs[i]->SS = (unsigned char *) contiguous_malloc(BUCKET_REGION);
 
         
     }
@@ -3692,10 +3692,10 @@ static void thread_data_free(thread_data * thrs, int n)/*{{{*/
         for (int side = 0; side < 2; side++) {
           thread_side_data_ptr ts = thrs[i]->sides[side];
           // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          free_pagealigned(ts->bucket_region, BUCKET_REGION + MEMSET_MIN);
+          contiguous_free(ts->bucket_region, BUCKET_REGION + MEMSET_MIN);
           ts->bucket_region = NULL;
         }
-        free_pagealigned(thrs[i]->SS, BUCKET_REGION);
+        contiguous_free(thrs[i]->SS, BUCKET_REGION);
         thrs[i]->SS = NULL;
     }
     free(thrs);
