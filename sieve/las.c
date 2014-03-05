@@ -1664,6 +1664,8 @@ struct thread_side_data_s {
   /* For small sieve */
   int * ssdpos;
   int * rsdpos;
+
+  unsigned char *bucket_region;
 };
 typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
@@ -1676,6 +1678,7 @@ struct thread_data_s {
   sieve_info_ptr si;
   las_report rep;
   unsigned int checksum_post_sieve[2];
+  unsigned char *SS;
 };
 typedef struct thread_data_s thread_data[1];
 typedef struct thread_data_s * thread_data_ptr;
@@ -3536,9 +3539,9 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc_pagealigned(BUCKET_REGION + MEMSET_MIN);
+        S[side] = ts->bucket_region;
     }
-    unsigned char *SS = malloc_pagealigned(BUCKET_REGION);
+    unsigned char *SS = th->SS;
     memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
@@ -3642,13 +3645,11 @@ void * process_bucket_region(thread_data_ptr th)
             memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
         }
       }
-    free_aligned(SS, BUCKET_REGION, pagesize());
 
     for(int side = 0 ; side < 2 ; side++) {
         thread_side_data_ptr ts = th->sides[side];
         free(ts->ssdpos);
         free(ts->rsdpos);
-        free_pagealigned(S[side], BUCKET_REGION + MEMSET_MIN);
     }
 
     return NULL;
@@ -3666,6 +3667,17 @@ static thread_data * thread_data_alloc(las_info_ptr las, int n)/*{{{*/
         thrs[i]->las = las;
         las_report_init(thrs[i]->rep);
         thrs[i]->checksum_post_sieve[0] = thrs[i]->checksum_post_sieve[1] = 0;
+
+        /* Allocate memory for each thread's two bucket regions (one for each
+           side) and for the intermediate sum (only one for both sides) */
+        for (int side = 0; side < 2; side++) {
+          thread_side_data_ptr ts = thrs[i]->sides[side];
+          // printf ("# Allocating thrs[%d]->sides[%d]->bucket_region\n", i, side);
+          ts->bucket_region = (unsigned char *) malloc_pagealigned(BUCKET_REGION + MEMSET_MIN);
+        }
+        thrs[i]->SS = malloc_pagealigned(BUCKET_REGION);
+
+        
     }
     return thrs;
 }/*}}}*/
@@ -3674,6 +3686,17 @@ static void thread_data_free(thread_data * thrs, int n)/*{{{*/
 {
     for (int i = 0; i < n ; ++i) {
         las_report_clear(thrs[i]->rep);
+        ASSERT_ALWAYS(thrs[i]->SS != NULL);
+
+        /* Free the memory for the bucket regions */
+        for (int side = 0; side < 2; side++) {
+          thread_side_data_ptr ts = thrs[i]->sides[side];
+          // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
+          free_pagealigned(ts->bucket_region, BUCKET_REGION + MEMSET_MIN);
+          ts->bucket_region = NULL;
+        }
+        free_pagealigned(thrs[i]->SS, BUCKET_REGION);
+        thrs[i]->SS = NULL;
     }
     free(thrs);
 }/*}}}*/
@@ -3703,23 +3726,24 @@ static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
     for(unsigned int side = 0 ; side < 2 ; side++) {
       thread_side_data_ptr ts = th->sides[side];
       uint32_t nb_buckets = thrs[i]->si->nb_buckets;
+      
       uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
       /* The previous buckets are identical ? */
       if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {
 	/* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
 	re_init_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
 	/* Buckets are ready to be filled */
-	continue;
+      } else {
+        /* No. We free the buckets, if we have already malloc them. */
+        if (ts->BA.n_bucket) clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+        /* We (re)create the buckets */
+        if (nb_buckets < THRESHOLD_K_BUCKETS)
+          init_bucket_array   (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+        else if (nb_buckets < THRESHOLD_M_BUCKETS)
+          init_k_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
+        else
+          init_m_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
       }
-      /* No. We free the buckets, if we have already malloc them. */
-      if (ts->BA.n_bucket) clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
-      /* We (re)create the buckets */
-      if (nb_buckets < THRESHOLD_K_BUCKETS)
-	init_bucket_array   (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
-      else if (nb_buckets < THRESHOLD_M_BUCKETS)
-	init_k_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
-      else
-	init_m_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
     }
   }
 }/*}}}*/
@@ -3728,13 +3752,12 @@ static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
 {
   for (unsigned int i = 0; i < n ; ++i) {
     thread_side_data_ptr ts;
-    ts = thrs[i]->sides[RATIONAL_SIDE];
-    /* if there is no special-q in the interval, the arrays are not malloced */
-    if (ts->BA.bucket_write != NULL)
-      clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
-    ts = thrs[i]->sides[ALGEBRAIC_SIDE];
-    if (ts->BA.bucket_write != NULL)
-      clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+    for(unsigned int side = 0 ; side < 2 ; side++) {
+      ts = thrs[i]->sides[side];
+      /* if there is no special-q in the interval, the arrays are not malloced */
+      if (ts->BA.bucket_write != NULL)
+        clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+    }
   }
 }/*}}}*/
 
