@@ -42,5 +42,6 @@
 #include "sm_utils.h"
 #include "memalloc.h"
 #include "mpz_vector.h"
+#include "cont_mem.h"
 
 #endif	/* CADO_UTILS_H_ */
