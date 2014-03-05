@@ -16,10 +16,11 @@ static int64_t rand_int64_t () {
 }
 
 int main() {
-  unsigned int d, logi, i, idiv2, j,  k, l, ej, p;
-  double coeff[MAX_DEGREE + 1], scale, log2max;
-  unsigned char *S1 = malloc_pagealigned(1U<<LOG_BUCKET_REGION);
-  unsigned char *S2 = malloc_pagealigned(1U<<LOG_BUCKET_REGION), *cS2;
+  unsigned int d, logI, k, l, p, ih;
+  uint32_t J, eJ;
+  double coeff[MAX_DEGREE + 1], u[MAX_DEGREE + 1], scale, log2max, h, g;
+  unsigned char *S1 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), 
+    *S2 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), *cS2, *lineS2;
   double_poly_t poly;
   
   ASSERT_ALWAYS (MIN_LOGI <= MAX_LOGI);
@@ -29,47 +30,46 @@ int main() {
   ASSERT_ALWAYS (!(VERT_NORM_STRIDE & (VERT_NORM_STRIDE - 1))); /* VERT_NORM_STRIDE must be = 2^x */
   poly->coeff = coeff;
   srand (getpid());
-  for (logi = MIN_LOGI; logi <= MAX_LOGI; logi++) {
-    i = 1U << logi;
-    idiv2 = i >> 1;
+  for (logI = MIN_LOGI; logI <= MAX_LOGI; logI++) {
+    const uint32_t I = 1U << logI;
+    const double didiv2 = (double) (I >> 1);
     for (d = MAX_DEGREE + 1; d--;) {
       poly->deg = d;
       for (k = NB_TESTS; k--;) {
-	j = rand() & (idiv2 - 1); /* Original j; 0 <= j < i/2 */
-	for (l = poly->deg + 1; l--;)
-	  poly->coeff[l] = (double) rand_int64_t () * rand_int64_t (); /* [(-2^63)^2, (2^63-1)^2] */
-	ej = (LOG_BUCKET_REGION - logi);
-	j >>= ej;                 /* In order to be able to compute a complete region */
-	log2max = log2(fabs(get_maxnorm_alg (poly, (double) idiv2, (double) idiv2) + 1.));
+	J = rand () ^ (rand() << 15); /* 0 <= J < 2^30 at least */
+	J &= (I >> 1) - 1;  /* Original J; 0 <= J < I/2 */
+	for (l = poly->deg + 1; l--;) /* (-2^63)^2 <= coeff <= (2^63-1)^2 */
+	  poly->coeff[l] = rand_int64_t () * (double) rand_int64_t ();
+	eJ = (LOG_BUCKET_REGION - logI);
+	J >>= eJ;                 /* In order to be able to compute a complete region */
+	log2max = log2(fabs(get_maxnorm_alg (poly, didiv2, didiv2) + 1.));
 	scale = (UCHAR_MAX - 1 - GUARD) / log2max; /* In order to have [GUARD, UCHAR_MAX-1] */
 	
 	/* Phase 1: compute S1 */
 	memset (S1, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed in next line */
-	init_alg_norms_bucket_region_internal (S1, j, i, poly->deg, scale, poly->coeff);
+	init_alg_norms_bucket_region_internal (S1, J, I, poly->deg, scale, poly->coeff);
 	
 	/* Phase 2: compute S2 */
-	/* Next 4 lines are the beginning of init_alg_norms_bucket_region_internal */
-	ej = 1U << ej;
-	p = MIN (ej, VERT_NORM_STRIDE);
-	j *= ej;
-	ej += j;
+	J <<= eJ;
+	eJ = 1U << eJ;
+	p = MIN (eJ, VERT_NORM_STRIDE);
+	eJ += J;
 	cS2 = S2;
 	memset (S2, 128, 1U<<LOG_BUCKET_REGION); /* To be sure S2 will be computed */
 	do {
-	  double h, u[poly->deg + 1];
-	  poly_scale(u, poly->coeff, poly->deg, (double) (j + (p >> 1)));
-	  h = 3 - (int) idiv2;
-	  for (unsigned int ih = 0; ih < i; ih += 8, h += 8.) {
-	    double g = u[poly->deg];
-	    for (l = poly->deg; l--; g = g * h + u[l]);
+	  poly_scale(u, poly->coeff, poly->deg, (double) (J + (p >> 1)));
+	  h = 3. - didiv2;
+	  for (ih = 0; ih < I; ih += 8, h += 8.) {
+	    for (g = u[poly->deg], l = poly->deg; l--; g = g * h + u[l]);
 	    g = log2(fabs(g) + 1.) * scale + GUARD; /* log2(|x|+1.) >= 0 */
+	    ASSERT_ALWAYS (g < (double) UCHAR_MAX);
 	    memset (cS2 + ih, (unsigned char) g, 8);
 	  }
-	  unsigned char *lineS2 = cS2;
-	  cS2 += i;
-	  for (l = p; --l; cS2 += i) memcpy (cS2, lineS2, i);
-	  j += p;
-	} while (j < ej);
+	  lineS2 = cS2;
+	  cS2 += I;
+	  for (l = p; --l; cS2 += I) memcpy (cS2, lineS2, I);
+	  J += p;
+	} while (J < eJ);
 
 	/* Phase 3: compare S1 & S2 */
 	/* It's possible the difference is 1, because the log2 is approximative */

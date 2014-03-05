@@ -891,6 +891,7 @@ class SM(Program):
     def __init__(self, *,
                  poly: Parameter(),
 		 renumber: Parameter(),
+		 badidealinfo: Parameter(),
                  purged: Parameter(),
                  index: Parameter(),
                  out: Parameter(),

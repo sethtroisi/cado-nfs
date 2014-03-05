@@ -1,13 +1,13 @@
 /*
 Wrapper version, to be used with
-  magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$ALGPR generators:=$GENERATORS purged:=$PURGED index:=$INDEX ficunits:=$FICUNITS ww:=true/false $DIR/nfsunits.mag
+  magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$ALGPR generators:=$GENERATORS badideals:=BADIDEALS purged:=$PURGED index:=$INDEX ficunits:=$FICUNITS ww:=true/false $DIR/nfsunits.mag
 */
 
 //
 // author: morain@lix.polytechnique.fr 
 //
 // Using units in SNFS-DL
-// version: 20140302.0900
+// version: 20140305.1500
 //
 
 QQ:=Rationals();
@@ -158,8 +158,8 @@ RecoverUnits := function(U, K, eta)
 	end for;
 	chk:=&* [U["units"][i]^eps[i] : i in [1..rK]];
 	if eta ne chk and eta ne -chk then
-//	    error("Check");
-	    printf "PB\n";
+	    printf "PB: %o %o\n", eta, chk;
+	    error("Check");
 	end if;
         printf "# floating point recovery for %o: %o\n", eta, eps;
 //error("DD");
@@ -169,7 +169,8 @@ end function;
 
 // lr contains the roots of f(X) mod p without multiplicity.
 // WARNING: does work for easy examples only...!
-// OUTPUT: [[c1, p1, e1], ..., [ck, pk, ek]]
+// OUTPUT: [[c1, p1, e1], ..., [ck, pk, ek]], 
+// e_i = ramification index, f_i = residual degree.
 GetIdeals := function(K, OK, p, lr)
 	lgp:=[];
 	eta:=p;
@@ -256,8 +257,8 @@ DivideGivenNorm := procedure(~eta, K, OK, FB, p, ex, c)
         n:=Degree(K);
 	g:=#FB[p][1];
 	// abelian case only, easy to change
-	e:=FB[p][1][1][3];
-	f:=n div (g*e);
+	e:=FB[p][1][1][3]; // ramification index
+	f:=n div (g*e);    // residual degree
 	ok:=false;
 	for ee:=1 to (ex div f) do
 	    for id in FB[p][1] do
@@ -275,7 +276,7 @@ DivideGivenNorm := procedure(~eta, K, OK, FB, p, ex, c)
 	if not ok then error("No ideal found"); end if;
 end procedure;
 
-// lf = factorization of Norm(a-b*t) = [<p1, e1>, ...]
+// lf = factorization of Norm(a-b*t) = [<p1, ex1>, ...]
 Treat_a_b := procedure(~FB, ~eps, K, OK, U, a, b, lf)
 	t:=K.1;
 	f:=DefiningPolynomial(K);
@@ -492,9 +493,44 @@ DLReadPurged := function(purged)
 	return ab;
 end function;
 
+ReadBadIdeals := function(K, badideals)
+	printf "# reading badideals\n";
+	fd:=Open(badideals, "r");
+	bad:=[];
+	while true do
+	    s:=Gets(fd); if IsEof(s) then break; end if;
+	    print s;
+	    // s = "### 3 (2 : 1) 1 [ 1 ] (i=1: ramified, e=3) ; easy."
+	    tmp:=Split(s, " ");
+	    if "easy." in tmp then
+		pp:=StringToInteger(tmp[2]);
+if false then // TODO: understand all this?
+		e:=Split(s, "=");
+		// e[2] = "1: ramified, e"
+		i:=Split(e[2], ":");
+		i:=StringToInteger(i[1]);
+		// e[3] = "3) ; easy."
+		e:=Split(e[3], ")");
+		e:=StringToInteger(e[1]);
+		// in the abelian case, i*e*f = n
+		f:=Degree(K) div (i*e);
+		bad[#bad+1]:=<pp, i, e, f>;
+else
+		bad[#bad+1]:=<pp>;
+end if;
+	    else
+	        error("Case not easy NYI");
+	    end if;
+	end while;
+	return bad;
+end function;
+
 // algpr contains lines "i p r" for algebraic primes (in hexa).
 // SIDE-EFFECT: fill in file 'generators' with generators.
-GeneratorsForPR := procedure(~GEN,p,K,OK,U,algpr,generators)
+GeneratorsForPR := procedure(~GEN,p,K,OK,U,badideals,algpr,generators)
+        bad:=ReadBadIdeals(K, badideals);	       
+	badp:=[x[1] : x in bad];
+	printf "# bad ideals=%o => badp=%o\n", bad, badp;
 	printf "# Extracting (p, r) from %o\n", algpr;
 	// first read algebraic ideals
         fd:=POpen("gzip -dc " * algpr, "r");
@@ -516,9 +552,21 @@ GeneratorsForPR := procedure(~GEN,p,K,OK,U,algpr,generators)
 	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
 	    ok,gp:=IsPrincipal(id);
 	    if not ok then error("Not principal"); end if;
-	    GEN[i]:=K!gp;
-	    tmp:=Eltseq(GEN[i]);
-	    fprintf fo, "%o", i;
+	    gp:=K!gp;
+	    if p in badp then
+	        printf "(%o) = %o\n", p, Factorization(p*OK);
+	        ep:=RamificationIndex(id); // id^ep || (p) = p*OK
+	    	fp:=Degree(id);
+	    	GEN[i]:=<gp, ep, fp>;
+	    else
+	        GEN[i]:=<gp, 1, 1>;
+	    end if;
+//print p, GEN[i], Norm(gp); if p gt 100 then error("FF"); end if;
+//	    GEN[i]:=<gp, 1, 1>; // FIXME!!!
+	    den:=Denominator(gp);
+	    tmp:=Eltseq(den*gp);
+	    fprintf fo, "%o %o %o", i, GEN[i][2], GEN[i][3];
+	    fprintf fo, " %o", den;
 	    for j:=1 to #tmp do
 	        fprintf fo, " %o", tmp[j];
 	    end for;
@@ -526,7 +574,6 @@ GeneratorsForPR := procedure(~GEN,p,K,OK,U,algpr,generators)
 	end while;
 end procedure;
 
-// TODO: blow up when denominators exist...!
 ReadGeneratorsForPR := procedure(~GEN, K, generators)
 	printf "# Reading generators for (p, r) from %o\n", generators;
 	t:=K.1;
@@ -535,14 +582,19 @@ ReadGeneratorsForPR := procedure(~GEN, K, generators)
         while true do
             s:=Gets(fd);
             if IsEof(s) then break; end if;
-	    // s = "i x0 ... x_{deg-1}"
+	    // s = "i ram_ind ram_deg den x0 ... x_{deg-1}"
 	    tmp:=Split(s, " ");
 	    i:=StringToInteger(tmp[1]);
+	    ind:=StringToInteger(tmp[2]);
+	    deg:=StringToInteger(tmp[3]);
+	    den:=StringToInteger(tmp[4]);
 	    x:=0;
-	    for j:=2 to #tmp do
-	        x:=x + StringToInteger(tmp[j]) * t^(j-2);
+	    for j:=5 to #tmp do
+	        x:=x + StringToInteger(tmp[j]) * t^(j-5);
 	    end for;
-	    GEN[i]:=x;
+	    GEN[i]:=<x/den, ind, deg>;
+//if i eq 2 then GEN[i]:=<GEN[i][1], 2, 2>; end if;
+//	    printf "GEN[%o]=%o (%o)\n", i, GEN[i], Norm(GEN[i][1]);
 	end while;
 end procedure;
 
@@ -567,14 +619,37 @@ UnitsForPurged := procedure(~GEN,~epsab,p,f,g,m,K,OK,U,purged)
 	    tmp2:=Split(tmp[1], ",");
 	    a:=StringToInteger(tmp2[1], 16);
 	    b:=StringToInteger(tmp2[2], 16);
+//	    printf "# s = %o\n", s;
+//	    printf "a-b*m=%o\n", Factorization(Integers()!(a-b*m));
+//	    printf "Norm(a-b*t)=%o\n", Factorization(Integers()!Norm(a-b*t));
+//	    printf "lf = %o\n", Factorization((a-b*t)*OK);
 	    tmp2:=Split(tmp[2], ",");
 	    // among these, we have rational or algebraic primes
-	    prod:=1;
+	    li:=[];
+	    oldi:=-1;
+	    exi:=1;
 	    for stri in tmp2 do
 	    	i:=StringToInteger(stri, 16);
 	        if not IsDefined(GEN, i) then continue; end if;
-//		printf "GEN[%o]=%o\n", i, GEN[i];
-		prod:=prod * GEN[i];
+		if i eq oldi then
+		    exi:=exi+1;
+		elif oldi ne -1 then
+		    li[#li+1]:=<oldi, exi>;
+		    exi:=1;
+		end if;
+		oldi:=i;
+	    end for;
+	    if oldi ne -1 then
+	        li[#li+1]:=<oldi, exi>;
+	    end if;
+	    prod:=1;
+	    for iexi in li do
+	        i,exi:=Explode(iexi);
+		if DLP_DEBUG ge 2 then
+		    printf "multiplying by GEN[%o]=%o", i, GEN[i];
+		    printf " of norm %o\n", Norm(GEN[i][1]);
+		end if;
+		prod:=prod * GEN[i][1]^(exi div GEN[i][3]);
 	    end for;
 	    eta:=(a-b*t)/prod;
 	    if DLP_DEBUG ge 2 then
@@ -815,7 +890,7 @@ UnitsWithParams := function(FB, epsab, G, GEN, gen_epsab, params)
 	    if IsDefined(params, "relsdir") then
 	    	TreatFromDir(~FB,~epsab,p,f,g,m,K,OK,U,params["relsdir"]);
 	    elif IsDefined(params, "algpr") then
-	        GeneratorsForPR(~GEN,p,K,OK,U,
+	        GeneratorsForPR(~GEN,p,K,OK,U,params["badideals"],
 				params["algpr"],params["generators"]);
 		UnitsForPurged(~GEN,~epsab,p,f,g,m,K,OK,U,purged);
 	    end if;
@@ -886,7 +961,7 @@ ComputeUnits := procedure(dir, name, ell)
 end procedure;
 
 // If generate = true, we must build algpr and generators.
-ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,purged,index,ficunits,generate)
+ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideals,purged,index,ficunits,generate)
         params:=AssociativeArray();
 
 	params["poly"]:=polyfile;
@@ -895,6 +970,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,purged,i
 	params["renumber"]:=renumber;
 	params["algpr"]:=algpr;
 	params["generators"]:=generators;
+	params["badideals"]:=badideals;
 
 	params["purged"]:=purged;
 	params["index"]:=index;
@@ -909,7 +985,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,purged,i
 	PrepareUnits(~U, ~G, K, OK, true);
 	U["grouptable"]:=G;
 	if generate then
-	    GeneratorsForPR(~GEN,p,K,OK,U,
+	    GeneratorsForPR(~GEN,p,K,OK,U,params["badideals"],
 			    params["algpr"],params["generators"]);
 	else
 	    ReadGeneratorsForPR(~GEN, K, generators);
@@ -919,8 +995,9 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,purged,i
 	end if;
 end procedure;
 
-// Simul("SNFS", "p59");
-Simul := procedure(dir, name)
+// Simul("SNFS", "p59", false);
+// Simul("SNFS", "p60x4x4", false);
+Simul := procedure(dir, name, gen)
         // "p59"  ===> "SNFS/p59/"
 	dir:=dir * "/" * name;
 	poly:=dir * "/" * name * ".polyselect.poly";
@@ -930,14 +1007,17 @@ Simul := procedure(dir, name)
 	purged:=dir * "/" * name * ".purge.purged.gz";
 	index:=dir * "/" * name * ".merge.index.gz";
 	ficunits:=dir * "/" * name * ".units.units";
+	badideals:=dir * "/" * name * ".magmanmbrthry.badidealinfo";
 
-	printf "generate\n";
-	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,purged,
-				index,ficunits,true);
+	if gen then
+	    printf "generate\n";
+	    ComputeUnitsFromWrapper(poly,renumber,algpr,generators,badideals,
+				    purged,index,ficunits,true);
+	end if;
 	printf "compute units\n";
-	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,purged,
-				index,ficunits,false);
+	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,badideals,
+				purged,index,ficunits,false);
 end procedure;
 
-ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
+ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
 exit;
