@@ -99,7 +99,7 @@ void trace_per_sq_init(sieve_info_srcptr si, const struct trace_Nx_t *Nx,
 void trace_per_sq_clear(sieve_info_srcptr si MAYBE_UNUSED)
 {
     for(int side = 0 ; side < 2 ; side++)
-        mpz_init(traced_norms[side]);
+        mpz_clear(traced_norms[side]);
 }
 
 #ifdef TRACE_K
