@@ -72,7 +72,7 @@ void *contiguous_malloc(const size_t size)
     largepages = mmap (NULL, LARGE_PAGE_SIZE, PROT_READ|PROT_WRITE, anon | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
     if (largepages != MAP_FAILED) {
       largepage_size = LARGE_PAGE_SIZE;
-      printf ("# mmap-ed large page at %p\n", largepages);
+      // printf ("# mmap-ed large page at %p\n", largepages);
       /* Try to write to the mapping so we bomb out right away if it can't be accessed */
       ((char *)largepages)[0] = 0;
     } else {
@@ -98,7 +98,7 @@ void *contiguous_malloc(const size_t size)
   if (last_offset + last_size + size > largepage_size) {
     /* If not, return memory allocated by malloc_pagealigned */
     void *ptr = malloc_pagealigned(size);
-    printf ("# Not enough large page memory available, returning malloc_pagealigned() = %p\n", ptr);
+    // printf ("# Not enough large page memory available, returning malloc_pagealigned() = %p\n", ptr);
     return ptr;
   }
 
@@ -117,7 +117,7 @@ void *contiguous_malloc(const size_t size)
   (*new_chunk)->next = NULL;
 
   void *ptr = largepages + (*new_chunk)->offset;  
-  printf ("# Returning large-page memory at %p\n", ptr);
+  // printf ("# Returning large-page memory at %p\n", ptr);
   return ptr;
 }
 
@@ -128,10 +128,10 @@ void contiguous_free(const void *ptr, const size_t size)
     struct largepage_chunk *chunk = *next;
     if (largepages + chunk->offset == ptr) {
       *next = chunk->next;
-      printf ("# Freeing large-page memory at %p\n", ptr);
+      // printf ("# Freeing large-page memory at %p\n", ptr);
       free(chunk);
       if (chunks == NULL) {
-        printf ("# Last chunk freed, unmapping large page\n");
+        // printf ("# Last chunk freed, unmapping large page\n");
         if (munmap(largepages, LARGE_PAGE_SIZE) != 0) {
           perror("munmap() failed");
         }
@@ -140,6 +140,6 @@ void contiguous_free(const void *ptr, const size_t size)
     }
     next = &(chunk->next);
   }
-  printf ("# large-page memory at %p not found, calling free_pagealigned()\n", ptr);
+  // printf ("# large-page memory at %p not found, calling free_pagealigned()\n", ptr);
   free_pagealigned(ptr, size);
 }
