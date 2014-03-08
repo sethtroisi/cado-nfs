@@ -117,7 +117,7 @@ if [ "$1" = "show" ] ; then
 fi
 
 # Make sure we have cmake, by the way !
-cmake_path="`which cmake 2>/dev/null`"
+:  ${cmake_path:="`which cmake 2>/dev/null`"}
 cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
 if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2

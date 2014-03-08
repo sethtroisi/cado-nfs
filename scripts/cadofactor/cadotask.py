@@ -3447,6 +3447,24 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
             server_whitelist += whitelist
         if "whitelist" in self.params:
             server_whitelist += [h.strip() for h in self.params["whitelist"].split(",")]
+
+        # If (1) any clients are to be started on localhost, but (2) the server
+        # is listening on a network-visible address, then we need to whitelist
+        # the network-visible address(es) of the current host as well, because
+        # the client's connection will come from (one of) the network-visible
+        # addresses of the current host.
+        # For test (1), it should suffice to look for "localhost" or
+        # "127.0.0.1" in the existing whitelist, as the host names on which to
+        # start clients are inserted verbatim.
+        # For (2), we check that serveraddress is either None (i.e., the
+        # wildcard address which is network-visible), or anything other than
+        # "localhost"
+        if (serveraddress is None or socket.getfqdn(serveraddress) != "localhost") \
+                and set(server_whitelist) & {"localhost", "127.0.0.1"}:
+            hostname = socket.gethostname()
+            if not hostname in server_whitelist:
+                self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
+                server_whitelist.append(hostname)
         if not server_whitelist:
             server_whitelist = None
 
