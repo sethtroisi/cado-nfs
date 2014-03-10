@@ -919,11 +919,11 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
 
 /* This function is used only to extract the interesting parameters of the
    complex structure si and call the previous function */
-void init_alg_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si)
+void init_alg_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, int side)
 {
-  init_alg_norms_bucket_region_internal \
-    (S, J, si->I,
-     si->cpoly->alg->deg, si->sides[ALGEBRAIC_SIDE]->scale, si->sides[ALGEBRAIC_SIDE]->fijd);
+  int deg = si->sides[side]->fij->deg;
+  init_alg_norms_bucket_region_internal(S, J, si->I, deg,
+          si->sides[side]->scale, si->sides[side]->fijd);
 }
 
 /* return max |g(x)| for x in (0, s) where s can be negative,

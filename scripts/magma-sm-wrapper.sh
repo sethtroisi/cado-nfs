@@ -10,8 +10,7 @@ unset ELL
 unset SMEXP
 unset NMAPS
 unset MT
-## for units
-unset RELSDIR
+
 EXPLICIT="no"
 
 while [ -n "$1" ]
@@ -55,10 +54,6 @@ do
   elif [ "$1" = "-mt" ]
   then
     MT="$2"
-    shift 2
-  elif [ "$1" = "-rels" ]
-  then
-    RELSDIR="$2"
     shift 2
   elif [ "$1" = "-explicit_units" ]
   then

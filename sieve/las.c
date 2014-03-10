@@ -3561,7 +3561,7 @@ void * process_bucket_region(thread_data_ptr th)
             if (si->cpoly->rat->deg == 1)
                 init_rat_norms_bucket_region(S[side], i, si);
             else {
-                init_alg_norms_bucket_region(S[side], i, si);
+                init_alg_norms_bucket_region(S[side], i, si, side);
             }
             // Invalidate the first row except (1,0)
             if (!i) {
@@ -3604,7 +3604,7 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init algebraic norms */
             rep->tn[side] -= seconds_thread ();
 
-            init_alg_norms_bucket_region(S[side], i, si);
+            init_alg_norms_bucket_region(S[side], i, si, side);
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
