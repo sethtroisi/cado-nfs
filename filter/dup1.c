@@ -121,7 +121,10 @@ split_iter_write_next(split_output_iter_t *iter, const char *line)
 {
   if (iter->lines_left == 0)
     split_iter_open_next_file(iter);
-  fputs (line, iter->file);
+  if (fputs (line, iter->file) == EOF) {
+    perror("Error writing relation");
+    abort();
+  }
   iter->lines_left--;
 }
 
