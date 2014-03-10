@@ -943,6 +943,7 @@ class Characters(Program):
                  lpbr: Parameter(),
                  lpba: Parameter(),
                  nchar: Parameter()=None,
+                 nratchars: Parameter()=None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
