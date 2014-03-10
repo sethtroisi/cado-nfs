@@ -38,7 +38,7 @@ Y2: -205964131819700
 $ makefb -poly c59.poly -alim 350000 -maxbits 18 -side 0 > c59.roots.0
 $ makefb -poly c59.poly -alim 350000 -maxbits 18 -side 1 > c59.roots.1
 
-$ las -poly c59.poly -fb0 c59.roots.0 -fb1 c59.roots.1 -I 12 -lim0 350000 -lim1 350000 -lpb0 24 -lpb1 24 -lambda0 1.1 -lambda1 1.1 -mfb0 34 -mfb1 34 -q0 350000 -q1 370000 > rels
+$ las -poly c59.poly -fb0 c59.roots.0 -fb1 c59.roots.1 -I 12 -lim0 350000 -lim1 350000 -lpb0 24 -lpb1 24 -lambda0 1.9 -lambda1 1.9 -mfb0 34 -mfb1 34 -q0 350000 -q1 370000 > rels
 
 This gives 1722157 relations (with revision cf809dc).
 
