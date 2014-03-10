@@ -3636,7 +3636,7 @@ class StartClientsTask(Task):
             assert clientid in self.pids
             assert clientid in self.hosts
             i += 1
-            clientid = "%s%d" % (host, i)
+            clientid = "%s+%d" % (host, i)
         return clientid
     
     # Cases:
