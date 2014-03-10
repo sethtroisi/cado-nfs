@@ -51,20 +51,6 @@ static inline uint64_t cputicks()
 #define HILIGHT_START   ""
 #define HILIGHT_END   ""
 
-#ifndef HAVE_LOG2
-static double MAYBE_UNUSED log2 (double x)
-{
-  return log (x) / log (2.0);
-}
-#endif
-
-#ifndef HAVE_EXP2
-static double MAYBE_UNUSED exp2 (double x)
-{
-  return exp (x * log (2.0));
-}
-#endif
-
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
