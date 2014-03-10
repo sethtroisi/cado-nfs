@@ -76,7 +76,8 @@ void *contiguous_malloc(const size_t size)
       /* Try to write to the mapping so we bomb out right away if it can't be accessed */
       ((char *)largepages)[0] = 0;
     } else {
-      perror("mmap failed");
+      // Commented out because it's spammy
+      // perror("mmap failed");
     }
   }
 #endif
