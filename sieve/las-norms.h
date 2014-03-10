@@ -19,6 +19,9 @@ void init_norms (sieve_info_ptr si, int side);
  * number J.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
  * not coprime.
+ * The sieve area S must be preallocated with at least (BUCKET_REGION +
+ * MEMSET_MIN) space. Indeed, the algorithm that is used might write a
+ * bit beyond the meaningful area.
  */
 void init_rat_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si);
 
