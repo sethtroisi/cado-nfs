@@ -28,8 +28,10 @@ void init_rat_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr 
 /* Initialize lognorms on the algebraic side for the bucket
  * number J.
  * Case GCD(i,j)!=1 gets 255.
+ * Since we can have two algebraic sides, we need to say explicitly which
+ * side we want to be initialized.
  */
-void init_alg_norms_bucket_region (unsigned char *alg_S, uint32_t J, sieve_info_ptr si);
+void init_alg_norms_bucket_region (unsigned char *alg_S, uint32_t J, sieve_info_ptr si, int side);
 
 /* This prepares the auxiliary data which is used by
  * init_rat_norms_bucket_region and init_alg_norms_bucket_region
