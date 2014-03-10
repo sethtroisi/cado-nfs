@@ -3900,9 +3900,11 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+#ifdef TRACE_K
   param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
   param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
   param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
+#endif
 }
 
 int main (int argc0, char *argv0[])/*{{{*/
