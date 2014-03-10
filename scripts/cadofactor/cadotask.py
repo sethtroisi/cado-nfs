@@ -1540,8 +1540,12 @@ class FactorBaseTask(Task):
 
             # Run command to generate factor base/free relations file
             self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.MakeFB.name)
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
+                                    stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
                                     **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
@@ -1621,18 +1625,24 @@ class FreeRelTask(Task):
             use_gz = ".gz" if self.params["gzip"] else ""
             freerelfilename = self.workdir.make_filename("freerel" + use_gz)
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.FreeRel.name)
             if self.params["dlp"]:
                 badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
                                          badideals=badidealfilename,
                                          out=str(freerelfilename),
+                                         stdout=str(stdoutpath),
+                                         stderr=str(stderrpath),
                                          **self.progparams[0])
             else:
                 # Run command to generate factor base/free relations file
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
                                          out=str(freerelfilename),
+                                         stdout=str(stdoutpath),
+                                         stderr=str(stderrpath),
                                          **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
@@ -2604,7 +2614,7 @@ class MergeDLPTask(Task):
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
-            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MergeDLP.name)
             p = cadoprograms.MergeDLP(mat=purged_filename,
                                    out=historyfile,
                                    keep=keep,
