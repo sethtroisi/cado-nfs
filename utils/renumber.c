@@ -473,13 +473,20 @@ renumber_read_table (renumber_t tab, const char * filename)
     v = parse_one_line(s);
     tab->table[i] = v;
 
-    if ((v >> MAX_LOG_CACHED))
+    p_r_values_t p;
+    if (tab->rat >= 0) {
+      p = (v > 0) ? (v - 1) : 0;
+    } else { // two alg sides, v is 2*p +1
+      p = v >> 1;
+    }
+
+    if ((p >> MAX_LOG_CACHED))
     {
       i++;
       break;
     }
     if (v > prev_v)
-      tab->cached[v] = i;
+      tab->cached[p] = i;
 
     prev_v = v;
     i++;
@@ -672,7 +679,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   }
   else //p is cached
   {
-    i = renumber_info->cached[vp];
+    i = renumber_info->cached[p];
 #ifdef DEBUG_RENUMB
     ASSERT_ALWAYS (renumber_info->table[i] == vp);
 #endif
