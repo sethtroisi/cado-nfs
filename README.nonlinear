@@ -60,6 +60,20 @@ $ check_rels -check_primality -complete rels.ok -poly c59.poly rels
   - Add the following to have characters also on the "rational" side:
     tasks.linalg.characters.nratchars = 25
 
+Here is an example of lines added to params.c59:
+
+slaves.nrclients = 2
+tasks.execpath = ${HOME}/svn/cado-nfs/build/coing
+tasks.workdir = /tmp/c59
+slaves.hostnames = localhost
+slaves.scriptpath = ${HOME}/svn/cado-nfs/scripts/cadofactor
+slaves.basepath = /tmp/c59
+N = 71641520761751435455133616475667090434063332228247871795429
+tasks.polyselect.admax = 0
+tasks.polyselect.import = /tmp/c59.poly
+tasks.sieve.import = /tmp/rels
+tasks.linalg.characters.nratchars = 25
+
 4) Run the script:
    scripts/cadofactor/cadofactor.py params.c59
 
