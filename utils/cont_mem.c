@@ -131,12 +131,17 @@ void contiguous_free(const void *ptr, const size_t size)
       *next = chunk->next;
       // printf ("# Freeing large-page memory at %p\n", ptr);
       free(chunk);
-      if (chunks == NULL) {
+#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
+      if (chunks == NULL && largepage_size != 0) {
         // printf ("# Last chunk freed, unmapping large page\n");
         if (munmap(largepages, LARGE_PAGE_SIZE) != 0) {
           perror("munmap() failed");
+        } else {
+          largepage_size = 0;
+          largepages = NULL;
         }
       }
+#endif
       return;
     }
     next = &(chunk->next);
