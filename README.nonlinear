@@ -27,9 +27,6 @@ Y0: 1199051061668898
 Y1: -71651332635517
 Y2: -205964131819700
 
-0 100000 1.2 22 24
-0 100000 1.2 22 24
-
 2) then create the factor bases and sieve:
 
 $ makefb -poly c59.poly -alim 100000 -maxbits 11 -side 0 > c59.roots.0
@@ -37,7 +34,8 @@ $ makefb -poly c59.poly -alim 100000 -maxbits 11 -side 1 > c59.roots.1
 
 $ las -poly c59.poly -fb0 c59.roots.0 -fb1 c59.roots.1 -I 11 -lim0 100000 -lim1 100000 -lpb0 22 -lpb1 22 -lambda0 1.2 -lambda1 1.2 -mfb0 24 -mfb1 24 -q0 200000 -q1 235000 > rels
 
-This gives 230885 relations (with revision c9835ff).
+This gives 230885 relations (with revision c9835ff). Note: these parameters are
+not necessarily optimal.
 
 You may check that relations are complete and do not contain non-prime ideals:
 
