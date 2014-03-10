@@ -715,9 +715,12 @@ class Duplicates1(Program):
                  out: Parameter()=None,
                  outfmt: Parameter()=None,
                  bzip: Toggle("bz")=None,
-                 only: Parameter()=None,
-                 nslices_log: Parameter("n")=None,
-                 lognrels: Parameter()=None,
+                 only_ab: Toggle("ab")=None,
+                 abhexa: Toggle()=None,
+                 force_posix_threads: Toggle("force-posix-threads")=None,
+                 only: Parameter(checktype=int)=None,
+                 nslices_log: Parameter("n", checktype=int)=None,
+                 lognrels: Parameter(checktype=int)=None,
                  filelist: Parameter(is_input_file=True)=None,
                  basepath: Parameter()=None,
                  **kwargs):
@@ -730,7 +733,7 @@ class Duplicates2(Program):
     subdir = "filter"
     def __init__(self,
                  *args: PositionalParameter(is_input_file=True),
-                 rel_count: Parameter("nrels"),
+                 rel_count: Parameter("nrels", checktype=int),
                  poly: Parameter(is_input_file=True),
                  renumber: Parameter(is_input_file=True),
                  filelist: Parameter(is_input_file=True)=None,
@@ -749,18 +752,17 @@ class Purge(Program):
                  filelist: Parameter(is_input_file=True)=None,
                  basepath: Parameter()=None,
                  subdirlist: Parameter()=None,
-                 nrels: Parameter()=None,
+                 nrels: Parameter(checktype=int)=None,
                  outdel: Parameter(is_output_file=True)=None,
                  sos: Parameter(is_output_file=True)=None,
-                 keep: Parameter()=None,
-                 minindex: Parameter()=None,
-                 nprimes: Parameter()=None,
-                 raw: Toggle()=None,
-                 threads: Parameter("npthr")=None,
+                 keep: Parameter(checktype=int)=None,
+                 minindex: Parameter(checktype=int)=None,
+                 nprimes: Parameter(checktype=int)=None,
+                 threads: Parameter("npthr", checktype=int)=None,
                  inprel: Parameter(is_input_file=True)=None,
                  outrel: Parameter(is_output_file=True)=None,
-                 npass: Parameter()=None,
-                 required_excess: Parameter()=None,
+                 npass: Parameter(checktype=int)=None,
+                 required_excess: Parameter(checktype=float)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -771,16 +773,16 @@ class Merge(Program):
     def __init__(self,
                  mat: Parameter(is_input_file=True),
                  out: Parameter(is_output_file=True),
-                 maxlevel: Parameter()=None,
-                 keep: Parameter()=None,
-                 skip: Parameter()=None,
-                 forbw: Parameter()=None,
-                 ratio: Parameter()=None,
-                 coverNmax: Parameter()=None,
-                 nbmergemax: Parameter()=None,
-                 resume: Parameter()=None,
-                 mkztype: Parameter()=None,
-                 wmstmax: Parameter()=None,
+                 maxlevel: Parameter(checktype=int)=None,
+                 keep: Parameter(checktype=int)=None,
+                 skip: Parameter(checktype=int)=None,
+                 forbw: Parameter(checktype=int)=None,
+                 ratio: Parameter(checktype=float)=None,
+                 coverNmax: Parameter(checktype=float)=None,
+                 nbmergemax: Parameter(checktype=int)=None,
+                 resume: Parameter(is_input_file=True)=None,
+                 mkztype: Parameter(checktype=int)=None,
+                 wmstmax: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -791,16 +793,16 @@ class MergeDLP(Program):
     def __init__(self,
                  mat: Parameter(is_input_file=True),
                  out: Parameter(is_output_file=True),
-                 maxlevel: Parameter()=None,
-                 keep: Parameter()=None,
-                 skip: Parameter()=None,
-                 forbw: Parameter()=None,
-                 ratio: Parameter()=None,
-                 coverNmax: Parameter()=None,
-                 nbmergemax: Parameter()=None,
-                 resume: Parameter()=None,
-                 mkztype: Parameter()=None,
-                 wmstmax: Parameter()=None,
+                 maxlevel: Parameter(checktype=int)=None,
+                 keep: Parameter(checktype=int)=None,
+                 skip: Parameter(checktype=int)=None,
+                 forbw: Parameter(checktype=int)=None,
+                 ratio: Parameter(checktype=float)=None,
+                 coverNmax: Parameter(checktype=float)=None,
+                 nbmergemax: Parameter(checktype=int)=None,
+                 resume: Parameter(is_input_file=True)=None,
+                 mkztype: Parameter(checktype=int)=None,
+                 wmstmax: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -810,11 +812,13 @@ class Replay(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 skip: Parameter()=None,
                  purged: Parameter()=None,
                  history: Parameter("his")=None,
                  index: Parameter()=None,
                  out: Parameter()=None,
+                 for_msieve: Toggle()=None,
+                 force_posix_threads: Toggle("force-posix-threads")=None,
+                 bwcostmin: Parameter(checktype=int)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -828,6 +832,7 @@ class ReplayDLP(Program):
                  history: Parameter("his")=None,
                  index: Parameter()=None,
                  out: Parameter()=None,
+                 skip: Parameter()=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

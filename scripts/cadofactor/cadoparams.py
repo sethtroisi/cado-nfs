@@ -336,7 +336,7 @@ class Parameters(object):
         scientific notation.
         Add datatype to key_types, and check for conflict.
         
-        >>> p = Parameters({})
+        >>> p = Parameters()
         
         >>> p._convert_one_type([], "foo", "1", int)
         1
