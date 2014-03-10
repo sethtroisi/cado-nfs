@@ -4146,7 +4146,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
+#ifdef TRACE_K
         init_trace_k(si, pl);
+#endif
 
         /* WARNING. We're filling the report info for thread 0 for
          * ttbuckets_fill, while in fact the cost is over all threads.
@@ -4227,7 +4229,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         qt0 = seconds() - qt0;
         las_report_accumulate_threads_and_display(las, si, report, thrs, qt0);
 
+#ifdef TRACE_K
         trace_per_sq_clear(si);
+#endif
 
       } // end of loop over special q ideals.
 
