@@ -180,7 +180,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
       if (ret != 2)
         {
-          fprintf (stderr, "Invalid line %lu\n", line_number);
+          fprintf (stderr, "Invalid line %lu in file %s\n", line_number,
+                   depname);
+          fflush (stderr);
           break;
         }
 
