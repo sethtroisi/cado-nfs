@@ -115,7 +115,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
     /* ci: coeff of degree i */
     else if (sscanf (s, "c%d:", &i) == 1) {
-      if (i > MAX_DEGREE) {
+      if (i > MAXDEGREE) {
         fprintf (stderr, "Error, too large degree %d\n", i);
         exit (1);
       }
@@ -145,7 +145,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
   }
 
-  for (d = MAX_DEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
+  for (d = MAXDEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
   if (mpz_cmp_ui (M, 0) == 0) {
     mpz_t t;
     /* M = -Y0/Y1 mod N */
@@ -397,7 +397,7 @@ print_poly_info_short ( mpz_t *f,
   cpoly->alg->degree = d;
   cpoly->rat->degree = 1;
   cpoly->skew = skew;
-  e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+  e = MurphyE (cpoly, bound_f, bound_g, area, MURPHY_K);
 
   printf ("# lognorm: %.2f, alpha: %.2f, (proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
           logmu,

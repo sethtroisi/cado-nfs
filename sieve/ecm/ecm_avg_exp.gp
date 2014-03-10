@@ -69,6 +69,27 @@ list_smooth (B1, B2, pmin, pmax, c, r, m, v) =
   return ([s1, s2]);
 }
 
+/* Returns the larges prime factor of n, or 1 if n==1. */
+largest_prime_factor(n) = {
+  local(f, l);
+  if (n == 1, return (1));
+  f = factorint(n);
+  l = length(f~);
+  return (f[l, 1]);
+}
+
+is_powersmooth(n, B) = {
+  local(f, i);
+  if (n == 1, return(1););
+  f = factorint(n);
+  for (i = 1, length(f~),
+    if (f[i,1]^f[i,2] > B,
+      return(0);
+    );
+  );
+  return(1);
+}
+
 
 /****************************************************************
  *                      Functions for P+1                       *
@@ -76,17 +97,40 @@ list_smooth (B1, B2, pmin, pmax, c, r, m, v) =
 
 /* Compute value of i-th Chebyshev polynomial defined by
    V_i(x+1/x) = x^i + 1/x^i */
-Chebyshev(i,X) = {
-  local(n); 
-  if (i == 0, return (2)); 
-  if (i == 1, return(X)); 
-  if(i % 2 == 0, return (Chebyshev (i/2, X)^2-2));
-  if(i % 3 == 0, n = Chebyshev (i/3, X); return (n^3 - 3 * n));
-  if(i % 5 == 0, n = Chebyshev (i/5, X); return (n^5 - 5 * n^3 + 5*n));
-  if(i % 7 == 0, n = Chebyshev (i/7, X); return (n^7 - 7*n^5 + 14*n^3 - 7*n));
-  return (Chebyshev ((i+1)/2, X) * Chebyshev ((i-1)/2, X) - X)
-}
 
+Chebyshev_V(i,X) = { 
+  local (bitlen, j, k, t1, t2);
+  if (i < 0, return(Chebyshev_V(-i,X)));
+  if (i == 0, return(2)); 
+  if (i == 1, return(X)); 
+  if(i % 2 == 0, return (Chebyshev_V (i/2, X)^2-2));
+  if(i % 3 == 0, return (Chebyshev_V (i/3, X^3 - 3*X)));
+
+  bitlen = truncate(log(i) / log(2)) + 1;
+  if (2^bitlen < i,
+    bitlen++;
+  );
+  if (2^bitlen < i,
+    /* This shouldn't happen */
+    error("bitlen ", bitlen, "still too small for ", i);
+  );
+  if (bittest(i, bitlen - 1) == 0,
+    error("MSB (bit ", bitlen - 1, ") of ", i, " is unset?");
+  );
+  t1 = X;       /* V_1(X) */
+  t2 = X^2 - 2; /* V_2(X) */
+  for (j = 2, bitlen, 
+    k = bitlen - j; /* k = bitlen-2, ..., 0 */
+    if (bittest(i, k),
+      t1 = t1 * t2 - X;
+      t2 = t2^2 - 2;
+    ,
+      t2 = t1 * t2 - X;
+      t1 = t1^2 - 2;
+    );
+  );
+  return(t1);
+}
 
 /* Determine the order of X in F_p[sqrt(X^2-4)]
    It divides p-1 or p+1, depending on whether X^2-4 is a QR mod p or not */
@@ -95,7 +139,7 @@ V_order (X, o) = {
   if (X == 0, return 4);
   m = lift(X) + lift(-X);
   if (o == 0, o=m-kronecker (lift(X)^2-4, m));
-  /* if (Chebyshev(o,X) != 2, error("V_order: group order should be ", o, " but isn't")); */
+  /* if (Chebyshev_V(o,X) != 2, error("V_order: group order should be ", o, " but isn't")); */ 
   f = factorint (o)~;
   po = o;
   for (i = 1, length(f), 
@@ -103,16 +147,17 @@ V_order (X, o) = {
     k = f[2,i];
     po /= p^k; /* All p's removed */
     j = 0;
-    Xp = Chebyshev(po, X);
-    while (Xp != 2, po *= p; j++; if (j == k, break); Xp = Chebyshev(p, Xp));
+    Xp = Chebyshev_V(po, X);
+    while (Xp != 2, po *= p; j++; if (j == k, break); Xp = Chebyshev_V(p, Xp));
   );
+  if (po == 1 && X != 2, error("V_order: point order computed as 1, but X != 2"));
   return (po);
 }
 
 
 list_pp1_order (pmin, pmax, res, mod, verbose) =
 {
-  local (p, o, d);
+  local (p, o, po);
 
   p = nextprime (pmin);
   n = 0;
@@ -128,7 +173,7 @@ list_pp1_order (pmin, pmax, res, mod, verbose) =
     o = p + (p % 6 - 3) / 2;
     po = V_order (Mod(2/7, p), o);
     if (o % po != 0, error ("Order of element does not divide order of group"));
-    if (verbose != 0, print(p, " ", o, " ", po, " ", o/po));
+    if (verbose != 0, print(p, " ", o, " ", po, " ", o / po));
     p = nextprime (p + 1);
   );
 }
@@ -137,27 +182,6 @@ list_pp1_order (pmin, pmax, res, mod, verbose) =
 /****************************************************************
  *                      Functions for ECM                       *
  ****************************************************************/
-
-/* Determine the order of the point P on E. 
-   The order of E must be given as a parameter */
-pointorder(E,P,o)={
-  local(f, i, e);
-  if (ellpow(E, P, o) != [0],
-    error("Supplied order is not a multiple of point's order");
-  );
-  f = factorint(o)~;
-  
-  /* For each prime, try if decreasing the exponent of that prime
-     still produces a multiple of the point's order */
-  e = o;
-  for (i = 1, length(f),             /* For each prime */
-    while(e % f[1,i] == 0 && ellpow(E, P, e / f[1,i]) == [0], 
-      e /= f[1,i];
-    );
-  );
-  return (e);
-}
-
 
 /* Generate an elliptic curve E, using the parameterization for
    ratinal torsion 12 from Montgomery's thesis.
@@ -206,7 +230,7 @@ ecmtorsion12(n,p,verbose) = {
   a = (t2 - 1)/(t2 + 3);
   /* Avoid a=0 */
   if (a == 0, 
-    error ("a == ", a);
+    return(0);
   );
 
   A = (-3*a^4 - 6*a^2 + 1)/(4*a^3);
@@ -357,13 +381,13 @@ ecm_printorder (parameterization, parameter, p) =
   if (EP == 0, print (p, " 0 0 0"); return);
   E = EP[1];
   P = EP[2];
-  o = ellsea (E, p);
-  po = pointorder (E, P, o);
+  o = p + 1 - ellap (E);
+  po = ellorder (E, P, o);
   print (p, " ", o, " ", po, " ", o / po);
 }
 
 
-/* Count those prime in [pmin, pmax] where the starting point
+/* Count those primes in [pmin, pmax] where the starting point
    on the elliptic curve with Brent-Suyama (parameterization=0)
    or Montgomery torsion 12 (parameterization=1)
    parameterization has order which is B1,B2-smooth. 
@@ -446,7 +470,7 @@ ecm_dist_exp(parameterization,s,pmin,pmax,r,m) = {
         );
         if (EP != 0,
           n++;
-          o = ellsea(EP[1],p); 
+          o = p + 1 - ellap(EP[1]); 
           p2[min (valuation(o,2)+1, len)]++; 
           p3[min (valuation(o,3)+1, len)]++; 
           p5[min (valuation(o,5)+1, len)]++; 
@@ -477,9 +501,216 @@ ecm_avg_exp(d) = {
   return(Vec(avg));
 }
 
+/* Return a vector [p, o, po. lpf] where o is the order of the group
+   over F_p, po is the order of the starting element in the group,
+   and lpf is the largest prime factor in po, for one of our factoring
+   methods:
+   0: P-1
+   1: P+1
+   2: ECM with Brent-Suyama parameterization
+   3: ECM with Montgomery torsion 12 parameterization
+   4: ECM with Montgomery torsion 16 parameterization
+*/
+get_order(p, param, method) = {
+  local(verbose);
+  verbose=0;
+  if (method == 0,
+    /* P-1 */
+    o = p-1;
+    po = znorder(Mod(param, p));
+  );
+  if (method == 1,
+    /* P+1 */
+    o = p - kronecker (lift(Mod(param,p)^2-4), p);
+    po = V_order(Mod(param, p), o);
+  );
+  if (method >= 2,
+    /* ECM */
+    if (method == 2,
+      /* Brent-Suyama */
+      EP = ecmsigma(param, p);
+    );
+    if (method == 3,
+      /* Montgomery 12 */
+      EP = ecmtorsion12(param, p, verbose);
+    );
+    if (method == 4,
+      /* Montgomery 16 */
+      EP = ecmtorsion16(param, p, verbose);
+    );
+    if (EP == 0, return(0));
+    if (p < 2^80,
+      o = p + 1 - ellap(EP[1]);
+      po = ellorder(EP[1], EP[2], o);
+    ,
+      o=p; po=p;
+    );
+  );
+  /* print("get_order("p, ", ", param, ", ", method, "): o=", o, ", po=", po); */
+  return([p, o, po, largest_prime_factor(po)]);
+}
+
+sort_orders_by_lpf(pmin, pmax, param, method) = {
+  local(l, v, p, o, po);
+  l = List();
+  forprime(p = pmin, pmax, 
+    listput(l, get_order(p, param, method);)
+  );
+  v = vecsort(Vec(l), 4);
+  return(v);
+}
+
+/* Find the smallest LPF >= mino in v (as produced by sort_orders_by_lpf())
+   such that there are two group orders with that LFP. Return those two
+   entries. */
+find_duplicate_lfp(v, mino) = {
+  local(i);
+  for (i = 2, length(v),
+    if(v[i-1][4] >= mino && v[i-1][4] == v[i][4],
+      return ([v[i-1], v[i]]);
+    );
+  );
+  return([]);
+}
+
+
+/* Find the smallest prime p >= minp such that largest prime factor lpf
+   in the order of the starting element for the factoring method satisfies
+   minlpf <= lpf <= maxlpf, or if maxlpf == 0, minlpf <= lpf. */
+find_lpf_in_range(minp, minlpf, maxlpf, param, method) = {
+  local(p, o, verbose);
+  verbose=0;
+  if(maxlpf != 0 && minlpf > maxlpf, error("minlpf=", minlpf, " > maxlpf=", maxlpf));
+  if (verbose, 
+    printf ("# find_lpf_in_range(%d, %d, %d, %d, %d)\n",
+            minp, minlpf, maxlpf, param, method);
+  );
+  p = nextprime(minp);
+  while(1,
+    o = get_order(p, param, method);
+    if(o != 0 && minlpf <= o[4] && (maxlpf == 0 || o[4] <= maxlpf),
+      return(o);
+    );
+    if (verbose,
+      print("For p=", p , ", received o=", o);
+    );
+    p = nextprime(p + 1);
+  );
+  return(0);
+}
+
+
+/* Find p such that the order of the starting element has exactly 1 prime
+   factor p, B1 < p <= B2, and all other prime powers <= B1 */
+find_B1_B2_smooth(minp, B1, B2, param, method) = {
+  local(p, o);
+  p = nextprime(minp);
+  while(1,
+    o = get_order(p, param, method);
+    if(B1 < o[4] && o[4] <= B2 && is_powersmooth(o[3] / o[4], B1),
+      return(o);
+    );
+    p = nextprime(p + 1);
+  );
+}
+
+str_order(p) = {
+  /* If the order is equal to the modulus, it was probably a too-large prime
+     for ellap(), so we don't print it. For P-1 and P+1, the order is never
+     equal to the prime; for an elliptic curve, it might be, but with our
+     curve parameterizations the order is always even, thus not equal to an
+     odd prime. */
+  if (p[1] != p[4],
+    return(Strprintf(" (order=%d, lpf=%d)", p[3], p[4]));
+  );
+  return("");
+}
+
+print_numbers(p1, p2, s1, s2, c) =
+{
+  local(q1, q2, t1, t2);
+  if (p1 == 0 && p2 == 0, print("# p1 = p2 = 0"));
+  if (p1 == 0, print("# p1 = 0"));
+  if (p2 == 0, print("# p2 = 0"));
+  /* Rename so that q1 refers to the smaller prime */
+  if (p1[1] < p2[1],
+    q1 = p1;
+    q2 = p2;
+    t1 = s1;
+    t2 = s2;
+  ,
+    q1 = p2;
+    q2 = p1;
+    t1 = s2;
+    t2 = s1;
+  );
+  print1(q1[1]*q2[1], " ", q1[1], " ", q2[1]);
+  if (c > 0,
+    print1(" ", c);
+  );
+  print(" # ", t1, str_order(q1), ", ", t2, str_order(q2));
+}
+
+
+find_test_combinations(B1, B2, param, method, minq=40, minp=10000) = {
+  local(p, q, verbose);
+  printf("# Created with: find_test_combinations(%d, %d, %d, %d, %d, %d)\n", 
+         B1, B2, param, method, minq, minp);
+  verbose = 0;
+  /* Composite number < 2^32 */
+  /* A B1-smooth factor */
+  p1 = find_lpf_in_range(minp, minq, B1, param, method);
+  /* A non-smooth cofactor */
+  q = find_lpf_in_range(10000, B2+1, 0, param, method);
+  print_numbers(p1, q, "one B1-smooth factor", "one non-smooth cofactor");
+
+  /* A B1, B2-smooth factor, but not B1-smooth */
+  p2 = find_B1_B2_smooth(minp, B1, B2, param, method);
+  print_numbers(p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor");
+
+  /* A B1 and a B1,B2-smooth factor */
+  print_numbers(p1, p2, "one B1-smooth factor", "one B1,B2-smooth factor");
+
+  /* Find two B1-smooth factors with different power of 2 in the order */
+  /* Backtracking does not work reliably for ECM as in the addition chain with
+     a point of small order, an addition may be used incorrectly where a
+     doubling would be required, causing a zero coordinate before a backtracking
+     checkpoint is reached. */
+  if (method < 2,
+    p3 = p1;
+    while (valuation(p1[3], 2) == (valuation(p3[3], 2)),
+      p3 = find_lpf_in_range(p3[1] + 1, minq, B1, param, method);
+    );
+    print_numbers(p1, p3, " # Two B1-smooth factors with different power of 2 in the order", "");
+  );
+
+  q1 = find_lpf_in_range(minp, B1, B1+50, param, method);
+  q2 = find_lpf_in_range(minp, q1[4] + 500, B2, param, method);
+  print_numbers(q1, q2, " # Two B1,B2-smooth factors with LPF in differnet giant-steps", "");
+
+  v = [33, 49, 65, 97, 127, 128, 200];
+  for (i = 1, length(v),
+    /* A non-smooth cofactor such that the product is >2^v[i] */
+    q = find_lpf_in_range(floor(2^v[i] / p1[1]), B2+1, 0, param, method);
+    print_numbers(p1, q, "one B1-smooth factor", "one non-smooth cofactor");
+    q = find_lpf_in_range(floor(2^v[i] / p2[1]), B2+1, 0, param, method);
+    print_numbers(p2, q, "one B1,B2-smooth factor", "one non-smooth cofactor");
+  );
+}
+
+print_orders(pmin, pmax, param, method) = {
+  local(p);
+  p = nextprime(pmin);
+  while (p <= pmax,
+    o = get_order(p, param, method);
+    print(o[1], " ", o[1], " ", o[3]);
+    p = nextprime(p+1);
+  );
+}
+
+
+
 /* Computes the order of the curve, the order of the starting point and
    the index of the starting point for curves with Montgomery torsion 12 
-n=0;v=vector(20);forprime(p=100000, 200000, EP=ecmtorsion12(2, p); E=EP[1]; P=EP[2]; o=ellsea(E,p); po = pointorder(E,P,o); n++; v[valuation(o/po,2)+1]++; print(p, ": ", o, " / ", po, " = ", o/po));
+n=0;v=vector(20);forprime(p=100000, 200000, EP=ecmtorsion12(2, p); E=EP[1]; P=EP[2]; o=p + 1 - ellap(E); po = ellorder(E,P,o); n++; v[valuation(o / po,2)+1]++; print(p, ": ", o, " / ", po, " = ", o/po));
 */
-
-

@@ -6,6 +6,8 @@
 
 #include "mod_ul_common.c"
 
+#include "modredc_ul.h"
+
 
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or set r to 0 and return 0 if s is not invertible */
@@ -107,4 +109,61 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t m)
 #endif
 
   return 1;
+}
+
+/* even_inv_lookup_table[i] is 1/(2*i+1) mod 128 */
+static unsigned long even_inv_lookup_table[64] = {
+  1, 43, 77, 55, 57, 35, 69, 111, 113, 27, 61, 39, 41, 19, 53, 95, 97, 11, 45,
+  23, 25, 3, 37, 79, 81, 123, 29, 7, 9, 115, 21, 63, 65, 107, 13, 119, 121, 99,
+  5, 47, 49, 91, 125, 103, 105, 83, 117, 31, 33, 75, 109, 87, 89, 67, 101, 15,
+  17, 59, 93, 71, 73, 51, 85, 127 } ;
+
+
+/* Faster modul_inv for the case where m = 2^k */
+int
+modul_inv_powerof2 (residue_t r, const residue_t A, const modulus_t m)
+{
+  unsigned long x = m[0], y = A[0];
+
+  ASSERT (!(x & (x-1))); /* assert that x is a power of 2 */
+  ASSERT (y < x);
+  if (!(y & 1UL))
+    return 0;
+  else
+  {
+    if (!(x >> 4)) /* x = 2, 4 or 8 */
+      r[0] = y;
+    else if (!(x >> 8)) /* x = 16, 32, 64, or 128 */
+      r[0] = even_inv_lookup_table[(y-1) >> 1] & (x-1);
+    else
+    {
+      modulusul_t m2;
+      residueul_t B;
+      unsigned long h = x >> (ularith_ctz(x) >> 1);
+      modul_initmod_ul (m2, h);
+      modul_init_noset0 (B, m2);
+      modul_set_ul_reduced (B, (y & (h-1)), m2);
+
+      modul_inv_powerof2 (r, B, m2);
+      unsigned long t = (r[0] * r[0]) & (x-1);
+      t = (t * y) & (x-1);
+      r[0] = (r[0] << 1) & (x-1);
+      r[0] = (r[0] - t) & (x-1);
+
+      modul_clear (B, m2);
+      modul_clearmod (m2);
+    }
+    return 1;
+  }
+}
+
+/* Faster modul_inv for the case where m is odd */
+int
+modul_inv_odd (residue_t r, const residue_t A, const modulus_t m)
+{
+  modulusredcul_t mm;
+  modredcul_initmod_ul_raw (mm, m[0]);
+  int ret = modredcul_intinv (r, A, mm);
+  modredcul_clearmod(mm);
+  return ret;
 }

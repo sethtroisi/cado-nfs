@@ -57,7 +57,7 @@ endif(GMP_INCDIR)
 if(GMP_LIBDIR)
 link_directories(${GMP_LIBDIR})
 else(GMP_LIBDIR)
-message(FATAL_ERROR "gmp.h cannot be found. Please install Gnu MP, and specify its install prefix in local.sh")
+message(FATAL_ERROR "GMP library cannot be found. Please install Gnu MP, and specify its install prefix in local.sh")
 endif(GMP_LIBDIR)
 
 set(gmp_libname "gmp")

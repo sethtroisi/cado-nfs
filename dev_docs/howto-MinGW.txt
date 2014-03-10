@@ -38,6 +38,12 @@ change PATH and append (possibly replacing the directory name to the correct
 directory where Git is installed):
 ;C:\Program Files (x86)\Git\cmd
 
+11. Download and install Python 3 from http://www.python.org/getit/. The
+Python 3 executable is called Python.exe, but the scripts expect to be able
+to run a Python 3 interpreter as "python3", so a link must be created:
+create the directory /urs/local/bin if it does not exist, and "ln -s" the
+Python.exe file as /urs/local/bin/python3
+
 ==== Per-user installation and settings ====
 
 7. Make ssh key and copy to VM host computer, write .ssh/config entry

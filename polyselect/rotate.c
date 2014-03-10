@@ -5,10 +5,10 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
-
+#include "area.h"
 
 static void usage_and_die(char *argv0) {
-    fprintf(stderr, "usage: %s poly j k\n", argv0);
+    fprintf(stderr, "usage: %s [-area a] [-Bf b] [-Bg c] poly j k\n", argv0);
     fprintf(stderr, "  apply rotation f += (j*x+k)*g to poly.\n");
     fprintf(stderr, "  poly: filename of polynomial\n");
     fprintf(stderr, "  j,k : integers\n");
@@ -22,6 +22,29 @@ int main(int argc, char **argv) {
 
     mpz_init(b);
     mpz_init(m);
+    while (argc >= 2 && argv[1][0] == '-')
+      {
+        if (strcmp (argv[1], "-area") == 0)
+          {
+            area = atof (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-Bf") == 0)
+          {
+            bound_f = atof (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
+        else if (strcmp (argv[1], "-Bg") == 0)
+          {
+            bound_g = atof (argv [2]);
+            argv += 2;
+            argc -= 2;
+          }
+        else
+          break;
+      }
     if (argc != 4)
         usage_and_die(argv[0]);
     cado_poly_init (poly);

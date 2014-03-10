@@ -124,7 +124,7 @@ generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
 }
 
 int
-SkewGauss (sieve_info_ptr si, double skewness)
+SkewGauss (sieve_info_ptr si)
 {
     mpz_t a[2], b[2];
     int fits;
@@ -133,7 +133,7 @@ SkewGauss (sieve_info_ptr si, double skewness)
     mpz_init_set (a[1], si->doing->r);
     mpz_init_set_ui (b[0], 0);
     mpz_init_set_ui (b[1], 1);
-    generic_skew_gauss (a, b, skewness);
+    generic_skew_gauss (a, b, si->conf->skewness);
     fits = mpz_fits_int64_p (a[0]);
     fits = fits && mpz_fits_int64_p (b[0]);
     fits = fits && mpz_fits_int64_p (a[1]);

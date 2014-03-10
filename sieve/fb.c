@@ -38,6 +38,7 @@ strtoul_const(const char *nptr, const char **endptr, const int base)
   return r;
 }
 
+#if 0 /* currently not used */
 void
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
 {
@@ -62,6 +63,7 @@ fb_fprint (FILE *fd, const factorbase_degn_t *fb)
       fb = fb_next (fb);
     }
 }
+#endif
 
 /* Initialise a factor base buffer to empty */
 static void
@@ -231,8 +233,8 @@ fb_split_wipe (fb_split_t *split)
   free (split->fb_bufs);
 }
 
+#if 0 /* currently unused */
 /* Sort n primes in array *primes into ascending order */
-
 void
 fb_sortprimes (fbprime_t *primes, const unsigned int n)
 {
@@ -253,6 +255,7 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
     ASSERT(primes[k - 1] <= primes[k]);
 #endif
 }
+#endif
 
 unsigned char
 fb_log (double n, double log_scale, double offset)
@@ -702,7 +705,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     /* NB: a short version is not possible for a prime power, so we
      * do the test only for !longversion */
     p = (longversion) ? fb_is_power (q, NULL) : 0;
-    ASSERT(isprime(p != 0 ? p : q));
+    ASSERT(ulong_isprime(p != 0 ? p : q));
     fb_cur->p = q;
     if (p != 0) {
         if (powlim && fb_cur->p >= powlim)

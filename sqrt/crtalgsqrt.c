@@ -1063,12 +1063,6 @@ static const char * size_disp(size_t s, char buf[16])
 
 // {{{ TODO: Now that the v field is gone, replace the polymodF layer.
 // Here's the only fragments which need to remain.
-    static int
-mpz_poly_normalized_p (const mpz_poly_t f)
-{
-    return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
-}
-
 static void
 mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
     tmp->deg = b != 0;

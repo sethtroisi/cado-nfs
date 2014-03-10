@@ -12,7 +12,7 @@ More details follow.
 Important note: For a larger factorization (distributed on several machines),
 please use directly the main script scripts/cadofactor/cadofactor.py (whose
 documentation is in scripts/cadofactor/README, and documented example parameter
-files are in params_py/params.c91 and scripts/cadofactor/parameters) instead of
+files are in params/params.c91 and scripts/cadofactor/parameters) instead of
 factor.sh (see section "Run a factorization on current machine").
 
 Supported platforms:
@@ -229,7 +229,7 @@ Factoring with SNFS:
 
 It is possible to take advantage of the special form of an integer and
 use the Special Number Field Sieve. See the doc in
-params_py/parameters.F9 for that. Note in particular that you can force
+params/parameters.F9 for that. Note in particular that you can force
 the special-q to be on the rational side if this is more appropriate
 for your number, with tasks.sieve.ratq=True on the factor.sh or
 cadofactor.py command line.

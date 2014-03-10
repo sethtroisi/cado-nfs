@@ -2,7 +2,6 @@
 
 import sys
 import os
-import fcntl
 import errno
 import stat
 import optparse
@@ -36,6 +35,83 @@ from io import BytesIO
 from workunit import Workunit
 import ssl
 
+
+
+# File locking functions are specific to Unix/Windows/MacOS platforms.
+# The FileLock class is an Interface with static methods.
+
+if os.name == "nt":
+    import msvcrt
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Lock a file """
+            # How do you get shared locks under Windows? There is a Python
+            # for Windows extension available at
+            # http://sourceforge.net/projects/pywin32/files/?source=navbar
+            # which offers many functions from the Win32 API, including file
+            # locking, but it is a binary extension for Python, and you have
+            # to choose the exact right package for your Python version and
+            # platform... can't be imported just like that.
+            # The msvcrt.locking function appears to support only one kind
+            # of locking, i.e., an exclusive lock. This mostly defeats the
+            # purpose of locking here, as we want to prevent clients from
+            # reading files that another client is currently downloading.
+            if not exclusive:
+                # Don't have shared lock - bail out. FIXME
+                return
+            else:
+                # For now, do nothing, until I figure out file locking under
+                # Windows
+                return
+            # Lock one byte from the start of the file
+            mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK
+            pos = f.tell()
+            f.seek(0)
+            msvcrt.locking(f.fileno(), mode, 1)
+            f.seek(pos)
+        @staticmethod
+        def unlock(f):
+            """ Unlock a file """
+            # Unlock one byte from the start of the file
+            # For now, do nothing, until I figure out file locking under
+            # Windows
+            return
+            pos = f.tell()
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            f.seek(pos)
+elif os.name == "posix":
+    import fcntl
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Lock a file
+            
+            If exclusive is True, lock for exclusive (a.k.a "write") access,
+            otherwise lock for shared (a.k.a. "read") access.
+            If blocking is False, don't block in case of already-locked
+            file, but raise IOError with EACCES or EAGAIN (depending on OS).
+            """
+            mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+            mode |= 0 if blocking else fcntl.LOCK_NB
+            fcntl.flock(f.fileno(), mode)
+        @staticmethod
+        def unlock(f):
+            """ Unlock a file """
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+else:
+    # No file locking. FIXME: What about MacOS?
+    class FileLock(object):
+        @staticmethod
+        def lock(f, exclusive=False, blocking=True):
+            """ Do nothing """
+            pass
+        @staticmethod
+        def unlock(f):
+            """ Do nothing """
+            pass
+
 # In Python 3.0, 3.1, 3.2.x < 3.2.4, 3.3.x < 3.3.1, use a fixed BytesGenerator
 # which accepts a bytes input. The fact that the BytesGenerator in these Python
 # versions doesn't is a bug, see http://bugs.python.org/issue16564
@@ -53,7 +129,7 @@ BUGGY_MIMEENCODER1 = (
 # These Python version have bug type #2
 BUGGY_MIMEENCODER2 = (
     (3,2,4), (3,2,5),
-    (3,3,2), (3,3,3)
+    (3,3,2), (3,3,3), (3,3,4)
 )
 
 HAVE_WGET = False
@@ -408,23 +484,22 @@ class SharedFile(object):
                 self.existed = True
                 self.wait_until_positive_filesize(filename)
                 self.file = open(filename, "r+b")
-                self.fd = self.file.fileno()
-                fcntl.flock(self.fd, fcntl.LOCK_SH)
+                FileLock.lock(self.file)
                 return
             else:
                 raise
         self.existed = False
-        fcntl.flock(fd, fcntl.LOCK_EX)
         self.file = os.fdopen(fd, "r+b")
+        FileLock.lock(self.file, exclusive=True)
 
     def close():
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        FileLock.unlock(self.file)
         self.file.close() # This should also close the fd
 
     def delete():
         if self.existed:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            FileLock.unlock(self.file)
+            FileLock.lock(self.file, exclusive=True)
         try:
             os.remove(self.filename)
         except OSError as err:
@@ -461,7 +536,7 @@ def open_exclusive(filename):
     """ Open a file and get an exclusive lock on it """
     fileobj = open(filename, "r+")
     try:
-        fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        FileLock.lock(fileobj, exclusive=True, blocking=False)
     except IOError as err:
         if err.errno == errno.EACCES or err.errno == errno.EAGAIN:
             fileobj.close()
@@ -471,24 +546,67 @@ def open_exclusive(filename):
 
 def close_exclusive(fileobj):
     """ Close a file, releasing any held lock on it """
-    fcntl.flock(fileobj, fcntl.LOCK_UN)
+    FileLock.unlock(fileobj)
     fileobj.close()
 
-def run_command(command, print_error=False):
+def run_command(command, print_error=True, **kwargs):
     """ Run command, wait for it to finish, return exit status, stdout
     and stderr
 
-    If print_error is True and the command exits with an non-zero exit code,
-    print stdout and stderr to the log.
+    If print_error is True and the command exits with a non-zero exit code,
+    print stdout and stderr to the log. If a KeyboardInterrupt exception
+    occurs while waiting for the command to finish, the command is
+    terminated.
     """
-    logging.info ("Running %s",
-            command if isinstance(command, str) else " ".join(command))
+    
+    command_str = command if isinstance(command, str) else " ".join(command)
+    
+    if os.name == "nt":
+        # We need to call bash explicitly as the WU COMMAND assumes POSIX
+        # syntax which the Windows command line shell does not implement.
+        # Turn command into an array so that "bash -c" gets the WU command
+        # as a single parameter, i.e., we defer propery quoting command_str
+        # to to the subprocess module.
+        command = ["bash",  "-c", command_str]
+        command_str = " ".join(command)
+        close_fds = False
+    else:
+        close_fds = True
+
+    logging.info ("Running %s", command_str)
+
     child = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
-                             close_fds=True)
-    (stdout, stderr) = child.communicate()
+                             close_fds=close_fds,
+                             **kwargs)
 
+    # If we receive SIGTERM (the default signal for "kill") while a
+    # subprocess is running, we want to be able to terminate the
+    # subprocess, too, so that the system is not kepy busy with
+    # orphaned processes.
+    # Python installs by default a signal handler for SIGINT which
+    # raises the KeyboardInterrupt exception. This is convenient, as
+    # it lets us simply terminate the child in an exception handler.
+    # Thus we install the signal handler of SIGINT for SIGTERM as well,
+    # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+
+    sigint_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGTERM , sigint_handler)  
+
+    # Wait for command to finish executing, capturing stdout and stderr 
+    # in output tuple
+    try:
+        (stdout, stderr) = child.communicate()
+    except KeyboardInterrupt:
+        logging.critical("KeyboardInterrupt received, killing child "
+                         "process with PID %d", child.pid)
+        child.terminate()
+        raise # Re-raise KeyboardInterrupt to terminate wuclient.py
+    
+    # Un-install our handler and revert to the default handler
+    signal.signal(signal.SIGTERM , signal.SIG_DFL)
+    
     if print_error and child.returncode != 0:
         logging.error("Command resulted in exit code %d", child.returncode)
         if stdout:
@@ -513,16 +631,67 @@ class WorkunitProcessor(object):
     def renice(self):
         os.nice(int(self.settings["NICENESS"]))
 
+    @staticmethod
+    def is_executable(filename):
+        """ Test that the file exists and, if the stat object knows the
+        "executable by user" constant, that it is executable
+        """
+        return os.path.isfile(filename) and not (hasattr(stat, "S_IXUSR") and
+                (os.stat(filename).st_mode & stat.S_IXUSR) == 0)
+
+    @staticmethod
+    def find_binary(filename, searchpath):
+        """ Given a semicolon-separated search path, find the directory which
+        contains an executable "filename". If not found, return None.
+        """
+        # If filename contains any path information (e.g., "./foo"), then
+        # try only filename itself, like the shell does
+        if os.path.basename(filename) != filename:
+            return filename if WorkunitProcessor.is_executable(filename) \
+                    else None
+        for trydir in searchpath.split(";"):
+            # An empty directory name results in tryname == filename, so it
+            # will search in the current working directory, like the shell
+            # PATH does
+            tryname = os.path.join(trydir, filename)
+            if WorkunitProcessor.is_executable(tryname):
+                return tryname
+        return None
+
     def run_commands(self):
         if self.result_exists():
             if self.settings["KEEPOLDRESULT"]:
                 return True
             else:
                 self.cleanup()
+        files = {}
+        
+        # To which directory do workunit files map?
+        dirs = {"FILE": self.settings["DLDIR"],
+                "RESULT": self.settings["WORKDIR"]}
+        
+        for key in dirs:
+            for (index, filename) in enumerate(self.workunit.get(key, [])):
+                if not isinstance(filename, str):
+                        filename = filename[0] # Drop checksum value
+                # index is 0-based, add 1 to make FILE1, FILE2, etc. 1-based
+                files["%s%d" % (key, index + 1)] = \
+                        os.path.join(dirs[key], filename)
+
+        key = "EXECFILE"
+        for (index, filename) in enumerate(self.workunit.get(key, [])):
+            if not isinstance(filename, str):
+                    filename = filename[0] # Drop checksum value
+            if self.settings["BINDIR"]:
+                binfile = self.find_binary(filename, self.settings["BINDIR"])
+                if binfile is None:
+                    raise Exception("Binary file %s not found" % filename)
+            else:
+                binfile = os.path.join(self.settings["DLDIR"], filename)
+            files["%s%d" % (key, index + 1)] = binfile
+        
         for (counter, command) in enumerate(self.workunit.get("COMMAND", [])):
-            command = Template(command).safe_substitute(self.settings)
-            logging.info ("Running command for workunit %s: %s", 
-                          self.workunit.get_id(), command)
+            command = Template(command).safe_substitute(files)
 
             # If niceness command line parameter was set, call self.renice() 
             # in child process, before executing command
@@ -531,51 +700,15 @@ class WorkunitProcessor(object):
             else:
                 renice_func = None
 
-            # Run the command
-            child = subprocess.Popen(command, shell=True, 
-                                     stdout = subprocess.PIPE, 
-                                     stderr = subprocess.PIPE, 
-                                     close_fds = True,
-                                     preexec_fn = renice_func)
+            (returncode, stdout, stderr) = run_command(command, shell=True,
+                    preexec_fn=renice_func)
 
-            # If we receive SIGTERM (the default signal for "kill") while a
-            # subprocess is running, we want to be able to terminate the
-            # subprocess, too, so that the system is not kepy busy with
-            # orphaned processes.
-            # Python installs by default a signal handler for SIGINT which
-            # raises the KeyboardInterrupt exception. This is convenient, as
-            # it lets us simply terminate the child in an exception handler.
-            # Thus we install the signal handler of SIGINT for SIGTERM as well,
-            # so that SIGTERM likewise raises a KeyboardInterrupt exception.
+            self.stdio["stdout"].append(stdout)
+            self.stdio["stderr"].append(stderr)
 
-            sigint_handler = signal.getsignal(signal.SIGINT)
-            signal.signal(signal.SIGTERM , sigint_handler)  
-
-            # Wait for command to finish executing, capturing stdout and stderr 
-            # in output tuple
-            try:
-                (child_stdout, child_stderr) = child.communicate()
-            except KeyboardInterrupt:
-                logging.critical("KeyboardInterrupt received, killing child "
-                                 "process with PID %d", child.pid)
-                child.terminate()
-                raise # Re-raise KeyboardInterrupt to terminate wuclient.py
-            
-            # Un-install our handler and revert to the default handler
-            signal.signal(signal.SIGTERM , signal.SIG_DFL)
-            
-            self.stdio["stdout"].append(child_stdout)
-            self.stdio["stderr"].append(child_stderr)
-
-            if child.returncode != 0:
-                logging.error ("Command exited with exit code %s", 
-                               child.returncode) 
-                if self.stdio["stdout"][-1]:
-                    logging.error ("Stdout: %s", self.stdio["stdout"][-1]) 
-                if self.stdio["stderr"][-1]:
-                    logging.error ("Stderr: %s", self.stdio["stderr"][-1]) 
+            if returncode != 0:
                 self.failedcommand = counter
-                self.errorcode = child.returncode
+                self.errorcode = returncode
                 return False
             else:
                 logging.debug ("Command exited successfully")
@@ -772,7 +905,10 @@ class WorkunitClient(object):
         contain special characters, like accents.
         """
         if sys.version_info[0] == 3:
-            return conn.info().get_content_charset()
+            charset = conn.info().get_content_charset()
+            if charset is None:
+                charset = "latin-1"
+            return charset
         else:
             encoding = "latin-1" # Default value
             for item in conn.info().getplist():
@@ -788,7 +924,7 @@ class WorkunitClient(object):
         silent_wait=self.settings["SILENT_WAIT"]
         waiting_since = 0
         while True:
-            (rc, stdout, stderr) = run_command (command, print_error=True)
+            (rc, stdout, stderr) = run_command (command)
             if rc == 0:
                 return True
             if waiting_since == 0 or not silent_wait:
@@ -863,10 +999,10 @@ class WorkunitClient(object):
                 return
             else:
                 raise
-        fcntl.flock(fd, fcntl.LOCK_EX)
         outfile = os.fdopen(fd, "wb")
+        FileLock.lock(outfile, exclusive=True)
         shutil.copyfileobj (request, outfile)
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        FileLock.unlock(outfile)
         outfile.close() # This should also close the fd
         request.close()
     
@@ -918,8 +1054,10 @@ class WorkunitClient(object):
         return True
 
     def get_files(self):
-        for (filename, checksum) in self.workunit.get("FILE", []) + \
-                self.workunit.get("EXECFILE", []):
+        files_to_download = self.workunit.get("FILE", [])
+        if not self.settings["BINDIR"]:
+            files_to_download += self.workunit.get("EXECFILE", [])
+        for (filename, checksum) in files_to_download:
             templ = Template(filename)
             archname = templ.safe_substitute({"ARCH": self.settings["ARCH"]})
             dlname = templ.safe_substitute({"ARCH": ""})
@@ -931,10 +1069,11 @@ class WorkunitClient(object):
             # Try to lock the file once to be sure that download has finished
             # if another wuclient is doing the downloading
             with open(dlpath) as file_to_lock:
-                fcntl.flock(file_to_lock, fcntl.LOCK_SH)
-                fcntl.flock(file_to_lock, fcntl.LOCK_UN)
+                FileLock.lock(file_to_lock)
+                FileLock.unlock(file_to_lock)
             
-            if filename in dict(self.workunit.get("EXECFILE", [])):
+            if os.name != "nt" and \
+                    filename in dict(self.workunit.get("EXECFILE", [])):
                 mode = os.stat(dlpath).st_mode
                 if mode & stat.S_IXUSR == 0:
                     logging.info ("Setting executable flag for %s", dlpath)
@@ -1017,13 +1156,13 @@ class WorkunitClient(object):
         # the file but before it gets the exclusive lock
         WorkunitClient.wait_until_positive_filesize(filename)
         infile = open(filename, "rb")
-        fcntl.flock(infile, fcntl.LOCK_SH)
+        FileLock.lock(infile)
         
         data = infile.read(blocksize)
         while data:
             sha1hash.update(data)
             data = infile.read(blocksize)
-        fcntl.flock(infile, fcntl.LOCK_UN)
+        FileLock.unlock(infile)
         infile.close()
         filesum = sha1hash.hexdigest()
         if checksum is None:
@@ -1125,13 +1264,13 @@ def get_missing_certificate(certfilename, netloc, fingerprint, retry=False,
 
 def try_wget():
     try:
-        return run_command(["wget", "-V"], print_error=True)[0] == 0
+        return run_command(["wget", "-V"])[0] == 0
     except OSError:
         return False
 
 def try_curl():
     try:
-        (rc, stdout, stderr) = run_command(["curl", "-V"], print_error=True)
+        (rc, stdout, stderr) = run_command(["curl", "-V"])
     except OSError:
         return False
     if rc != 0:
@@ -1166,6 +1305,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" :
                                    "<hostname>.<random hex number> is used"), 
                      "DLDIR" : ('download/', "Directory for downloading files"),
                      "WORKDIR" : (None, "Directory for result files"),
+                     "BINDIR" : (None, "Directory with existing executable "
+                                       "files to use"),
                      "BASEPATH" : (None, "Base directory for download and work "
                                          "directories"),
                      "GETWUPATH" : 

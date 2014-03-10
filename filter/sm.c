@@ -33,104 +33,70 @@ Output
 
 #include "filter_common.h"
 
-typedef struct
-{
-  mpz_poly_t *pairs;
-} read_sm_data_t;
-
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
-  read_sm_data_t *data = (read_sm_data_t *) context_data;
-  mpz_poly_init_set_ab(data->pairs[rel->num], rel->a, rel->b);
+  mpz_poly_t * abpolys = (mpz_poly_t *) context_data;
+  mpz_poly_init_set_ab(abpolys[rel->num], rel->a, rel->b);
 
   return NULL;
 }
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
-			  int * small_nrows, mpz_poly_t F, const mpz_t ell2)
+                             uint64_t * small_nrows, mpz_poly_t F,
+                             const mpz_t ell2)
 {
-  FILE * ix = fopen_maybe_compressed(indexname, "r");
+  uint64_t nrows, ncols, small_ncols, len_relset;
+  uint64_t r[MAX_LEN_RELSET];
+  int64_t e[MAX_LEN_RELSET];
+  int ret;
 
   /* array of (a,b) pairs from (purgedname) file */
   mpz_poly_t *pairs;
-  
-  /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file  */
-  sm_relset_ptr rels;
 
-  uint64_t nrows, ncols;
   purgedfile_read_firstline (purgedname, &nrows, &ncols);
-
-  pairs = (mpz_poly_t *) malloc(nrows * sizeof(mpz_poly_t));
-
+  pairs = (mpz_poly_t *) malloc (nrows * sizeof(mpz_poly_t));
+  ASSERT_ALWAYS (pairs != NULL);
   /* For each rel, read the a,b-pair and init the corresponding poly pairs[] */
-  read_sm_data_t data = {.pairs = pairs};
+  fprintf(stdout, "\n# Reading %" PRIu64 " (a,b) pairs\n", nrows);
   char *fic[2] = {(char *) purgedname, NULL};
-  filter_rels (fic, (filter_rels_callback_t) thread_sm, &data,
+  filter_rels (fic, (filter_rels_callback_t) thread_sm, pairs,
           EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
 
+
+  /* Array of (small_nrows) relation-sets built from array (pairs) and
+     (indexname) file  */
+  sm_relset_ptr rels;
+  FILE * ix = fopen_maybe_compressed(indexname, "r");
+
   /* small_ncols isn't used here: we don't care */
-  int small_ncols;
-  int ret = fscanf(ix, "%d %d", small_nrows, &small_ncols);
+  ret = fscanf(ix, "%" SCNu64 " %" SCNu64 "", small_nrows, &small_ncols);
   ASSERT(ret == 2);
 
-  rels = malloc(*small_nrows * sizeof(sm_relset_t));
+  rels = (sm_relset_ptr) malloc (*small_nrows * sizeof(sm_relset_t));
+  ASSERT_ALWAYS (rels != NULL);
 
-  for (int k = 0 ; k < *small_nrows ; k++) {
-    mpz_poly_init(rels[k].num, F->deg);
-    mpz_poly_init(rels[k].denom, F->deg);
-  }
-    
-  unsigned int ridx;
-  long e, nc;
-  mpz_poly_t tmp;
-  
-  mpz_t ee;
-  mpz_init(ee);  
+  fprintf(stdout, "\n# Building relation-sets\n");
+  for(uint64_t i = 0 ; i < *small_nrows ; i++)
+  {
+    ret = fscanf(ix, "%" SCNu64 "", &len_relset);
+    ASSERT_ALWAYS(ret == 1 && len_relset < MAX_LEN_RELSET);
 
-  mpz_poly_init(tmp, F->deg);
-
-  for(int i = 0 ; i < *small_nrows ; i++) {
-    ret = fscanf(ix, "%ld", &nc); 
-    ASSERT_ALWAYS(ret == 1);
-
-    (rels[i].num)->deg = 0;
-    (rels[i].denom)->deg = 0;
-    mpz_poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
-    mpz_poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
-
-    for(int k = 0 ; k < nc ; k++) {
-      ret = fscanf(ix, "%x:%ld", &ridx, &e); 
+    for (uint64_t k = 0 ; k < len_relset ; k++)
+    {
+      ret = fscanf(ix, " %" SCNx64 ":%" SCNd64 "", &r[k], &e[k]); 
       ASSERT_ALWAYS(ret == 2);
-
-      /* Should never happen! */
-      ASSERT_ALWAYS(e != 0);
-
-      if (e > 0) {
-	  mpz_set_si(ee, e);
-	  /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
-	  mpz_poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	  mpz_poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
-      }
-      else {
-	  mpz_set_si(ee, -e);
-	  /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
-	  mpz_poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	  mpz_poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
-      }
     }
-    mpz_poly_cleandeg(rels[i].num, F->deg);
-    mpz_poly_cleandeg(rels[i].denom, F->deg);
-
+     
+    sm_relset_init (&rels[i], F->deg);
+    sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
   }
-  mpz_poly_clear(tmp);
 
   fclose_maybe_compressed(ix, indexname);
 
   for (uint64_t i = 0; i < nrows; i++)
     mpz_poly_clear (pairs[i]);
   free (pairs);
-  mpz_clear (ee);
   
   return rels;
 }
@@ -157,32 +123,21 @@ void * thread_start(void *arg) {
   mpz_srcptr invl2 = ti->invl2;
   mpz_poly_t *sm = ti->sm;
   int offset = ti->offset;
-  mpz_t tmp;
-
-  mpz_init(tmp);
-
-  mpz_poly_t g, U, V;
-  mpz_poly_init(g, 0);
-  mpz_poly_init (U,0);
-  mpz_poly_init (V,0);
-
 
   for (int i = 0; i < ti->nb; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[offset+i], F, ell2, tmp, g, U, V);
+    mpz_poly_reduce_frac_mod_f_mod_mpz(rels[offset+i].num, rels[offset+i].denom,
+                                       F, ell2);
     compute_sm (sm[i], rels[offset+i].num, F, ell, eps, ell2, invl2);
   }
 
-  mpz_clear(tmp);
-  mpz_poly_clear(g);
-  mpz_poly_clear(U);
-  mpz_poly_clear(V);
   return NULL;
 }
 
 #define SM_BLOCK 500
 
-void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
-    const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
+void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
+            mpz_poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2,
+            int nsm)
 {
   // allocate space for results of threads
   mpz_poly_t **SM;
@@ -200,10 +155,10 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t 
   int threads_head = 0;    // next thread to wait / restart.
   
   // Prepare the main loop
-  int i = 0; // counter of relation-sets.
-  int out_cpt = 0; // counter of already printed relation-sets;
+  uint64_t i = 0; // counter of relation-sets.
+  uint64_t out_cpt = 0; // counter of already printed relation-sets;
   FILE * out = fopen(outname, "w");
-  fprintf(out, "%d\n", sr);
+  fprintf(out, "%" PRIu64 "\n", sr);
   mpz_t invl2;
   mpz_init(invl2);
   barrett_init(invl2, ell2);
@@ -266,47 +221,28 @@ void mt_sm(int nt, const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t 
 }
 
 
-void sm(const char * outname, sm_relset_ptr rels, int sr, mpz_poly_t F,
-	const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
+void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
+         const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
 {
   FILE * out = fopen(outname, "w");
   mpz_poly_t SM;
   mpz_t invl2;
-  mpz_t tmp;
-  
-  mpz_init(tmp);
 
   mpz_init(invl2);
   barrett_init(invl2, ell2);
 
-
-  fprintf(stderr, "\tBuilding %d relation sets mod ell^2:\n", sr);
-  fprintf(stderr, "\tell^2 = ");
-  mpz_out_str(stderr, 10, ell2);
-  fprintf(stderr, "\n");
-
   mpz_poly_init(SM, F->deg);
-  SM->deg = 0;
-  mpz_poly_setcoeff_si(SM, 0, 1);
 
-  mpz_poly_t g, U, V;
-  mpz_poly_init(g, 0);
-  mpz_poly_init (U,0);
-  mpz_poly_init (V,0);
-  
-  fprintf(out, "%d\n", sr);
+  fprintf(out, "%" PRIu64 "\n", sr);
 
-  for (int i=0; i<sr; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz (&rels[i], F, ell2, tmp, g, U, V);
+  for (uint64_t i=0; i<sr; i++) {
+    mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm);
   }
 
-  mpz_poly_clear(SM);
-  mpz_poly_clear(U);
-  mpz_poly_clear(V);
+  mpz_poly_clear (SM);
   mpz_clear(invl2);
-  mpz_clear(tmp);
   fclose(out);
 }
 
@@ -343,14 +279,12 @@ int main (int argc, char **argv)
   const char *purgedfile = NULL;
   const char *indexfile = NULL;
   const char *outfile = NULL;
-  const char *group_order = NULL;
-  const char *sm_exponent = NULL;
 
   param_list pl;
   cado_poly pol;
   mpz_poly_ptr F;
   sm_relset_ptr rels = NULL;
-  int sr;
+  uint64_t sr;
   mpz_t ell, ell2, eps;
   int mt = 1;
   double t0;
@@ -369,32 +303,45 @@ int main (int argc, char **argv)
     usage (argv0, NULL, pl);
   }
 
-
+  /* Read poly filename from command line */
   if ((polyfile = param_list_lookup_string(pl, "poly")) == NULL) {
       fprintf(stderr, "Error: parameter -poly is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
+  /* Read purged filename from command line */
   if ((purgedfile = param_list_lookup_string(pl, "purged")) == NULL) {
       fprintf(stderr, "Error: parameter -purged is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
+  /* Read index filename from command line */
   if ((indexfile = param_list_lookup_string(pl, "index")) == NULL) {
       fprintf(stderr, "Error: parameter -index is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
-  if ((group_order = param_list_lookup_string(pl, "gorder")) == NULL) {
+  /* Read outfile filename from command line */
+  if ((outfile = param_list_lookup_string(pl, "out")) == NULL) {
+      fprintf(stderr, "Error: parameter -out is mandatory\n");
+      param_list_print_usage(pl, argv0, stderr);
+      exit(EXIT_FAILURE);
+  }
+
+  /* Read ell from command line (assuming radix 10) */
+  mpz_init (ell);
+  if (!param_list_parse_mpz(pl, "gorder", ell)) {
       fprintf(stderr, "Error: parameter -gorder is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
   }
 
-  if ((sm_exponent = param_list_lookup_string(pl, "smexp")) == NULL) {
+  /* Read sm exponent from command line (assuming radix 10) */
+  mpz_init (eps);
+  if (!param_list_parse_mpz(pl, "smexp", eps)) {
       fprintf(stderr, "Error: parameter -smexp is mandatory\n");
       param_list_print_usage(pl, argv0, stderr);
       exit(EXIT_FAILURE);
@@ -407,16 +354,17 @@ int main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  outfile = param_list_lookup_string(pl, "out");
-
+  /* Init polynomial */
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
+  F = pol->pols[ALGEBRAIC_SIDE];
 
+  /* Read number of sm to be printed from command line */
   int nsm = pol->alg->deg;
   param_list_parse_int(pl, "nsm", &nsm);
   if (nsm < 1 || nsm > pol->alg->deg)
   {
-    fprintf(stderr, "Error: parameter nsm must be at least 1 and at most"
+    fprintf(stderr, "Error: parameter nsm must be at least 1 and at most "
                     "the degree of the rational polynomial\n");
     param_list_print_usage(pl, argv0, stderr);
     exit(EXIT_FAILURE);
@@ -426,46 +374,37 @@ int main (int argc, char **argv)
     usage (argv0, NULL, pl);
   param_list_print_command_line (stdout, pl);
 
-  /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
-  F = pol->pols[ALGEBRAIC_SIDE];
-  fprintf(stderr, "F = ");
-  mpz_poly_fprintf(stderr,F);
-
-  /* read ell from command line (assuming radix 10) */
-  mpz_init_set_str(ell, group_order, 10);
-
+  /* Print F, ell, smexp and ell2 */
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  fprintf(stderr, "\nSub-group order:\n\tell = ");
-  mpz_out_str(stderr, 10, ell);
-  fprintf(stderr, "\n");
-
-  mpz_init_set_str(eps, sm_exponent, 10);
-
-  fprintf(stderr, "\nShirokauer maps' exponent:\n\teps = ");
-  mpz_out_str(stderr, 10, eps);
-  fprintf(stderr, "\n");
+  fprintf(stdout, "\n# Algebraic polynomial:\nF = ");
+  mpz_poly_fprintf(stdout, F);
+  gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
+                      "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
+                      "exponent:\neps = %Zi\n", ell, ell2, eps);
 
   t0 = seconds();
   rels = build_rel_sets(purgedfile, indexfile, &sr, F, ell2);
-
-  fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
 
   /* adjust the number of threads based on the number of relations */
   double ntm = ceil((sr + 0.0)/SM_BLOCK);
   if (mt > ntm)
     mt = (int) ntm;
 
-  fprintf(stderr, "using %d threads\n", mt);
+  fprintf(stdout, "\n# Computing Shirokauer maps for %" PRIu64 " relations "
+                  "using %d threads\n", sr, mt);
 
   if (mt == 1)
     sm(outfile, rels, sr, F, eps, ell, ell2, nsm);
   else
     mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2, nsm);
 
-  fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
+  fprintf(stdout, "\n# sm completed in %2.2lf seconds\n", seconds() - t0);
 
+  for (uint64_t i = 0; i < sr; i++)
+    sm_relset_clear (&rels[i]);
+  free(rels);
   mpz_clear(eps);
   mpz_clear(ell);
   mpz_clear(ell2);

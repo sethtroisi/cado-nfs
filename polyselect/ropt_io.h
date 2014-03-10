@@ -4,11 +4,9 @@
 #include "utils.h"
 #include "murphyE.h"
 #include "ropt_param.h"
+#include "cachesize_cpuid.h"
 
 /* -- declarations -- */
-
-/* L1 cache detection */
-int cachesize_cpuid ( int ); // from utils
 
 int cachesize_guess ( int ); // from utils
 

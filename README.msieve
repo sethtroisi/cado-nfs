@@ -30,8 +30,10 @@ or msieve.
     See check_rels -h for others options.
 
 3) Create a parameterfile for the Python script: see, in the scripts/cadofactor
-directory, the files 'parameters' and 'REAMDE'. In the README file, read
+directory, the files 'parameters' and 'README'. In the README file, read
 thoroughly the section on importing polynomial file and importing relations.
+You can also look in the 'params' directory for examples of parameter files
+depending on the size of the input.
 
 4) run the cadofactor.py script (where $CADO is the CADO-NFS directory):
 
@@ -41,10 +43,10 @@ If the parameter file is correctly configure, the script will skip the
 polyselect step and the sieving. It will run all the remaining step of the
 factorization until the factors are found. 
 
-NB: If you want to do only the filtering step, you should remove the file
-'linalg/bwc/bwc.pl' in your __build directory__, this will make the script crash
-at the beginning of the linear algebra (a more elegant solution should be
-available soon).
+NB: If you only want to do the filtering step, add the following command-line
+arguments:
+
+   $ $CADO/scripts/cadofactor.py <parameterfile> 'tasks.linalg.run = false' 'tasks.sqrt.run = false'
 
 ==============================================================================
 

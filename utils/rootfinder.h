@@ -24,7 +24,6 @@ typedef struct {
 } enumeratediv_t;
 
 extern int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p);
-extern int poly_roots_long(long * r, mpz_t * f, int d, unsigned long p);
 extern int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p);
 extern int poly_roots_uint64(uint64_t * r, mpz_t * f, int d, uint64_t p);
 extern int roots_mod_uint64 (uint64_t * r, uint64_t a, int d, uint64_t p);

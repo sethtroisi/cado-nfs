@@ -3,75 +3,17 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Q = P^a mod f, mod p. Note, p is mpz_t */
+/* Init polynomial rel and set it to b*x - a */
 void
-mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                    const mpz_t a, const mpz_t p, MAYBE_UNUSED const mpz_t invp)
-{
-  int k = mpz_sizeinbase(a, 2);
-
-  if (mpz_cmp_ui(a, 0) == 0) {
-    Q->deg = 0;
-    mpz_set_ui(Q->coeff[0], 1);
-    return;
-  }
-  
-  // Initialize Q to P
-  mpz_poly_copy(Q, P);
-
-  // Horner
-  for (k -= 2; k >= 0; k--)
-  {
-    mpz_poly_sqr_mod_f_mod_mpz(Q, Q, f, p, NULL);  // R <- R^2
-    if (mpz_tstbit(a, k))
-      mpz_poly_mul_mod_f_mod_mpz(Q, Q, P, f, p, NULL);  // R <- R*P
-  }
-}
-
-inline void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
-  if (b == 0)
-  {
-    /* freerel */
-    mpz_poly_init(rel, 0);
-    mpz_poly_setcoeff_int64(rel, 0, a);
-    rel->deg=0;
-  }
-  else
-  {
-    /* an (a,b)-pair is a degree-1 poly */
-    mpz_poly_init(rel, 1);
-    mpz_poly_setcoeff_int64(rel, 0, a);
-    mpz_poly_setcoeff_int64(rel, 1, -b);
-    rel->deg = 1;
-  }
-}
-
-
-/*  Reduce frac(=num/denom) mod F mod m (the return value is in frac->num) */
-inline void
-mpz_poly_reduce_frac_mod_f_mod_mpz (sm_relset_ptr frac, const mpz_poly_t F,
-                        const mpz_t m, mpz_t tmp, mpz_poly_t g, mpz_poly_t U, mpz_poly_t V)
-{
-  if (frac->denom->deg == 0)
-  {
-    mpz_invert(tmp, frac->denom->coeff[0], m);
-    mpz_poly_mul_mpz(frac->num, frac->num, tmp);
-    mpz_poly_reduce_mod_mpz(frac->num, frac->num, m);
-  }
-  else
-  {
-    mpz_poly_xgcd_mpz (g, F, frac->denom, U, V, m);
-    mpz_poly_mul (frac->num, frac->num, V);
-    int d = mpz_poly_mod_f_mod_mpz (frac->num->coeff, frac->num->deg, F->coeff,
-                                F->deg, m, NULL);
-    mpz_poly_cleandeg(frac->num, d);
-  }
+  mpz_poly_init(rel, 1);
+  mpz_poly_setcoeff_int64(rel, 0, a);
+  mpz_poly_setcoeff_int64(rel, 1, -b);
 }
 
 /* compute the SM */
-inline void
+void
 compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
@@ -86,29 +28,96 @@ compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
   }
 }
 
-inline void
+/* Assume nSM > 0 */
+void
 print_sm (FILE *f, mpz_poly_t SM, int nSM)
 {
-  for(int j=0; j<nSM; j++)
+  if (0 > SM->deg)
+    fprintf(f, "0");
+  else
+    gmp_fprintf(f, "%Zu", SM->coeff[0]);
+  for(int j = 1; j < nSM; j++)
   {
     if (j > SM->deg)
-      fprintf(f, "0 ");
+      fprintf(f, " 0");
     else
-      gmp_fprintf(f, "%Zu ", SM->coeff[j]);
+      gmp_fprintf(f, " %Zu", SM->coeff[j]);
   }
   fprintf(f, "\n");
 }
 
 /* Computed the Shirokauer maps of a single pair (a,b). 
    SM must be allocated and is viewed as a polynomial of degree F->deg. */
-void sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F, const mpz_t eps, 
-                   const mpz_t ell, const mpz_t ell2, const mpz_t invl2)
+void
+sm_single_rel(mpz_poly_t SM, int64_t a, uint64_t b, mpz_poly_t F,
+              const mpz_t eps, const mpz_t ell, const mpz_t ell2,
+              const mpz_t invl2)
 {
   mpz_poly_t rel;
 
-  SM->deg = 0;
-  mpz_poly_setcoeff_si(SM, 0, 1);
-  
   mpz_poly_init_set_ab(rel, a, b);
   compute_sm (SM, rel, F, ell, eps, ell2, invl2);
+}
+
+void
+sm_relset_init (sm_relset_t r, int d)
+{
+  mpz_poly_init (r->num, d);
+  mpz_poly_init (r->denom, d);
+}
+
+void
+sm_relset_clear (sm_relset_t r)
+{
+  mpz_poly_clear (r->num);
+  mpz_poly_clear (r->denom);
+}
+
+/* Given an array of index of rows and an array abpolys, construct the polynomial
+ * that correspond to the relation-set, i.e. 
+ *          rel = prod(abpoly[rk]^ek)
+ *       where rk is the index of a row, ek its exponent 
+ *             and abpoly[rk] = bk*x - ak
+ * rel is build as a fraction (sm_relset_t) and should be init
+ */
+void
+sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
+                 mpz_poly_t * abpolys, mpz_poly_t F, const mpz_t ell2)
+{
+  mpz_t ee;
+  mpz_init(ee);  
+  mpz_poly_t tmp;
+  mpz_poly_init(tmp, F->deg);
+
+  /* Set the initial fraction to 1 / 1 */
+  mpz_poly_set_zero (rel->num);
+  mpz_poly_setcoeff_si(rel->num, 0, 1); 
+  mpz_poly_set_zero (rel->denom);
+  mpz_poly_setcoeff_si(rel->denom, 0, 1); 
+
+  for(int k = 0 ; k < len ; k++)
+  {
+    /* Should never happen! */
+    ASSERT_ALWAYS(e[k] != 0);
+
+    if (e[k] > 0)
+    {
+      mpz_set_si(ee, e[k]);
+      /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
+      mpz_poly_power_mod_f_mod_mpz (tmp, abpolys[r[k]], F, ee, ell2);
+      mpz_poly_mul_mod_f_mod_mpz (rel->num, rel->num, tmp, F, ell2, NULL);
+    }
+    else
+    {
+      mpz_set_si(ee, -e[k]);
+      /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
+      mpz_poly_power_mod_f_mod_mpz(tmp, abpolys[r[k]], F, ee, ell2);
+      mpz_poly_mul_mod_f_mod_mpz(rel->denom, rel->denom, tmp, F, ell2, NULL);
+    }
+  }
+  mpz_poly_cleandeg(rel->num, F->deg);
+  mpz_poly_cleandeg(rel->denom, F->deg);
+
+  mpz_clear (ee);
+  mpz_poly_clear(tmp);
 }

@@ -133,7 +133,7 @@
 #include "murphyE.h"
 #include "ropt.h"
 #include "portability.h"
-
+#include "area.h"
 
 /**
  * Usage
@@ -170,8 +170,10 @@ usage (char **argv)
   fprintf (stderr, " -b B          Fix the linear rotation of the sublattice by B.\n");
   fprintf (stderr, " -c C          Fix the constant rotation of the sublattice by C.\n");
   fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
-
-
+  fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
+  fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
+  fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
+  fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
@@ -276,6 +278,24 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-Bf") == 0)
+        {
+          bound_f = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-Bg") == 0)
+        {
+          bound_g = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-area") == 0)
+        {
+          area = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
         else {
           usage (argv);
         }
@@ -333,6 +353,24 @@ ropt_parse_param ( int argc,
         else if (argc >= 3 && strcmp (argv[1], "-d") == 0)
         {
           param->d = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-Bf") == 0)
+        {
+          bound_f = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-Bg") == 0)
+        {
+          bound_g = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-area") == 0)
+        {
+          area = atof (argv[2]);
           argv += 2;
           argc -= 2;
         }

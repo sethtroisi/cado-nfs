@@ -85,6 +85,8 @@ export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
 export DISABLE_SHARED
 export NO_PYTHON_CHECK
+export NO_SSE
+export NO_INLINE_ASSEMBLY
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -115,7 +117,7 @@ if [ "$1" = "show" ] ; then
 fi
 
 # Make sure we have cmake, by the way !
-cmake_path="`which cmake 2>/dev/null`"
+:  ${cmake_path:="`which cmake 2>/dev/null`"}
 cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
 if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2

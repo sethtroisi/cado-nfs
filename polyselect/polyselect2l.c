@@ -17,7 +17,8 @@
 #include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
-#include "implicit_mpz_poly.h"
+#include "mpz_poly.h"
+#include "area.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
@@ -42,6 +43,7 @@ char *phash = "";
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
+int keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
@@ -174,7 +176,7 @@ print_poly_info ( mpz_t *f,
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
 
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
   if (d == 6) {
     mpz_set_d (k2, skew);
@@ -183,8 +185,8 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k1, 1);
     mpz_mul_ui (k0, k1, (unsigned long) skew);
     rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew2, DEFAULT_L2_METHOD);
+    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew2);
     exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
     mpz_neg (k2, k2);
     mpz_neg (k1, k1);
@@ -198,8 +200,8 @@ print_poly_info ( mpz_t *f,
     rotate_auxg_z (f, g[1], g[0], k1, 1);
     mpz_mul_ui (k0, k1, (unsigned long) skew);
     rotate_auxg_z (f, g[1], g[0], k0, 0);
-    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew2, DEFAULT_L2_METHOD);
+    skew2 = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew2);
     exp_E = logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
     mpz_neg (k1, k1);
     mpz_neg (k0, k0);
@@ -208,8 +210,8 @@ print_poly_info ( mpz_t *f,
   }
   
   nroots = numberOfRealRoots (f, d, 0, 0, NULL);
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
 
@@ -250,9 +252,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   /* the expected rotation space is S^5 for degree 6 */
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%" PRId64 ") (%lu,%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%lu,%lld) (%lu,%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
 
@@ -392,21 +395,21 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_set (gold[0], g[0]);
 
   /* old lognorm */
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
 
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
     mpz_set (adz, f[3]);
     mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c3 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c3 = L2_lognorm (F, skewtmp);
     mpz_set (f[3], adz);
     mpz_set (adz, f[4]);
     mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c4 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c4 = L2_lognorm (F, skewtmp);
     mpz_set (f[4], adz);
   }
 
@@ -435,9 +438,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
-    for (j = KEEP - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
       best_raw_logmu[j] = best_raw_logmu[j-1];
     best_raw_logmu[j] = logmu;
 
@@ -445,13 +448,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     opt_found ++;
     optimize (F, g, 0, 1);
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -480,16 +483,16 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       else {
         unsigned long alim = 2000;
         long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
         mpz_neg (g[0], m);
         /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0, CIRCULAR);
+        optimize_aux (F, g, 0, 0);
       }
 #else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0, CIRCULAR);
+      optimize_aux (F, g, 0, 0);
 #endif
 
 #ifdef MAX_THREADS
@@ -503,19 +506,19 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     } // raw and sopt only ?
 
     /* check that the algebraic polynomial has content 1, otherwise skip it */
-    mp_poly_content (t, f, d);
+    mpz_poly_content (t, F);
     if (mpz_cmp_ui (t, 1) != 0)
       goto skip;
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -531,7 +534,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     for (j = d + 1; j -- != 0; )
       mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
 
     mpz_neg (m, g[0]);
 
@@ -575,8 +578,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
         gmp_printf ("# Optimized polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         print_poly_info (f, d, g, 0, phash);
-        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-                BOUND_F, BOUND_G, AREA, E, best_E);
+        printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+                bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);
 #ifdef MAX_THREADS
@@ -591,11 +594,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
 		  pthread_mutex_unlock (&lock);
 #endif
@@ -633,9 +636,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%" PRIu32 ",%" PRId64 ") (%" PRIu32 ",%" PRId64 ") for "
-	      "ad=%" PRIu64 ", q=%" PRIu64 ", rq=%Zd\n",
-              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("Found match: (%" PRIu32 ",%lld) (%" PRIu32 ",%lld) for "
+	      "ad=%llu, q=%llu, rq=%Zd\n",
+              p1, (long long) i, p2, (long long) i, (unsigned long long) ad,
+              (unsigned long long) q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
   mpz_init (tmp);
@@ -778,21 +782,21 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_set (gold[0], g[0]);
 
   /* old lognorm */
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
 
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
     mpz_set (tmp, f[3]);
     mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c3 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c3 = L2_lognorm (F, skewtmp);
     mpz_set (f[3], tmp);
     mpz_set (tmp, f[4]);
     mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu0c4 = L2_lognorm (F, skewtmp, DEFAULT_L2_METHOD);
+    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu0c4 = L2_lognorm (F, skewtmp);
     mpz_set (f[4], tmp);
   }
 
@@ -821,10 +825,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[KEEP - 1])
+  if (logmu < best_raw_logmu[keep - 1])
   {
     int k;
-    for (k = KEEP - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
+    for (k = keep - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
       best_raw_logmu[k] = best_raw_logmu[k-1];
     best_raw_logmu[k] = logmu;
 
@@ -832,13 +836,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     opt_found ++;
     optimize (F, g, 0, 1);
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
-    if (logmu >= best_opt_logmu[KEEP - 1])
+    if (logmu >= best_opt_logmu[keep - 1])
       goto skip;
 
-    for (j = KEEP - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
+    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
       best_opt_logmu[j] = best_opt_logmu[j-1];
     best_opt_logmu[j] = logmu;
 
@@ -867,16 +871,16 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       else {
         unsigned long alim = 2000;
         long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
         mpz_neg (g[0], m);
         /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0, CIRCULAR);
+        optimize_aux (F, g, 0, 0);
       }
 #else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0, CIRCULAR);
+      optimize_aux (F, g, 0, 0);
 #endif
 
 #ifdef MAX_THREADS
@@ -889,15 +893,15 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     } // raw and sopt only ?
 
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+    logmu = L2_lognorm (F, skew);
 
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
-    for (i = KEEP; i > 0 && logmu < best_logmu[i-1]; i--)
+    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
-    if (i < KEEP)
+    if (i < keep)
       best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
@@ -913,7 +917,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     for (j = d + 1; j -- != 0; )
       mpz_set (curr_poly->alg->coeff[j], f[j]);
     curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
 
     mpz_neg (m, g[0]);
 
@@ -956,8 +960,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       gmp_printf ("# Optimized polynomial:\n");
       gmp_printf ("#%sn: %Zd\n", phash, N);
       print_poly_info (f, d, g, 0, phash);
-      printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-              BOUND_F, BOUND_G, AREA, E, best_E);
+      printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+              bound_f, bound_g, area, E, best_E);
       printf ("\n");
       fflush (stdout);
 #ifdef MAX_THREADS
@@ -972,11 +976,11 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 		  pthread_mutex_lock (&lock);
 #endif
       if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
-                    logmu, ad, l, m, logmu0c3, logmu0c4);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+                    logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
       else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %" PRIu64 ", l: %Zd, m: %Zd\n",
-                    logmu, ad, l, m);
+        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                    logmu, (unsigned long long) ad, l, m);
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
 #endif
@@ -1096,7 +1100,7 @@ collision_on_p ( header_t header,
             }
         }
 #ifdef DEBUG_POLYSELECT2L
-      fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+      fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
       fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1330,8 +1334,8 @@ collision_on_each_sq ( header_t header,
     }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", milliseconds () - st);
-  fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n", milliseconds () - st);
+  fprintf (stderr, "# - q hash_alloc (q=%lu): %u\n", q, H->alloc);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
@@ -1744,7 +1748,7 @@ gmp_collision_on_p ( header_t header,
   }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
+  fprintf (stderr, "# collision_on_p took %lums\n", milliseconds () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1814,7 +1818,7 @@ gmp_collision_on_each_sq ( header_t header,
   } // next p
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n",
+  fprintf (stderr, "# inner collision_on_each_sq took %lums\n",
 	   milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
@@ -2085,9 +2089,10 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
   char str[200];
-  snprintf(str, 200, "maximum number of special-q's considered\n"
-          "               for each ad (default %d)", INT_MAX);
+  snprintf (str, 200, "maximum number of special-q's considered\n"
+            "               for each ad (default %d)", INT_MAX);
   param_list_decl_usage(pl, "nq", str);
+  param_list_decl_usage(pl, "keep", "number of polynomials kept (default 10)");
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
@@ -2097,6 +2102,12 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "t", "number of threads to use (default 1)");
   param_list_decl_usage(pl, "v", "(switch) verbose mode");
   param_list_decl_usage(pl, "q", "(switch) quiet mode");
+  snprintf (str, 200, "sieving area (default %.2e)", AREA);
+  param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
+  param_list_decl_usage(pl, "Bf", str);
+  snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
+  param_list_decl_usage(pl, "Bg", str);
 }
 
 static void
@@ -2177,9 +2188,21 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_int (pl, "keep", &keep);
+  if (keep <= 0 || keep > KEEP)
+    {
+      fprintf (stderr, "Error, keep should be in [1,%d]\n", KEEP);
+      exit (1);
+    }
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
   if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
     admin = 0;
   else
@@ -2248,7 +2271,7 @@ main (int argc, char *argv[])
   }
 
   /* initialize best norms */
-  for (i = 0; i < KEEP; i++)
+  for (i = 0; i < keep; i++)
     {
       best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
       best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
@@ -2405,24 +2428,24 @@ main (int argc, char *argv[])
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
           tries, tot_found, opt_found, ros_found);
 
-  /* print best KEEP values of logmu */
+  /* print best keep values of logmu */
   if (collisions_good > 0)
     {
       printf ("# Stat: best raw logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_raw_logmu[i]);
       printf ("\n");
       printf ("# Stat: best opt logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
       printf ("# Stat: best logmu:");
-      for (i = 0; i < KEEP; i++)
+      for (i = 0; i < keep; i++)
         printf (" %1.2f", best_logmu[i]);
       printf ("\n");
     }
 
-  /* print total time (format for cpu_time.sh) */
+  /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */

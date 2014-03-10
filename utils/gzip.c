@@ -99,10 +99,6 @@ void get_suffix_from_filename (char *s, char const **sfx)
   return;
 }
 
-void set_antebuffer_buffer_size(int bufsize) {
-    antebuffer_buffer_size = bufsize;
-}
-
 static int try_antebuffer_path()
 {
     int rc = access(antebuffer, X_OK);

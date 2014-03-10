@@ -6,11 +6,27 @@
 #endif
 #include <stdlib.h>
 #include <limits.h>
+#include <math.h>
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
 #include "portability.h"
 
+
+unsigned long
+trialdiv_get_max_p()
+{
+  /* With if(TRIALDIV_MAXLEN == 1) here, gcc complains about a division of zero
+     in ULONG_MAX / (TRIALDIV_MAXLEN - 1), so have to use preprocessor to get
+     gcc to shut up */
+#if TRIALDIV_MAXLEN == 1
+  return FBPRIME_MAX;
+#else
+  double s = sqrt(ULONG_MAX / (TRIALDIV_MAXLEN - 1));
+  ASSERT(s >= 1.);
+  return MIN((unsigned long)s - 1, FBPRIME_MAX);
+#endif
+}
 
 static void
 trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
@@ -19,11 +35,8 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
   int i;
 #endif
   ASSERT (p % 2UL == 1UL);
-  /* Test that p^2 does not overflow an unsigned long */
-  ASSERT (TRIALDIV_MAXLEN == 1 || p < (1UL << (LONG_BIT / 2)));
   /* Test that p < sqrt (word_base / (TRIALDIV_MAXLEN - 1)) */
-  ASSERT (TRIALDIV_MAXLEN == 1 || 
-	  p * p < ULONG_MAX / (TRIALDIV_MAXLEN - 1));
+  ASSERT (p <= trialdiv_get_max_p());
   d->p = p;
 #if TRIALDIV_MAXLEN > 1
   if (p == 1UL)
@@ -35,16 +48,6 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
 #endif
   d->pinv = ularith_invmod (p);
   d->plim = ULONG_MAX / p;
-}
-
-/* Trial division for integers with 1 unsigned long */
-static inline int
-trialdiv_div1 (const unsigned long *n, const trialdiv_divisor_t *d)
-{
-#ifdef __GNUC__
-  __asm__ ("# trialdiv_div1");
-#endif
-  return n[0] * d->pinv <= d->plim;
 }
 
 /* Trial division for integers with 2 unsigned long */
@@ -190,7 +193,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 	  const size_t max_div)
 {
   size_t n = 0;
-  
+
 #if TRIALDIV_MAXLEN > 6
 #error trialdiv not implemented for input sizes of more than 6 words
 #endif
@@ -201,8 +204,7 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
 #if VERBOSE
       gmp_printf ("s = %d, N = %Zd, ", s, N);
 #endif
-      if (s > TRIALDIV_MAXLEN)
-        abort ();
+      ASSERT_ALWAYS (s <= TRIALDIV_MAXLEN);
       if (s == 1)
         {
 	  mp_limb_t t = mpz_getlimbn (N, 0);

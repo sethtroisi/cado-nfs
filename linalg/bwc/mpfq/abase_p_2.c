@@ -19,11 +19,38 @@ static int abase_p_2_impl_mpi_use_count;   /* several stacked init()/clear() pai
 /* Active handler: Mpfq::gfp::elt */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
+   family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_2, }, ],
+   fieldtype=prime,
+   n=2,
+   nn=5,
+   opthw=,
+   tag=p_2,
    type=plain,
+   vbase_stuff={
+    choose_byfeatures=<code>,
+    families=[
+     [ u64k1, u64k2, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_2, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     ],
+    member_templates_restrict={
+     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
+     p_2=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_2, }, ],
+     p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
+     p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
+     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     u64k1=[ u64k1, u64k2, ],
+     u64k2=[ u64k1, u64k2, ],
+     },
+    vc:includes=[ <stdarg.h>, ],
+    },
    virtual_base={
     filebase=abase_vbase,
-    name=abase_vbase,
     global_prefix=abase_,
+    name=abase_vbase,
     substitutions=[
      [ (?^:abase_p_2_elt \*), void *, ],
      [ (?^:abase_p_2_src_elt\b), const void *, ],
@@ -47,35 +74,8 @@ static int abase_p_2_impl_mpi_use_count;   /* several stacked init()/clear() pai
      [ (?^:abase_p_2_dst_poly\b), void *, ],
      ],
     },
-   w=64,
-   fieldtype=prime,
-   nn=5,
-   tag=p_2,
-   vbase_stuff={
-    choose_byfeatures=<code>,
-    vc:includes=[ <stdarg.h>, ],
-    families=[
-     [ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     [ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     [ u64k1, u64k2, ],
-     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     [ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     ],
-    member_templates_restrict={
-     p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
-     p_2=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     u64k2=[ u64k1, u64k2, ],
-     p_3=[ { tag=p_3, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
-     u64k1=[ u64k1, u64k2, ],
-     p_4=[ { tag=p_4, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-     },
-    },
-   opthw=,
-   family=[ { tag=p_2, cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, }, ],
-   n=2,
    vtag=p_2,
+   w=64,
    } */
 
 
@@ -919,6 +919,24 @@ void abase_p_2_mpi_ops_clear(abase_p_2_dst_field K MAYBE_UNUSED)
 
 
 /* Object-oriented interface */
+static const char * abase_p_2_wrapper_impl_name();
+static const char * abase_p_2_wrapper_impl_name()
+{
+    return abase_p_2_impl_name();
+}
+
+static unsigned long abase_p_2_wrapper_impl_max_characteristic_bits();
+static unsigned long abase_p_2_wrapper_impl_max_characteristic_bits()
+{
+    return abase_p_2_impl_max_characteristic_bits();
+}
+
+static unsigned long abase_p_2_wrapper_impl_max_degree();
+static unsigned long abase_p_2_wrapper_impl_max_degree()
+{
+    return abase_p_2_impl_max_degree();
+}
+
 static void abase_p_2_wrapper_field_characteristic(abase_vbase_ptr, mpz_t);
 static void abase_p_2_wrapper_field_characteristic(abase_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
 {
@@ -1747,12 +1765,6 @@ static void abase_p_2_wrapper_mpi_ops_clear(abase_vbase_ptr vbase MAYBE_UNUSED)
     abase_p_2_mpi_ops_clear(vbase->obj);
 }
 
-static const char * abase_p_2_wrapper_oo_impl_name(abase_vbase_ptr);
-static const char * abase_p_2_wrapper_oo_impl_name(abase_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return abase_p_2_oo_impl_name(vbase);
-}
-
 static void abase_p_2_wrapper_oo_field_init(abase_vbase_ptr);
 static void abase_p_2_wrapper_oo_field_init(abase_vbase_ptr vbase MAYBE_UNUSED)
 {
@@ -1770,6 +1782,9 @@ void abase_p_2_oo_field_init(abase_vbase_ptr vbase)
     memset(vbase, 0, sizeof(struct abase_vbase_s));
     vbase->obj = malloc(sizeof(abase_p_2_field));
     abase_p_2_field_init((abase_p_2_dst_field) vbase->obj);
+    vbase->impl_name = (const char * (*) ()) abase_p_2_wrapper_impl_name;
+    vbase->impl_max_characteristic_bits = (unsigned long (*) ()) abase_p_2_wrapper_impl_max_characteristic_bits;
+    vbase->impl_max_degree = (unsigned long (*) ()) abase_p_2_wrapper_impl_max_degree;
     vbase->field_characteristic = (void (*) (abase_vbase_ptr, mpz_t)) abase_p_2_wrapper_field_characteristic;
     vbase->field_degree = (int (*) (abase_vbase_ptr)) abase_p_2_wrapper_field_degree;
     vbase->field_init = (void (*) (abase_vbase_ptr)) abase_p_2_wrapper_field_init;
@@ -1908,7 +1923,6 @@ void abase_p_2_oo_field_init(abase_vbase_ptr vbase)
     vbase->mpi_addition_op = (MPI_Op (*) (abase_vbase_ptr)) abase_p_2_wrapper_mpi_addition_op;
     vbase->mpi_addition_op_ur = (MPI_Op (*) (abase_vbase_ptr)) abase_p_2_wrapper_mpi_addition_op_ur;
     vbase->mpi_ops_clear = (void (*) (abase_vbase_ptr)) abase_p_2_wrapper_mpi_ops_clear;
-    vbase->oo_impl_name = (const char * (*) (abase_vbase_ptr)) abase_p_2_wrapper_oo_impl_name;
     vbase->oo_field_init = (void (*) (abase_vbase_ptr)) abase_p_2_wrapper_oo_field_init;
     vbase->oo_field_clear = (void (*) (abase_vbase_ptr)) abase_p_2_wrapper_oo_field_clear;
 }

@@ -109,6 +109,8 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
     mpz_clear(jj);
     return ok;
 }
+
+#if 0 /* currently unused */
 int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int i;
@@ -117,7 +119,9 @@ int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr 
     IJTox(x, a, b, si);
     return 1;
 }
+#endif
 
+#if 0 /* currently unused */
 int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int i;
@@ -126,5 +130,6 @@ int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b,
     IJToNx(N, x, a, b, si);
     return 1;
 }
+#endif
 /*  */
 

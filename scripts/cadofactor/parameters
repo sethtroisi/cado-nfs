@@ -101,6 +101,7 @@ tasks.mfbr=22
 tasks.mfba=22
 tasks.rlambda=1.2
 tasks.alambda=1.2
+tasks.I = 11
 
 
 # threads: number of threads to use in sub-programs.
@@ -142,7 +143,6 @@ tasks.sieve.ratq=False
 
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000
-tasks.sieve.I = 11
 tasks.filter.nslices_log=1
 tasks.filter.keep = 160
 tasks.filter.skip = 32
@@ -298,3 +298,11 @@ slaves.basepath = /tmp/work/$(name).wuclient
 # the --nosha1check option to wuclient2.py, which can be enabled in the
 # parameter file by setting:
 # slaves.wuclient.nosha1check = True
+
+# If the "--bindir path/to/executables/" parameter for wuclient2py is
+# specified, it does not try to download any executable files, but
+# uses the executables in the directory path/to/executables/ (where
+# they must exist, i.e., you need to copy them there). Their SHA1
+# checksum is not verified against the value in the workunit, so
+# machine-specific binaries can be used.
+# slaves.wuclient.bindir = /usr/local/bin

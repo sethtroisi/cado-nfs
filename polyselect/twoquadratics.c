@@ -3,840 +3,502 @@
 #include <stdlib.h>
 #include <gmp.h>
 #include <assert.h>
-#include "auxiliary.h"
-#include "murphyE.h"
-#include "rootsieve.h"
-#include "rho.h"
+#include <math.h>
 #include "portability.h"
+#include "utils.h"
+#include "auxiliary.h"
+#include "area.h"
+#include "murphyE.h"
 
+typedef struct {
+  cado_poly poly;
+  mpz_t m;
+  mpz_t p;  // common root is m/p mod N
+  mpz_t skew;
+  double E;
+} cado_poly_extended_s;
 
-//print a floating point GMP number using scientific notation
-//strangely this function doesn't seem to be implemented in GMP
-void printscientific(mpf_t x) {
+typedef cado_poly_extended_s cado_poly_extended[1];
+typedef cado_poly_extended_s *cado_poly_extended_ptr;
 
-    mpf_t mantisse;
-    mpf_init2(mantisse, 10);
-    mpf_set(mantisse, x);
-    int exposant = 0;
-    while(mpf_cmp_ui(mantisse, 10) > 0) {
-        mpf_div_ui(mantisse, mantisse, 10);
-        exposant++;
-    }
-    gmp_printf ("%Ff", mantisse);
-    printf("e%d", exposant);
+void
+cado_poly_extended_init (cado_poly_extended poly)
+{
+  cado_poly_init (poly->poly);
+  mpz_init (poly->m);
+  mpz_init (poly->p);
+  mpz_init (poly->skew);
+  poly->E = 0.0;
+}
 
-    mpf_clear(mantisse);
+void
+cado_poly_extended_clear (cado_poly_extended poly)
+{
+  cado_poly_clear (poly->poly);
+  mpz_clear (poly->m);
+  mpz_clear (poly->p);
+  mpz_clear (poly->skew);
+  poly->E = 0.0;
+}
 
+void
+cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, mpz_t m,
+                mpz_t p, mpz_t skew)
+{
+  mpz_poly_set (poly->pols[0], f->coeff, f->deg);
+  mpz_poly_set (poly->pols[1], g->coeff, g->deg);
+  mpz_set (poly->n, N);
+  poly->skew = mpz_get_d (skew);
+  mpz_invert (poly->m, p, N);
+  mpz_mul (poly->m, poly->m, m);
+  mpz_mod (poly->m, poly->m, N);
+}
+
+void
+cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
+                        mpz_t N, mpz_t m, mpz_t p, mpz_t skew, double E)
+{
+  mpz_poly_set (poly->poly->pols[0], f->coeff, f->deg);
+  mpz_poly_set (poly->poly->pols[1], g->coeff, g->deg);
+  mpz_set (poly->poly->n, N);
+  poly->poly->skew = mpz_get_d (skew);
+  mpz_invert (poly->poly->m, p, N);
+  mpz_mul (poly->poly->m, poly->poly->m, m);
+  mpz_mod (poly->poly->m, poly->poly->m, N);
+
+  mpz_set (poly->m, m);
+  mpz_set (poly->p, p);
+  mpz_set (poly->skew, skew);
+  poly->E = E;
+}
+
+double
+cado_poly_extended_get_E (cado_poly_extended poly)
+{
+  return poly->E;
+}
+
+void
+cado_poly_extended_print (FILE *out, cado_poly_extended poly, char *pre)
+{
+  mpz_t tmp;
+  mpz_init (tmp);
+  double s = poly->poly->skew;
+
+  mpz_poly_ptr f0 = poly->poly->pols[0];
+  mpz_poly_ptr f1 = poly->poly->pols[1];
+
+  gmp_fprintf (out, "%sN = %Zd\n", pre, poly->poly->n);
+
+  fprintf(out, "%sf0 = ", pre);
+  mpz_poly_fprintf (out, f0);
+  fprintf(out, "%sf1 = ", pre);
+  mpz_poly_fprintf (out, f1);
+
+  fprintf (out, "%sE = %e\n", pre, poly->E);
+  fprintf (out, "%salpha_f0 = %.2f\n", pre, get_alpha (f0, ALPHA_BOUND));
+  fprintf (out, "%salpha_f1 = %.2f\n", pre, get_alpha (f1, ALPHA_BOUND));
+  fprintf (out, "%sskew_f0 = %.2f\n", pre, L2_skewness (f0, SKEWNESS_DEFAULT_PREC));
+  fprintf (out, "%sskew_f1 = %.2f\n", pre, L2_skewness (f1, SKEWNESS_DEFAULT_PREC));
+  gmp_fprintf (out, "%sskewness = %Zd\n", pre, poly->skew);
+  fprintf (out, "%sL2_skew_norm_f0 = %.2f\n", pre, L2_lognorm (f0, s));
+  fprintf (out, "%sL2_skew_norm_f1 = %.2f\n", pre, L2_lognorm (f1, s));
+  gmp_fprintf (out, "%sp = %Zd\n", pre, poly->p);
+  gmp_fprintf (out, "%sm = %Zd\n", pre, poly->m);
+  mpz_mod (tmp, poly->m, poly->p);
+  gmp_fprintf (out, "%sr = %Zd\n", pre, tmp);
+  gmp_fprintf (out, "%scommon_root = %Zd\n", pre, poly->poly->m);
+
+  mpz_clear (tmp);
 }
 
 
-//returns the square root of N modulo p
-//p is here a long integer. we may have to adapt this procedure to the case p is too big to be an unsigned int
-//We use Tonelli-Shanks' algorithm
-unsigned long int modular_square_root(mpz_t N, unsigned long int p) {
 
-    mpz_t P;
-    mpz_init_set_ui(P, p);
+/* Set m to the nearest integer to m0, such that
+   m = r mod P, i.e. find the integer in [m-p/2,m+p/2] which is congruent to
+   r modulo P.
+ */
+void
+compute_m (mpz_t m, mpz_t m0, mpz_t r, mpz_t P)
+{
+  mpz_t t;
+  mpz_init (t);
+  mpz_tdiv_q_2exp (m, P, 1); // m = floor(p/2)
+  mpz_add (m, m ,m0);        // m = m0 + floor(p/2)
+  mpz_sub (t, m ,r);         // t = m0 + floor(p/2) - r
+  mpz_mod (t, t, P);         // t = (m0 + floor(p/2) -r) mod P
+  mpz_sub (m, m, t);         // m = m0 + floor(p/2) - t
+                             // By definition, (m0 + floor(p/2) - t) = r mod P
+  mpz_clear (t);
+}
 
-    assert(mpz_kronecker(N, P) == 1);
+/* Compute maximun skewness, which in floor(N^(1/d^2)) */
+void
+compute_default_max_skew (mpz_t skew, mpz_t N, int d)
+{
+  mpz_root (skew, N, (unsigned long) d*d);
+}
 
-    mpz_t n;
+/* Returns the square root of N modulo P, using Tonelli-Shanks' algorithm.
+   Assume P is prime.
+   Returns 0 in case of error (e.g. N is not a square), else non-zero.
+*/
+int
+mpz_msqrt (mpz_t r, mpz_t N, mpz_t P)
+{
+  if (mpz_cmp_ui (P, 2) == 0)
+  {
+    mpz_mod (r, N, P);
+    return mpz_sgn(r); // Return 0 if r == 0
+  }
+  else if (mpz_legendre (N, P) != 1)
+    return 0;
+  else
+  {
+    mpz_t Q, n, z, c, R, t, t0, b;
+
     mpz_init(n);
+    mpz_init_set_ui(z, 2);
+    mpz_init(c);
+    mpz_init(R);
+    mpz_init(t);
+    mpz_init(t0);
+    mpz_init(b);
+    mpz_init(Q);
+
     mpz_mod(n, N, P);
 
-    mpz_t z;
-    mpz_init_set_ui(z, 2);
+    mpz_sub_ui (Q, P, 1); // Q = P-1
+    int M, S;
+    for (S = 0; mpz_even_p(Q); S++)
+      mpz_tdiv_q_2exp (Q, Q, 1);
+    M = S;
 
-    mpz_t c;
-    mpz_init(c);
-
-    mpz_t R;
-    mpz_init(R);
-
-    mpz_t t;
-    mpz_init(t);
-
-    mpz_t t0;
-    mpz_init(t0);
-
-    mpz_t b;
-    mpz_init(b);
-
-    if (p == 2) {
-        return mpz_get_ui(n);
-    }
-
-    int Q = p-1;
-    int S = 0;
-    while (Q%2 == 0) {
-        S++;
-        Q = Q/2;
-    }
-
-    int M = S;
-
-    while (mpz_legendre(z, P) != -1) {
+    while (mpz_legendre(z, P) != -1)
         mpz_add_ui(z, z, 1);
-    }
-    mpz_powm_ui(c, z, Q, P);
-    mpz_powm_ui(R, n, (Q+1)/2, P);
-    mpz_powm_ui(t, n, Q, P);
 
-    while (1 == 1) {
-        if (mpz_cmp_ui(t, 1) == 0) {
-            mpz_clear(P);
-            mpz_clear(n);
-            mpz_clear(z);
-            mpz_clear(c);
-            mpz_clear(t);
-            mpz_clear(t0);
-            mpz_clear(b);
-            unsigned long int RR = mpz_get_ui(R);
-            mpz_clear(R);
-            return RR;
-        }
-        int i = 0;
-        mpz_set(t0, t);
-        while(mpz_cmp_ui(t, 1) != 0) {
-            mpz_pow_ui(t, t, 2);
-            mpz_mod(t, t, P);
-            i++;
-        }
-        mpz_set(b, c);
-        int j;
-        for (j = 0; j < M - i - 1; j++) {
-            mpz_pow_ui(b, b, 2);
-            mpz_mod(b, b, P);
-        }
-        mpz_mul(R, R, b);
-        mpz_mod(R, R, P);
-        mpz_mul(c, b, b);
-        mpz_mod(c, c, P);
-        mpz_mul(t, t0, c);
+    // We want c = z^Q mod P , t = n^Q mod P and R = n^((Q+1)/2) mod P
+    mpz_powm (c, z, Q, P); // c = z^Q mod P
+    mpz_sub_ui (Q, Q, 1);
+    mpz_tdiv_q_2exp (Q, Q, 1);
+    mpz_powm (R, n, Q, P); // R = n ^ ((Q-1)/2) mod P
+    mpz_mul (t, R, R);
+    mpz_mod (t, t, P);       // t = n^(Q-1) mod P
+    mpz_mul (R, R, n);
+    mpz_mod (R, R, P);       // R = n ^ ((Q+1)/2) mod P
+    mpz_mul (t, t, n);
+    mpz_mod (t, t, P);       // t = n^Q mod P
+
+    while (mpz_cmp_ui (t, 1) != 0)
+    {
+      int i = 0;
+      mpz_set(t0, t);
+      while(mpz_cmp_ui(t, 1) != 0)
+      {
+        mpz_pow_ui(t, t, 2);
         mpz_mod(t, t, P);
-        M = i;
+        i++;
+      }
+      mpz_set(b, c);
+      int j;
+      for (j = 0; j < M - i - 1; j++)
+      {
+        mpz_pow_ui(b, b, 2);
+        mpz_mod(b, b, P);
+      }
+      mpz_mul(R, R, b);
+      mpz_mod(R, R, P);
+      mpz_mul(c, b, b);
+      mpz_mod(c, c, P);
+      mpz_mul(t, t0, c);
+      mpz_mod(t, t, P);
+      M = i;
     }
 
+  mpz_set (r, R);
 
-
+  mpz_clear(Q);
+  mpz_clear(n);
+  mpz_clear(z);
+  mpz_clear(c);
+  mpz_clear(t);
+  mpz_clear(t0);
+  mpz_clear(b);
+  mpz_clear(R);
+  return 1;
+  }
 }
 
-
-//assign to no the value of the euclidean norm of a
-void norm(mpz_t no, mpz_t a[3]) {
-    
-    mpz_mul(no, a[0], a[0]);
-    mpz_addmul(no, a[1], a[1]);
-    mpz_addmul(no, a[2], a[2]);
-
-}
-
-
-//a single step of the LLL reduction
-void reduction(mpz_t k, mpz_t a[3], mpz_t b[3]) {
-
-    mpz_t n;
-    mpz_init(n);
-    mpz_mul(n, a[0], b[0]);
-    mpz_addmul(n, a[1], b[1]);
-    mpz_addmul(n, a[2], b[2]);
-
-    mpz_t d;
-    mpz_init(d);
-    norm(d, b);
-
-    mpz_fdiv_q(k, n, d);
-
-
-    mpz_t X1[3];
-    int i;
-    for (i = 0; i < 3; i++) {
-        mpz_init_set(X1[i], a[i]);
-        mpz_submul(X1[i], k, b[i]);
-    }
-    mpz_t norm1;
-    mpz_init(norm1);
-    norm(norm1, X1);
-
-    mpz_t X2[3];
-    for (i = 0; i < 3; i++) {
-        mpz_init_set(X2[i], X1[i]);
-        mpz_sub(X2[i], X2[i], b[i]);
-    }
-    mpz_t norm2;
-    mpz_init(norm2);
-    norm(norm2, X2);
-
-    if (mpz_cmp(norm1, norm2) > 0) {
-        mpz_add_ui(k, k, 1);
-        for (i = 0; i < 3; i++) {
-            mpz_set(a[i], X2[i]);
-        }
-    }
-    else {
-        for (i = 0; i < 3; i++) {
-            mpz_set(a[i], X1[i]);
-        }
-    }
-
-    mpz_clear(n);
-    mpz_clear(d);
-    for (i = 0; i < 3; i++) {
-        mpz_clear(X1[i]);
-        mpz_clear(X2[i]);
-    }
-    mpz_clear(norm1);
-    mpz_clear(norm2);
-
-}
-
-
-//the complete LLL reduction on two mpz_t vectors
-void LLL(mpz_t a[3], mpz_t b[3]) {
-
-    mpz_t k;
-    mpz_init_set_ui(k, 1);
-
-    mpz_t l;
-    mpz_init_set_ui(l, 1);
-
-    while ( (mpz_cmp_si(k, 0) != 0) || (mpz_cmp_si(l, 0) != 0) ) {
-
-        reduction(k, a, b);
-        reduction(l, b, a);
-    }
-
-    mpz_clear(k);
-    mpz_clear(l);
-
-}
-
-
-//assigns to a and b the coefficients of the two polynomials found via Montgomery's Two Quadratics Method,
-//given n and p
-void TQponctuel(mpz_t N, unsigned long int p, mpz_t a[3], mpz_t b[3], int i) {
-assert((i == 0)||(i == 1));
-  
-    mpz_t P;
-    mpz_init_set_ui(P, p);
-
-    mpz_t z;
-    mpz_init(z);
-    mpz_sqrt(z, N);  
-
-    
-    //We compute the vectors a, b, c the way Peter Montgomery explained, starting from a root of n modulo p
-    //These vectors span a lattice of Z^3
-
-    mpz_t c0;
-    mpz_init_set_ui(c0, p);
-
-    mpz_t c1;
-    mpz_init_set_ui(c1, modular_square_root(N, p));
-    if (i == 1) {mpz_neg(c1, c1);}
-
-    mpz_t X;
-    mpz_init(X);
-    mpz_add_ui(X, z, p/2);
-    mpz_sub(X, X, c1);
-    mpz_fdiv_q_ui(X, X, p);
-    mpz_mul_ui(X, X, p);
-    mpz_add(c1, c1, X);
-
-    mpz_t c2;
-    mpz_init(c2);
-    mpz_mul(c2, c1, c1);
-    mpz_sub(c2, c2, N);
-    mpz_fdiv_q_ui(c2, c2, p);
-
-    mpz_t c[3];
-    mpz_init_set(c[0], c0);
-    mpz_init_set(c[1], c1);
-    mpz_init_set(c[2], c2);
-
-    mpz_set(a[0], c1);
-    mpz_set_si(a[1], -p);
-    mpz_set_si(a[2], 0);
-
-    mpz_invert(X, c1, P);
-    mpz_mul(X, X, c2);
-    mpz_mod(X, X, P);
-
-    mpz_t b1;
-    mpz_init_set(b1, X);
-    mpz_neg(b1, b1);
-
-    mpz_mul(X, c1, X);
-    mpz_sub(X, X, c2);
-    mpz_fdiv_q_ui(X, X, p);
-
-    mpz_t b0;
-    mpz_init_set(b0, X);
-
-    mpz_set(b[0], b0);
-    mpz_set(b[1], b1);
-    mpz_set_ui(b[2], 1);
-
-   //We then perform a LLL reduction on a and b
-
-    LLL(a, b);
-
-    mpz_clear(c0);
-    mpz_clear(c1);
-    mpz_clear(c2);
-    mpz_clear(b0);
-    mpz_clear(b1);
-    mpz_clear(X);
-    mpz_clear(z);
-    mpz_clear(P);
-    for (i = 0; i < 3; i++) {
-        mpz_clear(c[i]);
-    }
-
-}
-
-
-//TTT(x, a[3], b[3]) = 4/1575*(
-//                             175*a0^2*b0^2 
-//                           + 75*(2*a0^2*b0*b2 + a0^2*b1^2 + 4*a0*a1*b0*b1 + (2*a0*a2 + a1^2)*b0^2)*x
-//                           + 63*(a0^2*b2^2 + 4*a1*a2*b0*b1 + a2^2*b0^2 + (2*a0*a2 + a1^2)*b1^2 + 2*(2*a0*a1*b1 + (2*a0*a2 + a1^2)*b0)*b2)*x^2 
-//                           + 75*(a2^2*b1^2 + (2*a0*a2 + a1^2)*b2^2 + 2*(2*a1*a2*b1 + a2^2*b0)*b2)*x^3 
-//                           + 175*a2^2*b2^2*x^4 
-//                             )/x^2
-//                   = 4/1575*(Y[0] + Y[1]*x + Y[2]*x^2 + Y[3]*x^3 + Y[4]*x^4)/x^2
-void TTT(mpf_t resultat, mpf_t x, mpz_t a[3], mpz_t b[3]) {
-
-    mpz_t a0;
-    mpz_init_set(a0, a[0]);
-    mpz_t a1;
-    mpz_init_set(a1, a[1]);
-    mpz_t a2;
-    mpz_init_set(a2, a[2]);
-
-    mpz_t b0;
-    mpz_init_set(b0, b[0]);
-    mpz_t b1;
-    mpz_init_set(b1, b[1]);
-    mpz_t b2;
-    mpz_init_set(b2, b[2]);
-
-    mpz_t Y[5];
-    int i = 0;
-    for (i = 0; i < 5; i++) {
-        mpz_init(Y[i]);
-    }
-
-    mpz_t Z;
-    mpz_init(Z);
-
-
-    ////Y[0]
-
-    mpz_set_ui(Y[0], 175);
-    mpz_mul(Y[0], Y[0], a0);
-    mpz_mul(Y[0], Y[0], a0);
-    mpz_mul(Y[0], Y[0], b0);
-    mpz_mul(Y[0], Y[0], b0);
-
-    ////Y[1]
-
-    mpz_mul(Z, a0, a0);
-    mpz_mul(Z, Z, b0);
-    mpz_mul(Z, Z, b2);
-    mpz_mul_ui(Z, Z, 2);
-
-    mpz_set(Y[1], Z);
-
-    mpz_mul(Z, a0, a0);
-    mpz_mul(Z, Z, b1);
-    mpz_mul(Z, Z, b1);
-
-    mpz_add(Y[1], Y[1], Z);
-
-    mpz_set_ui(Z, 4);
-    mpz_mul(Z, Z, a0);
-    mpz_mul(Z, Z, a1);
-    mpz_mul(Z, Z, b0);
-    mpz_mul(Z, Z, b1);
-
-    mpz_add(Y[1], Y[1], Z);
-
-    mpz_mul(Z, a0, a2);
-    mpz_mul_ui(Z, Z, 2);
-    mpz_addmul(Z, a1, a1);
-    mpz_t macro;
-    mpz_init_set(macro, Z);  //macro = 2*a0*a2 + a1^2
-    mpz_mul(Z, Z, b0);
-    mpz_mul(Z, Z, b0);
-
-    mpz_add(Y[1], Y[1], Z);
-
-    mpz_mul_ui(Y[1], Y[1], 75);
-
-    ////Y[2]
-
-    mpz_mul(Z, a0, a1);
-    mpz_mul(Z, Z, b1);
-    mpz_mul_ui(Z, Z, 2);
-    mpz_addmul(Z, macro, b0);
-    mpz_mul(Z, Z, b2);
-    mpz_mul_ui(Z, Z, 2);
-
-    mpz_set(Y[2], Z);
-
-    mpz_mul(Z, b1, b1);
-    mpz_mul(Z, Z, macro);
-
-    mpz_add(Y[2], Y[2], Z);
-
-    mpz_mul(Z, a2, b0);
-    mpz_mul(Z, Z, Z);
-
-    mpz_add(Y[2], Y[2], Z);
-
-    mpz_mul(Z, a1, a2);
-    mpz_mul(Z, Z, b0);
-    mpz_mul(Z, Z, b1);
-    mpz_mul_ui(Z, Z, 4);
-
-    mpz_add(Y[2], Y[2], Z);
-
-    mpz_mul(Z, a0, b2);
-    mpz_mul(Z, Z, Z);
-
-    mpz_add(Y[2], Y[2], Z);
-
-    mpz_mul_ui(Y[2], Y[2], 63);
-
-
-    ////Y[3]
-
-    mpz_mul(Z, a1, b1);
-    mpz_mul_ui(Z, Z, 2);
-    mpz_addmul(Z, a2, b0);
-    mpz_mul(Z, Z, a2);
-    mpz_mul(Z, Z, b2);
-    mpz_mul_ui(Z, Z, 2);
-
-    mpz_set(Y[3], Z);
-
-    mpz_mul(Z, b2, b2);
-    mpz_mul(Z, Z, macro);
-
-    mpz_add(Y[3], Y[3], Z);
-
-    mpz_mul(Z, a2, b1);
-    mpz_mul(Z, Z, Z);
-
-    mpz_add(Y[3], Y[3], Z);
-
-    mpz_mul_ui(Y[3], Y[3], 75);
-
-    ////Y[4]
-
-    mpz_mul(Z, a2,  b2);
-    mpz_mul(Z, Z, Z);
-    mpz_mul_ui(Z, Z, 175);
-
-    mpz_set(Y[4], Z);
-
-
-    ////Y[0] + Y[1]*x + Y[2]*x^2 + Y[3]*x^3 + Y[4]*x^4
-
-    mpf_t F;
-    mpf_init(F);
-
-    mpf_t RES;
-    mpf_init(RES);
-
-    mpf_set_z(F, Y[4]);
-    mpf_set(RES, F);
-
-    for(i = 0; i < 4; i++) {
-        mpf_mul(RES, RES, x);
-        mpf_set_z(F, Y[3-i]);
-        mpf_add(RES, RES, F);
-    }
-
-    ////TTT(x, a, b)
-
-    mpf_mul_ui(RES, RES, 4);
-    mpf_div_ui(RES, RES, 1575);
-    mpf_div(RES, RES, x);
-    mpf_div(RES, RES, x);
-
-    mpf_set(resultat, RES);
-
-
-    mpz_clear(a0);
-    mpz_clear(a1);
-    mpz_clear(a2);
-    mpz_clear(b0);
-    mpz_clear(b1);
-    mpz_clear(b2);
-    mpz_clear(Z);
-    for(i = 0; i < 5; i++) {
-        mpz_clear(Y[i]);
-    }
-
-    mpf_clear(F);
-    mpf_clear(RES);
-    mpz_clear(macro);
-
-}
-
-
-/// norme := min TTT(x, a, b)  (a and b fixed)
-/// s0 := argmin(TTT(x, a, b)) 
-void normeL2(mpf_t s0, mpf_t norme, mpz_t a[3], mpz_t b[3]) {
-    
-    mpf_t x0;
-    mpf_t x1;
-    mpf_t x2;
-    mpf_t x3;
-
-    mpf_init_set_d(x0, 0.000001);
-    mpf_init_set_d(x1, 1);
-    mpf_init_set_d(x2, 1);
-    mpf_init_set_d(x3, 2);
-
-    mpf_t T0;
-    mpf_t T1;
-    mpf_t T2;
-    mpf_t T3;
-
-    mpf_init(T0);
-    mpf_init(T1);
-    mpf_init(T2);
-    mpf_init(T3);
-
-    TTT(T0, x0, a, b);
-    TTT(T1, x1, a, b);
-    TTT(T2, x2, a, b);
-    TTT(T3, x3, a, b);
-
-
-    while(mpf_cmp(T2, T3) > 0) {
-        mpf_set(x2, x3);
-        mpf_set(T2, T3);
-        mpf_add(x3, x3, x3);
-        TTT(T3, x3, a, b);
-    }
-
-    mpf_t ecart;
-    mpf_init(ecart);
-    mpf_sub(ecart, x3, x0);
-
-    mpf_t F;
-    mpf_init(F);
-
-
-    while(mpf_cmp_d(ecart, 0.001) > 0) {
-        mpf_div_ui(F, ecart, 3);
-        mpf_add(x1, x0, F);
-        TTT(T1, x1, a, b);
-        mpf_add(x2, x1, F);
-        TTT(T2, x2, a, b);
-
-        int j = 0;
-        TTT(F, x0, a, b);
-
-        if (mpf_cmp(F, T1) > 0) {
-            j = 1;
-            mpf_set(F, T1);
-        }
-        if (mpf_cmp(F, T2) > 0) {
-            j = 2;
-            mpf_set(F, T2);
-        }
-        if (mpf_cmp(F, T3) > 0) {
-            j = 3;
-            mpf_set(F, T3);
-        }
-
-        if (j == 0) {
-            mpf_set(x3, x1);
-        }
-        if (j == 1) {
-            mpf_set(x3, x2);
-        }
-        if (j == 2) {
-            mpf_set(x0, x1);
-        }
-        if (j == 3) {
-            mpf_set(x0, x2);
-        }
-        mpf_sub(ecart, x3, x0);
-    }
-
-    mpf_sqrt(s0, x0);
-    mpf_sqrt(s0, s0);
-
-    TTT(norme, x0, a, b);
-
-    mpf_clear(x0);
-    mpf_clear(x1);
-    mpf_clear(x2);
-    mpf_clear(x3);
-    mpf_clear(T0);
-    mpf_clear(T1);
-    mpf_clear(T2);
-    mpf_clear(T3);
-    mpf_clear(ecart);
-    mpf_clear(F);
-
-}
-
-//x := exp(z)
-void expo(mpf_t x, mpf_t z) {
-
-    mpf_t x0;
-    mpf_init_set_ui(x0, 0);
-
-    mpf_t zz;
-    mpf_init_set_ui(zz, 1);
-
-    int i;
-    for (i = 1; i < 100; i++ ) {
-        mpf_add(x0, x0, zz);
-        mpf_mul(zz, zz, z);
-        mpf_div_ui(zz, zz, i);
-    }
-
-    mpf_set(x, x0);
-
-    mpf_clear(x0);
-    mpf_clear(zz);
-
-}
-
-
-// note := exp(alpha(a,2000))*exp(alpha(b,2000))*norme(a,b)     (cf. normeL2)
-void notation(mpf_t note, mpz_t a[3], mpz_t b[3], mpf_t norme) {
-
-    mpf_t alpha_a;
-    double aa = get_alpha(a, 2, 2000);
-    mpf_init_set_d(alpha_a, aa);
-
-    mpf_t alpha_b;
-    double bb = get_alpha(b, 2, 2000);
-    mpf_init_set_d(alpha_b, bb);
-
-    mpf_t X;
-    mpf_init(X);
-    mpf_sqrt(X, norme);
-
-    mpf_t exp_a;
-    mpf_init(exp_a);
-
-    mpf_t exp_b;
-    mpf_init(exp_b);
-
-    expo(exp_a, alpha_a);
-    expo(exp_b, alpha_b);
-
-    mpf_mul(X, X, exp_a);
-    mpf_mul(X, X, exp_b);
-
-    mpf_set(note, X);
-
-    mpf_clear(alpha_a);
-    mpf_clear(alpha_b);
-    mpf_clear(X);
-    mpf_clear(exp_a);
-    mpf_clear(exp_b);
-
-}
-
-
-
-//Given a big number N and an integer k,
-//tests k pairs of polynomials and print the pair having the best rating,
-//along with its skewness, norm, alpha(f), alpha(g), and the prime numer which gave it
-void
-twoquadratics (mpz_t N, unsigned long int k)
+/* Compute f and g the two polynomials found via Montgomery's Two
+   Quadratics Method, given N, P and m.
+   P and N should be coprime and m^2-N should be divisible by P.
+   The geometric progression is [c0, c1, c2] = [ p, m, (m^2-N)/p ]
+   We start with a = [m, -p, 0] and b = [(m*t-c2)/P, -t, 1]
+      where t = c2/m mod P
+   We then compute a reduced basis of the lattice spanned by a and b with the
+   Lagrange algorithm using the maximun possible skewness (bound by maxS)
+ */
+void MontgomeryTwoQuadratics (mpz_poly_t f, mpz_poly_t g, mpz_t skew, mpz_t N,
+                              mpz_t P, mpz_t m, mpz_t maxS)
 {
-    unsigned int compteur = 0;
-    unsigned long int p = 2;
-    
-    mpz_t P;
-    mpz_init_set_ui(P, p);
+  ASSERT_ALWAYS (mpz_coprime_p(P, N));
 
-    mpz_t a[3];
-    mpz_t b[3];
-    mpz_t a0[3];
-    mpz_t b0[3];
+  mpz_vector_t a, b, reduced_a, reduced_b;
+  mpz_vector_init (a, 3);
+  mpz_vector_init (b, 3);
+  mpz_vector_init (reduced_a, 3);
+  mpz_vector_init (reduced_b, 3);
 
-    mpf_t no1;
-    mpf_init(no1);
+  mpz_t tmp, c2, t;
+  mpz_init(tmp);
+  mpz_init(c2);
+  mpz_init(t);
 
-    mpf_t no;
-    mpf_init(no);
+  // compute c2
+  mpz_mul (tmp, m, m);
+  mpz_sub (tmp, tmp, N);
+  ASSERT_ALWAYS (mpz_divisible_p(tmp, P));
+  mpz_divexact (c2, tmp, P);    // c2 = (m^2 - N) / P
 
-    mpf_t s1;
-    mpf_init(s1);
+  //compute t
+  int ret = mpz_invert (tmp, m, P);
+  ASSERT_ALWAYS (ret != 0);
+  mpz_mul (t, tmp, c2);          // t = c2 / m mod P
 
-    mpf_t s0;
-    mpf_init(s0);
+  // Set vector a
+  mpz_vector_setcoordinate (a, 0, m); // a[0] = m
+  mpz_neg (tmp, P);
+  mpz_vector_setcoordinate (a, 1, tmp); // a[1] = -P
+  mpz_vector_setcoordinate_ui (a, 2, 0); // a[2] = 0
 
-    mpf_t alpha_a;
-    mpf_init(alpha_a);
+  // Set vector b
+  mpz_mul (tmp, m, t);
+  mpz_sub (tmp, tmp, c2);
+  ASSERT_ALWAYS (mpz_divisible_p(tmp, P));
+  mpz_divexact (tmp, tmp, P);
+  mpz_vector_setcoordinate (b, 0, tmp); // b[0] = (m*t - c2) / P
+  mpz_neg (tmp, t);
+  mpz_vector_setcoordinate (b, 1, tmp); // b[1] = -t
+  mpz_vector_setcoordinate_ui (b, 2, 1); // b[2] = 1
 
-    mpf_t alpha_b;
-    mpf_init(alpha_b);
+  mpz_vector_reduce_with_max_skew (reduced_a, reduced_b, skew, a, b, maxS, 2);
 
-    mpf_t note0;
-    mpf_init(note0);
+  mpz_vector_get_mpz_poly(f, reduced_a);
+  mpz_vector_get_mpz_poly(g, reduced_b);
 
-    mpf_t note1;
-    mpf_init(note1);
-
-    mpz_t P0;
-    mpz_init(P0);
-
-
-    int i;
-    for (i = 0; i < 3; i++ ) {
-        mpz_init(a[i]);
-        mpz_init(b[i]);
-        mpz_init(a0[i]);
-        mpz_init(b0[i]);
-    }
-
-    while(compteur < k) {
-        while(mpz_kronecker(N, P) != 1) {
-            mpz_nextprime(P, P);
-        }
-        p = mpz_get_ui(P);
-        TQponctuel(N, p, a, b, 0);
-        //gmp_printf ("\n\na = %Zd + %Zd * X + %Zd * X^2 \n", a[0], a[1], a[2]);
-        //gmp_printf ("b = %Zd + %Zd * X + %Zd * X^2 \n\n", b[0], b[1], b[2]);
-        normeL2(s1, no1, a, b);
-        notation(note1, a, b, no1);
-        if(compteur == 0) {
-            mpz_set(a0[0], a[0]);
-            mpz_set(a0[1], a[1]);
-            mpz_set(a0[2], a[2]);
-            mpz_set(b0[0], b[0]);
-            mpz_set(b0[1], b[1]);
-            mpz_set(b0[2], b[2]);
-            mpf_set(s0, s1);
-            mpf_set(no, no1);
-            mpf_set(note0, note1);
-        }
-        //printf ("note = ");
-        //printscientific(note1);
-        //printf("\n");
-        if (mpf_cmp(note0, note1) > 0) {
-            mpz_set(a0[0], a[0]);
-            mpz_set(a0[1], a[1]);
-            mpz_set(a0[2], a[2]);
-            mpz_set(b0[0], b[0]);
-            mpz_set(b0[1], b[1]);
-            mpz_set(b0[2], b[2]);
-            mpf_set(s0, s1);
-            mpf_set(note0, note1);
-            mpz_set(P0, P);
-        }
-        TQponctuel(N, p, a, b, 1);
-        //gmp_printf ("\na = %Zd + %Zd * X + %Zd * X^2 \n", a[0], a[1], a[2]);
-        //gmp_printf ("b = %Zd + %Zd * X + %Zd * X^2 \n\n", b[0], b[1], b[2]);
-        normeL2(s1, no1, a, b);
-        notation(note1, a, b, no);
-        if (mpf_cmp(note0, note1) > 0) {
-            mpz_set(a0[0], a[0]);
-            mpz_set(a0[1], a[1]);
-            mpz_set(a0[2], a[2]);
-            mpz_set(b0[0], b[0]);
-            mpz_set(b0[1], b[1]);
-            mpz_set(b0[2], b[2]);
-            mpf_set(s0, s1);
-            mpf_set(note0, note1);
-            mpz_set(P0, P);
-        }
-        //printf ("note = ");
-        //printscientific(note1);
-        //printf("\n");
-        mpz_nextprime(P, P);
-        compteur += 2;
-        //printf("\n%d\n", compteur);
-    }
-
-    printf("\n\nbest polynomials found:\n");
-    gmp_printf ("a = %Zd + %Zd * X + %Zd * X^2 \n", a0[0], a0[1], a0[2]);
-    gmp_printf ("b = %Zd + %Zd * X + %Zd * X^2 \n\n", b0[0], b0[1], b0[2]);
-
-    printf ("note = ");
-    printscientific(note0);
-    gmp_printf ("\ns0 = %Ff\n", s0);
-    double aaa = get_alpha(a0, 2, 2000);
-    printf ("alpha(a) = %f\n", aaa);
-    double bbb = get_alpha(b0, 2, 2000);
-    printf ("alpha(b) = %f\n", bbb);
-    normeL2(s0, no, a0, b0);
-    printf ("norme = ");
-    printscientific(no);
-    printf("\n");
-    gmp_printf ("P = %Zd\n", P0);
-
-
-    mpf_clear(no1);
-    mpf_clear(no);
-    mpf_clear(s1);
-    mpf_clear(s0);
-    mpf_clear(alpha_a);
-    mpf_clear(alpha_b);
-    mpf_clear(note0);
-    mpf_clear(note1);
-    mpz_clear(P0);
-    mpz_clear(P);
-
-    for (i = 0; i < 3; i++ ) {
-        mpz_clear(a[i]);
-        mpz_clear(b[i]);
-        mpz_clear(a0[i]);
-        mpz_clear(b0[i]);
-    }
-
+  mpz_clear(tmp);
+  mpz_clear(c2);
+  mpz_clear(t);
+  mpz_vector_clear (a);
+  mpz_vector_clear (b);
+  mpz_vector_clear (reduced_a);
+  mpz_vector_clear (reduced_b);
 }
 
-void
-usage ()
+
+static void declare_usage(param_list pl)
 {
-  fprintf (stderr, "Usage: twoquadratics [-k nnn] [N]\n");
+  param_list_decl_usage(pl, "N", "input number (default c59)");
+  param_list_decl_usage(pl, "minP", "Use P > minP (default 2)");
+  param_list_decl_usage(pl, "maxP", "Use P <= maxP (default nextprime(minP))");
+  param_list_decl_usage(pl, "skewness", "maximun skewness possible "
+                                        "(default floor(N^(1/4))");
+  param_list_decl_usage(pl, "v", "verbose output (print all polynomials)");
+  param_list_decl_usage(pl, "q", "quiet output (print only best polynomials)");
+  char str[200];
+  snprintf (str, 200, "sieving area (default %.2e)", AREA);
+  param_list_decl_usage(pl, "area", str);
+  snprintf (str, 200, "algebraic smoothness bound (default %.2e)", BOUND_F);
+  param_list_decl_usage(pl, "Bf", str);
+  snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
+  param_list_decl_usage(pl, "Bg", str);
+}
+
+static void usage (const char *argv, param_list pl)
+{
+  param_list_print_usage(pl, argv, stderr);
   exit (EXIT_FAILURE);
 }
 
 int
 main (int argc, char *argv[])
 {
-    mpz_t N;
-    int k = 100;
+  char *argv0 = argv[0];
+  int verbose = 0, quiet = 0;
 
-    while (argc >= 2 && argv[1][0] == '-')
+  mpz_t N, minP, maxP, max_skewness;
+  mpz_init (N);
+  mpz_init (minP);
+  mpz_init (maxP);
+  mpz_init (max_skewness);
+
+  param_list pl;
+
+  /* read params */
+  param_list_init(pl);
+  declare_usage(pl);
+
+  param_list_configure_switch (pl, "-v", &verbose);
+  param_list_configure_switch (pl, "-q", &quiet);
+
+  if (argc == 1)
+    usage (argv[0], pl);
+
+  argc--,argv++;
+  for ( ; argc ; )
+  {
+    if (param_list_update_cmdline (pl, &argc, &argv)) { continue; }
+    fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
+    usage (argv0, pl);
+  }
+
+  if (!param_list_parse_mpz(pl, "skewness", max_skewness))
+    mpz_set_ui (max_skewness, 0);
+  else if (mpz_cmp_ui (max_skewness, 1) < 0)
+  {
+    gmp_fprintf(stderr, "Error, skewness (%Zd) should be positive\n",
+                         max_skewness);
+    abort();
+  }
+
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
+  if (!param_list_parse_mpz(pl, "minP", minP))
+    mpz_set_ui (minP, 2);
+  if (!param_list_parse_mpz(pl, "maxP", maxP))
+    mpz_nextprime(maxP, minP);
+  if (!param_list_parse_mpz(pl, "N", N))
+    mpz_set_str (N,
+        "71641520761751435455133616475667090434063332228247871795429", 10);
+
+  if (mpz_cmp_ui (minP, 0) < 0)
+  {
+    gmp_fprintf(stderr, "Error, minP (%Zd) should be greater or equal to 0\n",
+                        minP);
+    abort();
+  }
+  if (mpz_cmp (maxP, minP) < 0)
+  {
+    gmp_fprintf(stderr, "Error, maxP (%Zd) should be greater or equal to minP "
+                        "(%Zd)\n", maxP, minP);
+    abort();
+  }
+  if (mpz_cmp_ui (N, 3) < 0)
+  {
+    gmp_fprintf(stderr, "Error, N (%Zd) should be greater or equal to 3\n", N);
+    abort();
+  }
+  if (mpz_divisible_ui_p (N, 2))
+  {
+    gmp_fprintf(stderr, "Error, N (%Zd) should not be divisible by 2\n", N);
+    abort();
+  }
+
+  if (quiet)
+    verbose = -1;
+
+  if (param_list_warn_unused(pl))
+    usage (argv0, pl);
+  param_list_print_command_line (stdout, pl);
+
+  if (verbose >= 0)
+  {
+    gmp_printf("### N = %Zd\n", N);
+    printf("### Bf = %.1e , Bg = %.1e , area = %.1e\n", bound_f, bound_g, area);
+  }
+
+  /* Compute max_skewness: use max_skewness if max_skewness argument is greater
+     than 0 and lesser than default value */
+  mpz_t tmp;
+  mpz_init (tmp);
+  compute_default_max_skew (tmp, N, 2);
+  if (mpz_cmp_ui(max_skewness, 0) == 0 || mpz_cmp(max_skewness, tmp) > 0)
+    mpz_set (max_skewness, tmp);
+  mpz_clear (tmp);
+
+/* Given an integer N and bounds on P, tests all pairs of polynomials
+   with P such that minP < P <= maxP and print the pair having the best
+   rating, along with its skewness, norm, alpha(f), alpha(g), and the
+   prime number P which gave it
+ */
+  cado_poly_extended best_poly, poly;
+  cado_poly cur_poly;
+  mpz_t P, sqrtN, r, m, skew_used;
+  mpz_poly_t f, g;
+
+  cado_poly_extended_init (best_poly);
+  cado_poly_extended_init (poly);
+  cado_poly_init (cur_poly);
+  mpz_init(P);
+  mpz_init(sqrtN);
+  mpz_init(r);
+  mpz_init(m);
+  mpz_init(skew_used);
+  mpz_poly_init (f, 2);
+  mpz_poly_init (g, 2);
+
+  // sqrtN = floor(sqrt(N))
+  mpz_sqrt(sqrtN, N);
+
+  mpz_nextprime (P, minP);
+  while(mpz_cmp (P, maxP) <= 0)
+  {
+    if (mpz_kronecker(N, P) == 1)
+    {
+      for (unsigned int k = 0; k < 2; k++)
       {
-        if (argc >= 3 && strcmp (argv[1], "-k") == 0)
-          {
-            k = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else
-          {
-            fprintf (stderr, "Unknown option: %s\n", argv[1]);
-            usage ();
-          }
+        if (k == 0) // For the first time compute r = sqrt of N modulo P
+        {
+          int ret = mpz_msqrt (r, N, P);
+          ASSERT_ALWAYS (ret != 0);
+        }
+        else // The second root mod P is P-r
+          mpz_sub(r, P, r);
+
+        if (verbose >= 0)
+          gmp_printf("### P = %Zd: compute polynomials for r = %Zd\n", P, r);
+        // m is the first integer >= sqrtN such that m = r (mod P)
+        compute_m (m, sqrtN, r, P);
+        MontgomeryTwoQuadratics (f, g, skew_used, N, P, m, max_skewness);
+        cado_poly_set2 (cur_poly, f, g, N, P, m, skew_used);
+        double E = MurphyE (cur_poly, bound_f, bound_g, area, MURPHY_K);
+        if(E > cado_poly_extended_get_E(best_poly))
+          cado_poly_extended_set (best_poly, f, g, N, m, P, skew_used, E);
+        if (verbose >= 1)
+        {
+          cado_poly_extended_set (poly, f, g, N, m, P, skew_used, E);
+          cado_poly_extended_print (stdout, poly, "# ");
+        }
       }
+    }
+    else if (verbose >= 0)
+      gmp_printf("### P = %Zd: N is not a square modulo P, skipping it.\n", P);
+    mpz_nextprime(P, P);
+  }
 
-    if (argc == 1) /* test on the c59 */
-      mpz_init_set_str (N, "71641520761751435455133616475667090434063332228247871795429", 10);
-    else
-      mpz_init_set_str (N, argv[1], 10);
+  printf("### Best polynomials found:\n");
+  cado_poly_extended_print (stdout, best_poly, "");
 
-    twoquadratics (N, k);
+  mpz_clear(P);
+  mpz_clear(sqrtN);
+  mpz_clear(r);
+  mpz_clear(m);
 
-    mpz_clear (N);
+  mpz_poly_clear (f);
+  mpz_poly_clear (g);
 
-    return 0;
+  cado_poly_clear (cur_poly);
+  cado_poly_extended_clear (poly);
+  cado_poly_extended_clear (best_poly);
+  mpz_clear (N);
+  mpz_clear (skew_used);
+  mpz_clear (max_skewness);
+  mpz_clear (minP);
+  mpz_clear (maxP);
+  param_list_clear(pl);
+  return EXIT_SUCCESS;
 }
-

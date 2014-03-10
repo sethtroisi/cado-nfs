@@ -17,8 +17,6 @@ if __name__ == '__main__':
                         "INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
     parser.add_argument("--filelog", help="Log file logging level, e.g., "
                         "INFO/COMMAND/DEBUG", default="DEBUG", metavar="LEVEL")
-    parser.add_argument("--old", help="Use old parameter file format",
-                        action="store_true")
     parser.add_argument("parameters", help="A file with the parameters to use")
     parser.add_argument("options", metavar="OPTION", help="An option as in "
                         "parameter file (format: key=value)", nargs="*")
@@ -28,11 +26,9 @@ if __name__ == '__main__':
     filelvlname = args.filelog
     
     parameters = cadoparams.Parameters()
-    if args.old:
-        parameters.read_old_defaults()
-    parameters.readfile(paramfile, old_format = args.old)
-    parameters.readparams(args.options, old_format = args.old)
-    tasksparams = parameters.myparams(("workdir", "name"), "tasks")
+    parameters.readfile(paramfile)
+    parameters.readparams(args.options)
+    tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())
     logger = logging.getLogger()
@@ -74,7 +70,25 @@ if __name__ == '__main__':
                                                parameters = parameters,
                                                path_prefix = [])
     factors = factorjob.run()
-    if factors is None:
-        sys.exit("Error occurred, terminating")
+    
+    dlp_param = parameters.myparams(("dlp",), "")
+    dlp = dlp_param.get("dlp", False)
+    if not dlp:
+        if factors is None:
+            sys.exit("Error occurred, terminating")
+        else:
+            print(" ".join(factors))
     else:
-        print(" ".join(factors))
+        p = int(factors[0])
+        ell = int(factors[1])
+        log2 = int(factors[2])
+        log3 = int(factors[3])
+        assert (p-1) % ell == 0
+        assert pow(3, log2*((p-1) // ell), p) == pow(2, log3*((p-1) // ell), p)
+        print("p = " + str(p))
+        print("ell = " + str(ell))
+        print("log2 = " + str(log2))
+        print("log3 = " + str(log3))
+        print("The other logarithms of the factor base elements are in %s" %
+                tasksparams["workdir"] + os.sep + tasksparams["name"] +
+                ".reconstructlog.dlog")

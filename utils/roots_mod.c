@@ -166,7 +166,9 @@ enumeratediv (enumeratediv_t *r)
 
 
 /* Return in o a k-th primitive root of unity modulo p, and in b a residue 
-   that is a q-th non-power for each q|k. Assumes that k | p-1. */
+   that is a q-th non-power for each q|k.
+   Assumes that k | p-1 and k >= 2.
+*/
 void
 omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp) 
 {
@@ -178,11 +180,7 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
   unsigned long c = k;
   unsigned int i, ndiv;
 
-  ASSERT (k > 0);
-  if (k == 1) {
-    mod_set1 (o, pp);
-    return;
-  }
+  ASSERT (k >= 2);
   
   pprime = (p-1) / k;
   ASSERT (pprime * k == p-1);
@@ -230,9 +228,10 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
 
 /************************** square roots *************************************/
 
+#if 0 /* unused currently */
 /* Uses Tonelli-Shanks, more precisely Algorithm from Table 1 in [1] */
 static int
-tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
+tonelli_shanks (residue_t *rr, int d, uint64_t n, const modulus_t pp)
 {
   uint64_t q, s, i, j, k = 0, l;
   residue_t aa, hh, delta, dd, bb, zz;
@@ -295,7 +294,7 @@ tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
 
   return k;
 }
-
+#endif
 
 /* Tonelli-shanks for the case pp == 5 (mod 8).
    In this case we know that 2 is a QNR. */
@@ -340,7 +339,7 @@ tonelli_shanks5(residue_t *rr, int d, uint64_t n, const modulus_t pp)
   return k;
 }
 
-
+/* put in rr a square root of aa mod pp */
 static void
 one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
 {
@@ -396,6 +395,8 @@ one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
       mod_div5 (cc, cc, pp);
       c /= 5;
     }
+    /* the smallest pp for which c is divisible by 11 is pp=293
+       (with aa=59) */
     while (c % 11 == 0) {
       mod_div11 (xx, xx, pp);
       mod_div11 (cc, cc, pp);
@@ -415,6 +416,8 @@ one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
   mod_clear (two, pp);
 }
 
+/* given n roots of x^(d/2) = a (mod p) at rr[d/2], ..., rr[d/2 + n - 1],
+   finds all (2n) roots of x^d = a (mod p) in rr[0], ..., rr[2n-1] */
 static int
 roots2_V (residue_t *rr, int d, uint64_t n, const modulus_t pp)
 {
@@ -473,9 +476,12 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
     }
 
   /* case p = 1 (mod 4). */ 
+#if 0
   if (0)
     k = tonelli_shanks (rr, d, n, pp);
-  else if (p % 8 == 5)
+  else
+#endif
+  if (p % 8 == 5)
     k = tonelli_shanks5 (rr, d, n, pp);
   else
     k = roots2_V (rr, d, n, pp);
@@ -618,8 +624,7 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   /* find the roots of x^(d/3) = a (mod p) */
   n = mod_roots (rr + 2 * (d / 3), aa, d / 3, pp);
 
-  if (n == 0)
-    return n;
+  ASSERT(n > 0);
 
   if ((p % 3) == 1)
     {
@@ -660,7 +665,9 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
 /************************** r-th roots ***************************************/
 
 /* Put in rop a r-th root of delta (mod p), assuming one exists,
-   using the algorithm from Table 4 in reference [1]. */
+   using the algorithm from Table 4 in reference [1].
+   Assume r >= 2 and p = 1 (mod r).
+*/
 static void
 one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
 {
@@ -668,15 +675,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   const uint64_t p = mod_getmod_ul (pp);
   uint64_t i, j, s, t, alpha, rt;
 
-  /* when p-1 is not divisible by r, there is exactly one root */
-  if (((p - 1) % r) != 0)
-    {
-      for (i = 1; (i * (p - 1) + 1) % r != 0; i++);
-      mod_pow_ul (rop, delta, (i * (p - 1) + 1) / r, pp);
-      return;
-    }
-
-  /* now p-1 is divisible by r */
+  ASSERT((p - 1) % r == 0);
 
   mod_init (a, pp);
   mod_init (b, pp);
@@ -687,7 +686,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   for (s = (p - 1) / r, t = 1, rt = r; (s % r) == 0; s /= r, t++, rt *= r);
 
 #if 1
-  omega(c, a, rt, pp);
+  omega (c, a, rt, pp);
   mod_pow_ul (a, c, rt/r, pp);
 #else  
   for (i = 2; i < p; i++)
@@ -757,7 +756,7 @@ is_rth_power (residue_t a, uint64_t r, modulus_t pp)
   return ret;
 }
 
-/* Roots of x^d = a (mod p), assuming d is not divisible by 2 nor 3.
+/* Roots of x^d = a (mod p), assuming d >= 5 is not divisible by 2 nor 3.
    (This code works in fact for d divisible by 3 too, if one starts by r = 3
    in the loop below.) */
 static int
@@ -766,6 +765,10 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
   uint64_t r, n, i, j, k;
   const uint64_t p = mod_getmod_ul (pp);
   residue_t z, *rr0;
+
+  ASSERT (d >= 5);
+  ASSERT ((d % 2) != 0);
+  ASSERT ((d % 3) != 0);
 
   /* first find the smallest prime r dividing d (r can be d) */
   for (r = 5; d % r; r += 2);
@@ -807,10 +810,11 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
     }
   for (i = k = 0; i < n; i++)
     {
+#ifndef NDEBUG
       /* check rr0[i] is a r-th power */
       mod_pow_ul (rr[k], rr0[i], (p - 1) / r, pp);
-      if (mod_is1 (rr[k], pp) == 0)
-        continue;
+      ASSERT(mod_is1 (rr[k], pp));
+#endif
       /* get one r-th root */
       one_rth_root (rr[k], r, rr0[i], pp);
       for (j = 1, k++; j < r; j++, k++)
@@ -901,14 +905,9 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       }
       sort_roots (r, n);
 #ifndef NDEBUG
-      for (i = 1; i < n; i++) {
-        /* Check for dupes */
-        if (r[i-1] >= r[i]) {
-          fprintf (stderr, "%" PRIu64 "^(1/%d) (mod %" PRIu64 "), r[%d]: %" PRIu64 " >= r[%d]: %" PRIu64 "\n", 
-                   a, d, p, i-1, r[i-1], i, r[i]);
-          ASSERT(r[i-1] < r[i]);
-        }
-      }
+      /* Check for duplicates */
+      for (i = 1; i < n; i++)
+        ASSERT(r[i-1] < r[i]);
 #endif
 
       for (i = 0; i < d; i++)

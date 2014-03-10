@@ -34,6 +34,14 @@ execute_process(COMMAND scripts/version.sh
 message(STATUS "Configuring CADO revision ${CADO_REV}")
 
 #####################################################################
+# Allow building unit test programs with "make test"
+enable_testing()
+# Also allow testing with "make check", but building all required
+# dependencies (las for the sieve test, etc.) as well. We also add the
+# "verbose" command line option here to get more meaningful output
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -V $(ARGS))
+
+#####################################################################
 # Get some overrides from the environment.
 
 macro(get_override extname intname)
@@ -109,11 +117,15 @@ get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 #####################################################################
 # Obtain information from the host.
 
-include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
+IF (NOT DEFINED ENV{NO_SSE})
+  include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
+  include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
+  include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
+  include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
+endif()
+IF (NOT DEFINED ENV{NO_INLINE_ASSEMBLY})
+  include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
+endif()
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-bugs.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
@@ -225,10 +237,10 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 
 ############################################################
 
+
 set(package_basename ${CADO_DIST_ARCHIVE_NAME})
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
 set(example_subdir share/${package_basename}/examples)
-set(example_subdir_py share/${package_basename}/examples_py)
 
 # These refer only to the place where files are put in the *build tree* !
 # set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
@@ -264,17 +276,14 @@ add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
 add_subdirectory (misc)
 add_subdirectory (scripts/cadofactor)
+add_subdirectory (tests EXCLUDE_FROM_ALL)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}
     WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
 )
 
-install(PROGRAMS cadofactor.pl DESTINATION bin)
-install(FILES cadofct.pm DESTINATION bin)
-
 install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
-install(DIRECTORY params_py/ DESTINATION ${example_subdir_py} FILES_MATCHING PATTERN "params.*")
 
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/factor.sh
@@ -282,7 +291,16 @@ configure_file(
     ESCAPE_QUOTES
     @ONLY)
 
-install(PROGRAMS scripts/cpu_time.sh DESTINATION bin)
+# Copy magma scripts, to make our life easier; this should be removed 
+# once everything will be rewritten in C.
+foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
+        badideals.mag  linalg.mag magma-sm-wrapper.sh nfsunits.mag)
+    configure_file(
+        ${CADO_NFS_SOURCE_DIR}/scripts/${script}
+        ${CADO_NFS_BINARY_DIR}/scripts/${script}
+        COPYONLY)
+endforeach(script)
+
 
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 

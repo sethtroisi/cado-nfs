@@ -4,7 +4,7 @@
 
 #include "utils_with_io.h"
 
-index_t findroot_ffs (int64_t a, uint64_t b, index_t p);
+index_t ffs_relation_compute_all_r (int64_t a, uint64_t b, index_t p);
 int ffs_poly_read(cado_poly poly, const char *filename);
 
 

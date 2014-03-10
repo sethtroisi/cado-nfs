@@ -3,97 +3,66 @@
 ###########################################################################
 # See params/params.c91 for an example which contains some documentation.
 
-# Anything after a # is a comment, until end of line.
-# Any empty line is ignored
-#
-#
-# Each parameter should be on an individual line, like
-#   param0=42.17
-#
-
 ###########################################################################
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 62-digit gnfs input
-# Warning: the parameters here are not claimed to be optimal!
-# Example: cadofactor.pl wdir=... name=... n=...
-
-name=c62
-parallel=1              # do we use parallel computation?
-delay=30                # time in seconds between two checks
-
-machines=mach_desc      # file describing available computers for parallel
-                        # computation
+name = c62
+tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-degree=4                # degree of the algebraic polynomial
-polsel_delay=30              # time between two checks
-polsel_nice=4            # nice level for selection
+tasks.polyselect.degree = 4
 
-# one can expect:
-# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.79e-06-2.40e-06
-
-## Parameters of polyselect
-polsel_admax=16000           # max value for lc(f)
-polsel_adrange=8000          # individual tasks
-polsel_incr=60               # forced divisor of lc(f)
-polsel_P=620                 # choose lc(g) with two prime factors in [P,2P]
+tasks.polyselect.admax = 16000
+tasks.polyselect.adrange = 8000
+tasks.polyselect.incr = 60
+tasks.polyselect.P = 620
+tasks.polyselect.nq = 1000
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-# (r,a) means rational or algebraic side
-# rlim/alim is the bound for sieving
-# lpbr/lpba is the (base 2 log of the) large prime bound
-# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try to
-#                                      split into large primes.
-# rlambda/alambda is the early-abort ratio: if after sieving the
-#                                      approximate norm is more than
-#                                      lambda times lpb, we reject.
-rlim=100000
-alim=200000
-lpbr=22
-lpba=22
-mfbr=24
-mfba=24
-rlambda=1.2
-alambda=1.2
+rlim = 100000
+alim = 200000
+lpbr = 22
+lpba = 22
+tasks.sieve.mfbr = 24
+tasks.sieve.mfba = 24
+tasks.sieve.rlambda = 1.2
+tasks.sieve.alambda = 1.2
 
-I=11                    # Sieving range in lattice siever
-qmin=200000             # Start of the special-q range
-qrange=5000             # The size of an elementary sieving task
-firstcheck=222000       # Try filtering only up from that many relations
-sievenice=10            # nice level for the sieving jobs
-sieve_max_threads=2
+tasks.I = 11
+tasks.sieve.qmin = 200000
+tasks.sieve.qrange = 1000
+tasks.sieve.rels_wanted = 222000
+slaves.niceness = 10
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-                        # (don't start merge otherwise)
-keeppurge=160           # maximal excess wanted after purge
-                        # (purge shrinks if needed)
-maxlevel=15
-ratio=1.1
-bwstrat=3
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 15
+tasks.filter.ratio = 1.1
+tasks.filter.merge.forbw = 3
+tasks.merge.coverNmax = 100
 
 ###########################################################################
 # Linear algebra
 ###########################################################################
 
-bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
-                        # <m>x<n> for bwc, or only one integer for bw.
-bwc_interval=100        # checkpointing interval for bwc.
+tasks.linalg.bwc.interval = 100
+tasks.linalg.bwc.interleaving = 0
+tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
 # Characters
 ###########################################################################
 
-nkermax=30              # maximal size of computed kernel
-nchar=50                # number of characters
+tasks.linalg.characters.nchar = 50
 

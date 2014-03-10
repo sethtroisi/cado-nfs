@@ -14,7 +14,7 @@
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
 p_r_values_t
-findroot_ffs (int64_t a, uint64_t b, p_r_values_t p)
+ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)
 {
   fppol64_t pol_a, pol_b, pol_p;
   fppol64_t pol_r;

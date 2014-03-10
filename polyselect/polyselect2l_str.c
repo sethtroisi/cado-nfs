@@ -276,7 +276,7 @@ qroots_rearrange (qroots_t R)
 {
   if (R->size > 1) {
     unsigned int i, j, k, max, tmpq, tmpnr;
-    uint64_t *tmpr = malloc (MAX_DEGREE * sizeof (uint64_t));
+    uint64_t *tmpr = malloc (MAXDEGREE * sizeof (uint64_t));
 
     for (i = 0; i < R->size; i ++) {
       max = i;
@@ -288,17 +288,17 @@ qroots_rearrange (qroots_t R)
 
       tmpq = R->q[i];
       tmpnr = R->nr[i];
-      for (k = 0; k < MAX_DEGREE; k ++)
+      for (k = 0; k < MAXDEGREE; k ++)
         tmpr[k] = R->roots[i][k];
 
       R->q[i] = R->q[max];
       R->nr[i] = R->nr[max];
-      for (k = 0; k < MAX_DEGREE; k ++)
+      for (k = 0; k < MAXDEGREE; k ++)
         R->roots[i][k] = R->roots[max][k];
 
       R->q[max] = tmpq;
       R->nr[max] = tmpnr;
-      for (k = 0; k < MAX_DEGREE; k ++)
+      for (k = 0; k < MAXDEGREE; k ++)
         R->roots[max][k] = tmpr[k];
     }
     free (tmpr);
@@ -316,7 +316,7 @@ qroots_add (qroots_t R, unsigned int q, unsigned int nr, uint64_t *roots)
     qroots_realloc (R, R->alloc + R->alloc / 2 + 1);
   R->q[R->size] = q;
   R->nr[R->size] = nr;
-  R->roots[R->size] = malloc (MAX_DEGREE * sizeof (uint64_t));
+  R->roots[R->size] = malloc (MAXDEGREE * sizeof (uint64_t));
   if (R->roots[R->size] == NULL)
   {
     fprintf (stderr, "Error, cannot allocate memory in roots_add\n");

@@ -4,11 +4,11 @@ script in relation to various distributions' Python installations.
 
 1. Python 3
 
-Python 3, version 3.2 or greater, is required for cadofactor.py. If you do
-not wish to use cadofactor.py, for example because you want to use the old
-cadofactor.pl Perl script or, for the brave, run all commands by hand, you
-can disable the Python check in CMake by setting NO_PYTHON_CHECK to any
-non-empty string in local.sh. See local.sh.example for a template.
+Python 3, version 3.2 or greater, is required for cadofactor.py. If you
+do not wish to use cadofactor.py, maybe because you plan to run all
+commands by hand, you can disable the Python check in CMake by setting
+NO_PYTHON_CHECK to any non-empty string in local.sh. See local.sh.example
+for a template.
 
 
 2. Sqlite 3

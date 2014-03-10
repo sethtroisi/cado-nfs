@@ -12,6 +12,7 @@
 #include "cado.h"
 #include "ropt.h"
 #include "portability.h"
+#include "area.h"
 
 
 /**
@@ -59,7 +60,7 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d,
                     global_E_pqueue->u[i], global_E_pqueue->v[i]);
-    optimize_aux (Fuv, guv, 0, 0, CIRCULAR);
+    optimize_aux (Fuv, guv, 0, 0);
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
     if (ave_MurphyE > best_E) {
@@ -181,10 +182,10 @@ ropt_do_both_stages ( ropt_poly_t poly,
 {
   if (poly->d == 5 || poly->d == 4 || poly->d == 3)
     ropt_linear (poly, bestpoly, param, info);
-  else if (poly->d == 6)
+  else if (poly->d == 6 || poly->d == 7)
     ropt_quadratic (poly, bestpoly, param, info);
   else {
-    fprintf (stderr, "Error: only support deg 4, 5 or 6.\n");
+    fprintf (stderr, "Error: only support deg 4, 5, 6 and 7.\n");
     exit(1);
   }
 }
@@ -218,7 +219,7 @@ ropt ( ropt_poly_t poly,
 
 
 /**
- * Called by polyselect2 or polyselect2l.
+ * Called by polyselect2l.
  */
 void
 ropt_polyselect ( mpz_t *f,

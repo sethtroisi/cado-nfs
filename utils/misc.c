@@ -96,19 +96,19 @@ void *malloc_aligned(size_t size, size_t alignment)
 #endif
 }
 
-void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNUSED)
+void free_aligned(const void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNUSED)
 {
 #ifdef HAVE_POSIX_MEMALIGN
-    free(p);
+    free((void *) p);
 #else
-    char * res = (char *) p;
+    const char * res = (const char *) p;
     ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
     ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
     res -= sizeof(size_t);
-    free(res);
+    free((void *)res);
 #endif
 }
 
@@ -159,7 +159,7 @@ void *malloc_pagealigned(size_t sz)
     return p;
 }
 
-void free_pagealigned(void * p, size_t sz)
+void free_pagealigned(const void * p, size_t sz)
 {
     free_aligned(p, sz, pagesize ());
 }
@@ -194,7 +194,7 @@ char * derived_filename(const char * prefix, const char * what, const char * ext
 }
 
 
-void chomp(char *s) {
+static void chomp(char *s) {
     char *p;
     if (s && (p = strrchr(s, '\n')) != NULL)
         *p = '\0';
@@ -214,12 +214,6 @@ strlcpy(char *dst, const char *src, const size_t size)
   return strlen(src);
 }
 #endif
-
-void strlcpy_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcpy(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
 
 #ifndef HAVE_STRLCAT
 size_t
@@ -246,12 +240,6 @@ strlcat(char *dst, const char *src, const size_t size)
   return dst_len + src_len;
 }
 #endif
-
-void strlcat_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcat(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
 
 /* Return a NULL-terminated list of file names read from filename.
    Empty lines and comment lines (starting with '#') are skipped.

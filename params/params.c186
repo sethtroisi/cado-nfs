@@ -1,8 +1,5 @@
-# those parameters are based on those used by Sam Wagstaff to factor N240 c186
-# (numerator of the 240th Bernoulli number)
 
 ###########################################################################
-#     Parameter file for Cado-NFS
 ###########################################################################
 # See params/params.c91 for an example which contains some documentation.
 
@@ -15,26 +12,16 @@
 #
 
 ###########################################################################
-# General parameters
 ###########################################################################
 
-# Sample parameter file for a 180-digit gnfs input
-# Example: cadofactor.pl wdir=... name=... n=...
-
-name=c186
-parallel=1           # do we use parallel computation?
-delay=300
-
-machines=mach_desc      # file describing available computers for parallel
-                        # computation
+tasks.threads = 2
+name = c186
+tasks.threads = 2
 
 ###########################################################################
-# Polynomial selection
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
-polsel_delay=300             # time between two checks
-polsel_nice=4            # nice level for selection
+tasks.polyselect.degree = 5
 
 # the polynomial (found by Shi Bai) for N240 c186 had
 # lognorm: 60.63, alpha: -8.76 (proj: -2.41), E: 51.87, nr: 3
@@ -42,13 +29,13 @@ polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
 # note: those parameters are just a guess, they might be far from optimal
-polsel_P=500000              # choose lc(g) with two prime factors in [P,2P]
-polsel_admax=2e7             # max value for lc(f)
-polsel_adrange=2e5           # individual tasks
-polsel_incr=60               # forced divisor of lc(f)
+tasks.polyselect.P = 500000
+tasks.polyselect.admax = 2e7
+tasks.polyselect.adrange = 2e5
+tasks.polyselect.incr = 60
+tasks.polyselect.nq = 1000
 
 ###########################################################################
-# Sieve
 ###########################################################################
 
 # (r,a) means rational or algebraic side
@@ -59,43 +46,42 @@ polsel_incr=60               # forced divisor of lc(f)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=40000000
-alim=80000000
-lpbr=32
-lpba=32
-mfbr=64
-mfba=96
-rlambda=2.1
-alambda=2.8
+rlim = 40000000
+alim = 80000000
+lpbr = 32
+lpba = 32
+tasks.sieve.mfbr = 64
+tasks.sieve.mfba = 96
+tasks.sieve.rlambda = 2.1
+tasks.sieve.alambda = 2.8
 
-I=15                    # Sieving range in lattice siever
+tasks.I = 15
 # Wagstaff did use I=14, I=15 should be better
-qmin=80000000           # Start of the special-q range
+tasks.sieve.qmin = 80000000
 # Sam Wagstaff did sieve special-q's < 1660M
-qrange=200000           # The size of an elementary sieving task
-checkrange=2000000      # We check if we have enough after each step
-                        # of that many relations found.
-sievenice=10
-sieve_max_threads=2
+tasks.sieve.qrange = 20000
+# of that many relations found.
+slaves.niceness = 10
+tasks.sieve.rels_wanted = 1
 
 ###########################################################################
-# Filtering
 ###########################################################################
 
-keeppurge=160           # shrink in purge if excess exceeds keeppurge
-maxlevel=25             # maximal merge level
-ratio=1.1  
-bwstrat=3               
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 25
+tasks.filter.ratio = 1.1
+tasks.filter.merge.forbw = 3
+tasks.merge.coverNmax = 100
 
 ###########################################################################
-# Linear algebra
 ###########################################################################
 
-bwmt=2x2                # Multithreading level of Block-Wiedemann
+tasks.linalg.bwc.interval = 1000
+tasks.linalg.bwc.interleaving = 0
+tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
-# Characters
 ###########################################################################
 
-nkermax=30              # maximal size of computed kernel
-nchar=50                # number of characters
+tasks.linalg.characters.nchar = 50
