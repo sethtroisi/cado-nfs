@@ -199,7 +199,7 @@ sha1cache = Sha1Cache()
 if os.name == "nt":
     defaultsuffix = ".exe"
 else:
-    defaultsuffix = None
+    defaultsuffix = ""
 
 class Program(object, metaclass=InspectType):
     ''' Base class that represents programs of the CADO suite
@@ -343,7 +343,7 @@ class Program(object, metaclass=InspectType):
         # calling os.path.isfile() multiple times
         path = str(execpath or self.path)
         subdir = str(execsubdir or self.subdir)
-        binary = str(execbin or self.binary) + (execsuffix or "")
+        binary = str(execbin or self.binary) + execsuffix
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
         if execsubfile != execfile and os.path.isfile(execsubfile):
