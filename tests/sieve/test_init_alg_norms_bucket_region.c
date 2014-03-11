@@ -22,7 +22,11 @@ int main() {
   unsigned char *S1 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), 
     *S2 = malloc_pagealigned((1U<<LOG_BUCKET_REGION) + MEMSET_MIN), *cS2, *lineS2;
   double_poly_t poly;
+  unsigned long count = 0, err[256];
   
+  for (l = 0; l < 256; l++)
+    err[l] = 0;
+
   ASSERT_ALWAYS (MIN_LOGI <= MAX_LOGI);
   ASSERT_ALWAYS (MAX_LOGI <= LOG_BUCKET_REGION);
   ASSERT_ALWAYS (S1);
@@ -73,9 +77,20 @@ int main() {
 
 	/* Phase 3: compare S1 & S2 */
 	/* It's possible the difference is 1, because the log2 is approximative */
-	for (l = 0; l < (1U<<LOG_BUCKET_REGION); l++) ASSERT_ALWAYS (abs(S1[l] - S2[l]) <= 1);
+	for (l = 0; l < (1U<<LOG_BUCKET_REGION); l++)
+          {
+            ASSERT_ALWAYS (abs(S1[l] - S2[l]) <= 1);
+            err[abs(S1[l] - S2[l])] ++;
+            count ++;
+          }
       }
     }
   }
   free(S1); free(S2);
+
+  for (l = 0; l < 256; l++)
+    if (err[l] != 0)
+      fprintf (stderr, "%u:%.1f%% ",
+               l, 100.0 * (double) err[l] / (double) count);
+  fprintf (stderr, "(total %lu)\n", count);
 }
