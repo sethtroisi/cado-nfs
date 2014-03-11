@@ -581,6 +581,13 @@ test_mpz_poly_base_modp_init (unsigned long iter)
       for (K[0] = k, l = 0; K[l] > 1; K[l+1] = (K[l] + 1) >> 1, l++);
       d = lrand48 () % 10;
       int m = (1 + (lrand48 () % 9)) * k;
+      if (iter == 0) /* exercise bug found on 32-bit MinGW */
+        {
+          p = 2048;
+          k = 119;
+          d = 1;
+          m = 833;
+        }
       mpz_poly_random (f, d, m);
       s = mpz_poly_sizeinbase (f, d, 2);
       for (i = 0; i <= d; i++)
