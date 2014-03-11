@@ -228,37 +228,37 @@ class Program(object, metaclass=InspectType):
       map to an instance Parameter("t")
 
     >>> p = Ls()
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls'
     >>> p = Ls(stdout='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo'
     >>> p = Ls(stderr='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls 2> foo'
     >>> p = Ls(stdout='foo', stderr='bar')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo 2> bar'
     >>> p = Ls(stdout='foo', stderr='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo 2>&1'
     >>> p = Ls(stdout='foo', append_stdout=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo'
     >>> p = Ls(stderr='foo', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls 2>> foo'
     >>> p = Ls(stdout='foo', append_stdout=True, stderr='bar', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo 2>> bar'
     >>> p = Ls(stdout='foo', append_stdout=True, stderr='foo', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo 2>&1'
     >>> p = Ls('foo', 'bar')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls foo bar'
     >>> p = Ls('foo', 'bar', long = True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls -l foo bar'
     '''
 
@@ -577,10 +577,10 @@ class Program(object, metaclass=InspectType):
 class Polyselect2l(Program):
     """
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect2l -P 5 -N 42 -degree 4 -v'
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect2l -P 5 -N 42 -degree 4 -v'
     """
     binary = "polyselect2l"
@@ -616,10 +616,10 @@ class Polyselect2l(Program):
 class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", alim=1)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1'
     >>> p = MakeFB(poly="foo.poly", alim=1, maxbits=5, stdout="foo.roots")
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
     """
     binary = "makefb"
@@ -639,10 +639,10 @@ class MakeFB(Program):
 class FreeRel(Program):
     """
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel'
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
     binary = "freerel"
