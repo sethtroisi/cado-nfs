@@ -2803,13 +2803,13 @@ class NmbrthryTask(Task):
         for line in stdout.splitlines():
             match = re.match(r'ell (\d+)', line)
             if match:
-                update["ell"] = match.group(1)
+                update["ell"] = int(match.group(1))
             match = re.match(r'smexp (\d+)', line)
             if match:
-                update["smexp"] = match.group(1)
+                update["smexp"] = int(match.group(1))
             match = re.match(r'nmaps (\d+)', line)
             if match:
-                update["nmaps"] = match.group(1)
+                update["nmaps"] = int(match.group(1))
         update["badinfofile"] = badinfofile.get_wdir_relative()
         update["badfile"] = badfile.get_wdir_relative()
         
