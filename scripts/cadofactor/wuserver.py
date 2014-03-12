@@ -276,8 +276,13 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def log_error(self, format, *args, **kwargs):
         # Log errors with WARNING level, except messages about no work being
         # available, as those are frequent and kinda spammy
-        level = logging.DEBUG if self.no_work_available else logging.WARNING
-        self.log(level, format, *args, **kwargs)
+        if self.no_work_available:
+            # Don't log "404 No work available" messages, those flood the log
+            # file and increase its size by a factor of too much
+            # self.log(logging.DEBUG, format, *args, **kwargs)
+            pass
+        else:
+            self.log(level, format, *args, **kwargs)
 
     def send_body(self, body):
         self.wfile.write(body)
