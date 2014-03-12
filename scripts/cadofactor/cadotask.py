@@ -1160,11 +1160,12 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         timeout = self.params["wutimeout"]
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
-        self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
-                          cutoff, now)
+        # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
+        #                   cutoff, now)
         results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
         if not results:
-            self.logger.debug("Found no timed-out workunits")
+            # self.logger.debug("Found no timed-out workunits")
+            pass
         for entry in results:
             self.cancel_wu(entry["wuid"], commit=False)
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
