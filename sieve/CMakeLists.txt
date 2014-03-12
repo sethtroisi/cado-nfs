@@ -24,6 +24,8 @@ target_link_libraries (las_tracek facul utils ${pthread_libs})
 
 add_library (libtrialdiv trialdiv.c)
 
+add_library (las-norms las-norms.c)
+
 add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)
 

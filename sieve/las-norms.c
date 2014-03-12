@@ -77,23 +77,23 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
    compute their log2).
    CAREFUL! This function adds (1., 1.) to i to avoid negative value in the
-   exposant (numbers < 1.) !
+   exponent (numbers < 1.) !
 */
-static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
+static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d one) {
   __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n"
-	   "addpd     %1,       %0       \n"
+	   "addpd     %1,       %0       \n" /* To avoid negative values in the exponents */
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i):"x"(un));
+	   : "+&x"(i):"x"(one));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ __volatile__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
 	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
-	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
-	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
+	   "punpcklwd %0,       %0       \n" /* 0000 XXXX 0000 YYYY */
+	   "pshufd    $0xA0,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
 	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
@@ -904,7 +904,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
       poly_scale(u, fijd, d, (double) (J + (p >> 1)));
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = u[d]; for (unsigned int k = d; --k != UINT_MAX; g = g*h+u[k]); g = fabs(g);
+	g = u[d]; for (unsigned int k = d; k--; g = g * h + u[k]); g = fabs(g);
 	g += one;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
@@ -988,7 +988,7 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
    (d) or on F(x,0) for -X <= x <= X (lower border, on the abscissa), but this
        maximum is f[d]*X^d, and is attained in (a).
 */
-static double
+double
 get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
   const unsigned int d = src_poly->deg;

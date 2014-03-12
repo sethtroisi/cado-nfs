@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "las-types.h"
+#include "double_poly.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,15 @@ void init_rat_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr 
  * side we want to be initialized.
  */
 void init_alg_norms_bucket_region (unsigned char *alg_S, uint32_t J, sieve_info_ptr si, int side);
+
+/* These functions are internals. Don't use them. It's need to declare them
+ * here for units & coverage tests.
+ */
+void init_alg_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, unsigned int d, double scale, double *fijd);
+
+void init_rat_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2);
+
+double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
 
 /* This prepares the auxiliary data which is used by
  * init_rat_norms_bucket_region and init_alg_norms_bucket_region
