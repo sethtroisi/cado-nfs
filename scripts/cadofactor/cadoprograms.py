@@ -105,10 +105,24 @@ class Option(object, metaclass=abc.ABCMeta):
             # thus we want to allow float parameters to be given in both
             # integer and float typee, so that passing, e.g., admax as an int
             # does not trip the assertion
-            if self.checktype is float:
-                assert isinstance(value, float) or isinstance(value, int)
-            else:
-                assert isinstance(value, self.checktype)
+            if self.checktype is float and type(value) is int:
+                # Write it to command line as an int
+                pass
+            elif self.checktype is int and type(value) is float:
+                # Can we convert this float to an int without loss?
+                if float(int(value)) == value:
+                    # Yes, convert it and write to command line as an int
+                    value = int(value)
+                else:
+                    raise ValueError("Cannot convert floating-point value %s "
+                                     "for parameter %s to an int without loss" %
+                                     (value, self.defaultname))
+            elif not isinstance(value, self.checktype):
+                raise TypeError("Value %s for parameter %s is of type %s, but "
+                                "checktype requires %s" %
+                                (repr(value), self.defaultname,
+                                 type(value).__name__,
+                                 self.checktype.__name__))
         return self._map(value)
 
     @abc.abstractmethod
@@ -595,9 +609,8 @@ class Polyselect2l(Program):
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
                  threads : Parameter("t", checktype=int)=None,
-                 admin : Parameter()=None, # Semantically an int, polyselect2l
-                    # parses as double to allow scientific notation
-                 admax : Parameter()=None, # Idem
+                 admin : Parameter(checktype=int)=None,
+                 admax : Parameter(checktype=int)=None,
                  incr : Parameter(checktype=int)=None,
                  nq : Parameter(checktype=int)=None,
                  save : Parameter(is_output_file=True)=None,
