@@ -34,8 +34,8 @@ void matpoly_clear(abdst_field ab, matpoly_ptr p);
 void matpoly_fill_random(abdst_field ab MAYBE_UNUSED, matpoly_ptr a, unsigned int size, gmp_randstate_t rstate);
 void matpoly_swap(matpoly_ptr a, matpoly_ptr b);
 int matpoly_cmp(abdst_field ab MAYBE_UNUSED, matpoly_srcptr a, matpoly_srcptr b);
-static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
-static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
 void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src);
 
 
@@ -72,19 +72,19 @@ void matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b);
 
 
 /* {{{ access interface for matpoly */
-static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     ASSERT_ALWAYS(p->size);
-    return p->x+(i*p->n+j)*p->alloc+k;
+    return abvec_subvec(ab, p->x, (i*p->n+j)*p->alloc+k);
 }
-static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *matpoly_part(p,i,j,k);
+static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr(ab, matpoly_part(ab, p,i,j,k), 0);
 }
-static inline const abelt * matpoly_part_const(matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline absrc_vec matpoly_part_const(abdst_field ab, matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
     ASSERT_ALWAYS(p->size);
-    return (const abelt*)p->x+(i*p->n+j)*p->alloc+k;
+    return abvec_subvec_const(ab, p->x, (i*p->n+j)*p->alloc+k);
 }
-static inline absrc_elt matpoly_coeff_const(matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *matpoly_part_const(p,i,j,k);
+static inline absrc_elt matpoly_coeff_const(abdst_field ab, matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr_const(ab, matpoly_part_const(ab, p,i,j,k), 0);
 }
 /* }}} */
 

@@ -42,6 +42,7 @@
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
@@ -49,6 +50,7 @@
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
      u64k1=[ u64k1, u64k2, ],
      u64k2=[ u64k1, u64k2, ],
      },
@@ -210,7 +212,7 @@ void abase_u64k1_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_elt);
 #define abase_u64k1_print(k, x)	abase_u64k1_fprint(k,stdout,x)
 int abase_u64k1_sscan(abase_u64k1_dst_field, abase_u64k1_dst_elt, const char *);
 int abase_u64k1_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_dst_elt);
-/* *io::code_for_scan */
+/* *Mpfq::defaults::code_for_scan */
 #define abase_u64k1_scan(k, x)	abase_u64k1_fscan(k,stdin,x)
 
 /* Vector functions */
@@ -219,6 +221,8 @@ void abase_u64k1_vec_reinit(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned i
 void abase_u64k1_vec_clear(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned int);
 static inline
 void abase_u64k1_vec_set(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, unsigned int);
+static inline
+void abase_u64k1_vec_set_partial(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, unsigned int, unsigned int, unsigned int);
 static inline
 void abase_u64k1_vec_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int);
 static inline
@@ -243,12 +247,20 @@ static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
 static inline
 int abase_u64k1_vec_is_zero(abase_u64k1_dst_field, abase_u64k1_src_vec, unsigned int);
+static inline
+abase_u64k1_dst_vec abase_u64k1_vec_subvec(abase_u64k1_dst_field, abase_u64k1_dst_vec, int);
+static inline
+abase_u64k1_src_vec abase_u64k1_vec_subvec_const(abase_u64k1_dst_field, abase_u64k1_src_vec, int);
+static inline
+abase_u64k1_dst_elt abase_u64k1_vec_coeff_ptr(abase_u64k1_dst_field, abase_u64k1_dst_vec, int);
+static inline
+abase_u64k1_src_elt abase_u64k1_vec_coeff_ptr_const(abase_u64k1_dst_field, abase_u64k1_src_vec, int);
 void abase_u64k1_vec_asprint(abase_u64k1_dst_field, char * *, abase_u64k1_src_vec, unsigned int);
 void abase_u64k1_vec_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_vec, unsigned int);
 void abase_u64k1_vec_print(abase_u64k1_dst_field, abase_u64k1_src_vec, unsigned int);
 int abase_u64k1_vec_sscan(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned int *, const char *);
 int abase_u64k1_vec_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_vec *, unsigned int *);
-/* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
 #define abase_u64k1_vec_scan(K, w, n)	abase_u64k1_vec_fscan(K,stdout,w,n)
 void abase_u64k1_vec_ur_init(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
 static inline
@@ -274,6 +286,14 @@ void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase
 /* missing vec_scal_mul_ur */
 /* missing vec_conv_ur */
 /* missing vec_reduce */
+static inline
+abase_u64k1_dst_vec_ur abase_u64k1_vec_ur_subvec(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, int);
+static inline
+abase_u64k1_src_vec_ur abase_u64k1_vec_ur_subvec_const(abase_u64k1_dst_field, abase_u64k1_src_vec_ur, int);
+static inline
+abase_u64k1_dst_elt abase_u64k1_vec_ur_coeff_ptr(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, int);
+static inline
+abase_u64k1_src_elt abase_u64k1_vec_ur_coeff_ptr_const(abase_u64k1_dst_field, abase_u64k1_src_vec_ur, int);
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, simd_flat */
 #define abase_u64k1_vec_elt_stride(K, n)	((n)*sizeof(abase_u64k1_elt))
 
@@ -437,6 +457,15 @@ void abase_u64k1_vec_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
     if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_set_partial, Mpfq::defaults::vec */
+static inline
+void abase_u64k1_vec_set_partial(abase_u64k1_dst_field k MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int bw, unsigned int bu, unsigned int l)
+{
+    unsigned int i;
+    for(i = 0; i < l; ++i)
+        abase_u64k1_set(k, w[bw+i], u[bu+i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec r, unsigned int n)
@@ -444,21 +473,21 @@ void abase_u64k1_vec_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_
     memset(r, 0, n*sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_elt x, unsigned int i)
 {
     abase_u64k1_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt x, abase_u64k1_src_vec w, unsigned int i)
 {
     abase_u64k1_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_add, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_add, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -467,7 +496,7 @@ void abase_u64k1_vec_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_neg, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_neg, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int n)
 {
@@ -476,7 +505,7 @@ void abase_u64k1_vec_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_neg(K, w[i], u[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_rev, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_rev, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int n)
 {
@@ -494,7 +523,7 @@ void abase_u64k1_vec_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
     abase_u64k1_clear(K, tmp);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_sub, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_sub, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -503,7 +532,7 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_sub(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
@@ -512,7 +541,7 @@ void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_random(K, w[i], state);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec */
 static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -525,7 +554,7 @@ int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_ve
     return 0;
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_is_zero, Mpfq::defaults::vec */
 static inline
 int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec r, unsigned int n)
 {
@@ -536,6 +565,34 @@ int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_sr
     return 1;
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_subvec, Mpfq::defaults::vec */
+static inline
+abase_u64k1_dst_vec abase_u64k1_vec_subvec(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec v, int i)
+{
+    return v+i;
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_subvec_const, Mpfq::defaults::vec */
+static inline
+abase_u64k1_src_vec abase_u64k1_vec_subvec_const(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec v, int i)
+{
+    return v+i;
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_coeff_ptr, Mpfq::defaults::vec */
+static inline
+abase_u64k1_dst_elt abase_u64k1_vec_coeff_ptr(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec v, int i)
+{
+    return v[i];
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_coeff_ptr_const, Mpfq::defaults::vec */
+static inline
+abase_u64k1_src_elt abase_u64k1_vec_coeff_ptr_const(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec v, int i)
+{
+    return v[i];
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur r, unsigned int n)
@@ -543,7 +600,7 @@ void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64
     memset(r, 0, n*sizeof(abase_u64k1_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_set_vec(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec u, unsigned int n)
 {
@@ -559,21 +616,21 @@ void abase_u64k1_vec_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_elt_ur x, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur x, abase_u64k1_src_vec_ur w, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, abase_u64k1_src_vec_ur v, unsigned int n)
 {
@@ -582,7 +639,7 @@ void abase_u64k1_vec_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_elt_ur_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, abase_u64k1_src_vec_ur v, unsigned int n)
 {
@@ -591,7 +648,7 @@ void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_elt_ur_sub(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_neg, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
 {
@@ -600,7 +657,7 @@ void abase_u64k1_vec_ur_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_elt_ur_neg(K, w[i], u[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_rev, Mpfq::defaults::vec */
 static inline
 void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, unsigned int n)
 {
@@ -616,6 +673,34 @@ void abase_u64k1_vec_ur_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     if (n & 1)
         abase_u64k1_elt_ur_set(K, w[nn], u[nn]);
     abase_u64k1_elt_ur_clear(K, tmp);
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_subvec, Mpfq::defaults::vec */
+static inline
+abase_u64k1_dst_vec_ur abase_u64k1_vec_ur_subvec(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur v, int i)
+{
+    return v+i;
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_subvec_const, Mpfq::defaults::vec */
+static inline
+abase_u64k1_src_vec_ur abase_u64k1_vec_ur_subvec_const(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec_ur v, int i)
+{
+    return v+i;
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_coeff_ptr, Mpfq::defaults::vec */
+static inline
+abase_u64k1_dst_elt abase_u64k1_vec_ur_coeff_ptr(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur v, int i)
+{
+    return v[i];
+}
+
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_coeff_ptr_const, Mpfq::defaults::vec */
+static inline
+abase_u64k1_src_elt abase_u64k1_vec_ur_coeff_ptr_const(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec_ur v, int i)
+{
+    return v[i];
 }
 
 /* *simd_flat::code_for_set_ui_at */

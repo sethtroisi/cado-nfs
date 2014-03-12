@@ -27,6 +27,10 @@
 #include "abase_p_8.h"
 #include "abase_p_8_t.h"
 #endif /* COMPILE_MPFQ_PRIME_FIELDS */
+#ifdef COMPILE_MPFQ_PRIME_FIELDS
+#include "abase_pz.h"
+#include "abase_pz_t.h"
+#endif /* COMPILE_MPFQ_PRIME_FIELDS */
 void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
 {
         va_list ap;
@@ -70,6 +74,10 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
 #ifdef COMPILE_MPFQ_PRIME_FIELDS
         } else if (groupsize == 1 && mpz_size(p) == 8) {
             abase_p_8_oo_field_init(v);
+#endif /* COMPILE_MPFQ_PRIME_FIELDS */
+#ifdef COMPILE_MPFQ_PRIME_FIELDS
+        } else if (groupsize == 1 && 1) {
+            abase_pz_oo_field_init(v);
 #endif /* COMPILE_MPFQ_PRIME_FIELDS */
         } else {
             gmp_fprintf(stderr, "Unsupported combination: group size = %d, p = %Zd, %zu limbs\n", groupsize, p, mpz_size(p));
@@ -130,6 +138,12 @@ void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr w, abase_vbase_ptr v0, a
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_8_p_8_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_8_p_8_addmul_tiny;
         w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_8_p_8_transpose;
+#endif /* defined(COMPILE_MPFQ_PRIME_FIELDS) */
+#if defined(COMPILE_MPFQ_PRIME_FIELDS)
+    } else if (strcmp(s0, "pz") == 0 && strcmp(s1, "pz") == 0) {
+        w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_pz_pz_dotprod;
+        w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_pz_pz_addmul_tiny;
+        w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_pz_pz_transpose;
 #endif /* defined(COMPILE_MPFQ_PRIME_FIELDS) */
     } else {
         abort();

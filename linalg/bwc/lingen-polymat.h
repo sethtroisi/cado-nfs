@@ -73,8 +73,8 @@ void polymat_clear(abdst_field ab, polymat_ptr p);
 void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned int size, gmp_randstate_t rstate);
 void polymat_swap(polymat_ptr a, polymat_ptr b);
 int polymat_cmp(abdst_field ab MAYBE_UNUSED, polymat_srcptr a, polymat_srcptr b);
-static inline abelt * polymat_part(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
-static inline abdst_elt polymat_coeff(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_vec polymat_part(abdst_field ab, polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_elt polymat_coeff(abdst_field ab, polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
 
 void polymat_set_matpoly(abdst_field ab MAYBE_UNUSED, polymat_ptr a, matpoly_srcptr b);
 
@@ -113,23 +113,23 @@ void polymat_mp(abdst_field ab, polymat c, polymat a, polymat b);
 #endif
 
 /* {{{ access interface for polymat */
-static inline abelt * polymat_part(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline abdst_vec polymat_part(abdst_field ab, polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     /* Assume row-major in all circumstances. Old code used to support
      * various orderings, here we don't */
     ASSERT_ALWAYS(p->size);
-    return p->x+(k*p->m+i)*p->n+j;
+    return abvec_subvec(ab, p->x, (k*p->m+i)*p->n+j);
 }
-static inline abdst_elt polymat_coeff(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *polymat_part(p,i,j,k);
+static inline abdst_elt polymat_coeff(abdst_field ab, polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr(ab, polymat_part(ab, p,i,j,k),0);
 }
-static inline const abelt * polymat_part_const(polymat_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline absrc_vec polymat_part_const(abdst_field ab, polymat_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
     /* Assume row-major in all circumstances. Old code used to support
      * various orderings, here we don't */
     ASSERT_ALWAYS(p->size);
-    return (const abelt*)p->x+(k*p->m+i)*p->n+j;
+    return abvec_subvec_const(ab, (absrc_vec)p->x,(k*p->m+i)*p->n+j);
 }
-static inline absrc_elt polymat_coeff_const(polymat_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *polymat_part_const(p,i,j,k);
+static inline absrc_elt polymat_coeff_const(abdst_field ab, polymat_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr_const(ab, polymat_part_const(ab, p,i,j,k),0);
 }
 /* }}} */
 

@@ -6,7 +6,7 @@
 
 MPFQ:=$$HOME/Mp/mpfq/src
 
-mpfq_tag_list:=u64k1 u64k2 p_1 p_2 p_3 p_4 p_8
+mpfq_tag_list:=u64k1 u64k2 p_1 p_2 p_3 p_4 p_8 pz
 
 all: basic binary-fields prime-fields
 
@@ -54,10 +54,14 @@ clean:
 	-rm -f abase_p16.h
 	-rm -f abase_p16_t.c
 	-rm -f abase_p16_t.h
-	-rm -f abase_p_*.c
-	-rm -f abase_p_*.h
-	-rm -f abase_p_*_t.c
-	-rm -f abase_p_*_t.h
+	-rm -f abase_p_?.c
+	-rm -f abase_p_?.h
+	-rm -f abase_p_?_t.c
+	-rm -f abase_p_?_t.h
+	-rm -f abase_pz.c
+	-rm -f abase_pz.h
+	-rm -f abase_pz_t.c
+	-rm -f abase_pz_t.h
 	-rm -f abase_u64k1.c
 	-rm -f abase_u64k1.h
 	-rm -f abase_u64k1_t.c

@@ -488,8 +488,8 @@ void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
      */
     /* MPI_IN_PLACE semantics for Reduce() and Gather() are stupid. */
     MPI_Reduce(
-            irank ? matpoly_part(dst, 0, 0, 0) : MPI_IN_PLACE,
-            irank ? NULL : matpoly_part(dst, 0, 0, 0),
+            irank ? matpoly_part(ab, dst, 0, 0, 0) : MPI_IN_PLACE,
+            irank ? NULL : matpoly_part(ab, dst, 0, 0, 0),
             src->m * src->n * src->size,
             abmpi_datatype(ab),
             abmpi_addition_op(ab), 0, src->col);
@@ -552,7 +552,7 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
      * Copy the full range of allocated bytes, not only up to size.
      */
     MPI_Bcast(
-            matpoly_part(src, 0, 0, 0),
+            matpoly_part(ab, src, 0, 0, 0),
             src->m * src->n * src->alloc,
             abmpi_datatype(ab),
             0,

@@ -172,7 +172,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
 
     unsigned int *pi_lengths = malloc(b * sizeof(unsigned int));
     for(unsigned int i = 0 ; i < b ; i++) {
-        abset_ui(ab, matpoly_coeff(pi, i, i, 0), 1);
+        abset_ui(ab, matpoly_coeff(ab, pi, i, i, 0), 1);
         pi_lengths[i] = 1;
     }
 
@@ -213,9 +213,12 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
                 for(unsigned int i = 0 ; i < m ; i++) {
                     for(unsigned int k = 0 ; k < b ; k++) {
                         abmul_ur(ab, tmp_ur,
-                                matpoly_coeff(E, i, k, t - s),
-                                matpoly_coeff(pi, k, j, s));
-                        abelt_ur_add(ab, e_ur[i*b+j], e_ur[i*b+j], tmp_ur);
+                                matpoly_coeff(ab, E, i, k, t - s),
+                                matpoly_coeff(ab, pi, k, j, s));
+                        abelt_ur_add(ab,
+                                abvec_ur_coeff_ptr(ab, e_ur, i*b+j),
+                                abvec_ur_coeff_ptr_const(ab, e_ur, i*b+j),
+                                tmp_ur);
                     }
                 }
             }
@@ -225,8 +228,9 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
             if (is_pivot[j]) continue;
             unsigned int nz = 0;
             for(unsigned int i = 0 ; i < m ; i++) {
-                abreduce(ab, matpoly_coeff(e, i, j, 0), e_ur[i*b+j]);
-                nz += abcmp_ui(ab, matpoly_coeff(e, i, j, 0), 0) == 0;
+                abreduce(ab, matpoly_coeff(ab, e, i, j, 0),
+                        abvec_ur_coeff_ptr(ab, e_ur, i*b+j));
+                nz += abcmp_ui(ab, matpoly_coeff(ab, e, i, j, 0), 0) == 0;
             }
             if (nz == m) {
                 newluck++, bm->lucky[j]++;
@@ -288,7 +292,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
             unsigned int u = 0;
             /* {{{ Find the pivot */
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, matpoly_coeff(e, u, j, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(ab, e, u, j, 0), 0) != 0)
                     break;
             }
             if (u == m) continue;
@@ -299,7 +303,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
-            int rc = abinv(ab, inv, matpoly_coeff(e, u, j, 0));
+            int rc = abinv(ab, inv, matpoly_coeff(ab, e, u, j, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, inv);
@@ -309,12 +313,12 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
                 unsigned int k = ctable[kl][1];
-                if (abcmp_ui(ab, matpoly_coeff(e, u, k, 0), 0) == 0)
+                if (abcmp_ui(ab, matpoly_coeff(ab, e, u, k, 0), 0) == 0)
                     continue;
                 // add lambda = e[u,k]*-e[u,j]^-1 times col j to col k.
                 abelt lambda;
                 abinit(ab, &lambda);
-                abmul(ab, lambda, inv, matpoly_coeff(e, u, k, 0));
+                abmul(ab, lambda, inv, matpoly_coeff(ab, e, u, k, 0));
 
                 assert(delta[j] <= delta[k]);
                 /* {{{ Apply on both e and pi */
@@ -322,10 +326,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
                 abinit(ab, &tmp);
                 for(unsigned int i = 0 ; i < m ; i++) {
                     /* TODO: Would be better if mpfq had an addmul */
-                    abmul(ab, tmp, lambda, matpoly_coeff(e, i, j, 0));
+                    abmul(ab, tmp, lambda, matpoly_coeff(ab, e, i, j, 0));
                     abadd(ab,
-                            matpoly_coeff(e, i, k, 0),
-                            matpoly_coeff(e, i, k, 0),
+                            matpoly_coeff(ab, e, i, k, 0),
+                            matpoly_coeff(ab, e, i, k, 0),
                             tmp);
                 }
                 if (bm->lucky[k] < 0) {
@@ -352,10 +356,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
                         /* TODO: Would be better if mpfq had an addmul */
                         abmul(ab, tmp, lambda,
-                                matpoly_coeff(pi, i, j, s));
+                                matpoly_coeff(ab, pi, i, j, s));
                         abadd(ab,
-                                matpoly_coeff(pi, i, k, s),
-                                matpoly_coeff(pi, i, k, s),
+                                matpoly_coeff(ab, pi, i, k, s),
+                                matpoly_coeff(ab, pi, i, k, s),
                                 tmp);
                     }
                 }
@@ -789,18 +793,18 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
                 for(unsigned int i = 0 ; i < m ; i++) {
                     if (i == u) continue;
                     abmul(ab, tmp,
-                              matpoly_coeff(M, i, v, 0),
-                              matpoly_coeff(M, u, r, 0));
-                    abadd(ab, matpoly_coeff(M, i, r, 0),
-                              matpoly_coeff(M, i, r, 0),
+                              matpoly_coeff(ab, M, i, v, 0),
+                              matpoly_coeff(ab, M, u, r, 0));
+                    abadd(ab, matpoly_coeff(ab, M, i, r, 0),
+                              matpoly_coeff(ab, M, i, r, 0),
                               tmp);
                 }
                 abset_zero(ab,
-                        matpoly_coeff(M, u, r, 0));
+                        matpoly_coeff(ab, M, u, r, 0));
 	    }
             unsigned int u = 0;
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, matpoly_coeff(M, u, r, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(ab, M, u, r, 0), 0) != 0)
                     break;
             }
             if (u == m) {
@@ -820,7 +824,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
 	    exponents[r] = k;
 
 	    /* Multiply the column so that the pivot becomes -1 */
-            int rc = abinv(ab, tmp, matpoly_coeff(M, u, r, 0));
+            int rc = abinv(ab, tmp, matpoly_coeff(ab, M, u, r, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, tmp);
@@ -829,8 +833,8 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
             }
             abneg(ab, tmp, tmp);
             for(unsigned int i = 0 ; i < m ; i++) {
-                abmul(ab, matpoly_coeff(M, i, r, 0),
-                          matpoly_coeff(M, i, r, 0),
+                abmul(ab, matpoly_coeff(ab, M, i, r, 0),
+                          matpoly_coeff(ab, M, i, r, 0),
                           tmp);
             }
 
@@ -947,8 +951,8 @@ void compute_final_F_red(bmstatus_ptr bm, matpoly f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abset(ab,
-                        matpoly_coeff(f, i, j, k),
-                        matpoly_coeff(pi, i, j1, k));
+                        matpoly_coeff(ab, f, i, j, k),
+                        matpoly_coeff(ab, pi, i, j1, k));
             }
         }
     }
@@ -962,9 +966,9 @@ void compute_final_F_red(bmstatus_ptr bm, matpoly f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abadd(ab,
-                        matpoly_coeff(f, c, j, k+t0-e),
-                        matpoly_coeff(f, c, j, k+t0-e),
-                        matpoly_coeff(pi, i+n, j1, k));
+                        matpoly_coeff(ab, f, c, j, k+t0-e),
+                        matpoly_coeff(ab, f, c, j, k+t0-e),
+                        matpoly_coeff(ab, pi, i+n, j1, k));
             }
         }
     }
@@ -1004,7 +1008,7 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
         unsigned int delta_orig = delta[j];
         for(int z = 1; z && delta[j] ; delta[j]-=z) {
             for(unsigned int i = 0 ; z && i < n ; i++) {
-                z = abis_zero(ab, matpoly_coeff(f_red, i, jj, delta[j]));
+                z = abis_zero(ab, matpoly_coeff(ab, f_red, i, jj, delta[j]));
             }
         }
         if (delta_orig > delta[j]) {
@@ -1021,7 +1025,7 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
                     if (i) fprintf(f, " ");
                     unsigned int j = sols[jj];
                     if (k <= delta[j]) {
-                        abfprint(ab, f, matpoly_coeff(f_red, i, jj, delta[j]-k));
+                        abfprint(ab, f, matpoly_coeff(ab, f_red, i, jj, delta[j]-k));
                     } else {
                         fprintf(f, "0");
                     }
@@ -1039,7 +1043,7 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
                 for(unsigned int i = 0 ; i < n ; i++) {
                     abset_zero(ab, tmp);
                     if (k <= delta[j])
-                        abset(ab, tmp, matpoly_coeff(f_red, i, jj, delta[j]-k));
+                        abset(ab, tmp, matpoly_coeff(ab, f_red, i, jj, delta[j]-k));
                     fwrite(tmp, sizeof(abelt), 1, f);
                 }
             }
@@ -1118,7 +1122,7 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
 	int k1 = k - ! !k;
 	for (unsigned int i = 0; i < m && !eof_met ; i++) {
 	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
-                abdst_elt x = matpoly_coeff(A, i, j, k1);
+                abdst_elt x = matpoly_coeff(ab, A, i, j, k1);
 		int rc;
                 if (ascii_input) {
                     rc = abfscan(ab, f, x);
@@ -1163,7 +1167,7 @@ void set_random_input(bmstatus_ptr bm, matpoly A, unsigned int length) /* {{{ */
     for(unsigned int k = 0 ; k < length ; k++) {
 	for (unsigned int i = 0; i < m ; i++) {
 	    for (unsigned int j = 0; j < n ; j++) {
-                abdst_elt x = matpoly_coeff(A, i, j, k);
+                abdst_elt x = matpoly_coeff(ab, A, i, j, k);
                 abrandom(ab, x, rstate);
             }
         }
@@ -1175,8 +1179,8 @@ void set_random_input(bmstatus_ptr bm, matpoly A, unsigned int length) /* {{{ */
         for(unsigned int k = length-10 ; k < length ; k++) {
             for (unsigned int i = 0; i < m ; i++) {
                 for (unsigned int j = 0; j < n ; j++) {
-                    absrc_elt x = matpoly_coeff(A, i, (j*1009)%n, k - (length - 10));
-                    abdst_elt y = matpoly_coeff(A, i, j, k);
+                    absrc_elt x = matpoly_coeff(ab, A, i, (j*1009)%n, k - (length - 10));
+                    abdst_elt y = matpoly_coeff(ab, A, i, j, k);
                     abset(ab, y, x);
                 }
             }

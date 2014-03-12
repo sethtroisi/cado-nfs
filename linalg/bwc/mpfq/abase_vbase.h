@@ -79,6 +79,7 @@ struct abase_vbase_s {
     void (*vec_reinit)(abase_vbase_ptr, void *, unsigned int, unsigned int);
     void (*vec_clear)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_set)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_set_partial)(abase_vbase_ptr, void *, const void *, unsigned int, unsigned int, unsigned int);
     void (*vec_set_zero)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_setcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_setcoef_ui)(abase_vbase_ptr, void *, unsigned long, unsigned int);
@@ -93,6 +94,10 @@ struct abase_vbase_s {
     void (*vec_random2)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     int (*vec_cmp)(abase_vbase_ptr, const void *, const void *, unsigned int);
     int (*vec_is_zero)(abase_vbase_ptr, const void *, unsigned int);
+    void * (*vec_subvec)(abase_vbase_ptr, void *, int);
+    const void * (*vec_subvec_const)(abase_vbase_ptr, const void *, int);
+    void * (*vec_coeff_ptr)(abase_vbase_ptr, void *, int);
+    const void * (*vec_coeff_ptr_const)(abase_vbase_ptr, const void *, int);
     void (*vec_asprint)(abase_vbase_ptr, char * *, const void *, unsigned int);
     void (*vec_fprint)(abase_vbase_ptr, FILE *, const void *, unsigned int);
     void (*vec_print)(abase_vbase_ptr, const void *, unsigned int);
@@ -114,6 +119,10 @@ struct abase_vbase_s {
     void (*vec_scal_mul_ur)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_conv_ur)(abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int);
     void (*vec_reduce)(abase_vbase_ptr, void *, void *, unsigned int);
+    void * (*vec_ur_subvec)(abase_vbase_ptr, void *, int);
+    const void * (*vec_ur_subvec_const)(abase_vbase_ptr, const void *, int);
+    void * (*vec_ur_coeff_ptr)(abase_vbase_ptr, void *, int);
+    const void * (*vec_ur_coeff_ptr_const)(abase_vbase_ptr, const void *, int);
     ptrdiff_t (*vec_elt_stride)(abase_vbase_ptr, int);
     void (*poly_init)(abase_vbase_ptr, void *, unsigned int);
     void (*poly_clear)(abase_vbase_ptr, void *);

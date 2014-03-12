@@ -3,6 +3,9 @@
 
 /* This header contains common declarations used by mpfq modules */
 
+/* we always include stdio.h, otherwise our inclusion of gmp.h might
+ * prevent gmp's I/O functions to ever be exposed... */
+#include <stdio.h>
 #include <gmp.h>
 
 #ifdef __cplusplus

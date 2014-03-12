@@ -35,6 +35,7 @@ static int abase_p_3_impl_mpi_use_count;   /* several stacked init()/clear() pai
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     [ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
      ],
     member_templates_restrict={
      p_1=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_1, }, ],
@@ -42,6 +43,7 @@ static int abase_p_3_impl_mpi_use_count;   /* several stacked init()/clear() pai
      p_3=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_3, }, ],
      p_4=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_4, }, ],
      p_8=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=p_8, }, ],
+     pz=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
      u64k1=[ u64k1, u64k2, ],
      u64k2=[ u64k1, u64k2, ],
      },
@@ -283,11 +285,22 @@ int abase_p_3_sqrt(abase_p_3_dst_field k, abase_p_3_dst_elt z, abase_p_3_src_elt
 void abase_p_3_asprint(abase_p_3_dst_field k, char * * pstr, abase_p_3_src_elt x)
 {
     int i, n;
+    mp_size_t size_x;
+    i=3-1;
+    while ((i>=0)&&(x[i]==0)) {
+        i--;
+    }
+    i++;
+    size_x=i;
+    mp_limb_t y[size_x];
+    for (i = 0; i<size_x; ++i) {
+        y[i]=x[i];
+    }
     // allocate enough room for base 2 conversion.
-    *pstr = (char *)malloc((3*64+1)*sizeof(char));
+    *pstr = (char *)malloc((size_x*64+1)*sizeof(char));
     if (*pstr == NULL)
         MALLOC_FAILED();
-    n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) x, 3);
+    n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) y, size_x);
     for (i = 0; i < n; ++i)
         (*pstr)[i] += '0';
     (*pstr)[n] = '\0';
@@ -374,16 +387,16 @@ int abase_p_3_fscan(abase_p_3_dst_field k, FILE * file, abase_p_3_dst_elt z)
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_init(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * v, unsigned int n)
 {
     unsigned int i;
     *v = (abase_p_3_vec) malloc (n*sizeof(abase_p_3_elt));
-    for(i = 0; i < n; i+=1)
+    for(i = 0; i < n; i++)
         abase_p_3_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_reinit(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -399,7 +412,7 @@ void abase_p_3_vec_reinit(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * v,
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_clear(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -408,7 +421,7 @@ void abase_p_3_vec_clear(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * v, 
     free(*v);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_asprint(abase_p_3_dst_field K MAYBE_UNUSED, char * * pstr, abase_p_3_src_vec w, unsigned int n)
 {
     if (n == 0) {
@@ -445,7 +458,7 @@ void abase_p_3_vec_asprint(abase_p_3_dst_field K MAYBE_UNUSED, char * * pstr, ab
     (*pstr)[len] = '\0';
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_fprint(abase_p_3_dst_field K MAYBE_UNUSED, FILE * file, abase_p_3_src_vec w, unsigned int n)
 {
     char *str;
@@ -454,13 +467,13 @@ void abase_p_3_vec_fprint(abase_p_3_dst_field K MAYBE_UNUSED, FILE * file, abase
     free(str);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_print(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_src_vec w, unsigned int n)
 {
     abase_p_3_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::gfp */
 int abase_p_3_vec_sscan(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -504,7 +517,7 @@ int abase_p_3_vec_sscan(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec * w, u
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::gfp */
 int abase_p_3_vec_fscan(abase_p_3_dst_field K MAYBE_UNUSED, FILE * file, abase_p_3_vec * w, unsigned int * n)
 {
     char *tmp;
@@ -537,7 +550,7 @@ int abase_p_3_vec_fscan(abase_p_3_dst_field K MAYBE_UNUSED, FILE * file, abase_p
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_ur_init(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -546,7 +559,7 @@ void abase_p_3_vec_ur_init(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec_ur 
         abase_p_3_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_ur_reinit(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -562,7 +575,7 @@ void abase_p_3_vec_ur_reinit(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec_u
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_3_vec_ur_clear(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -694,11 +707,14 @@ void abase_p_3_poly_divmod(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_pol
     int bmonic;
     abase_p_3_elt ilb;
     abase_p_3_init(K, &ilb);
-    if (abase_p_3_cmp_ui(K, (b->c)[degb], 1) == 0) {
+    abase_p_3_elt temp;
+    abase_p_3_init(K, &temp);
+    abase_p_3_poly_getcoef(K, temp, b, degb);
+    if (abase_p_3_cmp_ui(K, temp, 1) == 0) {
         abase_p_3_set_ui(K, ilb, 1);
         bmonic = 1;
     } else {
-        abase_p_3_inv(K, ilb, (b->c)[degb]);
+        abase_p_3_inv(K, ilb, temp);
         bmonic = 0;
     }
     
@@ -720,8 +736,12 @@ void abase_p_3_poly_divmod(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_pol
             abase_p_3_mul(K, aux, aux, ilb);
         abase_p_3_poly_setcoef(K, qq, aux, i-degb);
         for (j = i-1; j >= (int)(i - degb); --j) {
-            abase_p_3_mul(K, aux2, aux, (b->c)[j-i+degb]);
-            abase_p_3_sub(K, (rr->c)[j], (rr->c)[j], aux2);
+            abase_p_3_poly_getcoef(K, temp, b, j-i+degb);
+            abase_p_3_mul(K, aux2, aux, temp);
+            abase_p_3_poly_getcoef(K, temp, rr, j);
+    
+            abase_p_3_sub(K, temp, temp, aux2);
+            abase_p_3_poly_setcoef(K, rr, temp, j);
         }
     }    
     
@@ -733,6 +753,7 @@ void abase_p_3_poly_divmod(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_pol
         abase_p_3_poly_set(K, q, qq);
     if (r != NULL)
         abase_p_3_poly_set(K, r, rr);
+    abase_p_3_clear(K, &temp);
     abase_p_3_clear(K, &aux);
     abase_p_3_clear(K, &aux2);
     abase_p_3_poly_clear(K, rr);
@@ -747,7 +768,10 @@ void abase_p_3_poly_preinv(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_pol
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    assert (abase_p_3_cmp_ui(K, p->c[0], 1) == 0);
+    abase_p_3_elt temp;
+    abase_p_3_init(K, &temp);
+    abase_p_3_poly_getcoef(K, temp, p, 0);//Should be in the assert
+    assert( abase_p_3_cmp_ui(K, temp, 1) == 0);
     assert (p != q);
     int m;
     if (n <= 2) {
@@ -773,11 +797,14 @@ void abase_p_3_poly_preinv(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_pol
     abase_p_3_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
     int nn = MIN(n, MIN(n, p->size) + m -1);
     abase_p_3_vec_neg(K, tmp, tmp, nn);
-    abase_p_3_add_ui(K, tmp[0], tmp[0], 1);
+    abase_p_3_vec_getcoef(K, temp, tmp, 0);
+    abase_p_3_add_ui(K, temp, temp, 1);
+    abase_p_3_vec_setcoef(K, tmp, temp, 0);
     abase_p_3_vec_conv(K, tmp, q->c, m, tmp, nn);
     abase_p_3_vec_set(K, q->c + m, tmp + m, n-m);
     q->size = n;
     
+    abase_p_3_clear(K, &temp);
     abase_p_3_vec_clear(K, &tmp, m+n-1);
 }
 
@@ -1291,6 +1318,12 @@ static void abase_p_3_wrapper_vec_set(abase_vbase_ptr vbase MAYBE_UNUSED, abase_
     abase_p_3_vec_set(vbase->obj, r, s, n);
 }
 
+static void abase_p_3_wrapper_vec_set_partial(abase_vbase_ptr, abase_p_3_dst_vec, abase_p_3_src_vec, unsigned int, unsigned int, unsigned int);
+static void abase_p_3_wrapper_vec_set_partial(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec w MAYBE_UNUSED, abase_p_3_src_vec u MAYBE_UNUSED, unsigned int bw MAYBE_UNUSED, unsigned int bu MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
+{
+    abase_p_3_vec_set_partial(vbase->obj, w, u, bw, bu, l);
+}
+
 static void abase_p_3_wrapper_vec_set_zero(abase_vbase_ptr, abase_p_3_dst_vec, unsigned int);
 static void abase_p_3_wrapper_vec_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
@@ -1373,6 +1406,30 @@ static int abase_p_3_wrapper_vec_is_zero(abase_vbase_ptr, abase_p_3_src_vec, uns
 static int abase_p_3_wrapper_vec_is_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_src_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     return abase_p_3_vec_is_zero(vbase->obj, r, n);
+}
+
+static abase_p_3_dst_vec abase_p_3_wrapper_vec_subvec(abase_vbase_ptr, abase_p_3_dst_vec, int);
+static abase_p_3_dst_vec abase_p_3_wrapper_vec_subvec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_subvec(vbase->obj, v, i);
+}
+
+static abase_p_3_src_vec abase_p_3_wrapper_vec_subvec_const(abase_vbase_ptr, abase_p_3_src_vec, int);
+static abase_p_3_src_vec abase_p_3_wrapper_vec_subvec_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_subvec_const(vbase->obj, v, i);
+}
+
+static abase_p_3_dst_elt abase_p_3_wrapper_vec_coeff_ptr(abase_vbase_ptr, abase_p_3_dst_vec, int);
+static abase_p_3_dst_elt abase_p_3_wrapper_vec_coeff_ptr(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_coeff_ptr(vbase->obj, v, i);
+}
+
+static abase_p_3_src_elt abase_p_3_wrapper_vec_coeff_ptr_const(abase_vbase_ptr, abase_p_3_src_vec, int);
+static abase_p_3_src_elt abase_p_3_wrapper_vec_coeff_ptr_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_coeff_ptr_const(vbase->obj, v, i);
 }
 
 static void abase_p_3_wrapper_vec_asprint(abase_vbase_ptr, char * *, abase_p_3_src_vec, unsigned int);
@@ -1499,6 +1556,30 @@ static void abase_p_3_wrapper_vec_reduce(abase_vbase_ptr, abase_p_3_dst_vec, aba
 static void abase_p_3_wrapper_vec_reduce(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec w MAYBE_UNUSED, abase_p_3_dst_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     abase_p_3_vec_reduce(vbase->obj, w, u, n);
+}
+
+static abase_p_3_dst_vec_ur abase_p_3_wrapper_vec_ur_subvec(abase_vbase_ptr, abase_p_3_dst_vec_ur, int);
+static abase_p_3_dst_vec_ur abase_p_3_wrapper_vec_ur_subvec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_ur_subvec(vbase->obj, v, i);
+}
+
+static abase_p_3_src_vec_ur abase_p_3_wrapper_vec_ur_subvec_const(abase_vbase_ptr, abase_p_3_src_vec_ur, int);
+static abase_p_3_src_vec_ur abase_p_3_wrapper_vec_ur_subvec_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_ur_subvec_const(vbase->obj, v, i);
+}
+
+static abase_p_3_dst_elt abase_p_3_wrapper_vec_ur_coeff_ptr(abase_vbase_ptr, abase_p_3_dst_vec_ur, int);
+static abase_p_3_dst_elt abase_p_3_wrapper_vec_ur_coeff_ptr(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_ur_coeff_ptr(vbase->obj, v, i);
+}
+
+static abase_p_3_src_elt abase_p_3_wrapper_vec_ur_coeff_ptr_const(abase_vbase_ptr, abase_p_3_src_vec_ur, int);
+static abase_p_3_src_elt abase_p_3_wrapper_vec_ur_coeff_ptr_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_3_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_3_vec_ur_coeff_ptr_const(vbase->obj, v, i);
 }
 
 static ptrdiff_t abase_p_3_wrapper_vec_elt_stride(abase_vbase_ptr, int);
@@ -1844,6 +1925,7 @@ void abase_p_3_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_p_3_wrapper_vec_reinit;
     vbase->vec_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_3_wrapper_vec_clear;
     vbase->vec_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_3_wrapper_vec_set;
+    vbase->vec_set_partial = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, unsigned int, unsigned int)) abase_p_3_wrapper_vec_set_partial;
     vbase->vec_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_3_wrapper_vec_set_zero;
     vbase->vec_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_3_wrapper_vec_setcoef;
     vbase->vec_setcoef_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_p_3_wrapper_vec_setcoef_ui;
@@ -1858,6 +1940,10 @@ void abase_p_3_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_random2 = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_p_3_wrapper_vec_random2;
     vbase->vec_cmp = (int (*) (abase_vbase_ptr, const void *, const void *, unsigned int)) abase_p_3_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_3_wrapper_vec_is_zero;
+    vbase->vec_subvec = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_3_wrapper_vec_subvec;
+    vbase->vec_subvec_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_3_wrapper_vec_subvec_const;
+    vbase->vec_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_3_wrapper_vec_coeff_ptr;
+    vbase->vec_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_3_wrapper_vec_coeff_ptr_const;
     vbase->vec_asprint = (void (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_p_3_wrapper_vec_asprint;
     vbase->vec_fprint = (void (*) (abase_vbase_ptr, FILE *, const void *, unsigned int)) abase_p_3_wrapper_vec_fprint;
     vbase->vec_print = (void (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_3_wrapper_vec_print;
@@ -1879,6 +1965,10 @@ void abase_p_3_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_scal_mul_ur = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_3_wrapper_vec_scal_mul_ur;
     vbase->vec_conv_ur = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int)) abase_p_3_wrapper_vec_conv_ur;
     vbase->vec_reduce = (void (*) (abase_vbase_ptr, void *, void *, unsigned int)) abase_p_3_wrapper_vec_reduce;
+    vbase->vec_ur_subvec = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_3_wrapper_vec_ur_subvec;
+    vbase->vec_ur_subvec_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_3_wrapper_vec_ur_subvec_const;
+    vbase->vec_ur_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_3_wrapper_vec_ur_coeff_ptr;
+    vbase->vec_ur_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_3_wrapper_vec_ur_coeff_ptr_const;
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_p_3_wrapper_vec_elt_stride;
     vbase->poly_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_3_wrapper_poly_init;
     vbase->poly_clear = (void (*) (abase_vbase_ptr, void *)) abase_p_3_wrapper_poly_clear;

@@ -64,7 +64,8 @@ void matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
-            abelt * aij = matpoly_part(a, i, j, 0);
+            abvec aij = matpoly_part(ab, a, i, j, 0);
+            /* ok, casting like this is a crude hack ! */
             fft_do_dft_fppol(tij, (mp_limb_t *) aij, a->size, tt, fti, p);
         }
     }
@@ -206,7 +207,8 @@ void matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
-            abelt * aij = matpoly_part(a, i, j, 0);
+            abvec aij = matpoly_part(ab, a, i, j, 0);
+            /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol((mp_limb_t *) aij, a->size, tij, tt, fti, p);
         }
     }
@@ -235,7 +237,8 @@ void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
             void * tij = pointer_arith(t->data, offset);
-            abelt * aij = matpoly_part(a, i, j, 0);
+            abvec aij = matpoly_part(ab, a, i, j, 0);
+            /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol_mp((mp_limb_t *) aij, a->size, tij, tt, fti, p, shift);
         }
     }
