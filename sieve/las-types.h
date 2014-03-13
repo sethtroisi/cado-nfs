@@ -182,6 +182,7 @@ struct sieve_info_s {
 
     // parameters for bucket sieving
     unsigned int td_thresh;
+    unsigned int unsieve_thresh;
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     uint32_t nb_buckets;
 

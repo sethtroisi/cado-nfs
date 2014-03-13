@@ -439,6 +439,11 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     si->td_thresh = 1024;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
+    si->unsieve_thresh = 100;
+    if (param_list_parse_uint(pl, "unsievethresh", &(si->unsieve_thresh))) {
+        fprintf(las->output, "# Un-sieving primes > %u\n",
+                si->unsieve_thresh);
+    }
 
     /* Initialize the number of buckets */
 
@@ -2882,10 +2887,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             si->sides[0]->bound,
             si->sides[1]->bound,
         };
-        const unsigned int unsieve_thresh = 100;
         surv += search_survivors_in_line(both_S, both_bounds,
                                          si->conf->logI, j + first_j, N,
-                                         si->j_div, unsieve_thresh,
+                                         si->j_div, si->unsieve_thresh,
                                          si->us);
         /* Make survivor search create a list of x-coordinates that survived
            instead of changing sieve array? More localized accesses in
@@ -3878,6 +3882,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
+  param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
