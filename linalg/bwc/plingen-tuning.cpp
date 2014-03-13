@@ -183,7 +183,7 @@ struct cutoff_finder {
     vector<pair<unsigned int, pair<vector<double>, int> > > all_results;
     map<int, string> method_names;
         double slowness_ratio;
-        int age_slow_discard;
+        unsigned int age_slow_discard;
 
     cutoff_finder(unsigned int ntests, measurement_choice mc = measurement_choice())
         :
@@ -219,7 +219,7 @@ struct cutoff_finder {
 
     inline int done() const {
         int nactive=0;
-        for(int i = 0 ; i < ntests ; i++) {
+        for(unsigned int i = 0 ; i < ntests ; i++) {
             nactive += meaningful[i];
         }
         if (nactive > 1) return 0;
@@ -232,7 +232,7 @@ struct cutoff_finder {
     {
         std::ostringstream comments;
         int best = -1;
-        for(int i = 0 ; i < ntests ; i++) {
+        for(unsigned int i = 0 ; i < ntests ; i++) {
             if (meaningful[i] && (best < 0 || benches[i] < benches[best])) best = i;
         }
         ASSERT_ALWAYS(best >= 0);
@@ -274,10 +274,10 @@ struct cutoff_finder {
         }
         ostringstream s;
         s << k;
-        for(int i = 0 ; i < ntests ; i++) {
+        for(unsigned int i = 0 ; i < ntests ; i++) {
             if (was_meaningful[i]) {
                 s << " " << benches[i];
-                if (i==best) s << '#';
+                if ((int) i==best) s << '#';
             } else {
                 s << " *";
             }
