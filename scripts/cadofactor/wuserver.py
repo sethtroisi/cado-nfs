@@ -271,6 +271,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
+        if self.no_work_available and code == 404:
+            return
         self.log(logging.DEBUG, '"%s" %s %s', self.requestline, code, size)
 
     def log_error(self, format, *args, **kwargs):
