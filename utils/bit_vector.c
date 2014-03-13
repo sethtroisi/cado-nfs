@@ -119,8 +119,8 @@ void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
     FILE * f = fopen_maybe_compressed(fname, "r");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
-    int rz = fread(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz >= 0 && (size_t) rz == z);
+    size_t rz = fread(b->p, sizeof(bv_t), z, f);
+    ASSERT_ALWAYS(rz == z);
     fclose(f);
 }
 
@@ -129,8 +129,8 @@ void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname)
     FILE * f = fopen_maybe_compressed(fname, "w");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
-    int rz = fwrite(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz >= 0 && (size_t) rz == z);
+    size_t rz = fwrite(b->p, sizeof(bv_t), z, f);
+    ASSERT_ALWAYS(rz == z);
     fclose(f);
 }
 
