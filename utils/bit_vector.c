@@ -116,7 +116,7 @@ size_t bit_vector_memory_footprint(bit_vector_srcptr b)
 
 void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
 {
-    FILE * f = fopen_maybe_compressed(fname, "r");
+    FILE * f = fopen_maybe_compressed(fname, "rb");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
     size_t rz = fread(b->p, sizeof(bv_t), z, f);
@@ -126,7 +126,7 @@ void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
 
 void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname)
 {
-    FILE * f = fopen_maybe_compressed(fname, "w");
+    FILE * f = fopen_maybe_compressed(fname, "wb");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
     size_t rz = fwrite(b->p, sizeof(bv_t), z, f);
