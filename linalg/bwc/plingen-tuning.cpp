@@ -11,6 +11,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <assert.h>
+#ifdef  HAVE_SIGHUP
+#include <signal.h>
+#endif
 
 #include "portability.h"
 #include "macros.h"
@@ -367,6 +370,7 @@ struct cutoff_finder {
 };
 /* }}} */
 
+#ifdef  HAVE_SIGHUP
 double last_hup = 0;
 int hup_caught = 0;
 
@@ -397,6 +401,7 @@ void catch_control_signals()
     sigaddset(sset, SIGHUP);
     */
 }
+#endif
 
 /* This code will first try to bench the basic operations (first
  * local; global are later) of middle product E*pi and product pi*pi.
@@ -963,7 +968,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
     vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mul_kara_cutoff(improved, NULL);
 
-    cout << "/* Cutoffs for "
+    cout << "/* Cutoffs (0=basecase, 1=kara) for "
                 << (m+n)<<"*"<<(m+n)
                 <<" times "
                 << (m+n)<<"*"<<(m+n)<<" products: */\n";
@@ -1213,7 +1218,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
     vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
     polymat_set_mp_kara_cutoff(improved, NULL);
 
-    cout << "/* Cutoffs for "
+    cout << "/* Cutoffs (0=basecase, 1=kara) for "
                 << (m)<<"*"<<(m+n)
                 <<" times "
                 << (m+n)<<"*"<<(m+n)<<" middle-products */\n";
@@ -1325,8 +1330,14 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
     }
     mpz_clear(p);
 
-    if (catchsig)
+    if (catchsig) {
+#ifdef  HAVE_SIGHUP
         catch_control_signals();
+#else
+        fprintf(stderr, "Warning: support for signal trapping not enabled at compile time\n");
+#endif
+    }
+
     /* XXX BUG: with depth adjustment==0 early on, we get check failures.
      * Must investigate */
     cutoff_list cl_mul = NULL;
