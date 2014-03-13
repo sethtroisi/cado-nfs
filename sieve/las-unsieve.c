@@ -20,18 +20,20 @@ minisieve(unsieve_pattern_t * const array, const size_t stride)
       ((unsigned char *) array)[i] = 255;
 }
 
-void
+unsieve_aux_data_srcptr
 sieve_info_init_unsieve_data(sieve_info_ptr si)
 {
-  /* Store largest prime factor of k in si->us->lpf[k], 0 for k=0, 1 for k=1 */
-  si->us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) << si->conf->logI);
-  FATAL_ERROR_CHECK(si->us->entries == NULL, "malloc failed");
-  si->us->entries[0].lpf = 0U;
-  si->us->entries[0].cof = 0U;
-  si->us->entries[0].start = 0U;
-  si->us->entries[1].lpf = 1U;
-  si->us->entries[1].cof = 1U;
-  si->us->entries[1].start = 0U;
+  unsieve_aux_data_ptr us;
+  us = malloc_aligned(sizeof(unsieve_aux_data), 16);
+  /* Store largest prime factor of k in us->lpf[k], 0 for k=0, 1 for k=1 */
+  us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) << si->conf->logI);
+  FATAL_ERROR_CHECK(us->entries == NULL, "malloc failed");
+  us->entries[0].lpf = 0U;
+  us->entries[0].cof = 0U;
+  us->entries[0].start = 0U;
+  us->entries[1].lpf = 1U;
+  us->entries[1].cof = 1U;
+  us->entries[1].start = 0U;
   for (unsigned int k = 2U; k < si->I; k++)
     {
       unsigned int p, c = k;
@@ -44,22 +46,25 @@ sieve_info_init_unsieve_data(sieve_info_ptr si)
         }
       p = (c == 1U) ? p : c;
       c = k; do {c /= p;} while (c % p == 0);
-      si->us->entries[k].lpf = p;
-      si->us->entries[k].cof = c;
-      si->us->entries[k].start = (si->I / 2U) % p;
+      us->entries[k].lpf = p;
+      us->entries[k].cof = c;
+      us->entries[k].start = (si->I / 2U) % p;
     }
 
     /* Create pattern for sieving 3 */
-    minisieve(si->us->pattern3, 3);
+    minisieve(us->pattern3, 3);
     /* Create pattern for sieving 5 */
-    minisieve(si->us->pattern5, 5);
+    minisieve(us->pattern5, 5);
     /* Create pattern for sieving 7 */
-    minisieve(si->us->pattern7, 7);
+    minisieve(us->pattern7, 7);
+
+  return us;
 }
 
-void sieve_info_clear_unsieve_data(sieve_info_ptr si)
+void sieve_info_clear_unsieve_data(unsieve_aux_data_srcptr us)
 {
-  free (si->us->entries);
+  free (us->entries);
+  free_aligned (us, sizeof(unsieve_aux_data), 16);
 }
 
 static inline void
