@@ -276,7 +276,7 @@ void matpoly_addmp(abdst_field ab, matpoly b, matpoly a, matpoly c)/*{{{*/
                         matpoly_part(ab, a, i, k, 0), a->size,
                         matpoly_part(ab, c, k, j, 0), c->size);
                 abvec_ur_add(ab, tmp[1], tmp[1],
-                        tmp[0] + MIN(a->size, c->size) - 1,
+                        abvec_ur_subvec(ab, tmp[0], MIN(a->size, c->size) - 1),
                         nb);
             }
             abvec_reduce(ab, matpoly_part(ab, b, i, j, 0), tmp[1], b->size);
