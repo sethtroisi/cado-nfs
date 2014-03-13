@@ -19,6 +19,11 @@
 #define ALLOC(x) ((x)->_mp_alloc)
 #endif
 
+/* timings made on cochon, rev 6877b97 (buggy) */
+#define MP_FTI_DEPTH_ADJ_24_36_36 { { 1, 6 }, { 2, 4 }, { 3, 3 }, { 4, 2 }, { 10, 1 }, { 11, 2 }, { 13, 1 }, { 22, 2 }, { 28, 1 }, { 32, 2 }, { 33, 1 }, { 38, 0 }, { 39, 1 }, { 54, 0 }, { 55, 1 }, { 64, 0 }, { 65, 1 }, { 66, 0 }, { 103, 1 }, { 104, 0 }, { 107, 1 }, { 114, 0 }, { 115, 1 }, { 129, 0 }, }
+
+#define MUL_FTI_DEPTH_ADJ_36_36_36 { { 1, 6 }, { 2, 3 }, { 3, 2 }, { 6, 1 }, { 7, 2 }, { 14, 1 }, { 23, 0 }, { 26, 1 }, { 44, 0 }, { 46, 1 }, { 54, 0 }, { 61, 1 }, { 62, 0 }, }
+
 
 void matpoly_ft_init(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, unsigned int m, unsigned int n, struct fft_transform_info * fti)
 {
@@ -27,6 +32,7 @@ void matpoly_ft_init(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr t, unsigned int
     t->m = m;
     t->n = n;
     t->data = malloc(m * n * fft_alloc_sizes[0]);
+    memset(t->data, 0, m * n * fft_alloc_sizes[0]);
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
             size_t offset = (i*t->n+j) * fft_alloc_sizes[0];
@@ -52,13 +58,14 @@ void matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_
     /* TODO: mpfq's interface is flawed. We should have access to an
      * mpz_t variable */ 
     mpz_t p;
-    SIZ(p) = sizeof(abelt) / sizeof(mp_limb_t);
-    ALLOC(p) = sizeof(abelt) / sizeof(mp_limb_t);
+    SIZ(p) = ab->kl;
+    ALLOC(p) = ab->kl;
     PTR(p) = ab->p;
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     void * tt = malloc(fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[1]);
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
@@ -145,6 +152,8 @@ void matpoly_ft_addmul(abdst_field ab MAYBE_UNUSED, matpoly_ft_ptr u, matpoly_ft
     size_t tsize = fft_alloc_sizes[0];
     void * qt = malloc(fft_alloc_sizes[1]);
     void * tt = malloc(fft_alloc_sizes[2]);
+    memset(qt, 0, fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[2]);
 
     for(unsigned int i = 0 ; i < t0->m ; i++) {
         for(unsigned int j = 0 ; j < t1->n ; j++) {
@@ -195,13 +204,14 @@ void matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_
     /* TODO: mpfq's interface is flawed. We should have access to an
      * mpz_t variable */ 
     mpz_t p;
-    SIZ(p) = sizeof(abelt) / sizeof(mp_limb_t);
-    ALLOC(p) = sizeof(abelt) / sizeof(mp_limb_t);
+    SIZ(p) = ab->kl;
+    ALLOC(p) = ab->kl;
     PTR(p) = ab->p;
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     void * tt = malloc(fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[1]);
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
@@ -225,13 +235,14 @@ void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned
     /* TODO: mpfq's interface is flawed. We should have access to an
      * mpz_t variable */ 
     mpz_t p;
-    SIZ(p) = sizeof(abelt) / sizeof(mp_limb_t);
-    ALLOC(p) = sizeof(abelt) / sizeof(mp_limb_t);
+    SIZ(p) = ab->kl;
+    ALLOC(p) = ab->kl;
     PTR(p) = ab->p;
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     void * tt = malloc(fft_alloc_sizes[1]);
+    memset(tt, 0, fft_alloc_sizes[1]);
 
     for(unsigned int i = 0 ; i < t->m ; i++) {
         for(unsigned int j = 0 ; j < t->n ; j++) {
