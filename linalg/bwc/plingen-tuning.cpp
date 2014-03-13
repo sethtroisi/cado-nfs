@@ -412,7 +412,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
 
-    typedef timer_rusage timer_t;
+    typedef timer_rdtsc timer_t;
 
     int nadjs=7;
     measurement_choice mc;
@@ -422,6 +422,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
 
     measurement_choice mcout = mc;
     mcout.enough_repeats = 2;
+    mc.enough_time = 1.0;
 
     cutoff_finder<timer_t> finder(nadjs, mcout);
     finder.slowness_ratio = 1.4;
@@ -578,13 +579,13 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
 
-    typedef timer_rusage timer_t;
+    typedef timer_rdtsc timer_t;
 
     int nadjs=7;
     measurement_choice mc;
     mc.enough_time = 2.0;
-    mc.minimum_time = 0.05;
-    mc.enough_repeats = 25;
+    mc.minimum_time = 0.1;
+    mc.enough_repeats = 100;
 
     measurement_choice mcout = mc;
     mcout.enough_repeats = 2;
@@ -1330,8 +1331,9 @@ void plingen_tuning(abdst_field ab, unsigned int m, unsigned int n, MPI_Comm com
      * Must investigate */
     cutoff_list cl_mul = NULL;
     cutoff_list cl_mp = NULL;
-    plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
-    plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
+
+    // plingen_tune_mp_fti_depth(ab, m, n, &cl_mp);
+    // plingen_tune_mul_fti_depth(ab, m, n, &cl_mul);
     plingen_tune_mp(ab, m, n, cl_mp);
     plingen_tune_mul(ab, m, n, cl_mul);
 
