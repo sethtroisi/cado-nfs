@@ -85,6 +85,10 @@ then
   exit 1
 fi
 
-
-rm -f "${FB}" "${RELS}" "${FBC}"
-rmdir "${TMPDIR}"
+if [ -z "$KEEP_SIEVETEST" ]
+then
+  rm -f "${FB}" "${RELS}" "${FBC}"
+  rmdir "${TMPDIR}"
+else
+  echo "Keeping files in ${TMPDIR}"
+fi
