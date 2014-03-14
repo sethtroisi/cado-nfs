@@ -1,7 +1,6 @@
 #include "cado.h"
 #include "bucket.h"
 #include "portability.h"
-#include "cont_mem.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -55,16 +54,17 @@ re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t
 void
 init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
+  long pagesz = pagesize();
   BA->n_bucket = n_bucket;
   BA->bucket_size = size_bucket;
   BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
   BA->nr_logp = 0;
   BA->size_arr_logp = diff_logp;
-  BA->bucket_write = (bucket_update_t **) contiguous_malloc (BA->size_b_align);
-  BA->bucket_start = (bucket_update_t **) contiguous_malloc (BA->size_b_align);
-  BA->bucket_read = (bucket_update_t **) contiguous_malloc (BA->size_b_align);
+  BA->bucket_write = (bucket_update_t **) malloc_aligned (BA->size_b_align, pagesz);
+  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
+  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
   BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
-  BA->logp_idx = (bucket_update_t **) contiguous_malloc (BA->size_b_align * BA->size_arr_logp);
+  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
 
   uint8_t *big_data = physical_malloc (BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t), 1);
 
@@ -183,10 +183,10 @@ clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *
 
   free (BA->bucket_start[0]); /* Always = big_data in all BA, kBA, mBA init functions */
   free (BA->logp_val);
-  contiguous_free(BA->logp_idx, BA->size_b_align * BA->size_arr_logp);
-  contiguous_free(BA->bucket_read, BA->size_b_align);
-  contiguous_free(BA->bucket_start, BA->size_b_align);
-  contiguous_free(BA->bucket_write, BA->size_b_align);
+  free_aligned(BA->logp_idx, BA->size_b_align * BA->size_arr_logp, 0x40);
+  free_aligned(BA->bucket_read, BA->size_b_align, 0x40);
+  free_aligned(BA->bucket_start, BA->size_b_align, 0x40);
+  free_pagealigned(BA->bucket_write, BA->size_b_align);
   memset(BA, 0, sizeof(*BA));
 }
 
