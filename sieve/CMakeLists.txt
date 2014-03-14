@@ -22,6 +22,16 @@ add_executable (las_tracek EXCLUDE_FROM_ALL ${las_sources})
 set_property(TARGET las_tracek PROPERTY COMPILE_DEFINITIONS TRACE_K=1)
 target_link_libraries (las_tracek facul utils ${pthread_libs})
 
+# Targets with the minimum acceptable thresholds for K-buckets and
+# M-buckets, so that this code can be tested without requiring an
+# exorbitant amount of memory
+add_executable (las_kbucket EXCLUDE_FROM_ALL ${las_sources})
+set_property(TARGET las_kbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16)
+target_link_libraries (las_kbucket facul utils ${pthread_libs})
+add_executable (las_mbucket EXCLUDE_FROM_ALL ${las_sources})
+set_property(TARGET las_mbucket PROPERTY COMPILE_DEFINITIONS THRESHOLD_K_BUCKETS=16 THRESHOLD_M_BUCKETS=64)
+target_link_libraries (las_mbucket facul utils ${pthread_libs})
+
 add_library (libtrialdiv trialdiv.c)
 
 add_library (las-norms las-norms.c)

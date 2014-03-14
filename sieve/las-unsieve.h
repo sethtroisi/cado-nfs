@@ -46,8 +46,8 @@ typedef const struct j_div_s * j_div_srcptr;
 extern "C" {
 #endif
 
-void sieve_info_init_unsieve_data(sieve_info_ptr si);
-void sieve_info_clear_unsieve_data(sieve_info_ptr si);
+unsieve_aux_data_srcptr sieve_info_init_unsieve_data(sieve_info_ptr si);
+void sieve_info_clear_unsieve_data(unsieve_aux_data_srcptr us);
 
 void sieve_info_init_j_div(sieve_info_ptr);
 void sieve_info_clear_j_div(sieve_info_ptr);

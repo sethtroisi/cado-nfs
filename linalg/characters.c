@@ -115,11 +115,6 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
             } else if (ch->r == 2) {
                 /* Special: rational sign (sign of m1*a+m2*b) */
                 mpz_t tmp1, tmp2;
-
-		/* FIXME: the code below only works for a rational g(x),
-		   extend it to non-linear g(x).
-                   Or maybe it does not make sense ???
-                */
 		ASSERT_ALWAYS(pol->rat->deg == 1);
 
                 /* first perform a quick check */

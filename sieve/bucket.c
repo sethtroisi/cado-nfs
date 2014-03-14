@@ -171,8 +171,8 @@ clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *
 {
   /* Never free mBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
   if (mBA->logp_idx) free_aligned(mBA->logp_idx, mBA->size_b_align * BA->size_arr_logp, 0x40);
-  if (mBA->bucket_write) free_pagealigned(mBA->bucket_start, mBA->size_b_align);
-  if (mBA->bucket_start) free_aligned(mBA->bucket_write, mBA->size_b_align, 0x40);
+  if (mBA->bucket_write) free_pagealigned(mBA->bucket_write, mBA->size_b_align);
+  if (mBA->bucket_start) free_aligned(mBA->bucket_start, mBA->size_b_align, 0x40);
   memset(mBA, 0, sizeof(*mBA));
 
   /* Never free kBA->bucket_start[0]. This is done by free BA->bucket_start[0] */

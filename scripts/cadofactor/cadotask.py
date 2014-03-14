@@ -1160,11 +1160,12 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         timeout = self.params["wutimeout"]
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
-        self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
-                          cutoff, now)
+        # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
+        #                   cutoff, now)
         results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
         if not results:
-            self.logger.debug("Found no timed-out workunits")
+            # self.logger.debug("Found no timed-out workunits")
+            pass
         for entry in results:
             self.cancel_wu(entry["wuid"], commit=False)
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
@@ -1383,9 +1384,11 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if self.handle_error_result(message):
             return
         (filename, ) = message.get_output_files()
-        ok = self.process_polyfile(filename, commit=False)
+        self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
-        self.verification(message.get_wu_id(), ok, commit=True)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
     
     def process_polyfile(self, filename, commit=True):
         poly = self.parse_poly(filename)
@@ -1393,7 +1396,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.bestpoly = poly
             update = {"bestpoly": str(poly), "bestfile": filename}
             self.state.update(update, commit=commit)
-        return True
     
     def read_log_warning(self, filename):
         """ Read lines from file. If a "# WARNING" line occurs, log it.

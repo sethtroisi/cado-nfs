@@ -2,15 +2,20 @@
 # to stay compatible with older versions
 
 # Build makefb and las before running check
-add_dependencies(check makefb las las_tracek)
+add_dependencies(check makefb las las_tracek las_kbucket las_mbucket)
 
 # Get paths to the makefb and las binaries and store in variables
 # makefb_path and las_path, resp.
 get_property(makefb_path TARGET makefb PROPERTY LOCATION)
 get_property(las_path TARGET las PROPERTY LOCATION)
 get_property(las_tracek_path TARGET las_tracek PROPERTY LOCATION)
+get_property(las_kbucket_path TARGET las_kbucket PROPERTY LOCATION)
+get_property(las_mbucket_path TARGET las_mbucket PROPERTY LOCATION)
 
 add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
+add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -unsievethresh 1")
+add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
+add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
 add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${makefb_path}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be

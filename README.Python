@@ -10,6 +10,13 @@ commands by hand, you can disable the Python check in CMake by setting
 NO_PYTHON_CHECK to any non-empty string in local.sh. See local.sh.example
 for a template.
 
+Some operating systems don't have a Python 3 interpreter installed by
+default. The safest bet is to install a distribution-supplied package
+for Python 3. If no such package is available, you can download the
+Python source code, compile and and install it by yourself. For a good
+introduction to installing Python from source, see
+https://www.digitalocean.com/community/articles/how-to-set-up-python-2-7-6-and-3-3-3-on-centos-6-4
+
 
 2. Sqlite 3
 
