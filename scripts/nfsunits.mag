@@ -760,7 +760,7 @@ CyclicGetGenerator := function(ca, den, tca, p, r, rr, gp)
 	while sh le Degree(K) do
 	    sh:=sh+1;
 	    rr:=Evaluate(cap, rr);
-	    printf "sh = %o => rr = %o\n", sh, rr;
+//	    printf "sh = %o => rr = %o\n", sh, rr;
 	    if rr eq r then
 	        break;
 	    end if;
