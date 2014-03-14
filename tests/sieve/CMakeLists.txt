@@ -12,10 +12,21 @@ get_property(las_tracek_path TARGET las_tracek PROPERTY LOCATION)
 get_property(las_kbucket_path TARGET las_kbucket PROPERTY LOCATION)
 get_property(las_mbucket_path TARGET las_mbucket PROPERTY LOCATION)
 
-add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
-add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -unsievethresh 1")
-add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
-add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
+add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+# Before running F9_sievetest, remove the file with the captured checksums
+# We have to make this a "test" so that ctest runs it, even though it does
+# not actually test anything
+add_test(F9_sievetest_cleanup "${CMAKE_COMMAND}" -E remove -f "${CMAKE_CURRENT_BINARY_DIR}/F9.checksums")
+SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_sievetest_cleanup)
+
+add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -unsievethresh 1")
+add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest)
+add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
+
+# The TRACE_K test does only a single special-q, so we don't compare output
+# relations or checksums
 add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${makefb_path}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be

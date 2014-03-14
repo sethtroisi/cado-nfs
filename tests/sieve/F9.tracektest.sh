@@ -26,6 +26,6 @@ q0=1200007
 rho=554209
 
 export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 rho
-"${SOURCE_TEST_DIR}"/sievetest.sh "${MAKEFB}" "${LAS}" "${SRCDIR}/params/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" -traceab -8517,584707 "$@" || exit 1
+"${SOURCE_TEST_DIR}"/sievetest.sh "${MAKEFB}" "${LAS}" "${SRCDIR}/params/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "" -traceab -8517,584707 "$@" || exit 1
 
 exit 0
