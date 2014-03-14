@@ -284,7 +284,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # self.log(logging.DEBUG, format, *args, **kwargs)
             pass
         else:
-            self.log(level, format, *args, **kwargs)
+            self.log(logging.WARNING, format, *args, **kwargs)
 
     def send_body(self, body):
         self.wfile.write(body)
