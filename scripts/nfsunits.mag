@@ -7,8 +7,11 @@ Wrapper version, to be used with
 // author: morain@lix.polytechnique.fr 
 //
 // Using units in SNFS-DL
-// version: 20140312.1500
-//
+
+NFSUNITS_VERSION:="20140313.2000";
+
+printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
+SetDebugOnError(true);
 
 QQ:=Rationals();
 QX<X>:=PolynomialRing(QQ);
@@ -70,9 +73,17 @@ AllEmbeddings := function(U, x)
     	    rx:=AlgToComplex(x);
 	    return [Log(Abs(Evaluate(rx, z))) : z in U["roots"]];
 	else
-print K, U["rK"];	
 	    error("Pb in AllEmbeddings");
 	end if;
+end function;
+
+FiPoBounds := function(B, K, logunits)
+        U:=[];
+	for i:=1 to Degree(K) do
+	    U[i]:=&+ [Abs(logunits[j][i]) : j in [1..#logunits]];
+	    U[i]:=Exp((Log(B)/Degree(K)) + 0.5 * U[i]);
+	end for;
+	return U;
 end function;
 
 // rK = 1
@@ -142,7 +153,8 @@ InsertInBox := procedure(~l, K, U, elt, lipr, pmax)
 //	    printf "elt=%o no=%o\n", elt, no;
 	    if not IsDefined(l, no) then
 	        l[no]:=[elt];
-	    else
+	    elif #l[no] lt Degree(K) then
+	        // l[no] contains distinct prime ideals
 		ok:=true;
 		// if elt/x is never an integer we gain a new factor
 		for i:=1 to #l[no] do
@@ -198,7 +210,7 @@ end function;
 
 // generate boxes: a^bound = pamax??
 EnumeratePrimeNorms := function(K, OK, U, lipr, pmax)
-	printf "# bound? = %o\n", Truncate(pmax^(1/Degree(K)));
+	printf "# bounds = %o\n", FiPoBounds(pmax, K, U["logunits"]);
 	bound:=125; // FIXME: do better!
         if Degree(K) eq 3 then l:=EPN3(K, OK, U, lipr, bound, pmax);
         elif Degree(K) eq 4 then l:=EPN4(K, OK, U, lipr, bound, pmax);
@@ -737,6 +749,32 @@ PrintGenerator := procedure(fo, i, gef)
 	fprintf fo, "\n";
 end procedure;
 
+// sigma([p, alpha-r]) = [p, sigma(alpha)-r]
+// = [p, alpha-sigma^(-1)(r)]
+CyclicGetGenerator := function(ca, den, tca, p, r, rr, gp)
+	K:=Parent(Coefficient(ca, 0));
+	Fp:=GF(p);
+        cap:=PolynomialRing(Fp)!Eltseq(den * ca);
+	cap:=cap / (Fp!den);
+	sh:=0;
+	while sh le Degree(K) do
+	    sh:=sh+1;
+	    rr:=Evaluate(cap, rr);
+	    printf "sh = %o => rr = %o\n", sh, rr;
+	    if rr eq r then
+	        break;
+	    end if;
+	end while;
+	if sh gt Degree(K) then
+	    error("too many iterations in CyclicGetGenerator");
+	end if;
+	for ss:=1 to Degree(K)-sh do
+	    gpZ:=Parent(ca)!Eltseq(gp);
+	    gp:=Evaluate(gpZ, tca);
+	end for;
+	return gp;
+end function;
+
 // algpr contains lines "i p r" for algebraic primes (in hexa).
 // SIDE-EFFECT: fill in file 'generators' with generators.
 // TODO: separate bad primes.
@@ -754,11 +792,15 @@ GeneratorsForPRPlain := procedure(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators
 	oldp:=0;
 	oldr:=0;
 	oldgp:=0;
-	// ca = poly in Z => tca = elt of K
-	ca:=CyclicAction(K);
-	printf "# cyclic action: %o;\n", ca;
-	tca:=Eltseq(ca) cat [ 0 : i in [Degree(ca)+1..Degree(K)-1]];
-	tca:=K!tca;
+	iscyc:=IsCyclic(GaloisGroup(DefiningPolynomial(K)));
+	if iscyc then
+	    // ca = poly in Z => tca = elt of K
+	    printf "# cyclic Galois group\n";
+	    ca:=CyclicAction(K); // can be in OK[Z], hence have a denominator
+	    printf "# cyclic action: %o;\n", ca;
+	    tca:=Eltseq(ca) cat [ 0 : i in [Degree(ca)+1..Degree(K)-1]];
+	    tca:=K!tca;
+	end if;
         while true do
             s:=Gets(fd);
             if IsEof(s) then break; end if;
@@ -777,36 +819,30 @@ GeneratorsForPRPlain := procedure(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators
 	    	GEN[i]:=GeneratorForBad(K, OK, p, id);
 		gp:=GEN[i][1]; // for oldgp to work!
 	    else
-	        if p eq oldp then
+	        done:=false;
+	        if iscyc and p eq oldp then
 	 	    // use cyclic action and sigma(r) = rr (transitive stuff?)
 		    if DLP_DEBUG ge 2 then
 		        printf "roots=%o\n", Roots(PolynomialRing(GF(p))!Eltseq(DefiningPolynomial(K)));
 		    end if;
-		    gp:=oldgp;
-		    rr:=oldr;
-		    sh:=0;
-		    // sigma([p, alpha-r]) = [p, sigma(alpha)-r]
-		    // = [p, alpha-sigma^(-1)(r)]
-		    while true do
-		        sh:=sh+1;
-	    	        rr:=(Integers()!Evaluate(ca, rr)) mod p;
-		        if rr eq r then
-		            break;
-		        end if;
-		    end while;
-		    for ss:=1 to Degree(K)-sh do
-			gpZ:=Parent(ca)!Eltseq(gp);
-		        gp:=Evaluate(gpZ, tca);
-		    end for;
+		    den:=Lcm([Denominator(Coefficient(ca, i)) : i in [0..Degree(ca)]]);
+		    if (den mod p) eq 0 then
+		        printf "den = 0!!!!\n";;
+			done:=false;
+		    else
+			gp:=CyclicGetGenerator(ca,den,tca,p,r,oldr,oldgp);
 //printf "gp=%o => Norm = %o\n", gp, Norm(gp);
-	 	    if DLP_DEBUG ge 2 then
-		        // sometimes we have to check basic things...
-		        id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
-			foo,bar:=IsPrincipal(id);
-			print foo, K!bar, gp, (K!bar)/gp;
-		    	if not gp in id then error("gp"); end if;
+	 	    	if DLP_DEBUG ge 2 then
+		            // sometimes we have to check basic things...
+		            id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+			    foo,bar:=IsPrincipal(id);
+			    print foo, K!bar, gp, (K!bar)/gp;
+		    	    if not gp in id then error("gp"); end if;
+		    	end if;
+			done:=true;
 		    end if;
-		else
+		end if;
+		if not done then
 		    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
 		    ok,gp:=IsPrincipal(id);
 	    	    if not ok then error("Not principal"); end if;
@@ -854,7 +890,7 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr)
 end procedure;
 
 GeneratorsForPR := procedure(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators)
-	if Degree(K) gt 1 then
+	if Degree(K) gt 3 then
 	    GeneratorsForPRPlain(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators);
 	    return;
 	end if;
@@ -1033,10 +1069,10 @@ UnitsForPurged := procedure(~GEN,~BAD,~epsab,K,OK,U,purged)
 		elif IsDefined(BAD, i) then
 		    if DLP_DEBUG ge 2 then
 		        printf "multiplying by BAD[%o]^e=%o^%o", 
-			       i, BAD[i], exi div BAD[i][3];
+			       i, BAD[i][1], exi div BAD[i][3];
 		        printf " of norm %o\n", Norm(BAD[i][1]);
 		    end if;
-		    prod:=prod * BAD[i]^(exi div BAD[i][3]);
+		    prod:=prod * BAD[i][1]^(exi div BAD[i][3]);
 		end if;
 	    end for;
 	    eta:=(a-b*t)/prod;
@@ -1373,6 +1409,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
 	K<t>:=ext<QQ | f>;
 	OK:=MaximalOrder(K);
+	printf "OK = %o\n", [K!OK.i : i in [1..Degree(K)]];
 	U:=AssociativeArray();
 	PrepareUnits(~U, ~G, K, OK, true);
 	U["grouptable"]:=G;
@@ -1382,7 +1419,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	else
 	    BAD:=AssociativeArray();
 	    ReadGeneratorsForPR(~GEN, ~BAD, K, generators);
-print Keys(BAD);
+	    printf "# bad primes = %o\n", Keys(BAD);
 	    epsab:=AssociativeArray();
 	    UnitsForPurged(~GEN,~BAD,~epsab,K,OK,U,purged);
 	    UnitsWithParams(FB, epsab, G, GEN, BAD, false, params);
@@ -1411,7 +1448,5 @@ Simul := procedure(dir, name, gen)
 				purged,index,ficunits,false);
 end procedure;
 
-print "Simul(\"SNFS\", \"p59\", true);";
-// Simul("SNFS", "p60x4x4", false);
 ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
 exit;
