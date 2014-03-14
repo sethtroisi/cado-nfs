@@ -6,7 +6,8 @@ LAS="$2"
 POLY="$3"
 REFERENCE_SHA1="$4"
 REFERENCE_REVISION="$5"
-shift 5
+CHECKSUM_FILE="$6"
+shift 6
 
 if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
 then
@@ -87,9 +88,34 @@ then
   exit 1
 fi
 
+if [ -n "${CHECKSUM_FILE}" ]
+then
+  MYCHECKSUM_FILE="${TMPDIR}/${BASENAME}.checksums"
+  grep "# Checksums over sieve region:" "${RELS}" > "${MYCHECKSUM_FILE}"
+  if [ -f "${CHECKSUM_FILE}" ]
+  then
+    # File with checksums already exists, compare
+    if diff -b "${CHECKSUM_FILE}" "${MYCHECKSUM_FILE}" > /dev/null
+    then
+      echo "Checksums agree"
+    else
+      echo "Error, reference checksums in ${CHECKSUM_FILE} differ from mine in ${MYCHECKSUM_FILE}" >&2
+      exit 1
+    fi
+  else
+    # File with checksums does not exists, create it
+    cp "${MYCHECKSUM_FILE}" "${CHECKSUM_FILE}"
+    echo "Created checksum file"
+  fi
+fi
+
 if [ -z "$KEEP_SIEVETEST" ]
 then
   rm -f "${FB}" "${RELS}" "${FBC}"
+  if [ -n "${MYCHECKSUM_FILE}" ]
+  then
+    rm -f "${MYCHECKSUM_FILE}"
+  fi
   rmdir "${TMPDIR}"
 else
   echo "Keeping files in ${TMPDIR}"
