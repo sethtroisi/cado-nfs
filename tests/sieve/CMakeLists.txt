@@ -27,7 +27,7 @@ SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
 
 # The TRACE_K test does only a single special-q, so we don't compare output
 # relations or checksums
-add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${makefb_path}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\"\"")
+add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${makefb_path}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
