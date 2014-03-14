@@ -187,6 +187,7 @@
 #define abvec_ur_coeff_ptr(a0,a1,a2)	abcommon_name_(vec_ur_coeff_ptr) (a0,a1,a2)
 #define abvec_ur_coeff_ptr_const(a0,a1,a2)	abcommon_name_(vec_ur_coeff_ptr_const) (a0,a1,a2)
 #define abvec_elt_stride(a0,a1)	abcommon_name_(vec_elt_stride) (a0,a1)
+#define abvec_ur_elt_stride(a0,a1)	abcommon_name_(vec_ur_elt_stride) (a0,a1)
 
 
 

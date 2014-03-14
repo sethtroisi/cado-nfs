@@ -343,6 +343,8 @@ static inline
 abase_p_8_src_elt abase_p_8_vec_ur_coeff_ptr_const(abase_p_8_dst_field, abase_p_8_src_vec_ur, int);
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, Mpfq::gfp::elt, Mpfq::gfp */
 #define abase_p_8_vec_elt_stride(K, n)	((n)*sizeof(abase_p_8_elt))
+/* *Mpfq::defaults::flatdata::code_for_vec_ur_elt_stride, Mpfq::gfp::elt, Mpfq::gfp */
+#define abase_p_8_vec_ur_elt_stride(K, n)	((n)*sizeof(abase_p_8_elt_ur))
 
 /* Polynomial functions */
 static inline

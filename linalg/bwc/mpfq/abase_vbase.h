@@ -124,6 +124,7 @@ struct abase_vbase_s {
     void * (*vec_ur_coeff_ptr)(abase_vbase_ptr, void *, int);
     const void * (*vec_ur_coeff_ptr_const)(abase_vbase_ptr, const void *, int);
     ptrdiff_t (*vec_elt_stride)(abase_vbase_ptr, int);
+    ptrdiff_t (*vec_ur_elt_stride)(abase_vbase_ptr, int);
     void (*poly_init)(abase_vbase_ptr, void *, unsigned int);
     void (*poly_clear)(abase_vbase_ptr, void *);
     void (*poly_set)(abase_vbase_ptr, void *, const void *);

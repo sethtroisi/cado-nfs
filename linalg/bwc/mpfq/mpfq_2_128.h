@@ -323,6 +323,8 @@ static inline
 mpfq_2_128_src_elt mpfq_2_128_vec_ur_coeff_ptr_const(mpfq_2_128_dst_field, mpfq_2_128_src_vec_ur, int);
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, Mpfq::gf2n::trivialities */
 #define mpfq_2_128_vec_elt_stride(K, n)	((n)*sizeof(mpfq_2_128_elt))
+/* *Mpfq::defaults::flatdata::code_for_vec_ur_elt_stride, Mpfq::gf2n::trivialities */
+#define mpfq_2_128_vec_ur_elt_stride(K, n)	((n)*sizeof(mpfq_2_128_elt_ur))
 
 /* Polynomial functions */
 static inline

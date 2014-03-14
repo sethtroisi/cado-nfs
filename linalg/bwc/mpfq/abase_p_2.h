@@ -343,6 +343,8 @@ static inline
 abase_p_2_src_elt abase_p_2_vec_ur_coeff_ptr_const(abase_p_2_dst_field, abase_p_2_src_vec_ur, int);
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, Mpfq::gfp::elt, Mpfq::gfp */
 #define abase_p_2_vec_elt_stride(K, n)	((n)*sizeof(abase_p_2_elt))
+/* *Mpfq::defaults::flatdata::code_for_vec_ur_elt_stride, Mpfq::gfp::elt, Mpfq::gfp */
+#define abase_p_2_vec_ur_elt_stride(K, n)	((n)*sizeof(abase_p_2_elt_ur))
 
 /* Polynomial functions */
 static inline
@@ -428,9 +430,9 @@ MPI_Op abase_p_2_mpi_addition_op_ur(abase_p_2_dst_field);
 void abase_p_2_mpi_ops_clear(abase_p_2_dst_field);
 
 /* Object-oriented interface */
+void abase_p_2_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_p_2_oo_field_clear(abase_vbase_ptr);
-void abase_p_2_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

@@ -1195,7 +1195,7 @@ void usage()
 {
     fprintf(stderr, "Usage: ./plingen [options, to be documented]\n");
     fprintf(stderr,
-	    "General information about bwc optiosn is in the README file\n");
+	    "General information about bwc options is in the README file\n");
     exit(EXIT_FAILURE);
 }
 

@@ -895,9 +895,9 @@ void abase_p_1_mpi_ops_init(abase_p_1_dst_field K MAYBE_UNUSED)
 {
         if (abase_p_1_impl_mpi_use_count++) return;
     MPI_Type_create_keyval(MPI_TYPE_DUP_FN, MPI_TYPE_NULL_DELETE_FN, &abase_p_1_impl_mpi_attr, NULL);
-    MPI_Type_contiguous(sizeof(abase_p_1_elt), MPI_BYTE, &abase_p_1_impl_mpi_datatype);
+    MPI_Type_contiguous(abase_p_1_vec_elt_stride(K, 1), MPI_BYTE, &abase_p_1_impl_mpi_datatype);
     MPI_Type_commit(&abase_p_1_impl_mpi_datatype);
-    MPI_Type_contiguous(sizeof(abase_p_1_elt_ur), MPI_BYTE, &abase_p_1_impl_mpi_datatype_ur);
+    MPI_Type_contiguous(abase_p_1_vec_ur_elt_stride(K, 1), MPI_BYTE, &abase_p_1_impl_mpi_datatype_ur);
     MPI_Type_commit(&abase_p_1_impl_mpi_datatype_ur);
     MPI_Type_set_attr(abase_p_1_impl_mpi_datatype, abase_p_1_impl_mpi_attr, K);
     MPI_Type_set_attr(abase_p_1_impl_mpi_datatype_ur, abase_p_1_impl_mpi_attr, K);
@@ -1588,6 +1588,12 @@ static ptrdiff_t abase_p_1_wrapper_vec_elt_stride(abase_vbase_ptr vbase MAYBE_UN
     return abase_p_1_vec_elt_stride(vbase->obj, n);
 }
 
+static ptrdiff_t abase_p_1_wrapper_vec_ur_elt_stride(abase_vbase_ptr, int);
+static ptrdiff_t abase_p_1_wrapper_vec_ur_elt_stride(abase_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return abase_p_1_vec_ur_elt_stride(vbase->obj, n);
+}
+
 static void abase_p_1_wrapper_poly_init(abase_vbase_ptr, abase_p_1_poly, unsigned int);
 static void abase_p_1_wrapper_poly_init(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_1_poly p MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
@@ -1970,6 +1976,7 @@ void abase_p_1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_ur_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_1_wrapper_vec_ur_coeff_ptr;
     vbase->vec_ur_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_1_wrapper_vec_ur_coeff_ptr_const;
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_p_1_wrapper_vec_elt_stride;
+    vbase->vec_ur_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_p_1_wrapper_vec_ur_elt_stride;
     vbase->poly_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_1_wrapper_poly_init;
     vbase->poly_clear = (void (*) (abase_vbase_ptr, void *)) abase_p_1_wrapper_poly_clear;
     vbase->poly_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p_1_wrapper_poly_set;

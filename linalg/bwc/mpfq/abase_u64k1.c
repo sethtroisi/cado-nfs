@@ -488,9 +488,9 @@ void abase_u64k1_mpi_ops_init(abase_u64k1_dst_field K MAYBE_UNUSED)
 {
         if (abase_u64k1_impl_mpi_use_count++) return;
     MPI_Type_create_keyval(MPI_TYPE_DUP_FN, MPI_TYPE_NULL_DELETE_FN, &abase_u64k1_impl_mpi_attr, NULL);
-    MPI_Type_contiguous(sizeof(abase_u64k1_elt), MPI_BYTE, &abase_u64k1_impl_mpi_datatype);
+    MPI_Type_contiguous(abase_u64k1_vec_elt_stride(K, 1), MPI_BYTE, &abase_u64k1_impl_mpi_datatype);
     MPI_Type_commit(&abase_u64k1_impl_mpi_datatype);
-    MPI_Type_contiguous(sizeof(abase_u64k1_elt_ur), MPI_BYTE, &abase_u64k1_impl_mpi_datatype_ur);
+    MPI_Type_contiguous(abase_u64k1_vec_ur_elt_stride(K, 1), MPI_BYTE, &abase_u64k1_impl_mpi_datatype_ur);
     MPI_Type_commit(&abase_u64k1_impl_mpi_datatype_ur);
     MPI_Type_set_attr(abase_u64k1_impl_mpi_datatype, abase_u64k1_impl_mpi_attr, K);
     MPI_Type_set_attr(abase_u64k1_impl_mpi_datatype_ur, abase_u64k1_impl_mpi_attr, K);
@@ -977,6 +977,12 @@ static ptrdiff_t abase_u64k1_wrapper_vec_elt_stride(abase_vbase_ptr vbase MAYBE_
     return abase_u64k1_vec_elt_stride(vbase->obj, n);
 }
 
+static ptrdiff_t abase_u64k1_wrapper_vec_ur_elt_stride(abase_vbase_ptr, int);
+static ptrdiff_t abase_u64k1_wrapper_vec_ur_elt_stride(abase_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return abase_u64k1_vec_ur_elt_stride(vbase->obj, n);
+}
+
 static int abase_u64k1_wrapper_groupsize(abase_vbase_ptr);
 static int abase_u64k1_wrapper_groupsize(abase_vbase_ptr vbase MAYBE_UNUSED)
 {
@@ -1182,6 +1188,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_ur_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_u64k1_wrapper_vec_ur_coeff_ptr;
     vbase->vec_ur_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_u64k1_wrapper_vec_ur_coeff_ptr_const;
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_u64k1_wrapper_vec_elt_stride;
+    vbase->vec_ur_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_u64k1_wrapper_vec_ur_elt_stride;
     /* missing poly_init */
     /* missing poly_clear */
     /* missing poly_set */

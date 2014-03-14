@@ -273,6 +273,7 @@ abase_pz_dst_elt abase_pz_vec_ur_coeff_ptr(abase_pz_dst_field, abase_pz_dst_vec_
 static inline
 abase_pz_src_elt abase_pz_vec_ur_coeff_ptr_const(abase_pz_dst_field, abase_pz_src_vec_ur, int);
 ptrdiff_t abase_pz_vec_elt_stride(abase_pz_dst_field, int);
+ptrdiff_t abase_pz_vec_ur_elt_stride(abase_pz_dst_field, int);
 
 /* Polynomial functions */
 static inline
@@ -357,9 +358,9 @@ MPI_Op abase_pz_mpi_addition_op_ur(abase_pz_dst_field);
 void abase_pz_mpi_ops_clear(abase_pz_dst_field);
 
 /* Object-oriented interface */
+void abase_pz_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_pz_oo_field_clear(abase_vbase_ptr);
-void abase_pz_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
