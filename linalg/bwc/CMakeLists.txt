@@ -256,19 +256,8 @@ if(WITH_MPIR)
     target_link_libraries(test-flint flint-fft utils ${gmp_libname})
 endif(WITH_MPIR)
 
-# There's a matter of choice here. Either we use the mpz-based fits-all
-# implementation, which will give a binary called plingen_pz, or we use
-# the collection of predefined modulus sizes defined by
-# MPFQ_PRIME_FIELDS_FOR_DLOG. In the latter case, we get several
-# special-purpose binaries called plingen_p_1, plingen_p_2, and so on
-# (depending on what MPFQ_PRIME_FIELDS_FOR_DLOG is set to).
-
-# set(LINGEN_PRIME_BACKENDS ${MPFQ_PRIME_FIELDS_FOR_DLOG})
-# set(LINGEN_PRIME_BACKENDS pz)
-set(LINGEN_PRIME_BACKENDS pz p_1 p_2 p_8)
-
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-    foreach(v ${LINGEN_PRIME_BACKENDS})
+    foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
     set(plingen_${v}_sources
                     bw-common.c
                     bw-common-mpi.c

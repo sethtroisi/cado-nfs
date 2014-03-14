@@ -115,10 +115,8 @@ void abase_p_2_field_clear(abase_p_2_dst_field k)
 /* *Mpfq::gfp::field::code_for_field_specify, Mpfq::gfp */
 void abase_p_2_field_specify(abase_p_2_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-        if (k->p == NULL) k->p = (mp_limb_t *)malloc(2*sizeof(mp_limb_t));
-        if (k->bigmul_p == NULL) k->bigmul_p = (mp_limb_t *)malloc(5*sizeof(mp_limb_t));
-        if ((!k->p) || (!k->bigmul_p))
-            MALLOC_FAILED();
+        if (k->p == NULL) k->p = (mp_limb_t *)mpfq_malloc_check(2*sizeof(mp_limb_t));
+        if (k->bigmul_p == NULL) k->bigmul_p = (mp_limb_t *)mpfq_malloc_check(5*sizeof(mp_limb_t));
         k->kl = 2;
         k->url = 5;
         k->url_margin = LONG_MAX;
@@ -198,10 +196,8 @@ void abase_p_2_init_ts(abase_p_2_dst_field k)
     }
     k->ts_info.e = e;
     
-    k->ts_info.z = malloc(2*sizeof(mp_limb_t));
-    k->ts_info.hh = malloc(2*sizeof(mp_limb_t));
-    if (!k->ts_info.z || !k->ts_info.hh) 
-        MALLOC_FAILED();
+    k->ts_info.z = mpfq_malloc_check(2*sizeof(mp_limb_t));
+    k->ts_info.hh = mpfq_malloc_check(2*sizeof(mp_limb_t));
     
     abase_p_2_elt z, r;
     abase_p_2_init(k, &z);
@@ -297,9 +293,7 @@ void abase_p_2_asprint(abase_p_2_dst_field k, char * * pstr, abase_p_2_src_elt x
         y[i]=x[i];
     }
     // allocate enough room for base 2 conversion.
-    *pstr = (char *)malloc((size_x*64+1)*sizeof(char));
-    if (*pstr == NULL)
-        MALLOC_FAILED();
+    *pstr = (char *)mpfq_malloc_check((size_x*64+1)*sizeof(char));
     n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) y, size_x);
     for (i = 0; i < n; ++i)
         (*pstr)[i] += '0';
@@ -353,9 +347,7 @@ int abase_p_2_fscan(abase_p_2_dst_field k, FILE * file, abase_p_2_dst_elt z)
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -425,13 +417,13 @@ void abase_p_2_vec_clear(abase_p_2_dst_field K MAYBE_UNUSED, abase_p_2_vec * v, 
 void abase_p_2_vec_asprint(abase_p_2_dst_field K MAYBE_UNUSED, char * * pstr, abase_p_2_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)malloc(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
         return;
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)malloc(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -524,9 +516,7 @@ int abase_p_2_vec_fscan(abase_p_2_dst_field K MAYBE_UNUSED, FILE * file, abase_p
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)

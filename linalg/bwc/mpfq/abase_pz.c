@@ -117,9 +117,7 @@ void abase_pz_field_specify(abase_pz_dst_field k, unsigned long dummy MAYBE_UNUS
 {
         mpz_ptr p = (mpz_ptr) vp;
         k->kl = mpz_size(p);
-        k->p = (mp_limb_t *) malloc(k->kl * sizeof(mp_limb_t));
-        if (!k->p)
-        MALLOC_FAILED();
+        k->p = (mp_limb_t *) mpfq_malloc_check(k->kl * sizeof(mp_limb_t));
         for (unsigned int i = 0; i < k->kl; ++i)
         k->p[i] = mpz_getlimbn(p, i);
         k->url = 1 + 2 * k->kl;
@@ -127,9 +125,7 @@ void abase_pz_field_specify(abase_pz_dst_field k, unsigned long dummy MAYBE_UNUS
         // precompute bigmul_p = largest multiple of p that fits in an elt_ur,
         //   p*Floor( (2^(nn*w)-1)/p )
         if (k->bigmul_p == NULL)
-        k->bigmul_p = (mp_limb_t *) malloc(k->url * sizeof(mp_limb_t));
-        if (!k->bigmul_p)
-        MALLOC_FAILED();
+        k->bigmul_p = (mp_limb_t *) mpfq_malloc_check(k->url * sizeof(mp_limb_t));
         abase_pz_elt_ur big;
         abase_pz_elt_ur_init(k, &big);
         mp_limb_t q[k->url - k->kl + 1], r[k->kl], tmp[k->url + 1];
@@ -149,9 +145,7 @@ void abase_pz_field_specify(abase_pz_dst_field k, unsigned long dummy MAYBE_UNUS
 /* *pz::code_for_init */
 void abase_pz_init(abase_pz_dst_field k, abase_pz_elt * x)
 {
-        *x = (abase_pz_elt) malloc(k->kl * sizeof(mp_limb_t));
-        if (!(*x))
-        MALLOC_FAILED();
+        *x = (abase_pz_elt) mpfq_malloc_check(k->kl * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_clear */
@@ -170,9 +164,7 @@ void abase_pz_set_mpn(abase_pz_dst_field k, abase_pz_dst_elt z, mp_limb_t * x, s
         memset(z + n, 0, (k->kl - n) * sizeof(mp_limb_t));
         } else {
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) malloc((n + 1 - k->kl) * sizeof(mp_limb_t));
-        if (!tmp)
-            MALLOC_FAILED();
+        tmp = (mp_limb_t *) mpfq_malloc_check((n + 1 - k->kl) * sizeof(mp_limb_t));
         mpn_tdiv_qr(tmp, z, 0, x, n, k->p, k->kl);
         free(tmp);
         }
@@ -352,9 +344,7 @@ int abase_pz_inv(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x)
 /* *pz::code_for_elt_ur_init */
 void abase_pz_elt_ur_init(abase_pz_dst_field k, abase_pz_elt_ur * x)
 {
-        *x = (abase_pz_elt_ur) malloc(k->url * sizeof(mp_limb_t));
-        if (!(*x))
-        MALLOC_FAILED();
+        *x = (abase_pz_elt_ur) mpfq_malloc_check(k->url * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_elt_ur_clear */
@@ -405,9 +395,7 @@ void abase_pz_reduce(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_dst_elt_
         mpn_add_n(x, x, k->bigmul_p, k->url);
         }
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) malloc((k->url + 1) * sizeof(mp_limb_t));
-        if (!tmp)
-        MALLOC_FAILED();
+        tmp = (mp_limb_t *) mpfq_malloc_check((k->url + 1) * sizeof(mp_limb_t));
         mpn_tdiv_qr(tmp, z, 0, x, k->url, k->p, k->kl);
     //    if (neg)
     //        abase_pz_neg(k, z, z);
@@ -430,19 +418,15 @@ void abase_pz_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_elt x)
 {
         // deal with 0
         if (abase_pz_is_zero(k, x)) {
-        *pstr = (char *) malloc(2);
+        *pstr = (char *) mpfq_malloc_check(2);
         *pstr[0] = '0';
         *pstr[1] = '\0';
         return;
         }
         // allocate enough room for base 2 conversion.
-        *pstr = (char *) malloc(((k->kl) * 64 + 1));
-        if (*pstr == NULL)
-        MALLOC_FAILED();
+        *pstr = (char *) mpfq_malloc_check(((k->kl) * 64 + 1));
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) malloc((k->kl) * sizeof(mp_limb_t));
-        if (!tmp)
-        MALLOC_FAILED();
+        tmp = (mp_limb_t *) mpfq_malloc_check((k->kl) * sizeof(mp_limb_t));
         int tl = k->kl - 1;
         while (x[tl] == 0)		// x is non-zero, no need to test tl>0
         tl--;
@@ -509,17 +493,13 @@ int abase_pz_fscan(abase_pz_dst_field k, FILE * file, abase_pz_dst_elt x)
 /* *pz::code_for_vec_init */
 void abase_pz_vec_init(abase_pz_dst_field k, abase_pz_vec * v, unsigned int n)
 {
-        *v = (abase_pz_vec) malloc((k->kl) * n * sizeof(mp_limb_t));
-        if (!(*v))
-        MALLOC_FAILED();
+        *v = (abase_pz_vec) mpfq_malloc_check((k->kl) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_reinit */
 void abase_pz_vec_reinit(abase_pz_dst_field k, abase_pz_vec * v, unsigned int n MAYBE_UNUSED, unsigned int m)
 {
-        *v = (abase_pz_vec) realloc(*v, (k->kl) * m * sizeof(mp_limb_t));
-        if (!(*v))
-        MALLOC_FAILED();
+        *v = (abase_pz_vec) mpfq_realloc_check(*v, (k->kl) * m * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_clear */
@@ -662,13 +642,13 @@ int abase_pz_vec_is_zero(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int 
 void abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec v, unsigned int n)
 {
         if (n == 0) {
-        *pstr = (char *) malloc(4 * sizeof(char));
+        *pstr = (char *) mpfq_malloc_check(4 * sizeof(char));
         sprintf(*pstr, "[ ]");
         return;
         }
         int alloc = 100;
         int len = 0;
-        *pstr = (char *) malloc(alloc * sizeof(char));
+        *pstr = (char *) mpfq_malloc_check(alloc * sizeof(char));
         char *str = *pstr;
         *str++ = '[';
         *str++ = ' ';
@@ -760,9 +740,7 @@ int abase_pz_vec_fscan(abase_pz_dst_field k, FILE * file, abase_pz_vec * v, unsi
         int c;
         int allocated, len = 0;
         allocated = 100;
-        tmp = (char *) malloc(allocated * sizeof(char));
-        if (!tmp)
-        MALLOC_FAILED();
+        tmp = (char *) mpfq_malloc_check(allocated * sizeof(char));
         for (;;) {
         c = fgetc(file);
         if (c == EOF)
@@ -790,9 +768,7 @@ int abase_pz_vec_fscan(abase_pz_dst_field k, FILE * file, abase_pz_vec * v, unsi
 /* *pz::code_for_vec_ur_init */
 void abase_pz_vec_ur_init(abase_pz_dst_field k, abase_pz_vec_ur * v, unsigned int n)
 {
-        *v = (abase_pz_vec) malloc((k->url) * n * sizeof(mp_limb_t));
-        if (!(*v))
-        MALLOC_FAILED();
+        *v = (abase_pz_vec) mpfq_malloc_check((k->url) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_set_zero */
@@ -811,9 +787,7 @@ void abase_pz_vec_ur_set_vec(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_
 /* *pz::code_for_vec_ur_reinit */
 void abase_pz_vec_ur_reinit(abase_pz_dst_field k, abase_pz_vec_ur * v, unsigned int n MAYBE_UNUSED, unsigned int m)
 {
-        *v = (abase_pz_vec) realloc(*v, (k->url) * m * sizeof(mp_limb_t));
-        if (!(*v))
-        MALLOC_FAILED();
+        *v = (abase_pz_vec) mpfq_realloc_check(*v, (k->url) * m * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_clear */
@@ -909,10 +883,8 @@ void abase_pz_vec_conv_ur_ks(abase_pz_field k, abase_pz_dst_vec_ur w, abase_pz_s
     
         // Create big integers
         mp_limb_t *U, *V;
-        U = (mp_limb_t *) malloc(n * nwords * sizeof(mp_limb_t));
-        V = (mp_limb_t *) malloc(m * nwords * sizeof(mp_limb_t));
-        if (!U || !V)
-        MALLOC_FAILED();
+        U = (mp_limb_t *) mpfq_malloc_check(n * nwords * sizeof(mp_limb_t));
+        V = (mp_limb_t *) mpfq_malloc_check(m * nwords * sizeof(mp_limb_t));
         memset(U, 0, n * nwords * sizeof(mp_limb_t));
         for (unsigned int i = 0; i < n; ++i)
         abase_pz_get_mpn(k, U + i * nwords, u + i * k->kl);
@@ -921,9 +893,7 @@ void abase_pz_vec_conv_ur_ks(abase_pz_field k, abase_pz_dst_vec_ur w, abase_pz_s
         abase_pz_get_mpn(k, V + i * nwords, v + i * k->kl);
         // Mul !
         mp_limb_t *W;
-        W = (mp_limb_t *) malloc((n + m) * nwords * sizeof(mp_limb_t));
-        if (!W)
-        MALLOC_FAILED();
+        W = (mp_limb_t *) mpfq_malloc_check((n + m) * nwords * sizeof(mp_limb_t));
         if (n>=m)
             mpn_mul(W, U, n * nwords, V, m * nwords);
         else

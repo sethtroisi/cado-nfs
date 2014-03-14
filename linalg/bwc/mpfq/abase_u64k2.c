@@ -134,8 +134,7 @@ void abase_u64k2_asprint(abase_u64k2_dst_field K MAYBE_UNUSED, char * * ps, abas
 {
         const uint64_t * y = x;
         const unsigned int stride = abase_u64k2_vec_elt_stride(K,1)/sizeof(uint64_t);
-        *ps = malloc(stride * 16 + 1);
-        if (!*ps) MALLOC_FAILED();
+        *ps = mpfq_malloc_check(stride * 16 + 1);
         for(unsigned int i = 0 ; i < stride ; i++) {
             snprintf((*ps) + i * 16, 17, "%" PRIx64, y[i]);
         }
@@ -177,9 +176,7 @@ int abase_u64k2_fscan(abase_u64k2_dst_field k, FILE * file, abase_u64k2_dst_elt 
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -253,13 +250,13 @@ void abase_u64k2_vec_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec
 void abase_u64k2_vec_asprint(abase_u64k2_dst_field K MAYBE_UNUSED, char * * pstr, abase_u64k2_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)malloc(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
         return;
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)malloc(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -352,9 +349,7 @@ int abase_u64k2_vec_fscan(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, aba
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)

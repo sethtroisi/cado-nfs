@@ -104,10 +104,10 @@ void abase_pz_pz_dotprod(abase_pz_dst_field K0 MAYBE_UNUSED, abase_pz_dst_field 
         abase_pz_elt_ur_init(K0, &t);
         abase_pz_elt_ur_set_zero(K0, s);
         for(unsigned int i = 0 ; i < n ; i++) {
-            abase_pz_mul_ur(K0, t, abase_pz_vec_coeff_ptr_const(K, xu0, i), abase_pz_vec_coeff_ptr_const(K, xu1, i));
+            abase_pz_mul_ur(K0, t, abase_pz_vec_coeff_ptr_const(K0, xu0, i), abase_pz_vec_coeff_ptr_const(K1, xu1, i));
             abase_pz_elt_ur_add(K0, s, s, t);
         }
-        abase_pz_reduce(K0, abase_pz_vec_coeff_ptr(K, xw, 0), s);
+        abase_pz_reduce(K0, abase_pz_vec_coeff_ptr(K0, xw, 0), s);
         abase_pz_elt_ur_clear(K0, &s);
         abase_pz_elt_ur_clear(K0, &t);
 }
@@ -119,7 +119,7 @@ void abase_pz_pz_addmul_tiny(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_fie
         abase_pz_init(K, &s);
         for(unsigned int i = 0 ; i < n ; i++) {
             abase_pz_mul(K, s, abase_pz_vec_coeff_ptr_const(K, u, i), abase_pz_vec_coeff_ptr_const(K, v, 0));
-            abase_pz_add(K, abase_pz_vec_coeff_ptr_const(K, w, i), abase_pz_vec_coeff_ptr_const(K, w, i), s);
+            abase_pz_add(K, abase_pz_vec_coeff_ptr(K, w, i), abase_pz_vec_coeff_ptr_const(K, w, i), s);
         }
         abase_pz_clear(K, &s);
 }
@@ -127,7 +127,7 @@ void abase_pz_pz_addmul_tiny(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_fie
 /* *simd_pz::code_for_member_template_transpose */
 void abase_pz_pz_transpose(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_field L MAYBE_UNUSED, abase_pz_dst_vec w, abase_pz_src_vec u)
 {
-    abase_pz_set(K, abase_pz_vec_coeff_ptr_const(K, w, 0), abase_pz_vec_coeff_ptr_const(K, u, 0));
+    abase_pz_set(K, abase_pz_vec_coeff_ptr(K, w, 0), abase_pz_vec_coeff_ptr_const(K, u, 0));
 }
 
 

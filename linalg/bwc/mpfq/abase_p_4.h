@@ -430,9 +430,9 @@ MPI_Op abase_p_4_mpi_addition_op_ur(abase_p_4_dst_field);
 void abase_p_4_mpi_ops_clear(abase_p_4_dst_field);
 
 /* Object-oriented interface */
+void abase_p_4_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_p_4_oo_field_clear(abase_vbase_ptr);
-void abase_p_4_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

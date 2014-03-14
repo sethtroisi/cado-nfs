@@ -358,9 +358,9 @@ MPI_Op abase_u64k2_mpi_addition_op_ur(abase_u64k2_dst_field);
 void abase_u64k2_mpi_ops_clear(abase_u64k2_dst_field);
 
 /* Object-oriented interface */
-void abase_u64k2_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_u64k2_oo_field_clear(abase_vbase_ptr);
+void abase_u64k2_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

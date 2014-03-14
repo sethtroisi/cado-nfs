@@ -57,9 +57,7 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
     // Numerical io.
     if (type <= 16) {
         // allocate enough room for base 2 conversion.
-        *pstr = (char *)malloc((64+1)*sizeof(char));
-        if (*pstr == NULL)
-            MALLOC_FAILED();
+        *pstr = (char *)mpfq_malloc_check((64+1)*sizeof(char));
     
         mp_limb_t tmp[1 + 1];
         for (i = 0; i < 1; ++i)
@@ -108,9 +106,7 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
         char c = (char)type;
         // allocate (more than) enough room for polynomial conversion.
         // Warning: this is for exponent that fit in 3 digits
-        *pstr = (char *)malloc((8*64+1)*sizeof(char));
-        if (*pstr == NULL)
-            MALLOC_FAILED();
+        *pstr = (char *)mpfq_malloc_check((8*64+1)*sizeof(char));
         {
             unsigned int j;
             int sth = 0;
@@ -156,7 +152,7 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
     if (k->io_type <= 16) {
         unsigned char *tmp;
         int len = strlen(str);
-        tmp = (unsigned char *)malloc(len+1);
+        tmp = (unsigned char *)mpfq_malloc_check(len+1);
         int i;
         for (i = 0; i < len; ++i) {
             if (str[i] > '9')
@@ -166,7 +162,7 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
         }
         mp_limb_t *zz;
         // Allocate one limb per byte... very conservative.
-        zz = (mp_limb_t *)malloc(len*sizeof(mp_limb_t));
+        zz = (mp_limb_t *)mpfq_malloc_check(len*sizeof(mp_limb_t));
         int ret = mpn_set_str(zz, tmp, len, k->io_type);
         free(tmp);
         if (ret > 1) {
@@ -192,9 +188,7 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -263,13 +257,13 @@ void mpfq_2_64_vec_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, 
 void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)malloc(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
         return;
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)malloc(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -362,9 +356,7 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)

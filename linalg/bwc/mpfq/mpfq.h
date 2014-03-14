@@ -6,6 +6,7 @@
 /* we always include stdio.h, otherwise our inclusion of gmp.h might
  * prevent gmp's I/O functions to ever be exposed... */
 #include <stdio.h>
+#include <stdlib.h>
 #include <gmp.h>
 
 #ifdef __cplusplus
@@ -26,11 +27,23 @@ extern "C" {
 
 /***  Some useful macros ***/
 
-#define MALLOC_FAILED()                                                 \
-        do {                                                            \
-                fprintf(stderr, "malloc failed in %s\n", __func__);     \
-                abort();                                                \
-        } while (0)
+static inline void * mpfq_malloc_check(size_t s) {
+    void * r = malloc(s);
+    if (!r) {
+        fprintf(stderr, "malloc(%zu) failed in %s\n", s, __func__);
+        abort();
+    }
+    return r;
+}
+
+static inline void * mpfq_realloc_check(void * p, size_t s) {
+    void * r = realloc(p, s);
+    if (!r) {
+        fprintf(stderr, "realloc(%zu) failed in %s\n", s, __func__);
+        abort();
+    }
+    return r;
+}
 
 #define BUILD_BITMASK(x) ((x) == GMP_LIMB_BITS ? ((mp_limb_t) - 1) : (~ - ((mp_limb_t) 1 << (x))))
 
