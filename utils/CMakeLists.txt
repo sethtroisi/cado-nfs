@@ -37,6 +37,7 @@ add_custom_target(renew_modified_files
 # date if this file has changed
 add_custom_command(
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/modified_files.h"
+  COMMAND "${CMAKE_COMMAND}" -E echo
   DEPENDS renew_modified_files
 )
 
