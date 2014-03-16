@@ -81,6 +81,7 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* missing impl_max_degree */
 
 /* Functions operating on the field structure */
+/* missing field_characteristic_bits */
 /* *simd_u64k::code_for_field_specify */
 void abase_u64k2_field_specify(abase_u64k2_dst_field K MAYBE_UNUSED, unsigned long tag, void * x MAYBE_UNUSED)
 {
@@ -113,6 +114,7 @@ void abase_u64k2_field_specify(abase_u64k2_dst_field K MAYBE_UNUSED, unsigned lo
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing powz */
 /* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
@@ -242,7 +244,7 @@ void abase_u64k2_vec_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec
     free(*v);
 }
 
-/* missing vec_setcoef_ui */
+/* missing vec_setcoeff_ui */
 /* missing vec_scal_mul */
 /* missing vec_conv */
 /* missing vec_random2 */
@@ -416,9 +418,9 @@ void abase_u64k2_vec_ur_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_
 /* missing poly_clear */
 /* missing poly_set */
 /* missing poly_setmonic */
-/* missing poly_setcoef */
-/* missing poly_setcoef_ui */
-/* missing poly_getcoef */
+/* missing poly_setcoeff */
+/* missing poly_setcoeff_ui */
+/* missing poly_getcoeff */
 /* missing poly_deg */
 /* missing poly_add */
 /* missing poly_sub */
@@ -744,28 +746,22 @@ static void abase_u64k2_wrapper_vec_set(abase_vbase_ptr vbase MAYBE_UNUSED, abas
     abase_u64k2_vec_set(vbase->obj, r, s, n);
 }
 
-static void abase_u64k2_wrapper_vec_set_partial(abase_vbase_ptr, abase_u64k2_dst_vec, abase_u64k2_src_vec, unsigned int, unsigned int, unsigned int);
-static void abase_u64k2_wrapper_vec_set_partial(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec w MAYBE_UNUSED, abase_u64k2_src_vec u MAYBE_UNUSED, unsigned int bw MAYBE_UNUSED, unsigned int bu MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
-{
-    abase_u64k2_vec_set_partial(vbase->obj, w, u, bw, bu, l);
-}
-
 static void abase_u64k2_wrapper_vec_set_zero(abase_vbase_ptr, abase_u64k2_dst_vec, unsigned int);
 static void abase_u64k2_wrapper_vec_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     abase_u64k2_vec_set_zero(vbase->obj, r, n);
 }
 
-static void abase_u64k2_wrapper_vec_setcoef(abase_vbase_ptr, abase_u64k2_dst_vec, abase_u64k2_src_elt, unsigned int);
-static void abase_u64k2_wrapper_vec_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec w MAYBE_UNUSED, abase_u64k2_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_u64k2_wrapper_vec_setcoeff(abase_vbase_ptr, abase_u64k2_dst_vec, abase_u64k2_src_elt, unsigned int);
+static void abase_u64k2_wrapper_vec_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec w MAYBE_UNUSED, abase_u64k2_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_u64k2_vec_setcoef(vbase->obj, w, x, i);
+    abase_u64k2_vec_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_u64k2_wrapper_vec_getcoef(abase_vbase_ptr, abase_u64k2_dst_elt, abase_u64k2_src_vec, unsigned int);
-static void abase_u64k2_wrapper_vec_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt x MAYBE_UNUSED, abase_u64k2_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_u64k2_wrapper_vec_getcoeff(abase_vbase_ptr, abase_u64k2_dst_elt, abase_u64k2_src_vec, unsigned int);
+static void abase_u64k2_wrapper_vec_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt x MAYBE_UNUSED, abase_u64k2_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_u64k2_vec_getcoef(vbase->obj, x, w, i);
+    abase_u64k2_vec_getcoeff(vbase->obj, x, w, i);
 }
 
 static void abase_u64k2_wrapper_vec_add(abase_vbase_ptr, abase_u64k2_dst_vec, abase_u64k2_src_vec, abase_u64k2_src_vec, unsigned int);
@@ -906,16 +902,16 @@ static void abase_u64k2_wrapper_vec_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, a
     abase_u64k2_vec_ur_set(vbase->obj, r, s, n);
 }
 
-static void abase_u64k2_wrapper_vec_ur_setcoef(abase_vbase_ptr, abase_u64k2_dst_vec_ur, abase_u64k2_src_elt_ur, unsigned int);
-static void abase_u64k2_wrapper_vec_ur_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec_ur w MAYBE_UNUSED, abase_u64k2_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_u64k2_wrapper_vec_ur_setcoeff(abase_vbase_ptr, abase_u64k2_dst_vec_ur, abase_u64k2_src_elt_ur, unsigned int);
+static void abase_u64k2_wrapper_vec_ur_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec_ur w MAYBE_UNUSED, abase_u64k2_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_u64k2_vec_ur_setcoef(vbase->obj, w, x, i);
+    abase_u64k2_vec_ur_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_u64k2_wrapper_vec_ur_getcoef(abase_vbase_ptr, abase_u64k2_dst_elt_ur, abase_u64k2_src_vec_ur, unsigned int);
-static void abase_u64k2_wrapper_vec_ur_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur x MAYBE_UNUSED, abase_u64k2_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_u64k2_wrapper_vec_ur_getcoeff(abase_vbase_ptr, abase_u64k2_dst_elt_ur, abase_u64k2_src_vec_ur, unsigned int);
+static void abase_u64k2_wrapper_vec_ur_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur x MAYBE_UNUSED, abase_u64k2_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_u64k2_vec_ur_getcoef(vbase->obj, x, w, i);
+    abase_u64k2_vec_ur_getcoeff(vbase->obj, x, w, i);
 }
 
 static void abase_u64k2_wrapper_vec_ur_add(abase_vbase_ptr, abase_u64k2_dst_vec_ur, abase_u64k2_src_vec_ur, abase_u64k2_src_vec_ur, unsigned int);
@@ -1083,6 +1079,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing impl_max_characteristic_bits */
     /* missing impl_max_degree */
     vbase->field_characteristic = (void (*) (abase_vbase_ptr, mpz_t)) abase_u64k2_wrapper_field_characteristic;
+    /* missing field_characteristic_bits */
     vbase->field_degree = (int (*) (abase_vbase_ptr)) abase_u64k2_wrapper_field_degree;
     vbase->field_init = (void (*) (abase_vbase_ptr)) abase_u64k2_wrapper_field_init;
     vbase->field_clear = (void (*) (abase_vbase_ptr)) abase_u64k2_wrapper_field_clear;
@@ -1108,6 +1105,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing is_sqr */
     /* missing sqrt */
     /* missing pow */
+    /* missing powz */
     /* missing frobenius */
     /* missing add_ui */
     /* missing sub_ui */
@@ -1138,11 +1136,10 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_u64k2_wrapper_vec_reinit;
     vbase->vec_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_clear;
     vbase->vec_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_set;
-    vbase->vec_set_partial = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, unsigned int, unsigned int)) abase_u64k2_wrapper_vec_set_partial;
     vbase->vec_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_set_zero;
-    vbase->vec_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_setcoef;
-    /* missing vec_setcoef_ui */
-    vbase->vec_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_getcoef;
+    vbase->vec_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_setcoeff;
+    /* missing vec_setcoeff_ui */
+    vbase->vec_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_getcoeff;
     vbase->vec_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_add;
     vbase->vec_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_neg;
     vbase->vec_rev = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_rev;
@@ -1169,8 +1166,8 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_u64k2_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set;
-    vbase->vec_ur_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_setcoef;
-    vbase->vec_ur_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_getcoef;
+    vbase->vec_ur_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_setcoeff;
+    vbase->vec_ur_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_getcoeff;
     vbase->vec_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_add;
     vbase->vec_ur_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_sub;
     vbase->vec_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_neg;
@@ -1188,9 +1185,9 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing poly_clear */
     /* missing poly_set */
     /* missing poly_setmonic */
-    /* missing poly_setcoef */
-    /* missing poly_setcoef_ui */
-    /* missing poly_getcoef */
+    /* missing poly_setcoeff */
+    /* missing poly_setcoeff_ui */
+    /* missing poly_getcoeff */
     /* missing poly_deg */
     /* missing poly_add */
     /* missing poly_sub */

@@ -42,6 +42,32 @@
 /* Assignment of random values */
 
 /* Arithmetic operations on elements */
+/* *Mpfq::defaults::pow::code_for_powz, Mpfq::gf2n::trivialities */
+void mpfq_2_128_powz(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt y, mpfq_2_128_src_elt x, mpz_srcptr z)
+{
+        if (mpz_sgn(z) < 0) {
+            mpz_t mz;
+            mpz_init(mz);
+            mpz_neg(mz, z);
+            mpfq_2_128_powz(k, y, x, mz);
+            mpfq_2_128_inv(k, y, y);
+            mpz_clear(mz);
+        } else if (mpz_sizeinbase(z, 2) > mpfq_2_128_field_degree(k) * mpfq_2_128_field_characteristic_bits(k)) {
+            mpz_t zr;
+            mpz_init(zr);
+            mpz_t ppz;
+            mpfq_2_128_field_characteristic(k, ppz);
+            mpz_pow_ui(ppz,ppz,mpfq_2_128_field_degree(k));
+            mpz_sub_ui(ppz,ppz,1);
+            mpz_fdiv_r(zr, z, ppz);
+            mpfq_2_128_powz(k, y, x, zr);
+            mpz_clear(ppz);
+            mpz_clear(zr);
+        } else {
+            mpfq_2_128_pow(k, y, x, z->_mp_d, mpz_size(z));
+        }
+}
+
 
 /* Operations involving unreduced elements */
 
@@ -428,16 +454,16 @@ void mpfq_2_128_poly_setmonic(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_ds
         mpfq_2_128_elt aux;
         mpfq_2_128_init(K, &aux);
         mpfq_2_128_set_ui(K, aux, 1);
-        mpfq_2_128_poly_setcoef(K, q, aux, 0);
+        mpfq_2_128_poly_setcoeff(K, q, aux, 0);
         mpfq_2_128_clear(K, &aux);
         q->size = 1;
         return;
     }
     mpfq_2_128_elt lc;
     mpfq_2_128_init(K, &lc);
-    mpfq_2_128_poly_getcoef(K, lc, p, degp);
+    mpfq_2_128_poly_getcoeff(K, lc, p, degp);
     mpfq_2_128_inv(K, lc, lc);
-    mpfq_2_128_poly_setcoef_ui(K, q, 1, degp);
+    mpfq_2_128_poly_setcoeff_ui(K, q, 1, degp);
     mpfq_2_128_vec_scal_mul(K, q->c, p->c, lc, degp);
     q->size = degp+1;
     mpfq_2_128_clear(K, &lc);
@@ -475,7 +501,7 @@ void mpfq_2_128_poly_divmod(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_
     mpfq_2_128_init(K, &ilb);
     mpfq_2_128_elt temp;
     mpfq_2_128_init(K, &temp);
-    mpfq_2_128_poly_getcoef(K, temp, b, degb);
+    mpfq_2_128_poly_getcoeff(K, temp, b, degb);
     if (mpfq_2_128_cmp_ui(K, temp, 1) == 0) {
         mpfq_2_128_set_ui(K, ilb, 1);
         bmonic = 1;
@@ -497,17 +523,17 @@ void mpfq_2_128_poly_divmod(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_
     int i;
     int j;
     for (i = dega; i >= (int)degb; --i) {
-        mpfq_2_128_poly_getcoef(K, aux, rr, i);
+        mpfq_2_128_poly_getcoeff(K, aux, rr, i);
         if (!bmonic) 
             mpfq_2_128_mul(K, aux, aux, ilb);
-        mpfq_2_128_poly_setcoef(K, qq, aux, i-degb);
+        mpfq_2_128_poly_setcoeff(K, qq, aux, i-degb);
         for (j = i-1; j >= (int)(i - degb); --j) {
-            mpfq_2_128_poly_getcoef(K, temp, b, j-i+degb);
+            mpfq_2_128_poly_getcoeff(K, temp, b, j-i+degb);
             mpfq_2_128_mul(K, aux2, aux, temp);
-            mpfq_2_128_poly_getcoef(K, temp, rr, j);
+            mpfq_2_128_poly_getcoeff(K, temp, rr, j);
     
             mpfq_2_128_sub(K, temp, temp, aux2);
-            mpfq_2_128_poly_setcoef(K, rr, temp, j);
+            mpfq_2_128_poly_setcoeff(K, rr, temp, j);
         }
     }    
     
@@ -536,12 +562,12 @@ void mpfq_2_128_poly_preinv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_
     // Assume p != q (no alias)
     mpfq_2_128_elt temp;
     mpfq_2_128_init(K, &temp);
-    mpfq_2_128_poly_getcoef(K, temp, p, 0);//Should be in the assert
+    mpfq_2_128_poly_getcoeff(K, temp, p, 0);//Should be in the assert
     assert( mpfq_2_128_cmp_ui(K, temp, 1) == 0);
     assert (p != q);
     int m;
     if (n <= 2) {
-        mpfq_2_128_poly_setcoef_ui(K, q, 1, 0);
+        mpfq_2_128_poly_setcoeff_ui(K, q, 1, 0);
         q->size = 1;
         m = 1;
         if (n == 1)
@@ -563,11 +589,11 @@ void mpfq_2_128_poly_preinv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_
     mpfq_2_128_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
     int nn = MIN(n, MIN(n, p->size) + m -1);
     mpfq_2_128_vec_neg(K, tmp, tmp, nn);
-    mpfq_2_128_vec_getcoef(K, temp, tmp, 0);
+    mpfq_2_128_vec_getcoeff(K, temp, tmp, 0);
     mpfq_2_128_add_ui(K, temp, temp, 1);
-    mpfq_2_128_vec_setcoef(K, tmp, temp, 0);
+    mpfq_2_128_vec_setcoeff(K, tmp, temp, 0);
     mpfq_2_128_vec_conv(K, tmp, q->c, m, tmp, nn);
-    mpfq_2_128_vec_set(K, q->c + m, tmp + m, n-m);
+    mpfq_2_128_vec_set(K, mpfq_2_128_vec_subvec(K, q->c, m), mpfq_2_128_vec_subvec(K, tmp, m), n-m);
     q->size = n;
     
     mpfq_2_128_clear(K, &temp);

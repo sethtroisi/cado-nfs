@@ -125,6 +125,7 @@ extern "C" {
 /* Functions operating on the field structure */
 /* *simd_char2::code_for_field_characteristic */
 #define abase_u64k1_field_characteristic(K, z)	mpz_set_ui(z,2)
+/* missing field_characteristic_bits */
 /* *simd_u64k::code_for_field_degree */
 #define abase_u64k1_field_degree(f)	1
 static inline
@@ -170,6 +171,7 @@ void abase_u64k1_add(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing powz */
 /* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
@@ -222,14 +224,12 @@ void abase_u64k1_vec_clear(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned in
 static inline
 void abase_u64k1_vec_set(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, unsigned int);
 static inline
-void abase_u64k1_vec_set_partial(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, unsigned int, unsigned int, unsigned int);
-static inline
 void abase_u64k1_vec_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int);
 static inline
-void abase_u64k1_vec_setcoef(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_elt, unsigned int);
-/* missing vec_setcoef_ui */
+void abase_u64k1_vec_setcoeff(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_elt, unsigned int);
+/* missing vec_setcoeff_ui */
 static inline
-void abase_u64k1_vec_getcoef(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src_vec, unsigned int);
+void abase_u64k1_vec_getcoeff(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src_vec, unsigned int);
 static inline
 void abase_u64k1_vec_add(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
 static inline
@@ -272,9 +272,9 @@ void abase_u64k1_vec_ur_clear(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsig
 static inline
 void abase_u64k1_vec_ur_set(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 static inline
-void abase_u64k1_vec_ur_setcoef(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_elt_ur, unsigned int);
+void abase_u64k1_vec_ur_setcoeff(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_elt_ur, unsigned int);
 static inline
-void abase_u64k1_vec_ur_getcoef(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur, abase_u64k1_src_vec_ur, unsigned int);
+void abase_u64k1_vec_ur_getcoeff(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur, abase_u64k1_src_vec_ur, unsigned int);
 static inline
 void abase_u64k1_vec_ur_add(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase_u64k1_src_vec_ur, abase_u64k1_src_vec_ur, unsigned int);
 static inline
@@ -304,9 +304,9 @@ abase_u64k1_src_elt abase_u64k1_vec_ur_coeff_ptr_const(abase_u64k1_dst_field, ab
 /* missing poly_clear */
 /* missing poly_set */
 /* missing poly_setmonic */
-/* missing poly_setcoef */
-/* missing poly_setcoef_ui */
-/* missing poly_getcoef */
+/* missing poly_setcoeff */
+/* missing poly_setcoeff_ui */
+/* missing poly_getcoeff */
 /* missing poly_deg */
 /* missing poly_add */
 /* missing poly_sub */
@@ -459,15 +459,6 @@ void abase_u64k1_vec_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
     if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_set_partial, Mpfq::defaults::vec */
-static inline
-void abase_u64k1_vec_set_partial(abase_u64k1_dst_field k MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int bw, unsigned int bu, unsigned int l)
-{
-    unsigned int i;
-    for(i = 0; i < l; ++i)
-        abase_u64k1_set(k, w[bw+i], u[bu+i]);
-}
-
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec r, unsigned int n)
@@ -475,16 +466,16 @@ void abase_u64k1_vec_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_
     memset(r, 0, n*sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoeff, Mpfq::defaults::vec */
 static inline
-void abase_u64k1_vec_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_elt x, unsigned int i)
+void abase_u64k1_vec_setcoeff(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_elt x, unsigned int i)
 {
     abase_u64k1_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec */
+/* *Mpfq::defaults::vec::getset::code_for_vec_getcoeff, Mpfq::defaults::vec */
 static inline
-void abase_u64k1_vec_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt x, abase_u64k1_src_vec w, unsigned int i)
+void abase_u64k1_vec_getcoeff(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt x, abase_u64k1_src_vec w, unsigned int i)
 {
     abase_u64k1_set(K, x, w[i]);
 }
@@ -618,16 +609,16 @@ void abase_u64k1_vec_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
     if (r != s) memmove(r, s, n*sizeof(abase_u64k1_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoeff, Mpfq::defaults::vec */
 static inline
-void abase_u64k1_vec_ur_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_elt_ur x, unsigned int i)
+void abase_u64k1_vec_ur_setcoeff(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_elt_ur x, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoeff, Mpfq::defaults::vec */
 static inline
-void abase_u64k1_vec_ur_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur x, abase_u64k1_src_vec_ur w, unsigned int i)
+void abase_u64k1_vec_ur_getcoeff(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur x, abase_u64k1_src_vec_ur w, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, x, w[i]);
 }

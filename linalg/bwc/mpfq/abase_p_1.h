@@ -132,7 +132,10 @@ extern "C" {
 #define abase_p_1_impl_max_degree()	1
 
 /* Functions operating on the field structure */
+static inline
 void abase_p_1_field_characteristic(abase_p_1_dst_field, mpz_t);
+static inline
+unsigned long abase_p_1_field_characteristic_bits(abase_p_1_dst_field);
 /* *Mpfq::gfp::field::code_for_field_degree, Mpfq::gfp */
 #define abase_p_1_field_degree(K)	1
 static inline
@@ -188,6 +191,7 @@ int abase_p_1_is_sqr(abase_p_1_dst_field, abase_p_1_src_elt);
 int abase_p_1_sqrt(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_elt);
 static inline
 void abase_p_1_pow(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_elt, unsigned long *, size_t);
+void abase_p_1_powz(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_elt, mpz_srcptr);
 /* *Mpfq::gfp::elt::code_for_frobenius, Mpfq::gfp */
 #define abase_p_1_frobenius(k, x, y)	abase_p_1_set(k, x, y)
 static inline
@@ -259,15 +263,13 @@ void abase_p_1_vec_clear(abase_p_1_dst_field, abase_p_1_vec *, unsigned int);
 static inline
 void abase_p_1_vec_set(abase_p_1_dst_field, abase_p_1_dst_vec, abase_p_1_src_vec, unsigned int);
 static inline
-void abase_p_1_vec_set_partial(abase_p_1_dst_field, abase_p_1_dst_vec, abase_p_1_src_vec, unsigned int, unsigned int, unsigned int);
-static inline
 void abase_p_1_vec_set_zero(abase_p_1_dst_field, abase_p_1_dst_vec, unsigned int);
 static inline
-void abase_p_1_vec_setcoef(abase_p_1_dst_field, abase_p_1_dst_vec, abase_p_1_src_elt, unsigned int);
+void abase_p_1_vec_setcoeff(abase_p_1_dst_field, abase_p_1_dst_vec, abase_p_1_src_elt, unsigned int);
 static inline
-void abase_p_1_vec_setcoef_ui(abase_p_1_dst_field, abase_p_1_dst_vec, unsigned long, unsigned int);
+void abase_p_1_vec_setcoeff_ui(abase_p_1_dst_field, abase_p_1_dst_vec, unsigned long, unsigned int);
 static inline
-void abase_p_1_vec_getcoef(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_vec, unsigned int);
+void abase_p_1_vec_getcoeff(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_vec, unsigned int);
 static inline
 void abase_p_1_vec_add(abase_p_1_dst_field, abase_p_1_dst_vec, abase_p_1_src_vec, abase_p_1_src_vec, unsigned int);
 static inline
@@ -313,9 +315,9 @@ void abase_p_1_vec_ur_clear(abase_p_1_dst_field, abase_p_1_vec_ur *, unsigned in
 static inline
 void abase_p_1_vec_ur_set(abase_p_1_dst_field, abase_p_1_dst_vec_ur, abase_p_1_src_vec_ur, unsigned int);
 static inline
-void abase_p_1_vec_ur_setcoef(abase_p_1_dst_field, abase_p_1_dst_vec_ur, abase_p_1_src_elt_ur, unsigned int);
+void abase_p_1_vec_ur_setcoeff(abase_p_1_dst_field, abase_p_1_dst_vec_ur, abase_p_1_src_elt_ur, unsigned int);
 static inline
-void abase_p_1_vec_ur_getcoef(abase_p_1_dst_field, abase_p_1_dst_elt_ur, abase_p_1_src_vec_ur, unsigned int);
+void abase_p_1_vec_ur_getcoeff(abase_p_1_dst_field, abase_p_1_dst_elt_ur, abase_p_1_src_vec_ur, unsigned int);
 static inline
 void abase_p_1_vec_ur_add(abase_p_1_dst_field, abase_p_1_dst_vec_ur, abase_p_1_src_vec_ur, abase_p_1_src_vec_ur, unsigned int);
 static inline
@@ -355,11 +357,11 @@ static inline
 void abase_p_1_poly_set(abase_p_1_dst_field, abase_p_1_dst_poly, abase_p_1_src_poly);
 void abase_p_1_poly_setmonic(abase_p_1_dst_field, abase_p_1_dst_poly, abase_p_1_src_poly);
 static inline
-void abase_p_1_poly_setcoef(abase_p_1_dst_field, abase_p_1_dst_poly, abase_p_1_src_elt, unsigned int);
+void abase_p_1_poly_setcoeff(abase_p_1_dst_field, abase_p_1_dst_poly, abase_p_1_src_elt, unsigned int);
 static inline
-void abase_p_1_poly_setcoef_ui(abase_p_1_dst_field, abase_p_1_dst_poly, unsigned long, unsigned int);
+void abase_p_1_poly_setcoeff_ui(abase_p_1_dst_field, abase_p_1_dst_poly, unsigned long, unsigned int);
 static inline
-void abase_p_1_poly_getcoef(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_poly, unsigned int);
+void abase_p_1_poly_getcoeff(abase_p_1_dst_field, abase_p_1_dst_elt, abase_p_1_src_poly, unsigned int);
 static inline
 int abase_p_1_poly_deg(abase_p_1_dst_field, abase_p_1_src_poly);
 static inline
@@ -430,20 +432,34 @@ MPI_Op abase_p_1_mpi_addition_op_ur(abase_p_1_dst_field);
 void abase_p_1_mpi_ops_clear(abase_p_1_dst_field);
 
 /* Object-oriented interface */
-void abase_p_1_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_p_1_oo_field_clear(abase_vbase_ptr);
+void abase_p_1_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
 
 /* Implementations for inlines */
+/* *Mpfq::gfp::field::code_for_field_characteristic, Mpfq::gfp */
+static inline
+void abase_p_1_field_characteristic(abase_p_1_dst_field k, mpz_t z)
+{
+        mpz_set(z, k->p);
+}
+
+/* *Mpfq::gfp::field::code_for_field_characteristic_bits, Mpfq::gfp */
+static inline
+unsigned long abase_p_1_field_characteristic_bits(abase_p_1_dst_field k)
+{
+        return mpz_sizeinbase(k->p, 2);
+}
+
 /* *Mpfq::gfp::field::code_for_field_init, Mpfq::gfp */
 static inline
 void abase_p_1_field_init(abase_p_1_dst_field k)
 {
-    k->p = NULL;
-    k->bigmul_p = NULL;
+    mpz_init(k->p);
+    mpz_init(k->bigmul_p);
     k->io_base = 10;
     mpz_init(k->factor);
     k->ts_info.e=0;
@@ -454,7 +470,6 @@ static inline
 void abase_p_1_init(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_elt * x MAYBE_UNUSED)
 {
     assert(k);
-    assert(k->p);
     assert(*x);
 }
 
@@ -477,7 +492,7 @@ void abase_p_1_set(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_elt r, abas
 static inline
 void abase_p_1_set_ui(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_elt r, unsigned long x)
 {
-    r[0] = x % ((k->p)[0]);
+    r[0] = x % mpz_getlimbn(k->p, 0);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
@@ -506,7 +521,7 @@ void abase_p_1_set_mpn(abase_p_1_dst_field k, abase_p_1_dst_elt r, mp_limb_t * x
             r[i] = 0;
     } else {
         mp_limb_t tmp[n-1+1];
-        mpn_tdiv_qr(tmp, r, 0, x, n, k->p, 1);
+        mpn_tdiv_qr(tmp, r, 0, x, n, k->p->_mp_d, 1);
     }
 }
 
@@ -577,8 +592,8 @@ void abase_p_1_add(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt
 {
     mp_limb_t cy;
     cy = add_1(z, x, y);
-    if (cy || (cmp_1(z, k->p) >= 0))
-        sub_1(z, z, k->p);
+    if (cy || (cmp_1(z, k->p->_mp_d) >= 0))
+        sub_1(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sub, Mpfq::gfp */
@@ -588,7 +603,7 @@ void abase_p_1_sub(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt
     mp_limb_t cy;
     cy = sub_1(z, x, y);
     if (cy) // negative result
-        add_1(z, z, k->p);
+        add_1(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_neg, Mpfq::gfp */
@@ -596,7 +611,7 @@ static inline
 void abase_p_1_neg(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt x)
 {
     if (cmp_ui_1(x, 0))
-        sub_1(z, k->p, x);
+        sub_1(z, k->p->_mp_d, x);
     else {
         int i;
         for (i = 0; i < 1; ++i)
@@ -610,7 +625,7 @@ void abase_p_1_mul(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt
 {
     mp_limb_t tmp[2*1];
     mul_1(tmp, x, y);
-    mod_1(z, tmp, k->p);
+    mod_1(z, tmp, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqr, Mpfq::gfp */
@@ -619,7 +634,7 @@ void abase_p_1_sqr(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt
 {
     mp_limb_t tmp[2*1];
     sqr_1(tmp, x);
-    mod_1(z, tmp, k->p);
+    mod_1(z, tmp, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_is_sqr, Mpfq::gfp */
@@ -628,7 +643,7 @@ int abase_p_1_is_sqr(abase_p_1_dst_field k, abase_p_1_src_elt x)
 {
     mp_limb_t pp[1];
     abase_p_1_elt y;
-    sub_ui_nc_1(pp, k->p, 1);
+    sub_ui_nc_1(pp, k->p->_mp_d, 1);
     rshift_1(pp, 1);
     abase_p_1_init(k, &y);
     abase_p_1_pow(k, y, x, pp, 1);
@@ -692,8 +707,8 @@ void abase_p_1_add_ui(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_
 {
     mp_limb_t cy;
     cy = add_ui_1(z, x, y);
-    if (cy || (cmp_1(z, k->p) >= 0))
-        sub_1(z, z, k->p);
+    if (cy || (cmp_1(z, k->p->_mp_d) >= 0))
+        sub_1(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sub_ui, Mpfq::gfp */
@@ -703,7 +718,7 @@ void abase_p_1_sub_ui(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_
     mp_limb_t cy;
     cy = sub_ui_1(z, x, y);
     if (cy) // negative result
-        add_1(z, z, k->p);
+        add_1(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_mul_ui, Mpfq::gfp */
@@ -712,14 +727,14 @@ void abase_p_1_mul_ui(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_
 {
     mp_limb_t tmp[1+1], q[2];
     mul1_1(tmp,x,y);
-    mpn_tdiv_qr(q, z, 0, tmp, 1+1, k->p, 1);
+    mpn_tdiv_qr(q, z, 0, tmp, 1+1, k->p->_mp_d, 1);
 }
 
 /* *Mpfq::gfp::elt::code_for_inv, Mpfq::gfp */
 static inline
 int abase_p_1_inv(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_src_elt x)
 {
-    int ret=invmod_1(z, x, k->p);
+    int ret=invmod_1(z, x, k->p->_mp_d);
     if (!ret)
         abase_p_1_get_mpz(k, k->factor, z);
     return ret;
@@ -750,7 +765,6 @@ static inline
 void abase_p_1_elt_ur_init(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_elt_ur * x MAYBE_UNUSED)
 {
     assert(k);
-    assert(k->p);
     assert(*x);
 }
 
@@ -852,19 +866,19 @@ void abase_p_1_reduce(abase_p_1_dst_field k, abase_p_1_dst_elt z, abase_p_1_dst_
     mp_limb_t q[3+1];
     if (x[3-1]>>(64-1)) {
         // negative number, add bigmul_p to make it positive before reduction
-        mpn_add_n(x, x, k->bigmul_p, 3);
+        mpn_add_n(x, x, k->bigmul_p->_mp_d, 3);
     }
-    mpn_tdiv_qr(q, z, 0, x, 3, k->p, 1);
+    mpn_tdiv_qr(q, z, 0, x, 3, k->p->_mp_d, 1);
 }
 
 /* *Mpfq::gfp::elt::code_for_normalize, Mpfq::gfp */
 static inline
 void abase_p_1_normalize(abase_p_1_dst_field k, abase_p_1_dst_elt x)
 {
-    if (cmp_1(x,k->p)>=0) {
+    if (cmp_1(x,k->p->_mp_d)>=0) {
       mp_limb_t q[1+1];
       abase_p_1_elt r;
-      mpn_tdiv_qr(q, r, 0, x, 1, k->p, 1);
+      mpn_tdiv_qr(q, r, 0, x, 1, k->p->_mp_d, 1);
       abase_p_1_set(k, x, r);
     }
 }
@@ -922,15 +936,6 @@ void abase_p_1_vec_set(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec r, 
     if (r != s) memmove(r, s, n*sizeof(abase_p_1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_set_partial, Mpfq::defaults::vec, Mpfq::gfp */
-static inline
-void abase_p_1_vec_set_partial(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_vec w, abase_p_1_src_vec u, unsigned int bw, unsigned int bu, unsigned int l)
-{
-    unsigned int i;
-    for(i = 0; i < l; ++i)
-        abase_p_1_set(k, w[bw+i], u[bu+i]);
-}
-
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
 static inline
 void abase_p_1_vec_set_zero(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec r, unsigned int n)
@@ -938,23 +943,23 @@ void abase_p_1_vec_set_zero(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_ve
     memset(r, 0, n*sizeof(abase_p_1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoeff, Mpfq::defaults::vec, Mpfq::gfp */
 static inline
-void abase_p_1_vec_setcoef(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec w, abase_p_1_src_elt x, unsigned int i)
+void abase_p_1_vec_setcoeff(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec w, abase_p_1_src_elt x, unsigned int i)
 {
     abase_p_1_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef_ui, Mpfq::defaults::vec, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoeff_ui, Mpfq::defaults::vec, Mpfq::gfp */
 static inline
-void abase_p_1_vec_setcoef_ui(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec w, unsigned long x, unsigned int i)
+void abase_p_1_vec_setcoeff_ui(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec w, unsigned long x, unsigned int i)
 {
     abase_p_1_set_ui(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_getcoeff, Mpfq::defaults::vec, Mpfq::gfp */
 static inline
-void abase_p_1_vec_getcoef(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_elt x, abase_p_1_src_vec w, unsigned int i)
+void abase_p_1_vec_getcoeff(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_elt x, abase_p_1_src_vec w, unsigned int i)
 {
     abase_p_1_set(K, x, w[i]);
 }
@@ -1117,16 +1122,16 @@ void abase_p_1_vec_ur_set(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec_
     if (r != s) memmove(r, s, n*sizeof(abase_p_1_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoeff, Mpfq::defaults::vec, Mpfq::gfp */
 static inline
-void abase_p_1_vec_ur_setcoef(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec_ur w, abase_p_1_src_elt_ur x, unsigned int i)
+void abase_p_1_vec_ur_setcoeff(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec_ur w, abase_p_1_src_elt_ur x, unsigned int i)
 {
     abase_p_1_elt_ur_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec, Mpfq::gfp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoeff, Mpfq::defaults::vec, Mpfq::gfp */
 static inline
-void abase_p_1_vec_ur_getcoef(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_elt_ur x, abase_p_1_src_vec_ur w, unsigned int i)
+void abase_p_1_vec_ur_getcoeff(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_elt_ur x, abase_p_1_src_vec_ur w, unsigned int i)
 {
     abase_p_1_elt_ur_set(K, x, w[i]);
 }
@@ -1396,50 +1401,44 @@ void abase_p_1_poly_set(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w
     w->size = u->size;
 }
 
-/* *Mpfq::defaults::poly::code_for_poly_setcoef, Mpfq::gfp */
+/* *Mpfq::defaults::poly::code_for_poly_setcoeff, Mpfq::gfp */
 static inline
-void abase_p_1_poly_setcoef(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_elt x, unsigned int i)
+void abase_p_1_poly_setcoeff(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_elt x, unsigned int i)
 {
-    unsigned long j;
     if (w->alloc < (i+1)) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, i+1);
         w->alloc = i+1;
     }
-    abase_p_1_vec_setcoef(k, w->c, x, i);
     if (w->size < (i+1)) {
-        for (j = w->size; j < i; ++j) {
-            abase_p_1_vec_setcoef_ui(k, w->c, 0, j);
-        }  
+        abase_p_1_vec_set_zero(k, abase_p_1_vec_subvec(k, w->c, w->size), (i - w->size));
         w->size = i+1;
     }
+    abase_p_1_vec_setcoeff(k, w->c, x, i);
 }
 
-/* *Mpfq::defaults::poly::code_for_poly_setcoef_ui, Mpfq::gfp */
+/* *Mpfq::defaults::poly::code_for_poly_setcoeff_ui, Mpfq::gfp */
 static inline
-void abase_p_1_poly_setcoef_ui(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, unsigned long x, unsigned int i)
+void abase_p_1_poly_setcoeff_ui(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, unsigned long x, unsigned int i)
 {
-    unsigned long j;
     if (w->alloc < (i+1)) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, i+1);
         w->alloc = i+1;
     }
-    abase_p_1_vec_setcoef_ui(k, w->c, x, i);
     if (w->size < (i+1)) {
-        for (j = w->size; j < i; ++j) {
-            abase_p_1_vec_setcoef_ui(k, w->c, 0, j);
-        }  
+        abase_p_1_vec_set_zero(k, abase_p_1_vec_subvec(k, w->c, w->size), (i - w->size));
         w->size = i+1;
     }
+    abase_p_1_vec_setcoeff_ui(k, w->c, x, i);
 }
 
-/* *Mpfq::defaults::poly::code_for_poly_getcoef, Mpfq::gfp */
+/* *Mpfq::defaults::poly::code_for_poly_getcoeff, Mpfq::gfp */
 static inline
-void abase_p_1_poly_getcoef(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_elt x, abase_p_1_src_poly w, unsigned int i)
+void abase_p_1_poly_getcoeff(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_elt x, abase_p_1_src_poly w, unsigned int i)
 {
     if (w->size < (i+1)) {
        abase_p_1_set_ui(k,x,0);
     } else {
-       abase_p_1_vec_getcoef(k, x, w->c, i);
+       abase_p_1_vec_getcoeff(k, x, w->c, i);
     }
 }
 
@@ -1452,12 +1451,12 @@ int abase_p_1_poly_deg(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_src_poly w)
     int deg = w->size-1;
     abase_p_1_elt temp;
     abase_p_1_init(K, &temp);
-    abase_p_1_vec_getcoef(K, temp, w->c, deg);
+    abase_p_1_vec_getcoeff(K, temp, w->c, deg);
     int comp=abase_p_1_cmp_ui(K, temp, 0);
     while ((deg >= 0) && (comp == 0)){
         deg--;
         if (deg>=0) {
-           abase_p_1_vec_getcoef(K, temp, w->c, deg);
+           abase_p_1_vec_getcoeff(K, temp, w->c, deg);
            comp=abase_p_1_cmp_ui(K, temp, 0);
         }
     }
@@ -1469,53 +1468,46 @@ int abase_p_1_poly_deg(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_src_poly w)
 static inline
 void abase_p_1_poly_add(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_poly u, abase_p_1_src_poly v)
 {
-    unsigned int minsize MAYBE_UNUSED = MIN(u->size, v->size);
-    unsigned int maxsize MAYBE_UNUSED = MAX(u->size, v->size);
+    unsigned int su = u->size;
+    unsigned int sv = v->size;
+    unsigned int maxsize = MAX(su, sv);
     if (w->alloc < maxsize) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, maxsize);
         w->alloc = maxsize;
     }
-    if (u->size <= v->size) {
-        abase_p_1_vec_add(k, w->c, u->c, v->c, u->size);
-        abase_p_1_vec_set_partial(k, (w->c), (v->c), u->size, u->size, v->size-u->size);
+    w->size = maxsize;
+    if (!maxsize) return;
+    if (su <= sv) {
+        abase_p_1_vec_add(k, w->c, u->c, v->c, su);
+        abase_p_1_vec_set(k, abase_p_1_vec_subvec(k, w->c, su), abase_p_1_vec_subvec_const(k, v->c, su), sv-su);
     } else {
-        abase_p_1_vec_add(k, w->c, u->c, v->c, v->size);
-        abase_p_1_vec_set_partial(k, (w->c), (u->c), v->size, v->size, u->size-v->size);
+        abase_p_1_vec_add(k, w->c, u->c, v->c, sv);
+        abase_p_1_vec_set(k, abase_p_1_vec_subvec(k, w->c, sv), abase_p_1_vec_subvec_const(k, u->c, sv), su-sv);
     }
-    w->size=maxsize;
-    unsigned int wdeg = abase_p_1_poly_deg(k, w);
-    w->size=wdeg+1;
+    w->size = 1 + abase_p_1_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_sub, Mpfq::gfp */
 static inline
 void abase_p_1_poly_sub(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_poly u, abase_p_1_src_poly v)
 {
-    unsigned int minsize MAYBE_UNUSED = MIN(u->size, v->size);
-    unsigned int maxsize MAYBE_UNUSED = MAX(u->size, v->size);
+    unsigned int su = u->size;
+    unsigned int sv = v->size;
+    unsigned int maxsize = MAX(su, sv);
     if (w->alloc < maxsize) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, maxsize);
         w->alloc = maxsize;
     }
-    if (u->size <= v->size) {
-        abase_p_1_vec_sub(k, w->c, u->c, v->c, u->size);
-        unsigned int i;
-        abase_p_1_elt temp;
-        abase_p_1_init(k, &temp);
-        for (i = u->size; i< v->size; ++i) {
-            abase_p_1_poly_getcoef(k, temp, v, i);
-            abase_p_1_neg(k, temp, temp);
-            abase_p_1_poly_setcoef(k, w, temp, i);
-        }
+    w->size = maxsize;
+    if (!maxsize) return;
+    if (su <= sv) {
+        abase_p_1_vec_sub(k, w->c, u->c, v->c, su);
+        abase_p_1_vec_neg(k, abase_p_1_vec_subvec(k, w->c, su), abase_p_1_vec_subvec_const(k, v->c, su), sv-su);
     } else {
-        abase_p_1_vec_sub(k, w->c, u->c, v->c, v->size);
-        abase_p_1_vec_set_partial(k, (w->c), (u->c), v->size, v->size, u->size-v->size);
+        abase_p_1_vec_sub(k, w->c, u->c, v->c, sv);
+        abase_p_1_vec_set(k, abase_p_1_vec_subvec(k, w->c, sv), abase_p_1_vec_subvec_const(k, u->c, sv), su-sv);
     }
-    w->size=maxsize;
-    //abase_p_1_poly_neg(k, w, v);
-    //abase_p_1_poly_add(k, w, u, w);
-    unsigned int wdeg = abase_p_1_poly_deg(k, w);
-    w->size=wdeg+1;
+    w->size = 1 + abase_p_1_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add_ui, Mpfq::gfp */
@@ -1531,22 +1523,18 @@ void abase_p_1_poly_add_ui(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_pol
             abase_p_1_vec_reinit(k, &(w->c), w->alloc, 1);
             w->alloc = 1;
         }
+        abase_p_1_vec_setcoeff_ui(k, w->c, x, 0);
         w->size = 1;
-        abase_p_1_vec_setcoef_ui(k, w->c, x, 0);
+        w->size = 1 + abase_p_1_poly_deg(k, w);
         return;
     }
     if (w->alloc < u->size) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, u->size);
         w->alloc = u->size;
     }
-    abase_p_1_elt temp;
-    abase_p_1_init(k, &temp);
-    abase_p_1_poly_getcoef(k, temp, u, 0);
-    abase_p_1_add_ui(k, temp, temp, x);
-    abase_p_1_vec_setcoef(k, w->c, temp, 0);
-    abase_p_1_vec_set_partial(k, w->c, u->c, 1, 1, u->size-1);
     w->size=u->size;
-    abase_p_1_clear(k, &temp);
+    abase_p_1_vec_set(k, abase_p_1_vec_subvec(k, w->c, 1), abase_p_1_vec_subvec_const(k, u->c, 1), u->size - 1);
+    abase_p_1_add_ui(k, abase_p_1_vec_coeff_ptr(k, w->c, 0), abase_p_1_vec_coeff_ptr_const(k, u->c, 0), x);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_sub_ui, Mpfq::gfp */
@@ -1562,26 +1550,21 @@ void abase_p_1_poly_sub_ui(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_pol
             abase_p_1_vec_reinit(k, &(w->c), w->alloc, 1);
             w->alloc = 1;
         }
-        w->size = 1;
         abase_p_1_elt temp;
         abase_p_1_init(k, &temp);
         abase_p_1_set_ui(k, temp, x);
-        abase_p_1_neg(k, temp, temp);
-        abase_p_1_vec_setcoef(k, w->c, temp, 0);
+        abase_p_1_neg(k, abase_p_1_vec_coeff_ptr(k, w->c, 0), temp);
+        w->size = abase_p_1_cmp_ui(k, temp, 0);
+        abase_p_1_clear(k, &temp);
         return;
     }
     if (w->alloc < u->size) {
         abase_p_1_vec_reinit(k, &(w->c), w->alloc, u->size);
         w->alloc = u->size;
     }
-    abase_p_1_elt temp;
-    abase_p_1_init(k, &temp);
-    abase_p_1_poly_getcoef(k, temp, u, 0);
-    abase_p_1_sub_ui(k, temp, temp, x);
-    abase_p_1_vec_setcoef(k, w->c, temp, 0);
-    abase_p_1_vec_set_partial(k, w->c, u->c, 1, 1, u->size-1);
     w->size=u->size;
-    abase_p_1_clear(k, &temp);
+    abase_p_1_vec_set(k, abase_p_1_vec_subvec(k, w->c, 1), abase_p_1_vec_subvec_const(k, u->c, 1), u->size - 1);
+    abase_p_1_sub_ui(k, abase_p_1_vec_coeff_ptr(k, w->c, 0), abase_p_1_vec_coeff_ptr_const(k, u->c, 0), x);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_neg, Mpfq::gfp */
@@ -1611,25 +1594,27 @@ void abase_p_1_poly_scal_mul(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_p
     }
     abase_p_1_vec_scal_mul(k, w->c, u->c, x, n);
     w->size=n;
+    w->size = 1 + abase_p_1_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_mul, Mpfq::gfp */
 static inline
-void abase_p_1_poly_mul(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_poly u, abase_p_1_src_poly v)
+void abase_p_1_poly_mul(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly w, abase_p_1_src_poly u, abase_p_1_src_poly v)
 {
-    unsigned int usize = abase_p_1_poly_deg(K, u)+1;
-    unsigned int vsize = abase_p_1_poly_deg(K, v)+1;
+    unsigned int usize = abase_p_1_poly_deg(k, u)+1;
+    unsigned int vsize = abase_p_1_poly_deg(k, v)+1;
     if ((usize == 0) || (vsize == 0)) {
         w->size = 0;
         return;
     }
     unsigned int wsize = usize + vsize - 1;
     if (w->alloc < wsize) {
-        abase_p_1_vec_reinit(K, &(w->c), w->alloc, wsize);
+        abase_p_1_vec_reinit(k, &(w->c), w->alloc, wsize);
         w->alloc = wsize;
     }
-    abase_p_1_vec_conv(K, w->c, u->c, usize, v->c, vsize);
+    abase_p_1_vec_conv(k, w->c, u->c, usize, v->c, vsize);
     w->size=wsize;
+    w->size = 1 + abase_p_1_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::polygcd::code_for_poly_gcd, Mpfq::defaults::poly, Mpfq::gfp */
@@ -1674,12 +1659,12 @@ void abase_p_1_poly_xgcd(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly 
       abase_p_1_poly_set(k,v0,b0);
       abase_p_1_poly_set(k,g,a0);
      } else {
-      abase_p_1_poly_getcoef(k,c,a0,da0);
+      abase_p_1_poly_getcoeff(k,c,a0,da0);
       abase_p_1_inv(k,c,c);
       abase_p_1_poly_scal_mul(k,g,a0,c);
       abase_p_1_poly_set(k,v0,b0);
       abase_p_1_poly_set(k,u0,b0);
-      abase_p_1_poly_setcoef(k,u0,c,0);
+      abase_p_1_poly_setcoeff(k,u0,c,0);
      }
     }
     else {
@@ -1693,8 +1678,8 @@ void abase_p_1_poly_xgcd(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly 
      abase_p_1_poly_init(k,v,1);
      abase_p_1_poly_init(k,w,1);
      abase_p_1_poly_init(k,x,1);
-     abase_p_1_poly_setcoef_ui(k,u,1,0);
-     abase_p_1_poly_setcoef_ui(k,x,1,0);
+     abase_p_1_poly_setcoeff_ui(k,u,1,0);
+     abase_p_1_poly_setcoeff_ui(k,x,1,0);
      /* u*a_initial + v*b_initial = a */
      /* w*a_initial + x*b_initial = b */
      while (abase_p_1_poly_deg(k,b)>=0) {
@@ -1711,7 +1696,7 @@ void abase_p_1_poly_xgcd(abase_p_1_dst_field k MAYBE_UNUSED, abase_p_1_dst_poly 
       abase_p_1_poly_set(k,x,r);
      }
      dega=abase_p_1_poly_deg(k,a);
-     abase_p_1_poly_getcoef(k,c,a,dega);
+     abase_p_1_poly_getcoeff(k,c,a,dega);
      abase_p_1_inv(k,c,c);
      abase_p_1_poly_scal_mul(k,g,a,c);
      abase_p_1_poly_scal_mul(k,u0,u,c);

@@ -33,10 +33,8 @@ typedef struct {
 
 
 typedef struct {
-  mp_limb_t *p;
-  size_t kl;   // number of limbs of a reduced elt
-  size_t url;  // number of limbs of an unreduced elt
-  mp_limb_t *bigmul_p; // largest multiple of p that fits in an ur_elt
+  mpz_t p;
+  mpz_t bigmul_p; // largest multiple of p that fits in an ur_elt
   long url_margin;  // number of adds of unreduced elts that are allowed (>=500)
   mgy_info_struct mgy_info;
   ts_info_struct ts_info;

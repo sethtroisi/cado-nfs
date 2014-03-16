@@ -7,12 +7,15 @@
 /* Active handler: simd_pz */
 /* Automatically generated code  */
 /* Active handler: pz */
+/* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
    fieldtype=prime,
+   n=mpz_size(k->p),
+   nn=(2*mpz_size(k->p) + 1),
    tag=pz,
    type=plain,
    vbase_stuff={

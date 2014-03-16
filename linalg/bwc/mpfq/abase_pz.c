@@ -14,12 +14,15 @@ static int abase_pz_impl_mpi_use_count;   /* several stacked init()/clear() pair
 /* Active handler: simd_pz */
 /* Automatically generated code  */
 /* Active handler: pz */
+/* Active handler: Mpfq::gfp::field */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::poly */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Options used:{
    family=[ { cpp_ifdef=COMPILE_MPFQ_PRIME_FIELDS, tag=pz, }, ],
    fieldtype=prime,
+   n=mpz_size(k->p),
+   nn=(2*mpz_size(k->p) + 1),
    tag=pz,
    type=plain,
    vbase_stuff={
@@ -78,36 +81,14 @@ static int abase_pz_impl_mpi_use_count;   /* several stacked init()/clear() pair
 
 
 /* Functions operating on the field structure */
-/* *pz::code_for_field_characteristic */
-void abase_pz_field_characteristic(abase_pz_dst_field k, mpz_t z)
-{
-        int i;
-        int n = k->kl;
-        mpz_set_ui(z, k->p[n - 1]);
-        for (i = n - 2; i >= 0; --i) {
-        mpz_mul_2exp(z, z, 64);
-        mpz_add_ui(z, z, k->p[i]);
-        }
-}
-
-/* *pz::code_for_field_init */
-void abase_pz_field_init(abase_pz_dst_field k)
-{
-        k->p = NULL;
-        k->bigmul_p = NULL;
-        k->io_base = 10;
-        mpz_init(k->factor);
-        k->ts_info.e = 0;
-}
-
-/* *pz::code_for_field_clear */
+/* *Mpfq::gfp::field::code_for_field_clear, pz */
 void abase_pz_field_clear(abase_pz_dst_field k)
 {
-        free(k->p);
-        free(k->bigmul_p);
+        mpz_clear(k->p);
+        mpz_clear(k->bigmul_p);
         if (k->ts_info.e > 0) {
-        free(k->ts_info.hh);
-        free(k->ts_info.z);
+            free(k->ts_info.hh);
+            free(k->ts_info.z);
         }
         mpz_clear(k->factor);
 }
@@ -115,29 +96,28 @@ void abase_pz_field_clear(abase_pz_dst_field k)
 /* *pz::code_for_field_specify */
 void abase_pz_field_specify(abase_pz_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-        mpz_ptr p = (mpz_ptr) vp;
-        k->kl = mpz_size(p);
-        k->p = (mp_limb_t *) mpfq_malloc_check(k->kl * sizeof(mp_limb_t));
-        for (unsigned int i = 0; i < k->kl; ++i)
-        k->p[i] = mpz_getlimbn(p, i);
-        k->url = 1 + 2 * k->kl;
         k->url_margin = LONG_MAX;
-        // precompute bigmul_p = largest multiple of p that fits in an elt_ur,
-        //   p*Floor( (2^(nn*w)-1)/p )
-        if (k->bigmul_p == NULL)
-        k->bigmul_p = (mp_limb_t *) mpfq_malloc_check(k->url * sizeof(mp_limb_t));
-        abase_pz_elt_ur big;
-        abase_pz_elt_ur_init(k, &big);
-        mp_limb_t q[k->url - k->kl + 1], r[k->kl], tmp[k->url + 1];
-    
-        for (unsigned int i = 0; i < k->url; ++i)
-        big[i] = ~0UL;
-        mpn_tdiv_qr(q, r, 0, big, k->url, k->p, k->kl);
-        mpn_mul(tmp, q, k->url - k->kl + 1, k->p, k->kl);
-        for (unsigned int i = 0; i < k->url; ++i)
-        (k->bigmul_p)[i] = tmp[i];
-        abase_pz_elt_ur_clear(k, &big);
-        assert(tmp[k->url] == 0UL);
+        if (dummy == MPFQ_PRIME_MPN) {
+            fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
+            return;
+        } else if (dummy == MPFQ_PRIME_MPZ) {
+            mpz_srcptr p = (mpz_srcptr) vp;
+            mpz_set(k->p, p);
+            {
+                /* precompute bigmul_p = largest multiple of p that fits in an
+                 * elt_ur: p*Floor( (2^((2*mpz_size(k->p) + 1)*64)-1)/p )
+                 */
+                mpz_ui_pow_ui(k->bigmul_p, 2, (2*mpz_size(k->p) + 1)*64);
+                mpz_sub_ui(k->bigmul_p, k->bigmul_p, 1);
+                mpz_fdiv_q(k->bigmul_p, k->bigmul_p, k->p);
+                mpz_mul(k->bigmul_p, k->bigmul_p, k->p);
+            }
+        } else if (dummy == MPFQ_GROUPSIZE && *(int*)vp == 1) {
+            /* Do nothing, this is an admitted condition */
+            return;
+        } else {
+            return;
+        }
 }
 
 
@@ -145,13 +125,13 @@ void abase_pz_field_specify(abase_pz_dst_field k, unsigned long dummy MAYBE_UNUS
 /* *pz::code_for_init */
 void abase_pz_init(abase_pz_dst_field k, abase_pz_elt * x)
 {
-        *x = (abase_pz_elt) mpfq_malloc_check(k->kl * sizeof(mp_limb_t));
+        *x = (abase_pz_elt) mpfq_malloc_check(mpz_size(k->p) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_clear */
 void abase_pz_clear(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_elt * x)
 {
-        free(*x);
+        mpfq_free(*x, mpz_size(k->p) * sizeof(mp_limb_t));
 }
 
 
@@ -159,14 +139,14 @@ void abase_pz_clear(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_elt * x)
 /* *pz::code_for_set_mpn */
 void abase_pz_set_mpn(abase_pz_dst_field k, abase_pz_dst_elt z, mp_limb_t * x, size_t n)
 {
-        if (n < k->kl) {
+        if (n < mpz_size(k->p)) {
         memcpy(z, x, n * sizeof(mp_limb_t));
-        memset(z + n, 0, (k->kl - n) * sizeof(mp_limb_t));
+        memset(z + n, 0, (mpz_size(k->p) - n) * sizeof(mp_limb_t));
         } else {
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) mpfq_malloc_check((n + 1 - k->kl) * sizeof(mp_limb_t));
-        mpn_tdiv_qr(tmp, z, 0, x, n, k->p, k->kl);
-        free(tmp);
+        tmp = (mp_limb_t *) mpfq_malloc_check((n + 1 - mpz_size(k->p)) * sizeof(mp_limb_t));
+        mpn_tdiv_qr(tmp, z, 0, x, n, k->p->_mp_d, mpz_size(k->p));
+        mpfq_free(tmp, (n + 1 - mpz_size(k->p)) * sizeof(mp_limb_t));
         }
 }
 
@@ -187,7 +167,7 @@ void abase_pz_random(abase_pz_dst_field k, abase_pz_dst_elt z, gmp_randstate_t s
 {
         mpz_t zz;
         mpz_init(zz);
-        mpz_urandomb(zz, state, k->kl * GMP_LIMB_BITS);
+        mpz_urandomb(zz, state, mpz_size(k->p) * GMP_LIMB_BITS);
         abase_pz_set_mpz(k, z, zz);
         mpz_clear(zz);
 }
@@ -197,7 +177,7 @@ void abase_pz_random2(abase_pz_dst_field k, abase_pz_dst_elt z, gmp_randstate_t 
 {
         mpz_t zz;
         mpz_init(zz);
-        mpz_rrandomb(zz, state, k->kl * GMP_LIMB_BITS);
+        mpz_rrandomb(zz, state, mpz_size(k->p) * GMP_LIMB_BITS);
         abase_pz_set_mpz(k, z, zz);
         mpz_clear(zz);
 }
@@ -208,18 +188,18 @@ void abase_pz_random2(abase_pz_dst_field k, abase_pz_dst_elt z, gmp_randstate_t 
 void abase_pz_add(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x, abase_pz_src_elt y)
 {
         mp_limb_t cy;
-        cy = mpn_add_n(z, x, y, k->kl);
-        if (cy || mpn_cmp(z, k->p, k->kl) >= 0)
-        mpn_sub_n(z, z, k->p, k->kl);
+        cy = mpn_add_n(z, x, y, mpz_size(k->p));
+        if (cy || mpn_cmp(z, k->p->_mp_d, mpz_size(k->p)) >= 0)
+        mpn_sub_n(z, z, k->p->_mp_d, mpz_size(k->p));
 }
 
 /* *pz::code_for_sub */
 void abase_pz_sub(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x, abase_pz_src_elt y)
 {
         mp_limb_t cy;
-        cy = mpn_sub_n(z, x, y, k->kl);
+        cy = mpn_sub_n(z, x, y, mpz_size(k->p));
         if (cy)
-        mpn_add_n(z, z, k->p, k->kl);
+        mpn_add_n(z, z, k->p->_mp_d, mpz_size(k->p));
 }
 
 /* *pz::code_for_neg */
@@ -228,7 +208,7 @@ void abase_pz_neg(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x)
         if (abase_pz_is_zero(k, x))
         abase_pz_set_zero(k, z);
         else
-        mpn_sub_n(z, k->p, x, k->kl);
+        mpn_sub_n(z, k->p->_mp_d, x, mpz_size(k->p));
 }
 
 /* *pz::code_for_mul */
@@ -283,22 +263,48 @@ void abase_pz_pow(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x, 
         mpz_clear(xx);
 }
 
+/* *Mpfq::defaults::pow::code_for_powz, pz */
+void abase_pz_powz(abase_pz_dst_field k, abase_pz_dst_elt y, abase_pz_src_elt x, mpz_srcptr z)
+{
+        if (mpz_sgn(z) < 0) {
+            mpz_t mz;
+            mpz_init(mz);
+            mpz_neg(mz, z);
+            abase_pz_powz(k, y, x, mz);
+            abase_pz_inv(k, y, y);
+            mpz_clear(mz);
+        } else if (mpz_sizeinbase(z, 2) > abase_pz_field_degree(k) * abase_pz_field_characteristic_bits(k)) {
+            mpz_t zr;
+            mpz_init(zr);
+            mpz_t ppz;
+            abase_pz_field_characteristic(k, ppz);
+            mpz_pow_ui(ppz,ppz,abase_pz_field_degree(k));
+            mpz_sub_ui(ppz,ppz,1);
+            mpz_fdiv_r(zr, z, ppz);
+            abase_pz_powz(k, y, x, zr);
+            mpz_clear(ppz);
+            mpz_clear(zr);
+        } else {
+            abase_pz_pow(k, y, x, z->_mp_d, mpz_size(z));
+        }
+}
+
 /* *pz::code_for_add_ui */
 void abase_pz_add_ui(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x, unsigned long y)
 {
         mp_limb_t cy;
-        cy = mpn_add_1(z, x, k->kl, y);
-        if (cy || mpn_cmp(z, k->p, k->kl) >= 0)
-        mpn_sub_n(z, z, k->p, k->kl);
+        cy = mpn_add_1(z, x, mpz_size(k->p), y);
+        if (cy || mpn_cmp(z, k->p->_mp_d, mpz_size(k->p)) >= 0)
+        mpn_sub_n(z, z, k->p->_mp_d, mpz_size(k->p));
 }
 
 /* *pz::code_for_sub_ui */
 void abase_pz_sub_ui(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x, unsigned long y)
 {
         mp_limb_t cy;
-        cy = mpn_sub_1(z, x, k->kl, y);
+        cy = mpn_sub_1(z, x, mpz_size(k->p), y);
         if (cy)
-        mpn_add_n(z, z, k->p, k->kl);
+        mpn_add_n(z, z, k->p->_mp_d, mpz_size(k->p));
 }
 
 /* *pz::code_for_mul_ui */
@@ -344,69 +350,69 @@ int abase_pz_inv(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_elt x)
 /* *pz::code_for_elt_ur_init */
 void abase_pz_elt_ur_init(abase_pz_dst_field k, abase_pz_elt_ur * x)
 {
-        *x = (abase_pz_elt_ur) mpfq_malloc_check(k->url * sizeof(mp_limb_t));
+        *x = (abase_pz_elt_ur) mpfq_malloc_check(mpz_size(k->bigmul_p) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_elt_ur_clear */
 void abase_pz_elt_ur_clear(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_elt_ur * x)
 {
-        free(*x);
+        mpfq_free(*x, mpz_size(k->bigmul_p) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_elt_ur_add */
 void abase_pz_elt_ur_add(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_elt_ur x, abase_pz_src_elt_ur y)
 {
-        mpn_add_n(z, x, y, k->url);
+        mpn_add_n(z, x, y, mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_elt_ur_neg */
 void abase_pz_elt_ur_neg(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_elt_ur x)
 {
-        mpn_neg(z, x, k->url);
+        mpn_neg(z, x, mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_elt_ur_sub */
 void abase_pz_elt_ur_sub(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_elt_ur x, abase_pz_src_elt_ur y)
 {
-        mpn_sub_n(z, x, y, k->url);
+        mpn_sub_n(z, x, y, mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_mul_ur */
 void abase_pz_mul_ur(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_elt x, abase_pz_src_elt y)
 {
-        mpn_mul_n(z, x, y, k->kl);
-        z[k->url - 1] = 0;
+        mpn_mul_n(z, x, y, mpz_size(k->p));
+        z[mpz_size(k->bigmul_p) - 1] = 0;
 }
 
 /* *pz::code_for_sqr_ur */
 void abase_pz_sqr_ur(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_elt x)
 {
-        mpn_sqr(z, x, k->kl);
-        z[k->url - 1] = 0;
+        mpn_sqr(z, x, mpz_size(k->p));
+        z[mpz_size(k->bigmul_p) - 1] = 0;
 }
 
 /* *pz::code_for_reduce */
 void abase_pz_reduce(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_dst_elt_ur x)
 {
     //    int neg = 0;
-        if (x[k->url - 1] >> (GMP_LIMB_BITS - 1)) {	// negative input
+        if (x[mpz_size(k->bigmul_p) - 1] >> (GMP_LIMB_BITS - 1)) {	// negative input
     //        neg = 1;
     //        abase_pz_elt_ur_neg(k, x, x);
-        mpn_add_n(x, x, k->bigmul_p, k->url);
+        mpn_add_n(x, x, k->bigmul_p->_mp_d, mpz_size(k->bigmul_p));
         }
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) mpfq_malloc_check((k->url + 1) * sizeof(mp_limb_t));
-        mpn_tdiv_qr(tmp, z, 0, x, k->url, k->p, k->kl);
+        tmp = (mp_limb_t *) mpfq_malloc_check((mpz_size(k->bigmul_p) + 1) * sizeof(mp_limb_t));
+        mpn_tdiv_qr(tmp, z, 0, x, mpz_size(k->bigmul_p), k->p->_mp_d, mpz_size(k->p));
     //    if (neg)
     //        abase_pz_neg(k, z, z);
-        free(tmp);
+        mpfq_free(tmp, (mpz_size(k->bigmul_p) + 1) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_normalize */
 void abase_pz_normalize(abase_pz_dst_field k, abase_pz_dst_elt z)
 {
         mp_limb_t tmp;
-        mpn_tdiv_qr(&tmp, z, 0, z, k->kl, k->p, k->kl);
+        mpn_tdiv_qr(&tmp, z, 0, z, mpz_size(k->p), k->p->_mp_d, mpz_size(k->p));
 }
 
 
@@ -418,22 +424,22 @@ void abase_pz_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_elt x)
 {
         // deal with 0
         if (abase_pz_is_zero(k, x)) {
-        *pstr = (char *) mpfq_malloc_check(2);
-        *pstr[0] = '0';
-        *pstr[1] = '\0';
+        char * s = *pstr = (char *) malloc(2);
+        s[0] = '0';
+        s[1] = '\0';
         return;
         }
         // allocate enough room for base 2 conversion.
-        *pstr = (char *) mpfq_malloc_check(((k->kl) * 64 + 1));
+        *pstr = (char *) malloc(((mpz_size(k->p)) * 64 + 1));
         mp_limb_t *tmp;
-        tmp = (mp_limb_t *) mpfq_malloc_check((k->kl) * sizeof(mp_limb_t));
-        int tl = k->kl - 1;
+        tmp = (mp_limb_t *) mpfq_malloc_check((mpz_size(k->p)) * sizeof(mp_limb_t));
+        int tl = mpz_size(k->p) - 1;
         while (x[tl] == 0)		// x is non-zero, no need to test tl>0
         tl--;
         for (int i = 0; i <= tl; ++i)
         tmp[i] = x[i];
         int n = mpn_get_str((unsigned char *) (*pstr), k->io_base, tmp, tl + 1);
-        free(tmp);
+        mpfq_free(tmp, (mpz_size(k->p)) * sizeof(mp_limb_t));
         for (int i = 0; i < n; ++i)
         (*pstr)[i] += '0';
         (*pstr)[n] = '\0';
@@ -493,74 +499,64 @@ int abase_pz_fscan(abase_pz_dst_field k, FILE * file, abase_pz_dst_elt x)
 /* *pz::code_for_vec_init */
 void abase_pz_vec_init(abase_pz_dst_field k, abase_pz_vec * v, unsigned int n)
 {
-        *v = (abase_pz_vec) mpfq_malloc_check((k->kl) * n * sizeof(mp_limb_t));
+        *v = (abase_pz_vec) mpfq_malloc_check((mpz_size(k->p)) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_reinit */
 void abase_pz_vec_reinit(abase_pz_dst_field k, abase_pz_vec * v, unsigned int n MAYBE_UNUSED, unsigned int m)
 {
-        *v = (abase_pz_vec) mpfq_realloc_check(*v, (k->kl) * m * sizeof(mp_limb_t));
+        *v = (abase_pz_vec) mpfq_realloc_check(*v, (mpz_size(k->p)) * n * sizeof(mp_limb_t), (mpz_size(k->p)) * m * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_clear */
 void abase_pz_vec_clear(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_vec * v, unsigned int n MAYBE_UNUSED)
 {
-        free(*v);
+        mpfq_free(*v, (mpz_size(k->p)) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_set */
 void abase_pz_vec_set(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec v, unsigned int n)
 {
         if (v != w)
-        memmove(w, v, n * k->kl * sizeof(mp_limb_t));
-}
-
-/* *pz::code_for_vec_set_partial */
-void abase_pz_vec_set_partial(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec v, unsigned int bw, unsigned int bv, unsigned int l)
-{
-        if ((v + bv * k->kl * sizeof(mp_limb_t)) !=
-        (w + bw * k->kl * sizeof(mp_limb_t)))
-        memmove((w + bw * k->kl * sizeof(mp_limb_t)),
-            (v + bv * k->kl * sizeof(mp_limb_t)),
-            l * k->kl * sizeof(mp_limb_t));
+        memmove(w, v, n * mpz_size(k->p) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_set_zero */
 void abase_pz_vec_set_zero(abase_pz_dst_field k, abase_pz_dst_vec w, unsigned int n)
 {
-        memset(w, 0, n * k->kl * sizeof(mp_limb_t));
+        if (n) memset(w, 0, n * mpz_size(k->p) * sizeof(mp_limb_t));
 }
 
-/* *pz::code_for_vec_setcoef */
-void abase_pz_vec_setcoef(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_elt x, unsigned int i)
+/* *pz::code_for_vec_setcoeff */
+void abase_pz_vec_setcoeff(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_elt x, unsigned int i)
 {
-        abase_pz_set(k, w + i * k->kl, x);
+        abase_pz_set(k, w + i * mpz_size(k->p), x);
 }
 
-/* *pz::code_for_vec_setcoef_ui */
-void abase_pz_vec_setcoef_ui(abase_pz_dst_field k, abase_pz_dst_vec w, unsigned long x0, unsigned int i)
+/* *pz::code_for_vec_setcoeff_ui */
+void abase_pz_vec_setcoeff_ui(abase_pz_dst_field k, abase_pz_dst_vec w, unsigned long x0, unsigned int i)
 {
-        abase_pz_set_ui(k, w + i * k->kl, x0);
+        abase_pz_set_ui(k, w + i * mpz_size(k->p), x0);
 }
 
-/* *pz::code_for_vec_getcoef */
-void abase_pz_vec_getcoef(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_vec v, unsigned int i)
+/* *pz::code_for_vec_getcoeff */
+void abase_pz_vec_getcoeff(abase_pz_dst_field k, abase_pz_dst_elt z, abase_pz_src_vec v, unsigned int i)
 {
-        abase_pz_set(k, z, v + i * k->kl);
+        abase_pz_set(k, z, v + i * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_add */
 void abase_pz_vec_add(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec u, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_add(k, w + i * k->kl, u + i * k->kl, v + i * k->kl);
+        abase_pz_add(k, w + i * mpz_size(k->p), u + i * mpz_size(k->p), v + i * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_neg */
 void abase_pz_vec_neg(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_neg(k, w + i * k->kl, v + i * k->kl);
+        abase_pz_neg(k, w + i * mpz_size(k->p), v + i * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_rev */
@@ -569,13 +565,13 @@ void abase_pz_vec_rev(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec
         unsigned int nn = n >> 1;
         abase_pz_elt tmp;
         abase_pz_init(k, &tmp);
-        for (unsigned int i = 0; i < nn; ++i) {
-        abase_pz_set(k, tmp, v + i * k->kl);
-        abase_pz_set(k, w + i * k->kl, v + (n - 1 - i) * k->kl);
-        abase_pz_set(k, w + (n - 1 - i) * k->kl, tmp);
+        for (unsigned int i = 0; i < n - 1 - i; ++i) {
+        abase_pz_set(k, tmp, v + i * mpz_size(k->p));
+        abase_pz_set(k, w + i * mpz_size(k->p), v + (n - 1 - i) * mpz_size(k->p));
+        abase_pz_set(k, w + (n - 1 - i) * mpz_size(k->p), tmp);
         }
         if (n & 1)
-        abase_pz_set(k, w + nn * k->kl, v + nn * k->kl);
+        abase_pz_set(k, w + nn * mpz_size(k->p), v + nn * mpz_size(k->p));
         abase_pz_clear(k, &tmp);
 }
 
@@ -583,14 +579,14 @@ void abase_pz_vec_rev(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec
 void abase_pz_vec_sub(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec u, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_sub(k, w + i * k->kl, u + i * k->kl, v + i * k->kl);
+        abase_pz_sub(k, w + i * mpz_size(k->p), u + i * mpz_size(k->p), v + i * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_scal_mul */
 void abase_pz_vec_scal_mul(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_vec v, abase_pz_src_elt x, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_mul(k, w + i * k->kl, v + i * k->kl, x);
+        abase_pz_mul(k, w + i * mpz_size(k->p), v + i * mpz_size(k->p), x);
 }
 
 /* *pz::code_for_vec_conv */
@@ -607,21 +603,21 @@ void abase_pz_vec_conv(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_src_ve
 void abase_pz_vec_random(abase_pz_dst_field k, abase_pz_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_random(k, w + i * k->kl, state);
+        abase_pz_random(k, w + i * mpz_size(k->p), state);
 }
 
 /* *pz::code_for_vec_random2 */
 void abase_pz_vec_random2(abase_pz_dst_field k, abase_pz_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_random2(k, w + i * k->kl, state);
+        abase_pz_random2(k, w + i * mpz_size(k->p), state);
 }
 
 /* *pz::code_for_vec_cmp */
 int abase_pz_vec_cmp(abase_pz_dst_field k, abase_pz_src_vec u, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i) {
-        int ret = abase_pz_cmp(k, u + i * k->kl, v + i * k->kl);
+        int ret = abase_pz_cmp(k, u + i * mpz_size(k->p), v + i * mpz_size(k->p));
         if (ret != 0)
             return ret;
         }
@@ -632,7 +628,7 @@ int abase_pz_vec_cmp(abase_pz_dst_field k, abase_pz_src_vec u, abase_pz_src_vec 
 int abase_pz_vec_is_zero(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i) {
-        if (!abase_pz_is_zero(k, v + i * k->kl))
+        if (!abase_pz_is_zero(k, v + i * mpz_size(k->p)))
             return 0;
         }
         return 1;
@@ -642,13 +638,14 @@ int abase_pz_vec_is_zero(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int 
 void abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec v, unsigned int n)
 {
         if (n == 0) {
-        *pstr = (char *) mpfq_malloc_check(4 * sizeof(char));
+        *pstr = (char *) malloc(4);
         sprintf(*pstr, "[ ]");
         return;
         }
         int alloc = 100;
         int len = 0;
-        *pstr = (char *) mpfq_malloc_check(alloc * sizeof(char));
+        *pstr = (char *) malloc(alloc);
+        if (!*pstr) abort();
         char *str = *pstr;
         *str++ = '[';
         *str++ = ' ';
@@ -659,11 +656,11 @@ void abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec 
             (*pstr)[len++] = ' ';
         }
         char *tmp;
-        abase_pz_asprint(k, &tmp, v + i * k->kl);
+        abase_pz_asprint(k, &tmp, v + i * mpz_size(k->p));
         int ltmp = strlen(tmp);
         if (len + ltmp + 4 > alloc) {
             alloc = len + ltmp + 100;
-            *pstr = (char *) realloc(*pstr, alloc * sizeof(char));
+            *pstr = (char *) realloc(*pstr, alloc);
         }
         strncpy(*pstr + len, tmp, ltmp + 4);
         len += ltmp;
@@ -713,7 +710,7 @@ int abase_pz_vec_sscan(abase_pz_dst_field k, abase_pz_vec * v, unsigned int * n,
             *n = i + 1;
         }
         int ret;
-        ret = abase_pz_sscan(k, (*v) + i * k->kl, str);
+        ret = abase_pz_sscan(k, (*v) + i * mpz_size(k->p), str);
         if (!ret) {
             return 0;
         }
@@ -740,14 +737,15 @@ int abase_pz_vec_fscan(abase_pz_dst_field k, FILE * file, abase_pz_vec * v, unsi
         int c;
         int allocated, len = 0;
         allocated = 100;
-        tmp = (char *) mpfq_malloc_check(allocated * sizeof(char));
+        tmp = (char *) malloc(allocated);
+        if (!tmp) abort();
         for (;;) {
         c = fgetc(file);
         if (c == EOF)
             return 0;
         if (len == allocated) {
             allocated += 100;
-            tmp = (char *) realloc(tmp, allocated * sizeof(char));
+            tmp = (char *) realloc(tmp, allocated);
         }
         tmp[len] = c;
         len++;
@@ -756,7 +754,7 @@ int abase_pz_vec_fscan(abase_pz_dst_field k, FILE * file, abase_pz_vec * v, unsi
         }
         if (len == allocated) {
         allocated += 1;
-        tmp = (char *) realloc(tmp, allocated * sizeof(char));
+        tmp = (char *) realloc(tmp, allocated);
         }
         tmp[len] = '\0';
         int ret = abase_pz_vec_sscan(k, v, n, tmp);
@@ -764,78 +762,77 @@ int abase_pz_vec_fscan(abase_pz_dst_field k, FILE * file, abase_pz_vec * v, unsi
         return ret;
 }
 
-/* missing vec_scan */
 /* *pz::code_for_vec_ur_init */
 void abase_pz_vec_ur_init(abase_pz_dst_field k, abase_pz_vec_ur * v, unsigned int n)
 {
-        *v = (abase_pz_vec) mpfq_malloc_check((k->url) * n * sizeof(mp_limb_t));
+        *v = (abase_pz_vec) mpfq_malloc_check((mpz_size(k->bigmul_p)) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_set_zero */
 void abase_pz_vec_ur_set_zero(abase_pz_dst_field k, abase_pz_dst_vec_ur w, unsigned int n)
 {
-        memset(w, 0, n * k->url * sizeof(mp_limb_t));
+        memset(w, 0, n * mpz_size(k->bigmul_p) * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_set_vec */
 void abase_pz_vec_ur_set_vec(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_elt_ur_set_elt(k, w + i * k->url, v + i * k->kl);
+        abase_pz_elt_ur_set_elt(k, w + i * mpz_size(k->bigmul_p), v + i * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_ur_reinit */
 void abase_pz_vec_ur_reinit(abase_pz_dst_field k, abase_pz_vec_ur * v, unsigned int n MAYBE_UNUSED, unsigned int m)
 {
-        *v = (abase_pz_vec) mpfq_realloc_check(*v, (k->url) * m * sizeof(mp_limb_t));
+        *v = (abase_pz_vec) mpfq_realloc_check(*v, (mpz_size(k->bigmul_p)) * n * sizeof(mp_limb_t), (mpz_size(k->bigmul_p)) * m * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_clear */
 void abase_pz_vec_ur_clear(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_vec_ur * v, unsigned int n MAYBE_UNUSED)
 {
-        free(*v);
+        mpfq_free(*v, (mpz_size(k->bigmul_p)) * n * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_ur_set */
 void abase_pz_vec_ur_set(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec_ur v, unsigned int n)
 {
         if (v != w)
-        memmove(w, v, n * k->url * sizeof(mp_limb_t));
+        memmove(w, v, n * mpz_size(k->bigmul_p) * sizeof(mp_limb_t));
 }
 
-/* *pz::code_for_vec_ur_setcoef */
-void abase_pz_vec_ur_setcoef(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_elt_ur x, unsigned int i)
+/* *pz::code_for_vec_ur_setcoeff */
+void abase_pz_vec_ur_setcoeff(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_elt_ur x, unsigned int i)
 {
-        abase_pz_elt_ur_set(k, w + i * k->url, x);
+        abase_pz_elt_ur_set(k, w + i * mpz_size(k->bigmul_p), x);
 }
 
-/* *pz::code_for_vec_ur_getcoef */
-void abase_pz_vec_ur_getcoef(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_vec_ur v, unsigned int i)
+/* *pz::code_for_vec_ur_getcoeff */
+void abase_pz_vec_ur_getcoeff(abase_pz_dst_field k, abase_pz_dst_elt_ur z, abase_pz_src_vec_ur v, unsigned int i)
 {
-        abase_pz_elt_ur_set(k, z, v + i * k->url);
+        abase_pz_elt_ur_set(k, z, v + i * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_ur_add */
 void abase_pz_vec_ur_add(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec_ur u, abase_pz_src_vec_ur v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_elt_ur_add(k, w + i * k->url, u + i * k->url,
-                      v + i * k->url);
+        abase_pz_elt_ur_add(k, w + i * mpz_size(k->bigmul_p), u + i * mpz_size(k->bigmul_p),
+                      v + i * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_ur_sub */
 void abase_pz_vec_ur_sub(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec_ur u, abase_pz_src_vec_ur v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_elt_ur_sub(k, w + i * k->url, u + i * k->url,
-                      v + i * k->url);
+        abase_pz_elt_ur_sub(k, w + i * mpz_size(k->bigmul_p), u + i * mpz_size(k->bigmul_p),
+                      v + i * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_ur_neg */
 void abase_pz_vec_ur_neg(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec_ur v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_elt_ur_neg(k, w + i * k->url, v + i * k->url);
+        abase_pz_elt_ur_neg(k, w + i * mpz_size(k->bigmul_p), v + i * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_ur_rev */
@@ -845,12 +842,12 @@ void abase_pz_vec_ur_rev(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_s
         abase_pz_elt_ur tmp;
         abase_pz_elt_ur_init(k, &tmp);
         for (unsigned int i = 0; i < nn; ++i) {
-        abase_pz_elt_ur_set(k, tmp, v + i * k->url);
-        abase_pz_elt_ur_set(k, w + i * k->url, v + (n - 1 - i) * k->url);
-        abase_pz_elt_ur_set(k, w + (n - 1 - i) * k->url, tmp);
+        abase_pz_elt_ur_set(k, tmp, v + i * mpz_size(k->bigmul_p));
+        abase_pz_elt_ur_set(k, w + i * mpz_size(k->bigmul_p), v + (n - 1 - i) * mpz_size(k->bigmul_p));
+        abase_pz_elt_ur_set(k, w + (n - 1 - i) * mpz_size(k->bigmul_p), tmp);
         }
         if (n & 1)
-        abase_pz_elt_ur_set(k, w + nn * k->url, v + nn * k->url);
+        abase_pz_elt_ur_set(k, w + nn * mpz_size(k->bigmul_p), v + nn * mpz_size(k->bigmul_p));
         abase_pz_elt_ur_clear(k, &tmp);
 }
 
@@ -858,7 +855,7 @@ void abase_pz_vec_ur_rev(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_s
 void abase_pz_vec_scal_mul_ur(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_src_vec v, abase_pz_src_elt x, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_mul_ur(k, w + i * k->url, v + i * k->kl, x);
+        abase_pz_mul_ur(k, w + i * mpz_size(k->bigmul_p), v + i * mpz_size(k->p), x);
 }
 
 static void abase_pz_vec_conv_ur_ks(abase_pz_field, abase_pz_dst_vec_ur, abase_pz_src_vec, unsigned int, abase_pz_src_vec, unsigned int);
@@ -879,7 +876,7 @@ void abase_pz_vec_conv_ur_ks(abase_pz_field k, abase_pz_dst_vec_ur w, abase_pz_s
         unsigned long nwords = 1 + ((nbits - 1) / GMP_NUMB_BITS);
         nbits = GMP_NUMB_BITS * nwords;
         mpz_clear(p);
-        assert(k->url >= nwords);
+        assert(mpz_size(k->bigmul_p) >= nwords);
     
         // Create big integers
         mp_limb_t *U, *V;
@@ -887,10 +884,10 @@ void abase_pz_vec_conv_ur_ks(abase_pz_field k, abase_pz_dst_vec_ur w, abase_pz_s
         V = (mp_limb_t *) mpfq_malloc_check(m * nwords * sizeof(mp_limb_t));
         memset(U, 0, n * nwords * sizeof(mp_limb_t));
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_get_mpn(k, U + i * nwords, u + i * k->kl);
+        abase_pz_get_mpn(k, U + i * nwords, u + i * mpz_size(k->p));
         memset(V, 0, m * nwords * sizeof(mp_limb_t));
         for (unsigned int i = 0; i < m; ++i)
-        abase_pz_get_mpn(k, V + i * nwords, v + i * k->kl);
+        abase_pz_get_mpn(k, V + i * nwords, v + i * mpz_size(k->p));
         // Mul !
         mp_limb_t *W;
         W = (mp_limb_t *) mpfq_malloc_check((n + m) * nwords * sizeof(mp_limb_t));
@@ -899,12 +896,12 @@ void abase_pz_vec_conv_ur_ks(abase_pz_field k, abase_pz_dst_vec_ur w, abase_pz_s
         else
             mpn_mul(W, V, m * nwords, U, n * nwords);
         // Put coeffs in w
-        memset(w, 0, (n + m - 1) * k->url * sizeof(mp_limb_t));
+        memset(w, 0, (n + m - 1) * mpz_size(k->bigmul_p) * sizeof(mp_limb_t));
         for (unsigned int i = 0; i < n + m - 1; ++i)
-        memcpy(w + i * k->url, W + i * nwords, nwords * sizeof(mp_limb_t));
-        free(U);
-        free(V);
-        free(W);
+        memcpy(w + i * mpz_size(k->bigmul_p), W + i * nwords, nwords * sizeof(mp_limb_t));
+        mpfq_free(U, n * nwords * sizeof(mp_limb_t));
+        mpfq_free(V, m * nwords * sizeof(mp_limb_t));
+        mpfq_free(W, (m+n) * nwords * sizeof(mp_limb_t));
 }
 
 /* *pz::code_for_vec_conv_ur */
@@ -917,19 +914,19 @@ void abase_pz_vec_conv_ur(abase_pz_dst_field k, abase_pz_dst_vec_ur w, abase_pz_
 void abase_pz_vec_reduce(abase_pz_dst_field k, abase_pz_dst_vec w, abase_pz_dst_vec_ur v, unsigned int n)
 {
         for (unsigned int i = 0; i < n; ++i)
-        abase_pz_reduce(k, w + i * k->kl, v + i * k->url);
+        abase_pz_reduce(k, w + i * mpz_size(k->p), v + i * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_elt_stride */
 ptrdiff_t abase_pz_vec_elt_stride(abase_pz_dst_field k, int n)
 {
-        return n * k->kl * sizeof(mp_limb_t);
+        return n * mpz_size(k->p) * sizeof(mp_limb_t);
 }
 
 /* *pz::code_for_vec_ur_elt_stride */
 ptrdiff_t abase_pz_vec_ur_elt_stride(abase_pz_dst_field k, int n)
 {
-        return n * k->url * sizeof(mp_limb_t);
+        return n * mpz_size(k->bigmul_p) * sizeof(mp_limb_t);
 }
 
 
@@ -946,16 +943,16 @@ void abase_pz_poly_setmonic(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly
         abase_pz_elt aux;
         abase_pz_init(K, &aux);
         abase_pz_set_ui(K, aux, 1);
-        abase_pz_poly_setcoef(K, q, aux, 0);
+        abase_pz_poly_setcoeff(K, q, aux, 0);
         abase_pz_clear(K, &aux);
         q->size = 1;
         return;
     }
     abase_pz_elt lc;
     abase_pz_init(K, &lc);
-    abase_pz_poly_getcoef(K, lc, p, degp);
+    abase_pz_poly_getcoeff(K, lc, p, degp);
     abase_pz_inv(K, lc, lc);
-    abase_pz_poly_setcoef_ui(K, q, 1, degp);
+    abase_pz_poly_setcoeff_ui(K, q, 1, degp);
     abase_pz_vec_scal_mul(K, q->c, p->c, lc, degp);
     q->size = degp+1;
     abase_pz_clear(K, &lc);
@@ -993,7 +990,7 @@ void abase_pz_poly_divmod(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly q
     abase_pz_init(K, &ilb);
     abase_pz_elt temp;
     abase_pz_init(K, &temp);
-    abase_pz_poly_getcoef(K, temp, b, degb);
+    abase_pz_poly_getcoeff(K, temp, b, degb);
     if (abase_pz_cmp_ui(K, temp, 1) == 0) {
         abase_pz_set_ui(K, ilb, 1);
         bmonic = 1;
@@ -1015,17 +1012,17 @@ void abase_pz_poly_divmod(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly q
     int i;
     int j;
     for (i = dega; i >= (int)degb; --i) {
-        abase_pz_poly_getcoef(K, aux, rr, i);
+        abase_pz_poly_getcoeff(K, aux, rr, i);
         if (!bmonic) 
             abase_pz_mul(K, aux, aux, ilb);
-        abase_pz_poly_setcoef(K, qq, aux, i-degb);
+        abase_pz_poly_setcoeff(K, qq, aux, i-degb);
         for (j = i-1; j >= (int)(i - degb); --j) {
-            abase_pz_poly_getcoef(K, temp, b, j-i+degb);
+            abase_pz_poly_getcoeff(K, temp, b, j-i+degb);
             abase_pz_mul(K, aux2, aux, temp);
-            abase_pz_poly_getcoef(K, temp, rr, j);
+            abase_pz_poly_getcoeff(K, temp, rr, j);
     
             abase_pz_sub(K, temp, temp, aux2);
-            abase_pz_poly_setcoef(K, rr, temp, j);
+            abase_pz_poly_setcoeff(K, rr, temp, j);
         }
     }    
     
@@ -1054,12 +1051,12 @@ void abase_pz_poly_preinv(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly q
     // Assume p != q (no alias)
     abase_pz_elt temp;
     abase_pz_init(K, &temp);
-    abase_pz_poly_getcoef(K, temp, p, 0);//Should be in the assert
+    abase_pz_poly_getcoeff(K, temp, p, 0);//Should be in the assert
     assert( abase_pz_cmp_ui(K, temp, 1) == 0);
     assert (p != q);
     int m;
     if (n <= 2) {
-        abase_pz_poly_setcoef_ui(K, q, 1, 0);
+        abase_pz_poly_setcoeff_ui(K, q, 1, 0);
         q->size = 1;
         m = 1;
         if (n == 1)
@@ -1081,11 +1078,11 @@ void abase_pz_poly_preinv(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly q
     abase_pz_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
     int nn = MIN(n, MIN(n, p->size) + m -1);
     abase_pz_vec_neg(K, tmp, tmp, nn);
-    abase_pz_vec_getcoef(K, temp, tmp, 0);
+    abase_pz_vec_getcoeff(K, temp, tmp, 0);
     abase_pz_add_ui(K, temp, temp, 1);
-    abase_pz_vec_setcoef(K, tmp, temp, 0);
+    abase_pz_vec_setcoeff(K, tmp, temp, 0);
     abase_pz_vec_conv(K, tmp, q->c, m, tmp, nn);
-    abase_pz_vec_set(K, q->c + m, tmp + m, n-m);
+    abase_pz_vec_set(K, abase_pz_vec_subvec(K, q->c, m), abase_pz_vec_subvec(K, tmp, m), n-m);
     q->size = n;
     
     abase_pz_clear(K, &temp);
@@ -1130,7 +1127,6 @@ void abase_pz_poly_mod_pre(abase_pz_dst_field K MAYBE_UNUSED, abase_pz_dst_poly 
     abase_pz_poly_clear(K, revq);
 }
 
-/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_pz::code_for_dotprod */
@@ -1253,6 +1249,12 @@ static void abase_pz_wrapper_field_characteristic(abase_vbase_ptr, mpz_t);
 static void abase_pz_wrapper_field_characteristic(abase_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
 {
     abase_pz_field_characteristic(vbase->obj, z);
+}
+
+static unsigned long abase_pz_wrapper_field_characteristic_bits(abase_vbase_ptr);
+static unsigned long abase_pz_wrapper_field_characteristic_bits(abase_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return abase_pz_field_characteristic_bits(vbase->obj);
 }
 
 static int abase_pz_wrapper_field_degree(abase_vbase_ptr);
@@ -1397,6 +1399,12 @@ static void abase_pz_wrapper_pow(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src
 static void abase_pz_wrapper_pow(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt z MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, unsigned long * n MAYBE_UNUSED, size_t nl MAYBE_UNUSED)
 {
     abase_pz_pow(vbase->obj, z, x, n, nl);
+}
+
+static void abase_pz_wrapper_powz(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_elt, mpz_srcptr);
+static void abase_pz_wrapper_powz(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt y MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, mpz_srcptr z MAYBE_UNUSED)
+{
+    abase_pz_powz(vbase->obj, y, x, z);
 }
 
 static void abase_pz_wrapper_frobenius(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_elt);
@@ -1591,34 +1599,28 @@ static void abase_pz_wrapper_vec_set(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p
     abase_pz_vec_set(vbase->obj, w, v, n);
 }
 
-static void abase_pz_wrapper_vec_set_partial(abase_vbase_ptr, abase_pz_dst_vec, abase_pz_src_vec, unsigned int, unsigned int, unsigned int);
-static void abase_pz_wrapper_vec_set_partial(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int bw MAYBE_UNUSED, unsigned int bv MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
-{
-    abase_pz_vec_set_partial(vbase->obj, w, v, bw, bv, l);
-}
-
 static void abase_pz_wrapper_vec_set_zero(abase_vbase_ptr, abase_pz_dst_vec, unsigned int);
 static void abase_pz_wrapper_vec_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
     abase_pz_vec_set_zero(vbase->obj, w, n);
 }
 
-static void abase_pz_wrapper_vec_setcoef(abase_vbase_ptr, abase_pz_dst_vec, abase_pz_src_elt, unsigned int);
-static void abase_pz_wrapper_vec_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_vec_setcoeff(abase_vbase_ptr, abase_pz_dst_vec, abase_pz_src_elt, unsigned int);
+static void abase_pz_wrapper_vec_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_vec_setcoef(vbase->obj, w, x, i);
+    abase_pz_vec_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_pz_wrapper_vec_setcoef_ui(abase_vbase_ptr, abase_pz_dst_vec, unsigned long, unsigned int);
-static void abase_pz_wrapper_vec_setcoef_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, unsigned long x0 MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_vec_setcoeff_ui(abase_vbase_ptr, abase_pz_dst_vec, unsigned long, unsigned int);
+static void abase_pz_wrapper_vec_setcoeff_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec w MAYBE_UNUSED, unsigned long x0 MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_vec_setcoef_ui(vbase->obj, w, x0, i);
+    abase_pz_vec_setcoeff_ui(vbase->obj, w, x0, i);
 }
 
-static void abase_pz_wrapper_vec_getcoef(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_vec, unsigned int);
-static void abase_pz_wrapper_vec_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt z MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_vec_getcoeff(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_vec, unsigned int);
+static void abase_pz_wrapper_vec_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt z MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_vec_getcoef(vbase->obj, z, v, i);
+    abase_pz_vec_getcoeff(vbase->obj, z, v, i);
 }
 
 static void abase_pz_wrapper_vec_add(abase_vbase_ptr, abase_pz_dst_vec, abase_pz_src_vec, abase_pz_src_vec, unsigned int);
@@ -1735,6 +1737,12 @@ static int abase_pz_wrapper_vec_fscan(abase_vbase_ptr vbase MAYBE_UNUSED, FILE *
     return abase_pz_vec_fscan(vbase->obj, file, v, n);
 }
 
+static int abase_pz_wrapper_vec_scan(abase_vbase_ptr, abase_pz_vec *, unsigned int *);
+static int abase_pz_wrapper_vec_scan(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
+{
+    return abase_pz_vec_scan(vbase->obj, w, n);
+}
+
 static void abase_pz_wrapper_vec_ur_init(abase_vbase_ptr, abase_pz_vec_ur *, unsigned int);
 static void abase_pz_wrapper_vec_ur_init(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
@@ -1771,16 +1779,16 @@ static void abase_pz_wrapper_vec_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, abas
     abase_pz_vec_ur_set(vbase->obj, w, v, n);
 }
 
-static void abase_pz_wrapper_vec_ur_setcoef(abase_vbase_ptr, abase_pz_dst_vec_ur, abase_pz_src_elt_ur, unsigned int);
-static void abase_pz_wrapper_vec_ur_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec_ur w MAYBE_UNUSED, abase_pz_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_vec_ur_setcoeff(abase_vbase_ptr, abase_pz_dst_vec_ur, abase_pz_src_elt_ur, unsigned int);
+static void abase_pz_wrapper_vec_ur_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_vec_ur w MAYBE_UNUSED, abase_pz_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_vec_ur_setcoef(vbase->obj, w, x, i);
+    abase_pz_vec_ur_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_pz_wrapper_vec_ur_getcoef(abase_vbase_ptr, abase_pz_dst_elt_ur, abase_pz_src_vec_ur, unsigned int);
-static void abase_pz_wrapper_vec_ur_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt_ur z MAYBE_UNUSED, abase_pz_src_vec_ur v MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_vec_ur_getcoeff(abase_vbase_ptr, abase_pz_dst_elt_ur, abase_pz_src_vec_ur, unsigned int);
+static void abase_pz_wrapper_vec_ur_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt_ur z MAYBE_UNUSED, abase_pz_src_vec_ur v MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_vec_ur_getcoef(vbase->obj, z, v, i);
+    abase_pz_vec_ur_getcoeff(vbase->obj, z, v, i);
 }
 
 static void abase_pz_wrapper_vec_ur_add(abase_vbase_ptr, abase_pz_dst_vec_ur, abase_pz_src_vec_ur, abase_pz_src_vec_ur, unsigned int);
@@ -1885,22 +1893,22 @@ static void abase_pz_wrapper_poly_setmonic(abase_vbase_ptr vbase MAYBE_UNUSED, a
     abase_pz_poly_setmonic(vbase->obj, q, p);
 }
 
-static void abase_pz_wrapper_poly_setcoef(abase_vbase_ptr, abase_pz_dst_poly, abase_pz_src_elt, unsigned int);
-static void abase_pz_wrapper_poly_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_poly w MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_poly_setcoeff(abase_vbase_ptr, abase_pz_dst_poly, abase_pz_src_elt, unsigned int);
+static void abase_pz_wrapper_poly_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_poly w MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_poly_setcoef(vbase->obj, w, x, i);
+    abase_pz_poly_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_pz_wrapper_poly_setcoef_ui(abase_vbase_ptr, abase_pz_dst_poly, unsigned long, unsigned int);
-static void abase_pz_wrapper_poly_setcoef_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_poly w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_poly_setcoeff_ui(abase_vbase_ptr, abase_pz_dst_poly, unsigned long, unsigned int);
+static void abase_pz_wrapper_poly_setcoeff_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_poly w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_poly_setcoef_ui(vbase->obj, w, x, i);
+    abase_pz_poly_setcoeff_ui(vbase->obj, w, x, i);
 }
 
-static void abase_pz_wrapper_poly_getcoef(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_poly, unsigned int);
-static void abase_pz_wrapper_poly_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt x MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_pz_wrapper_poly_getcoeff(abase_vbase_ptr, abase_pz_dst_elt, abase_pz_src_poly, unsigned int);
+static void abase_pz_wrapper_poly_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_elt x MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_pz_poly_getcoef(vbase->obj, x, w, i);
+    abase_pz_poly_getcoeff(vbase->obj, x, w, i);
 }
 
 static int abase_pz_wrapper_poly_deg(abase_vbase_ptr, abase_pz_src_poly);
@@ -2029,6 +2037,12 @@ static int abase_pz_wrapper_poly_fscan(abase_vbase_ptr vbase MAYBE_UNUSED, FILE 
     return abase_pz_poly_fscan(vbase->obj, file, w);
 }
 
+static int abase_pz_wrapper_poly_scan(abase_vbase_ptr, abase_pz_dst_poly);
+static int abase_pz_wrapper_poly_scan(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_dst_poly w MAYBE_UNUSED)
+{
+    return abase_pz_poly_scan(vbase->obj, w);
+}
+
 static int abase_pz_wrapper_groupsize(abase_vbase_ptr);
 static int abase_pz_wrapper_groupsize(abase_vbase_ptr vbase MAYBE_UNUSED)
 {
@@ -2134,6 +2148,7 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->impl_max_characteristic_bits = (unsigned long (*) ()) abase_pz_wrapper_impl_max_characteristic_bits;
     vbase->impl_max_degree = (unsigned long (*) ()) abase_pz_wrapper_impl_max_degree;
     vbase->field_characteristic = (void (*) (abase_vbase_ptr, mpz_t)) abase_pz_wrapper_field_characteristic;
+    vbase->field_characteristic_bits = (unsigned long (*) (abase_vbase_ptr)) abase_pz_wrapper_field_characteristic_bits;
     vbase->field_degree = (int (*) (abase_vbase_ptr)) abase_pz_wrapper_field_degree;
     vbase->field_init = (void (*) (abase_vbase_ptr)) abase_pz_wrapper_field_init;
     vbase->field_clear = (void (*) (abase_vbase_ptr)) abase_pz_wrapper_field_clear;
@@ -2159,6 +2174,7 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->is_sqr = (int (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_is_sqr;
     /* missing sqrt */
     vbase->pow = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long *, size_t)) abase_pz_wrapper_pow;
+    vbase->powz = (void (*) (abase_vbase_ptr, void *, const void *, mpz_srcptr)) abase_pz_wrapper_powz;
     vbase->frobenius = (void (*) (abase_vbase_ptr, void *, const void *)) abase_pz_wrapper_frobenius;
     vbase->add_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_pz_wrapper_add_ui;
     vbase->sub_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_pz_wrapper_sub_ui;
@@ -2191,11 +2207,10 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_pz_wrapper_vec_reinit;
     vbase->vec_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_pz_wrapper_vec_clear;
     vbase->vec_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_set;
-    vbase->vec_set_partial = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, unsigned int, unsigned int)) abase_pz_wrapper_vec_set_partial;
     vbase->vec_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_pz_wrapper_vec_set_zero;
-    vbase->vec_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_setcoef;
-    vbase->vec_setcoef_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_pz_wrapper_vec_setcoef_ui;
-    vbase->vec_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_getcoef;
+    vbase->vec_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_setcoeff;
+    vbase->vec_setcoeff_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_pz_wrapper_vec_setcoeff_ui;
+    vbase->vec_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_getcoeff;
     vbase->vec_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_pz_wrapper_vec_add;
     vbase->vec_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_neg;
     vbase->vec_rev = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_rev;
@@ -2215,15 +2230,15 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_print = (void (*) (abase_vbase_ptr, const void *, unsigned int)) abase_pz_wrapper_vec_print;
     vbase->vec_sscan = (int (*) (abase_vbase_ptr, void *, unsigned int *, const char *)) abase_pz_wrapper_vec_sscan;
     vbase->vec_fscan = (int (*) (abase_vbase_ptr, FILE *, void *, unsigned int *)) abase_pz_wrapper_vec_fscan;
-    /* missing vec_scan */
+    vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_pz_wrapper_vec_scan;
     vbase->vec_ur_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_pz_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_pz_wrapper_vec_ur_set_zero;
     vbase->vec_ur_set_vec = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_set_vec;
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_pz_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_pz_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_set;
-    vbase->vec_ur_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_setcoef;
-    vbase->vec_ur_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_getcoef;
+    vbase->vec_ur_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_setcoeff;
+    vbase->vec_ur_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_getcoeff;
     vbase->vec_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_add;
     vbase->vec_ur_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_sub;
     vbase->vec_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_vec_ur_neg;
@@ -2241,9 +2256,9 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->poly_clear = (void (*) (abase_vbase_ptr, void *)) abase_pz_wrapper_poly_clear;
     vbase->poly_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_pz_wrapper_poly_set;
     vbase->poly_setmonic = (void (*) (abase_vbase_ptr, void *, const void *)) abase_pz_wrapper_poly_setmonic;
-    vbase->poly_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_poly_setcoef;
-    vbase->poly_setcoef_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_pz_wrapper_poly_setcoef_ui;
-    vbase->poly_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_poly_getcoef;
+    vbase->poly_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_poly_setcoeff;
+    vbase->poly_setcoeff_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_pz_wrapper_poly_setcoeff_ui;
+    vbase->poly_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_pz_wrapper_poly_getcoeff;
     vbase->poly_deg = (int (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_poly_deg;
     vbase->poly_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_pz_wrapper_poly_add;
     vbase->poly_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_pz_wrapper_poly_sub;
@@ -2265,7 +2280,7 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->poly_print = (void (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_poly_print;
     vbase->poly_sscan = (int (*) (abase_vbase_ptr, void *, const char *)) abase_pz_wrapper_poly_sscan;
     vbase->poly_fscan = (int (*) (abase_vbase_ptr, FILE *, void *)) abase_pz_wrapper_poly_fscan;
-    /* missing poly_scan */
+    vbase->poly_scan = (int (*) (abase_vbase_ptr, void *)) abase_pz_wrapper_poly_scan;
     vbase->groupsize = (int (*) (abase_vbase_ptr)) abase_pz_wrapper_groupsize;
     vbase->offset = (int (*) (abase_vbase_ptr, int)) abase_pz_wrapper_offset;
     vbase->stride = (int (*) (abase_vbase_ptr)) abase_pz_wrapper_stride;

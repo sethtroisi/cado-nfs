@@ -21,6 +21,7 @@ struct abase_vbase_s {
     unsigned long (*impl_max_characteristic_bits)();
     unsigned long (*impl_max_degree)();
     void (*field_characteristic)(abase_vbase_ptr, mpz_t);
+    unsigned long (*field_characteristic_bits)(abase_vbase_ptr);
     int (*field_degree)(abase_vbase_ptr);
     void (*field_init)(abase_vbase_ptr);
     void (*field_clear)(abase_vbase_ptr);
@@ -46,6 +47,7 @@ struct abase_vbase_s {
     int (*is_sqr)(abase_vbase_ptr, const void *);
     int (*sqrt)(abase_vbase_ptr, void *, const void *);
     void (*pow)(abase_vbase_ptr, void *, const void *, unsigned long *, size_t);
+    void (*powz)(abase_vbase_ptr, void *, const void *, mpz_srcptr);
     void (*frobenius)(abase_vbase_ptr, void *, const void *);
     void (*add_ui)(abase_vbase_ptr, void *, const void *, unsigned long);
     void (*sub_ui)(abase_vbase_ptr, void *, const void *, unsigned long);
@@ -79,11 +81,10 @@ struct abase_vbase_s {
     void (*vec_reinit)(abase_vbase_ptr, void *, unsigned int, unsigned int);
     void (*vec_clear)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_set)(abase_vbase_ptr, void *, const void *, unsigned int);
-    void (*vec_set_partial)(abase_vbase_ptr, void *, const void *, unsigned int, unsigned int, unsigned int);
     void (*vec_set_zero)(abase_vbase_ptr, void *, unsigned int);
-    void (*vec_setcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
-    void (*vec_setcoef_ui)(abase_vbase_ptr, void *, unsigned long, unsigned int);
-    void (*vec_getcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_setcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_setcoeff_ui)(abase_vbase_ptr, void *, unsigned long, unsigned int);
+    void (*vec_getcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_add)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_neg)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_rev)(abase_vbase_ptr, void *, const void *, unsigned int);
@@ -110,8 +111,8 @@ struct abase_vbase_s {
     void (*vec_ur_reinit)(abase_vbase_ptr, void *, unsigned int, unsigned int);
     void (*vec_ur_clear)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set)(abase_vbase_ptr, void *, const void *, unsigned int);
-    void (*vec_ur_setcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
-    void (*vec_ur_getcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_ur_setcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*vec_ur_getcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
     void (*vec_ur_add)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_ur_sub)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_ur_neg)(abase_vbase_ptr, void *, const void *, unsigned int);
@@ -129,9 +130,9 @@ struct abase_vbase_s {
     void (*poly_clear)(abase_vbase_ptr, void *);
     void (*poly_set)(abase_vbase_ptr, void *, const void *);
     void (*poly_setmonic)(abase_vbase_ptr, void *, const void *);
-    void (*poly_setcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
-    void (*poly_setcoef_ui)(abase_vbase_ptr, void *, unsigned long, unsigned int);
-    void (*poly_getcoef)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*poly_setcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
+    void (*poly_setcoeff_ui)(abase_vbase_ptr, void *, unsigned long, unsigned int);
+    void (*poly_getcoeff)(abase_vbase_ptr, void *, const void *, unsigned int);
     int (*poly_deg)(abase_vbase_ptr, const void *);
     void (*poly_add)(abase_vbase_ptr, void *, const void *, const void *);
     void (*poly_sub)(abase_vbase_ptr, void *, const void *, const void *);
