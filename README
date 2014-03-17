@@ -46,8 +46,10 @@ Required software tools:
 *) GNU make and CMake for building (CMake is installed on the fly if missing
    (requires an Internet connection))
 *) Support for posix threads.
-*) The main cadofactor.py script uses a lot of unix tools: Python, Python3, 
-   ssh, rsync, gzip to mention but a few.
+*) The main cadofactor.py script uses a lot of unix tools: Python3, ssh,
+   rsync, gzip, and libsqlite3 to mention but a few. For more information
+   about the supported Python versions and required modules, see
+   README.Python.
 
 Optionally:
 *) Support for curl library.
