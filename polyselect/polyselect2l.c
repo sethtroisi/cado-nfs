@@ -238,6 +238,36 @@ expected_collisions (uint32_t twoP)
   return m * m;
 }
 
+static void
+check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name,
+                  const unsigned long q, const char *q_name)
+{
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_ui_p (d, q) == 0)
+  {
+    gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%lu\n",
+                 d_name, d, q_name, q);
+    exit (1);
+  }
+#endif
+  mpz_divexact_ui (r, d, q);
+}
+
+static void
+check_divexact(mpz_t r, const mpz_t d, const char *d_name, const mpz_t q,
+               const char *q_name)
+{
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_p (d, q) == 0)
+  {
+    gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%Zd\n",
+                 d_name, d, q_name, q);
+    exit (1);
+  }
+#endif
+  mpz_divexact (r, d, q);
+}
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
@@ -310,25 +340,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_ui_p (m, d) == 0)
-  {
-    fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact_ui (m, m, d);
+  check_divexact_ui (m, m, "m-a_{d-1}*l", d, "d");
 
   mpz_set_uint64 (adz, ad);
 
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (m, adz) == 0)
-  {
-    fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (m, m, adz);
+  check_divexact (m, m, "(m-a_{d-1}*l)/d", adz, "ad");
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
   mpz_set (f[d], adz);
@@ -336,28 +352,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul (t, t, adz);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
   {
-#ifdef DEBUG_POLYSELECT2L
-    if (mpz_divisible_p (t, l) == 0)
-    {
-      fprintf (stderr, "Error: t not divisible by l\n");
-      exit (1);
-    }
-#endif
-    mpz_divexact (t, t, l);
+    check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
     mpz_pow_ui (mtilde, m, j);
     /* fdiv rounds toward -infinity: adm1 = floor(t/mtilde) */
@@ -378,14 +379,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* subtract adm1*m^j */
     mpz_submul (t, mtilde, adm1);
   }
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
   /* save unoptimized polynomial to fold */
@@ -701,23 +695,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     mpz_sub (adm1, adm1, m);
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_ui_p (m, d) == 0)
-  {
-    fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact_ui (m, m, d);
+  check_divexact_ui (m, m, "m-a_{d-1}*l", d, "d");
   mpz_set_uint64 (adz, ad);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (m, adz) == 0)
-  {
-    fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (m, m, adz);
+  check_divexact (m, m, "(m-a_{d-1}*l)/d", adz, "ad");
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
   mpz_set (f[d], adz);
@@ -725,27 +705,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_mul (t, t, adz);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
   {
-#ifdef DEBUG_POLYSELECT2L
-    if (mpz_divisible_p (t, l) == 0)
-    {
-      fprintf (stderr, "Error: t not divisible by l\n");
-      exit (1);
-    }
-#endif
-    mpz_divexact (t, t, l);
+    check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
     mpz_pow_ui (mtilde, m, j);
     mpz_fdiv_q (adm1, t, mtilde); /* t -> adm1 * mtilde + t */
@@ -765,14 +731,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     mpz_submul (t, mtilde, adm1);
   }
 
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
   /* save unoptimized polynomial to fold */
