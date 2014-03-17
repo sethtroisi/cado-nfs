@@ -159,7 +159,10 @@ print_relation (FILE * file, earlyparsed_relation_srcptr rel)
 
   *(--p) = '\n';
   p[1] = 0;
-  fputs(buf, file);
+  if (fputs(buf, file) == EOF) {
+    perror("Error writing relation");
+    abort();
+  }
 }
 
 /* if duplicate is_dup = 1, else is_dup = 0

@@ -1,0 +1,84 @@
+Example of DLP in GF(p), with two algebraic polynomials.
+--------------------------------------------------------
+
+p = 71641520761751435455133616475667090434063332228247871855387
+
+With the polyselect/dlpolyselect program, we can find, for instance, the
+following:
+
+f = x^3 + 685*x^2 + 673*x + 21
+g = 20670492739628179278*x^2 + 7876345484835446710*x + 4426557527324220673
+skew = 1
+m = 19059804078929077752845532041439366212060940525972515545722
+
+1) Create a polynomial file:
+   (remember that Y is for side 0 and c is for side 1)
+$ cat p59.poly
+n: 71641520761751435455133616475667090434063332228247871855387
+m: 19059804078929077752845532041439366212060940525972515545722
+skew: 1.0
+Y2: 20670492739628179278
+Y1: 7876345484835446710
+Y0: 4426557527324220673
+c3: 1
+c2: 685
+c1: 673
+c0: 21
+
+2) then create the factor bases and sieve:
+
+$ makefb -poly p59.poly -alim 100000 -maxbits 11 -side 0 > p59.fb0
+$ makefb -poly p59.poly -alim 100000 -maxbits 11 -side 1 > p59.fb1
+
+$ las -poly p59.poly -fb0 p59.fb0 -fb1 p59.fb1 -I 11 -lim0 100000 -lim1 100000 -lpb0 22 -lpb1 22 -lambda0 1.2 -lambda1 1.2 -mfb0 24 -mfb1 24 -q0 200000 -q1 235000 -ratq > rels
+
+This gives 426065 relations (with revision 7de5be4). 
+
+3) Create a parameter file:
+  - start with a copy of params_dl/params.p59
+  - add the required parameters to run the python script outside
+    factor.sh: slaves.nrclients, tasks.execpath, tasks.workdir,
+    slaves.hostnames, slaves.scriptpath, slaves.basepath.
+    [ if you don't remember what they mean, this is normal; just start
+    factor.sh, and look at the parameter file it creates in order to
+    imitate ]
+  - add a line with the number p you want to deal with:
+    N = 71641520761751435455133616475667090434063332228247871855387
+  - Tell the script to use your polynomial file:
+    tasks.polyselect.admax = 0
+    tasks.polyselect.import = /my/wonderful/path/p59.poly
+  - Tell the script to use your relation file:
+    tasks.sieve.import = /my/wonderful/path/rels
+
+4) Run the script:
+   scripts/cadofactor/cadofactor.py params.p59
+
+It should finish with an error, claiming that it is impossible to find
+log2 and log3 in the resulting file.
+
+However, the result should be correct: for this example, on the 0-side, 3
+and 5 split completely, and therefore the file p59.reconstructlog.dlog
+should contain lines of the form:
+
+7 3 0 3 log30
+8 3 0 2 log31
+11 5 0 3 log50
+12 5 0 2 log51
+
+where the first column can vary (this is just an index), and the last
+column contain large numbers to be understand modulo ell=(p-1)/2.
+By defining
+  log3 = (log30+log31) mod ell
+  log5 = (log50+log51) mod ell
+it should be true that in GF(p) we have
+  3^(2*log5) == 5^(2*log3)
+(here the integer 2 is just the quotient (p-1)/ell).
+
+** IMPORTANT REMARK ** This example works because the "rational side" is
+of degree 2 and has a negative discriminant. Therefore, there are no
+units on the 0-side. No SM are needed on this side. This is consistent
+with the default behaviour of the script that adds SM only on the 1-side.
+However, this will probably fail if the 0-side is of degree 3 or if it is
+a real quadratic polynomial.
+
+Taking care of the more general case is work in progress...

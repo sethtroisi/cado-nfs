@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <math.h>
 #include "utils.h"
 #include "polyselect/rho.h"
 #include "tests_common.h"
@@ -42,7 +43,8 @@ test_rho (void)
   y = dickman_rho (0.0);
   ASSERT_ALWAYS (y == 1.0);
 
-  x = drand48 ();
+  x = ldexp(random_uint64(), -64);
+  ASSERT_ALWAYS (0 <= x && x < 1.0);
   y = dickman_rho (x);
   ASSERT_ALWAYS (y == 1.0);
 
@@ -95,7 +97,7 @@ test_rho (void)
 int
 main (int argc, const char *argv[])
 {
-  tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER);
+  tests_common_cmdline (&argc, &argv, PARSE_SEED);
   test_rho ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);

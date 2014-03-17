@@ -1314,12 +1314,16 @@ mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk)
   int i;
 
   /* first check P[k] exists and is not zero */
-  for (i = 0; i <= k; i++)
-    if (P[i]->deg == -1)
-      return;
+  if (P[k]->deg == -1)
+    return;
 
-  for (i = 0; i <= P[k]->deg; i++)
+  mpz_poly_realloc (a, P[k]->deg + 1);
+
+  for (i = 0; i <= P[k]->deg && i <= a->deg; i++)
     mpz_addmul (a->coeff[i], P[k]->coeff[i], pk);
+
+  for (; i <= P[k]->deg; i++)
+    mpz_mul (a->coeff[i], P[k]->coeff[i], pk);
 
   mpz_poly_cleandeg (a, (a->deg >= P[k]->deg) ? a->deg : P[k]->deg);
 }

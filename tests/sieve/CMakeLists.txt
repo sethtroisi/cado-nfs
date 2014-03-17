@@ -2,16 +2,32 @@
 # to stay compatible with older versions
 
 # Build makefb and las before running check
-add_dependencies(check makefb las las_tracek)
+add_dependencies(check makefb las las_tracek las_kbucket las_mbucket)
 
 # Get paths to the makefb and las binaries and store in variables
 # makefb_path and las_path, resp.
 get_property(makefb_path TARGET makefb PROPERTY LOCATION)
 get_property(las_path TARGET las PROPERTY LOCATION)
 get_property(las_tracek_path TARGET las_tracek PROPERTY LOCATION)
+get_property(las_kbucket_path TARGET las_kbucket PROPERTY LOCATION)
+get_property(las_mbucket_path TARGET las_mbucket PROPERTY LOCATION)
 
-add_test(F9_sievetest "${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh" "${makefb_path}" "${las_path}" "${CADO_NFS_SOURCE_DIR}")
-add_test(F9_tracektest "${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh" "${makefb_path}" "${las_tracek_path}" "${CADO_NFS_SOURCE_DIR}")
+add_test(F9_sievetest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+# Before running F9_sievetest, remove the file with the captured checksums
+# We have to make this a "test" so that ctest runs it, even though it does
+# not actually test anything
+add_test(F9_sievetest_cleanup "${CMAKE_COMMAND}" -E remove -f "${CMAKE_CURRENT_BINARY_DIR}/F9.checksums")
+SET_TESTS_PROPERTIES(F9_sievetest PROPERTIES DEPENDS F9_sievetest_cleanup)
+
+add_test(F9_sievetest_unsieve1 bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\" -unsievethresh 1")
+add_test(F9_kbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_kbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_kbucket_test PROPERTIES DEPENDS F9_sievetest)
+add_test(F9_mbucket_test bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.sievetest.sh\" \"${makefb_path}\" \"${las_mbucket_path}\" \"${CADO_NFS_SOURCE_DIR}\" \"${CMAKE_CURRENT_BINARY_DIR}/F9.checksums\"")
+SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
+
+# The TRACE_K test does only a single special-q, so we don't compare output
+# relations or checksums
+add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${makefb_path}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\"")
 
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
@@ -28,14 +44,14 @@ endmacro(add_trialdiv_test)
 macro (add_init_alg_norms_bucket_region)
   add_executable(test_init_alg_norms_bucket_region test_init_alg_norms_bucket_region.c)
   set_property(TARGET test_init_alg_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
-  target_link_libraries(test_init_alg_norms_bucket_region utils tests)
+  target_link_libraries(test_init_alg_norms_bucket_region las-norms utils tests)
   run_test(test_init_alg_norms_bucket_region test_init_alg_norms_bucket_region)
 endmacro(add_init_alg_norms_bucket_region)
 
 macro (add_init_rat_norms_bucket_region)
   add_executable(test_init_rat_norms_bucket_region test_init_rat_norms_bucket_region.c)
   set_property(TARGET test_init_rat_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
-  target_link_libraries(test_init_rat_norms_bucket_region utils tests)
+  target_link_libraries(test_init_rat_norms_bucket_region las-norms utils tests)
   run_test(test_init_rat_norms_bucket_region test_init_rat_norms_bucket_region)
 endmacro(add_init_rat_norms_bucket_region)
 

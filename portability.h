@@ -257,7 +257,9 @@ asprintf( char ** const sptr, const char * const fmt, ... )
 #define getc_unlocked getc
 #endif
 #ifndef HAVE_LRAND48
+#include <stdlib.h>
 #define lrand48 rand
+#define mrand48() (rand() - RAND_MAX/2)
 #endif
 
 #if defined(HAVE_MINGW) && !defined(HAVE_REALPATH)

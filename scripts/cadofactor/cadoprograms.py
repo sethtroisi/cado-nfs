@@ -105,10 +105,24 @@ class Option(object, metaclass=abc.ABCMeta):
             # thus we want to allow float parameters to be given in both
             # integer and float typee, so that passing, e.g., admax as an int
             # does not trip the assertion
-            if self.checktype is float:
-                assert isinstance(value, float) or isinstance(value, int)
-            else:
-                assert isinstance(value, self.checktype)
+            if self.checktype is float and type(value) is int:
+                # Write it to command line as an int
+                pass
+            elif self.checktype is int and type(value) is float:
+                # Can we convert this float to an int without loss?
+                if float(int(value)) == value:
+                    # Yes, convert it and write to command line as an int
+                    value = int(value)
+                else:
+                    raise ValueError("Cannot convert floating-point value %s "
+                                     "for parameter %s to an int without loss" %
+                                     (value, self.defaultname))
+            elif not isinstance(value, self.checktype):
+                raise TypeError("Value %s for parameter %s is of type %s, but "
+                                "checktype requires %s" %
+                                (repr(value), self.defaultname,
+                                 type(value).__name__,
+                                 self.checktype.__name__))
         return self._map(value)
 
     @abc.abstractmethod
@@ -199,7 +213,7 @@ sha1cache = Sha1Cache()
 if os.name == "nt":
     defaultsuffix = ".exe"
 else:
-    defaultsuffix = None
+    defaultsuffix = ""
 
 class Program(object, metaclass=InspectType):
     ''' Base class that represents programs of the CADO suite
@@ -228,37 +242,37 @@ class Program(object, metaclass=InspectType):
       map to an instance Parameter("t")
 
     >>> p = Ls()
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls'
     >>> p = Ls(stdout='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo'
     >>> p = Ls(stderr='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls 2> foo'
     >>> p = Ls(stdout='foo', stderr='bar')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo 2> bar'
     >>> p = Ls(stdout='foo', stderr='foo')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls > foo 2>&1'
     >>> p = Ls(stdout='foo', append_stdout=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo'
     >>> p = Ls(stderr='foo', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls 2>> foo'
     >>> p = Ls(stdout='foo', append_stdout=True, stderr='bar', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo 2>> bar'
     >>> p = Ls(stdout='foo', append_stdout=True, stderr='foo', append_stderr=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls >> foo 2>&1'
     >>> p = Ls('foo', 'bar')
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls foo bar'
     >>> p = Ls('foo', 'bar', long = True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace("ls.exe", "/bin/ls")
     '/bin/ls -l foo bar'
     '''
 
@@ -343,7 +357,7 @@ class Program(object, metaclass=InspectType):
         # calling os.path.isfile() multiple times
         path = str(execpath or self.path)
         subdir = str(execsubdir or self.subdir)
-        binary = str(execbin or self.binary) + (execsuffix or "")
+        binary = str(execbin or self.binary) + execsuffix
         execfile = os.path.normpath(os.sep.join([path, binary]))
         execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
         if execsubfile != execfile and os.path.isfile(execsubfile):
@@ -577,10 +591,10 @@ class Program(object, metaclass=InspectType):
 class Polyselect2l(Program):
     """
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect2l -P 5 -N 42 -degree 4 -v'
     >>> p = Polyselect2l(P=5, N=42, degree=4, verbose=True)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'polyselect2l -P 5 -N 42 -degree 4 -v'
     """
     binary = "polyselect2l"
@@ -595,9 +609,8 @@ class Polyselect2l(Program):
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
                  threads : Parameter("t", checktype=int)=None,
-                 admin : Parameter()=None, # Semantically an int, polyselect2l
-                    # parses as double to allow scientific notation
-                 admax : Parameter()=None, # Idem
+                 admin : Parameter(checktype=int)=None,
+                 admax : Parameter(checktype=int)=None,
                  incr : Parameter(checktype=int)=None,
                  nq : Parameter(checktype=int)=None,
                  save : Parameter(is_output_file=True)=None,
@@ -616,10 +629,10 @@ class Polyselect2l(Program):
 class MakeFB(Program):
     """
     >>> p = MakeFB(poly="foo.poly", alim=1)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1'
     >>> p = MakeFB(poly="foo.poly", alim=1, maxbits=5, stdout="foo.roots")
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
     """
     binary = "makefb"
@@ -639,10 +652,10 @@ class MakeFB(Program):
 class FreeRel(Program):
     """
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel")
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel'
     >>> p = FreeRel(poly="foo.poly", renumber="foo.renumber", lpbr=1, lpba=2, out="foo.freerel", badideals="foo.bad", pmin=123, pmax=234)
-    >>> p.make_command_line()
+    >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'freerel -poly foo.poly -renumber foo.renumber -lpbr 1 -lpba 2 -out foo.freerel -badideals foo.bad -pmin 123 -pmax 234'
     """
     binary = "freerel"
@@ -943,6 +956,7 @@ class Characters(Program):
                  lpbr: Parameter(),
                  lpba: Parameter(),
                  nchar: Parameter()=None,
+                 nratchars: Parameter()=None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)

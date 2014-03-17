@@ -77,23 +77,23 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
    compute their log2).
    CAREFUL! This function adds (1., 1.) to i to avoid negative value in the
-   exposant (numbers < 1.) !
+   exponent (numbers < 1.) !
 */
-static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d un) {
+static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d one) {
   __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrlq     $0x01,    %0       \n"
-	   "addpd     %1,       %0       \n"
+	   "addpd     %1,       %0       \n" /* To avoid negative values in the exponents */
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i):"x"(un));
+	   : "+&x"(i):"x"(one));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ __volatile__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
 	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
-	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
-	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
+	   "punpcklwd %0,       %0       \n" /* 0000 XXXX 0000 YYYY */
+	   "pshufd    $0xA0,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
 	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
@@ -904,7 +904,7 @@ void init_alg_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
       poly_scale(u, fijd, d, (double) (J + (p >> 1)));
       h = (double) (3 - Idiv2);
       for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = u[d]; for (unsigned int k = d; --k != UINT_MAX; g = g*h+u[k]); g = fabs(g);
+	g = u[d]; for (unsigned int k = d; k--; g = g * h + u[k]); g = fabs(g);
 	g += one;
 	uint64truncfastlog2(g,add,scale,S,ih);
       }
@@ -988,7 +988,7 @@ get_maxnorm_aux_pm (double_poly_srcptr poly, double s)
    (d) or on F(x,0) for -X <= x <= X (lower border, on the abscissa), but this
        maximum is f[d]*X^d, and is attained in (a).
 */
-static double
+double
 get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
   const unsigned int d = src_poly->deg;
@@ -1193,7 +1193,7 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   rat->logmax = log2(get_maxnorm_alg (poly, (double)si->I/2, (double)si->I/2));
 
   /* we increase artificially 'logmax', to allow larger values of J */
-  rat->logmax += 1.;
+  rat->logmax += 2.0;
 
   /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
@@ -1231,18 +1231,7 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /* we increase artificially 'logmax', to allow larger values of J */
   alg->logmax += 2.0;
-
-  /* on the algebraic side, we want that the non-reports on the rational
-     side, which are set to 255, remain larger than the report bound 'r',
-     even if the algebraic norm is totally smooth. For this, we artificially
-     increase by 'r' the maximal range.
-     If lambda * lpb < logmax, which is the usual case, then non-reports on
-     the rational side will start from logmax + lambda * lpb or more, and
-     decrease to lambda * lpb or more, thus above the threshold as we want.
-     If logmax < lambda * lpb, non-reports on the rational side will start
-     from 2*logmax or more, and decrease to logmax or more. */
-  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
-  maxlog2 = alg->logmax + r;
+  maxlog2 = alg->logmax;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
@@ -1255,9 +1244,11 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
   alg->bound = (unsigned char) (r * alg->scale + GUARD);
   fprintf (output, " bound=%u\n", alg->bound);
-  double max_alambda = (alg->logmax) / si->conf->sides[ALGEBRAIC_SIDE]->lpb;
+  double max_alambda = (maxlog2 - GUARD / alg->scale) /
+      si->conf->sides[ALGEBRAIC_SIDE]->lpb;
   if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }

@@ -5,7 +5,9 @@
 MAKEFB="$1"
 LAS="$2"
 SRCDIR="$3"
+CHECKSUM_FILE="$4"
 SOURCE_TEST_DIR="`dirname "$0"`"
+shift 4
 
 REFERENCE_SHA1="a5bb1736493c387e415da14d4470761c2c29f463"
 # The Git revision that created the REFERENCE_SHA1 hash
@@ -25,6 +27,6 @@ q0=1200000
 q1=1200200
 
 export rlim alim lpbr lpba maxbits mfbr mfba rlambda alambda I q0 q1
-"${SOURCE_TEST_DIR}"/sievetest.sh "${MAKEFB}" "${LAS}" "${SRCDIR}/params/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" || exit 1
+"${SOURCE_TEST_DIR}"/sievetest.sh "${MAKEFB}" "${LAS}" "${SRCDIR}/params/F9.poly" "${REFERENCE_SHA1}" "${REFERENCE_REVISION}" "${CHECKSUM_FILE}" -v "$@" || exit 1
 
 exit 0

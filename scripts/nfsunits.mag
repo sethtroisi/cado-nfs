@@ -7,14 +7,19 @@ Wrapper version, to be used with
 // author: morain@lix.polytechnique.fr 
 //
 // Using units in SNFS-DL
-// version: 20140305.1500
-//
+
+NFSUNITS_VERSION:="20140313.2000";
+
+printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
+SetDebugOnError(true);
 
 QQ:=Rationals();
 QX<X>:=PolynomialRing(QQ);
 QXT<T>:=PolynomialRing(QX);
 
 DLP_USE_UNITS_FLOAT:=true;
+R20:=RealField(20);
+C20:=ComplexField(R20);
 RR:=RealField(50);
 RRY<Y>:=PolynomialRing(RR);
 CC:=ComplexField(RR);
@@ -24,7 +29,7 @@ DLP_DEBUG:=1;
 DLP_VERIFICATION:=false; // for expert debug mode only...
 
 // precompute all products of units^ex with |ex| <= bound.
-BuildSmallGroupTable := function(UK, bound)
+BuildGroupTable := function(UK, bound)
         if DLP_DEBUG ge 2 then
 	    printf "# BSGT --> %o at %o\n", UK, Cputime();
 	end if;
@@ -58,23 +63,187 @@ AlgToComplex := function(x)
         return CCZ ! [ CC ! y : y in Eltseq(x)];
 end function;
 
+// For elt in K.
+AllEmbeddings := function(U, x)
+	K:=Parent(x);
+	if U["rK"] eq Degree(K)-1 then
+    	    rx:=AlgToReal(x);
+	    return [Log(Abs(Evaluate(rx, R20!z))) : z in U["roots"]];
+	elif 2*U["rK"]+2 eq Degree(K) then
+    	    rx:=AlgToComplex(x);
+	    return [Log(Abs(Evaluate(rx, z))) : z in U["roots"]];
+	else
+	    error("Pb in AllEmbeddings");
+	end if;
+end function;
+
+FiPoBounds := function(B, K, logunits)
+        U:=[];
+	for i:=1 to Degree(K) do
+	    U[i]:=&+ [Abs(logunits[j][i]) : j in [1..#logunits]];
+	    U[i]:=Exp((Log(B)/Degree(K)) + 0.5 * U[i]);
+	end for;
+	return U;
+end function;
+
+// rK = 1
+Minimize1 := function(x, lx, U)
+	units:=U["units"];
+	lunits:=U["logunits"];
+	a1min:=&+ [ lx[i] * lunits[1][i] : i in [1..#lx] ];
+	a1min:=a1min / (&+ [ lunits[1][i]^2 : i in [1..#lx] ])^2;
+//	printf "a1min = %o\n", a1min;
+	a1min:=Round(a1min);
+        return x/units[1]^a1min;
+end function;
+
+// rK = 2
+Minimize2 := function(x, lx, U)
+	units:=U["units"];
+	lunits:=U["logunits"];
+	min:=10^30;
+	for a1:=-3 to 3 do
+	    tmp1:=[lx[i]-a1*lunits[1][i] : i in [1..#lx]];
+	    for a2:=-3 to 3 do
+	        tmp:=&+ [(tmp1[i]-a2*lunits[2][i])^2 : i in [1..#lx]];
+		if tmp le min then
+//		    printf "a1=%o a2=%o tmp=%o\n", a1, a2, tmp;
+		    min:=tmp;
+		    a1min:=a1; a2min:=a2;
+		end if;
+	    end for;
+	end for;
+	u:=units[1]^a1min*units[2]^a2min;
+        return x/u;
+end function;
+
+// rK = 3
+Minimize3 := function(x, lx, U)
+        units:=U["units"];
+        lunits:=U["logunits"];
+	min:=10^30;
+	for a1:=-3 to 3 do
+	  for a2:=-3 to 3 do
+	    for a3:=-3 to 3 do
+	        tmp:=&+ [(lx[i]-a1*lunits[1][i]-a2*lunits[2][i]-a3*lunits[3][i])^2 : i in [1..#lx]];
+		if tmp le min then
+//		    printf "a1=%o a2=%o tmp=%o\n", a1, a2, tmp;
+		    min:=tmp;
+		    a1min:=a1; a2min:=a2; a3min:=a3;
+		end if;
+	    end for;
+	  end for;
+	end for;
+	u:=units[1]^a1min*units[2]^a2min*units[3]^a3min;
+        return x/u;
+end function;
+
+Minimize := function(K, U, x)
+	lx:=AllEmbeddings(U, K!x);
+	if U["rK"] eq 1 then return Minimize1(x,lx,U);
+	elif U["rK"] eq 2 then return Minimize2(x,lx,U);
+	elif U["rK"] eq 3 then return Minimize2(x,lx,U);
+	else return x;
+	end if;
+end function;
+
+InsertInBox := procedure(~l, K, U, elt, lipr, pmax)
+	no:=Integers() ! Abs(Norm(elt));
+	if IsDefined(lipr, no) then // meaning no is prime...!
+//	    printf "elt=%o no=%o\n", elt, no;
+	    if not IsDefined(l, no) then
+	        l[no]:=[elt];
+	    elif #l[no] lt Degree(K) then
+	        // l[no] contains distinct prime ideals
+		ok:=true;
+		// if elt/x is never an integer we gain a new factor
+		for i:=1 to #l[no] do
+		    x:=l[no][i];
+		    r:=elt/x;
+		    if IsIntegral(r) then
+		        ok:=false;
+			break;
+		    end if;
+		end for;
+		if ok then
+	 	    l[no]:=Append(l[no], elt);
+		end if;
+//if #l[no] gt 2 then print l[no]; error("TTTT"); end if;
+	    end if;
+	end if;
+end procedure;
+
+// Perhaps a more carefully used ellipsoid would be better?
+EPN3 := function(K, OK, U, lipr, bound, pmax)
+        tp:=Cputime();
+	l:=AssociativeArray();
+	for a0:=0 to bound do
+	    printf "# a0 = %o at %o\n", a0, Cputime();
+	    for a1:=-bound to bound do
+	        for a2:=-bound to bound do
+		    elt:=a0*OK.1+a1*OK.2+a2*OK.3;
+		    InsertInBox(~l, K, U, elt, lipr, pmax);
+	    	end for;
+	    end for;
+	end for;
+	printf "#T# EPN3: %o\n", Cputime(tp);
+	return l;
+end function;
+
+EPN4 := function(K, OK, U, lipr, bound, pmax)
+        tp:=Cputime();
+	l:=AssociativeArray();
+	for a0:=0 to bound do
+	    printf "# a0 = %o at %o\n", a0, Cputime();
+	    for a1:=-bound to bound do
+	        for a2:=-bound to bound do
+	 	    for a3:=-bound to bound do
+		    	elt:=a0*OK.1+a1*OK.2+a2*OK.3+a3*OK.4;
+			InsertInBox(~l, K, U, elt, lipr, pmax);
+	 	    end for;
+	    	end for;
+	    end for;
+	end for;
+	printf "# time for EPN4: %o\n", Cputime(tp);
+	return l;
+end function;
+
+// generate boxes: a^bound = pamax??
+EnumeratePrimeNorms := function(K, OK, U, lipr, pmax)
+	printf "# bounds = %o\n", FiPoBounds(pmax, K, U["logunits"]);
+	bound:=125; // FIXME: do better!
+        if Degree(K) eq 3 then l:=EPN3(K, OK, U, lipr, bound, pmax);
+        elif Degree(K) eq 4 then l:=EPN4(K, OK, U, lipr, bound, pmax);
+	end if;
+	tp:=Cputime();
+	for no in Keys(l) do
+	    l[no]:=[Minimize(K, U, x) : x in l[no]];
+	end for;
+	printf "#T# minimizing generators: %o\n", Cputime(tp);
+	return l; 
+end function;
+
 // u_1, ..., u_ell with ell = r1+r2-1; if r1 > 0, u0 = -1.
 // We suppose f has real roots alpha_1, ..., alpha_{r_1}
 // and complex roots alpha_{r_1+1}, ..., alpha_n
 // s.t. alpha_{r_1+r_2+j} is the complex conjugate of alpha_{r_1+j}
 // for 1 <= j <= r_2. Note that r1+2*r2 = n = deg(K) = deg(f).
 // For 1 <= i <= ell, varphi_i(alpha) = alpha_i.
+// U["units"] will contain units in OK as EltSeq.
 PrepareUnits := procedure(~U, ~G, K, OK, genG)
 	r1,r2:=Signature(K);
 	rK:=r1+r2-1;
 	printf "# r1=%o, r2=%o => rK=%o\n", r1, r2, rK;
 	// boxes will have bound^{2*rK} points
-	if rK lt 4 then bound:=10; else bound:=5; end if;
+	if rK le 2 then bound:=20;
+	elif rK le 3 then bound:=10;
+	else bound:=5; end if;
 	f:=DefiningPolynomial(K);
 	if r2 eq 0 then
 	    lr:=[r[1] : r in Roots(AlgToReal(f))];
 	elif r1 eq 0 then
 	    lr0:=[r[1] : r in Roots(AlgToComplex(f))];
+	    if DLP_DEBUG ge 3 then printf "lr0=%o\n", lr0; end if;
 	    // assuming that roots are [alpha1, conj(alpha1), ...]
 	    // reorder them to [alpha1, alpha2, ..., alpha_r2, conj(alpha1)...]
 	    lr:=[];
@@ -82,7 +251,6 @@ PrepareUnits := procedure(~U, ~G, K, OK, genG)
 	        lr[i]:=lr0[2*i-1];
 		lr[i+r2]:=lr0[2*i];
 	    end for;
-	    printf "lr0=%o\n", lr0;
 	else
 	    // TODO: order roots of f...!
 	    error("NYI");
@@ -98,7 +266,7 @@ PrepareUnits := procedure(~U, ~G, K, OK, genG)
 	        units[#units+1]:=OK!map(gen);
 	    end if;
 	end for;
-	printf "# units_OK = %o\n", units;
+//	printf "# units_OK = %o\n", units;
 	printf "# units_K = %o\n", [K!u : u in units];
 	// build matrix
 	M:=KMatrixSpace(RR, rK, rK)!0;
@@ -112,20 +280,23 @@ PrepareUnits := procedure(~U, ~G, K, OK, genG)
 	end for;
 	print M;
 	if genG then
-	    printf "# BuildSmallGroupTable with bound %o\n", bound;
-	    G:=BuildSmallGroupTable(units, bound);
+	    printf "# BuildGroupTable with bound %o\n", bound;
+	    tp:=Cputime();
+	    G:=BuildGroupTable(units, bound);
+	    printf "#T# BGT: %o\n", Cputime(tp);
 	end if;
 	U["roots"]:=lr;
 	U["units"]:=units;
 	U["rK"]:=rK;
 	U["Minv"]:=M^(-1);
+	U["logunits"]:=[AllEmbeddings(U, K!units[i]) : i in [1..rK]];
 end procedure;
 
 // If x is not close enough to an integer, do not round it!
 Roundify := function(x)
 	prec:=Precision(x);
 	ix:=Round(x);
-	if Abs(ix-x) gt 10^(0.5 * prec) then error("Precision pb?"); end if;
+	if Abs(ix-x) gt 10^(-0.5 * prec) then error("Precision pb?"); end if;
 	return ix;
 end function;
 
@@ -493,9 +664,9 @@ DLReadPurged := function(purged)
 	return ab;
 end function;
 
-ReadBadIdeals := function(K, badideals)
-	printf "# reading badideals\n";
-	fd:=Open(badideals, "r");
+ReadBadIdeals := function(K, badidealinfo)
+	printf "# reading badidealinfo\n";
+	fd:=Open(badidealinfo, "r");
 	bad:=[];
 	while true do
 	    s:=Gets(fd); if IsEof(s) then break; end if;
@@ -525,10 +696,91 @@ end if;
 	return bad;
 end function;
 
+// OUTPUT: r(Z) s.t. r(Z) generates Gal(f).
+CyclicAction := function(K)
+        t:=K.1;
+	KZ<Z>:=PolynomialRing(K);
+	fZ:=KZ!Eltseq(DefiningPolynomial(K));
+	lr:=Roots(fZ); // lr = [<t, 1>, ...]
+//	print lr;
+	for i:=1 to #lr do
+	    if lr[i][1] eq t then continue; end if;
+	    // check for order
+	    r:=lr[i][1];
+	    rZ:=KZ!Eltseq(r);
+	    rj:=r;
+	    ord:=1;
+	    for j:=1 to Degree(K) do
+	        rj:=Evaluate(rZ, rj);
+//		printf "r_%o = %o\n", j, rj;
+		if rj eq r then break; end if;
+		ord:=ord+1;
+	    end for;
+	    if ord eq Degree(K) then break; end if;
+	end for;
+	return rZ;
+end function;
+
+GeneratorForBad := function(K, OK, p, id)
+	lf:=Factorization(id);
+	printf "# lf(%o | %o)=%o\n", id, p, lf;
+	if #lf ne 1 then error("PB??"); end if;
+	ok,gp:=IsPrincipal(lf[1][1]);
+	if not ok then error("Not principal"); end if;
+	// lf[1][2] is the ramification index
+	return <K!gp, lf[1][2], Degree(lf[1][1])>;
+end function;
+
+PrintGenerator := procedure(fo, i, gef)
+	gp,ep,fp:=Explode(gef);
+	den:=Denominator(gp);
+	tmp:=Eltseq(den*gp);
+	fprintf fo, "%o", i;
+	if ep eq 1 and fp eq 1 then
+	    // ordinary case
+	    fprintf fo, " %o", den;
+	else
+	    fprintf fo, " %o %o", -ep, fp;
+	    fprintf fo, " %o", den;
+	end if;
+	for j:=1 to #tmp do
+	    fprintf fo, " %o", tmp[j];
+	end for;
+	fprintf fo, "\n";
+end procedure;
+
+// sigma([p, alpha-r]) = [p, sigma(alpha)-r]
+// = [p, alpha-sigma^(-1)(r)]
+CyclicGetGenerator := function(ca, den, tca, p, r, rr, gp)
+	K:=Parent(Coefficient(ca, 0));
+	Fp:=GF(p);
+        cap:=PolynomialRing(Fp)!Eltseq(den * ca);
+	cap:=cap / (Fp!den);
+	sh:=0;
+	while sh le Degree(K) do
+	    sh:=sh+1;
+	    rr:=Evaluate(cap, rr);
+//	    printf "sh = %o => rr = %o\n", sh, rr;
+	    if rr eq r then
+	        break;
+	    end if;
+	end while;
+	if sh gt Degree(K) then
+	    error("too many iterations in CyclicGetGenerator");
+	end if;
+	for ss:=1 to Degree(K)-sh do
+	    gpZ:=Parent(ca)!Eltseq(gp);
+	    gp:=Evaluate(gpZ, tca);
+	end for;
+	return gp;
+end function;
+
 // algpr contains lines "i p r" for algebraic primes (in hexa).
 // SIDE-EFFECT: fill in file 'generators' with generators.
-GeneratorsForPR := procedure(~GEN,p,K,OK,U,badideals,algpr,generators)
-        bad:=ReadBadIdeals(K, badideals);	       
+// TODO: separate bad primes.
+GeneratorsForPRPlain := procedure(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators)
+	tp:=Cputime();
+        bad:=ReadBadIdeals(K, badidealinfo);	       
 	badp:=[x[1] : x in bad];
 	printf "# bad ideals=%o => badp=%o\n", bad, badp;
 	printf "# Extracting (p, r) from %o\n", algpr;
@@ -537,44 +789,189 @@ GeneratorsForPR := procedure(~GEN,p,K,OK,U,badideals,algpr,generators)
         fo:=POpen("gzip -c > " * generators, "w");
 	zero:=[0 : i in [1..Degree(K)-2]];
 	npr:=0;
+	oldp:=0;
+	oldr:=0;
+	oldgp:=0;
+	iscyc:=IsCyclic(GaloisGroup(DefiningPolynomial(K)));
+	if iscyc then
+	    // ca = poly in Z => tca = elt of K
+	    printf "# cyclic Galois group\n";
+	    ca:=CyclicAction(K); // can be in OK[Z], hence have a denominator
+	    printf "# cyclic action: %o;\n", ca;
+	    tca:=Eltseq(ca) cat [ 0 : i in [Degree(ca)+1..Degree(K)-1]];
+	    tca:=K!tca;
+	end if;
         while true do
             s:=Gets(fd);
             if IsEof(s) then break; end if;
 	    npr:=npr+1;
 	    if npr mod 10000 eq 0 then
-	        printf "# %o-th ideal at %o\n", npr, Cputime();
+	        printf "# plain-computing generator for %o-th ideal at %o\n", 
+		       npr, Cputime();
 	    end if;
 	    // s = "i p r"
 	    tmp:=Split(s, " ");
 	    i:=StringToInteger(tmp[1], 16);
 	    p:=StringToInteger(tmp[2], 16);
 	    r:=StringToInteger(tmp[3], 16);
-	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
-	    ok,gp:=IsPrincipal(id);
-	    if not ok then error("Not principal"); end if;
-	    gp:=K!gp;
 	    if p in badp then
-	        printf "(%o) = %o\n", p, Factorization(p*OK);
-	        ep:=RamificationIndex(id); // id^ep || (p) = p*OK
-	    	fp:=Degree(id);
-	    	GEN[i]:=<gp, ep, fp>;
+	        id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+	    	GEN[i]:=GeneratorForBad(K, OK, p, id);
+		gp:=GEN[i][1]; // for oldgp to work!
 	    else
-	        GEN[i]:=<gp, 1, 1>;
+	        done:=false;
+	        if iscyc and p eq oldp then
+	 	    // use cyclic action and sigma(r) = rr (transitive stuff?)
+		    if DLP_DEBUG ge 2 then
+		        printf "roots=%o\n", Roots(PolynomialRing(GF(p))!Eltseq(DefiningPolynomial(K)));
+		    end if;
+		    den:=Lcm([Denominator(Coefficient(ca, i)) : i in [0..Degree(ca)]]);
+		    if (den mod p) eq 0 then
+		        printf "den = 0!!!!\n";;
+			done:=false;
+		    else
+			gp:=CyclicGetGenerator(ca,den,tca,p,r,oldr,oldgp);
+//printf "gp=%o => Norm = %o\n", gp, Norm(gp);
+	 	    	if DLP_DEBUG ge 2 then
+		            // sometimes we have to check basic things...
+		            id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+			    foo,bar:=IsPrincipal(id);
+			    print foo, K!bar, gp, (K!bar)/gp;
+		    	    if not gp in id then error("gp"); end if;
+		    	end if;
+			done:=true;
+		    end if;
+		end if;
+		if not done then
+		    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+		    ok,gp:=IsPrincipal(id);
+	    	    if not ok then error("Not principal"); end if;
+	    	    gp:=K!gp;
+		end if;
+	        GEN[i]:=<Minimize(K, U, gp), 1, 1>;
 	    end if;
-//print p, GEN[i], Norm(gp); if p gt 100 then error("FF"); end if;
-//	    GEN[i]:=<gp, 1, 1>; // FIXME!!!
-	    den:=Denominator(gp);
-	    tmp:=Eltseq(den*gp);
-	    fprintf fo, "%o %o %o", i, GEN[i][2], GEN[i][3];
-	    fprintf fo, " %o", den;
-	    for j:=1 to #tmp do
-	        fprintf fo, " %o", tmp[j];
-	    end for;
-	    fprintf fo, "\n";
+	    if DLP_DEBUG ge 2 then
+	        printf "(p, r)=(%o, %o), gen=%o, norm(gen)=%o\n", 
+	    		   p, r, GEN[i], Norm(gp);
+	    end if;
+//if p gt 50 then error("FF"); end if;
+       	    PrintGenerator(fo, i, GEN[i]);
+	    oldp:=p;
+	    oldr:=r;
+	    oldgp:=gp;
+	end while;
+	printf "#T# plain-computing all generators: %o\n", Cputime(tp);
+end procedure;
+
+ReadAlgpr := procedure(~lipr, ~pamax, algpr)
+	printf "# Reading file %o\n", algpr;
+        fd:=POpen("gzip -dc " * algpr, "r");
+	lipr:=AssociativeArray();
+	npr:=0;
+        while true do
+            s:=Gets(fd);
+            if IsEof(s) then break; end if;
+	    npr:=npr+1;
+	    if npr mod 10000 eq 0 then
+	        printf "# reading %o-th ideal at %o\n", npr, Cputime();
+	    end if;
+	    // s = "i p r"
+	    tmp:=Split(s, " ");
+	    i:=StringToInteger(tmp[1], 16);
+	    p:=StringToInteger(tmp[2], 16);
+	    r:=StringToInteger(tmp[3], 16);
+	    if IsDefined(lipr, p) then
+	        lipr[p]:=Append(lipr[p], <i, r>);
+	    else
+	        lipr[p]:=[<i, r>];
+	    end if;
+	    pamax:=p;
 	end while;
 end procedure;
 
-ReadGeneratorsForPR := procedure(~GEN, K, generators)
+GeneratorsForPR := procedure(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators)
+	if Degree(K) gt 3 then
+	    GeneratorsForPRPlain(~GEN,~BAD,K,OK,U,badidealinfo,algpr,generators);
+	    return;
+	end if;
+        bad:=ReadBadIdeals(K, badidealinfo);	       
+	badp:=[x[1] : x in bad];
+	printf "# bad ideals=%o => badp=%o\n", bad, badp;
+	// read algpr in a table
+	ReadAlgpr(~lipr, ~pamax, algpr); // useful to have in-core?
+	printf "# pamax = %o\n", pamax;
+	printf "# enumerating at %o\n", Cputime();
+	l:=EnumeratePrimeNorms(K, OK, U, lipr, pamax);
+//	printf "K:=%m;\nOK:=MaximalOrder(K);\n", K;
+//	print l;
+	npcp:=0;
+	ndone:=0;
+	printf "# inspecting at %o\n", Cputime();
+	zero:=[0 : i in [1..Degree(K)-2]];
+	npr:=0;
+	tot:=Cputime();
+	totmb:=0.0;
+	for p in Sort([x : x in Keys(lipr)]) do // humf!
+	  npr:=npr+1;
+	  if npr mod 1000 eq 0 then
+	        printf "# computing generator for %o-th ideal[%o] at %o\n", 
+		       npr, p, Cputime();
+	  end if;
+	  for ir in lipr[p] do
+	    i,r:=Explode(ir);
+	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
+	    if p in badp then
+	        printf "bad: id(<%o, %o>) = %o\n", p, r, id;
+	        GEN[i]:=GeneratorForBad(K, OK, p, id);
+	    else
+		ok:=false;
+		if IsDefined(l, p) then
+		    tp:=Cputime();
+//		    printf "%o: %o\n", lipr[p], #l[p];
+		    for elt in l[p] do
+		        if elt in id then
+			    ok:=true;
+			    GEN[i]:=<K!elt, 1, 1>;
+			    break;
+			end if;
+		    end for;
+//		    if not ok then printf "missed\n"; end if;
+//		    printf "# membership: %o %o\n", #l[p], Cputime(tp);
+		    totmb:=totmb+Cputime(tp);
+		    ndone:=ndone+1;
+		end if;
+		if ok then
+//		    printf "found: %o\n", GEN[i][1];
+		    Exclude(~l[p], GEN[i][1]);
+		else
+//		    printf "I need to principalize: %o %o\n", p, ir;
+		    tp:=Cputime();
+		    ok,gp:=IsPrincipal(id);
+		    tp:=Cputime(tp);
+		    if tp gt 1.0 then
+		        printf "#T# pcp: %o\n", tp;
+		    end if;
+		    if not ok then error("Not principal"); end if;
+		    GEN[i]:=<K!gp, 1, 1>;// FIXME: useless since bad are known?
+		    npcp:=npcp+1;
+		end if;
+	    end if;
+//if i gt 20 then error("FFF"); end if;
+	  end for;
+	end for;
+	printf "#T# totpcp=%o totmb=%o npcp=%o ndone=%o\n", 
+	       Cputime(tot), totmb, npcp, ndone;
+	tp:=Cputime();
+        fo:=POpen("gzip -c > " * generators, "w");
+	for i in Sort([x : x in Keys(GEN)]) do
+       	    PrintGenerator(fo, i, GEN[i]);
+	end for;
+	printf "#T# output: %o\n", Cputime(tp);
+end procedure;
+
+// GEN[i] = x
+// BAD[i] = <x, ind, deg>
+ReadGeneratorsForPR := procedure(~GEN, ~BAD, K, generators)
 	printf "# Reading generators for (p, r) from %o\n", generators;
 	t:=K.1;
         fd:=POpen("gzip -dc " * generators, "r");
@@ -582,18 +979,34 @@ ReadGeneratorsForPR := procedure(~GEN, K, generators)
         while true do
             s:=Gets(fd);
             if IsEof(s) then break; end if;
-	    // s = "i ram_ind ram_deg den x0 ... x_{deg-1}"
+	    // s = "i -ram_ind ram_deg den x0 ... x_{deg-1}"
+	    // or
+	    // s = "i den x0 ... x_{deg-1}" with den > 0
 	    tmp:=Split(s, " ");
 	    i:=StringToInteger(tmp[1]);
 	    ind:=StringToInteger(tmp[2]);
-	    deg:=StringToInteger(tmp[3]);
-	    den:=StringToInteger(tmp[4]);
+	    if ind gt 0 then
+	        // ordinary case
+		den:=ind;
+		ind:=1;
+		deg:=1;
+		j0:=3;
+	    else
+	        // a bad ideal
+		ind:=-ind;
+	        deg:=StringToInteger(tmp[3]);
+	    	den:=StringToInteger(tmp[4]);
+		j0:=5;
+	    end if;
 	    x:=0;
-	    for j:=5 to #tmp do
-	        x:=x + StringToInteger(tmp[j]) * t^(j-5);
+	    for j:=j0 to #tmp do
+	        x:=x + StringToInteger(tmp[j]) * t^(j-j0);
 	    end for;
-	    GEN[i]:=<x/den, ind, deg>;
-//if i eq 2 then GEN[i]:=<GEN[i][1], 2, 2>; end if;
+	    if j0 eq 3 then
+	        GEN[i]:=x/den;
+	    else
+		BAD[i]:=<x/den, ind, deg>;
+	    end if;
 //	    printf "GEN[%o]=%o (%o)\n", i, GEN[i], Norm(GEN[i][1]);
 	end while;
 end procedure;
@@ -601,7 +1014,7 @@ end procedure;
 // now read all ab pairs from purged, together with the ideal numbers
 // eps[(a, b)_i] <- unit for (a-b*theta) given its algebraic factorization.
 // All that matters is that index i.
-UnitsForPurged := procedure(~GEN,~epsab,p,f,g,m,K,OK,U,purged)
+UnitsForPurged := procedure(~GEN,~BAD,~epsab,K,OK,U,purged)
 	t:=K.1;
         fd:=POpen("gzip -dc " * purged, "r");
 	s:=Gets(fd);
@@ -630,7 +1043,9 @@ UnitsForPurged := procedure(~GEN,~epsab,p,f,g,m,K,OK,U,purged)
 	    exi:=1;
 	    for stri in tmp2 do
 	    	i:=StringToInteger(stri, 16);
-	        if not IsDefined(GEN, i) then continue; end if;
+	        if not IsDefined(GEN, i) and not IsDefined(BAD, i) then
+		    continue;
+		end if;
 		if i eq oldi then
 		    exi:=exi+1;
 		elif oldi ne -1 then
@@ -645,11 +1060,20 @@ UnitsForPurged := procedure(~GEN,~epsab,p,f,g,m,K,OK,U,purged)
 	    prod:=1;
 	    for iexi in li do
 	        i,exi:=Explode(iexi);
-		if DLP_DEBUG ge 2 then
-		    printf "multiplying by GEN[%o]=%o", i, GEN[i];
-		    printf " of norm %o\n", Norm(GEN[i][1]);
+		if IsDefined(GEN, i) then
+		    if DLP_DEBUG ge 2 then
+		        printf "multiplying by GEN[%o]^e=%o^%o",i,GEN[i],exi;
+		        printf " of norm %o\n", Norm(GEN[i]);
+		    end if;
+		    prod:=prod * GEN[i]^exi;
+		elif IsDefined(BAD, i) then
+		    if DLP_DEBUG ge 2 then
+		        printf "multiplying by BAD[%o]^e=%o^%o", 
+			       i, BAD[i][1], exi div BAD[i][3];
+		        printf " of norm %o\n", Norm(BAD[i][1]);
+		    end if;
+		    prod:=prod * BAD[i][1]^(exi div BAD[i][3]);
 		end if;
-		prod:=prod * GEN[i][1]^(exi div GEN[i][3]);
 	    end for;
 	    eta:=(a-b*t)/prod;
 	    if DLP_DEBUG ge 2 then
@@ -851,7 +1275,7 @@ DLReadSM := procedure(~M, sm, rK)
 	end while;	
 end procedure;
 
-UnitsWithParams := function(FB, epsab, G, GEN, gen_epsab, params)
+UnitsWithParams := function(FB, epsab, G, GEN, BAD, gen_epsab, params)
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
         if DLP_VERIFICATION then
 	    ell:=params["ell"];
@@ -886,19 +1310,21 @@ UnitsWithParams := function(FB, epsab, G, GEN, gen_epsab, params)
 
         purged:=params["purged"];
 	if gen_epsab then
+	    BAD:=AssociativeArray();
 	    epsab:=AssociativeArray();
 	    if IsDefined(params, "relsdir") then
 	    	TreatFromDir(~FB,~epsab,p,f,g,m,K,OK,U,params["relsdir"]);
 	    elif IsDefined(params, "algpr") then
-	        GeneratorsForPR(~GEN,p,K,OK,U,params["badideals"],
+	        GeneratorsForPR(~GEN,~BAD,K,OK,U,params["badidealinfo"],
 				params["algpr"],params["generators"]);
-		UnitsForPurged(~GEN,~epsab,p,f,g,m,K,OK,U,purged);
+		UnitsForPurged(~GEN,~BAD,~epsab,K,OK,U,purged);
 	    end if;
-	    return FB,epsab,G,GEN; // OHHHHHHHHHHHHHHHH!
+	    return FB,epsab,G,GEN,BAD; // OHHHHHHHHHHHHHHHH!
 	else
 	    printf "# epsab already computed\n";
 	end if;
 
+	tp:=Cputime();
 	index :=params["index"];
 	mat:=[];
 	if IsDefined(params, "relsdir") then
@@ -906,6 +1332,7 @@ UnitsWithParams := function(FB, epsab, G, GEN, gen_epsab, params)
 	else
  	    DLProduceUnits2(~mat, index, #U["units"], epsab);
 	end if;
+	printf "#T# producing units: %o\n", Cputime(tp);
 	nrows:=#mat;
 	// last two cols should be plenty of eps values...!
 	ficunits:=params["ficunits"];
@@ -926,7 +1353,7 @@ end function;
 // ell:=63682780151674075656521332710720136307;
 // FB,epsab,G:=UnitsFromCADO("SNFS", "p59", ell, [], [], [], true);
 // UnitsFromCADO("SNFS", "p59", ell, FB, epsab, G, false);
-UnitsFromCADO := function(dir, name, ell, FB, epsab, G, GEN, gen_epsab)
+UnitsFromCADO := function(dir, name, ell, FB, epsab, G, GEN, BAD, gen_epsab)
         params:=AssociativeArray();
 	if DLP_VERIFICATION then
 	    params["ell"]:=ell;
@@ -949,19 +1376,19 @@ UnitsFromCADO := function(dir, name, ell, FB, epsab, G, GEN, gen_epsab)
 	params["purged"]:=dir * "/" * name * ".purge.purged.gz";
 	params["index"]:=dir * "/" * name * ".merge.index.gz";
 	params["ficunits"]:=dir * "/" * name * ".units.units";
-	return UnitsWithParams(FB, epsab, G, GEN, gen_epsab, params);
+	return UnitsWithParams(FB, epsab, G, GEN, BAD, gen_epsab, params);
 end function;
 
 // ComputeUnits("SNFS", "p59", 63682780151674075656521332710720136307);
 // ComputeUnits("SNFS", "p60-2", 13);
 // ComputeUnits("SNFS", "p65d5", 13);
 ComputeUnits := procedure(dir, name, ell)
-	FB,epsab,G,GEN:=UnitsFromCADO(dir, name, ell, [], [], [], [], true);
-	UnitsFromCADO(dir, name, ell, FB, epsab, G, GEN, false);
+	FB,epsab,G,GEN,BAD:=UnitsFromCADO(dir,name,ell,[],[],[],[],[],true);
+	UnitsFromCADO(dir, name, ell, FB, epsab, G, GEN, BAD, false);
 end procedure;
 
 // If generate = true, we must build algpr and generators.
-ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideals,purged,index,ficunits,generate)
+ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badidealinfo,purged,index,ficunits,generate)
         params:=AssociativeArray();
 
 	params["poly"]:=polyfile;
@@ -970,7 +1397,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	params["renumber"]:=renumber;
 	params["algpr"]:=algpr;
 	params["generators"]:=generators;
-	params["badideals"]:=badideals;
+	params["badidealinfo"]:=badidealinfo;
 
 	params["purged"]:=purged;
 	params["index"]:=index;
@@ -978,25 +1405,27 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 
 	FB:=[];
 	GEN:=AssociativeArray();
+	BAD:=AssociativeArray();
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
 	K<t>:=ext<QQ | f>;
 	OK:=MaximalOrder(K);
+	printf "OK = %o\n", [K!OK.i : i in [1..Degree(K)]];
 	U:=AssociativeArray();
 	PrepareUnits(~U, ~G, K, OK, true);
 	U["grouptable"]:=G;
 	if generate then
-	    GeneratorsForPR(~GEN,p,K,OK,U,params["badideals"],
+	    GeneratorsForPR(~GEN,~BAD,K,OK,U,params["badidealinfo"],
 			    params["algpr"],params["generators"]);
 	else
-	    ReadGeneratorsForPR(~GEN, K, generators);
+	    BAD:=AssociativeArray();
+	    ReadGeneratorsForPR(~GEN, ~BAD, K, generators);
+	    printf "# bad primes = %o\n", Keys(BAD);
 	    epsab:=AssociativeArray();
-	    UnitsForPurged(~GEN,~epsab,p,f,g,m,K,OK,U,purged);
-	    UnitsWithParams(FB, epsab, G, GEN, false, params);
+	    UnitsForPurged(~GEN,~BAD,~epsab,K,OK,U,purged);
+	    UnitsWithParams(FB, epsab, G, GEN, BAD, false, params);
 	end if;
 end procedure;
 
-// Simul("SNFS", "p59", false);
-// Simul("SNFS", "p60x4x4", false);
 Simul := procedure(dir, name, gen)
         // "p59"  ===> "SNFS/p59/"
 	dir:=dir * "/" * name;
@@ -1007,15 +1436,15 @@ Simul := procedure(dir, name, gen)
 	purged:=dir * "/" * name * ".purge.purged.gz";
 	index:=dir * "/" * name * ".merge.index.gz";
 	ficunits:=dir * "/" * name * ".units.units";
-	badideals:=dir * "/" * name * ".magmanmbrthry.badidealinfo";
+	bad:=dir * "/" * name * ".magmanmbrthry.badidealinfo";
 
 	if gen then
-	    printf "generate\n";
-	    ComputeUnitsFromWrapper(poly,renumber,algpr,generators,badideals,
+	    printf "# compute generators\n";
+	    ComputeUnitsFromWrapper(poly,renumber,algpr,generators,bad,
 				    purged,index,ficunits,true);
 	end if;
-	printf "compute units\n";
-	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,badideals,
+	printf "# compute units for file %o\n", purged;
+	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,bad,
 				purged,index,ficunits,false);
 end procedure;
 

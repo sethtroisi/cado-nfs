@@ -94,12 +94,6 @@
 #include "gauss.h"
 #include "worker-threads.h"
 
-// #if defined(__FreeBSD__) && (__FreeBSD__ <= 7)
-/* pthread_cond_wait seems to be buggy on FreeBSD 7 (shard.starfyre.net) */
-/* #define NTHREADS 1
-#else
-#define NTHREADS 16
-#endif */
 
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
@@ -121,9 +115,6 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
             } else if (ch->r == 2) {
                 /* Special: rational sign (sign of m1*a+m2*b) */
                 mpz_t tmp1, tmp2;
-
-		/* FIXME: the code below only works for a rational g(x),
-		   extend it to non-linear g(x) */
 		ASSERT_ALWAYS(pol->rat->deg == 1);
 
                 /* first perform a quick check */
@@ -225,18 +216,22 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     int nchars2 = iceildiv(nchars, 64) * 64;
 
     mpz_init (pp);
-    roots = malloc(pol->alg->deg * sizeof(unsigned long));
+    roots = malloc(MAX(pol->alg->deg, pol->rat->deg) * sizeof(unsigned long));
 
     alg_prime_t * chars = malloc(nchars2 * sizeof(alg_prime_t));
 
-    /* force rational sign */
-    chars[0] = (alg_prime_t) { .p = 0, .r = 2 };
+    int nspecchar = 2;
     /* force parity */
-    chars[1] = (alg_prime_t) { .p = 0, .r = 1 };
+    chars[0] = (alg_prime_t) { .p = 0, .r = 1 };
     /* force parity of the free relations. This is really only because
      * we're lazy -- it's been asserted that it eases stuff at some
      * point, but nobody remembers the why and how. */
-    chars[2] = (alg_prime_t) { .p = 0, .r = 3 };
+    chars[1] = (alg_prime_t) { .p = 0, .r = 3 };
+    if (pol->rat->deg == 1) {
+        /* force rational sign */
+        chars[2] = (alg_prime_t) { .p = 0, .r = 2 };
+        nspecchar++;
+    }
 
     /* we might want to force evenness of the number of relations as well. Easy
      * to put this in chars[1] if needed (and add the appropriate stuff above
@@ -246,18 +241,19 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
      * option inserts some */
     /* we want some prime beyond the (rational) large prime bound */
     mpz_set_ui (pp, 1UL << lpb[RATIONAL_SIDE]);
-    for(int i = 3 ; i < 3 + nratchars && i < nchars ; ) {
+    for(int i = nspecchar ; i < nspecchar + nratchars && i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
         ret = poly_roots_ulong(roots, pol->rat->coeff, pol->rat->deg, p);
-        for(int j = 0 ; j < ret && i < 3 + nratchars && i < nchars ; j++, i++) {
+        for(int j = 0 ; j < ret && i < nspecchar + nratchars && i < nchars ;
+                j++, i++) {
             chars[i].p = p;
             chars[i].r = roots[j];
         }
     }
     /* we want some prime beyond the (algebraic) large prime bound */
     mpz_set_ui (pp, 1UL << lpb[ALGEBRAIC_SIDE]);
-    for(int i = 3 + nratchars ; i < nchars ; ) {
+    for(int i = nspecchar + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
         ret = poly_roots_ulong(roots, pol->alg->coeff, pol->alg->deg, p);

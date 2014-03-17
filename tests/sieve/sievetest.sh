@@ -6,7 +6,8 @@ LAS="$2"
 POLY="$3"
 REFERENCE_SHA1="$4"
 REFERENCE_REVISION="$5"
-shift 5
+CHECKSUM_FILE="$6"
+shift 6
 
 if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
 then
@@ -54,11 +55,13 @@ if [ -n "$rho" ]
 then
   end=("-rho" "$rho")
 fi
-
+echo "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}"
 "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 # first exercise the -fbc command-line option to create a cache file
+echo "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@"
 "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 # then use the cache file created above
+echo "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@"
 "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 
 
@@ -85,6 +88,35 @@ then
   exit 1
 fi
 
+if [ -n "${CHECKSUM_FILE}" ]
+then
+  MYCHECKSUM_FILE="${TMPDIR}/${BASENAME}.checksums"
+  grep "# Checksums over sieve region:" "${RELS}" > "${MYCHECKSUM_FILE}"
+  if [ -f "${CHECKSUM_FILE}" ]
+  then
+    # File with checksums already exists, compare
+    if diff -b "${CHECKSUM_FILE}" "${MYCHECKSUM_FILE}" > /dev/null
+    then
+      echo "Checksums agree"
+    else
+      echo "Error, reference checksums in ${CHECKSUM_FILE} differ from mine in ${MYCHECKSUM_FILE}" >&2
+      exit 1
+    fi
+  else
+    # File with checksums does not exists, create it
+    cp "${MYCHECKSUM_FILE}" "${CHECKSUM_FILE}"
+    echo "Created checksum file"
+  fi
+fi
 
-rm -f "${FB}" "${RELS}" "${FBC}"
-rmdir "${TMPDIR}"
+if [ -z "$KEEP_SIEVETEST" ]
+then
+  rm -f "${FB}" "${RELS}" "${FBC}"
+  if [ -n "${MYCHECKSUM_FILE}" ]
+  then
+    rm -f "${MYCHECKSUM_FILE}"
+  fi
+  rmdir "${TMPDIR}"
+else
+  echo "Keeping files in ${TMPDIR}"
+fi

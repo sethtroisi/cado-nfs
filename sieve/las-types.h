@@ -182,13 +182,14 @@ struct sieve_info_s {
 
     // parameters for bucket sieving
     unsigned int td_thresh;
+    unsigned int unsieve_thresh;
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     uint32_t nb_buckets;
 
     sieve_side_info sides[2];
 
     /* Data for unsieving locations where gcd(i,j) > 1 */
-    unsieve_aux_data us;
+    unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */
     j_div_ptr j_div;
 

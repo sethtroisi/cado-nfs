@@ -46,20 +46,20 @@ if [ "$?" -ne "0" ] ; then
 fi
 
 
-diff -q "${TMPDIR}"/sm.5.1 "${TMPDIR}"/sm.5.2
+diff -b "${TMPDIR}"/sm.5.1 "${TMPDIR}"/sm.5.2 > /dev/null
 if [ "$?" -ne "0" ] ; then
   echo "$0: Mono-threaded and multi-threaded versions do not match (without -nsm). Files remain in ${TMPDIR}"
   exit 1
 fi
 
-diff -q "${TMPDIR}"/sm.2.1 "${TMPDIR}"/sm.2.2
+diff -b "${TMPDIR}"/sm.2.1 "${TMPDIR}"/sm.2.2 > /dev/null
 if [ "$?" -ne "0" ] ; then
   echo "$0: Mono-threaded and multi-threaded versions do not match (with -nsm 2). Files remain in ${TMPDIR}"
   exit 1
 fi
 
 cut -d " " -f 1-2 "${TMPDIR}"/sm.5.1 > "${TMPDIR}"/sm.5.1.short
-diff -q "${TMPDIR}"/sm.5.1.short "${TMPDIR}"/sm.2.1
+diff -b "${TMPDIR}"/sm.5.1.short "${TMPDIR}"/sm.2.1 > /dev/null
 if [ "$?" -ne "0" ] ; then
   echo "$0: First two SMs computed without -nsm do not match SMs computed with -nsm 2). Files remain in ${TMPDIR}"
   exit 1
