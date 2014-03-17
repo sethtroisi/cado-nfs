@@ -50,7 +50,15 @@ and then running
 emerge  --deep --newuse world
 
 
-3. SSL
+3. Python 2 or 3 for the workunit client
+
+The client script wuclient2.py can run under both Python 2, version 2.6 or
+newer, and Python 3, version 3.2 or newer. This backward compatibility is
+supported to simplify deployment on many different machines over which the
+user may not have administrative control.
+
+
+4. SSL
 
 The workunit server and clients use SSL for communication to prevent an
 attacker on the same network from injecting text into workunits which could
