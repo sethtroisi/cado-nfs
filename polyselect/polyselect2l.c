@@ -239,8 +239,8 @@ expected_collisions (uint32_t twoP)
 }
 
 static void
-check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name,
-                  const unsigned long q, const char *q_name)
+check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED,
+                  const unsigned long q, const char *q_name MAYBE_UNUSED)
 {
 #ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_ui_p (d, q) == 0)
@@ -254,8 +254,8 @@ check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name,
 }
 
 static void
-check_divexact(mpz_t r, const mpz_t d, const char *d_name, const mpz_t q,
-               const char *q_name)
+check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mpz_t q,
+               const char *q_name MAYBE_UNUSED)
 {
 #ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_p (d, q) == 0)
