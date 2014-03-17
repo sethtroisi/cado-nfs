@@ -728,11 +728,13 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         bigmatpoly xpi, xE;
 
         bigmatpoly_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
+        // ???
         /* We prefer to allocate soon. The interface doesn't really like
          * lazy allocation at the moment */
-        bigmatpoly_init(ab, xE, model, m, b, E->size);
+        // bigmatpoly_init(ab, xE, model, m, b, E->size);
+        bigmatpoly_init(ab, xE, model, 0, 0, 0);
         bigmatpoly_init(ab, xpi, model, 0, 0, 0);   /* pre-init for now */
-        bigmatpoly_scatter_mat(ab, xE, E);
+        bigmatpoly_scatter_mat_alt(ab, xE, E);
         ASSERT_ALWAYS(xE->size);
         done = bw_biglingen_collective(bm, xpi, xE, delta);
         bigmatpoly_gather_mat(ab, pi, xpi);

@@ -9,9 +9,10 @@
 /* This defines an MPI-shared polynomial matrix type */
 
 struct bigmatpoly_s {
-    /* XXX the first four fields must be compatible with bigmatpoly_ft_s */
+    /* XXX the first five fields must be compatible with bigmatpoly_ft_s */
     unsigned int m1;      /* number of block rows, index i */
     unsigned int n1;      /* number of block cols, index j */
+    MPI_Comm comm;       /* MPI_COMM_WORLD, but reordered */
     MPI_Comm row;        /* size == n1 */
     MPI_Comm col;        /* size == m1 */
 
@@ -55,6 +56,8 @@ void bigmatpoly_mp(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b);
 
 void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src);
 void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src);
+
+void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src);
 
 /* {{{ access interface for bigmatpoly */
 static inline matpoly * bigmatpoly_part(bigmatpoly_ptr p, unsigned int i, unsigned int j) {

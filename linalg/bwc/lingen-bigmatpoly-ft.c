@@ -49,6 +49,7 @@ void bigmatpoly_ft_init_model(bigmatpoly_ft_ptr model, MPI_Comm comm, unsigned i
     memset(model, 0, sizeof(bigmatpoly_ft));
     model->m1 = m;
     model->n1 = n;
+    MPI_Comm_dup(comm, &(model->comm));
     MPI_Comm_split(comm, irank, jrank, &(model->row));
     MPI_Comm_split(comm, jrank, irank, &(model->col));
 }
@@ -82,6 +83,7 @@ void bigmatpoly_ft_init(abdst_field ab, bigmatpoly_ft_ptr p, bigmatpoly_ft_srcpt
     memset(p, 0, sizeof(bigmatpoly_ft));
     p->m1 = model->m1;
     p->n1 = model->n1;
+    MPI_Comm_dup(model->comm, &(p->comm));
     MPI_Comm_dup(model->row, &(p->row));
     MPI_Comm_dup(model->col, &(p->col));
 
@@ -120,6 +122,7 @@ int bigmatpoly_ft_check_pre_init(bigmatpoly_ft_srcptr p)
 
 void bigmatpoly_ft_clear_model(bigmatpoly_ft_ptr p)
 {
+    MPI_Comm_free(&(p->comm));
     MPI_Comm_free(&(p->row));
     MPI_Comm_free(&(p->col));
     memset(p, 0, sizeof(bigmatpoly_ft));

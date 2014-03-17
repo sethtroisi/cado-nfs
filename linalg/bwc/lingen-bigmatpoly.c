@@ -29,6 +29,7 @@ void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm comm, unsigned int m, 
     memset(model, 0, sizeof(bigmatpoly));
     model->m1 = m;
     model->n1 = n;
+    MPI_Comm_dup(comm, &(model->comm));
     MPI_Comm_split(comm, irank, jrank, &(model->row));
     MPI_Comm_split(comm, jrank, irank, &(model->col));
 }
@@ -63,6 +64,7 @@ void bigmatpoly_init(abdst_field ab, bigmatpoly_ptr p, bigmatpoly_srcptr model, 
     memset(p, 0, sizeof(bigmatpoly));
     p->m1 = model->m1;
     p->n1 = model->n1;
+    MPI_Comm_dup(model->comm, &(p->comm));
     MPI_Comm_dup(model->row, &(p->row));
     MPI_Comm_dup(model->col, &(p->col));
 
@@ -101,6 +103,7 @@ int bigmatpoly_check_pre_init(bigmatpoly_srcptr p)
 
 void bigmatpoly_clear_model(bigmatpoly_ptr p)
 {
+    MPI_Comm_free(&(p->comm));
     MPI_Comm_free(&(p->row));
     MPI_Comm_free(&(p->col));
     memset(p, 0, sizeof(bigmatpoly));
@@ -578,4 +581,104 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
     }
     bigmatpoly_scatter_row(ab, dst);
     bigmatpoly_unprovision_row(ab, dst);
+}
+
+/* Exactly the converse of the previous function. */
+void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
+{
+    int rank;
+    int irank;
+    int jrank;
+    MPI_Comm_rank(dst->comm, &rank);
+    MPI_Comm_rank(dst->col, &irank);
+    MPI_Comm_rank(dst->row, &jrank);
+    /* src at root must be initialized.
+     * src at other nodes is untouched. */
+
+    /* share allocation size. Don't share data, as it's not very
+     * relevant. */
+    matpoly shell;
+    shell->m = src->m;
+    shell->n = src->n;
+    shell->size = src->size;
+    shell->alloc = src->alloc;
+
+    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->comm);
+
+    /* dst must be in pre-init mode */
+    ASSERT_ALWAYS(bigmatpoly_check_pre_init(dst));
+
+    /* Important: allocate the same area */
+    bigmatpoly_finish_init(ab, dst, shell->m, shell->n, shell->alloc);
+
+    bigmatpoly_set_size(dst, shell->size);
+
+    /* sanity check, because the code below assumes this. */
+    ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
+
+    if (!rank) {
+        MPI_Request * reqs = malloc(dst->m1 * dst->n1 * dst->m0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        /* the master sends data to everyone ! */
+        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
+                    unsigned int ii = i1 * dst->m0 + i0;
+                    unsigned int jj = j1 * dst->n0;
+                    unsigned int count = dst->n0 * shell->alloc;
+                    unsigned int peer = i1 * dst->n1 + j1;
+                    unsigned int tag = ii * dst->n + jj;
+                    abdst_vec from = matpoly_part(ab, src, ii, jj, 0);
+
+                    if (peer == 0) {
+                        /* talk to ourself */
+                        matpoly_ptr me = bigmatpoly_my_cell(dst);
+                        abdst_vec to = matpoly_part(ab, me, i0, 0, 0);
+                        abvec_set(ab, to, from, count);
+                    } else {
+                        MPI_Isend(from, count, abmpi_datatype(ab),
+                                peer, tag, dst->comm, req);
+                    }
+
+                    req++;
+                }
+            }
+        }
+
+        req = reqs;
+        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
+                    unsigned int peer = i1 * dst->n1 + j1;
+                    if (peer)
+                        MPI_Wait(req, MPI_STATUS_IGNORE);
+                    req++;
+                }
+            }
+        }
+        free(reqs);
+    } else {
+        MPI_Request * reqs = malloc(dst->m0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        /* receive. Each job will receive exactly dst->m0 transfers */
+        matpoly_ptr me = bigmatpoly_my_cell(dst);
+        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+            unsigned int i1 = irank;
+            unsigned int j1 = jrank;
+            unsigned int ii = i1 * dst->m0 + i0;
+            unsigned int jj = j1 * dst->n0;
+            unsigned int count = dst->n0 * shell->alloc;
+            unsigned int tag = ii * dst->n + jj;
+            abdst_vec to = matpoly_part(ab, me, i0, 0, 0);
+            MPI_Irecv(to, count, abmpi_datatype(ab),
+                    0, tag, dst->comm, req);
+            req++;
+        }
+        req = reqs;
+        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+            MPI_Wait(req, MPI_STATUS_IGNORE);
+            req++;
+        }
+        free(reqs);
+    }
 }

@@ -19,6 +19,7 @@ struct bigmatpoly_ft_s {
     /* XXX the first four fields must be compatible with bigmatpoly_s */
     unsigned int m1;      /* number of block rows, index i */
     unsigned int n1;      /* number of block cols, index j */
+    MPI_Comm comm;       /* MPI_COMM_WORLD, but reordered */
     MPI_Comm row;        /* size == n1 */
     MPI_Comm col;        /* size == m1 */
 
