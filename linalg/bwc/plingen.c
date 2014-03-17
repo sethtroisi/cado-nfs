@@ -11,6 +11,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <assert.h>
 
@@ -744,134 +746,6 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
 
 /**********************************************************************/
 
-unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
-{				
-    dims *d = bm->d;
-    abdst_field ab = d->ab;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-
-    ASSERT(A->m == m);
-    ASSERT(A->n == n);
-
-    abelt tmp;
-    abinit(ab, &tmp);
-
-    /* First try to create the initial F matrix */
-    printf("Computing t0\n");
-
-    /* We want to create a full rank m*m matrix M, by extracting columns
-     * from the first coefficients of A */
-
-    matpoly M;
-    matpoly_init(ab, M, m, m, 1);
-    M->size = 1;
-
-    /* For each integer i between 0 and m-1, we have a column, picked
-     * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
-     * the other ones, has coefficient at row pivots[i] unequal to zero.
-     */
-    unsigned int *pivots = malloc(m * sizeof(unsigned int));
-    unsigned int *exponents = malloc(m * sizeof(unsigned int));
-    unsigned int *cnum = malloc(m * sizeof(unsigned int));
-    unsigned int r = 0;
-
-    for (unsigned int k = 0; r < m && k < A->size; k++) {
-	for (unsigned int j = 0; r < m && j < n; j++) {
-	    /* Extract a full column into M */
-            matpoly_extract_column(ab, M, r, 0, A, j, k);
-
-            /* Now reduce it modulo all other columns */
-	    for (unsigned int v = 0; v < r; v++) {
-		unsigned int u = pivots[v];
-		/* the v-th column in the M is known to
-		 * kill coefficient u (more exactly, to have a -1 as u-th
-		 * coefficient, and zeroes for the other coefficients
-		 * referenced in the pivots[0] to pivots[v-1] indices).
-		 */
-                /* add M[u,r]*column v of M to column r of M */
-                for(unsigned int i = 0 ; i < m ; i++) {
-                    if (i == u) continue;
-                    abmul(ab, tmp,
-                              matpoly_coeff(ab, M, i, v, 0),
-                              matpoly_coeff(ab, M, u, r, 0));
-                    abadd(ab, matpoly_coeff(ab, M, i, r, 0),
-                              matpoly_coeff(ab, M, i, r, 0),
-                              tmp);
-                }
-                abset_zero(ab,
-                        matpoly_coeff(ab, M, u, r, 0));
-	    }
-            unsigned int u = 0;
-            for( ; u < m ; u++) {
-                if (abcmp_ui(ab, matpoly_coeff(ab, M, u, r, 0), 0) != 0)
-                    break;
-            }
-            if (u == m) {
-		printf("[X^%d] A, col %d does not increase rank (still %d)\n",
-		       k, j, r);
-		if (k * n > m + 40) {
-		    printf("The choice of starting vectors was bad. "
-			   "Cannot find %u independent cols within A\n", m);
-		    exit(EXIT_FAILURE);
-		}
-		continue;
-	    }
-
-	    /* Bingo, it's a new independent col. */
-	    pivots[r] = u;
-	    cnum[r] = j;
-	    exponents[r] = k;
-
-	    /* Multiply the column so that the pivot becomes -1 */
-            int rc = abinv(ab, tmp, matpoly_coeff(ab, M, u, r, 0));
-            if (!rc) {
-                fprintf(stderr, "Error, found a factor of the modulus: ");
-                abfprint(ab, stderr, tmp);
-                fprintf(stderr, "\n");
-                exit(EXIT_FAILURE);
-            }
-            abneg(ab, tmp, tmp);
-            for(unsigned int i = 0 ; i < m ; i++) {
-                abmul(ab, matpoly_coeff(ab, M, i, r, 0),
-                          matpoly_coeff(ab, M, i, r, 0),
-                          tmp);
-            }
-
-	    r++;
-
-	    // if (r == m)
-		printf
-		    ("[X^%d] A, col %d increases rank to %d (head row %d)\n",
-		     k, j, r, u);
-	}
-    }
-
-    if (r != m) {
-	printf("This amount of data is insufficient. "
-	       "Cannot find %u independent cols within A\n", m);
-	exit(EXIT_FAILURE);
-    }
-
-    unsigned int t0 = exponents[r - 1] + 1;
-    printf("Found satisfying init data for t0=%d\n", t0);
- 
-    bm->t = t0;
-
-    unsigned int (*fdesc)[2] = malloc(2 * m * sizeof(unsigned int));
-    for(unsigned int j = 0 ; j < m ; j++) {
-        fdesc[j][0] = exponents[j];
-        fdesc[j][1] = cnum[j];
-    }
-    free(pivots);
-    free(exponents);
-    free(cnum);
-    matpoly_clear(ab, M);
-    abclear(ab, &tmp);
-
-    return fdesc;
-}				/*}}} */
-
 unsigned int get_max_delta_on_solutions(bmstatus_ptr bm, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
@@ -1054,104 +928,448 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
     fclose(f);
 }/*}}}*/
 
-void compute_initial_E(bmstatus_ptr bm, matpoly E, matpoly A, unsigned int (*fdesc)[2])/*{{{*/
+struct a_reading_task_s {/*{{{*/
+    bmstatus_ptr bm;
+    unsigned int t0;
+    FILE * f;
+    const char * input_file;
+    int ascii;
+    /* This is only a rolling window ! */
+    matpoly A;
+    unsigned int (*fdesc)[2];
+    /* This k is the coefficient in A(X) div X of the next coefficient to
+     * be read. This is thus the total number of coefficients of A(X) div
+     * X which have been read so far */
+    unsigned int k;
+
+    unsigned int guessed_length;
+    double avg_matsize;
+};
+
+typedef struct a_reading_task_s a_reading_task[1];
+typedef struct a_reading_task_s * a_reading_task_ptr;/*}}}*/
+
+int a_reading_task_read1(a_reading_task_ptr aa, unsigned int modulus)/*{{{*/
+{
+    bmstatus_ptr bm = aa->bm;
+    dims *d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    matpoly_ptr A = aa->A;
+
+    unsigned int pos = aa->k;
+    if (modulus) {
+        pos = pos % modulus;
+        ASSERT_ALWAYS(A->size == modulus);
+    } else {
+        ASSERT_ALWAYS(A->size == aa->k);
+        if (aa->k >= A->alloc) {
+            matpoly_realloc(aa->bm->d->ab, A, A->alloc + 1);
+        }
+        A->size++;
+    }
+    for (unsigned int i = 0; i < m ; i++) {
+        for (unsigned int j = 0; j < n ; j++) {
+            abdst_elt x = matpoly_coeff(ab, A, i, j, pos);
+            int rc;
+            if (aa->ascii) {
+                rc = abfscan(ab, aa->f, x);
+                rc = rc == 1;
+            } else {
+                size_t elemsize = abvec_elt_stride(ab, 1);
+                rc = fread(x, elemsize, 1, aa->f);
+                rc = rc == 1;
+                abnormalize(ab, x);
+            }
+            if (!rc) {
+                if (i == 0 && j == 0) {
+                    return 0;
+                }
+                fprintf(stderr,
+                        "Parse error while reading coefficient (%d,%d,%d)%s\n",
+                        i, j, 1 + aa->k,
+                        aa->ascii ? "" : " (forgot --ascii?)");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+    aa->k++;
+    return 1;
+}/*}}}*/
+
+void a_reading_task_init(a_reading_task_ptr aa, bmstatus_ptr bm, const char * input_file, int ascii)/*{{{*/
+{
+    memset(aa, 0, sizeof(*aa));
+    aa->bm = bm;
+    aa->ascii = ascii;
+    aa->input_file = input_file;
+    dims * d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    abdst_field ab = d->ab;
+
+    aa->f = fopen(input_file, ascii ? "r" : "rb");
+    DIE_ERRNO_DIAG(aa->f == NULL, "fopen", input_file);
+
+    matpoly_init(ab, aa->A, m, n, 1);
+    /* read and discard the first coefficient */
+    if (!a_reading_task_read1(aa, 0)) {
+        fprintf(stderr, "Read error from %s\n", input_file);
+        exit(EXIT_FAILURE);
+    }
+    /* discard ! */
+    aa->A->size = aa->k = 0;
+}/*}}}*/
+
+void a_reading_task_clear(a_reading_task_ptr aa)/*{{{*/
+{
+    fclose(aa->f);
+    /* caller code actually steals the pointer from us (and replaces it
+     * by a NULL */
+    if (aa->fdesc) free(aa->fdesc);
+    matpoly_clear(aa->bm->d->ab, aa->A);
+}/*}}}*/
+
+void a_reading_task_guess_length(a_reading_task_ptr aa)/*{{{*/
+{
+    bmstatus_ptr bm = aa->bm;
+    dims * d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    abdst_field ab = d->ab;
+
+    struct stat sbuf[1];
+    int rc = fstat(fileno(aa->f), sbuf);
+    if (rc < 0) {
+        perror(aa->input_file);
+        exit(EXIT_FAILURE);
+    }
+
+    size_t filesize = sbuf->st_size;
+
+    /* Easy case first. If we have binary input, then we know a priori
+     * that the input data must have size a multiple of the element size.
+     */
+    if (!aa->ascii) {
+        size_t elemsize = abvec_elt_stride(ab, 1);
+        size_t matsize = elemsize * m * n;
+        if (filesize % matsize) {
+            fprintf(stderr, "File %s has %zu bytes, while its size should be amultiple of %zu bytes (assuming binary input; perhaps --ascii is missing ?).\n", aa->input_file, filesize, matsize);
+            exit(EXIT_FAILURE);
+        }
+        aa->avg_matsize = matsize;
+        aa->guessed_length = filesize / matsize;
+        return;
+    }
+
+    /* Ascii is more complicated. We're necessarily fragile here.
+     * However, assuming that each coefficient comes with only one space,
+     * and each matrix with an extra space (this is how the GPU program
+     * prints data -- not that this ends up having a considerable impact
+     * anyway...), we can guess the number of bytes per matrix. */
+
+    /* Formula for the average number of digits of an integer mod p,
+     * written in base b:
+     *
+     * (k-((b^k-1)/(b-1)-1)/p)  with b = Ceiling(Log(p)/Log(b)).
+     */
+    double avg;
+    {
+        mpz_t p, a;
+        mpz_init(p);
+        mpz_init(a);
+        abfield_characteristic(ab, p);
+        unsigned long k = ceil(log(mpz_get_d(p))/log(10));
+        unsigned long b = 10;
+        mpz_ui_pow_ui(a, b, k);
+        mpz_sub_ui(a, a, 1);
+        mpz_fdiv_q_ui(a, a, b-1);
+        avg = k - mpz_get_d(a) / mpz_get_d(p);
+        mpz_clear(p);
+        mpz_clear(a);
+        printf("Expect roughly %.2f decimal digits for integers mod p.\n", avg);
+    }
+
+    double matsize = (avg + 1) * m * n + 1;
+    printf("Expect roughly %.2f bytes for each sequence matrix.\n", matsize);
+
+    double expected_length = filesize / matsize;
+    printf("Expect roughly %.2f items in the sequence.\n", expected_length);
+
+    /* First coefficient is always lighter, so we add a +1. The 5% are
+     * here really only to take into account the deviations, but we don't
+     * expect much */
+    size_t guessed_length = 1 + ceil(1.05 * expected_length);
+    printf("With safety margin: expect length %zu at most\n", guessed_length);
+
+    aa->avg_matsize = matsize;
+    aa->guessed_length = guessed_length;
+
+#if 0
+    /* we don't have the struct bw at hand here... */
+    if (bw->end || bw->start) {
+        printf("(Note: from bw parameters, we expect %u).\n",
+                bw->end - bw->start);
+    }
+    printf(".\n");
+#endif
+}/*}}}*/
+
+void a_reading_task_compute_F(a_reading_task_ptr aa) /*{{{ */
+{
+    bmstatus_ptr bm = aa->bm;
+    dims *d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    matpoly_ptr A = aa->A;
+
+    /* read the first few coefficients. Expand A accordingly as we are
+     * doing the read */
+
+    ASSERT(A->m == m);
+    ASSERT(A->n == n);
+
+    abelt tmp;
+    abinit(ab, &tmp);
+
+    /* First try to create the initial F matrix */
+    printf("Computing t0\n");
+
+    /* We want to create a full rank m*m matrix M, by extracting columns
+     * from the first coefficients of A */
+
+    matpoly M;
+    matpoly_init(ab, M, m, m, 1);
+    M->size = 1;
+
+    /* For each integer i between 0 and m-1, we have a column, picked
+     * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
+     * the other ones, has coefficient at row pivots[i] unequal to zero.
+     */
+    unsigned int *pivots = malloc(m * sizeof(unsigned int));
+    unsigned int *exponents = malloc(m * sizeof(unsigned int));
+    unsigned int *cnum = malloc(m * sizeof(unsigned int));
+    unsigned int r = 0;
+
+    for (unsigned int k = 0; r < m ; k++) {
+        /* read a new coefficient */
+        a_reading_task_read1(aa, 0);
+
+	for (unsigned int j = 0; r < m && j < n; j++) {
+	    /* Extract a full column into M */
+            matpoly_extract_column(ab, M, r, 0, A, j, k);
+
+            /* Now reduce it modulo all other columns */
+	    for (unsigned int v = 0; v < r; v++) {
+		unsigned int u = pivots[v];
+		/* the v-th column in the M is known to
+		 * kill coefficient u (more exactly, to have a -1 as u-th
+		 * coefficient, and zeroes for the other coefficients
+		 * referenced in the pivots[0] to pivots[v-1] indices).
+		 */
+                /* add M[u,r]*column v of M to column r of M */
+                for(unsigned int i = 0 ; i < m ; i++) {
+                    if (i == u) continue;
+                    abmul(ab, tmp,
+                              matpoly_coeff(ab, M, i, v, 0),
+                              matpoly_coeff(ab, M, u, r, 0));
+                    abadd(ab, matpoly_coeff(ab, M, i, r, 0),
+                              matpoly_coeff(ab, M, i, r, 0),
+                              tmp);
+                }
+                abset_zero(ab,
+                        matpoly_coeff(ab, M, u, r, 0));
+	    }
+            unsigned int u = 0;
+            for( ; u < m ; u++) {
+                if (abcmp_ui(ab, matpoly_coeff(ab, M, u, r, 0), 0) != 0)
+                    break;
+            }
+            if (u == m) {
+		printf("[X^%d] A, col %d does not increase rank (still %d)\n",
+		       k, j, r);
+
+                /* we need at least m columns to get as starting matrix
+                 * with full rank. Given that we have n columns per
+                 * coefficient, this means at least m/n matrices.
+                 */
+
+		if (k * n > m + 40) {
+		    printf("The choice of starting vectors was bad. "
+			   "Cannot find %u independent cols within A\n", m);
+		    exit(EXIT_FAILURE);
+		}
+		continue;
+	    }
+
+	    /* Bingo, it's a new independent col. */
+	    pivots[r] = u;
+	    cnum[r] = j;
+	    exponents[r] = k;
+
+	    /* Multiply the column so that the pivot becomes -1 */
+            int rc = abinv(ab, tmp, matpoly_coeff(ab, M, u, r, 0));
+            if (!rc) {
+                fprintf(stderr, "Error, found a factor of the modulus: ");
+                abfprint(ab, stderr, tmp);
+                fprintf(stderr, "\n");
+                exit(EXIT_FAILURE);
+            }
+            abneg(ab, tmp, tmp);
+            for(unsigned int i = 0 ; i < m ; i++) {
+                abmul(ab, matpoly_coeff(ab, M, i, r, 0),
+                          matpoly_coeff(ab, M, i, r, 0),
+                          tmp);
+            }
+
+	    r++;
+
+	    // if (r == m)
+		printf
+		    ("[X^%d] A, col %d increases rank to %d (head row %d)\n",
+		     aa->k, j, r, u);
+	}
+    }
+
+    if (r != m) {
+	printf("This amount of data is insufficient. "
+	       "Cannot find %u independent cols within A\n", m);
+	exit(EXIT_FAILURE);
+    }
+
+    aa->t0 = exponents[r - 1] + 1;
+    ASSERT_ALWAYS(aa->t0 == aa->k);
+
+    printf("Found satisfying init data for t0=%d\n", aa->t0);
+ 
+    bm->t = aa->t0;
+
+    /* We've also got some adjustments to make: room for one extra
+     * coefficient is needed in A. Reading of further coefficients will
+     * pickup where they stopped, and will always leave the last t0+1
+     * coefficients readable. */
+    matpoly_realloc(ab, A, aa->t0 + 1);
+    A->size++;
+    
+
+    unsigned int (*fdesc)[2] = malloc(2 * m * sizeof(unsigned int));
+    for(unsigned int j = 0 ; j < m ; j++) {
+        fdesc[j][0] = exponents[j];
+        fdesc[j][1] = cnum[j];
+        ASSERT_ALWAYS(exponents[j] < aa->t0);
+    }
+    aa->fdesc = fdesc;
+    free(pivots);
+    free(exponents);
+    free(cnum);
+    matpoly_clear(ab, M);
+    abclear(ab, &tmp);
+}				/*}}} */
+
+int a_reading_task_compute_E_oneblock(a_reading_task_ptr aa, matpoly E, unsigned int pos, unsigned int block_size)/*{{{*/
 {
     // F0 is exactly the n x n identity matrix, plus the
     // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
     // pairs
+    bmstatus_ptr bm = aa->bm;
+    dims * d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int t0 = bm->t;
+    abdst_field ab = d->ab;
+
+    unsigned int s;
+
+    for(s = 0 ; s < block_size ; s++) {
+        /* keep this value of k, since this is the one of interest to us */
+        unsigned int k = aa->k;
+
+        if (!a_reading_task_read1(aa, t0 + 1)) {
+            fprintf(stderr, "EOF met after reading %u coefficients\n", k);
+            E->size = k - t0;
+            break;
+        }
+
+        unsigned int kr = k % (t0 + 1);
+
+        if (k > aa->guessed_length) {
+            fprintf(stderr, "Going past guessed length ???\n");
+        }
+
+        for(unsigned int j = 0 ; j < n ; j++) {
+            /* Column j of E simply comes from multiplication by the
+             * identity matrix. Only coefficients of degree t0 and
+             * above in A contribute, here. In effect, coefficient of
+             * degree k in e is exactly coefficient of degree k + t0
+             * in E.
+             */
+            matpoly_extract_column(ab, E, j, pos + s, aa->A, j, kr);
+        }
+        for(unsigned int j = n ; j < m + n ; j++) {
+            /* Because the initial matrix F has powers of x in its
+             * right part, we use columns of A from earlier reads
+             * here.
+             *
+             * Let c, e be as below. Column j of E is x^(t0-e) times
+             * column c of A. Coefficient of degree k in E is thus
+             * coefficient of degree k + t0 in the product A *
+             * x^(t0-e), which is thus coefficient of degree k + e in
+             * A. Since e is in [0..t0-1]. Therefore, our cyclic
+             * buffer of depth t0 + 1 still has the required
+             * coefficient.
+             */
+            unsigned int c = aa->fdesc[j-n][1];
+            unsigned int e = aa->fdesc[j-n][0];
+            matpoly_extract_column(ab, E, j, pos + s, aa->A, c, (k - t0 + e) % (t0 + 1));
+        }
+    }
+    return s;
+}/*}}}*/
+
+void a_reading_task_compute_E_local(a_reading_task_ptr aa, matpoly E)/*{{{*/
+{
+    // F0 is exactly the n x n identity matrix, plus the
+    // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
+    // pairs
+    bmstatus_ptr bm = aa->bm;
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
     unsigned int b = m + n;
     unsigned int t0 = bm->t;
-    ASSERT(A->m == m);
-    ASSERT(A->n == n);
-
-    ASSERT(!E->m && !E->n && !E->alloc);
     abdst_field ab = d->ab;
-    /* Now we're ready to compute E, which is nothing more than a rewrite
-     * of A, of course. */
-    matpoly_init(ab, E, m, b, A->size - t0);
-    E->size = A->size - t0;
-    for(unsigned int k = t0 ; k < A->size ; k++) {
-        for(unsigned int j = 0 ; j < n ; j++) {
-            /* Take column j of A, shifted by t0 positions */
-            matpoly_extract_column(ab, E, j, k-t0, A, j, k);
+
+    unsigned int guess = aa->guessed_length;
+    ASSERT(!E->m && !E->n && !E->alloc);
+    matpoly_init(ab, E, m, b, guess);
+    E->size = guess;
+
+    double tt0 = wct_seconds();
+    double next_t = tt0 + 10;
+    unsigned int k0 = aa->k;
+    ASSERT_ALWAYS(k0 == t0);
+
+    for(unsigned next_k = guess / 100 ; aa->k < guess ; ) {
+        /* read E by blocks of B coefficients */
+        unsigned int B = 1000;
+        unsigned int nr = a_reading_task_compute_E_oneblock(aa, E, aa->k - t0, B);
+        if (aa->k > next_k) {
+            double tt = wct_seconds();
+            if (tt > next_t) {
+                fprintf(stderr,
+                        "Read %u coefficients (%.1f%%) in %.1f s (%.1f MB/s)\n",
+                        aa->k, 100.0 * aa->k / guess,
+                        tt-tt0, (aa->k - k0)*aa->avg_matsize/(tt-tt0)/1.0e6);
+                next_t = tt + 10;
+                next_k = aa->k + guess/ 100;
+            }
         }
-        for(unsigned int j = n ; j < m + n ; j++) {
-            /* Take column cnum[j-n] of coeff exponents[j-n] of A, to
-             * reach position t0. Which means that since we're
-             * effectively computing E from coefficient t0 onwards, we
-             * shift by exponents[j-n] coefficients */
-            unsigned int c = fdesc[j-n][1];
-            unsigned int e = fdesc[j-n][0];
-            matpoly_extract_column(ab, E, j, k-t0, A, c, k-t0+e);
-        }
+        if (nr < B)
+            break;
     }
 }/*}}}*/
-
-void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
-			  const char *input_file, int ascii_input)
-{
-    dims * d = bm->d;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    abdst_field ab = d->ab;
-
-    unsigned int guess_len = 1000;
-
-    ASSERT(!A->m && !A->n && !A->alloc);
-    matpoly_init(ab, A, m, n, guess_len);
-
-    FILE *f = fopen(input_file, ascii_input ? "r" : "rb");
-    DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
-
-    unsigned int k = 0;
-    int eof_met = 0;
-    for( ; !eof_met ; k++) {
-        if (k == A->alloc) {
-            matpoly_realloc(ab, A, A->alloc + A->alloc / 10);
-        }
-        ASSERT_ALWAYS(k < A->alloc);
-        A->size = k + 1;
-
-	/* coefficient 0 will be read to position 0 (k-!!k=0), but all
-	 * other coefficients from position 1 onwards will be stored to
-	 * position k-1 (!!k=1), effectively chopping the first
-	 * coefficient.
-	 */
-	int k1 = k - ! !k;
-	for (unsigned int i = 0; i < m && !eof_met ; i++) {
-	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
-                abdst_elt x = matpoly_coeff(ab, A, i, j, k1);
-		int rc;
-                if (ascii_input) {
-                    rc = abfscan(ab, f, x);
-                    rc = rc == 1;
-                } else {
-                    rc = fread(x, abvec_elt_stride(ab, 1), 1, f);
-                    rc = rc == 1;
-                    abnormalize(ab, x);
-                }
-		if (!rc) {
-                    if (i == 0 && j == 0) {
-                        eof_met = 1;
-                        break;
-                    }
-		    fprintf(stderr,
-			    "Parse error in %s while reading coefficient (%d,%d,%d) (forgot --ascii?)\n",
-			    input_file, i, j, k);
-		    exit(EXIT_FAILURE);
-		}
-	    }
-	}
-    }
-    /* We can bail out only via eof_met, so this incurs an extra k++ */
-    k--;
-    fclose(f);
-    printf("Using A(X) div X in order to consider Y as starting point\n");
-    A->size = k - 1;
-} /* }}} */
 
 void set_random_input(bmstatus_ptr bm, matpoly A, unsigned int length) /* {{{ */
 {
@@ -1225,7 +1443,7 @@ int main(int argc, char *argv[])
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
-    unsigned int random_length = 0;
+    unsigned int random_input_length = 0;
 
 
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -1247,7 +1465,7 @@ int main(int argc, char *argv[])
 
     info_init_timer();
 
-    param_list_parse_uint(pl, "random-input-with-length", &random_length);
+    param_list_parse_uint(pl, "random-input-with-length", &random_input_length);
     param_list_parse_int(pl, "caching", &caching);
 
     const char * afile = param_list_lookup_string(pl, "afile");
@@ -1260,7 +1478,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "no n value set\n");
 	exit(EXIT_FAILURE);
     }
-    if (!tune && !(afile || random_length)) {
+    if (!tune && !(afile || random_input_length)) {
         fprintf(stderr, "No afile provided\n");
         exit(EXIT_FAILURE);
     }
@@ -1387,37 +1605,38 @@ int main(int argc, char *argv[])
     matpoly E;
     matpoly_init(ab, E, 0, 0, 0);
 
-    if (rank == 0) { /* {{{ Read A, compute F0 and E, and keep only E */
-        matpoly A;
-        matpoly_init(ab, A, 0, 0, 0);
 
-        if (!random_length) {
-            printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
-            read_data_for_series(bm, A, afile, ascii);
-
-            printf("Read %zu+1=%zu iterations",
-                    A->size, A->size+ 1);
-        } else {
-            set_random_input(bm, A, random_length);
-        }
-        if (bw->end || bw->start) {
-            printf(" (bw parameters: expect %u)",
-                    bw->end - bw->start);
-        }
-        printf(".\n");
-        /* Data read stage completed. */
-
-        fdesc = compute_initial_F(bm, A);
-
-        compute_initial_E(bm, E, A, fdesc);
-
-        printf("Throwing out a(X)\n");
-        matpoly_clear(ab, A);
-    } /* }}} */
     MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
+
+    if (rank == 0) { /* {{{ compute E by reading A on the fly */
+        // compute_initial_E(bm, E, A, fdesc);
+        if (!random_input_length) {
+            a_reading_task aa;
+            a_reading_task_init(aa, bm, afile, ascii);
+            a_reading_task_guess_length(aa);
+            a_reading_task_compute_F(aa);
+            fdesc = aa->fdesc;
+
+            /* This is one possible way to go */
+            a_reading_task_compute_E_local(aa, E);
+
+            // compute_initial_E_from_A_ondisk(bm, E, afile, fdesc, ascii);
+            aa->fdesc = NULL;
+            a_reading_task_clear(aa);
+        } else {
+            matpoly_init(ab, E, m, b, random_input_length);
+            gmp_randstate_t rstate;
+            gmp_randinit_default(rstate);
+            abvec_random(ab, E->x, m * b * random_input_length, rstate);
+            gmp_randclear(rstate);
+        }
+
+    } /* }}} */
+
+
     /* This will quite probably be changed. We are playing nasty games
-     * here, with E->size being used to draw decisions even though the is
-     * no corresponding allocation.
+     * here, with E->size being used to draw decisions even though there
+     * is no corresponding allocation.
      */
     MPI_Bcast(&(E->size), 1, MPI_UNSIGNED, 0, bm->world);
 
@@ -1445,7 +1664,7 @@ int main(int argc, char *argv[])
             matpoly f_red;
             matpoly_init(ab, f_red, 0, 0, 0);
             compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
-            if (random_length) {
+            if (random_input_length) {
                 fprintf(stderr, "Not writing result for random data\n");
             } else {
                 char * f_filename;
