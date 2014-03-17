@@ -448,8 +448,7 @@ void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
      */
     bigmatpoly_allgather_row(ab, src);
     dst->size = src->size;
-    /* Do this on all nodes. This will aid the coding of the next gather
-     * */
+    /* Do this on all nodes. This will aid the coding of the next gather */
     unsigned int ibase = irank * src->m0;
     for(unsigned int i = 0 ; i < src->m0 ; i++) {
         for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
@@ -534,6 +533,9 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
         if (irank || jrank) {
             /* make sure we have exactly the same amount of allocated
              * memory everywhere */
+            /* XXX In effect, this allocates the root amount
+             * *everywhere*, which is completely insane !
+             */
             matpoly_init(ab, src, shell->m, shell->n, shell->alloc);
             src->size = shell->size;
         }

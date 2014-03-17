@@ -1044,7 +1044,8 @@ void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int
                     abset_zero(ab, tmp);
                     if (k <= delta[j])
                         abset(ab, tmp, matpoly_coeff(ab, f_red, i, jj, delta[j]-k));
-                    fwrite(tmp, sizeof(abelt), 1, f);
+                    size_t elemsize = abvec_elt_stride(ab, 1);
+                    fwrite(tmp, elemsize, 1, f);
                 }
             }
         }
@@ -1128,7 +1129,7 @@ void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
                     rc = abfscan(ab, f, x);
                     rc = rc == 1;
                 } else {
-                    rc = fread(x, sizeof(abelt), 1, f);
+                    rc = fread(x, abvec_elt_stride(ab, 1), 1, f);
                     rc = rc == 1;
                     abnormalize(ab, x);
                 }

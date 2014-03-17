@@ -126,7 +126,7 @@ void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j
     ASSERT_ALWAYS((size + 1) <= pi->alloc);
     for(unsigned int i = 0 ; i < pi->m ; i++) {
         memmove(matpoly_part(ab, pi, i, j, 1), matpoly_part(ab, pi, i, j, 0), 
-                size * sizeof(abelt));
+                size * abvec_elt_stride(ab, 1));
         abset_ui(ab, matpoly_coeff(ab, pi, i, j, 0), 0);
     }
 }/*}}}*/
