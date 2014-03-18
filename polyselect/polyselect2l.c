@@ -971,25 +971,17 @@ static inline unsigned long
 collision_on_p ( header_t header,
                  proots_t R )
 {
-  unsigned long i, j, nprimes, p, nrp, c = 0, tot_roots = 0;
+  unsigned long j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   double pc1;
-  mpz_t *f, tmp;
+  mpz_t zero;
   int found = 0;
   shash_t H;
   int st = 0;
 
-  /* init f for roots computation */
-  mpz_init_set_ui (tmp, 0);
-  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
-  if (f == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
-    exit (1);
-  }
-  for (i = 0; i <= header->d; i++)
-    mpz_init (f[i]);
-  mpz_set_ui (f[header->d], 1);
+  /* init zero */
+  mpz_init_set_ui (zero, 0);
 
   rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
@@ -1052,10 +1044,10 @@ collision_on_p ( header_t header,
             {
               for (u = (int64_t) rp[j]; u < umax; u += ppl)
                 hash_add (H, p, u, header->m0, header->ad, header->d,
-                          header->N, 1, tmp);
+                          header->N, 1, zero);
               for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
                 hash_add (H, p, -u, header->m0, header->ad,
-                          header->d, header->N, 1, tmp);
+                          header->d, header->N, 1, zero);
             }
         }
 #ifdef DEBUG_POLYSELECT2L
@@ -1070,10 +1062,7 @@ collision_on_p ( header_t header,
       hash_clear (H);
     }
 
-  for (i = 0; i <= header->d; i++)
-    mpz_clear (f[i]);
-  free (f);
-  mpz_clear (tmp);
+  mpz_clear (zero);
 
   pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
@@ -1648,22 +1637,14 @@ static inline unsigned long
 gmp_collision_on_p ( header_t header,
 		     proots_t R )
 {
-  unsigned long i, j, nprimes, p, nrp, c = 0;
+  unsigned long j, nprimes, p, nrp, c = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   double pc1;
-  mpz_t *f, tmp;
+  mpz_t zero;
 
-  /* init f for roots computation */
-  mpz_init_set_ui (tmp, 0);
-  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
-  if (f == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
-    exit (1);
-  }
-  for (i = 0; i <= header->d; i++)
-    mpz_init (f[i]);
-  mpz_set_ui (f[header->d], 1);
+  /* init zero */
+  mpz_init_set_ui (zero, 0);
 
   rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
@@ -1699,10 +1680,10 @@ gmp_collision_on_p ( header_t header,
     for (j = 0; j < nrp; j++, c++) {
       for (u = (int64_t) rp[j]; u < umax; u += ppl)
         gmp_hash_add (H, p, u, header->m0, header->ad,
-                      header->d, header->N, 1, tmp);
+                      header->d, header->N, 1, zero);
       for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
         gmp_hash_add (H, p, -u, header->m0, header->ad,
-                      header->d, header->N, 1, tmp);
+                      header->d, header->N, 1, zero);
     }
   }
 
@@ -1713,11 +1694,8 @@ gmp_collision_on_p ( header_t header,
 
   hash_clear (H);
 
-  for (i = 0; i <= header->d; i++)
-    mpz_clear (f[i]);
-  free (f);
   free (rp);
-  mpz_clear (tmp);
+  mpz_clear (zero);
 
   pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
