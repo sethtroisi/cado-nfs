@@ -227,8 +227,6 @@ comp_sq_roots ( header_t header,
     nrq = roots_mod_uint64 (rq, mpz_fdiv_ui (header->Ntilde, q), header->d, q);
     /* sort roots to get reproducible results with the same seed
        (since poly_roots_uint64 also uses the random generator) */
-    /* XXX Is it still needed ? We now use roots_mod_uint64 */
-    roots_sort (rq, nrq);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
 
 #ifdef DEBUG_POLYSELECT2L
