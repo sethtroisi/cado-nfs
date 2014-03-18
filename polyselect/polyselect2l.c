@@ -83,6 +83,22 @@ static inline uint64_t cputicks()
 }
 
 
+static void
+mutex_lock(pthread_mutex_t *lock)
+{
+#ifdef MAX_THREADS
+  pthread_mutex_lock (lock);
+#endif
+}
+
+static void
+mutex_unlock(pthread_mutex_t *lock)
+{
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (lock);
+#endif
+}
+
 /* inline function */
 extern void shash_add (shash_t, uint64_t);
 
@@ -411,9 +427,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+  mutex_lock (&lock);
   /* information on all polynomials */
   total_adminus2 += g0;
   collisions ++;
@@ -427,9 +441,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
     max_raw_lognorm = logmu;
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+  mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
   if (logmu < best_raw_logmu[keep - 1])
@@ -461,13 +473,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time -= seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -489,13 +497,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       optimize_aux (F, g, 0, 0);
 #endif
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time += seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
     } // raw and sopt only ?
 
@@ -507,9 +511,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew);
 
-#ifdef MAX_THREADS
-    pthread_mutex_lock (&lock);
-#endif
+    mutex_lock (&lock);
     for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
     if (i < keep)
@@ -553,16 +555,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+    mutex_unlock (&lock);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+        mutex_lock (&lock);
         printf ("# Raw polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         print_poly_info (fold, d, gold, 1, phash);
@@ -576,26 +574,20 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+        mutex_unlock (&lock);
       }
   }
   else {
   skip:
     if (verbose >= 1) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                     logmu, (unsigned long long) ad, l, m);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
     }
   }
 
@@ -763,9 +755,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+  mutex_lock (&lock);
   /* information on all polynomials */
   total_adminus2 += g0;
   collisions ++;
@@ -779,9 +769,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
     max_raw_lognorm = logmu;
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+  mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
   if (logmu < best_raw_logmu[keep - 1])
@@ -814,13 +802,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time -= seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -842,22 +826,16 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       optimize_aux (F, g, 0, 0);
 #endif
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time += seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
     } // raw and sopt only ?
 
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew);
 
-#ifdef MAX_THREADS
-    pthread_mutex_lock (&lock);
-#endif
+    mutex_lock (&lock);
     for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
     if (i < keep)
@@ -901,15 +879,11 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+    mutex_unlock (&lock);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
       if (verbose >= 0) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       printf ("# Raw polynomial:\n");
       gmp_printf ("%sn: %Zd\n", phash, N);
       print_poly_info (fold, d, gold, 1, phash);
@@ -923,26 +897,20 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
               bound_f, bound_g, area, E, best_E);
       printf ("\n");
       fflush (stdout);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
       }
   }
   else {
   skip:
     if (verbose >= 1) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
                     logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                     logmu, (unsigned long long) ad, l, m);
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
     }
   }
 
