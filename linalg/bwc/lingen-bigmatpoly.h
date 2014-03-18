@@ -57,6 +57,7 @@ void bigmatpoly_mp(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b);
 void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src);
 void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src);
 
+void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src);
 void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src);
 
 /* {{{ access interface for bigmatpoly */

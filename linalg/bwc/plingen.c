@@ -693,7 +693,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         matpoly sE, spi;
         matpoly_init(ab, sE, m, b, E->size);
         matpoly_init(ab, spi, 0, 0, 0);
-        bigmatpoly_gather_mat(ab, sE, E);
+        bigmatpoly_gather_mat_alt(ab, sE, E);
         /* Only the master node does the local computation */
         done = bw_biglingen_single(bm, spi, sE, delta);
         bigmatpoly_scatter_mat(ab, pi, spi);
@@ -745,7 +745,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         bigmatpoly_scatter_mat_alt(ab, xE, E);
         ASSERT_ALWAYS(xE->size);
         done = bw_biglingen_collective(bm, xpi, xE, delta);
-        bigmatpoly_gather_mat(ab, pi, xpi);
+        bigmatpoly_gather_mat_alt(ab, pi, xpi);
         bigmatpoly_clear(ab, xE);
         bigmatpoly_clear(ab, xpi);
         bigmatpoly_clear_model(model);
