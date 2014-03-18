@@ -60,6 +60,8 @@ test_modul_poly_is_irreducible (unsigned long iter)
       d = 1 + lrand48 () % (MAXDEGREE - 1);
       q = lrand48 ();
       q = ulong_nextprime (q);
+      /* modul_poly_cantor_zassenhaus only works for odd primes */
+      q += (q == 2);
       modul_initmod_ul (p, q);
       for (i = 0; i <= d; i++)
         modul_set_ul (f->coeff[i], lrand48 (), p);

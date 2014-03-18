@@ -464,7 +464,6 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p)
   modul_poly_t q, h, ff;
   int d = f->degree, dq, n, m;
 
-  if ((p[0] & 1) == 0) printf ("p=%lu\n", p[0]);
   ASSERT (p[0] & 1);
   ASSERT (d >= 1);
 
