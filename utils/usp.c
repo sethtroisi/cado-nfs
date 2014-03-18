@@ -63,6 +63,7 @@ B) to use within another program: compile without -DMAIN, the main function
 #include <math.h>
 #include <gmp.h>
 #include "usp.h"
+#include "double_poly.h"
 #include "portability.h"
 #include "macros.h"
 
@@ -475,6 +476,39 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
   free (r);
 
   return nroots;
+}
+
+/* refine the root interval r[0] for the polynomial p of degree n,
+   and return a double-precision approximation of the corresponding root */
+double
+rootRefine (root_struct *r, mpz_t *p, int n)
+{
+  double a, b, c, sa, sb, sc;
+  double_poly_t q;
+  mpz_poly_t P;
+
+  P->coeff = p;
+  P->deg = n;
+  double_poly_init (q, n);
+  double_poly_set_mpz_poly (q, P);
+  a = ldexp (mpz_get_d (r[0].a), -r[0].ka); /* a/2^ka */
+  b = ldexp (mpz_get_d (r[0].b), -r[0].kb); /* b/2^kb */
+  sa = double_poly_eval (q, a);
+  sb = double_poly_eval (q, b);
+  ASSERT_ALWAYS (sa * sb < 0.0);
+  while (1)
+    {
+      c = (a + b) * 0.5;
+      if (c == a || c == b)
+        break;
+      sc = double_poly_eval (q, c);
+      if (sa * sc < 0.0)
+        b = c;
+      else
+        a = c;
+    }
+  double_poly_clear (q);
+  return c;
 }
 
 #ifdef MAIN
