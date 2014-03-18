@@ -617,11 +617,15 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
     tt = wct_seconds();
     if (E->size > display_threshold) print_info_mpi_mp(bm->t, E, pi_left);
+#ifdef  HAVE_MPIR
     if (caching) {
         bigmatpoly_mp_caching(ab, E_right, E, pi_left);
     } else {
         bigmatpoly_mp(ab, E_right, E, pi_left);
     }
+#else
+        bigmatpoly_mp(ab, E_right, E, pi_left);
+#endif
     tt = wct_seconds() - tt;
     if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mp = tt;
@@ -630,11 +634,15 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 
     tt = wct_seconds();
     if (E->size > display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right);
+#ifdef  HAVE_MPIR
     if (caching) {
         bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
     } else {
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     }
+#else
+    bigmatpoly_mul(ab, pi, pi_left, pi_right);
+#endif
     tt = wct_seconds() - tt;
     if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mul += tt;
