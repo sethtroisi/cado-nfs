@@ -184,22 +184,6 @@ binom ( unsigned long n,
   return tot;
 }
 
-/* sort r[0..n-1] in increasing order */
-static void
-roots_sort (uint64_t *r, unsigned long n)
-{
-  unsigned long i, j;
-  uint64_t v;
-
-  for (i = 1; i < n; i++)
-    {
-      v = r[i];
-      for (j = i; j > 0 && v < r[j - 1]; j--)
-        r[j] = r[j - 1];
-      r[j] = v;
-    }
-}
-
 /* prepare special-q's roots */
 void
 comp_sq_roots ( header_t header,
