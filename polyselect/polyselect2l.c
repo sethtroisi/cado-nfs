@@ -567,9 +567,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-        gmp_printf ("# Optimized polynomial:\n");
-        gmp_printf ("%sn: %Zd\n", phash, N);
-        print_poly_info (f, d, g, 0, phash);
+        if (raw)
+          gmp_printf ("# Size-optimized polynomial:\n");
+        else
+          gmp_printf ("# Optimized polynomial:\n");
+        gmp_printf ("%sn: %Zd\n", raw ? "" : phash, N);
+        print_poly_info (f, d, g, 0, raw ? "" : phash);
         printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
@@ -890,9 +893,12 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       if (d == 6)
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-      gmp_printf ("# Optimized polynomial:\n");
-      gmp_printf ("#%sn: %Zd\n", phash, N);
-      print_poly_info (f, d, g, 0, phash);
+        if (raw)
+          gmp_printf ("# Size-optimized polynomial:\n");
+        else
+          gmp_printf ("# Optimized polynomial:\n");
+      gmp_printf ("#%sn: %Zd\n", raw ? "" : phash, N);
+      print_poly_info (f, d, g, 0, raw ? "" : phash);
       printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
               bound_f, bound_g, area, E, best_E);
       printf ("\n");
@@ -2358,10 +2364,13 @@ main (int argc, char *argv[])
 #endif
     printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
 
-  if (best_E == 0.0)
+  if (raw) {
+    /* We did not optimize roots, so Murphy_E is almost meaningless.
+       Don't print the "best" polynomial because it probably isn't */
+  } else if (best_E == 0.0) {
     /* This line is required by the script: */
     printf ("# No polynomial found, please increase the ad range or decrease P\n");
-  else {
+  } else {
     /* This line is required by the script: */
     printf ("# Best polynomial found:\n");
     print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
