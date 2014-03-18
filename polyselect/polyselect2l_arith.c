@@ -184,22 +184,6 @@ binom ( unsigned long n,
   return tot;
 }
 
-/* sort r[0..n-1] in increasing order */
-static void
-roots_sort (uint64_t *r, unsigned long n)
-{
-  unsigned long i, j;
-  uint64_t v;
-
-  for (i = 1; i < n; i++)
-    {
-      v = r[i];
-      for (j = i; j > 0 && v < r[j - 1]; j--)
-        r[j] = r[j - 1];
-      r[j] = v;
-    }
-}
-
 /* prepare special-q's roots */
 void
 comp_sq_roots ( header_t header,
@@ -207,18 +191,6 @@ comp_sq_roots ( header_t header,
 {
   unsigned long i, q, nrq;
   uint64_t *rq;
-  modulusul_t qq;
-  mpz_t *f;
-
-  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
-  if (f == NULL)
-  {
-    fprintf (stderr, "Error, cannot allocate memory in comp_sq_r\n");
-    exit (1);
-  }
-  for (i = 0; i <= header->d; i++)
-    mpz_init (f[i]);
-  mpz_set_ui (f[header->d], 1);
 
   rq = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rq == NULL)
@@ -236,21 +208,16 @@ comp_sq_roots ( header_t header,
     if ( mpz_fdiv_ui (header->Ntilde, q) == 0 )
       continue;
 
-    modul_initmod_ul (qq, q * q);
-    mpz_mod_ui (f[0], header->Ntilde, q);
-    mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrq = poly_roots_uint64 (rq, f, header->d, q);
+    nrq = roots_mod_uint64 (rq, mpz_fdiv_ui (header->Ntilde, q), header->d, q);
     /* sort roots to get reproducible results with the same seed
        (since poly_roots_uint64 also uses the random generator) */
-    roots_sort (rq, nrq);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
 
-#if 0
+#ifdef DEBUG_POLYSELECT2L
     unsigned int j = 0;
-    mpz_t r1, r2, *rqz;
+    mpz_t r1, r2;
     mpz_init (r1);
     mpz_init (r2);
-    rqz = (mpz_t*) malloc (header->d * sizeof (mpz_t));
     mpz_set (r1, header->Ntilde);
     mpz_mod_ui (r1, r1, q*q);
 
@@ -276,16 +243,12 @@ comp_sq_roots ( header_t header,
 #endif
 
     qroots_add (SQ_R, q, nrq, rq);
-    modul_clearmod (qq);
   }
 
   /* Reorder R entries by nr. It is safe to comment it. */
   qroots_rearrange (SQ_R);
 
   free(rq);
-  for (i = 0; i <= header->d; i++)
-    mpz_clear (f[i]);
-  free (f);
   qroots_realloc (SQ_R, SQ_R->size); /* free unused space */
 }
 
