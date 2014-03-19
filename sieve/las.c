@@ -2924,27 +2924,32 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
        FIXME: We can use SSE to scan 16 bytes at a time, but have to make 
        sure that SS is 16-aligned first, thus currently disabled. */
 #if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-    const int together = sizeof(__m128i);
+    const size_t together = sizeof(__m128i);
     __m128i ones128 = (__m128i) {-1,-1};
+    const __m128i * restrict SS_lw = (const __m128i *)SS;
 #else
     const int together = sizeof(unsigned long);
+    const unsigned long * restrict SS_lw = (const unsigned long *)SS;
 #endif
 
-    for (int xul = 0; xul < BUCKET_REGION; xul += together) {
+    for ( ; (unsigned char *) SS_lw < SS + BUCKET_REGION; SS_lw++) {
 #ifdef TRACE_K
-        if ((unsigned int) N == trace_Nx.N && (unsigned int) xul <= trace_Nx.x && (unsigned int) xul + sizeof (unsigned long) > trace_Nx.x) {
+        size_t trace_offset = (const unsigned char *) SS_lw - SS;
+        if ((unsigned int) N == trace_Nx.N && (unsigned int) trace_offset <= trace_Nx.x && 
+            (unsigned int) trace_offset + together > trace_Nx.x) {
             fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
                     trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
         }
 #endif
 #if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
-        if (_mm_testc_si128(*(__m128i *)(SS + xul), ones128))
+        if (LIKELY(_mm_testc_si128(*SS_lw, ones128)))
             continue;
 #else
-        if (*(unsigned long *)(SS + xul) == (unsigned long)(-1L)) 
+        if (LIKELY(*SS_lw == (unsigned long)(-1L)))
             continue;
 #endif
-        for (int x = xul; x < xul + (int) together; ++x) {
+        size_t offset = (const unsigned char *) SS_lw - SS;
+        for (size_t x = offset; x < offset + together; ++x) {
             if (SS[x] == 255) continue;
 
             th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
@@ -2963,7 +2968,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             if (t >= deadline) {
                 /* Also break the outer loop (ugly!) */
-                xul = BUCKET_REGION;
+                SS_lw = SS + BUCKET_REGION;
                 fprintf(las->output, "# [descent] Aborting, deadline passed\n");
                 break;
             }
@@ -3185,7 +3190,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     if (time_left == 0) {
                         fprintf(las->output, "# [descent] Yiippee, splitting done\n");
                         /* break both loops */
-                        xul = BUCKET_REGION;
+                        SS_lw = SS + BUCKET_REGION;
                         relation_clear(rel);
                         break;
                     } else if (delta != DBL_MAX) {
