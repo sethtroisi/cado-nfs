@@ -994,7 +994,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             for (j = 0; j < nj; j ++) {
                 WHERE_AM_I_UPDATE(w, j, j);
                 for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
-                    if (S_ptr[i] == 255) continue;
+                    if (LIKELY(S_ptr[i] == 255)) continue;
                     bucket_prime_t prime;
                     unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {

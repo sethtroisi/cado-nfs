@@ -91,9 +91,10 @@ class Polynomials(object):
 
     re_pol_f = re.compile("c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile("Y(\d+)\s*:\s*(-?\d+)")
-    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=(.*)$")
+    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % cap_fp)
+    re_lognorm = re.compile(r"\s*#\s*lognorm:\s*%s," % cap_fp)
     
-    # Keys that can occur in a polynomial file in their preferred ordering,
+    # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string.
     keys = OrderedDict(
@@ -108,6 +109,7 @@ class Polynomials(object):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
         """
         self.MurphyE = 0.
+        self.lognorm = 0.
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
@@ -124,12 +126,18 @@ class Polynomials(object):
             return False
 
         for line in lines:
-            # print ("Parsing line: >%s<" % line)
+            # print ("Parsing line: >%s<" % line.strip())
             # If this is a comment line telling the Murphy E value,
             # extract the value and store it
             match = self.re_Murphy.match(line)
             if match:
                 self.MurphyE = float(match.group(1))
+                continue
+            # If this is a comment line telling the lognorm,
+            # extract the value and store it
+            match = self.re_lognorm.match(line)
+            if match:
+                self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
             line2 = line.split('#', 1)[0].strip()
@@ -186,6 +194,8 @@ class Polynomials(object):
                 in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
+        if not self.lognorm == 0.:
+            arr.append("# lognorm = %g\n" % self.lognorm)
         arr.append("# f(x) = %s\n" % str(self.polyf))
         arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)

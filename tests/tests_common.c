@@ -135,11 +135,11 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
     srand48 (seed);
 #else
     unsigned int s = labs(seed);
-    if (seed < 0 || s != (unsigned long) seed) {
-      printf("Warning, seed truncated to %u\n", s);
-    }
-    srand((unsigned int) labs(seed));
+    if (seed < 0 || s != (unsigned long) seed)
+      printf ("Warning, seed truncated to %u\n", s);
+    srand ((unsigned int) labs(seed));
 #endif
+    fflush (stdout);
     gmp_randinit_default (state);
     gmp_randseed_ui (state, (unsigned long) labs(seed));
     rng_state_inited = 1;

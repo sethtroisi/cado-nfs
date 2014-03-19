@@ -83,6 +83,22 @@ static inline uint64_t cputicks()
 }
 
 
+static void
+mutex_lock(pthread_mutex_t *lock)
+{
+#ifdef MAX_THREADS
+  pthread_mutex_lock (lock);
+#endif
+}
+
+static void
+mutex_unlock(pthread_mutex_t *lock)
+{
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (lock);
+#endif
+}
+
 /* inline function */
 extern void shash_add (shash_t, uint64_t);
 
@@ -238,6 +254,36 @@ expected_collisions (uint32_t twoP)
   return m * m;
 }
 
+static void
+check_divexact_ui(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED,
+                  const unsigned long q, const char *q_name MAYBE_UNUSED)
+{
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_ui_p (d, q) == 0)
+  {
+    gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%lu\n",
+                 d_name, d, q_name, q);
+    exit (1);
+  }
+#endif
+  mpz_divexact_ui (r, d, q);
+}
+
+static void
+check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mpz_t q,
+               const char *q_name MAYBE_UNUSED)
+{
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_p (d, q) == 0)
+  {
+    gmp_fprintf (stderr, "Error: %s=%Zd not divisible by %s=%Zd\n",
+                 d_name, d, q_name, q);
+    exit (1);
+  }
+#endif
+  mpz_divexact (r, d, q);
+}
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
@@ -310,25 +356,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_ui_p (m, d) == 0)
-  {
-    fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact_ui (m, m, d);
+  check_divexact_ui (m, m, "m-a_{d-1}*l", d, "d");
 
   mpz_set_uint64 (adz, ad);
 
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (m, adz) == 0)
-  {
-    fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (m, m, adz);
+  check_divexact (m, m, "(m-a_{d-1}*l)/d", adz, "ad");
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
   mpz_set (f[d], adz);
@@ -336,28 +368,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul (t, t, adz);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
   {
-#ifdef DEBUG_POLYSELECT2L
-    if (mpz_divisible_p (t, l) == 0)
-    {
-      fprintf (stderr, "Error: t not divisible by l\n");
-      exit (1);
-    }
-#endif
-    mpz_divexact (t, t, l);
+    check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
     mpz_pow_ui (mtilde, m, j);
     /* fdiv rounds toward -infinity: adm1 = floor(t/mtilde) */
@@ -378,14 +395,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* subtract adm1*m^j */
     mpz_submul (t, mtilde, adm1);
   }
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
   /* save unoptimized polynomial to fold */
@@ -417,9 +427,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+  mutex_lock (&lock);
   /* information on all polynomials */
   total_adminus2 += g0;
   collisions ++;
@@ -433,9 +441,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
     max_raw_lognorm = logmu;
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+  mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
   if (logmu < best_raw_logmu[keep - 1])
@@ -467,13 +473,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time -= seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -495,13 +497,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       optimize_aux (F, g, 0, 0);
 #endif
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time += seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
     } // raw and sopt only ?
 
@@ -513,9 +511,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew);
 
-#ifdef MAX_THREADS
-    pthread_mutex_lock (&lock);
-#endif
+    mutex_lock (&lock);
     for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
     if (i < keep)
@@ -559,49 +555,42 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+    mutex_unlock (&lock);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+        mutex_lock (&lock);
         printf ("# Raw polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         print_poly_info (fold, d, gold, 1, phash);
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-        gmp_printf ("# Optimized polynomial:\n");
-        gmp_printf ("%sn: %Zd\n", phash, N);
-        print_poly_info (f, d, g, 0, phash);
+        if (raw)
+          gmp_printf ("# Size-optimized polynomial:\n");
+        else
+          gmp_printf ("# Optimized polynomial:\n");
+        gmp_printf ("%sn: %Zd\n", raw ? "" : phash, N);
+        print_poly_info (f, d, g, 0, raw ? "" : phash);
         printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+        mutex_unlock (&lock);
       }
   }
   else {
   skip:
     if (verbose >= 1) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                     logmu, (unsigned long long) ad, l, m);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
     }
   }
 
@@ -701,23 +690,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     mpz_sub (adm1, adm1, m);
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_ui_p (m, d) == 0)
-  {
-    fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact_ui (m, m, d);
+  check_divexact_ui (m, m, "m-a_{d-1}*l", d, "d");
   mpz_set_uint64 (adz, ad);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (m, adz) == 0)
-  {
-    fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (m, m, adz);
+  check_divexact (m, m, "(m-a_{d-1}*l)/d", adz, "ad");
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
   mpz_set (f[d], adz);
@@ -725,27 +700,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_mul (t, t, adz);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
   {
-#ifdef DEBUG_POLYSELECT2L
-    if (mpz_divisible_p (t, l) == 0)
-    {
-      fprintf (stderr, "Error: t not divisible by l\n");
-      exit (1);
-    }
-#endif
-    mpz_divexact (t, t, l);
+    check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
     mpz_pow_ui (mtilde, m, j);
     mpz_fdiv_q (adm1, t, mtilde); /* t -> adm1 * mtilde + t */
@@ -765,14 +726,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     mpz_submul (t, mtilde, adm1);
   }
 
-#ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_p (t, l) == 0)
-  {
-    fprintf (stderr, "Error: t not divisible by l\n");
-    exit (1);
-  }
-#endif
-  mpz_divexact (t, t, l);
+  check_divexact (t, t, "t", l, "l");
   mpz_set (f[0], t);
 
   /* save unoptimized polynomial to fold */
@@ -804,9 +758,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+  mutex_lock (&lock);
   /* information on all polynomials */
   total_adminus2 += g0;
   collisions ++;
@@ -820,9 +772,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
     max_raw_lognorm = logmu;
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+  mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
   if (logmu < best_raw_logmu[keep - 1])
@@ -855,13 +805,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time -= seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -883,22 +829,16 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       optimize_aux (F, g, 0, 0);
 #endif
 
-#ifdef MAX_THREADS
-  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       rootsieve_time += seconds_thread ();
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
 
     } // raw and sopt only ?
 
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     logmu = L2_lognorm (F, skew);
 
-#ifdef MAX_THREADS
-    pthread_mutex_lock (&lock);
-#endif
+    mutex_lock (&lock);
     for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
       best_logmu[i] = best_logmu[i-1];
     if (i < keep)
@@ -942,48 +882,41 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
       fclose (fp);
     }
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+    mutex_unlock (&lock);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
       if (verbose >= 0) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       printf ("# Raw polynomial:\n");
       gmp_printf ("%sn: %Zd\n", phash, N);
       print_poly_info (fold, d, gold, 1, phash);
       if (d == 6)
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-      gmp_printf ("# Optimized polynomial:\n");
-      gmp_printf ("#%sn: %Zd\n", phash, N);
-      print_poly_info (f, d, g, 0, phash);
+        if (raw)
+          gmp_printf ("# Size-optimized polynomial:\n");
+        else
+          gmp_printf ("# Optimized polynomial:\n");
+      gmp_printf ("#%sn: %Zd\n", raw ? "" : phash, N);
+      print_poly_info (f, d, g, 0, raw ? "" : phash);
       printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
               bound_f, bound_g, area, E, best_E);
       printf ("\n");
       fflush (stdout);
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
       }
   }
   else {
   skip:
     if (verbose >= 1) {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
+      mutex_lock (&lock);
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
                     logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                     logmu, (unsigned long long) ad, l, m);
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
+      mutex_unlock (&lock);
     }
   }
 
@@ -1012,25 +945,17 @@ static inline unsigned long
 collision_on_p ( header_t header,
                  proots_t R )
 {
-  unsigned long i, j, nprimes, p, nrp, c = 0, tot_roots = 0;
+  unsigned long j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   double pc1;
-  mpz_t *f, tmp;
+  mpz_t zero;
   int found = 0;
   shash_t H;
   int st = 0;
 
-  /* init f for roots computation */
-  mpz_init_set_ui (tmp, 0);
-  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
-  if (f == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
-    exit (1);
-  }
-  for (i = 0; i <= header->d; i++)
-    mpz_init (f[i]);
-  mpz_set_ui (f[header->d], 1);
+  /* init zero */
+  mpz_init_set_ui (zero, 0);
 
   rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
@@ -1093,10 +1018,10 @@ collision_on_p ( header_t header,
             {
               for (u = (int64_t) rp[j]; u < umax; u += ppl)
                 hash_add (H, p, u, header->m0, header->ad, header->d,
-                          header->N, 1, tmp);
+                          header->N, 1, zero);
               for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
                 hash_add (H, p, -u, header->m0, header->ad,
-                          header->d, header->N, 1, tmp);
+                          header->d, header->N, 1, zero);
             }
         }
 #ifdef DEBUG_POLYSELECT2L
@@ -1111,10 +1036,7 @@ collision_on_p ( header_t header,
       hash_clear (H);
     }
 
-  for (i = 0; i <= header->d; i++)
-    mpz_clear (f[i]);
-  free (f);
-  mpz_clear (tmp);
+  mpz_clear (zero);
 
   pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
@@ -1689,22 +1611,14 @@ static inline unsigned long
 gmp_collision_on_p ( header_t header,
 		     proots_t R )
 {
-  unsigned long i, j, nprimes, p, nrp, c = 0;
+  unsigned long j, nprimes, p, nrp, c = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   double pc1;
-  mpz_t *f, tmp;
+  mpz_t zero;
 
-  /* init f for roots computation */
-  mpz_init_set_ui (tmp, 0);
-  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
-  if (f == NULL) {
-    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
-    exit (1);
-  }
-  for (i = 0; i <= header->d; i++)
-    mpz_init (f[i]);
-  mpz_set_ui (f[header->d], 1);
+  /* init zero */
+  mpz_init_set_ui (zero, 0);
 
   rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
@@ -1740,10 +1654,10 @@ gmp_collision_on_p ( header_t header,
     for (j = 0; j < nrp; j++, c++) {
       for (u = (int64_t) rp[j]; u < umax; u += ppl)
         gmp_hash_add (H, p, u, header->m0, header->ad,
-                      header->d, header->N, 1, tmp);
+                      header->d, header->N, 1, zero);
       for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
         gmp_hash_add (H, p, -u, header->m0, header->ad,
-                      header->d, header->N, 1, tmp);
+                      header->d, header->N, 1, zero);
     }
   }
 
@@ -1754,11 +1668,8 @@ gmp_collision_on_p ( header_t header,
 
   hash_clear (H);
 
-  for (i = 0; i <= header->d; i++)
-    mpz_clear (f[i]);
-  free (f);
   free (rp);
-  mpz_clear (tmp);
+  mpz_clear (zero);
 
   pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
@@ -2453,10 +2364,13 @@ main (int argc, char *argv[])
 #endif
     printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
 
-  if (best_E == 0.0)
+  if (raw) {
+    /* We did not optimize roots, so Murphy_E is almost meaningless.
+       Don't print the "best" polynomial because it probably isn't */
+  } else if (best_E == 0.0) {
     /* This line is required by the script: */
     printf ("# No polynomial found, please increase the ad range or decrease P\n");
-  else {
+  } else {
     /* This line is required by the script: */
     printf ("# Best polynomial found:\n");
     print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
