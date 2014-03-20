@@ -176,13 +176,12 @@ print_poly_info ( mpz_t *f,
                   unsigned int d,
                   mpz_t g[2],
                   mpz_t n,
-                  mpz_t m,
                   int raw,
                   char *prefix )
 {
   unsigned int i, nroots;
   double skew, skew2, logmu, alpha, alpha_proj, exp_E;
-  mpz_t k0, k1, k2;
+  mpz_t k0, k1, k2, m;
   mpz_poly_t F;
   mpz_init (k0);
   mpz_init (k1);
@@ -194,7 +193,16 @@ print_poly_info ( mpz_t *f,
   gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
+
+  /* Compute and print common root */
+  mpz_init(m);
+  int ok = mpz_invert(m, g[1], n);
+  ASSERT_ALWAYS(ok);
+  mpz_mul(m, m, g[0]);
+  mpz_neg(m, m);
+  mpz_mod(m, m, n);
   gmp_printf ("%sm: %Zd\n", prefix, m);
+  mpz_clear(m);
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -566,7 +574,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       {
         mutex_lock (&lock);
         printf ("# Raw polynomial:\n");
-        print_poly_info (fold, d, gold, N, m, 1, phash);
+        print_poly_info (fold, d, gold, N, 1, phash);
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -574,7 +582,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
           gmp_printf ("# Size-optimized polynomial:\n");
         else
           gmp_printf ("# Optimized polynomial:\n");
-        print_poly_info (f, d, g, N, m, 0, raw ? "" : phash);
+        print_poly_info (f, d, g, N, 0, raw ? "" : phash);
         printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
@@ -890,7 +898,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       if (verbose >= 0) {
       mutex_lock (&lock);
       printf ("# Raw polynomial:\n");
-      print_poly_info (fold, d, gold, N, m, 1, phash);
+      print_poly_info (fold, d, gold, N, 1, phash);
       if (d == 6)
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -898,7 +906,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
         gmp_printf ("# Size-optimized polynomial:\n");
       else
         gmp_printf ("# Optimized polynomial:\n");
-      print_poly_info (f, d, g, N, m, 0, raw ? "" : phash);
+      print_poly_info (f, d, g, N, 0, raw ? "" : phash);
       printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
               bound_f, bound_g, area, E, best_E);
       printf ("\n");

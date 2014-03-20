@@ -170,6 +170,6 @@ void hash_grow (hash_t);
 void hash_clear (hash_t);
 void shash_clear (shash_t);
 
-void print_poly_info (mpz_t *, unsigned int d, mpz_t *, mpz_t, mpz_t, int, char *);
+void print_poly_info (mpz_t *, unsigned int d, mpz_t *, mpz_t, int, char *);
 
 #endif
