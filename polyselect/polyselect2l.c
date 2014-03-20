@@ -408,18 +408,28 @@ output_msieve(const char *out, const unsigned long d, mpz_t *f, mpz_t *g)
   mutex_unlock (&lock);
 }
 
+/* Insert a value into a sorted array of length len.
+   Returns 1 if element was inserted, 0 if it was too big */
+int
+sorted_insert_double(double *array, const size_t len, const double value)
+{
+  size_t k;
+  if (value >= array[len - 1])
+    return 0;
+
+  for (k = len - 1; k > 0 && value < array[k-1]; k--)
+    array[k] = array[k-1];
+  array[k] = value;
+  return 1;
+}
+
 int
 optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
     const unsigned long d, mpz_t N, double *E)
 {
-  int k;
   unsigned long j;
   double skew;
   mpz_t t;
-  
-  for (k = keep - 1; k > 0 && *logmu < best_raw_logmu[k-1]; k--)
-    best_raw_logmu[k] = best_raw_logmu[k-1];
-  best_raw_logmu[k] = *logmu;
 
   /* optimize size */
   opt_found ++;
@@ -428,12 +438,8 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
 
-  if (*logmu >= best_opt_logmu[keep - 1])
+  if (!sorted_insert_double(best_opt_logmu, keep, *logmu))
     return 0;
-
-  for (j = keep - 1; j > 0 && *logmu < best_opt_logmu[j-1]; j--)
-    best_opt_logmu[j] = best_opt_logmu[j-1];
-  best_opt_logmu[j] = *logmu;
 
   if (!raw) {
     rootsieve_poly(g, d, N, F);
@@ -452,10 +458,8 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
   *logmu = L2_lognorm (F, skew);
 
   mutex_lock (&lock);
-  for (k = keep; k > 0 && *logmu < best_logmu[k-1]; k--)
-    best_logmu[k] = best_logmu[k-1];
-  if (k < keep)
-    best_logmu[k] = *logmu;
+  
+  sorted_insert_double(best_logmu, keep, *logmu);
   collisions_good ++;
   aver_opt_lognorm += *logmu;
   var_opt_lognorm += *logmu * *logmu;
@@ -643,7 +647,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   /* if the polynomial has small norm, we optimize it */
   int did_optimize = 0;
   double E;
-  if (logmu < best_raw_logmu[keep - 1]) {
+  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
     did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
   }
 
@@ -839,7 +843,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   /* if the polynomial has small norm, we optimize it */
   int did_optimize = 0;
   double E;
-  if (logmu < best_raw_logmu[keep - 1]) {
+  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
     did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
   }
 
