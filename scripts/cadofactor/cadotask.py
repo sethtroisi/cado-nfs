@@ -12,6 +12,7 @@ from math import log, sqrt
 import logging
 import socket
 import gzip
+import heapq
 import patterns
 import wudb
 import cadoprograms
@@ -1485,6 +1486,325 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.progparams[0].pop("admax", None)
             p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
                                           stdout=str(outputfile),
+                                          **self.progparams[0])
+            self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
+        self.state.update({"adnext": adend}, commit=True)
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect2l """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
+class Polysel1Task(ClientServerTask, patterns.Observer):
+    """ Finds a number of size-optimized polynomial, uses client/server """
+    @property
+    def name(self):
+        return "polyselect"
+    @property
+    def title(self):
+        return "Polynomial Selection (size optimized)"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def progparam_override(self):
+        # admin and admax are special, which is a bit ugly: these parameters
+        # to the Polyselect2l constructor are supplied by the task, but the
+        # task has itself admin, admax parameters, which specify the total
+        # size of the search range. Thus we don't include admin, admax here,
+        # or PolyselTask would incorrectly warn about them not being used.
+        return [[]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {
+            "adrange": 1000, "admin": 0, "admax": 10000, "import": None,
+            "I": 13, "alim": 100000, "rlim": 100000, "nrkeep": 5})
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+        assert self.params["nrkeep"] > 0
+        self.state["adnext"] = \
+            max(self.state.get("adnext", 0), self.params["admin"])
+        self.did_import = False
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["alim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+
+        tablename = self.make_tablename("bestpolynomials")
+        self.best_polynomials = self.make_db_dict(
+                tablename, connection=self.db_connection)
+        self._check_best_polynomials()
+
+        self.poly_heap = []
+        self.import_existing_polynomials()
+        self._check_best_polynomials()
+        self._compare_heap_db()
+    
+    def _check_best_polynomials(self):
+        # Check that the keys form a sequence of consecutive non-negative
+        # integers
+        oldkeys = list(self.best_polynomials.keys())
+        oldkeys.sort(key=int)
+        assert oldkeys == list(map(str, range(len(self.best_polynomials))))
+
+    def _compare_heap_db(self):
+        """ Compare that the polynomials in the heap and in the DB agree
+        
+        They must contain an equal number of entries, and each polynomial
+        stored in the heap must be at the specified index in the DB.
+        """
+        assert len(self.poly_heap) == len(self.best_polynomials)
+        for lognorm, (key, poly) in self.poly_heap:
+            assert self.best_polynomials[key] == str(poly)
+
+    def import_existing_polynomials(self):
+        debug = False
+        oldkeys = list(self.best_polynomials.keys())
+        oldkeys.sort(key=int) # Sort by numerical value
+        for oldkey in oldkeys:
+            if debug:
+                print("Adding old polynomial at DB index %s: %s" %
+                      (oldkey, self.best_polynomials[oldkey]))
+            poly = Polynomials(self.best_polynomials[oldkey].splitlines())
+            if not poly.lognorm:
+                self.logger.error("Polynomial at DB index %s has no lognorm", oldkey)
+                continue
+            newkey = self._add_poly_heap(poly)
+            if newkey is None:
+                # Heap is full, and the poly was worse than the worst one on
+                # the heap. Thus it did not get added and must be removed from
+                # the DB
+                if debug:
+                    print("Deleting polynomial lognorm=%f, key=%s" % 
+                          (poly.lognorm, oldkey))
+                del(self.best_polynomials[oldkey])
+            elif newkey != oldkey:
+                # Heap is full, worst one in heap (with key=newkey) was
+                # overwritten and its DB entry gets replaced with poly from
+                # key=oldkey
+                if debug:
+                    print("Overwriting poly lognorm=%f, key=%s with poly "
+                          "lognorm=%f, key=%s" %
+                          (self.poly_heap[0][0], newkey, poly, oldkey))
+                self.best_polynomials.clear(oldkey, commit=False)
+                self.best_polynomials.update({newkey: poly}, commit=True)
+            else:
+                # Last case newkey == oldkey: nothing to do
+                if debug:
+                    print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
+
+    def run(self):
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        
+        worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
+                if self.poly_heap else ""
+        self.logger.info("%d polynomials in queue from previous run%s", 
+                         len(self.poly_heap), worstmsg);
+        
+        if "import" in self.params and not self.did_import:
+            self.process_polyfile(self.params["import"])
+            self.did_import = True
+        
+        if self.is_done():
+            self.logger.info("Polynomial selection already finished - "
+                             "nothing to do")
+            return True
+        
+        # Submit all the WUs we need to reach admax
+        while self.need_more_wus():
+            self.submit_one_wu()
+        
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
+            self.wait()
+        
+        self._compare_heap_db()
+        self.logger.info("Finished")
+        return True
+    
+    def is_done(self):
+        return not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
+    
+    def updateObserver(self, message):
+        identifier = self.filter_notification(message)
+        if not identifier:
+            # This notification was not for me
+            return
+        if self.handle_error_result(message):
+            return
+        (filename, ) = message.get_output_files()
+        self.process_polyfile(filename, commit=False)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
+    
+    @staticmethod
+    def read_blocks(input):
+        """ Return blocks of consecutive non-empty lines from input
+        
+        Whitespace is stripped; a line containing only whitespace is
+        considered empty. An empty block is never returned.
+        
+        >>> list(Polysel1Task.read_blocks(['', 'a', 'b', '', 'c', '', '', 'd', 'e', '']))
+        [['a', 'b'], ['c'], ['d', 'e']]
+        """
+        block = []
+        for line in input:
+            line = line.strip()
+            if line:
+                block.append(line)
+            else:
+                if block:
+                    yield block
+                block = []
+        if block:
+            yield block
+
+    def process_polyfile(self, filename, commit=True):
+        """ Read all size-optimized polynomials in a file and add them to the
+        DB and priority queue if worthwhile.
+        
+        Different polynomials must be separated by a blank line.
+        """
+        try:
+            polyfile = self.read_log_warning(filename)
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        totalparsed, totaladded = 0, 0
+        for block in self.read_blocks(polyfile):
+            parsed, added = self.parse_and_add_poly(block, filename)
+            totalparsed += parsed
+            totaladded += added
+        self.logger.info("Parsed %d polynomials, added %d to priority queue",
+                         totalparsed, totaladded)
+        if totaladded:
+            self.logger.info("Worst polynomial in queue now has lognorm %f",
+                             -self.poly_heap[0][0])
+                                     
+    
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                yield line
+
+    def parse_and_add_poly(self, text, filename):
+        """ Parse a polynomial from an array of lines and add it to the
+        priority queue and DB. Return a two-element list with the number of
+        polynomials parsed and added, i.e., (0,0) or (1,0) or (1,1).
+        """
+        poly = self.parse_poly(text, filename)
+        if poly is None:
+            return (0, 0)
+        if not poly.lognorm:
+            self.logger.warn("Polynomial in file %s has no lognorm",
+                             filename)
+            return (0, 0)
+        key = self._add_poly_heap(poly)
+        if key is None:
+            return (1, 0)
+        self.best_polynomials[key] = str(poly)
+        return (1, 1)
+
+    def _add_poly_heap(self, poly):
+        """ Add a polynomial to the heap
+        
+        If the heap is full (nrkeep), the worst polynomial (i.e., with the
+        largest lognorm) is replaced if the new one is better.
+        """
+        assert len(self.poly_heap) <= self.params["nrkeep"]
+        debug = False
+
+        # Find DB index under which to store this new poly. If the heap
+        # is not full, use the next bigger index.
+        key = len(self.poly_heap)
+        # Is the heap full?
+        if key == self.params["nrkeep"]:
+            # Should we store this poly at all, i.e., is it better than
+            # the worst one in the heap?
+            worstnorm = -self.poly_heap[0][0]
+            if worstnorm <= poly.lognorm:
+                if debug:
+                    print("_add_poly_heap(): new poly lognorm %f, worst in "
+                          "heap has %f. Not adding" 
+                          % (poly.lognorm, worstnorm))
+                return None
+            # Pop the worst poly from heap and re-use its DB index
+            key = heapq.heappop(self.poly_heap)[1][0]
+            if debug:
+                print("_add_poly_heap(): new poly lognorm %f, worst in heap "
+                      "has %f. Replacing DB index %s"
+                      % (poly.lognorm, worstnorm, key))
+                debug = False # Suppress "not full" message below
+
+        # The DB requires the key to be a string. In order to have
+        # identical data in DB and heap, we store key as str everywhere.
+        key = str(key)
+
+        # Python heapq stores a minheap, so in order to have the worst
+        # polynomial (with largest norm) easily accessible, we use
+        # -lognorm as the heap key
+        if debug:
+            print("_add_poly_heap(): heap was not full, adding poly with "
+                  "lognorm %f at DB index %s" % (poly.lognorm, key))
+        new_entry = (-poly.lognorm, (key, poly))
+        heapq.heappush(self.poly_heap, new_entry)
+        return key
+
+    def parse_poly(self, text, filename):
+        poly = None
+        try:
+            poly = Polynomials(text)
+        except PolynomialParseException as e:
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+            return None
+        
+        if not poly:
+            return None
+        return poly
+    
+    def get_poly(self):
+        return None
+    
+    def get_poly_filename(self):
+        return None
+
+    def need_more_wus(self):
+        return self.state["adnext"] < self.params["admax"]
+    
+    def submit_one_wu(self):
+        adstart = self.state["adnext"]
+        adend = adstart + self.params["adrange"]
+        adend = min(adend, self.params["admax"])
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            # Remove admin and admax from the parameter-file-supplied
+            # parameters as those would conflict with the computed values
+            self.progparams[0].pop("admin", None)
+            self.progparams[0].pop("admax", None)
+            p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
+                                          stdout=str(outputfile),
+                                          sizeonly=True,
                                           **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
