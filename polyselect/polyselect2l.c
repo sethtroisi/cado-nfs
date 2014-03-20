@@ -414,13 +414,18 @@ int
 sorted_insert_double(double *array, const size_t len, const double value)
 {
   size_t k;
-  if (value >= array[len - 1])
+  int result = 0;
+  if (len == 0)
     return 0;
-
-  for (k = len - 1; k > 0 && value < array[k-1]; k--)
-    array[k] = array[k-1];
-  array[k] = value;
-  return 1;
+  mutex_lock (&lock);
+  if (value < array[len - 1]) {
+    for (k = len - 1; k > 0 && value < array[k-1]; k--)
+      array[k] = array[k-1];
+    array[k] = value;
+    result = 1;
+  }
+  mutex_unlock (&lock);
+  return result;
 }
 
 int
@@ -457,9 +462,9 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
 
+  sorted_insert_double(best_logmu, keep, *logmu);
   mutex_lock (&lock);
   
-  sorted_insert_double(best_logmu, keep, *logmu);
   collisions_good ++;
   aver_opt_lognorm += *logmu;
   var_opt_lognorm += *logmu * *logmu;
