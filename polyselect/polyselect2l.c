@@ -348,8 +348,10 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
     const double E)
 {
   mutex_lock (&lock);
-  printf ("# Raw polynomial:\n");
-  print_poly_info (fold, d, gold, N, 1, phash);
+  if (fold != NULL && gold != NULL) {
+    printf ("# Raw polynomial:\n");
+    print_poly_info (fold, d, gold, N, 1, phash);
+  }
   if (d == 6 && verbose >= 1)
     gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                 logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -474,8 +476,11 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
     max_opt_lognorm = *logmu;
 
   /* MurphyE */
+  mpz_set (curr_poly->n, N);
+  curr_poly->rat->deg = 1;
   mpz_set (curr_poly->rat->coeff[0], g[0]);
   mpz_set (curr_poly->rat->coeff[1], g[1]);
+  curr_poly->alg->deg = F->deg;
   for (j = d + 1; j -- != 0; )
     mpz_set (curr_poly->alg->coeff[j], F->coeff[j]);
   curr_poly->skew = skew;
@@ -1921,6 +1926,81 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
   header_clear (header);
 }
 
+int
+read_mpz(mpz_t result, const char *line, const char prefix, const unsigned int index)
+{
+  char pattern[64];
+  snprintf(pattern, sizeof(pattern)/sizeof(char), "%c%u: %%Zd\n", prefix, index);
+  return gmp_sscanf(line, pattern, result);
+}
+
+/* Read polynomials from a file, separated by empty lines,
+   optimize them (size and roots) and print them */
+void
+read_raw_poly_file(const char *filename)
+{
+  char line[MAX_LINE_LENGTH];
+  mpz_t g[2];
+  mpz_poly_t F;
+  mpz_t M, N;
+  FILE *file;
+  const int max_degree = 10;
+  
+  file = fopen(filename, "ra");
+  if (file == NULL) {
+    perror("Could not open file");
+    exit(EXIT_FAILURE);
+  }
+  mpz_init(g[0]);
+  mpz_init(g[1]);
+  mpz_init(M);
+  mpz_init(N);
+  mpz_poly_init (F, max_degree);
+  F->deg = 0;
+  memset(line, 0, MAX_LINE_LENGTH); /* For nicer gdb output */
+
+  while (!feof(file)) {
+    line[0] = 0;
+    if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+      /* Don't break here, in fact, as we want to output the polynomial
+         when we hit the EOF on the input */
+    }
+    /*  Empty line separates polynomials. At EOF, we also output */
+    if (line[0] == 0 || strcmp(line, "\n") == 0) {
+      /* Did we get all required fields? */
+      if (mpz_sgn(N) && mpz_sgn(g[0]) && mpz_sgn(g[1]) && F->deg > 0) {
+        double logmu, E;
+        /* Optimize and, if good enough, print */
+        if (optimize_raw_poly(&logmu, F, g, F->deg, N, &E)) {
+          output_polynomials(NULL, F->deg, NULL, N, 0., 0., F->coeff, g, E);
+        }
+        mpz_set_ui(N, 0);
+        mpz_set_ui(M, 0);
+        for (int i = 0; i < 2; i++)
+          mpz_set_ui(g[i], 0);
+        F->deg = 0;
+      }
+      continue;
+    }
+    gmp_sscanf(line, "n: %Zd\n", N);
+    gmp_sscanf(line, "m: %Zd\n", M);
+    for (int i = 0; i < 2; i++)
+      read_mpz(g[i], line, 'Y', i);
+    for (int i = 0; i < max_degree; i++) {
+      if (read_mpz(F->coeff[i], line, 'c', i))
+        F->deg = MAX(F->deg, i);
+    }
+  }
+  
+  mpz_clear(g[0]);
+  mpz_clear(g[1]);
+  mpz_clear(M);
+  mpz_clear(N);
+  mpz_poly_clear (F);
+  fclose(file); 
+}
+
+
 void*
 one_thread (void* args)
 {
@@ -1949,6 +2029,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
+  param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "save", "save state in given file");
@@ -1979,7 +2060,7 @@ main (int argc, char *argv[])
 {
   int argc0 = argc;
   char **argv0 = argv;
-  const char *save = NULL, *resume = NULL;
+  const char *save = NULL, *resume = NULL, *rootsieve_filename = NULL;
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
@@ -2020,6 +2101,28 @@ main (int argc, char *argv[])
     usage (argv0[0], NULL, pl);
   }
 
+  /* initialize best norms */
+  for (i = 0; i < keep; i++)
+    {
+      best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
+      best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
+      best_logmu[i] = 999.99;       /* best logmu after rootsieve */
+    }
+
+  /* These parameters need to be parsed even for -rootsieve */
+  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
+    area = AREA;
+  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
+    bound_f = BOUND_F;
+  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
+    bound_g = BOUND_G;
+
+  rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
+  if (rootsieve_filename != NULL) {
+    read_raw_poly_file(rootsieve_filename);
+    goto print_statistics;
+  }
+
   /* parse and check N in the first place */
   int have_n = param_list_parse_mpz(pl, "n", N);
 
@@ -2050,12 +2153,6 @@ main (int argc, char *argv[])
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
-  if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
-    area = AREA;
-  if (param_list_parse_double (pl, "Bf", &bound_f) == 0) /* no -Bf */
-    bound_f = BOUND_F;
-  if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
-    bound_g = BOUND_G;
   if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
     admin = 0;
   else
@@ -2122,14 +2219,6 @@ main (int argc, char *argv[])
     }
     fclose (fp);
   }
-
-  /* initialize best norms */
-  for (i = 0; i < keep; i++)
-    {
-      best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
-      best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
-      best_logmu[i] = 999.99;       /* best logmu after rootsieve */
-    }
 
   /* init primes */
   double Pd;
@@ -2281,6 +2370,12 @@ main (int argc, char *argv[])
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
           tries, tot_found, opt_found, ros_found);
 
+  for (i = 0; i < nthreads ; i++)
+    mpz_clear (T[i]->N);
+  free (T);
+  clearPrimes (&Primes);
+
+print_statistics:
   /* print best keep values of logmu */
   if (collisions_good > 0)
     {
@@ -2318,11 +2413,7 @@ main (int argc, char *argv[])
     print_cadopoly_extra (stdout, best_poly, argc0, argv0, st0);
   }
 
-  for (i = 0; i < nthreads ; i++)
-    mpz_clear (T[i]->N);
-  free (T);
   mpz_clear (N);
-  clearPrimes (&Primes);
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
   param_list_clear (pl);
