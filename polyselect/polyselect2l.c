@@ -359,6 +359,21 @@ output_polynomials(mpz_t *fold, unsigned long d, mpz_t *gold, mpz_t N,
 }
 
 void
+output_skipped_poly(unsigned long d, double logmu, uint64_t ad, const mpz_t l,
+    const mpz_t m, const double logmu0c3, const double logmu0c4)
+{
+  mutex_lock (&lock);
+  if (d == 6)
+    gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+                logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+  else
+    gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                logmu, (unsigned long long) ad, l, m);
+  mutex_unlock (&lock);
+}
+
+
+void
 output_msieve(const char *out, unsigned long d, mpz_t *f, mpz_t *g)
 {
   FILE *fp;
@@ -382,16 +397,92 @@ output_msieve(const char *out, unsigned long d, mpz_t *f, mpz_t *g)
   mutex_unlock (&lock);
 }
 
+int
+optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
+    const unsigned long d, mpz_t *f, mpz_t N, double *E)
+{
+  int k;
+  unsigned long j;
+  double skew;
+  mpz_t t;
+  
+  for (k = keep - 1; k > 0 && *logmu < best_raw_logmu[k-1]; k--)
+    best_raw_logmu[k] = best_raw_logmu[k-1];
+  best_raw_logmu[k] = *logmu;
+
+  /* optimize size */
+  opt_found ++;
+  optimize (F, g, 0, 1);
+
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  *logmu = L2_lognorm (F, skew);
+
+  if (*logmu >= best_opt_logmu[keep - 1])
+    return 0;
+
+  for (j = keep - 1; j > 0 && *logmu < best_opt_logmu[j-1]; j--)
+    best_opt_logmu[j] = best_opt_logmu[j-1];
+  best_opt_logmu[j] = *logmu;
+
+  if (!raw) {
+    rootsieve_poly(m, g, d, f, N, F);
+  } // raw and sopt only ?
+
+  /* check that the algebraic polynomial has content 1, otherwise skip it */
+  mpz_init(t);
+  mpz_poly_content (t, F);
+  if (mpz_cmp_ui (t, 1) != 0) {
+    mpz_clear(t);
+    return 0;
+  }
+  mpz_clear(t);
+
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  *logmu = L2_lognorm (F, skew);
+
+  mutex_lock (&lock);
+  for (k = keep; k > 0 && *logmu < best_logmu[k-1]; k--)
+    best_logmu[k] = best_logmu[k-1];
+  if (k < keep)
+    best_logmu[k] = *logmu;
+  collisions_good ++;
+  aver_opt_lognorm += *logmu;
+  var_opt_lognorm += *logmu * *logmu;
+  if (*logmu < min_opt_lognorm)
+    min_opt_lognorm = *logmu;
+  if (*logmu > max_opt_lognorm)
+    max_opt_lognorm = *logmu;
+
+  /* MurphyE */
+  mpz_set (curr_poly->rat->coeff[0], g[0]);
+  mpz_set (curr_poly->rat->coeff[1], g[1]);
+  for (j = d + 1; j -- != 0; )
+    mpz_set (curr_poly->alg->coeff[j], f[j]);
+  curr_poly->skew = skew;
+  *E = MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
+
+  mpz_neg (m, g[0]);
+
+  if (*E > best_E)
+  {
+    best_E = *E;
+    cado_poly_set (best_poly, curr_poly);
+  }
+  mutex_unlock (&lock);
+
+  return 1;
+}
+
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
-match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
+match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
        uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
        mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], adz;
-  unsigned long j;
   int cmp;
-  double skew, logmu, E;
+  double skew, logmu;
   mpz_poly_t F;
 
   /* the expected rotation space is S^5 for degree 6 */
@@ -423,7 +514,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     fprintf (stderr, "Error, cannot allocate memory in match\n");
     exit (1);
   }
-  for (j = 0; j <= d; j++)
+  for (unsigned long j = 0; j <= d; j++)
     mpz_init (fold[j]);
   /* we have l = p1*p2*q */
   mpz_set_ui (l, p1);
@@ -470,7 +561,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
-  for (j = d - 2; j > 0; j--)
+  for (unsigned long j = d - 2; j > 0; j--)
   {
     check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
@@ -497,8 +588,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_set (f[0], t);
 
   /* save unoptimized polynomial to fold */
-  for (i = d + 1; i -- != 0; )
-    mpz_set (fold[i], f[i]);
+  for (unsigned long j = d + 1; j -- != 0; )
+    mpz_set (fold[j], f[j]);
   mpz_set (gold[1], g[1]);
   mpz_set (gold[0], g[0]);
 
@@ -542,88 +633,21 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[keep - 1])
-  {
-    for (j = keep - 1; j > 0 && logmu < best_raw_logmu[j-1]; j--)
-      best_raw_logmu[j] = best_raw_logmu[j-1];
-    best_raw_logmu[j] = logmu;
-
-    /* optimize size */
-    opt_found ++;
-    optimize (F, g, 0, 1);
-
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew);
-
-    if (logmu >= best_opt_logmu[keep - 1])
-      goto skip;
-
-    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
-      best_opt_logmu[j] = best_opt_logmu[j-1];
-    best_opt_logmu[j] = logmu;
-
-    if (!raw) {
-      rootsieve_poly(m, g, d, f, N, F);
-    } // raw and sopt only ?
-
-    /* check that the algebraic polynomial has content 1, otherwise skip it */
-    mpz_poly_content (t, F);
-    if (mpz_cmp_ui (t, 1) != 0)
-      goto skip;
-
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew);
-
-    mutex_lock (&lock);
-    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    if (i < keep)
-      best_logmu[i] = logmu;
-    collisions_good ++;
-    aver_opt_lognorm += logmu;
-    var_opt_lognorm += logmu * logmu;
-    if (logmu < min_opt_lognorm)
-      min_opt_lognorm = logmu;
-    if (logmu > max_opt_lognorm)
-      max_opt_lognorm = logmu;
-
-    /* MurphyE */
-    mpz_set (curr_poly->rat->coeff[0], g[0]);
-    mpz_set (curr_poly->rat->coeff[1], g[1]);
-    for (j = d + 1; j -- != 0; )
-      mpz_set (curr_poly->alg->coeff[j], f[j]);
-    curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
-
-    mpz_neg (m, g[0]);
-
-    if (E > best_E)
-    {
-      best_E = E;
-      cado_poly_set (best_poly, curr_poly);
-    }
-    mutex_unlock (&lock);
-    if (out != NULL)
-      output_msieve(out, d, f, g);
-
-    /* print optimized (maybe size- or size-root- optimized) polynomial */
-    if (verbose >= 0) {
-      output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
-    }
+  int did_optimize = 0;
+  double E;
+  if (logmu < best_raw_logmu[keep - 1]) {
+    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, f, N, &E);
   }
-  else {
-  skip:
-    if (verbose >= 1) {
-      mutex_lock (&lock);
-      if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-      else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
-                    logmu, (unsigned long long) ad, l, m);
-      mutex_unlock (&lock);
-    }
-  }
+
+  if (did_optimize && out != NULL)
+    output_msieve(out, d, f, g);
+  
+  /* print optimized (maybe size- or size-root- optimized) polynomial */
+  if (did_optimize && verbose >= 0)
+    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
+  
+  if (!did_optimize && verbose >= 1)
+    output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
 
   mpz_clear (l);
   mpz_clear (m);
@@ -637,7 +661,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_clear (gold[0]);
   mpz_clear (gold[1]);
   mpz_poly_clear (F);
-  for (j = 0; j <= d; j++)
+  for (unsigned long j = 0; j <= d; j++)
     mpz_clear (fold[j]);
   free (fold);
 }
@@ -650,9 +674,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 	   mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz, tmp;
-  unsigned int j;
   int cmp;
-  double skew, logmu, E;
+  double skew, logmu;
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
@@ -684,7 +707,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     fprintf (stderr, "Error, cannot allocate memory in match\n");
     exit (1);
   }
-  for (j = 0; j <= d; j++)
+  for (unsigned long j = 0; j <= d; j++)
     mpz_init (fold[j]);
   /* we have l = p1*p2*q */
   mpz_set_ui (l, p1);
@@ -735,7 +758,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
-  for (j = d - 2; j > 0; j--)
+  for (unsigned long j = d - 2; j > 0; j--)
   {
     check_divexact (t, t, "t", l, "l");
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
@@ -806,84 +829,21 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  if (logmu < best_raw_logmu[keep - 1])
-  {
-    int k;
-    for (k = keep - 1; k > 0 && logmu < best_raw_logmu[k-1]; k--)
-      best_raw_logmu[k] = best_raw_logmu[k-1];
-    best_raw_logmu[k] = logmu;
-
-    /* optimize size */
-    opt_found ++;
-    optimize (F, g, 0, 1);
-
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew);
-
-    if (logmu >= best_opt_logmu[keep - 1])
-      goto skip;
-
-    for (j = keep - 1; j > 0 && logmu < best_opt_logmu[j-1]; j--)
-      best_opt_logmu[j] = best_opt_logmu[j-1];
-    best_opt_logmu[j] = logmu;
-
-    if (!raw) {
-      rootsieve_poly(m, g, d, f, N, F);
-    } // raw and sopt only ?
-
-    skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (F, skew);
-
-    mutex_lock (&lock);
-    for (i = keep; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    if (i < keep)
-      best_logmu[i] = logmu;
-    collisions_good ++;
-    aver_opt_lognorm += logmu;
-    var_opt_lognorm += logmu * logmu;
-    if (logmu < min_opt_lognorm)
-      min_opt_lognorm = logmu;
-    if (logmu > max_opt_lognorm)
-      max_opt_lognorm = logmu;
-
-    /* MurphyE */
-    mpz_set (curr_poly->rat->coeff[0], g[0]);
-    mpz_set (curr_poly->rat->coeff[1], g[1]);
-    for (j = d + 1; j -- != 0; )
-      mpz_set (curr_poly->alg->coeff[j], f[j]);
-    curr_poly->skew = skew;
-    E =  MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
-
-    mpz_neg (m, g[0]);
-
-    if (E > best_E)
-    {
-      best_E = E;
-      cado_poly_set (best_poly, curr_poly);
-    }
-    mutex_unlock (&lock);
-    if (out != NULL)
-      output_msieve(out, d, f, g);
-
-    /* print optimized (maybe size- or size-root- optimized) polynomial */
-    if (verbose >= 0) {
-      output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
-    }
+  int did_optimize = 0;
+  double E;
+  if (logmu < best_raw_logmu[keep - 1]) {
+    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, f, N, &E);
   }
-  else {
-  skip:
-    if (verbose >= 1) {
-      mutex_lock (&lock);
-      if (d == 6)
-        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
-                    logmu, (unsigned long long) ad, l, m, logmu0c3, logmu0c4);
-      else
-        gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
-                    logmu, (unsigned long long) ad, l, m);
-      mutex_unlock (&lock);
-    }
-  }
+  
+  if (did_optimize && out != NULL)
+    output_msieve(out, d, f, g);
+  
+  /* print optimized (maybe size- or size-root- optimized) polynomial */
+  if (did_optimize && verbose >= 0)
+    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
+  
+  if (!did_optimize && verbose >= 1)
+    output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
 
   mpz_clear (tmp);
   mpz_clear (l);
@@ -899,7 +859,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mpz_clear (gold[0]);
   mpz_clear (gold[1]);
   mpz_poly_clear (F);
-  for (j = 0; j <= d; j++)
+  for (unsigned long j = 0; j <= d; j++)
     mpz_clear (fold[j]);
   free (fold);
 }
