@@ -296,6 +296,46 @@ check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mp
   mpz_divexact (r, d, q);
 }
 
+
+void rootsieve_poly(mpz_t m, mpz_t *g, unsigned long d, mpz_t *f, mpz_t N, mpz_poly_t F)
+{
+  ros_found ++;
+  /* root sieve */
+#ifndef NEW_ROOTSIEVE
+  unsigned long alim = 2000;
+  long jmin, kmin;
+#endif
+  mpz_neg (m, g[0]);
+
+  mutex_lock (&lock);
+  rootsieve_time -= seconds_thread ();
+  mutex_unlock (&lock);
+
+#ifdef NEW_ROOTSIEVE
+  if (d > 3) {
+    ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+    mpz_neg (g[0], m);
+  }
+  else {
+    unsigned long alim = 2000;
+    long jmin, kmin;
+    rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
+    mpz_neg (g[0], m);
+    /* optimize again, but only translation */
+    optimize_aux (F, g, 0, 0);
+  }
+#else
+  rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
+  mpz_neg (g[0], m);
+  /* optimize again, but only translation */
+  optimize_aux (F, g, 0, 0);
+#endif
+
+  mutex_lock (&lock);
+  rootsieve_time += seconds_thread ();
+  mutex_unlock (&lock);
+}
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
@@ -477,42 +517,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     best_opt_logmu[j] = logmu;
 
     if (!raw) {
-      ros_found ++;
-/* root sieve */
-#ifndef NEW_ROOTSIEVE
-      unsigned long alim = 2000;
-      long jmin, kmin;
-#endif
-      mpz_neg (m, g[0]);
-
-      mutex_lock (&lock);
-      rootsieve_time -= seconds_thread ();
-      mutex_unlock (&lock);
-
-#ifdef NEW_ROOTSIEVE
-      if (d > 3) {
-        ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
-        mpz_neg (g[0], m);
-      }
-      else {
-        unsigned long alim = 2000;
-        long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
-        mpz_neg (g[0], m);
-        /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0);
-      }
-#else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
-      mpz_neg (g[0], m);
-      /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0);
-#endif
-
-      mutex_lock (&lock);
-      rootsieve_time += seconds_thread ();
-      mutex_unlock (&lock);
-
+      rootsieve_poly(m, g, d, f, N, F);
     } // raw and sopt only ?
 
     /* check that the algebraic polynomial has content 1, otherwise skip it */
@@ -807,42 +812,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     best_opt_logmu[j] = logmu;
 
     if (!raw) {
-      ros_found ++;
-/* root sieve */
-#ifndef NEW_ROOTSIEVE
-      unsigned long alim = 2000;
-      long jmin, kmin;
-#endif
-      mpz_neg (m, g[0]);
-
-      mutex_lock (&lock);
-      rootsieve_time -= seconds_thread ();
-      mutex_unlock (&lock);
-
-#ifdef NEW_ROOTSIEVE
-      if (d > 3) {
-        ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
-        mpz_neg (g[0], m);
-      }
-      else {
-        unsigned long alim = 2000;
-        long jmin, kmin;
-        rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
-        mpz_neg (g[0], m);
-        /* optimize again, but only translation */
-        optimize_aux (F, g, 0, 0);
-      }
-#else
-      rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
-      mpz_neg (g[0], m);
-      /* optimize again, but only translation */
-      optimize_aux (F, g, 0, 0);
-#endif
-
-      mutex_lock (&lock);
-      rootsieve_time += seconds_thread ();
-      mutex_unlock (&lock);
-
+      rootsieve_poly(m, g, d, f, N, F);
     } // raw and sopt only ?
 
     skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
