@@ -367,8 +367,11 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
 
 void
 output_skipped_poly(const unsigned long d, const double logmu, const uint64_t ad,
-    const mpz_t l, const mpz_t m, const double logmu0c3, const double logmu0c4)
+    const mpz_t l, const mpz_t g0, const double logmu0c3, const double logmu0c4)
 {
+  mpz_t m;
+  mpz_init(m);
+  mpz_neg(m, g0); 
   mutex_lock (&lock);
   if (d == 6)
     gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
@@ -377,6 +380,7 @@ output_skipped_poly(const unsigned long d, const double logmu, const uint64_t ad
     gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                 logmu, (unsigned long long) ad, l, m);
   mutex_unlock (&lock);
+  mpz_clear(m);
 }
 
 
@@ -405,7 +409,7 @@ output_msieve(const char *out, const unsigned long d, mpz_t *f, mpz_t *g)
 }
 
 int
-optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
+optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
     const unsigned long d, mpz_t N, double *E)
 {
   int k;
@@ -467,8 +471,6 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
     mpz_set (curr_poly->alg->coeff[j], F->coeff[j]);
   curr_poly->skew = skew;
   *E = MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
-
-  mpz_neg (m, g[0]);
 
   if (*E > best_E)
   {
@@ -642,7 +644,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   int did_optimize = 0;
   double E;
   if (logmu < best_raw_logmu[keep - 1]) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, N, &E);
+    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
   }
 
   if (did_optimize && out != NULL)
@@ -653,7 +655,7 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
     output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
+    output_skipped_poly(d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
 
   mpz_clear (l);
   mpz_clear (m);
@@ -838,7 +840,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   int did_optimize = 0;
   double E;
   if (logmu < best_raw_logmu[keep - 1]) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, N, &E);
+    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
   }
 
   if (did_optimize && out != NULL)
@@ -849,7 +851,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
+    output_skipped_poly(d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
 
   mpz_clear (tmp);
   mpz_clear (l);
