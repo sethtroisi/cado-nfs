@@ -235,7 +235,7 @@ ropt_polyselect ( mpz_t *f,
 
   /* setup poly */
   mpz_set (poly->g[1], l);
-  mpz_neg (poly->g[0], m);
+  mpz_set (poly->g[0], m);
   for (i = 0; i <=d; i ++)
     mpz_set (poly->f[i], f[i]);
   mpz_set (poly->n, N);
@@ -258,7 +258,7 @@ ropt_polyselect ( mpz_t *f,
   /* bring bestpoly back to polyselect2* */
   for (i = 0; i <= d; i++)
     mpz_set (f[i], bestpoly->f[i]);
-  mpz_neg (m, bestpoly->g[0]);
+  mpz_set (m, bestpoly->g[0]);
   mpz_set (l, bestpoly->g[1]);
 
   /* free */

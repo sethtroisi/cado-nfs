@@ -297,7 +297,7 @@ check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mp
 }
 
 
-void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d,
+void rootsieve_poly(mpz_t *g, const unsigned long d,
     const mpz_t N, mpz_poly_t F)
 {
   ros_found ++;
@@ -306,7 +306,6 @@ void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d,
   unsigned long alim = 2000;
   long jmin, kmin;
 #endif
-  mpz_neg (m, g[0]);
 
   mutex_lock (&lock);
   rootsieve_time -= seconds_thread ();
@@ -314,20 +313,26 @@ void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d,
 
 #ifdef NEW_ROOTSIEVE
   if (d > 3) {
-    ropt_polyselect (F->coeff, d, m, g[1], N, 0); // verbose = 2 to see details.
-    mpz_neg (g[0], m);
-  }
-  else {
+    ropt_polyselect (F->coeff, d, g[0], g[1], N, 0); // verbose = 2 to see details.
+  } else {
     unsigned long alim = 2000;
     long jmin, kmin;
+    mpz_t m;
+    mpz_init(m);
+    mpz_neg (m, g[0]);
     rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
     mpz_neg (g[0], m);
+    mpz_clear(m);
     /* optimize again, but only translation */
     optimize_aux (F, g, 0, 0);
   }
 #else
+  mpz_t m;
+  mpz_init(m);
+  mpz_neg (m, g[0]);
   rotate (F, alim, m, g[1], &jmin, &kmin, 0, verbose);
   mpz_neg (g[0], m);
+  mpz_clear(m);
   /* optimize again, but only translation */
   optimize_aux (F, g, 0, 0);
 #endif
@@ -427,7 +432,7 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
   best_opt_logmu[j] = *logmu;
 
   if (!raw) {
-    rootsieve_poly(m, g, d, N, F);
+    rootsieve_poly(g, d, N, F);
   } // raw and sopt only ?
 
   /* check that the algebraic polynomial has content 1, otherwise skip it */
