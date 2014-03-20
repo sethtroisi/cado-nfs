@@ -173,11 +173,11 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
 /* print poly info */
 void
 print_poly_info ( mpz_t *f,
-                  unsigned int d,
+                  const unsigned int d,
                   mpz_t g[2],
-                  mpz_t n,
-                  int raw,
-                  char *prefix )
+                  const mpz_t n,
+                  const int raw,
+                  const char *prefix )
 {
   unsigned int i, nroots;
   double skew, skew2, logmu, alpha, alpha_proj, exp_E;
@@ -297,7 +297,8 @@ check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mp
 }
 
 
-void rootsieve_poly(mpz_t m, mpz_t *g, unsigned long d, mpz_t *f, mpz_t N, mpz_poly_t F)
+void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d, mpz_t *f,
+    const mpz_t N, mpz_poly_t F)
 {
   ros_found ++;
   /* root sieve */
@@ -337,8 +338,9 @@ void rootsieve_poly(mpz_t m, mpz_t *g, unsigned long d, mpz_t *f, mpz_t N, mpz_p
 }
 
 void
-output_polynomials(mpz_t *fold, unsigned long d, mpz_t *gold, mpz_t N,
-    double logmu0c3, double logmu0c4, mpz_t *f, mpz_t *g, double E)
+output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
+    const mpz_t N, const double logmu0c3, const double logmu0c4, mpz_t *f, mpz_t *g,
+    const double E)
 {
   mutex_lock (&lock);
   printf ("# Raw polynomial:\n");
@@ -359,8 +361,8 @@ output_polynomials(mpz_t *fold, unsigned long d, mpz_t *gold, mpz_t N,
 }
 
 void
-output_skipped_poly(unsigned long d, double logmu, uint64_t ad, const mpz_t l,
-    const mpz_t m, const double logmu0c3, const double logmu0c4)
+output_skipped_poly(const unsigned long d, const double logmu, const uint64_t ad,
+    const mpz_t l, const mpz_t m, const double logmu0c3, const double logmu0c4)
 {
   mutex_lock (&lock);
   if (d == 6)
@@ -374,7 +376,7 @@ output_skipped_poly(unsigned long d, double logmu, uint64_t ad, const mpz_t l,
 
 
 void
-output_msieve(const char *out, unsigned long d, mpz_t *f, mpz_t *g)
+output_msieve(const char *out, const unsigned long d, mpz_t *f, mpz_t *g)
 {
   FILE *fp;
   unsigned long j;

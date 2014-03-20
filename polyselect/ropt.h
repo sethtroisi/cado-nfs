@@ -25,7 +25,7 @@ void ropt_polyselect ( mpz_t *f,
                        int d,
                        mpz_t m,
                        mpz_t l,
-                       mpz_t N,
+                       const mpz_t N,
                        int verbose );
 
 #endif /* ROPT_H */
