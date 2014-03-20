@@ -92,7 +92,7 @@ class Polynomials(object):
     re_pol_f = re.compile("c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile("Y(\d+)\s*:\s*(-?\d+)")
     re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % cap_fp)
-    re_lognorm = re.compile(r"\s*#\s*lognorm:\s*%s," % cap_fp)
+    re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % cap_fp)
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -101,7 +101,7 @@ class Polynomials(object):
         (
             ("n", (int, True)),
             ("m", (int, True)),
-            ("skew", (float, True)),
+            ("skew", (float, False)),
             ("type", (str, False))
         ))
     
@@ -195,7 +195,7 @@ class Polynomials(object):
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
         if not self.lognorm == 0.:
-            arr.append("# lognorm = %g\n" % self.lognorm)
+            arr.append("# lognorm %g\n" % self.lognorm)
         arr.append("# f(x) = %s\n" % str(self.polyf))
         arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)
