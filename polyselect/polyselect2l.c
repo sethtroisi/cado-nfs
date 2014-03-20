@@ -297,7 +297,7 @@ check_divexact(mpz_t r, const mpz_t d, const char *d_name MAYBE_UNUSED, const mp
 }
 
 
-void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d, mpz_t *f,
+void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d,
     const mpz_t N, mpz_poly_t F)
 {
   ros_found ++;
@@ -314,7 +314,7 @@ void rootsieve_poly(mpz_t m, mpz_t *g, const unsigned long d, mpz_t *f,
 
 #ifdef NEW_ROOTSIEVE
   if (d > 3) {
-    ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+    ropt_polyselect (F->coeff, d, m, g[1], N, 0); // verbose = 2 to see details.
     mpz_neg (g[0], m);
   }
   else {
@@ -401,7 +401,7 @@ output_msieve(const char *out, const unsigned long d, mpz_t *f, mpz_t *g)
 
 int
 optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
-    const unsigned long d, mpz_t *f, mpz_t N, double *E)
+    const unsigned long d, mpz_t N, double *E)
 {
   int k;
   unsigned long j;
@@ -427,7 +427,7 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
   best_opt_logmu[j] = *logmu;
 
   if (!raw) {
-    rootsieve_poly(m, g, d, f, N, F);
+    rootsieve_poly(m, g, d, N, F);
   } // raw and sopt only ?
 
   /* check that the algebraic polynomial has content 1, otherwise skip it */
@@ -459,7 +459,7 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
   mpz_set (curr_poly->rat->coeff[0], g[0]);
   mpz_set (curr_poly->rat->coeff[1], g[1]);
   for (j = d + 1; j -- != 0; )
-    mpz_set (curr_poly->alg->coeff[j], f[j]);
+    mpz_set (curr_poly->alg->coeff[j], F->coeff[j]);
   curr_poly->skew = skew;
   *E = MurphyE (curr_poly, bound_f, bound_g, area, MURPHY_K);
 
@@ -474,7 +474,6 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g, mpz_t m,
 
   return 1;
 }
-
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
@@ -638,15 +637,15 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   int did_optimize = 0;
   double E;
   if (logmu < best_raw_logmu[keep - 1]) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, f, N, &E);
+    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, N, &E);
   }
 
   if (did_optimize && out != NULL)
-    output_msieve(out, d, f, g);
+    output_msieve(out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
+    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
     output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
@@ -834,15 +833,15 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   int did_optimize = 0;
   double E;
   if (logmu < best_raw_logmu[keep - 1]) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, f, N, &E);
+    did_optimize = optimize_raw_poly(&logmu, F, g, m, d, N, &E);
   }
-  
+
   if (did_optimize && out != NULL)
-    output_msieve(out, d, f, g);
+    output_msieve(out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, f, g, E);
+    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
     output_skipped_poly(d, logmu, ad, l, m, logmu0c3, logmu0c4);
