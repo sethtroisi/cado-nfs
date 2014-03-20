@@ -586,8 +586,8 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
 /* Collect everything into node 0 */
 void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
 {
-    // All alloce'd vector should be the same. Let's pick the one
-    // That's inside our part of src.
+    // All vectors should be the same allocated space. Let's pick the one
+    // that's inside our part of src.
     size_t alloc;
     {
         matpoly_ptr me = bigmatpoly_my_cell(src);
@@ -740,7 +740,6 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
                         MPI_Isend(from, count, abmpi_datatype(ab),
                                 peer, tag, dst->comm, req);
                     }
-
                     req++;
                 }
             }
@@ -781,5 +780,307 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
             req++;
         }
         free(reqs);
+    }
+}
+
+/*
+ * Same functionality as above, but with "partial" transfer in order to
+ * allow some kind of streaming between reading a matrix on node 0 and
+ * scaterring it on all the nodes. (and the same for gather / writing to
+ * file on node 0).
+ */
+
+/* The piece [offset, offset+length[ of the bigmatpoly source is gathered
+ * in the matpoly dst on node 0.
+ * We assume that all the data structures are already set up properly,
+ * and that dst has indeed room for length elements (we set the size, but
+ * don't realloc dst).
+ */
+void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
+        size_t offset, size_t length)
+{
+    int rank;
+    int irank;
+    int jrank;
+    MPI_Comm_rank(src->comm, &rank);
+    MPI_Comm_rank(src->col, &irank);
+    MPI_Comm_rank(src->row, &jrank);
+
+    /* sanity checks, because the code below assumes this. */
+    ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
+
+    // Node 0 receives data
+    if (!rank) {
+        ASSERT_ALWAYS(dst->m == src->m);
+        ASSERT_ALWAYS(dst->n == src->n);
+        ASSERT_ALWAYS(dst->alloc >= length);
+        dst->size = length;
+        MPI_Request * reqs = malloc(src->m1 * src->n1
+                * src->m0 * src->n0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        /* the master receives data from everyone */
+        for(unsigned int i1 = 0 ; i1 < src->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
+                    for(unsigned int j0 = 0 ; j0 < src->n0 ; j0++) {
+                        unsigned int ii = i1 * src->m0 + i0;
+                        unsigned int jj = j1 * src->n0 + j0;
+                        unsigned int peer = i1 * src->n1 + j1;
+                        unsigned int tag = ii * src->n + jj;
+                        abdst_vec to = matpoly_part(ab, dst, ii, jj, 0);
+
+                        if (peer == 0) {
+                            /* talk to ourself */
+                            matpoly_ptr me = bigmatpoly_my_cell(src);
+                            abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
+                            abvec_set(ab, to, from, length);
+                        } else {
+                            MPI_Irecv(to, length, abmpi_datatype(ab),
+                                    peer, tag, src->comm, req);
+                        }
+                        req++;
+                    }
+                }
+            }
+        }
+
+        req = reqs;
+        for(unsigned int i1 = 0 ; i1 < src->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < src->n1 ; j1++) {
+                    for(unsigned int j0 = 0 ; j0 < src->n0 ; j0++) {
+                        unsigned int peer = i1 * src->n1 + j1;
+                        if (peer)
+                            MPI_Wait(req, MPI_STATUS_IGNORE);
+                        req++;
+                    }
+                }
+            }
+        }
+        free(reqs);
+    } else {
+        // All the other nodes send their data.
+        MPI_Request * reqs = malloc(src->m0 * src->n0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        /* receive. Each job will receive exactly dst->m0 transfers */
+        matpoly_ptr me = bigmatpoly_my_cell(src);
+        for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
+            for(unsigned int j0 = 0 ; j0 < src->n0 ; j0++) {
+                unsigned int i1 = irank;
+                unsigned int j1 = jrank;
+                unsigned int ii = i1 * src->m0 + i0;
+                unsigned int jj = j1 * src->n0 + j0;
+                unsigned int tag = ii * src->n + jj;
+                abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
+                MPI_Isend(from, length, abmpi_datatype(ab),
+                        0, tag, src->comm, req);
+                req++;
+            }
+        }
+        req = reqs;
+        for(unsigned int i0 = 0 ; i0 < src->m0 ; i0++) {
+            for(unsigned int j0 = 0 ; j0 < src->n0 ; j0++) {
+                MPI_Wait(req, MPI_STATUS_IGNORE);
+                req++;
+            }
+        }
+        free(reqs);
+    }
+}
+
+/* Exactly the converse of the previous function.
+ * Take length element in the src matrix on node 0, and scatter it
+ * in dst, with the given offset.
+ * We assume that dst has been initialized: all the communicators, mn's,
+ * are already set and enough space to accomodate length+offset elements
+ * have been already allocated. The only non-data field of dst that is
+ * modified is size.
+ */
+void bigmatpoly_scatter_mat_partial(abdst_field ab,
+        bigmatpoly_ptr dst, matpoly_ptr src,
+        size_t offset, size_t length)
+{
+    int rank;
+    int irank;
+    int jrank;
+    MPI_Comm_rank(dst->comm, &rank);
+    MPI_Comm_rank(dst->col, &irank);
+    MPI_Comm_rank(dst->row, &jrank);
+
+    bigmatpoly_set_size(dst, offset+length);
+
+    /* sanity check, because the code below assumes this. */
+    ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
+
+    if (!rank) {
+        MPI_Request * reqs = malloc(dst->m1 * dst->n1
+                * dst->m0 * dst->n0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        /* the master sends data to everyone */
+        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
+                    for(unsigned int j0 = 0 ; j0 < dst->n0 ; j0++) {
+                        unsigned int ii = i1 * dst->m0 + i0;
+                        unsigned int jj = j1 * dst->n0 + j0;
+                        unsigned int peer = i1 * dst->n1 + j1;
+                        unsigned int tag = ii * dst->n + jj;
+                        abdst_vec from = matpoly_part(ab, src, ii, jj, 0);
+
+                        if (peer == 0) {
+                            /* talk to ourself */
+                            matpoly_ptr me = bigmatpoly_my_cell(dst);
+                            abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
+                            abvec_set(ab, to, from, length);
+                        } else {
+                            MPI_Isend(from, length, abmpi_datatype(ab),
+                                    peer, tag, dst->comm, req);
+                        }
+                        req++;
+                    }
+                }
+            }
+        }
+
+        req = reqs;
+        for(unsigned int i1 = 0 ; i1 < dst->m1 ; i1++) {
+            for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+                for(unsigned int j1 = 0 ; j1 < dst->n1 ; j1++) {
+                    for(unsigned int j0 = 0 ; j0 < dst->n0 ; j0++) {
+                        unsigned int peer = i1 * dst->n1 + j1;
+                        if (peer)
+                            MPI_Wait(req, MPI_STATUS_IGNORE);
+                        req++;
+                    }
+                }
+            }
+        }
+        free(reqs);
+    } else {
+        MPI_Request * reqs = malloc(dst->m0 * dst->n0 * sizeof(MPI_Request));
+        MPI_Request * req = reqs;
+        matpoly_ptr me = bigmatpoly_my_cell(dst);
+        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+            for(unsigned int j0 = 0 ; j0 < dst->n0 ; j0++) {
+                unsigned int i1 = irank;
+                unsigned int j1 = jrank;
+                unsigned int ii = i1 * dst->m0 + i0;
+                unsigned int jj = j1 * dst->n0 + j0;
+                unsigned int tag = ii * dst->n + jj;
+                abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
+                MPI_Irecv(to, length, abmpi_datatype(ab),
+                        0, tag, dst->comm, req);
+                req++;
+            }
+        }
+        req = reqs;
+        for(unsigned int i0 = 0 ; i0 < dst->m0 ; i0++) {
+            for(unsigned int j0 = 0 ; j0 < dst->n0 ; j0++) {
+                MPI_Wait(req, MPI_STATUS_IGNORE);
+                req++;
+            }
+        }
+        free(reqs);
+    }
+}
+
+
+
+/* Collect everything into node 0 */
+void bigmatpoly_gather_mat_alt2(abdst_field ab, matpoly dst, bigmatpoly src)
+{
+    matpoly dst_partial;
+    size_t length = 100;
+    int rank;
+    MPI_Comm_rank(src->comm, &rank);
+
+    if (!rank) {
+        // Leader should initialize the result matrix
+        if (matpoly_check_pre_init(dst)) {
+            matpoly_init(ab, dst, src->m, src->n, src->size);
+        }
+        dst->size = src->size;
+
+        // Leader creates a buffer matpoly of size length
+        matpoly_init(ab, dst_partial, src->m, src->n, length);
+        dst_partial->size = length;
+    }
+
+    size_t offset = 0;
+    while (src->size > offset) {
+        size_t len = MIN(length, (src->size-offset));
+        bigmatpoly_gather_mat_partial(ab, dst_partial, src, offset, len);
+
+        // Copy the partial data into dst. This is the place where we
+        // could write directly on disk if memory is a concern:
+        if (!rank) {
+            for (unsigned int i = 0; i < dst->m; ++i) {
+                for (unsigned int j = 0; j < dst->n; ++j) {
+                    abdst_vec to = matpoly_part(ab, dst, i, j, offset);
+                    absrc_vec from = matpoly_part(ab, dst_partial, i, j, 0);
+                    abvec_set(ab, to, from, len);
+                }
+            }
+        }
+        offset += len;
+    }
+
+    if (!rank) {
+        matpoly_clear(ab, dst_partial);
+    }
+}
+
+
+/* Exactly the converse of the previous function. */
+void bigmatpoly_scatter_mat_alt2(abdst_field ab,
+        bigmatpoly_ptr dst, matpoly_ptr src)
+{
+    matpoly src_partial;
+    size_t length = 100;
+    int rank;
+    MPI_Comm_rank(dst->comm, &rank);
+
+    /* share allocation size. */
+    matpoly shell;
+    shell->m = src->m;
+    shell->n = src->n;
+    shell->size = src->size;
+    shell->alloc = src->alloc;
+
+    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->comm);
+
+    /* dst must be in pre-init mode */
+    ASSERT_ALWAYS(bigmatpoly_check_pre_init(dst));
+
+    /* Allocate enough space on each node */
+    bigmatpoly_finish_init(ab, dst, shell->m, shell->n, shell->alloc);
+    // bigmatpoly_set_size(dst, shell->size);
+
+    if (!rank) {
+        // Leader creates a buffer matpoly of size length
+        matpoly_init(ab, src_partial, src->m, src->n, length);
+        src_partial->size = length;
+    }
+
+    size_t offset = 0;
+    while (shell->size > offset) {
+        size_t len = MIN(length, (shell->size-offset));
+        // Copy the partial data into src_partial. This is the place where we
+        // could read directly from disk if memory is a concern:
+        if (!rank) {
+            for (unsigned int i = 0; i < src->m; ++i) {
+                for (unsigned int j = 0; j < src->n; ++j) {
+                    abdst_vec to = matpoly_part(ab, src_partial, i, j, 0);
+                    absrc_vec from = matpoly_part(ab, src, i, j, offset);
+                    abvec_set(ab, to, from, len);
+                }
+            }
+        }
+        bigmatpoly_scatter_mat_partial(ab, dst, src_partial, offset, len);
+        offset += len;
+    }
+
+    if (!rank) {
+        matpoly_clear(ab, src_partial);
     }
 }
