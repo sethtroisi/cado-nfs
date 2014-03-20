@@ -358,6 +358,30 @@ output_polynomials(mpz_t *fold, unsigned long d, mpz_t *gold, mpz_t N,
   mutex_unlock (&lock);
 }
 
+void
+output_msieve(const char *out, unsigned long d, mpz_t *f, mpz_t *g)
+{
+  FILE *fp;
+  unsigned long j;
+  mpz_t m;
+  mutex_lock (&lock);
+  fp = fopen (out, (ros_found == 0) ? "w" : "a");
+  if (fp == NULL)
+  {
+    fprintf (stderr, "Error, cannot open file %s\n", out);
+    exit (1);
+  }
+  fprintf (fp, "0");
+  for (j = d + 1; j -- != 0; )
+    gmp_fprintf (fp, " %Zd", f[j]);
+  mpz_init(m);
+  mpz_neg (m, g[0]);
+  gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
+  mpz_clear(m);
+  fclose (fp);
+  mutex_unlock (&lock);
+}
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
@@ -578,23 +602,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       best_E = E;
       cado_poly_set (best_poly, curr_poly);
     }
-    if (out != NULL) /* msieve output */
-    {
-      FILE *fp;
-      fp = fopen (out, (ros_found == 0) ? "w" : "a");
-      if (fp == NULL)
-      {
-        fprintf (stderr, "Error, cannot open file %s\n", out);
-        exit (1);
-      }
-      fprintf (fp, "0");
-      for (j = d + 1; j -- != 0; )
-        gmp_fprintf (fp, " %Zd", f[j]);
-      mpz_neg (m, g[0]);
-      gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
-      fclose (fp);
-    }
     mutex_unlock (&lock);
+    if (out != NULL)
+      output_msieve(out, d, f, g);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0) {
@@ -852,23 +862,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       best_E = E;
       cado_poly_set (best_poly, curr_poly);
     }
-    if (out != NULL) /* msieve output */
-    {
-      FILE *fp;
-      fp = fopen (out, (ros_found == 0) ? "w" : "a");
-      if (fp == NULL)
-      {
-        fprintf (stderr, "Error, cannot open file %s\n", out);
-        exit (1);
-      }
-      fprintf (fp, "0");
-      for (j = d + 1; j -- != 0; )
-        gmp_fprintf (fp, " %Zd", f[j]);
-      mpz_neg (m, g[0]);
-      gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
-      fclose (fp);
-    }
     mutex_unlock (&lock);
+    if (out != NULL)
+      output_msieve(out, d, f, g);
 
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0) {
