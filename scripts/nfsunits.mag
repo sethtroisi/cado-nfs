@@ -8,7 +8,7 @@ Wrapper version, to be used with
 //
 // Using units in SNFS-DL
 
-NFSUNITS_VERSION:="20140319.1300"; // generators by Galois
+NFSUNITS_VERSION:="20140321.0830"; // misc
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -87,6 +87,7 @@ ComputeDualBasis := function(K, OK)
 	        T[i, j]:=Trace(OK.i * OK.j);
 	    end for;
 	end for;
+//	printf "# T=\n%o\n", T;
 	return T^(-1);
 end function;
 
@@ -128,7 +129,7 @@ FiPoBounds := function(B, Kdata, logunits)
 	end if;
 end function;
 
-// rK = 1
+// rK = 1 for (deg, r1, r2) = (4, 0, 2)
 Minimize1 := function(x, lx, U)
 	units:=U["units"];
 	lunits:=U["logunits"];
@@ -139,7 +140,7 @@ Minimize1 := function(x, lx, U)
         return x/units[1]^a1min;
 end function;
 
-// rK = 2
+// rK = 2 for (deg, r1, r2) = (3, 3, 0)
 Minimize2 := function(x, lx, U)
 	units:=U["units"];
 	lunits:=U["logunits"];
@@ -159,7 +160,7 @@ Minimize2 := function(x, lx, U)
         return x/u;
 end function;
 
-// rK = 3
+// rK = 3 for (deg, r1, r2) = (4, 4, 0)
 Minimize3 := function(x, lx, U)
         units:=U["units"];
         lunits:=U["logunits"];
@@ -359,6 +360,7 @@ PrepareUnits := procedure(~U, ~G, Kdata, genG)
 	// boxes will have bound^{2*rK} points
 	if rK le 2 then bound:=20;
 	elif rK le 3 then bound:=10;
+	elif rK le 4 then bound:=7;
 	else bound:=5; end if;
 	lr:=Kdata["roots"];
 	UK,map:=UnitGroup(K);
@@ -559,7 +561,6 @@ Treat_a_b := procedure(~FB, ~eps, Kdata, U, a, b, lf)
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
 	t:=K.1;
-	f:=DefiningPolynomial(K);
 	if DLP_DEBUG ge 2 then printf "a=%o, b=%o: %o\n", a, b, lf; end if;
 	theta:=(a-b*t);
 	eta:=OK!theta;
@@ -932,7 +933,6 @@ end function;
 // SIDE-EFFECT: fill in file 'generators' with generators.
 // TODO: separate bad primes.
 GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,U,badidealinfo,algpr,generators)
-	printf "# plain-computing generators\n";
 	tp:=Cputime();
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
@@ -949,6 +949,7 @@ GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,U,badidealinfo,algpr,generator
 	oldr:=0;
 	oldgp:=0;
 	hasGalois:=IsDefined(Kdata, "Galois");
+	printf "# plain-computing generators\n";
         while true do
             s:=Gets(fd);
             if IsEof(s) then break; end if;
@@ -1154,6 +1155,7 @@ end procedure;
 // eps[(a, b)_i] <- unit for (a-b*theta) given its algebraic factorization.
 // All that matters is that index i.
 UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,U,purged)
+	tp:=Cputime();
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
 	t:=K.1;
@@ -1224,6 +1226,7 @@ UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,U,purged)
 	    epsab[iab]:=RecoverUnits(U, Kdata, OK!eta);
 	    if epsab[iab] eq [] then error("No unit found"); end if;
 	end while;
+	printf "#T# units for purged relations: %o\n", Cputime(tp);
 end procedure;
 
 // File XXX.index
