@@ -602,9 +602,9 @@ class Polyselect2l(Program):
     subdir = "polyselect"
 
     def __init__(self, *,
-                 P : Parameter(checktype=int), 
-                 N : Parameter(checktype=int),
-                 degree : Parameter(checktype=int),
+                 P : Parameter(checktype=int)=None,
+                 N : Parameter(checktype=int)=None,
+                 degree : Parameter(checktype=int)=None,
                  verbose : Toggle("v")=None,
                  quiet : Toggle("q")=None,
                  sizeonly : Toggle("r")=None,
@@ -615,6 +615,7 @@ class Polyselect2l(Program):
                  nq : Parameter(checktype=int)=None,
                  save : Parameter(is_output_file=True)=None,
                  resume : Parameter(is_input_file=True)=None,
+                 rootsieve : Parameter(is_input_file=True)=None,
                  maxtime : Parameter(checktype=float)=None,
                  out : Parameter(is_output_file=True)=None,
                  printdelay : Parameter("s", checktype=int)=None,
