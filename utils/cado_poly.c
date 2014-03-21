@@ -111,11 +111,10 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     }
 
     if (!have_m) {
-        fprintf (stderr, "must provide m for non-linear polynomials\n");
-        exit (EXIT_FAILURE);
+        fprintf (stderr, "Warning: should provide m for non-linear polynomials. Sqrt will fail.\n");
+    } else {
+        cado_poly_check(poly);
     }
-
-    cado_poly_check(poly);
 
     return 1;
 }
