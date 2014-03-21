@@ -19,7 +19,7 @@ string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" PYTHON_VERSION_PATCH 
 
 # List acceptable Python versions. Although 3.4 is not released at this time,
 # presumably will be ok, too
-set(_Python_ACCEPTED 3.4 3.3 3.2)
+set(_Python_ACCEPTED 3.9 3.8 3.7 3.6 3.5 3.4 3.3 3.2)
 
 # Check that the interpreter is one of the accepted versions
 foreach(_TEST_VERSION ${_Python_ACCEPTED})

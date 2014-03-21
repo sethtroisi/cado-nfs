@@ -1358,8 +1358,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.did_import = True
         
         if self.is_done():
-            self.logger.info("Polynomial selection already finished - "
-                             "nothing to do")
+            self.logger.info("Already finished - nothing to do")
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
             if filename is None or not filename.isfile():
@@ -1499,7 +1498,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
     """ Finds a number of size-optimized polynomial, uses client/server """
     @property
     def name(self):
-        return "polyselect"
+        return "polyselect1"
     @property
     def title(self):
         return "Polynomial Selection (size optimized)"
@@ -1517,8 +1516,8 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "adrange": 1000, "admin": 0, "admax": 10000, "import": None,
-            "I": 13, "alim": 100000, "rlim": 100000, "nrkeep": 5})
+            "adrange": int, "admin": 0, "admax": int, "import": None,
+            "I": int, "alim": int, "rlim": int, "nrkeep": 20})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator = mediator, db = db, parameters = parameters,
@@ -1609,8 +1608,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             self.did_import = True
         
         if self.is_done():
-            self.logger.info("Polynomial selection already finished - "
-                             "nothing to do")
+            self.logger.info("Already finished - nothing to do")
             return True
         
         # Submit all the WUs we need to reach admax
@@ -1683,8 +1681,11 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             parsed, added = self.parse_and_add_poly(block, filename)
             totalparsed += parsed
             totaladded += added
-        self.logger.info("Parsed %d polynomials, added %d to priority queue",
-                         totalparsed, totaladded)
+        have = len(self.poly_heap)
+        nrkeep = self.params["nrkeep"]
+        fullmsg = ("%d/%d" % (have, nrkeep)) if have < nrkeep else "%d" % nrkeep
+        self.logger.info("Parsed %d polynomials, added %d to priority queue (has %s)",
+                         totalparsed, totaladded, fullmsg)
         if totaladded:
             self.logger.info("Worst polynomial in queue now has lognorm %f",
                              -self.poly_heap[0][0])
@@ -1781,12 +1782,10 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             return None
         return poly
     
-    def get_poly(self):
-        return None
+    def get_raw_polynomials(self):
+        # Extract polynomials from heap and return as list
+        return [entry[1][1] for entry in self.poly_heap]
     
-    def get_poly_filename(self):
-        return None
-
     def need_more_wus(self):
         return self.state["adnext"] < self.params["admax"]
     
@@ -1809,6 +1808,196 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
                                           **self.progparams[0])
             self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
         self.state.update({"adnext": adend}, commit=True)
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect2l """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
+
+class Polysel2Task(ClientServerTask, patterns.Observer):
+    """ Finds a polynomial, uses client/server """
+    @property
+    def name(self):
+        return "polyselect2"
+    @property
+    def title(self):
+        return "Polynomial Selection (root optimized)"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def progparam_override(self):
+        return [[]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {
+            "import": None, "I": int, "alim": int, "rlim": int})
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator = mediator, db = db, parameters = parameters,
+                         path_prefix = path_prefix)
+        self.bestpoly = None
+        if "bestpoly" in self.state:
+            self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
+        self.did_import = False
+        self.state.setdefault("nr_poly_submitted", 0)
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["alim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        self.poly_to_submit = None
+
+    def run(self):
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        
+        if self.bestpoly is None:
+            self.logger.info("No polynomial was previously found")
+        else:
+            self.logger.info("Best polynomial previously found in %s has "
+                             "Murphy_E = %g",
+                             self.state["bestfile"], self.bestpoly.MurphyE)
+            self.logger.info("No polynomial was previously found")
+        
+        if "import" in self.params and not self.did_import:
+            self.process_polyfile(self.params["import"])
+            if not self.bestpoly is None:
+                self.write_poly_file()
+            self.did_import = True
+        
+        # Get the list of polynomials to submit
+        self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
+        
+        if self.is_done():
+            self.logger.info("Already finished - nothing to do")
+            # If the poly file got lost somehow, write it again
+            filename = self.get_state_filename("polyfilename")
+            if filename is None or not filename.isfile():
+                self.logger.warn("Polynomial file disappeared, writing again")
+                self.write_poly_file()
+            return True
+        
+        # Submit all the WUs we need
+        while self.need_more_wus():
+            self.submit_one_wu()
+        
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
+            self.wait()
+        
+        if self.bestpoly is None:
+            self.logger.error ("No polynomial found. Consider increasing the "
+                               "search range bound admax, or maxnorm")
+            return False
+        self.logger.info("Finished, best polynomial from file %s has Murphy_E "
+                         "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
+        self.write_poly_file()
+        return True
+    
+    def is_done(self):
+        return not self.bestpoly is None and not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
+    
+    def need_more_wus(self):
+        return self.state["nr_poly_submitted"] < len(self.poly_to_submit)
+    
+    def updateObserver(self, message):
+        identifier = self.filter_notification(message)
+        if not identifier:
+            # This notification was not for me
+            return
+        if self.handle_error_result(message):
+            return
+        (filename, ) = message.get_output_files()
+        self.process_polyfile(filename, commit=False)
+        self.parse_stats(filename, commit=False)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
+    
+    def process_polyfile(self, filename, commit=True):
+        poly = self.parse_poly(filename)
+        if not poly is None:
+            self.bestpoly = poly
+            update = {"bestpoly": str(poly), "bestfile": filename}
+            self.state.update(update, commit=commit)
+    
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                yield line
+
+    def parse_poly(self, filename):
+        poly = None
+        try:
+            poly = Polynomials(self.read_log_warning(filename))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        except PolynomialParseException as e:
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+            return None
+        
+        if not poly:
+            self.logger.info('No polynomial found in %s', filename)
+            return None
+        if not poly.MurphyE:
+            self.logger.warn("Polynomial in file %s has no Murphy E value",
+                             filename)
+        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
+            self.logger.info("New best polynomial from file %s:"
+                             " Murphy E = %g" % (filename, poly.MurphyE))
+            self.logger.debug("New best polynomial is:\n%s", poly)
+            return poly
+        else:
+            self.logger.info("Best polynomial from file %s with E=%g is "
+                             "no better than current best with E=%g",
+                             filename, poly.MurphyE, self.bestpoly.MurphyE)
+        return None
+    
+    def write_poly_file(self):
+        filename = self.workdir.make_filename("poly")
+        self.bestpoly.create_file(filename)
+        self.state["polyfilename"] = filename.get_wdir_relative()
+    
+    def get_poly(self):
+        if not "bestpoly" in self.state:
+            return None
+        return Polynomials(self.state["bestpoly"].splitlines())
+    
+    def get_poly_filename(self):
+        return self.get_state_filename("polyfilename")
+
+    def submit_one_wu(self):
+        nr = self.state["nr_poly_submitted"]
+        inputfilename = self.workdir.make_filename("raw_%d" % nr)
+        # Write one raw polynomial to inputfile
+        with inputfilename.open("w") as inputfile:
+            inputfile.write(str(self.poly_to_submit[nr]))
+        outputfile = self.workdir.make_filename("opt_%d" % nr)
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            p = cadoprograms.Polyselect2l(rootsieve=str(inputfilename),
+                                          stdout=str(outputfile),
+                                          **self.progparams[0])
+            self.submit_command(p, "%d" % nr, commit=False)
+        self.state.update({"nr_poly_submitted": nr + 1}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
         """ Return number of seconds of cpu time spent by polyselect2l """
@@ -4082,8 +4271,9 @@ class Notification(Message):
     SUBSCRIBE_WU_NOTIFICATIONS = object()
 
 class Request(Message):
-    # Lacking a proper enum before Python 3.3, we generate dummy objects
+    # Lacking a proper enum before Python 3.4, we generate dummy objects
     # which have separate identity and can be used as dict keys
+    GET_RAW_POLYNOMIALS = object()
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
     GET_FACTORBASE_FILENAME = object()
@@ -4163,15 +4353,20 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 whitelist=whitelist)
 
         parampath = self.parameters.get_param_path()
+        polyselpath = parampath + ['polyselect']
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
         ## tasks that are common to factorization and dlp
-        self.polysel = PolyselTask(mediator = self,
+        self.polysel1 = Polysel1Task(mediator = self,
                                    db = db,
                                    parameters = self.parameters,
-                                   path_prefix = parampath)
+                                   path_prefix = polyselpath)
+        self.polysel2 = Polysel2Task(mediator = self,
+                                   db = db,
+                                   parameters = self.parameters,
+                                   path_prefix = polyselpath)
         self.fb = FactorBaseTask(mediator = self,
                                  db = db,
                                  parameters = self.parameters,
@@ -4245,13 +4440,14 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
         else:
-            self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
+            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.linalg, self.characters, self.sqrt)
         
         self.request_map = {
-            Request.GET_POLYNOMIAL: self.polysel.get_poly,
-            Request.GET_POLYNOMIAL_FILENAME: self.polysel.get_poly_filename,
+            Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
+            Request.GET_POLYNOMIAL: self.polysel2.get_poly,
+            Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,

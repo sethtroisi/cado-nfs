@@ -430,13 +430,25 @@ sorted_insert_double(double *array, const size_t len, const double value)
   return result;
 }
 
+/* return 1 if the polynomial is ok and among the best ones,
+   otherwise return 0 */
 int
-optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
-    const unsigned long d, mpz_t N, double *E)
+optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
+                   const unsigned long d, mpz_t N, double *E)
 {
   unsigned long j;
   double skew;
   mpz_t t;
+
+  /* check that the algebraic polynomial has content 1, otherwise skip it */
+  mpz_init (t);
+  mpz_poly_content (t, F);
+  if (mpz_cmp_ui (t, 1) != 0)
+    {
+      mpz_clear (t);
+      return 0;
+    }
+  mpz_clear (t);
 
   /* optimize size */
   opt_found ++;
@@ -445,26 +457,17 @@ optimize_raw_poly(double *logmu, mpz_poly_t F, mpz_t *g,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
 
-  if (!sorted_insert_double(best_opt_logmu, keep, *logmu))
-    return 0;
+  if (!sorted_insert_double (best_opt_logmu, keep, *logmu))
+    return 0; /* not among the best 'keep' ones */
 
-  if (!raw) {
-    rootsieve_poly(g, d, N, F);
-  } // raw and sopt only ?
+  if (!raw)
+    {
+      rootsieve_poly (g, d, N, F);
+      skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+      *logmu = L2_lognorm (F, skew);
+    }
 
-  /* check that the algebraic polynomial has content 1, otherwise skip it */
-  mpz_init(t);
-  mpz_poly_content (t, F);
-  if (mpz_cmp_ui (t, 1) != 0) {
-    mpz_clear(t);
-    return 0;
-  }
-  mpz_clear(t);
-
-  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-  *logmu = L2_lognorm (F, skew);
-
-  sorted_insert_double(best_logmu, keep, *logmu);
+  sorted_insert_double (best_logmu, keep, *logmu);
   mutex_lock (&lock);
   
   collisions_good ++;
