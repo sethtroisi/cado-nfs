@@ -2977,9 +2977,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
 #ifdef TRACE_K
-            if (trace_on_spot_ab(a, b)) {
-                fprintf(stderr, "# about to start cofactorization for (%" PRId64 ",%" PRIu64 ")  %d %u\n",a,b, x, SS[x]);
-            }
+            if (trace_on_spot_ab(a, b))
+              fprintf (stderr, "# about to start cofactorization for (%"
+                       PRId64 ",%" PRIu64 ")  %zu %u\n", a, b, x, SS[x]);
 #endif
             /* since a,b both even were not sieved, either a or b should
              * be odd. However, exceptionally small norms, even without
