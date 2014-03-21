@@ -177,7 +177,8 @@ test_mpz_poly_roots_mpz (unsigned long iter)
         mpz_set_si (f[n], mrand48 ());
       mpz_urandomb (p, state, 128);
       mpz_nextprime (p, p);
-      ASSERT_ALWAYS (mpz_cmp_ui (f[d], 0) != 0);
+      while (mpz_divisible_p (f[d], p))
+        mpz_set_si (f[d], mrand48 ());
       n = mpz_poly_roots_mpz (r, f, d, p);
       ASSERT_ALWAYS (n <= d);
       while (n-- > 0)

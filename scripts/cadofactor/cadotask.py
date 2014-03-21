@@ -101,7 +101,7 @@ class Polynomials(object):
     keys = OrderedDict(
         (
             ("n", (int, True)),
-            ("m", (int, True)),
+            ("m", (int, False)),
             ("skew", (float, False)),
             ("type", (str, False))
         ))
@@ -176,12 +176,13 @@ class Polynomials(object):
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
         # Test that the roots mod n are correct
-        val_f = polyf.eval(self.params["m"]) % self.params["n"]
-        if val_f != 0:
-            raise PolynomialParseException("Error: m is not a root of f(x) mod n")
-        val_g = polyg.eval(self.params["m"]) % self.params["n"]
-        if val_g != 0:
-            raise PolynomialParseException("Error: m is not a root of g(x) mod n")
+        if "m" is self.params:
+            val_f = polyf.eval(self.params["m"]) % self.params["n"]
+            if val_f != 0:
+                raise PolynomialParseException("Error: m is not a root of f(x) mod n")
+            val_g = polyg.eval(self.params["m"]) % self.params["n"]
+            if val_g != 0:
+                raise PolynomialParseException("Error: m is not a root of g(x) mod n")
         self.polyf = polyf
         self.polyg = polyg
         return
