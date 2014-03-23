@@ -8,7 +8,7 @@ Wrapper version, to be used with
 //
 // Using units in SNFS-DL
 
-NFSUNITS_VERSION:="20140321.1515"; // cleaning + optimizing
+NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -278,8 +278,13 @@ EPN5 := function(Kdata, lipr, bounds, pmax)
 	return l;
 end function;
 
+// OUTPUT: l s.t. l[p] is an element of norm p.
 EnumeratePrimeNorms := function(Kdata, lipr, pmax)
-        tt:=Cputime();		    
+        if Kdata["hK"] gt 1 then
+	    printf "#W# EPN not used when hK > 1 yet\n";
+	    return AssociativeArray();
+	end if;		   
+        tt:=Cputime();
         U:=Kdata["UK"];		    
 	bounds:=FiPoBounds(pmax, Kdata, U["logunits"]);
 	printf "# bounds = %o\n", bounds;
@@ -839,14 +844,15 @@ end if;
 	return bad;
 end function;
 
-GeneratorForBad := function(K, OK, p, id)
+GeneratorForBad := function(Kdata, p, id)
 	lf:=Factorization(id);
-	printf "# lf(%o | %o)=%o\n", id, p, lf;
+//	printf "# p=%o, id=%o => lf=%o\n", p, id, lf;
 	if #lf ne 1 then error("PB??"); end if;
-	ok,gp:=IsPrincipal(lf[1][1]);
-	if not ok then error("Not principal"); end if;
+	lf1h:=lf[1][1]^Kdata["hK"];
+	ok,gp:=IsPrincipal(lf1h);
+	if not ok then error("Not principal in GeneratorForBad"); end if;
 	// lf[1][2] is the ramification index
-	return <K!gp, lf[1][2], Degree(lf[1][1])>;
+	return <Kdata["K"]!gp, lf[1][2], Degree(lf[1][1])>;
 end function;
 
 PrintGenerator := procedure(fo, i, gef)
@@ -934,6 +940,7 @@ end function;
 // algpr contains lines "i p r" for algebraic primes (in hexa).
 // SIDE-EFFECT: fill in file 'generators' with generators.
 // TODO: separate bad primes.
+// Should be obsolete.
 GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 	tp:=Cputime();
 	K:=Kdata["K"];
@@ -968,7 +975,7 @@ GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 	    end if;
 	    if p in badp then
 	        id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
-	    	GEN[i]:=GeneratorForBad(K, OK, p, id);
+	    	GEN[i]:=GeneratorForBad(Kdata, p, id);
 		gp:=GEN[i][1]; // for oldgp to work!
 	    else
 	        done:=false;
@@ -1058,7 +1065,7 @@ GeneratorsForPR := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
 	    if p in badp then
 	        printf "bad: id(<%o, %o>) = %o\n", p, r, id;
-	        GEN[i]:=GeneratorForBad(K, OK, p, id);
+	        GEN[i]:=GeneratorForBad(Kdata, p, id);
 	    else
 		ok:=false;
 		if IsDefined(l, p) then
@@ -1088,14 +1095,17 @@ error("obsolete?");
 //		    printf "found: %o\n", GEN[i][1];
 //		    Exclude(~l[p], GEN[i][1]);
 		else // most probably, lp[p] = NULL
-//		    printf "I need to principalize: %o %o\n", p, ir;
+		    if DLP_DEBUG ge 2 then
+		        printf "I need to principalize: %o %o^%o\n", 
+		    	          p, ir, Kdata["hK"];
+		    end if;
 		    tp:=Cputime();
-		    ok,gp:=IsPrincipal(id);
+		    ok,gp:=IsPrincipal(id^Kdata["hK"]);
 		    tp:=Cputime(tp);
 		    if tp gt 1.0 then
 		        printf "#T# pcp: %o\n", tp;
 		    end if;
-		    if not ok then error("Not principal"); end if;
+		    if not ok then error("Not principal in Gen"); end if;
 		    GEN[i]:=<K!gp, 1, 1>;// FIXME: useless since bad are known?
 		    // trick: add it to lp[]
 		    npcp:=npcp+1;
@@ -1183,9 +1193,12 @@ UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,purged)
 	    a:=StringToInteger(tmp2[1], 16);
 	    b:=StringToInteger(tmp2[2], 16);
 //	    printf "# s = %o\n", s;
-//	    printf "a-b*m=%o\n", Factorization(Integers()!(a-b*m));
-//	    printf "Norm(a-b*t)=%o\n", Factorization(Integers()!Norm(a-b*t));
-//	    printf "lf = %o\n", Factorization((a-b*t)*OK);
+	    if DLP_DEBUG ge 2 then
+	        printf "a:=%o; b:=%o;\n", a, b;
+//	        printf "a-b*m=%o\n", Factorization(Integers()!(a-b*m));
+	    	printf "Norm(a-b*t)=%o\n", Factorization(Integers()!Norm(a-b*t));
+		printf "lf = %o\n", Factorization((a-b*t)*OK);
+	    end if;
 	    tmp2:=Split(tmp[2], ",");
 	    // among these, we have rational or algebraic primes
 	    li:=[];
@@ -1225,7 +1238,7 @@ UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,purged)
 		    prod:=prod * BAD[i][1]^(exi div BAD[i][3]);
 		end if;
 	    end for;
-	    eta:=(a-b*t)/prod;
+	    eta:=((a-b*t)^Kdata["hK"])/prod;
 	    if DLP_DEBUG ge 2 then
 	        printf "eta=%o => Norm=%o\n", eta, Norm(eta);
 	    end if;

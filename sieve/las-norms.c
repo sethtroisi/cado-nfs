@@ -934,11 +934,10 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
   double_poly_t deriv;
   const int d = poly->deg;
 
-  if (d < 0) {
-    return 0;
-  } else if (d == 0) {
-    return poly->coeff[0];
-  }
+  ASSERT_ALWAYS(d >= 0);
+
+  if (d == 0)
+    return fabs (poly->coeff[0]);
 
   double *roots = (double*) malloc (poly->deg * sizeof (double));
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
@@ -992,16 +991,12 @@ double
 get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
 {
   const unsigned int d = src_poly->deg;
-  const int debug = 0;
   double norm, max_norm;
 
   /* Make copy of polynomial as we need to revert the coefficients */
   double_poly_t poly;
   double_poly_init (poly, d);
   double_poly_set (poly, src_poly);
-
-  if (debug)
-    double_poly_print(stdout, poly, "# Computing max norm for polynomial ");
 
   /* (b) determine the maximum of |f(x)| * Y^d for -X/Y <= x <= X/Y */
   max_norm = get_maxnorm_aux_pm (poly, X/Y) * pow(Y, (double)d);
@@ -1013,9 +1008,6 @@ get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y)
     max_norm = norm;
 
   double_poly_clear(poly);
-
-  if (debug)
-    fprintf(stdout, "# Max norm is %f\n", max_norm);
 
   return max_norm;
 }
@@ -1067,7 +1059,6 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  const int verbose = 0;
   const double fudge_factor = 16.; /* How much bigger a norm than optimal
                                       we're willing to tolerate */
   const double I = (double) (si->I);
@@ -1091,23 +1082,14 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double_poly_clear (dpoly);
       if (side == si->doing->side)
         maxnorm /= q;
-      if (verbose) {
-        printf ("Best possible maxnorm for side %d: %g\n", side, maxnorm);
-      }
 
       maxnorm *= fudge_factor;
-      if (verbose) {
-        printf ("Threshold for acceptable norm for side %d: %g\n", side, maxnorm);
-      }
 
       double_poly_t F;
       F->deg = ps->deg;
       F->coeff = s->fijd;
       
       double v = get_maxnorm_alg (F, I, Jmax);
-      if (verbose) {
-        printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)Jmax, v);
-      }
       
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
@@ -1118,24 +1100,15 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
             {
               c = (a + b) * 0.5;
               v = get_maxnorm_alg (F, I, c);
-              if (verbose) {
-                printf ("Actual maxnorm for side %d with J=%d: %g\n", side, (int)c, v);
-              }
               if (v < maxnorm)
                 a = c;
               else
                 b = c;
             }
           Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
-          if (verbose) {
-            printf ("Setting Jmax=%d\n", (int)Jmax);
-          }
         }
     }
 
-   if (verbose) {
-     printf ("Final maxnorm J=%d\n", (int)Jmax);
-   }
   return (unsigned int) Jmax;
 }
 
@@ -1214,9 +1187,8 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   fprintf (output, " bound=%u\n", rat->bound);
   double max_rlambda = (maxlog2 - GUARD / rat->scale) /
       si->conf->sides[RATIONAL_SIDE]->lpb;
-  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda) {
-      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
-  }
+  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda)
+    fprintf (output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
 
   /************************** algebraic side *********************************/
 
@@ -1249,10 +1221,8 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   fprintf (output, " bound=%u\n", alg->bound);
   double max_alambda = (maxlog2 - GUARD / alg->scale) /
       si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda) {
-      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
-  }
-
+  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda)
+    fprintf (output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
 
   /* improve bound on J if possible */
   unsigned int Jmax;
