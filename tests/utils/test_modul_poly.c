@@ -117,7 +117,16 @@ test_modul_poly_roots_ulong (unsigned long iter)
       modul_poly_init (fp, d);
       modul_poly_set_mod (fp, f, d, p);
       if (n > 0 && d > 1)
-        ASSERT_ALWAYS(modul_poly_is_irreducible (fp, p) == 0);
+        {
+          if (modul_poly_is_irreducible (fp, p))
+            {
+              for (i = 0; i <= d; i++)
+                gmp_printf ("f[%d]=%Zd\n", i, f[i]);
+              printf ("p=%lu\n", p[0]);
+              fflush (stdout);
+            }
+          ASSERT_ALWAYS(modul_poly_is_irreducible (fp, p) == 0);
+        }
       /* if n=0, f might be irreducible or not mod p (product of two
          degree-2 factors for example),
          if d=1, f is irreducible */
