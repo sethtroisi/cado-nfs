@@ -9,6 +9,7 @@ Wrapper version, to be used with
 // Using units in SNFS-DL
 
 NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
+NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -129,65 +130,73 @@ FiPoBounds := function(B, Kdata, logunits)
 	end if;
 end function;
 
-// rK = 1 for (deg, r1, r2) = (4, 0, 2)
-Minimize1 := function(x, lx, U)
-	units:=U["units"];
-	lunits:=U["logunits"];
-	a1min:=&+ [ lx[i] * lunits[1][i] : i in [1..#lx] ];
-	a1min:=a1min / (&+ [ lunits[1][i]^2 : i in [1..#lx] ])^2;
-//	printf "a1min = %o\n", a1min;
-	a1min:=Round(a1min);
-        return x/units[1]^a1min;
-end function;
-
-// rK = 2 for (deg, r1, r2) = (3, 3, 0)
-Minimize2 := function(x, lx, U)
-	units:=U["units"];
-	lunits:=U["logunits"];
-	min:=10^30;
-	for a1:=-3 to 3 do
-	    tmp1:=[lx[i]-a1*lunits[1][i] : i in [1..#lx]];
-	    for a2:=-3 to 3 do
-	        tmp:=&+ [(tmp1[i]-a2*lunits[2][i])^2 : i in [1..#lx]];
-		if tmp le min then
-//		    printf "a1=%o a2=%o tmp=%o\n", a1, a2, tmp;
-		    min:=tmp;
-		    a1min:=a1; a2min:=a2;
-		end if;
+// Use LLL?
+MinimizeTry := function(Kdata, x, lx)
+	rK:=Kdata["rK"];
+	U:=Kdata["UK"];
+	n:=Degree(Kdata["K"]);
+	M:=KMatrixSpace(R20, n, rK+1)!0;
+	for i:=1 to n do M[i, 1]:=lx[i]; end for;
+	for j:=1 to rK do
+	    for i:=1 to n do
+	        M[i, j+1]:=U["logunits"][j][i];
 	    end for;
 	end for;
-	u:=units[1]^a1min*units[2]^a2min;
-        return x/u;
-end function;
-
-// rK = 3 for (deg, r1, r2) = (4, 4, 0)
-Minimize3 := function(x, lx, U)
-        units:=U["units"];
-        lunits:=U["logunits"];
-	min:=10^30;
-	for a1:=-3 to 3 do
-	  for a2:=-3 to 3 do
-	    for a3:=-3 to 3 do
-	        tmp:=&+ [(lx[i]-a1*lunits[1][i]-a2*lunits[2][i]-a3*lunits[3][i])^2 : i in [1..#lx]];
-		if tmp le min then
-//		    printf "a1=%o a2=%o tmp=%o\n", a1, a2, tmp;
-		    min:=tmp;
-		    a1min:=a1; a2min:=a2; a3min:=a3;
-		end if;
-	    end for;
-	  end for;
-	end for;
-	u:=units[1]^a1min*units[2]^a2min*units[3]^a3min;
-        return x/u;
-end function;
-
-Minimize := function(Kdata, U, x)
-	lx:=AllEmbeddings(Kdata, Kdata["K"]!x);
-	if U["rK"] eq 1 then return Minimize1(x,lx,U);
-	elif U["rK"] eq 2 then return Minimize2(x,lx,U);
-	elif U["rK"] eq 3 then return Minimize2(x,lx,U);
-	else return x;
+//	print M;
+	Mred,T,rg:=LLL(M);
+	// Mred = T * M, T unimodular
+	// col 1 of T is [t11 t21 ... tr1]
+	// x^t11*eps1^t21*...*epsr^tr1
+	printf "T=\n%o\n", T;
+	xx:=&* [U["units"][i]^T[1, i+1] : i in [1..rK]];
+	if T[1, 1] eq 1 then
+	    xx:=x*xx;
+	elif T[1, 1] eq -1 then
+	    xx:=xx/x;
+	else error("Not possible");
 	end if;
+	printf "xx=%o\n", xx;
+end function;
+
+// Any rK.
+Minimize := function(Kdata, x)
+	lx:=AllEmbeddings(Kdata, Kdata["K"]!x);
+	U:=Kdata["UK"];
+	rK:=Kdata["rK"];
+	n:=Degree(Kdata["K"]);
+	units:=U["units"];
+	y:=U["logunits"];
+	Rr<[a]>:=PolynomialRing(R20, rK);
+	f:=&+ [ (lx[i]- (&+ [a[j]*y[j, i] : j in [1..rK]]))^2 : i in [1..n]];
+	df:=[Derivative(f, i) : i in [1..rK]];
+//	printf "f:=%o;\n", f;
+//	printf "df = %o\n", df;
+	M:=KMatrixSpace(R20, rK, rK)!0;
+	for i:=1 to rK do
+	    for j:=1 to rK do
+	        M[i, j]:=Coefficient(df[i], a[j], 1);
+	    end for;
+	end for;
+//	print M;
+	invM:=M^(-1);
+	c:=[];
+	for i:=1 to rK do
+	    tmp:=df[i];
+	    for j:=1 to rK do
+	        tmp:=Coefficient(tmp, a[j], 0);
+	    end for;
+	    c[i]:=R20!tmp;
+	end for;
+	amin:=[- (&+ [ invM[i, j] * c[j] : j in [1..rK]]) : i in [1..rK]];
+//	printf "amin:=%o;\n", amin;
+//	printf "f(min)=%o\n", Evaluate(f, amin);
+//	printf "f(min)=%o\n", Evaluate(f, [Round(a1min), Round(a2min)]);
+//	printf "f(min)=%o\n", Evaluate(f, [Truncate(a1min), Truncate(a2min)]);
+//	error("DD");
+	amin:=[Round(amin[i]) : i in [1..rK]];
+//	printf "amin = %o\n", amin;
+	u:=&* [ units[i]^amin[i] : i in [1..rK] ];
+        return x/u;
 end function;
 
 // If K is Galois, only one generator has to be stored and the other
@@ -197,7 +206,7 @@ InsertInBox := procedure(~l, Kdata, elt, lipr, pmax)
 	if IsDefined(lipr, no) then // meaning no is prime...!
 //	    printf "elt=%o no=%o\n", elt, no;
 	    if not IsDefined(l, no) then
-	        l[no]:=[elt];
+	        l[no]:=[elt^Kdata["hK"]]; // what a trick!
 	    // terrific hack: store one elt per norm in the Galois case!!!!
 	    elif (not IsDefined(Kdata, "Galois"))
 	    	 and (#l[no] lt Degree(Kdata["K"])) then
@@ -280,10 +289,6 @@ end function;
 
 // OUTPUT: l s.t. l[p] is an element of norm p.
 EnumeratePrimeNorms := function(Kdata, lipr, pmax)
-        if Kdata["hK"] gt 1 then
-	    printf "#W# EPN not used when hK > 1 yet\n";
-	    return AssociativeArray();
-	end if;		   
         tt:=Cputime();
         U:=Kdata["UK"];		    
 	bounds:=FiPoBounds(pmax, Kdata, U["logunits"]);
@@ -293,6 +298,7 @@ EnumeratePrimeNorms := function(Kdata, lipr, pmax)
         elif degK eq 4 then l:=EPN4(Kdata, lipr, bounds, pmax);
         elif degK eq 5 then l:=EPN5(Kdata, lipr, bounds, pmax);
 	end if;
+	printf "# Card(l)=%o\n", #Keys(l);
 if false then
 	for no in Keys(l) do
 	    if #l[no] lt degK then
@@ -303,7 +309,7 @@ end if;
 	printf "# entering minimization of generators\n";
 	tp:=Cputime();
 	for no in Keys(l) do
-	    l[no]:=[Minimize(Kdata, U, x) : x in l[no]];
+	    l[no]:=[Minimize(Kdata, x) : x in l[no]];
 	end for;
 	printf "#T# minimizing generators: %o\n", Cputime(tp);
 	printf "#T# enumerating prime norms: %o\n", Cputime(tt);
@@ -987,7 +993,7 @@ GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 		    ok,gp:=IsPrincipal(id);
 	    	    if not ok then error("Not principal"); end if;
 		end if;
-	        GEN[i]:=<Minimize(Kdata, U, K!gp), 1, 1>;
+	        GEN[i]:=<Minimize(Kdata, K!gp), 1, 1>;
 	    end if;
 	    if DLP_DEBUG ge 2 then
 	        printf "(p, r)=(%o, %o), gen=%o, norm(gen)=%o\n", 
@@ -1075,13 +1081,13 @@ GeneratorsForPR := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 		    if ok then
 //		        printf "FG(%o, %o) -> %o (%o)\n", p, r, gp, Norm(gp);
 //		    	assert(gp in id);
-			GEN[i]:=<Minimize(Kdata, U, K!gp), 1, 1>;
+			GEN[i]:=<Minimize(Kdata, K!gp), 1, 1>;
 		    else // obsolete or cautious?
 error("obsolete?");
 		      for elt in l[p] do
 		        if elt in id then
 			    ok:=true;
-			    GEN[i]:=<Minimize(Kdata, U, K!elt), 1, 1>;
+			    GEN[i]:=<Minimize(Kdata, K!elt), 1, 1>;
 			    break;
 			end if;
 		      end for;
