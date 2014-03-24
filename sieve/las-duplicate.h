@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-int relation_is_duplicate(relation_t *, int, sieve_info_srcptr);
+int relation_is_duplicate(FILE *, relation_t *, int, sieve_info_srcptr);
 
 /* FIXME: These function are defined in las.c. The prototypes should not be 
    here. The functions should be moved to an appropriate file 

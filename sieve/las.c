@@ -3119,7 +3119,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             {
                 int do_check = th->las->suppress_duplicates;
-                int is_dup = do_check && relation_is_duplicate(rel, las->nb_threads, si);
+                int is_dup = do_check && relation_is_duplicate(las->output, rel,
+                        las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
