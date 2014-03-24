@@ -288,18 +288,18 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     goto clear_and_exit;
   }
 
-  /* Check that log_logbase(cofactor) <= lambda * log_logbase(fb_bound).
+  /* Check that log_logbase(cofactor) <= lambda * log_logbase(lp_bound).
      We can cancel logbase.
      FIXME: What we should check here is that the estimate of the log norm,
      minus the rounded norms of all the sieved primes is below the sieve
      report threshold.  */
   for (int side = 0; side < 2; side++) {
-    const double log_fbb = log((double)old_si->conf->sides[side]->lim);
+    const double log_lpb = (double)old_si->conf->sides[side]->lpb * log(2);
     const double lambda = old_si->conf->sides[side]->lambda;
     const double log_cof = log(mpz_get_d(cof[side]));
-    if (log_cof > lambda * log_fbb) {
+    if (log_cof > lambda * log_lpb) {
       gmp_fprintf(output, "# DUPECHECK log of cofactor %Zd is above sieve report threshold on side %d: %f > %f * %f\n",
-                 cof, side, log_cof, lambda, log_fbb);
+                 cof, side, log_cof, lambda, log_lpb);
       is_dupe = 0;
       goto clear_and_exit;
     }
