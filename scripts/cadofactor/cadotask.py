@@ -1711,7 +1711,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         if poly is None:
             return (0, 0)
         if not poly.lognorm:
-            self.logger.warn("Polynomial in file %s has no lognorm",
+            self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
                              filename)
             return (0, 0)
         key = self._add_poly_heap(poly)
@@ -1857,7 +1857,6 @@ class Polysel2Task(ClientServerTask, patterns.Observer):
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
-            self.logger.info("No polynomial was previously found")
         
         if "import" in self.params and not self.did_import:
             self.process_polyfile(self.params["import"])
@@ -4435,7 +4434,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         # Defines an order on tasks in which tasks that want to run should be
         # run
         if self.params["dlp"]:
-            self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
+            self.tasks = (self.polysel, self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
