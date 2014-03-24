@@ -4434,7 +4434,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         # Defines an order on tasks in which tasks that want to run should be
         # run
         if self.params["dlp"]:
-            self.tasks = (self.polysel, self.nmbrthry, self.fb,
+            self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
