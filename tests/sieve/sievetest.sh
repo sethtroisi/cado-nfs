@@ -7,7 +7,7 @@ function run {
 }
 
 # Input files. First parameter is the polynomial file to use, second is root of the build directory, third is the expected SHA1 value
-MAKEFB="$1"
+FB="$1"
 LAS="$2"
 POLY="$3"
 REFERENCE_SHA1="$4"
@@ -15,15 +15,15 @@ REFERENCE_REVISION="$5"
 CHECKSUM_FILE="$6"
 shift 6
 
-if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
+if [[ -z "${FB}" || ! -f "${FB}" ]]
 then
-  echo "Makefb binary ${MAKEFB} is not a executable file" >&2
+  echo "Factor base ${FB} is not a file" >&2
   exit 1
 fi
 
 if [[ -z "${LAS}" || ! -x "${LAS}" ]]
 then
-  echo "Las binary ${LAS} is not a executable file" >&2
+  echo "Las binary ${LAS} is not an executable file" >&2
   exit 1
 fi
 
@@ -49,7 +49,6 @@ BASENAME="${BASENAME%%.*}"
 TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXXXX`
 # Make temp direcotry world-readable for easier debugging
 chmod a+rx "${TMPDIR}"
-FB="${TMPDIR}/${BASENAME}.roots"
 RELS="${TMPDIR}/${BASENAME}.rels"
 FBC="${TMPDIR}/${BASENAME}.fbc"
 
@@ -61,7 +60,6 @@ if [ -n "$rho" ]
 then
   end=("-rho" "$rho")
 fi
-run "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 # first exercise the -fbc command-line option to create a cache file
 run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 # then use the cache file created above
@@ -114,7 +112,7 @@ fi
 
 if [ -z "$KEEP_SIEVETEST" ]
 then
-  rm -f "${FB}" "${RELS}" "${FBC}"
+  rm -f "${RELS}" "${FBC}"
   if [ -n "${MYCHECKSUM_FILE}" ]
   then
     rm -f "${MYCHECKSUM_FILE}"
