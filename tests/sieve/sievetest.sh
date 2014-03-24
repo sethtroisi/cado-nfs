@@ -42,6 +42,12 @@ then
   exit 1
 fi
 
+if [ "$1" = "-regex" ]
+then
+  REGEX="$2"
+  shift 2
+fi
+
 BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
 
@@ -107,6 +113,16 @@ then
     # File with checksums does not exists, create it
     cp "${MYCHECKSUM_FILE}" "${CHECKSUM_FILE}"
     echo "Created checksum file"
+  fi
+fi
+
+if [ -n "${REGEX}" ]
+then
+  echo "Searching for regex \"${REGEX}\"" >&2
+  if ! grep "${REGEX}" "${RELS}" >&2
+  then
+    echo "Error, regular expression \"${REGEX}\" does not match output file"
+    exit 1
   fi
 fi
 
