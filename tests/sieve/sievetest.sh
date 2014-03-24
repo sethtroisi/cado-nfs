@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Print and run a command
+function run {
+  echo "Running: $*"
+  "$@"
+}
+
 # Input files. First parameter is the polynomial file to use, second is root of the build directory, third is the expected SHA1 value
 MAKEFB="$1"
 LAS="$2"
@@ -55,14 +61,11 @@ if [ -n "$rho" ]
 then
   end=("-rho" "$rho")
 fi
-echo "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}"
-"$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
+run "$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 # first exercise the -fbc command-line option to create a cache file
-echo "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@"
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 # then use the cache file created above
-echo "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@"
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 
 
 SHA1BIN=sha1sum
