@@ -35,6 +35,10 @@ SET_TESTS_PROPERTIES(F9_mbucket_test PROPERTIES DEPENDS F9_sievetest)
 # relations or checksums
 add_test(F9_tracektest bash -c "\"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_tracek_path}\" \"${CADO_NFS_SOURCE_DIR}\" -traceab -8517,584707")
 
+# Try a too-large lambda value
+add_test(F9_rlambdatest bash -c "rlambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"rlambda>.* does not make sense\"")
+add_test(F9_alambdatest bash -c "alambda=5 \"${CMAKE_CURRENT_SOURCE_DIR}/F9.tracektest.sh\" \"${F9_roots}\" \"${las_path}\" \"${CADO_NFS_SOURCE_DIR}\" -regex \"alambda>.* does not make sense\"")
+
 # Try with default TRIALDIV_MAXLEN, whatever it may be
 add_executable(test_trialdiv test_trialdiv.c "${CADO_NFS_SOURCE_DIR}/sieve/trialdiv.c")
 target_link_libraries(test_trialdiv utils tests)
