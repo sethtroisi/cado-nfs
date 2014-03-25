@@ -88,6 +88,7 @@ void mpz_poly_div_2_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_t m);
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x);
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m);
+int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_t root, mpz_t modulus);
 void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m, const mpz_t mx);
 void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * res, mpz_poly_srcptr * f, int k, const mpz_t x,

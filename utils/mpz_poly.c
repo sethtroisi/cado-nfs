@@ -801,6 +801,17 @@ void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
     mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
 }
 
+/* Return 1 if poly(root) % modulus == 0, return 0 otherwise */
+int mpz_poly_is_root(const mpz_poly_t poly, mpz_t root, mpz_t modulus)
+{
+    mpz_t x;
+    mpz_init(x);
+    mpz_poly_eval_mod_mpz(x, poly, root, modulus);
+    int is_root = (mpz_cmp_ui(x, 0) == 0);
+    mpz_clear(x);
+    return is_root;
+}
+
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
 void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m, const mpz_t mx) {
