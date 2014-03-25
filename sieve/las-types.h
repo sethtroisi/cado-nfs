@@ -37,8 +37,12 @@ struct siever_config_s {
     int side;
     int logI;
     double skewness;
+    unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned int td_thresh;
+    unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
+        unsigned long powlim; /* bound on powers in the factor base */
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
         double lambda;     /* lambda sieve parameter */
@@ -181,9 +185,6 @@ struct sieve_info_s {
     int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
-    unsigned int td_thresh;
-    unsigned int unsieve_thresh;
-    int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     uint32_t nb_buckets;
 
     sieve_side_info sides[2];

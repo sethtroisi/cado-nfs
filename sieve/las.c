@@ -148,9 +148,9 @@ static void sieve_info_init_trialdiv(sieve_info_ptr si, int side)/*{{{*/
      * called, so that the only primes which are still in s->fb are the
      * trial-divided ones */
     sieve_side_info_ptr s = si->sides[side];
-    unsigned long pmax = MIN((unsigned long) si->bucket_thresh,
+    unsigned long pmax = MIN((unsigned long) si->conf->bucket_thresh,
                              trialdiv_get_max_p());
-    s->trialdiv_primes = fb_extract_bycost (s->fb, pmax, si->td_thresh);
+    s->trialdiv_primes = fb_extract_bycost (s->fb, pmax, si->conf->td_thresh);
     int n;
     for (n = 0; s->trialdiv_primes[n] != FB_END; n++);
     int skip2 = n > 0 && s->trialdiv_primes[0] == 2;
@@ -168,10 +168,6 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si, int side)/*{{{*/
 void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_list pl)
 {
     double tfb;
-    /* TODO should these go into siever_config or not ? */
-    int pow_lim[2] = {0,0};
-    param_list_parse_int(pl, "powlim0", &pow_lim[RATIONAL_SIDE]);
-    param_list_parse_int(pl, "powlim1", &pow_lim[ALGEBRAIC_SIDE]);
     const char * fbcfilename = param_list_lookup_string(pl, "fbc");
 
     if (fbcfilename != NULL) {
@@ -196,18 +192,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         mpz_poly_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
         unsigned long lim = si->conf->sides[side]->lim;
-        /* If [ar]powlim is not given, or if it is too large, set it to its
-         * maximum allowed value */
-        if (pow_lim[side] >= si->bucket_thresh) {
-            pow_lim[side] = si->bucket_thresh - 1;
-            fprintf (las->output, "# pow_lim on side %s reduced to %d\n",
-                    sidenames[side], pow_lim[side]);
-        }
-        if (pow_lim[side] == 0) {
-            pow_lim[side] = si->bucket_thresh - 1;
-            fprintf (las->output, "# Using default value of %d for pow_lim on %s side\n",
-                     pow_lim[side], sidenames[side]);
-        }
         if (pol->deg > 1) {
             tfb = seconds ();
             char fbparamname[4];
@@ -215,8 +199,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
-                              si->bucket_thresh, las->nb_threads, las->verbose,
-                              lim, pow_lim[side], las->output);
+                              si->conf->bucket_thresh, las->nb_threads, las->verbose,
+                              lim, si->conf->sides[side]->powlim, las->output);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             sis->fb_is_mmapped = 0;
@@ -229,8 +213,8 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             tfb = seconds ();
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->coeff, (fbprime_t) lim,
-                                     si->bucket_thresh, las->nb_threads,
-                                     pow_lim[side], las->verbose, 1, las->output);
+                                     si->conf->bucket_thresh, las->nb_threads,
+                                     si->conf->sides[side]->powlim, las->verbose, 1, las->output);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
@@ -296,8 +280,8 @@ void reorder_fb(sieve_info_ptr si, int side)
     fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
     fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
 
-    fbprime_t plim = si->bucket_thresh;
-    fbprime_t costlim = si->td_thresh;
+    fbprime_t plim = si->conf->bucket_thresh;
+    fbprime_t costlim = si->conf->td_thresh;
 
 #define PUSH_LIST(x) do {						\
             memcpy(fb_## x, fb, fb_entrysize(fb));			\
@@ -423,18 +407,6 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     ASSERT_ALWAYS(sc->logI > 0);
     si->I = 1 << sc->logI;
     si->J = 1 << (sc->logI - 1);
-
-    si->bucket_thresh = si->I;	/* default value */
-    /* overrides default only if parameter is given */
-    param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
-
-    si->td_thresh = 1024;	/* default value */
-    param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
-    si->unsieve_thresh = 100;
-    if (param_list_parse_uint(pl, "unsievethresh", &(si->unsieve_thresh))) {
-        fprintf(las->output, "# Un-sieving primes > %u\n",
-                si->unsieve_thresh);
-    }
 
     /* Initialize the number of buckets */
 
@@ -901,6 +873,33 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
         exit(EXIT_FAILURE);
+    }
+
+    /* Parse optional siever configuration parameters */
+    sc->td_thresh = 1024;	/* default value */
+    param_list_parse_uint(pl, "tdthresh", &(sc->td_thresh));
+
+    sc->unsieve_thresh = 100;
+    if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
+        fprintf(las->output, "# Un-sieving primes > %u\n",
+                sc->unsieve_thresh);
+    }
+
+    sc->bucket_thresh = 1 << sc->logI;	/* default value */
+    /* overrides default only if parameter is given */
+    param_list_parse_ulong(pl, "bkthresh", &(sc->bucket_thresh));
+
+    const char *powlim_params[2] = {"powlim0", "powlim1"};
+    for (int side = 0; side < 2; side++) {
+        if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
+            sc->sides[side]->powlim = sc->bucket_thresh - 1;
+            fprintf (las->output, "# Using default value of %lu for -%s\n",
+                     sc->sides[side]->powlim, powlim_params[side]);
+        } else if (sc->sides[side]->powlim >= sc->bucket_thresh) {
+            sc->sides[side]->powlim = sc->bucket_thresh - 1;
+            fprintf (las->output, "# -%s reduced to %lu\n",
+                    powlim_params[side], sc->sides[side]->powlim);
+        }
     }
 
     /* }}} */
@@ -2880,7 +2879,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         };
         surv += search_survivors_in_line(both_S, both_bounds,
                                          si->conf->logI, j + first_j, N,
-                                         si->j_div, si->unsieve_thresh,
+                                         si->j_div, si->conf->unsieve_thresh,
                                          si->us);
         /* Make survivor search create a list of x-coordinates that survived
            instead of changing sieve array? More localized accesses in
