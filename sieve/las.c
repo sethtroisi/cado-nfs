@@ -196,22 +196,23 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         mpz_poly_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
         unsigned long lim = si->conf->sides[side]->lim;
+        /* If [ar]powlim is not given, or if it is too large, set it to its
+         * maximum allowed value */
+        if (pow_lim[side] >= si->bucket_thresh) {
+            pow_lim[side] = si->bucket_thresh - 1;
+            fprintf (las->output, "# pow_lim on side %s reduced to %d\n",
+                    sidenames[side], pow_lim[side]);
+        }
+        if (pow_lim[side] == 0) {
+            pow_lim[side] = si->bucket_thresh - 1;
+            fprintf (las->output, "# Using default value of %d for pow_lim on %s side\n",
+                     pow_lim[side], sidenames[side]);
+        }
         if (pol->deg > 1) {
             tfb = seconds ();
             char fbparamname[4];
             sprintf(fbparamname, "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
-            /* If apowlim is not given, or if it is too large, set it to
-             * its maximum allowed value */
-            if (pow_lim[side] >= si->bucket_thresh) {
-                pow_lim[side] = si->bucket_thresh - 1;
-                fprintf (las->output, "# pow_lim on side %s reduced to %d\n",
-                        sidenames[side], pow_lim[side]);
-            }
-            if (pow_lim[side] == 0) {
-                pow_lim[side] = si->bucket_thresh - 1;
-                fprintf (las->output, "# Using default value of %d for pow_lim on side %s\n", pow_lim[side], sidenames[side]);
-            }
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->bucket_thresh, las->nb_threads, las->verbose,
@@ -226,16 +227,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     fb_size (sis->fb) >> 20, tfb);
         } else {
             tfb = seconds ();
-            if (pow_lim[side] >= si->bucket_thresh)
-              {
-                pow_lim[side] = si->bucket_thresh - 1;
-                printf ("# pow_lim reduced to %d on side %s\n",
-                        pow_lim[side], sidenames[side]);
-              }
-            if (pow_lim[side] == 0) {
-                pow_lim[side] = si->bucket_thresh - 1;
-                fprintf (las->output, "# Using default value of %d for pow_lim on side %s\n", pow_lim[side], sidenames[side]);
-            }
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->coeff, (fbprime_t) lim,
                                      si->bucket_thresh, las->nb_threads,
@@ -829,6 +820,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las_display_config_flags(las->output);
 
     las->verbose = param_list_parse_switch(pl, "-v");
+    las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->nb_threads = 1;		/* default value */
     param_list_parse_int(pl, "mt", &las->nb_threads);
     if (las->nb_threads <= 0) {
@@ -935,8 +927,6 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Allocate room for only one sieve_info */
     las->sievers = malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
-
-    las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
 }/*}}}*/
 
 void las_info_clear(las_info_ptr las)/*{{{*/
