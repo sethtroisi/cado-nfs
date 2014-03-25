@@ -500,15 +500,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
  * the todo list is pruned */
 void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
 {
-    mpz_poly_t f;
-    mpz_poly_init(f, si->cpoly->pols[(*todo)->side]->deg);
-    mpz_poly_set(f,  si->cpoly->pols[(*todo)->side]->coeff, si->cpoly->pols[(*todo)->side]->deg);
-    mpz_t x;
-    mpz_init(x);
-    mpz_poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
-    ASSERT_ALWAYS(mpz_cmp_ui(x, 0) == 0);
-    mpz_clear(x);
-    mpz_poly_clear(f);
+    ASSERT_ALWAYS(mpz_poly_is_root(si->cpoly->pols[(*todo)->side], (*todo)->r, (*todo)->p));
     mpz_clear(si->doing->p);
     mpz_clear(si->doing->r);
     memcpy(si->doing, *todo, sizeof(las_todo));
