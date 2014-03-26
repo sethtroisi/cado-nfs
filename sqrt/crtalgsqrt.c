@@ -3546,7 +3546,7 @@ int main(int argc, char **argv)
     glob.n = glob.pol->alg->deg;
     ASSERT_ALWAYS(ret == 1);
     mpz_init(glob.root_m);
-    cado_poly_getm(glob.root_m, glob.pol);
+    cado_poly_getm(glob.root_m, glob.pol, glob.pol->n);
 
     /* {{{ create f_hat, the minimal polynomial of alpha_hat = lc(f) *
      * alpha */

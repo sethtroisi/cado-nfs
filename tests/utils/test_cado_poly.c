@@ -34,7 +34,7 @@ test_cado_poly_set ()
   ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[2], 429156742) == 0);
   mpz_t m;
   mpz_init(m);
-  cado_poly_getm(m, p);
+  cado_poly_getm(m, p, p->n);
   ASSERT_ALWAYS (mpz_cmp_ui (m, 123128869) == 0);
   mpz_clear(m);
   cado_poly_clear (p);

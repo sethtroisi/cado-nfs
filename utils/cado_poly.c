@@ -110,7 +110,7 @@ int cado_poly_read(cado_poly poly, const char *filename)
 }
 
 
-int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly)
+int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
 {
     // have to work with copies, because pseudo_gcd destroys its input
     mpz_poly_t f[2];
@@ -119,12 +119,12 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly)
         mpz_poly_copy(f[i], cpoly->pols[i]);
     }
     int ret;
-    ret = mpz_poly_pseudogcd_mpz(f[0], f[1], cpoly->n, m); 
+    ret = mpz_poly_pseudogcd_mpz(f[0], f[1], N, m); 
     if (ret) {
         ASSERT_ALWAYS(f[0]->deg == 1);
         mpz_t inv;
         mpz_init(inv);
-        int ret2 = mpz_invert(inv, f[0]->coeff[1], cpoly->n);
+        int ret2 = mpz_invert(inv, f[0]->coeff[1], N);
         // This inversion should always work.
         // If not, it means that N has a small factor (not sure we want
         // to be robust against that...)
@@ -132,7 +132,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly)
         ASSERT_ALWAYS(ret2);
         mpz_mul(inv, inv, f[0]->coeff[0]);
         mpz_neg(inv, inv);
-        mpz_mod(m, inv, cpoly->n);
+        mpz_mod(m, inv, N);
         mpz_clear(inv);
     }
     for (int i = 0; i < 2; ++i)

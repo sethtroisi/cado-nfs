@@ -45,11 +45,13 @@ extern void cado_poly_init (cado_poly_ptr);
 extern void cado_poly_clear (cado_poly_ptr);
 
 // Compute m as the common root of f and g mod N.
+// N is taken as a third argument; it can be a strict factor of the N
+// stored in the polynomial.
 // If this fails, then in most of the cases we have found a factor of N
 // that is given instead of m.
 // The return value tells whether it worked (and then m is the common
 // root) or it failed (and then m is a factor of N).
-extern int cado_poly_getm(mpz_ptr, cado_poly_ptr);
+extern int cado_poly_getm(mpz_ptr, cado_poly_ptr, mpz_ptr);
 
 #ifdef __cplusplus
 }
