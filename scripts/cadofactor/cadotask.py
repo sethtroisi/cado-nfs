@@ -1746,6 +1746,8 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         
         If the heap is full (nrkeep), the worst polynomial (i.e., with the
         largest lognorm) is replaced if the new one is better.
+        Returns the key (as a str) under which the polynomial was added,
+        or None if it was not added.
         """
         assert len(self.poly_heap) <= self.params["nrkeep"]
         debug = False
@@ -1930,6 +1932,7 @@ class Polysel2Task(ClientServerTask, patterns.Observer):
         self.parse_stats(filename, commit=False)
         # Always mark ok to avoid warning messages about WUs that did not
         # find a poly
+        # FIXME: wrong, we should always get an optimized poly for a raw one
         self.verification(message.get_wu_id(), True, commit=True)
     
     def process_polyfile(self, filename, commit=True):
