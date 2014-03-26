@@ -90,10 +90,10 @@ class Polynomials(object):
     'n: 1021\nm: 4\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
     """
 
-    re_pol_f = re.compile("c(\d+)\s*:\s*(-?\d+)")
-    re_pol_g = re.compile("Y(\d+)\s*:\s*(-?\d+)")
     re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % cap_fp)
     re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % cap_fp)
+    re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
+    re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -215,7 +215,7 @@ class Polynomials(object):
             poly_file.write(str(self))
 
     def getN(self):
-        return self.poly["N"]
+        return self.params["n"]
 
 class FilePath(object):
     """ A class that represents a path to a file, where the path should be
@@ -3906,7 +3906,7 @@ class ReconstructLogTask(Task):
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not dlogfilename.isfile():
-                raise Exception("Output file %s does not exist" % smfilename)
+                raise Exception("Output file %s does not exist" % dlogfilename)
             self.state["dlog"] = dlogfilename.get_wdir_relative()
         self.logger.debug("Exit ReconstructLogTask.run(" + self.name + ")")
         return True
