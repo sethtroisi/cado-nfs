@@ -1760,17 +1760,21 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             worstnorm = -self.poly_heap[0][0]
             if worstnorm <= poly.lognorm:
                 if debug:
-                    print("_add_poly_heap(): new poly lognorm %f, worst in "
-                          "heap has %f. Not adding" 
-                          % (poly.lognorm, worstnorm))
+                    self.logger.debug("_add_poly_heap(): new poly lognorm %f, "
+                          "worst in heap has %f. Not adding",
+                          poly.lognorm, worstnorm)
                 return None
             # Pop the worst poly from heap and re-use its DB index
             key = heapq.heappop(self.poly_heap)[1][0]
             if debug:
-                print("_add_poly_heap(): new poly lognorm %f, worst in heap "
-                      "has %f. Replacing DB index %s"
-                      % (poly.lognorm, worstnorm, key))
-                debug = False # Suppress "not full" message below
+                self.logger.debug("_add_poly_heap(): new poly lognorm %f, "
+                    "worst in heap has %f. Replacing DB index %s",
+                     poly.lognorm, worstnorm, key)
+        else:
+            # Heap was not full
+            if debug:
+                self.logger.debug("_add_poly_heap(): heap was not full, adding "
+                    "poly with lognorm %f at DB index %s", poly.lognorm, key)
 
         # The DB requires the key to be a string. In order to have
         # identical data in DB and heap, we store key as str everywhere.
@@ -1779,9 +1783,6 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         # Python heapq stores a minheap, so in order to have the worst
         # polynomial (with largest norm) easily accessible, we use
         # -lognorm as the heap key
-        if debug:
-            print("_add_poly_heap(): heap was not full, adding poly with "
-                  "lognorm %f at DB index %s" % (poly.lognorm, key))
         new_entry = (-poly.lognorm, (key, poly))
         heapq.heappush(self.poly_heap, new_entry)
         return key
