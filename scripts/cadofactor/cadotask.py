@@ -1715,7 +1715,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
                 yield line
 
     def parse_and_add_poly(self, text, filename):
-        """ Parse a polynomial from an array of lines and add it to the
+        """ Parse a polynomial from an iterable of lines and add it to the
         priority queue and DB. Return a two-element list with the number of
         polynomials parsed and added, i.e., (0,0) or (1,0) or (1,1).
         """
@@ -1726,11 +1726,20 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
                              filename)
             return (0, 0)
+        if self._add_poly_heap_db(poly):
+            return (1, 1)
+        else:
+            return (1, 0)
+
+    def _add_poly_heap_db(self, poly):
+        """ Add a polynomial to the heap and DB, if it's good enough.
+        
+        Returns True if the poly was added, False if not. """
         key = self._add_poly_heap(poly)
         if key is None:
-            return (1, 0)
+            return False
         self.best_polynomials[key] = str(poly)
-        return (1, 1)
+        return True
 
     def _add_poly_heap(self, poly):
         """ Add a polynomial to the heap
