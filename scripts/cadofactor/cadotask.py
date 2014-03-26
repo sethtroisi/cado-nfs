@@ -1538,6 +1538,10 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
                 * self.params["alim"])
         self.progparams[0].setdefault("Bf", float(self.params["alim"]))
         self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        # Remove admin and admax from the parameter-file-supplied program
+        # parameters as those would conflict with the computed values
+        self.progparams[0].pop("admin", None)
+        self.progparams[0].pop("admax", None)
 
         tablename = self.make_tablename("bestpolynomials")
         self.best_polynomials = self.make_db_dict(
@@ -1806,10 +1810,6 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            # Remove admin and admax from the parameter-file-supplied
-            # parameters as those would conflict with the computed values
-            self.progparams[0].pop("admin", None)
-            self.progparams[0].pop("admax", None)
             p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
                                           stdout=str(outputfile),
                                           sizeonly=True,
