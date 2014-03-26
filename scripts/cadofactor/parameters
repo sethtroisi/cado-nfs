@@ -138,7 +138,8 @@ tasks.polyselect.maxnorm = 21.5
 # nrkeep: Keep the 20 best size-optimized polynomials from polyselect 
 # phase 1 and rootsieve them in polyselect phase 2
 tasks.polyselect.nrkeep = 20
-                              
+# batch: how many polynomial to put in each WU in the rootsieve phase
+tasks.polyselect.batch = 10                              
 
 # define tasks.sieve.ratq to True if you want special-q's to be taken on
 # the rational side (by default they are on the algebraic side), this can be
