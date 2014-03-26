@@ -32,8 +32,8 @@ from workunit import Workunit
 # --defaults which does not overwrite, and --forceparam which does
 
 # Pattern for floating-point number
-re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
-cap_fp = "(%s)" % re_fp
+RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
+CAP_FP = "(%s)" % RE_FP
 
 class Polynomial(list):
     """
@@ -90,10 +90,10 @@ class Polynomials(object):
     'n: 1021\nm: 4\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
     """
 
-    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % cap_fp)
-    re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % cap_fp)
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
+    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % CAP_FP)
+    re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % CAP_FP)
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -677,10 +677,10 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         pairs = zip((cputotal, realtotal), ("cpu", "real"))
         usepairs = [pair for pair in pairs if pair[0]]
         if usepairs:
-            format = "/".join(["%g"] * len(usepairs))
+            printformat = "/".join(["%g"] * len(usepairs))
             usepairs = tuple(zip(*usepairs))
             timestr = '/'.join(usepairs[1])
-            self.logger.info("Total %s time for %s: " + format,
+            self.logger.info("Total %s time for %s: " + printformat,
                     timestr, program, *usepairs[0])
                                                 
     def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
@@ -1259,21 +1259,21 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: potential collisions=%s" % cap_fp)
+            re.compile(r"# Stat: potential collisions=%s" % CAP_FP)
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
         ),
         (
             "stats_tries",
@@ -1292,21 +1292,21 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             (float, )*10,
             "",
             Statistics.smallest_10,
-            re.compile(r"# Stat: best logmu:" + (" " + cap_fp)*10)
+            re.compile(r"# Stat: best logmu:" + (" " + CAP_FP)*10)
         ),
         (
             "stats_total_time",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: total phase took %ss" % cap_fp)
+            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
         ),
         (
             "stats_rootsieve_time",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
+            re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
         )
     )
     @property
@@ -2235,28 +2235,28 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             (float, int),
             "0 0",
             Statistics.zip_combine_mean,
-            re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+            re.compile(r"# Average J=%s for (\d+) special-q's" % CAP_FP)
         ),
         (
             "stats_max_bucket_fill",
             (float, ),
             "0",
             max,
-            re.compile(r"#.*max bucket fill %s" % cap_fp)
+            re.compile(r"#.*max bucket fill %s" % CAP_FP)
         ),
         (
             "stats_total_cpu_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"# Total cpu time %ss" % cap_fp)
+            re.compile(r"# Total cpu time %ss" % CAP_FP)
         ),
         (
             "stats_total_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"# Total time %ss" % cap_fp)
+            re.compile(r"# Total time %ss" % CAP_FP)
         )
     )
     @property
@@ -2469,7 +2469,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
         ),
     )
     @property
@@ -2689,7 +2689,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
+            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
         ),
     )
     @property
@@ -3448,35 +3448,35 @@ class LinAlgTask(Task, HasStatistics):
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; CPU: %s" % cap_fp)
+            re.compile(r"krylov done, N=\d+ ; CPU: %s" % CAP_FP)
         ),
         (
             "krylov_comm",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; COMM: %s" % cap_fp)
+            re.compile(r"krylov done, N=\d+ ; COMM: %s" % CAP_FP)
         ),
         (
             "lingen_time",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"Total computation took %s" % cap_fp)
+            re.compile(r"Total computation took %s" % CAP_FP)
         ),
         (
             "mksol_time",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; CPU: %s" % cap_fp)
+            re.compile(r"mksol done, N=\d+ ; CPU: %s" % CAP_FP)
         ),
         (
             "mksol_comm",
             (float,),
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; COMM: %s" % cap_fp)
+            re.compile(r"mksol done, N=\d+ ; COMM: %s" % CAP_FP)
         ),
     )
     @property
