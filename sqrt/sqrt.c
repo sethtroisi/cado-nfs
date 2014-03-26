@@ -855,7 +855,11 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   
     mpz_init(algsqrt);
     mpz_init(aux);
-    mpz_poly_eval_mod_mpz(algsqrt, prd->p, pol->m, Np);
+    mpz_t m;
+    mpz_init(m);
+    cado_poly_getm(m, pol);
+    mpz_poly_eval_mod_mpz(algsqrt, prd->p, m, Np);
+    mpz_clear(m);
     mpz_invert(aux, F->coeff[F->deg], Np);  // 1/fd mod n
     mpz_powm_ui(aux, aux, prd->v, Np);      // 1/fd^v mod n
     mpz_mul(algsqrt, algsqrt, aux);

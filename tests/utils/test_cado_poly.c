@@ -13,24 +13,30 @@ test_cado_poly_set ()
 
   const double s = 3.1415;
 
-  mpz_set_ui (q->n, 123456789);
+  mpz_set_ui (q->n, 1000000007);
   q->skew = s;
   q->pols[0]->deg = 1;
-  mpz_set_ui (q->pols[0]->coeff[0], 17);
-  mpz_set_ui (q->pols[0]->coeff[1], 42);
-  q->pols[1]->deg = 0;
-  mpz_set_ui (q->pols[1]->coeff[0], 59);
-  mpz_set_ui (q->m, 3613);
+  mpz_set_si (q->pols[0]->coeff[0], -123128869);
+  mpz_set_ui (q->pols[0]->coeff[1], 1000000008);
+  q->pols[1]->deg = 2;
+  mpz_set_ui (q->pols[1]->coeff[0], 228868283);
+  mpz_set_ui (q->pols[1]->coeff[1], 887036294);
+  mpz_set_ui (q->pols[1]->coeff[2], 429156742);
 
   cado_poly_set (p, q);
 
-  ASSERT_ALWAYS (mpz_cmp_ui (p->n, 123456789) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->n, 1000000007) == 0);
   ASSERT_ALWAYS (p->skew == s);
-  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[0], 17) == 0);
-  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[1], 42) == 0);
-  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[0], 59) == 0);
-  ASSERT_ALWAYS (mpz_cmp_ui (p->m, 3613) == 0);
-
+  ASSERT_ALWAYS (mpz_cmp_si (p->pols[0]->coeff[0], -123128869) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[0]->coeff[1], 1000000008) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[0], 228868283) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[1], 887036294) == 0);
+  ASSERT_ALWAYS (mpz_cmp_ui (p->pols[1]->coeff[2], 429156742) == 0);
+  mpz_t m;
+  mpz_init(m);
+  cado_poly_getm(m, p);
+  ASSERT_ALWAYS (mpz_cmp_ui (m, 123128869) == 0);
+  mpz_clear(m);
   cado_poly_clear (p);
   cado_poly_clear (q);
 }

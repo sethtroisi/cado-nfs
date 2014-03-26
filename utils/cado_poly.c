@@ -23,7 +23,6 @@ void cado_poly_init(cado_poly poly)
       mpz_poly_init (poly->pols[side], MAXDEGREE);
 
     mpz_init_set_ui(poly->n, 0);
-    mpz_init_set_ui(poly->m, 0);
 }
 
 void cado_poly_clear(cado_poly poly)
@@ -32,7 +31,6 @@ void cado_poly_clear(cado_poly poly)
       mpz_poly_clear (poly->pols[side]);
 
     mpz_clear(poly->n);
-    mpz_clear(poly->m);
     memset(poly, 0, sizeof(poly[0]));
 }
 
@@ -44,7 +42,6 @@ cado_poly_set (cado_poly p, cado_poly q)
     p->skew = q->skew;
     for(int side = 0 ; side < 2 ; side++)
       mpz_poly_copy (p->pols[side], q->pols[side]);
-    mpz_set (p->m, q->m);
 }
 
 // This function is no longer exported
@@ -53,9 +50,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
     int have_f[2][(MAXDEGREE + 1)] = {{ 0, }, {0,}};
-    int have_m = 0;
     int i;
-    mpz_t tmp;
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
     poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
@@ -73,10 +68,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
         have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->coeff[i]);
     }
 
-    mpz_set_ui (poly->m, 0);
-    param_list_parse_mpz(pl, "m", poly->m);
-    have_m = mpz_cmp_ui (poly->m, 0);
-
     for(int side = 0 ; side < 2 ; side++) {
         mpz_poly_ptr ps = poly->pols[side];
         int d;
@@ -88,33 +79,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     }
 
     ASSERT_ALWAYS(have_n);
-
-    // compute m, the common root of f and g mod n
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = poly->pols[side];
-        if (ps->deg != 1) continue;
-        mpz_init (tmp);
-        mpz_invert (tmp, ps->coeff[1], poly->n);
-        mpz_mul (tmp, tmp, ps->coeff[0]);
-        mpz_mod (tmp, tmp, poly->n);
-        mpz_sub (tmp, poly->n, tmp);
-        mpz_mod (tmp, tmp, poly->n);
-
-        if (have_m && (mpz_cmp (poly->m, tmp) != 0))
-        {
-            fprintf (stderr, "m is not a root of g mod N\n");
-            exit (EXIT_FAILURE);
-        }
-        have_m = 1;
-        mpz_set (poly->m, tmp);
-        mpz_clear(tmp);
-    }
-
-    if (!have_m) {
-        fprintf (stderr, "Warning: should provide m for non-linear polynomials. Sqrt will fail.\n");
-    } else {
-        cado_poly_check(poly);
-    }
 
     return 1;
 }
@@ -146,25 +110,32 @@ int cado_poly_read(cado_poly poly, const char *filename)
 }
 
 
-/* check that m is a root of both f and g mod n */
-void cado_poly_check(cado_poly cpoly)
+int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly)
 {
-    mpz_t tmp;
-
-    mpz_init(tmp);
-
-    for(int side = 0 ; side < 2 ; side++) {
-        mpz_poly_ptr ps = cpoly->pols[side];
-
-        /* check m is a root of f mod n */
-        mpz_poly_eval (tmp, ps, cpoly->m);
-        mpz_mod (tmp, tmp, cpoly->n);
-        if (mpz_cmp_ui (tmp, 0) != 0)
-        {
-            fprintf (stderr, "m is not a root of the %s polynomial modulo n\n", sidenames[side]);
-            exit (EXIT_FAILURE);
-        }
+    // have to work with copies, because pseudo_gcd destroys its input
+    mpz_poly_t f[2];
+    for (int i = 0; i < 2; ++i) {
+        mpz_poly_init(f[i], cpoly->pols[i]->alloc);
+        mpz_poly_copy(f[i], cpoly->pols[i]);
     }
-
-    mpz_clear(tmp);
+    int ret;
+    ret = mpz_poly_pseudogcd_mpz(f[0], f[1], cpoly->n, m); 
+    if (ret) {
+        ASSERT_ALWAYS(f[0]->deg == 1);
+        mpz_t inv;
+        mpz_init(inv);
+        int ret2 = mpz_invert(inv, f[0]->coeff[1], cpoly->n);
+        // This inversion should always work.
+        // If not, it means that N has a small factor (not sure we want
+        // to be robust against that...)
+        // Or maybe the polynomial selection was really bogus!
+        ASSERT_ALWAYS(ret2);
+        mpz_mul(inv, inv, f[0]->coeff[0]);
+        mpz_neg(inv, inv);
+        mpz_mod(m, inv, cpoly->n);
+        mpz_clear(inv);
+    }
+    for (int i = 0; i < 2; ++i)
+        mpz_poly_clear(f[i]);
+    return ret;
 }

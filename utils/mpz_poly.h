@@ -123,6 +123,9 @@ void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 
+// compute f = GCD(f,g) mod N. If this fails, put the factor in the last
+// given argument.
+int mpz_poly_pseudogcd_mpz(mpz_poly_t , mpz_poly_t , const mpz_t , mpz_t );
 
 #ifdef __cplusplus
 }

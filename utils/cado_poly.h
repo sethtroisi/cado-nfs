@@ -16,7 +16,6 @@
 
 struct cado_poly_s {
   mpz_t n;        /* number to factor */
-  mpz_t m;        /* common root of f and g mod n */
   double skew;    /* skewness from poly file, if given, otherwise 0. */
 
   mpz_poly_ptr rat, alg;
@@ -45,8 +44,12 @@ extern void cado_poly_set (cado_poly_ptr p, cado_poly_ptr q);
 extern void cado_poly_init (cado_poly_ptr);
 extern void cado_poly_clear (cado_poly_ptr);
 
-/* sanity check */
-extern void cado_poly_check (cado_poly_ptr);
+// Compute m as the common root of f and g mod N.
+// If this fails, then in most of the cases we have found a factor of N
+// that is given instead of m.
+// The return value tells whether it worked (and then m is the common
+// root) or it failed (and then m is a factor of N).
+extern int cado_poly_getm(mpz_ptr, cado_poly_ptr);
 
 #ifdef __cplusplus
 }

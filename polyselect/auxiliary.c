@@ -1854,21 +1854,6 @@ print_cadopoly (FILE *fp, cado_poly p)
    fprint_polynomial (fp, p->alg->coeff, p->alg->deg);
 #endif
 
-   /* m and type */
-   fprintf (fp, "m: ");
-   /* if f[1]<>1, then m = -f[0]/f[1] mod n */
-   if (mpz_cmp_ui (p->rat->coeff[1], 1) != 0)
-   {
-      mpz_invert (p->m, p->rat->coeff[1], p->n);
-      mpz_neg (p->m, p->m);
-      mpz_mul (p->m, p->m, p->rat->coeff[0]);
-      mpz_mod (p->m, p->m, p->n);
-   }
-   else
-      mpz_neg (p->m, p->rat->coeff[0]);
-   mpz_out_str (fp, 10, p->m);
-   fprintf (fp, "\n");
-
    fprintf (fp, "skew: %1.3f\n", p->skew);
 
    logmu = L2_lognorm (F, p->skew);
