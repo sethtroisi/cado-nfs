@@ -192,7 +192,7 @@ struct sieve_info_s {
     /* Data for unsieving locations where gcd(i,j) > 1 */
     unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */
-    j_div_ptr j_div;
+    j_div_srcptr j_div;
 
     /* used in check_leftover_norm */
     mpz_t BB[2], BBB[2], BBBB[2];

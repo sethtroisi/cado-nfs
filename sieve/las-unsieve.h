@@ -1,6 +1,8 @@
 #ifndef LAS_UNSIEVE_H_
 #define LAS_UNSIEVE_H_
 
+#include <stdint.h>
+
 typedef struct {
     unsigned int lpf, cof, start;
 } unsieve_entry_t;
@@ -40,17 +42,16 @@ struct j_div_s {
 typedef struct j_div_s * j_div_ptr;
 typedef const struct j_div_s * j_div_srcptr;
 
-#include "las-types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-unsieve_aux_data_srcptr sieve_info_init_unsieve_data(sieve_info_ptr si);
-void sieve_info_clear_unsieve_data(unsieve_aux_data_srcptr us);
+unsieve_aux_data_srcptr init_unsieve_data(uint32_t);
+void clear_unsieve_data(unsieve_aux_data_srcptr);
 
-void sieve_info_init_j_div(sieve_info_ptr);
-void sieve_info_clear_j_div(sieve_info_ptr);
+j_div_srcptr init_j_div(uint32_t);
+void clear_j_div(j_div_srcptr);
 int  search_survivors_in_line(unsigned char * const restrict[2], const unsigned char[2], 
         unsigned int, unsigned int, int, j_div_srcptr, unsigned int,
         unsieve_aux_data_srcptr);

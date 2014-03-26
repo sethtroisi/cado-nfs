@@ -436,8 +436,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     else
       fprintf(las->output, "# nb_buckets = %u, three passes for the buckets sort\n", si->nb_buckets);
 
-    sieve_info_init_j_div(si);
-    si->us = sieve_info_init_unsieve_data(si);
+    si->j_div = init_j_div(si->J);
+    si->us = init_unsieve_data(si->I);
     mpz_init(si->doing->p);
     mpz_init(si->doing->r);
 
@@ -601,9 +601,10 @@ static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
 {
-    sieve_info_clear_unsieve_data(si->us);
+    clear_unsieve_data(si->us);
     si->us = NULL;
-    sieve_info_clear_j_div(si);
+    clear_j_div(si->j_div);
+    si->j_div = NULL;
 
     for(int s = 0 ; s < 2 ; s++) {
         facul_clear_strategy (si->sides[s]->strategy);
