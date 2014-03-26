@@ -54,7 +54,7 @@ class Polynomial(list):
         list.__setitem__(self, index, value)
 
     def __str__(self):
-        xpow = ["", "*x"] + ["*x^%d" % i for i in range(2,len(self))]
+        xpow = ["", "*x"] + ["*x^%d" % i for i in range(2, len(self))]
         arr = ["%+d%s" % (self[idx], xpow[idx]) for idx in range(0, len(self))
                if self[idx]]
         poly = "".join(reversed(arr)).lstrip('+')
@@ -62,6 +62,7 @@ class Polynomial(list):
         return poly
 
     def eval(self, x):
+        """ Evaluate the polynomial at x """
         if len(self) == 0:
             return 0
         deg = self.degree
@@ -72,6 +73,7 @@ class Polynomial(list):
 
 
 class PolynomialParseException(Exception):
+    """ Exception class for signaling errors during polynomial parsing """
     pass
 
 class Polynomials(object):
@@ -704,7 +706,7 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         """ Return number of seconds of cpu time spent by all programs of
         this Task
         """
-        total = 0.;
+        total = 0.
         for program in self.programs:
             total += self.update_cpu_or_real_time(is_cpu, program.name, 0.,
                     commit=False)
@@ -805,15 +807,15 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         
         Raise IOError if any check fails, return None
         """
-        for f in filenames:
-            if isinstance(f, FilePath):
-                exists = f.isfile()
+        for filename in filenames:
+            if isinstance(filename, FilePath):
+                exists = filename.isfile()
             else:
-                exists = os.path.isfile(f)
+                exists = os.path.isfile(filename)
             if shouldexist and not exists:
-                raise IOError("%s file %s does not exist" % (filedesc, f))
+                raise IOError("%s file %s does not exist" % (filedesc, filename))
             elif not shouldexist and exists:
-                raise IOError("%s file %s already exists" % (filedesc, f))
+                raise IOError("%s file %s already exists" % (filedesc, filename))
         return
     
     # These two function go together, one produces a workunit name from the
@@ -910,21 +912,21 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             return self.host
 
     def log_failed_command_error(self, message, command_nr):
-            host = message.get_host()
-            host_msg = " run on %s" % host if host else ""
-            self.logger.error("Program%s failed with exit code %d", 
-                              host_msg, message.get_exitcode(command_nr))
-            cmd_line = message.get_command_line(command_nr)
-            if cmd_line:
-                self.logger.error("Command line was: %s", cmd_line)
-            stderr = message.read_stderr(command_nr)
-            stderrfilename = message.get_stderrfile(command_nr)
-            if stderrfilename:
-                stderrmsg = " (stored in file %s)" % stderrfilename
-            else:
-                stderrmsg = ""
-            if stderr:
-                self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+        host = message.get_host()
+        host_msg = " run on %s" % host if host else ""
+        self.logger.error("Program%s failed with exit code %d", 
+                          host_msg, message.get_exitcode(command_nr))
+        cmd_line = message.get_command_line(command_nr)
+        if cmd_line:
+            self.logger.error("Command line was: %s", cmd_line)
+        stderr = message.read_stderr(command_nr)
+        stderrfilename = message.get_stderrfile(command_nr)
+        if stderrfilename:
+            stderrmsg = " (stored in file %s)" % stderrfilename
+        else:
+            stderrmsg = ""
+        if stderr:
+            self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
@@ -1606,7 +1608,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
                 if self.poly_heap else ""
         self.logger.info("%d polynomials in queue from previous run%s", 
-                         len(self.poly_heap), worstmsg);
+                         len(self.poly_heap), worstmsg)
         
         if "import" in self.params and not self.did_import:
             self.process_polyfile(self.params["import"])
@@ -3033,12 +3035,10 @@ class PurgeTask(Task):
         # input_nrels, input_nprimes: rels and primes among input
         # nrels, nprimes, excess: rels and primes when purging stopped
         if not input_nprimes is None:
-            self.update_excess_per_input(input_nrels, input_nprimes, nrels,
-                                         nprimes)
+            self.update_excess_per_input(input_nrels, nrels, nprimes)
         return have_enough
     
-    def update_excess_per_input(self, input_nrels, input_nprimes, nrels,
-                                nprimes):
+    def update_excess_per_input(self, input_nrels, nrels, nprimes):
         if input_nrels == 0:
             return # Nothing sensible that we can do
         last_input_nrels = self.state.get("last_input_nrels", 0)
@@ -4524,7 +4524,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         # Do we want the sum of real times over all sub-processes for
         # something?
         # realtotal = self.get_total_cpu_or_real_time(False)
-        self.print_cpu_real_time(cputotal, elapsed, "everything");
+        self.print_cpu_real_time(cputotal, elapsed, "everything")
 
         if last_task and not last_status:
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
@@ -4575,7 +4575,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         return [False, None]
     
     def get_total_cpu_or_real_time(self, is_cpu):
-        total = 0;
+        total = 0
         for task in self.tasks:
             task_time = task.get_total_cpu_or_real_time(is_cpu)
             total += task_time
