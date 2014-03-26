@@ -181,7 +181,7 @@ print_poly_info ( mpz_t *f,
 {
   unsigned int i, nroots;
   double skew, skew2, logmu, alpha, alpha_proj, exp_E;
-  mpz_t k0, k1, k2, m;
+  mpz_t k0, k1, k2;
   mpz_poly_t F;
   mpz_init (k0);
   mpz_init (k1);
@@ -193,16 +193,6 @@ print_poly_info ( mpz_t *f,
   gmp_printf ("%sY1: %Zd\n%sY0: %Zd\n", prefix, g[1], prefix, g[0]);
   for (i = d + 1; i -- != 0; )
     gmp_printf ("%sc%u: %Zd\n", prefix, i, f[i]);
-
-  /* Compute and print common root */
-  mpz_init(m);
-  int ok = mpz_invert(m, g[1], n);
-  ASSERT_ALWAYS(ok);
-  mpz_mul(m, m, g[0]);
-  mpz_neg(m, m);
-  mpz_mod(m, m, n);
-  gmp_printf ("%sm: %Zd\n", prefix, m);
-  mpz_clear(m);
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -1945,7 +1935,7 @@ read_raw_poly_file(const char *filename)
   char line[MAX_LINE_LENGTH];
   mpz_t g[2];
   mpz_poly_t F;
-  mpz_t M, N;
+  mpz_t N;
   FILE *file;
   const int max_degree = 10;
   
@@ -1956,7 +1946,6 @@ read_raw_poly_file(const char *filename)
   }
   mpz_init(g[0]);
   mpz_init(g[1]);
-  mpz_init(M);
   mpz_init(N);
   mpz_poly_init (F, max_degree);
   F->deg = 0;
@@ -1978,7 +1967,6 @@ read_raw_poly_file(const char *filename)
           output_polynomials(NULL, F->deg, NULL, N, 0., 0., F->coeff, g, E);
         }
         mpz_set_ui(N, 0);
-        mpz_set_ui(M, 0);
         for (int i = 0; i < 2; i++)
           mpz_set_ui(g[i], 0);
         F->deg = 0;
@@ -1986,7 +1974,6 @@ read_raw_poly_file(const char *filename)
       continue;
     }
     gmp_sscanf(line, "n: %Zd\n", N);
-    gmp_sscanf(line, "m: %Zd\n", M);
     for (int i = 0; i < 2; i++)
       read_mpz(g[i], line, 'Y', i);
     for (int i = 0; i < max_degree; i++) {
@@ -1997,7 +1984,6 @@ read_raw_poly_file(const char *filename)
   
   mpz_clear(g[0]);
   mpz_clear(g[1]);
-  mpz_clear(M);
   mpz_clear(N);
   mpz_poly_clear (F);
   fclose(file); 

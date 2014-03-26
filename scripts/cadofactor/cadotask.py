@@ -84,14 +84,14 @@ class Polynomials(object):
     >>> Polynomials([""])
     Traceback (most recent call last):
     cadotask.PolynomialParseException: No polynomials found
-    >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nm: 4\nskew: 1.0\n"
+    >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
-    'n: 1021\nm: 4\nskew: 1.0\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\n# f(x) = x^5-x+1\n# g(x) = -x+4\n'
-    >>> t="n: 1021\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\nm: 4\nskew: 1.0\n"
+    'n: 1021\nskew: 1.0\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\n# f(x) = x^5-x+1\n# g(x) = -x+4\n'
+    >>> t="n: 1021\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
-    'n: 1021\nm: 4\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
+    'n: 1021\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
     """
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
@@ -105,7 +105,6 @@ class Polynomials(object):
     keys = OrderedDict(
         (
             ("n", (int, True)),
-            ("m", (int, False)),
             ("skew", (float, False)),
             ("type", (str, False))
         ))
@@ -179,14 +178,6 @@ class Polynomials(object):
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
-        # Test that the roots mod n are correct
-        if "m" is self.params:
-            val_f = polyf.eval(self.params["m"]) % self.params["n"]
-            if val_f != 0:
-                raise PolynomialParseException("Error: m is not a root of f(x) mod n")
-            val_g = polyg.eval(self.params["m"]) % self.params["n"]
-            if val_g != 0:
-                raise PolynomialParseException("Error: m is not a root of g(x) mod n")
         self.polyf = polyf
         self.polyg = polyg
         return
