@@ -1849,7 +1849,7 @@ class Polysel2Task(ClientServerTask, patterns.Observer):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "import": None, "I": int, "alim": int, "rlim": int})
+            "import": None, "I": int, "alim": int, "rlim": int, "batch": 5})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2000,11 +2000,16 @@ class Polysel2Task(ClientServerTask, patterns.Observer):
         return self.get_state_filename("polyfilename")
 
     def submit_one_wu(self):
+        assert self.need_more_wus()
+        to_submit = len(self.poly_to_submit)
         nr = self.state["nr_poly_submitted"]
         inputfilename = self.workdir.make_filename("raw_%d" % nr)
         # Write one raw polynomial to inputfile
+        batchsize = min(to_submit - nr, self.params["batch"])
         with inputfilename.open("w") as inputfile:
-            inputfile.write(str(self.poly_to_submit[nr]))
+            for i in range(batchsize):
+                inputfile.write(str(self.poly_to_submit[nr + i]))
+                inputfile.write("\n")
         outputfile = self.workdir.make_filename("opt_%d" % nr)
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
@@ -2014,7 +2019,7 @@ class Polysel2Task(ClientServerTask, patterns.Observer):
                                           stdout=str(outputfile),
                                           **self.progparams[0])
             self.submit_command(p, "%d" % nr, commit=False)
-        self.state.update({"nr_poly_submitted": nr + 1}, commit=True)
+        self.state.update({"nr_poly_submitted": nr + batchsize}, commit=True)
 
     def get_total_cpu_or_real_time(self, is_cpu):
         """ Return number of seconds of cpu time spent by polyselect2l """
