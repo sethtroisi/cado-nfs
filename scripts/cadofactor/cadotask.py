@@ -671,6 +671,11 @@ class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
 class SimpleStatistics(BaseStatistics, HasState, DoesLogging, 
         metaclass=abc.ABCMeta):
 
+    @abc.abstractproperty
+    def programs(self):
+        # A list of classes of Programs which this tasks uses
+        pass
+
     def print_cpu_real_time(self, cputotal, realtotal, program):
         """ Print cpu and/or real time to logger """
         # Uses self only for access to the logger
@@ -4320,6 +4325,9 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     @property
     def title(self):
         return "Complete Factorization"
+    @property
+    def programs(self):
+        return []
     
     def __init__(self, db, parameters, path_prefix):
         super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
