@@ -398,7 +398,7 @@ class Statistics(object):
         "new_stats"
         """
         
-        assert self.conversions is new_stats.conversions
+        assert self.conversions == new_stats.conversions
         for (key, types, defaults, combine, regex) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
@@ -544,6 +544,19 @@ class Statistics(object):
         concat.sort()
         return concat[0:n]
 
+    def parse_stats(self, filename):
+        """ Parse statistics from the file with name "filename" and merge them
+        into self
+        
+        Returns the newly parsed stats as a dictionary
+        """
+        new_stats = Statistics(self.conversions, self.stat_formats)
+        with open(str(filename), "r") as inputfile:
+            for line in inputfile:
+                new_stats.parse_line(line)
+        self.merge_stats(new_stats)
+        return new_stats.as_dict()
+
 
 class HasName(object, metaclass=abc.ABCMeta):
     @abc.abstractproperty
@@ -640,13 +653,17 @@ class BaseStatistics(object):
     def print_stats(self):
         pass
 
+
 class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta):
-    @abc.abstractproperty
+    @property
     def stat_conversions(self):
-        pass
-    @abc.abstractproperty
+        """ Sub-classes should override """
+        return []
+
+    @property
     def stat_formats(self):
-        pass
+        """ Sub-classes should override """
+        return []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -667,6 +684,14 @@ class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta
             for msg in stat_msgs:
                 self.logger.info(msg)
         super().print_stats()
+    
+    def parse_stats(self, filename, *, commit):
+        new_stats = self.statistics.parse_stats(filename)
+        self.logger.debug("Newly arrived stats: %s", new_stats)
+        update = self.statistics.as_dict()
+        self.logger.debug("Combined stats: %s", update)
+        self.state.update(update, commit=commit)
+
 
 class SimpleStatistics(BaseStatistics, HasState, DoesLogging, 
         metaclass=abc.ABCMeta):
@@ -1022,19 +1047,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if did_increment:
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
-    
-    def parse_stats(self, filename, *, commit):
-        if not isinstance(self, HasStatistics):
-            return
-        new_stats = Statistics(self.stat_conversions, self.stat_formats)
-        with open(str(filename), "r") as inputfile:
-            for line in inputfile:
-                new_stats.parse_line(line)
-        self.logger.debug("Newly arrived stats: %s", new_stats.as_dict())
-        self.statistics.merge_stats(new_stats)
-        update = self.statistics.as_dict()
-        self.logger.debug("Combined stats: %s", update)
-        self.state.update(update, commit=commit)
 
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
@@ -1825,7 +1837,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
 
-class Polysel2Task(ClientServerTask, patterns.Observer):
+class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
