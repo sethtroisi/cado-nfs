@@ -4330,7 +4330,7 @@ class Request(Message):
     GET_NMAPS = object()
     GET_WU_RESULT = object()
 
-class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
+class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     @property
@@ -4542,11 +4542,12 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         if had_interrupt:
             return None
 
-        cputotal = self.get_total_cpu_or_real_time(True)
+        cputotal = self.get_sum_of_cpu_or_real_time(True)
         # Do we want the sum of real times over all sub-processes for
         # something?
-        # realtotal = self.get_total_cpu_or_real_time(False)
-        self.print_cpu_real_time(cputotal, elapsed, "everything")
+        # realtotal = self.get_sum_of_cpu_or_real_time(False)
+        self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
+                         cputotal, elapsed)
 
         if last_task and not last_status:
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
@@ -4596,7 +4597,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 return [task.run(), task.title]
         return [False, None]
     
-    def get_total_cpu_or_real_time(self, is_cpu):
+    def get_sum_of_cpu_or_real_time(self, is_cpu):
         total = 0
         for task in self.tasks:
             task_time = task.get_total_cpu_or_real_time(is_cpu)
@@ -4604,8 +4605,6 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             # self.logger.info("Task %s reports %s time of %g, new total: %g",
             #         task.name, "cpu" if is_cpu else "real", task_time, total)
         return total
-        return sum([task.get_total_cpu_or_real_time(is_cpu) \
-                for task in self.tasks])
 
     def register_filename(self, d):
         return self.servertask.register_filename(d)
