@@ -640,7 +640,7 @@ class BaseStatistics(object):
     def print_stats(self):
         pass
 
-class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
+class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta):
     @abc.abstractproperty
     def stat_conversions(self):
         pass
@@ -651,6 +651,7 @@ class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions, self.stat_formats)
+        self.statistics.from_dict(self.state)
 
     def get_statistics_as_strings(self):
         """ Return the statistics collected so far as a List of strings.
@@ -686,7 +687,7 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
             timestr = '/'.join(usepairs[1])
             self.logger.info("Total %s time for %s: " + printformat,
                     timestr, program, *usepairs[0])
-                                                
+    
     def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
@@ -783,7 +784,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
-        self.init_stats()
         # Request mediator to run this task, unless "run" parameter is set
         # to false
         if self.params["run"]:
@@ -1022,11 +1022,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if did_increment:
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
-    
-    def init_stats(self):
-        if not isinstance(self, HasStatistics):
-            return
-        self.statistics.from_dict(self.state)
     
     def parse_stats(self, filename, *, commit):
         if not isinstance(self, HasStatistics):
