@@ -10,6 +10,7 @@ Wrapper version, to be used with
 
 NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
+NFSUNITS_VERSION:="20140327.0730"; // more cleaning w.r.t. U
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -346,43 +347,6 @@ GaloisAction := function(K, iscyc)
 	return sigma;
 end function;
 
-PrepareField := function(K)
-	r1,r2:=Signature(K);
-	f:=DefiningPolynomial(K);
-	if r2 eq 0 then
-	    lr:=[r[1] : r in Roots(AlgToReal(f))];
-	elif r1 eq 0 then
-	    lr0:=[r[1] : r in Roots(AlgToComplex(f))];
-	    if DLP_DEBUG ge 3 then printf "lr0=%o\n", lr0; end if;
-	    // assuming that roots are [alpha1, conj(alpha1), ...]
-	    // reorder them to [alpha1, alpha2, ..., alpha_r2, conj(alpha1)...]
-	    lr:=[];
-	    for i:=1 to r2 do
-	        lr[i]:=lr0[2*i-1];
-		lr[i+r2]:=lr0[2*i];
-	    end for;
-	else
-	    // TODO: order roots of f...!
-	    error("NYI");
-	end if;
-	printf "# ordered roots: %o\n", lr;
-	Kdata:=AssociativeArray();
-	Kdata["K"]:=K;
-	Kdata["OK"]:=MaximalOrder(K);
-	printf "OK = %o\n", [K!Kdata["OK"].i : i in [1..Degree(K)]];
-	Kdata["roots"]:=lr;
-	Kdata["rK"]:=r1+r2-1;
-	gal:=GaloisGroup(DefiningPolynomial(K));
-//	printf "# Galois group:\n%o\n", gal;
-	iscyc:=IsCyclic(gal);
-	Kdata["Galois"]:=<iscyc, GaloisAction(K, iscyc)>;
-	if iscyc then printf "# Galois(f) is cyclic\n"; end if;
-//	printf "# Galois action:\n%o\n", Kdata["Galois"];
-	Kdata["hK"]:=ClassNumber(K);
-	printf "# hK = %o\n", Kdata["hK"];
-	return Kdata;
-end function;
-
 // u_1, ..., u_ell with ell = r1+r2-1; if r1 > 0, u0 = -1.
 // We suppose f has real roots alpha_1, ..., alpha_{r_1}
 // and complex roots alpha_{r_1+1}, ..., alpha_n
@@ -437,6 +401,47 @@ PrepareUnits := procedure(~U, ~G, Kdata, genG)
 	U["logunits"]:=[AllEmbeddings(Kdata, K!units[i]) : i in [1..rK]];
 end procedure;
 
+PrepareField := function(K, generate)
+	r1,r2:=Signature(K);
+	f:=DefiningPolynomial(K);
+	if r2 eq 0 then
+	    lr:=[r[1] : r in Roots(AlgToReal(f))];
+	elif r1 eq 0 then
+	    lr0:=[r[1] : r in Roots(AlgToComplex(f))];
+	    if DLP_DEBUG ge 3 then printf "lr0=%o\n", lr0; end if;
+	    // assuming that roots are [alpha1, conj(alpha1), ...]
+	    // reorder them to [alpha1, alpha2, ..., alpha_r2, conj(alpha1)...]
+	    lr:=[];
+	    for i:=1 to r2 do
+	        lr[i]:=lr0[2*i-1];
+		lr[i+r2]:=lr0[2*i];
+	    end for;
+	else
+	    // TODO: order roots of f...!
+	    error("NYI");
+	end if;
+	printf "# ordered roots: %o\n", lr;
+	Kdata:=AssociativeArray();
+	Kdata["K"]:=K;
+	Kdata["OK"]:=MaximalOrder(K);
+	printf "OK = %o\n", [K!Kdata["OK"].i : i in [1..Degree(K)]];
+	Kdata["roots"]:=lr;
+	Kdata["rK"]:=r1+r2-1;
+	gal:=GaloisGroup(DefiningPolynomial(K));
+//	printf "# Galois group:\n%o\n", gal;
+	iscyc:=IsCyclic(gal);
+	Kdata["Galois"]:=<iscyc, GaloisAction(K, iscyc)>;
+	if iscyc then printf "# Galois(f) is cyclic\n"; end if;
+//	printf "# Galois action:\n%o\n", Kdata["Galois"];
+	Kdata["hK"]:=ClassNumber(K);
+	printf "# hK = %o\n", Kdata["hK"];
+	U:=AssociativeArray();
+	PrepareUnits(~U,~G,Kdata,generate);
+	if generate then U["grouptable"]:=G; end if;
+	Kdata["UK"]:=U;
+	return Kdata;
+end function;
+
 // If x is not close enough to an integer, do not round it!
 Roundify := function(x)
 	prec:=Precision(x);
@@ -447,8 +452,9 @@ end function;
 
 // INPUT: Keys(U) = {"grouptable", "roots", "units", "rK"}
 //        eta is in OK.
-RecoverUnits := function(U, Kdata, eta)
+RecoverUnits := function(Kdata, eta)
 	K:=Kdata["K"];
+	U:=Kdata["UK"];
 	G:=U["grouptable"];
 	if IsDefined(G, eta) then
 	    return [1] cat G[eta];
@@ -553,7 +559,7 @@ end if;
 	FBp:=GetIdeals(K, OK, p, lr);
 	if FBp[2] ne 0 then
 	    // free relation: recover eps...!
-	    eps:=RecoverUnits(U, Kdata, FBp[2]);
+	    eps:=RecoverUnits(Kdata, FBp[2]);
 	    if eps eq [] then error("No unit found"); end if;
 	    FBp:=<FBp[1], eps>;
 	end if;
@@ -622,7 +628,7 @@ Treat_a_b := procedure(~FB, ~eps, Kdata, U, a, b, lf)
 	if DLP_DEBUG ge 2 then
 	    printf "eta=%o => Norm=%o\n", eta, Norm(eta);
 	end if;
-	eps:=RecoverUnits(U, Kdata, eta);
+	eps:=RecoverUnits(Kdata, eta);
 	if eps eq [] then error("no unit found for ", eta); end if;
 	if DLP_DEBUG ge 2 then
 	    printf "eps=%o\n", eps;
@@ -760,7 +766,7 @@ ReadFactorBase := procedure(~FB, Kdata, U, fb, degf)
 //	    printf "p*OK = %o\n", Factorization(p*OK);
 	    FBp:=GetIdeals(K, OK, p, lr);
 	    if FBp[2] ne 0 then
-	        eps:=RecoverUnits(U, Kdata, FBp[2]);
+	        eps:=RecoverUnits(Kdata, FBp[2]);
           	if eps eq [] then error("No unit found"); end if;
                 FBp:=<FBp[1], eps>;
 	    end if;
@@ -1249,7 +1255,7 @@ UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,purged)
 	        printf "eta=%o => Norm=%o\n", eta, Norm(eta);
 	    end if;
 	    iab:=iab+1;
-	    epsab[iab]:=RecoverUnits(U, Kdata, OK!eta);
+	    epsab[iab]:=RecoverUnits(Kdata, OK!eta);
 	    if epsab[iab] eq [] then error("No unit found"); end if;
 	end while;
 	printf "#T# units for purged relations: %o\n", Cputime(tp);
@@ -1446,7 +1452,7 @@ DLReadSM := procedure(~M, sm, rK)
 end procedure;
 
 // OUTPUT: if generate then FB,epsab,G,GEN,BAD;
-UnitsWithParams := function(Kdata, FB, epsab, G, GEN, BAD, generate, params)
+UnitsWithParams := function(Kdata, FB, epsab, GEN, BAD, generate, params)
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
         if DLP_VERIFICATION then
 	    ell:=params["ell"];
@@ -1454,13 +1460,9 @@ UnitsWithParams := function(Kdata, FB, epsab, G, GEN, BAD, generate, params)
 	if generate then
 	    FB:=AssociativeArray();
 	    GEN:=AssociativeArray();
-	    K<t>:=ext<QQ | f>;
-	    Kdata:=PrepareField(K);
-	    U:=AssociativeArray();
-	    PrepareUnits(~U,~G,Kdata,generate);
-	    U["grouptable"]:=G;
-	    Kdata["UK"]:=U; // TODO: improve this
 	end if;
+	K<t>:=ext<QQ | f>; // FIXME
+	Kdata:=PrepareField(K, true); // FIXME
 	rK:=Kdata["rK"];
         if DLP_VERIFICATION then
 	    printf "# Reading small matrix\n";
@@ -1491,7 +1493,7 @@ UnitsWithParams := function(Kdata, FB, epsab, G, GEN, BAD, generate, params)
 				params["algpr"],params["generators"]);
 		UnitsForPurged(~GEN,~BAD,~epsab,Kdata,purged);
 	    end if;
-	    return FB,epsab,G,GEN,BAD,Kdata; // OHHHHHHHHHHHHHHHH!
+	    return FB,epsab,GEN,BAD,Kdata; // OHHHHHHHHHHHHHHHH!
 	else
 	    printf "# epsab already computed\n";
 	end if;
@@ -1535,7 +1537,7 @@ UnitsFromCADO := function(dir, name, ell, Kdata, FB, epsab, G, GEN, BAD, gen_eps
 	end if;
         // "p59"  ===> "SNFS/p59/"
 	dir:=dir * "/" * name;
-	params["poly"]:=dir * "/" * name * ".polyselect.poly";
+	params["poly"]:=dir * "/" * name * ".polyselect2.poly";
 
 	// not needed, actually
 	// fb = "SNFS/p59/p59.factorbase.roots"
@@ -1549,7 +1551,7 @@ UnitsFromCADO := function(dir, name, ell, Kdata, FB, epsab, G, GEN, BAD, gen_eps
 	params["purged"]:=dir * "/" * name * ".purge.purged.gz";
 	params["index"]:=dir * "/" * name * ".merge.index.gz";
 	params["ficunits"]:=dir * "/" * name * ".units.units";
-	return UnitsWithParams(Kdata, FB, epsab, G, GEN, BAD, gen_epsab, params);
+	return UnitsWithParams(Kdata, FB, epsab, GEN, BAD, gen_epsab, params);
 end function;
 
 // ComputeUnits("SNFS", "p59", 63682780151674075656521332710720136307);
@@ -1582,11 +1584,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	BAD:=AssociativeArray();
 	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
 	K<t>:=ext<QQ | f>;
-	Kdata:=PrepareField(K);
-	U:=AssociativeArray();
-	PrepareUnits(~U, ~G, Kdata, true);
-	U["grouptable"]:=G;
-	Kdata["UK"]:=U;
+	Kdata:=PrepareField(K, true); // FIXME
 	if generate then
 	    GeneratorsForPR(~GEN,~BAD,Kdata,params["badidealinfo"],
 			    params["algpr"],params["generators"]);
@@ -1596,14 +1594,14 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	    printf "# bad primes = %o\n", Keys(BAD);
 	    epsab:=AssociativeArray();
 	    UnitsForPurged(~GEN,~BAD,~epsab,Kdata,purged);
-	    UnitsWithParams(Kdata, FB, epsab, G, GEN, BAD, false, params);
+	    UnitsWithParams(Kdata, FB, epsab, GEN, BAD, false, params);
 	end if;
 end procedure;
 
 Simul := procedure(dir, name, gen)
         // "p59"  ===> "SNFS/p59/"
 	dir:=dir * "/" * name;
-	poly:=dir * "/" * name * ".polyselect.poly";
+	poly:=dir * "/" * name * ".polyselect2.poly";
 	renumber:=dir * "/" * name * ".freerel.renumber.gz";
 	algpr:=dir * "/" * name * ".algpr.gz";
 	generators:=dir * "/" * name * ".generators.gz";
