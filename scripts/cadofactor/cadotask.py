@@ -365,8 +365,7 @@ class Statistics(object):
         """ Initialise values in self from the strings in the "stats"
         dictionary
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in stats:
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
@@ -378,8 +377,7 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             match = regex.match(line)
             if match:
                 assert not key in self.stats
@@ -401,8 +399,7 @@ class Statistics(object):
         """
         
         assert self.conversions is new_stats.conversions
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
@@ -421,12 +418,11 @@ class Statistics(object):
         printed if the value is not known.
         """
         result = []
-        stats = self.stats
         for format_arr in self.stat_formats:
             line = []
             for format_str in format_arr:
                 try:
-                    line.append(format_str.format(**stats))
+                    line.append(format_str.format(**self.stats))
                 except (KeyError, IndexError):
                     pass
             if line:
@@ -541,12 +537,12 @@ class Statistics(object):
                 abs(combined1[1] / combined2[1] - 1) < 1e-10 and \
                 abs(combined1[2] - combined2[2]) <= 1e-10 * combined2[2]
     
-    def smallest_10(*lists):
+    def smallest_n(*lists, n=10):
         concat = []
         for l in lists:
             concat += l
         concat.sort()
-        return concat[0:10]
+        return concat[0:n]
 
 
 class HasName(object, metaclass=abc.ABCMeta):
@@ -1299,7 +1295,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             "stats_logmu",
             (float, )*10,
             "",
-            Statistics.smallest_10,
+            Statistics.smallest_n,
             re.compile(r"# Stat: best logmu:" + (" " + CAP_FP)*10)
         ),
         (
