@@ -24,21 +24,7 @@ If you want to let the server automatically start clients, you need to supply a 
 to let it start two clients on localhost. The scriptpath parameter must be the path to the directory on the client machine which contains wuclient2.py (and workunit.py).
 
 
-Legacy parameter names with --old
-=================================
-
-With the --old command line option, the script will translate parameter
-files written for the Perl script. It will still accept parameters in the
-new format, both in the file and on the command line.
-
-For example, the two command lines above may be written instead as:
-
-./cadofactor.py --old ../../params/params.c59 n=90377629292003121684002147101760858109247336549001090677693 wdir=/tmp/c59 bindir=$HOME/build/cado-nfs/normal
-
-./cadofactor.py --old ../../params/params.c59 n=90377629292003121684002147101760858109247336549001090677693 wdir=/tmp/c59 bindir=$HOME/build/cado-nfs/normal slaves.hostnames=localhost slaves.nrclients=2 slaves.scriptpath=$HOME/git/cado-nfs/scripts/cadofactor
-
-
-For complex set-ups, it is preferable to write a parameter file in the new format. Some examples are in "parameters", "parameters.oar", and "parameters.rsa512.oar".
+For complex set-ups, it is preferable to write a parameter file. Some examples are in "parameters", "parameters.oar", and "parameters.rsa512.oar".
 
 The .oar parameter files are meant for cadofactor scripts that run *inside* an OAR submission, as they read the list of slave hostnames from the OAR node file.
 
@@ -78,6 +64,32 @@ and restarting cadofactor to prevent it from running polynomial selection;
 if after interruption a larger admax is given, cadofactor will perform
 polynomial search from the point where it left off (i.e., at ad=0) up to the
 new upper limit, admax.
+
+The polynomial selection run by cadofactor is performed in two phases:
+the first phase searches for polynomials with good size property and keeps
+a priority queue the "nrkeep" most promising ones, then the second phase
+root-optimizes these to find the overall best polynomial.
+
+Care should be taken when trying to import size-optimized polynomials into
+phase 1's priority queue (so that they will be forwarded to the second
+phase.) It is advisable to give the full parameter path to the "import"
+statement, so that the polynomials aren't misinterpreted as being both
+size- and root-optimized already. E.g.,
+
+tasks.polyselect.polyselect1.import = size_optimized_polynomials.txt
+
+will import them to phase 1's priority queue, so that phase 2 will later
+root-optimize them.
+
+To import polynomials that are fully optimized already (as produced by an
+earlier factorization, or an SNFS polynomials), it is sufficient to use
+
+tasks.polyselect.import = polynomial.txt
+
+If the polynomial in the polynomial.txt file does not specify a "lognorm",
+it is simply ignored by the first phase and does not get added to the
+priority queue, but is imported as an already optimized polynomial into
+the second phase.
 
 
 Importing relations
