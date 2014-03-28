@@ -67,19 +67,19 @@ new upper limit, admax.
 
 The polynomial selection run by cadofactor is performed in two phases:
 the first phase searches for polynomials with good size property and keeps
-a priority queue the "nrkeep" most promising ones, then the second phase
+in a priority queue the "nrkeep" most promising ones, then the second phase
 root-optimizes these to find the overall best polynomial.
 
 Care should be taken when trying to import size-optimized polynomials into
 phase 1's priority queue (so that they will be forwarded to the second
-phase.) It is advisable to give the full parameter path to the "import"
+phase). It is advisable to give the full parameter path to the "import"
 statement, so that the polynomials aren't misinterpreted as being both
-size- and root-optimized already. E.g.,
+size- and root-optimized already. E.g., write
 
 tasks.polyselect.polyselect1.import = size_optimized_polynomials.txt
 
-will import them to phase 1's priority queue, so that phase 2 will later
-root-optimize them.
+(and not just tasks.polyselect.import = ...) to import them to phase 1's
+priority queue, so that phase 2 will later root-optimize them.
 
 To import polynomials that are fully optimized already (as produced by an
 earlier factorization, or an SNFS polynomials), it is sufficient to use
