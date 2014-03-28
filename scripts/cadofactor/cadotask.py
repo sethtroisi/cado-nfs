@@ -3635,7 +3635,7 @@ class SqrtTask(Task):
                  "alg", "gcd", "dep"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"N": int})
+        return self.join_params(super().paramnames, {"N": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3653,6 +3653,8 @@ class SqrtTask(Task):
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
+            if self.params["gzip"]:
+                prefix += ".gz"
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Sqrt.name)
             self.logger.info("Creating file of (a,b) values")
