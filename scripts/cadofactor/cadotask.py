@@ -365,8 +365,7 @@ class Statistics(object):
         """ Initialise values in self from the strings in the "stats"
         dictionary
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in stats:
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
@@ -378,8 +377,7 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             match = regex.match(line)
             if match:
                 assert not key in self.stats
@@ -400,9 +398,8 @@ class Statistics(object):
         "new_stats"
         """
         
-        assert self.conversions is new_stats.conversions
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        assert self.conversions == new_stats.conversions
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
@@ -421,12 +418,11 @@ class Statistics(object):
         printed if the value is not known.
         """
         result = []
-        stats = self.stats
         for format_arr in self.stat_formats:
             line = []
             for format_str in format_arr:
                 try:
-                    line.append(format_str.format(**stats))
+                    line.append(format_str.format(**self.stats))
                 except (KeyError, IndexError):
                     pass
             if line:
@@ -541,12 +537,25 @@ class Statistics(object):
                 abs(combined1[1] / combined2[1] - 1) < 1e-10 and \
                 abs(combined1[2] - combined2[2]) <= 1e-10 * combined2[2]
     
-    def smallest_10(*lists):
+    def smallest_n(*lists, n=10):
         concat = []
         for l in lists:
             concat += l
         concat.sort()
-        return concat[0:10]
+        return concat[0:n]
+
+    def parse_stats(self, filename):
+        """ Parse statistics from the file with name "filename" and merge them
+        into self
+        
+        Returns the newly parsed stats as a dictionary
+        """
+        new_stats = Statistics(self.conversions, self.stat_formats)
+        with open(str(filename), "r") as inputfile:
+            for line in inputfile:
+                new_stats.parse_line(line)
+        self.merge_stats(new_stats)
+        return new_stats.as_dict()
 
 
 class HasName(object, metaclass=abc.ABCMeta):
@@ -644,17 +653,22 @@ class BaseStatistics(object):
     def print_stats(self):
         pass
 
-class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
-    @abc.abstractproperty
+
+class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta):
+    @property
     def stat_conversions(self):
-        pass
-    @abc.abstractproperty
+        """ Sub-classes should override """
+        return []
+
+    @property
     def stat_formats(self):
-        pass
+        """ Sub-classes should override """
+        return []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions, self.stat_formats)
+        self.statistics.from_dict(self.state)
 
     def get_statistics_as_strings(self):
         """ Return the statistics collected so far as a List of strings.
@@ -670,6 +684,14 @@ class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
             for msg in stat_msgs:
                 self.logger.info(msg)
         super().print_stats()
+    
+    def parse_stats(self, filename, *, commit):
+        new_stats = self.statistics.parse_stats(filename)
+        self.logger.debug("Newly arrived stats: %s", new_stats)
+        update = self.statistics.as_dict()
+        self.logger.debug("Combined stats: %s", update)
+        self.state.update(update, commit=commit)
+
 
 class SimpleStatistics(BaseStatistics, HasState, DoesLogging, 
         metaclass=abc.ABCMeta):
@@ -690,7 +712,7 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
             timestr = '/'.join(usepairs[1])
             self.logger.info("Total %s time for %s: " + printformat,
                     timestr, program, *usepairs[0])
-                                                
+    
     def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
@@ -787,7 +809,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
-        self.init_stats()
         # Request mediator to run this task, unless "run" parameter is set
         # to false
         if self.params["run"]:
@@ -1026,24 +1047,6 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if did_increment:
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
-    
-    def init_stats(self):
-        if not isinstance(self, HasStatistics):
-            return
-        self.statistics.from_dict(self.state)
-    
-    def parse_stats(self, filename, *, commit):
-        if not isinstance(self, HasStatistics):
-            return
-        new_stats = Statistics(self.stat_conversions, self.stat_formats)
-        with open(str(filename), "r") as inputfile:
-            for line in inputfile:
-                new_stats.parse_line(line)
-        self.logger.debug("Newly arrived stats: %s", new_stats.as_dict())
-        self.statistics.merge_stats(new_stats)
-        update = self.statistics.as_dict()
-        self.logger.debug("Combined stats: %s", update)
-        self.state.update(update, commit=commit)
 
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
@@ -1299,7 +1302,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             "stats_logmu",
             (float, )*10,
             "",
-            Statistics.smallest_10,
+            Statistics.smallest_n,
             re.compile(r"# Stat: best logmu:" + (" " + CAP_FP)*10)
         ),
         (
@@ -1834,7 +1837,7 @@ class Polysel1Task(ClientServerTask, patterns.Observer):
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
 
-class Polysel2Task(ClientServerTask, patterns.Observer):
+class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -3632,7 +3635,7 @@ class SqrtTask(Task):
                  "alg", "gcd", "dep"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"N": int})
+        return self.join_params(super().paramnames, {"N": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3650,6 +3653,8 @@ class SqrtTask(Task):
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
+            if self.params["gzip"]:
+                prefix += ".gz"
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Sqrt.name)
             self.logger.info("Creating file of (a,b) values")
@@ -4327,7 +4332,7 @@ class Request(Message):
     GET_NMAPS = object()
     GET_WU_RESULT = object()
 
-class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
+class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     @property
@@ -4539,11 +4544,12 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         if had_interrupt:
             return None
 
-        cputotal = self.get_total_cpu_or_real_time(True)
+        cputotal = self.get_sum_of_cpu_or_real_time(True)
         # Do we want the sum of real times over all sub-processes for
         # something?
-        # realtotal = self.get_total_cpu_or_real_time(False)
-        self.print_cpu_real_time(cputotal, elapsed, "everything")
+        # realtotal = self.get_sum_of_cpu_or_real_time(False)
+        self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
+                         cputotal, elapsed)
 
         if last_task and not last_status:
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
@@ -4593,7 +4599,7 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 return [task.run(), task.title]
         return [False, None]
     
-    def get_total_cpu_or_real_time(self, is_cpu):
+    def get_sum_of_cpu_or_real_time(self, is_cpu):
         total = 0
         for task in self.tasks:
             task_time = task.get_total_cpu_or_real_time(is_cpu)
@@ -4601,8 +4607,6 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             # self.logger.info("Task %s reports %s time of %g, new total: %g",
             #         task.name, "cpu" if is_cpu else "real", task_time, total)
         return total
-        return sum([task.get_total_cpu_or_real_time(is_cpu) \
-                for task in self.tasks])
 
     def register_filename(self, d):
         return self.servertask.register_filename(d)

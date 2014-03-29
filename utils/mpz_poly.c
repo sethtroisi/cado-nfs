@@ -1417,7 +1417,8 @@ mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
 /* Attempt to compute the f=gcd(f,g) mod N, where N is not necessarily a
  * prime. If at some point a division fails, this gives a proper factor
  * of N that is put in the corresponding argument.
- * The return value tells whether the process was successful.
+ * The return value tells whether the process was successful (1 means
+ * that no inversion failed, 0 means that a factor was found).
  * WARNING: this function destroys its input.
  */
 int
