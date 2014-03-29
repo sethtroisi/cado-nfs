@@ -47,7 +47,7 @@ run_test(test_trialdiv test_trialdiv)
 macro (add_trialdiv_test MAXLEN)
   add_executable(test_trialdiv${MAXLEN} test_trialdiv.c)
   set_property(TARGET test_trialdiv${MAXLEN} PROPERTY COMPILE_DEFINITIONS TRIALDIV_MAXLEN=${MAXLEN})
-  target_link_libraries(test_trialdiv${MAXLEN} libtrialdiv utils tests)
+  target_link_libraries(test_trialdiv${MAXLEN} trialdiv utils tests)
   run_test(test_trialdiv${MAXLEN} test_trialdiv${MAXLEN})
 endmacro(add_trialdiv_test)
 
