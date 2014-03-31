@@ -65,7 +65,7 @@ static inline uint8_t lg2 (double i, double add, double scale) {
      to do the transfert. Without it, a warning appears but the code is false!
   */
   void *tg = &i;
-  return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
+  return (uint8_t) (((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
 #endif
 }
 
@@ -81,7 +81,7 @@ static inline uint8_t lg2abs (double i, double add, double scale) {
   return (uint8_t) ((i-add)*scale);
 #else
   void *tg = &i;
-  return (uint8_t) ((((double) ((*((uint64_t *)tg) << 1 ) >> 0x20)) - add) * scale);
+  return (uint8_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
 #endif
 }
 
@@ -441,15 +441,17 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
    Internal function, only with simple types, for unit/integration testing. */
  void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd)
 { 
-  uint32_t endJ;
-  ssize_t ih, Idiv2;
-  scale *= 1./0x100000;
-  const double add = 0x3FF00000 - GUARD / scale;
-  Idiv2 = (ssize_t) I >> 1;
-  endJ = LOG_BUCKET_REGION - ctz (I);
+  unsigned char *beginS;
+  uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
+  ssize_t ih;
+  const ssize_t Idiv2 = (ssize_t) I >> 1;
   J <<= endJ;
+  beginJ = J;
   endJ = (1U << endJ) + J;
   S += Idiv2;
+  beginS = S;
+  scale *= 1./0x100000;
+  const double add = 0x3FF00000 - GUARD / scale;
 
 #ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM /* Light optimization, only log2 */
   
@@ -752,6 +754,9 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 #undef _MM_SHUFFLE_EPI32
 #undef ALG_CONST_INIT
 #endif /* End of HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+  /* Special ultra rare case. The correction of log2(F(0,0)) is false, because
+     the fast algorithm of log2 is not good in 0.0. */
+  if (UNLIKELY(!beginJ)) *beginS = GUARD;
 }
 
 /* Smart initialization. Computes only one initialization value F(i+3.5,const j)
@@ -762,13 +767,13 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
    NB: in fact, the function is log2(fabs(F(i, const j)))... Don't care ?
    2 versions: SSE version (32bits compatible) & non SSE versions.
    Internal function, only with simple types, for unit/integration testing */
-void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, double *roots) { 
-  
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, double *roots)
+{ 
   ASSERT (d >= 2);
-  int ih;
   unsigned char *beginS;
   uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
-  const int Idiv2 = (int) I >> 1;
+  ssize_t ih;
+  const ssize_t Idiv2 = (ssize_t) I >> 1;
   J <<= endJ;
   beginJ = J;
   endJ = (1U << endJ) + J;
