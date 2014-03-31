@@ -15,6 +15,9 @@ dlp = true
 #  N = 53236943330228380237618624445646085674945074907141464418703
 #  gorder = 46188898894770668459
 
+# if you don't want the "full column of 1", uncomment the following line.
+# tasks.addfullcol = false
+
 ## Standard stuff; uncomment and edit according to your config.
 #slaves.nrclients=2
 #tasks.threads = 2

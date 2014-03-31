@@ -671,7 +671,7 @@ class FreeRel(Program):
                  badideals: Parameter(is_output_file=True)=None,
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
-                 dlp: Toggle("addfullcol")=None,
+                 addfullcol: Toggle() = None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
