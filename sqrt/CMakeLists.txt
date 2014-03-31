@@ -28,11 +28,4 @@ set_target_properties(crtalgsqrt PROPERTIES
 endif(HAVE_CABSL)
 endif(${WITH_PTHREADS})
 
-# add_executable(dispatch dispatch.cpp)
-# 
-# set_target_properties(dispatch PROPERTIES
-#     COMPILE_FLAGS "--mpi"
-#     LINK_FLAGS "--mpi")
-# 
-
 include(CMakeLists-nodist.txt OPTIONAL)
