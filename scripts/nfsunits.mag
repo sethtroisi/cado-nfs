@@ -11,6 +11,7 @@ Wrapper version, to be used with
 NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
 NFSUNITS_VERSION:="20140327.0730"; // more cleaning w.r.t. U
+NFSUNITS_VERSION:="20140329.1930"; // computing m + other stuff
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -802,6 +803,7 @@ end procedure;
 //     the other.
 // a,b and the h_i's are in hexadecimal.
 //
+// OUTPUT: [[a, b]]
 DLReadPurged := function(purged)
         ab:=[];
         fd:=POpen("gzip -dc " * purged, "r");
@@ -856,6 +858,7 @@ end if;
 	return bad;
 end function;
 
+// <elt_of_K, e, f>
 GeneratorForBad := function(Kdata, p, id)
 	lf:=Factorization(id);
 //	printf "# p=%o, id=%o => lf=%o\n", p, id, lf;
@@ -867,6 +870,9 @@ GeneratorForBad := function(Kdata, p, id)
 	return <Kdata["K"]!gp, lf[1][2], Degree(lf[1][1])>;
 end function;
 
+// INPUT: fo = file descriptor
+//        i = index
+//        gef = <gp, ep, fp> with gp in K
 PrintGenerator := procedure(fo, i, gef)
 	gp,ep,fp:=Explode(gef);
 	den:=Denominator(gp);
@@ -902,6 +908,17 @@ InspectIdeals := procedure(p, r, Kdata, elt)
 	end for;
 end procedure;
 
+// OUTPUT: ok, PZ(r) mod p.
+RatEvaluate := function(FpW, PZ, r)
+	den:=Lcm([Denominator(Coefficient(PZ, i)) : i in [0..Degree(PZ)]]);
+	p:=#BaseRing(FpW);
+	if (den mod p) eq 0 then
+	    printf "den = 0!!!!\n";;
+	    return false, 0;
+	end if;
+	return true,Evaluate(FpW!Eltseq(PZ), r);
+end function;
+
 // INPUT: lp a list of elements in K of norm p; id = [p, alpha-r] an ideal.
 // OUTPUT: a generator for id, found using conjugates of elt under Galois.
 // For this, we use:
@@ -928,12 +945,8 @@ FindGeneratorWithGalois := function(p, r, Kdata, lp)
 //	    printf "# root(%o) = %o\n", elt, e;
 	    for cyc in galac[2] do
 	      for sig in cyc do
-		den:=Lcm([Denominator(Coefficient(sig, i)) : i in [0..Degree(sig)]]);
-		if (den mod p) eq 0 then
-		    printf "den = 0!!!!\n";;
-		    return false, 0;
-		end if;
-	        rr:=Evaluate(FpW!Eltseq(sig), r);
+	        ok,rr:=RatEvaluate(FpW, sig, r);
+		if not ok then return false, 0; end if;
 //	        printf "## (%o)(%o)=%o\n", sig, r, rr;
 		if rr eq e then
 		    // sigma(r) = e or sigma^(-1)(e) = r
@@ -1150,6 +1163,7 @@ ReadGeneratorsForPR := procedure(~GEN, ~BAD, K, generators)
 	    // s = "i -ram_ind ram_deg den x0 ... x_{deg-1}"
 	    // or
 	    // s = "i den x0 ... x_{deg-1}" with den > 0
+	    // x_i are rational integers
 	    tmp:=Split(s, " ");
 	    i:=StringToInteger(tmp[1]);
 	    ind:=StringToInteger(tmp[2]);
@@ -1170,19 +1184,21 @@ ReadGeneratorsForPR := procedure(~GEN, ~BAD, K, generators)
 	    for j:=j0 to #tmp do
 	        x:=x + StringToInteger(tmp[j]) * t^(j-j0);
 	    end for;
+	    // GEN[i], BAD[i] = <elt_of_K, ...>
 	    if j0 eq 3 then
 	        GEN[i]:=x/den;
+//	    	printf "GEN[%o]=%o (%o)\n", i, GEN[i], Norm(GEN[i][1]);
 	    else
 		BAD[i]:=<x/den, ind, deg>;
+	    	printf "BAD[%o]=%o (%o)\n", i, BAD[i], Norm(BAD[i][1]);
 	    end if;
-//	    printf "GEN[%o]=%o (%o)\n", i, GEN[i], Norm(GEN[i][1]);
 	end while;
 end procedure;
 
 // now read all ab pairs from purged, together with the ideal numbers
 // eps[(a, b)_i] <- unit for (a-b*theta) given its algebraic factorization.
 // All that matters is that index i.
-UnitsForPurged := procedure(~GEN,~BAD,~epsab,Kdata,purged)
+UnitsForPurged := procedure(~epsab,Kdata,~GEN,~BAD,purged)
 	tp:=Cputime();
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
@@ -1382,8 +1398,6 @@ ReadDataFromPolyFile := function(name)
 	    if #tmp eq 2 then
 	        if tmp[1] eq "n:" then
 	            p:=StringToInteger(tmp[2]);
-	    	elif tmp[1] eq "m:" then
-		    m:=StringToInteger(tmp[2]);
 		elif tmp[1][1] eq "c" then
 		    // tmp[1] = "c0:"
 		    i:=StringToInteger(tmp[1][2]); // humf!
@@ -1395,6 +1409,10 @@ ReadDataFromPolyFile := function(name)
 		end if;
 	    end if;
 	end while;
+	FpW:=PolynomialRing(GF(p));
+	tmp:=Gcd(FpW!Eltseq(f), FpW!Eltseq(g));
+	if Degree(tmp) ne 1 then error("gcd(f, g)"); end if;
+	m:=Integers()!(-Coefficient(tmp, 0));
 	printf "## check f, g, f(m), g(m): ";
 	printf "%o, %o, %o, %o\n", f, g, (Integers()!Evaluate(f, m)) mod p,
 	      (Integers()!Evaluate(g, m)) mod p;
@@ -1491,7 +1509,7 @@ UnitsWithParams := function(Kdata, FB, epsab, GEN, BAD, generate, params)
 	    elif IsDefined(params, "algpr") then
 	        GeneratorsForPR(~GEN,~BAD,Kdata,params["badidealinfo"],
 				params["algpr"],params["generators"]);
-		UnitsForPurged(~GEN,~BAD,~epsab,Kdata,purged);
+		UnitsForPurged(~epsab,Kdata,~GEN,~BAD,purged);
 	    end if;
 	    return FB,epsab,GEN,BAD,Kdata; // OHHHHHHHHHHHHHHHH!
 	else
@@ -1593,7 +1611,7 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 	    ReadGeneratorsForPR(~GEN, ~BAD, K, generators);
 	    printf "# bad primes = %o\n", Keys(BAD);
 	    epsab:=AssociativeArray();
-	    UnitsForPurged(~GEN,~BAD,~epsab,Kdata,purged);
+	    UnitsForPurged(~epsab,Kdata,~GEN,~BAD,purged);
 	    UnitsWithParams(Kdata, FB, epsab, GEN, BAD, false, params);
 	end if;
 end procedure;
@@ -1610,6 +1628,7 @@ Simul := procedure(dir, name, gen)
 	ficunits:=dir * "/" * name * ".units.units";
 	bad:=dir * "/" * name * ".magmanmbrthry.badidealinfo";
 
+	// FIXME: strange what happens here -> simplify?
 	if gen then
 	    printf "# computing generators\n";
 	    ComputeUnitsFromWrapper(poly,renumber,algpr,generators,bad,

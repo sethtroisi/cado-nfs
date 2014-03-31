@@ -2128,7 +2128,8 @@ class FreeRelTask(Task):
         return [["poly", "renumber", "badideals", "out"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"dlp": False, "gzip": True})
+        return self.join_params(super().paramnames,
+                {"dlp": False, "gzip": True, "addfullcol": None})
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -2179,6 +2180,9 @@ class FreeRelTask(Task):
                     self.make_std_paths(cadoprograms.FreeRel.name)
             if self.params["dlp"]:
                 badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
+                # default for dlp is addfullcol
+                if not "addfullcol" in self.progparams[0]:
+                    self.progparams[0]["addfullcol"] = True;
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
                                          badideals=badidealfilename,

@@ -3,7 +3,7 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Init polynomial rel and set it to b*x - a */
+/* Init polynomial rel and set it to a - b*x */
 void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
