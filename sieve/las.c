@@ -3537,11 +3537,7 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds_thread ();
-            if (si->cpoly->rat->deg == 1)
-                init_rat_norms_bucket_region(S[side], i, si);
-            else {
-                init_alg_norms_bucket_region(S[side], i, si, side);
-            }
+	    init_norms_bucket_region(S[side], i, si, side, 1);
             // Invalidate the first row except (1,0)
             if (!i) {
                 int pos10 = 1+((si->I)>>1);
@@ -3552,7 +3548,7 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After rationals init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply rational buckets */
@@ -3583,11 +3579,11 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init algebraic norms */
             rep->tn[side] -= seconds_thread ();
 
-            init_alg_norms_bucket_region(S[side], i, si, side);
+            init_norms_bucket_region(S[side], i, si, side, 1);
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After algebraics init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply algebraic buckets */

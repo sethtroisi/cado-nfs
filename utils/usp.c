@@ -69,6 +69,18 @@ B) to use within another program: compile without -DMAIN, the main function
 
 /* #define DEBUG */
 
+void
+root_struct_init (root_struct *R) {
+  mpz_init (R->a);
+  mpz_init (R->b);
+}
+
+void
+root_struct_clear (root_struct *R) {
+  mpz_clear (R->a);
+  mpz_clear (R->b);
+}
+
 static int
 sign (mpz_t a)
 {

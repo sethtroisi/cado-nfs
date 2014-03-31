@@ -146,7 +146,9 @@ struct sieve_side_info_s {
     mpz_poly_t fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-
+    unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
+    double *roots;     /* d^2(F(i, const j))/d(i)^2 */
+			    
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
     small_sieve_data_t ssd[1];
