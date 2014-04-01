@@ -1287,7 +1287,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       F->deg = ps->deg;
       F->coeff = s->fijd;
       
-      double v = get_maxnorm_alg (F, I, Jmax);
+      double v = get_maxnorm_alg (F, I/2, Jmax);
       
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
@@ -1297,7 +1297,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = get_maxnorm_alg (F, I, c);
+              v = get_maxnorm_alg (F, I/2, c);
               if (v < maxnorm)
                 a = c;
               else
