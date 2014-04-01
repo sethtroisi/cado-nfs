@@ -109,9 +109,9 @@ double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr 
   ASSERT(h->deg >= f->deg + g->deg);
   h->deg = f->deg + g->deg;
   memset (h->coeff, 0, sizeof(double) * (h->deg + 1));
-  for (ssize_t i_f = f->deg + 1; i_f--; ) {
+  for (size_t i_f = f->deg + 1; i_f--; ) {
     double fcoeff = f->coeff[i_f], *hcoeff = h->coeff + i_f;
-    for (ssize_t i_g = g->deg + 1; i_g--; )
+    for (size_t i_g = g->deg + 1; i_g--; )
       hcoeff[i_g] += fcoeff * g->coeff[i_g];
   }
 }
@@ -122,7 +122,7 @@ double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr 
 void
 MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  ssize_t i;
+  size_t i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
@@ -142,7 +142,7 @@ MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_pol
 void
 double_poly_substract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
-  ssize_t i;
+  size_t i;
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
