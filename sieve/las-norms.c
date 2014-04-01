@@ -1257,8 +1257,14 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  const double fudge_factor = 16.; /* How much bigger a norm than optimal
-                                      we're willing to tolerate */
+  // The following parameter controls the scaling on the norm.
+  // Relevant values are between 1.0 and 3.0. A higher value means we
+  // select higher values of J, and therefore we find more relations, but
+  // this increases the time per relations.
+  // The value 2.0 seems to be a good compromise. Setting 1.5 reduces the
+  // time per relation and number of relations by about 1.5% on a typical
+  // RSA704 benchmark.
+  const double fudge_factor = 2.0; 
   const double I = (double) (si->I);
   const double q = mpz_get_d(si->doing->p);
   const double skew = si->cpoly->skew;
@@ -1276,12 +1282,11 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double_poly_t dpoly;
       double_poly_init (dpoly, ps->deg);
       double_poly_set_mpz_poly (dpoly, ps);
-      double maxnorm = get_maxnorm_alg (dpoly, A/2., B);
+      double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
+              fudge_factor*B);
       double_poly_clear (dpoly);
       if (side == si->doing->side)
         maxnorm /= q;
-
-      maxnorm *= fudge_factor;
 
       double_poly_t F;
       F->deg = ps->deg;
