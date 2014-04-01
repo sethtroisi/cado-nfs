@@ -714,6 +714,10 @@ int main(int argc, char **argv)
       if (!want_longq) {
         // Select next special-q
         if (nroots == 0) { // find next q
+            // exit early if rho was given
+            if (rho_given)
+                break;
+            // otherwise, compute next valid q.
             do {
                 do {
                     sq_monic_set_next(q0, q0, 64);
