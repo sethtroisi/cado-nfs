@@ -30,6 +30,7 @@ void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, 
 void init_degree_one_norms_bucket_region_internal     (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2);
 void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd);
 void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, double *roots);
+void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, unsigned int *nroots, double *roots);
 
 double get_maxnorm_alg (double_poly_srcptr src_poly, const double X, const double Y);
 

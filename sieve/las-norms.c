@@ -162,6 +162,87 @@ static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d sc
 }
 #endif /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
 
+/* This function computes the roots of the polynome F(i,1) and
+   the roots of the polynomes d^2(F(i,1))/d(i)^2, so the roots of
+   F(i,1)F"(i,1)-F'(i,1)^2.
+   The number of Roots is <= d + 2 * (d - 1), where d is the degree
+   of F(i,1).
+   After, the special "pseudo" roots 0.0 is add, in order to correct
+   the smart initialization in the neigborhood of i = 0.
+   These roots are useful to correct the smart initialization of the
+   algebraics, because the computed values are false near the roots.
+
+   if deg(f) = 0, nroots = 1 (pseudo root 0.0),
+   if deg(f) >= 1, nroots <= 1 (root of f) + 0 (root of f") + 1 (pseudo root),.
+   if deg(f) >= 2, nroots <= deg(f) + 2 * deg(f) - 2 + 1 = 3 * deg(f) - 1.
+   So, the size of the array roots must be 3 * deg(f) + 1.
+
+   This function is internal. Don't use it. Use the wrapper below.
+
+   Input: F(i,1): degree et coefficients. max_abs_root = Absolute maximum value
+   of a root (before and after, the root is useless).
+   Output: nroots & roots.
+*/
+void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, unsigned int *nroots, double *roots)
+{
+  const double_poly_t f = {{ degree, coeff }};
+  double_poly_t df, ddf, f_ddf, df_df, d2f;
+  root_struct Roots[2 * f->deg + 1];
+  mpz_t           p[2 * f->deg + 1];
+  unsigned int nroots_f, nroots_d2f;
+  size_t k;
+  for (k = 2 * f->deg + 1; k--; ) {
+    mpz_init (p[k]);
+    root_struct_init (&(Roots[k]));
+  }
+  for (k = f->deg + 1; k--; )
+    mpz_set_d (p[k], f->coeff[k]);
+  
+  nroots_f = numberOfRealRoots (p, f->deg, max_abs_root, 0, Roots);
+  for (k = nroots_f; k--; )
+    roots[k] = rootRefine (&(Roots[k]), p, f->deg);
+
+  double_poly_init (df, MAX(0,((int)f->deg - 1)));
+  double_poly_derivative (df, f);
+  double_poly_init (df_df, df->deg + df->deg);
+  double_poly_product (df_df, df, df);
+
+  double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
+  double_poly_derivative (ddf, df);
+  double_poly_init (f_ddf, f->deg + ddf->deg);
+  double_poly_product (f_ddf, f, ddf);
+  
+  double_poly_init (d2f, MAX(f_ddf->deg, df_df->deg));
+  double_poly_substract (d2f, f_ddf, df_df);
+  
+  for (k = d2f->deg + 1; k--; )
+    mpz_set_d (p[k], d2f->coeff[k]);
+
+  double_poly_clear(df);
+  double_poly_clear(ddf);
+  double_poly_clear(f_ddf);
+  double_poly_clear(df_df);
+  double_poly_clear(d2f);
+
+  nroots_d2f = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
+  for (k = nroots_d2f; k--; )
+    roots[k + nroots_f] = rootRefine (&(Roots[k]), p, d2f->deg);
+
+  /* Pseudo root 0.0 */
+  roots[nroots_f + nroots_d2f] = 0.0;
+  *nroots = nroots_f + nroots_d2f + 1;
+
+  for (k = f->deg * 2 + 1; k--; ) {
+    mpz_clear (p[k]);
+    root_struct_clear (&(Roots[k]));
+  }
+}
+
+/* A wrapper for the function above */
+void init_norms_roots (sieve_info_ptr si, unsigned int side)
+{
+  init_norms_roots_internal (si->cpoly->pols[side]->deg, si->sides[side]->fijd, (double) ((si->I + 16) >> 1), &(si->sides[side]->nroots), si->sides[side]->roots);
+}
 
 /* Initialize lognorms of the bucket region S[] number J, for F(i,j) with
  * degree = 1.
@@ -954,12 +1035,6 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   /* Now, the value near the roots must be corrected. */
   J = beginJ;
   S = beginS;
-  /* CAREFUL! F(0. +/- epsilon, j) and its neighborhood are not especially a
-     root for F(i,j). But at this place, F(i,j) is not so smooth to accept
-     the smart initialization (1 computed F(i,j) value could be ~ correct for
-     its (8*VERT_NORM_STRIDE) neighbours).
-     To correct this, I add a "false" root: 0. */
-  roots[nroots++] = 0.;
   double dIdiv2 = (double) Idiv2;
   for (; J < endJ; S += I, J++) {
     double u[d+1];
@@ -978,7 +1053,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	  if (UNLIKELY(abs (c1 - S[ih]))) {
 	    S[ih] = c1;
 	    c2 = 0;
-	  } else if (++c2 > 8) break;
+	  } else if (++c2 > 4) break;
 	} while (--ih >= -Idiv2);
       }
       if (hr < dIdiv2) {
@@ -992,7 +1067,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	  if (UNLIKELY(abs (c1 - S[ih]))) {
 	    S[ih] = c1;
 	    c2 = 0;
-	  } else if (++c2 > 8) break;
+	  } else if (++c2 > 4) break;
 	} while (++ih < Idiv2);
       }
     }
@@ -1145,7 +1220,8 @@ void sieve_info_init_norm_data(sieve_info_ptr si)
       mpz_poly_init (si->sides[side]->fij, d);
       si->sides[side]->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
-      si->sides[side]->roots = (double *) malloc_aligned(((d + 1 ) << 1) * sizeof(double), 16);
+      /* Cf init_norms_roots to see the reason of d*3+1 */
+      si->sides[side]->roots = (double *) malloc_aligned((d * 3 + 1) * sizeof(double), 16);
       FATAL_ERROR_CHECK(si->sides[side]->roots == NULL, "malloc failed");
       si->sides[side]->nroots = 0;
     }
@@ -1280,6 +1356,14 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /************************** rational side **********************************/
 
+  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
+     d^2(F(i,1))/d(i)^2.
+     These roots and 0.0 are need to be corrected the norms initialization on their
+     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
+#ifdef SMART_NORM
+  if (si->cpoly->pols[RATIONAL_SIDE]->deg >= 2) init_norms_roots (si, RATIONAL_SIDE);
+#endif
+
   /* Compute the maximum norm of the rational polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
@@ -1316,6 +1400,13 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /************************** algebraic side *********************************/
 
+  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
+     d^2(F(i,1))/d(i)^2.
+     These roots and 0.0 are need to be corrected the norms initialization on their
+     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
+#ifdef SMART_NORM
+  if (si->cpoly->pols[ALGEBRAIC_SIDE]->deg >= 2) init_norms_roots (si, ALGEBRAIC_SIDE);
+#endif
   /* Compute the maximum norm of the algebraic polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */

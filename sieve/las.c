@@ -3537,7 +3537,11 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds_thread ();
+#ifdef SMART_NORM
 	    init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+	    init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
             // Invalidate the first row except (1,0)
             if (!i) {
                 int pos10 = 1+((si->I)>>1);
@@ -3579,7 +3583,11 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init algebraic norms */
             rep->tn[side] -= seconds_thread ();
 
-            init_norms_bucket_region(S[side], i, si, side, 1);
+#ifdef SMART_NORM
+	    init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+            init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
