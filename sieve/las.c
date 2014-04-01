@@ -3104,6 +3104,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int is_dup = do_check && relation_is_duplicate(las->output, rel,
                         las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
+                if (!is_dup)
+                    cpt++;
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
@@ -3112,7 +3114,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pthread_mutex_unlock(&io_mutex);
             }
 
-            cpt++;
             /* Build histogram of lucky S[x] values */
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 

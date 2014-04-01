@@ -113,20 +113,9 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
 
   new_si->cpoly = old_si->cpoly; /* A pointer, and polynomial not get modified */
 
-  new_si->conf->side = old_si->conf->side;
-  new_si->conf->logI = old_si->conf->logI;
-  new_si->conf->bitsize = old_si->conf->bitsize;
-  new_si->conf->skewness = old_si->conf->skewness;
-  for(int side = 0; side < 2; side++) {
-    new_si->conf->sides[side]->lim = old_si->conf->sides[side]->lim;
-    new_si->conf->sides[side]->lpb = old_si->conf->sides[side]->lpb;
-    new_si->conf->sides[side]->mfb = old_si->conf->sides[side]->mfb;
-    new_si->conf->sides[side]->lambda = old_si->conf->sides[side]->lambda;
-    
-    new_si->sides[side]->logmax = old_si->sides[side]->logmax;
-    new_si->sides[side]->strategy = old_si->sides[side]->strategy;
-  }
+  memmove(new_si->conf, old_si->conf, sizeof(new_si->conf));
 
+  /* Allocate memory */
   sieve_info_init_norm_data(new_si);
 
   /* Compute the root a/b (mod p) */
@@ -171,12 +160,13 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
   int saw_sq = 0;
   for (int i = 0; i < nr_lp; i++) {
     const unsigned long p = large_primes[i];
-    if (!saw_sq && p == sq) {
+    if (sq != 0 && !saw_sq && p == sq) {
       saw_sq = 1;
       continue;
     }
     mpz_mul_ui(cof, cof, p);
   }
+  ASSERT_ALWAYS(sq == 0 || saw_sq);
 }
 
 #define WRAP(x) x
