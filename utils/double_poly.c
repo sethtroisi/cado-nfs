@@ -146,8 +146,8 @@ double_poly_substract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcpt
   if (f->deg <= g->deg) {
     ASSERT(h->deg >= g->deg);
     h->deg = g->deg;
-    for (     ; i <= f->deg; ++i) h->coeff[i] =             - g->coeff[i];
-    for (i = 0; i <= g->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
+    for (i = 0; i <= f->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
+    for (     ; i <= g->deg; ++i) h->coeff[i] =             - g->coeff[i];
   } else {
     ASSERT(h->deg >= f->deg);
     h->deg = f->deg;
