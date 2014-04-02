@@ -321,7 +321,7 @@ insert_rel_into_table(void * context_data, earlyparsed_relation_ptr rel)
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
-    weight_t e = rel->primes[i].e;
+    exponent_t e = rel->primes[i].e;
 
     if (data->w[h] == 0)
     {

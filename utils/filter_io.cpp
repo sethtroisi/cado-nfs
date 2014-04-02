@@ -666,15 +666,20 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
 
     for( ; ; ) {
         uint64_t pr;
+        int sgn = 1;
         if (c == '\n') break;
+        if (c == '-') {
+            sgn = -1;
+            RINGBUF_GET_ONE_BYTE(c, r, p);
+        }
         c = earlyparser_inner_read_prime(r, &p, &pr);
         if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
+            rel->primes[n-1].e += sgn;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
             rel->primes[n].h = (index_t) pr;
             rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
+            rel->primes[n].e = sgn;
             n++;
         }
     }

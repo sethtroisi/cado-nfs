@@ -50,7 +50,7 @@
 /* For relations, we hope that there will never be more */
 /* than 255 ideals per relation */
 #define weight_t uint8_t
-#define exponent_t uint8_t
+#define exponent_t int8_t
 #define REL_MAX_SIZE 255
 
 typedef struct {
