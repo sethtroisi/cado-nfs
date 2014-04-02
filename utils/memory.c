@@ -59,7 +59,7 @@ malloc_hugepages(const size_t size)
   }
   return m;
 #else
-  return malloc_pagealigned(sz);
+  return malloc_pagealigned(size);
 #endif
 }
 
