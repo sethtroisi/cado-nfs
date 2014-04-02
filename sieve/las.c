@@ -1099,7 +1099,14 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     return pushed;
 }
 
-
+/* Format of a file with a list of special-q (-todo option):
+ *   - Comments are allowed (start line with #)
+ *   - Blank lines are ignored
+ *   - Each valid line must have the form
+ *       s q r
+ *     where s is "a" or "r", giving the "algebraic" or "rational" side
+ *     of the special q, and q and r are as usual.
+ */
 int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 {
     if (las->todo) return 1; /* keep going */
