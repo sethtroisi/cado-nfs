@@ -495,7 +495,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
 double
 rootRefine (root_struct *r, mpz_t *p, int n)
 {
-  volatile double a, b, c;
+  double a, b, c;
   double sa, sb, sc;
   double_poly_t q;
   mpz_poly_t P;
@@ -514,7 +514,8 @@ rootRefine (root_struct *r, mpz_t *p, int n)
                                    exponents of the double format */
   while (count++ < MAX_LOOPS)
     {
-      c = (a + b) * 0.5;
+      c = a + b;
+      c = (double) (c * 0.5); /* explicit cast to avoid extended precision */
       if (c == a || c == b)
         break;
       sc = double_poly_eval (q, c);
