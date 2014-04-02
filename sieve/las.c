@@ -3683,10 +3683,10 @@ static void thread_data_free(thread_data * thrs, int n)/*{{{*/
         for (int side = 0; side < 2; side++) {
           thread_side_data_ptr ts = thrs[i]->sides[side];
           // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          contiguous_free(ts->bucket_region, BUCKET_REGION + MEMSET_MIN);
+          contiguous_free(ts->bucket_region);
           ts->bucket_region = NULL;
         }
-        contiguous_free(thrs[i]->SS, BUCKET_REGION);
+        contiguous_free(thrs[i]->SS);
         thrs[i]->SS = NULL;
     }
     free(thrs);
