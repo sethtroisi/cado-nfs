@@ -44,6 +44,25 @@ void
     return p;
 }
 
+
+void *
+malloc_hugepages(const size_t size)
+{
+#ifdef MADV_HUGEPAGE
+  void *m = malloc_aligned(size, LARGE_PAGE_SIZE);
+  int r;
+  do {
+    r = madvise(m, size, MADV_HUGEPAGE);
+  } while (r == EAGAIN);
+  if (r != 0) {
+    perror("madvise failed");
+  }
+  return m;
+#else
+  return malloc_pagealigned(sz);
+#endif
+}
+
 void
 *physical_malloc (const size_t x, const int affect)
 {

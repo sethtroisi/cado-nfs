@@ -6,6 +6,7 @@
 extern void * malloc_check(const size_t x);
 extern void * physical_malloc(const size_t x, const int affect);
 
+void *malloc_hugepages(size_t);
 extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
 extern void free_aligned(const void * ptr, size_t alignment);
