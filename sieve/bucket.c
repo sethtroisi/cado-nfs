@@ -1,6 +1,7 @@
 #include "cado.h"
 #include "bucket.h"
 #include "portability.h"
+#include "memory.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
