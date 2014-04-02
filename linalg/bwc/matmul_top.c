@@ -41,9 +41,9 @@
 #define ALWAYS_ALIGN_LARGE_MALLOCS      16
 
 #ifdef  ALWAYS_ALIGN_LARGE_MALLOCS
-#include "misc.h"       /* malloc/free_aligned are in utils */
+#include "memory.h"       /* malloc/free_aligned are in utils */
 #define alignable_malloc(s)  malloc_aligned((s), ALWAYS_ALIGN_LARGE_MALLOCS)
-#define alignable_free(p,s)  free_aligned((p), (s), ALWAYS_ALIGN_LARGE_MALLOCS)
+#define alignable_free(p,s)  free_aligned((p), ALWAYS_ALIGN_LARGE_MALLOCS)
 #else
 #define alignable_malloc(s)  malloc((s))
 #define alignable_free(p,s)  free((p))

@@ -44,11 +44,30 @@ void
     return p;
 }
 
+
+void *
+malloc_hugepages(const size_t size)
+{
+#ifdef MADV_HUGEPAGE
+  void *m = malloc_aligned(size, LARGE_PAGE_SIZE);
+  int r;
+  do {
+    r = madvise(m, size, MADV_HUGEPAGE);
+  } while (r == EAGAIN);
+  if (r != 0) {
+    perror("madvise failed");
+  }
+  return m;
+#else
+  return malloc_pagealigned(size);
+#endif
+}
+
 void
 *physical_malloc (const size_t x, const int affect)
 {
   void *p;
-  p = malloc_check(x);
+  p = malloc_hugepages(x);
   if (affect) {
     size_t i, m;
 #ifdef HAVE_SSE2
@@ -96,7 +115,7 @@ void *malloc_aligned(size_t size, size_t alignment)
 #endif
 }
 
-void free_aligned(const void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNUSED)
+void free_aligned(const void * p, size_t alignment MAYBE_UNUSED)
 {
 #ifdef HAVE_POSIX_MEMALIGN
     free((void *) p);
@@ -133,9 +152,9 @@ void *malloc_pagealigned(size_t sz)
     return p;
 }
 
-void free_pagealigned(const void * p, size_t sz)
+void free_pagealigned(const void * p)
 {
-    free_aligned(p, sz, pagesize ());
+    free_aligned(p, pagesize ());
 }
 
 /* Functions for allocating contiguous physical memory, if large pages are available.
@@ -226,7 +245,7 @@ void *contiguous_malloc(const size_t size)
   return ptr;
 }
 
-void contiguous_free(const void *ptr, const size_t size)
+void contiguous_free(const void *ptr)
 {
   struct largepage_chunk **next = &chunks;
   while (*next != NULL) {
@@ -251,5 +270,5 @@ void contiguous_free(const void *ptr, const size_t size)
     next = &(chunk->next);
   }
   // printf ("# large-page memory at %p not found, calling free_pagealigned()\n", ptr);
-  free_pagealigned(ptr, size);
+  free_pagealigned(ptr);
 }

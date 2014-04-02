@@ -6,14 +6,15 @@
 extern void * malloc_check(const size_t x);
 extern void * physical_malloc(const size_t x, const int affect);
 
+void *malloc_hugepages(size_t);
 extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
-extern void free_aligned(const void * ptr, size_t size, size_t alignment);
+extern void free_aligned(const void * ptr, size_t alignment);
 
 extern void * malloc_pagealigned(size_t sz);
-extern void free_pagealigned(const void * ptr, size_t sz);
+extern void free_pagealigned(const void * ptr);
 
 void *contiguous_malloc(size_t);
-void contiguous_free(const void *, size_t);
+void contiguous_free(const void *);
 
 #endif

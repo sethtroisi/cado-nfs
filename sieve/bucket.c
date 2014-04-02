@@ -171,23 +171,23 @@ void
 clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   /* Never free mBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
-  if (mBA->logp_idx) free_aligned(mBA->logp_idx, mBA->size_b_align * BA->size_arr_logp, 0x40);
-  if (mBA->bucket_write) free_pagealigned(mBA->bucket_write, mBA->size_b_align);
-  if (mBA->bucket_start) free_aligned(mBA->bucket_start, mBA->size_b_align, 0x40);
+  if (mBA->logp_idx) free_aligned(mBA->logp_idx, 0x40);
+  if (mBA->bucket_write) free_pagealigned(mBA->bucket_write);
+  if (mBA->bucket_start) free_aligned(mBA->bucket_start, 0x40);
   memset(mBA, 0, sizeof(*mBA));
 
   /* Never free kBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
-  if (kBA->logp_idx) free_aligned(kBA->logp_idx, kBA->size_b_align * BA->size_arr_logp, 0x40);
-  if (kBA->bucket_write) free_pagealigned(kBA->bucket_write, kBA->size_b_align);
-  if (kBA->bucket_start) free_aligned(kBA->bucket_start, kBA->size_b_align, 0x40);
+  if (kBA->logp_idx) free_aligned(kBA->logp_idx, 0x40);
+  if (kBA->bucket_write) free_pagealigned(kBA->bucket_write);
+  if (kBA->bucket_start) free_aligned(kBA->bucket_start, 0x40);
   memset(kBA, 0, sizeof(*kBA));
 
   free (BA->bucket_start[0]); /* Always = big_data in all BA, kBA, mBA init functions */
   free (BA->logp_val);
-  free_aligned(BA->logp_idx, BA->size_b_align * BA->size_arr_logp, 0x40);
-  free_aligned(BA->bucket_read, BA->size_b_align, 0x40);
-  free_aligned(BA->bucket_start, BA->size_b_align, 0x40);
-  free_pagealigned(BA->bucket_write, BA->size_b_align);
+  free_aligned(BA->logp_idx, 0x40);
+  free_aligned(BA->bucket_read, 0x40);
+  free_aligned(BA->bucket_start, 0x40);
+  free_pagealigned(BA->bucket_write);
   memset(BA, 0, sizeof(*BA));
 }
 
