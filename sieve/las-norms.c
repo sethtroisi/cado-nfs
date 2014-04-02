@@ -20,12 +20,36 @@
 #include "utils.h"
 #include "portability.h"
 
-/* Input: i, double. i >= 0 needed!
+#if 0
+/* In gcc 4.8.2, fabs(__m128d) is done by X = andpd (X, c_and)
+   with const _m128d c_and 0x7FFFFFFFFFFFFFFF7FFFFFFFFFFFFFFF.
+   Id for fabs(double) with X = andsd.
+   No so good because it needs a read memory operation.
+   These 2 SSE operations are much faster. */
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+static inline ffabs_m128d (__m128d *i) {
+  __asm__ __volatile__ (
+	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
+	   "psrlq     $0x01,    %0       \n" /* i = fast_abs(i) */
+	   : "+&x" (*i));
+}
+#endif
+
+static inline ffabs_double (double *i) {
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+  ffabs_m128d ((__m128d *) i);
+#else
+  *i = fabs(*i);
+#endif
+}
+#endif /* 0 */
+
+/* Input: i, double. i > 0 needed! If not, the result has no sense at all.
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
    Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
    Add & scale are need to compute o'=f(log2(i)) where f is an affine function.
 */
-static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
+static inline uint8_t lg2 (double i, double add, double scale) {
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
             "psrlq $0x20,  %0    \n"
@@ -41,21 +65,38 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
      to do the transfert. Without it, a warning appears but the code is false!
   */
   void *tg = &i;
-  return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
+  return (uint8_t) (((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
 #endif
 }
 
-/* Same than previous, but the result is duplicated 8 times in a "false" double
-   in SSE version, i.e. in a xmm register, or in a 64 bits general register in
-   non SSE version, and written at addr[decal].
+/* Same than previous with a fabs on i before the computation of the log2.
+ */
+static inline uint8_t lg2abs (double i, double add, double scale) {
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+  __asm__ __volatile__ (
+            "psllq $0x01,  %0    \n"
+            "psrlq $0x21,  %0    \n"
+	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
+	    : "+&x" (i));             /* Really need + here! i is not modified in C code! */
+  return (uint8_t) ((i-add)*scale);
+#else
+  void *tg = &i;
+  return (uint8_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
+#endif
+}
+
+/* Same than previous with the result is duplicated 8 times
+   in a "false" double in SSE version, i.e. in a xmm register, or in a 64 bits
+   general register in non SSE version, and written at addr[decal].
    The SSE version has 4 interests: no memory use, no General Register use, 
    no xmm -> GR conversion, no * 0x0101010101010101 (3 to 4 cycles) but only
    2 P-instructions (1 cycle).
 */
-static inline void uint64truncfastlog2(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
+static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   __asm__ __volatile__ (
-            "psrlq $0x20,  %0                 \n"
+            "psllq $0x01,  %0                 \n"
+            "psrlq $0x21,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
 	    : "+&x" (i));
   i = (i - add) * scale;
@@ -67,7 +108,7 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) (((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
+  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
 #endif
 }
 
@@ -76,17 +117,17 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
    I prefer use X86 ASM directly and avoid intrinsics because the trick of
    cvtdq2pd (I insert 2 doubles values and do a cvtdq2pd on them in order to
    compute their log2).
-   CAREFUL! This function adds (1., 1.) to i to avoid negative value in the
-   exponent (numbers < 1.) !
+   This function does a double abs of the __m128d i, and computes the double
+   log2 of the result.
+   Careful: if i == 0, the result is not predictible.
 */
-static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, uint8_t *addr, ssize_t decal, __m128d one) {
+static inline void w128lg2abs(__m128d i, const __m128d add, const __m128d scale, uint8_t *addr, const ssize_t decal) {
   __asm__ __volatile__ (
 	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
-	   "psrlq     $0x01,    %0       \n"
-	   "addpd     %1,       %0       \n" /* To avoid negative values in the exponents */
+	   "psrlq     $0x01,    %0       \n" /* i = fast_abs(i) */
 	   "shufps    $0xED,    %0,    %0\n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "+&x"(i):"x"(one));
+	   : "+&x"(i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ __volatile__ (
 	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
@@ -97,22 +138,133 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   : "+&x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
-#endif
 
-/* Initialize lognorms on the rational side for the bucket_region
- * number N.
+/* This function is for the SSE2 init algebraics, but for the exact initialization.
+   Same than previous but return a SSE2 register with only 16 lowest bits are computed
+   as the 2 results (2 8-bits values). 
+   CAREFUL! This function returns the computed value in the data i.
+   the i value is modified by this function !
+*/
+static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d scale) {
+  __asm__ __volatile__ (
+	   "psllq     $0x01,    %0       \n" /* Dont use pabsd! */
+	   "psrlq     $0x01,    %0       \n"
+	   "shufps    $0xED,    %0,    %0\n"
+	   "cvtdq2pd  %0,       %0       \n"
+	   : "+&x"(*i));
+  *i = _mm_mul_pd(_mm_sub_pd(*i, add), scale);
+  __asm__ __volatile__ (
+	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
+	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
+	   "packuswb  %0,       %0       \n" /* 0000 0000 0000 00XY */
+	   : "+&x"(*i));
+  return *(__m128i *) i;
+}
+#endif /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+
+/* This function computes the roots of the polynome F(i,1) and
+   the roots of the polynomes d^2(F(i,1))/d(i)^2, so the roots of
+   F(i,1)F"(i,1)-F'(i,1)^2.
+   The number of Roots is <= d + 2 * (d - 1), where d is the degree
+   of F(i,1).
+   After, the special "pseudo" roots 0.0 is add, in order to correct
+   the smart initialization in the neigborhood of i = 0.
+   These roots are useful to correct the smart initialization of the
+   algebraics, because the computed values are false near the roots.
+
+   if deg(f) = 0, nroots = 1 (pseudo root 0.0),
+   if deg(f) >= 1, nroots <= 1 (root of f) + 0 (root of f") + 1 (pseudo root),.
+   if deg(f) >= 2, nroots <= deg(f) + 2 * deg(f) - 2 + 1 = 3 * deg(f) - 1.
+   So, the size of the array roots must be 3 * deg(f) + 1.
+
+   This function is internal. Don't use it. Use the wrapper below.
+
+   Input: F(i,1): degree et coefficients. max_abs_root = Absolute maximum value
+   of a root (before and after, the root is useless).
+   Output: nroots & roots.
+*/
+void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, unsigned int *nroots, double *roots)
+{
+  const double_poly_t f = {{ degree, coeff }};
+  double_poly_t df, ddf, f_ddf, df_df, d2f;
+  root_struct Roots[2 * f->deg + 1];
+  mpz_t           p[2 * f->deg + 1];
+  unsigned int nroots_f, nroots_d2f;
+  size_t k;
+  for (k = 2 * f->deg + 1; k--; ) {
+    mpz_init (p[k]);
+    root_struct_init (&(Roots[k]));
+  }
+  for (k = f->deg + 1; k--; )
+    mpz_set_d (p[k], f->coeff[k]);
+  
+  nroots_f = numberOfRealRoots (p, f->deg, max_abs_root, 0, Roots);
+  for (k = nroots_f; k--; )
+    roots[k] = rootRefine (&(Roots[k]), p, f->deg);
+
+  double_poly_init (df, MAX(0,((int)f->deg - 1)));
+  double_poly_derivative (df, f);
+  double_poly_init (df_df, df->deg + df->deg);
+  double_poly_product (df_df, df, df);
+
+  double_poly_init (ddf, MAX(0,((int)df->deg - 1)));
+  double_poly_derivative (ddf, df);
+  double_poly_init (f_ddf, f->deg + ddf->deg);
+  double_poly_product (f_ddf, f, ddf);
+  
+  double_poly_init (d2f, MAX(f_ddf->deg, df_df->deg));
+  double_poly_substract (d2f, f_ddf, df_df);
+  
+  for (k = d2f->deg + 1; k--; )
+    mpz_set_d (p[k], d2f->coeff[k]);
+
+  double_poly_clear(df);
+  double_poly_clear(ddf);
+  double_poly_clear(f_ddf);
+  double_poly_clear(df_df);
+  double_poly_clear(d2f);
+
+  nroots_d2f = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
+  for (k = nroots_d2f; k--; )
+    roots[k + nroots_f] = rootRefine (&(Roots[k]), p, d2f->deg);
+
+  /* Pseudo root 0.0 */
+  roots[nroots_f + nroots_d2f] = 0.0;
+  *nroots = nroots_f + nroots_d2f + 1;
+
+  for (k = f->deg * 2 + 1; k--; ) {
+    mpz_clear (p[k]);
+    root_struct_clear (&(Roots[k]));
+  }
+}
+
+/* A wrapper for the function above */
+void init_norms_roots (sieve_info_ptr si, unsigned int side)
+{
+  init_norms_roots_internal (si->cpoly->pols[side]->deg, si->sides[side]->fijd, (double) ((si->I + 16) >> 1), &(si->sides[side]->nroots), si->sides[side]->roots);
+}
+
+/* Initialize lognorms of the bucket region S[] number J, for F(i,j) with
+ * degree = 1.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
  * not coprime, except for the line j=0.
  */
-
 /* Internal function, only with simple types, for unit/integration testing */
-void init_rat_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2) {
-#define COMPUTE_Y(G) (inttruncfastlog2 ((G) + 1., add, scale))
+void init_degree_one_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, double u0, double u1, double *cexp2) {
+
+  /* The computation of the log2 by inttruncfastlog2 needs a value >= 1.
+     Here, in the classical rational initialization, the degree of the used
+     polynome F(i,j) is hardcoded to 1. So, it's possible to have F(i,j) = 0,
+     even if i, j and the coefficients of F(i,j) are integers and != 0.
+     So, I add 1.0 on all G values.
+     It's not useful to do a fabs(G) here because the code uses always COMPUTE_Y(G)
+     with G >= 0. */
+#define COMPUTE_Y(G) lg2 ((G) + 1., add, scale)
   /* For internal debug: print all */
   // #define DEBUG_INIT_RAT 1
   double add, d0_init, g, rac, u0J, d0, d1, i;
   size_t ts;
-  uint32_t eJ;
+  uint32_t endJ;
   int int_i;
   unsigned int inc;
   uint8_t oy, y;
@@ -122,9 +274,9 @@ void init_rat_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
   const int Idiv2 = (int) I >> 1;
   const double Idiv2_double = (double) Idiv2, Idiv2_double_minus_one = Idiv2_double - 1., invu1 = 1./u1;
   
-  eJ = LOG_BUCKET_REGION - ctz(I);
-  J <<= eJ;
-  eJ = (1U << eJ) + J;
+  endJ = LOG_BUCKET_REGION - ctz(I);
+  J <<= endJ;
+  endJ = (1U << endJ) + J;
 
 #ifdef DEBUG_INIT_RAT
   fprintf (stderr, "Begin: j=%u, u0=%.20e u1=%.20e, scale=%.20e, rac=%.20e\n", J, u0, u1, scale, u0 * j * (-invu1));
@@ -134,7 +286,7 @@ void init_rat_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
   add = 0x3FF00000 - GUARD / scale;
   u0J = u0 * J;
   d0_init = cexp2[((unsigned int)GUARD) - 1U];
-  for (; J < eJ ; J++, u0J += u0) {
+  for (; J < endJ ; J++, u0J += u0) {
     int_i = -Idiv2;
     g = u0J + u1 * int_i;
     rac = u0J * (-invu1);
@@ -349,581 +501,623 @@ void init_rat_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32
   }
 }
 
-/* This function is used only to extract the interesting parameters of the
-   complex structure si and call the previous function */
-void init_rat_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si)
-{
-  init_rat_norms_bucket_region_internal \
-    (S, J, (uint32_t) si->I, si->sides[RATIONAL_SIDE]->scale,
-     si->sides[RATIONAL_SIDE]->fijd[0], si->sides[RATIONAL_SIDE]->fijd[1],
-     si->sides[RATIONAL_SIDE]->cexp2);
-}
-
 static inline void
-poly_scale (double *u, const double *t, unsigned int d, double h)
+poly_scale_double (double  *u, const double *t, unsigned int d, const double h)
 {
-  double hpow;
   u[d] = t[d];
-  for (hpow = h; d--; hpow *= h) u[d] = t[d] * hpow;
+  for (double hpow = h; d--; hpow *= h) u[d] = t[d] * hpow;
 }
-
-/* Smart initialization of the algebraics. Computes the central
-   initialization value of a box of (horizontail=8,vertical=p) and
-   propagates it in the box. 8 is locked by the code and p is the
-   minimum of VERT_NORM_STRIDE (#define, =4) and eJ, with eJ =
-   2^(LOG_BUCKET_REGION-si->conf->logI).
-   So, the fastest code is for logI <= 14.
-   2 versions: SSE version (32bits compatible) & non SSE versions. */
-
-/* Internal function, only with simple types, for unit/integration testing */
-void init_alg_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, unsigned int d, double scale, double *fijd) { 
-  
-/* Macro to fill the others lines, used on SSE and non SSE versions.
-   The first line is now OK; this macro copies it on the
-   VERT_NORM_STRIDE-1 next lines. p is always >= 1. */
-#define FILL_OTHER_LINES do {						\
-    if (LIKELY(p > 1)) {						\
-      unsigned char *mS = S + Idiv2;					\
-      unsigned int k = p - 1;						\
-      S -= Idiv2;							\
-      do { aligned_medium_memcpy (mS, S, I); mS += I; } while (--k);	\
-      S = mS + Idiv2; J += p;						\
-    }									\
-    else { S += I; J++; }						\
-  } while (0)
-
-  unsigned int p;
-  uint32_t eJ;
-  int ih, Idiv2;
-  Idiv2 = (int) I >> 1;
-  eJ = LOG_BUCKET_REGION - ctz (I);
-  J <<= eJ;
-  eJ = 1U << eJ;
-  p = MIN (eJ, VERT_NORM_STRIDE);
-  eJ += J;
-
-  S += Idiv2;
 
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+static inline void
+poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
+{
+  u[d] = _mm_set1_pd (t[d]);
+  for (double hpow = h; d--; hpow *= h) u[d] = _mm_set1_pd (t[d] * hpow);
+}
+#endif
+
+
+/* Exact initialisation of F(i,j) with degre >= 2 (not mandatory). Slow.
+   Internal function, only with simple types, for unit/integration testing. */
+ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd)
+{ 
+  unsigned char *beginS;
+  uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
+  ssize_t ih;
+  const ssize_t Idiv2 = (ssize_t) I >> 1;
+  J <<= endJ;
+  beginJ = J;
+  endJ = (1U << endJ) + J;
+  S += Idiv2;
+  beginS = S;
+  scale *= 1./0x100000;
+  const double add = 0x3FF00000 - GUARD / scale;
+
+#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM /* Light optimization, only log2 */
+  
+  for (; J < endJ; S += I, J++) {
+    double g, h, u[d+1];
+    poly_scale_double (u, fijd, d, (double) J);
+    for (ih = -Idiv2, h = (double) -Idiv2; ih < Idiv2; h += 1., ++ih) {
+      g = u[d]; for (size_t k = d; k--; g = g * h + u[k]);
+      S[ih] = lg2abs (g, add, scale);
+    }
+  }
+
+#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM : optimized part. Stupid fast code. */
+
+  /****** Some SSE internals macros & functions for this function *********/
+#ifndef HAVE_SSSE3
+  inline __m128i _mm_alignr_epi8 (__m128i a, __m128i b, const int c) {
+    return _mm_add_epi16 (_mm_slli_si128 (a, 16 - c), _mm_srli_si128 (b, c));
+  }
+#endif
+  
+  /* This macro avoids a stupid & boring C types control */
+#define _MM_SHUFFLE_EPI32(A,B,C) __asm__ __volatile__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
+  
+  /* Initialisation of the data with intrinsics. */
+#define ALG_CONST_INIT __m128d _two = _mm_set1_pd(2.), \
+    _scale = _mm_set1_pd (scale), _add = _mm_set1_pd (add)
+  /*************** End of the macros for this function *****************/
+
+  /* This function is highly expensive in SSE computations,
+     so it's seriously optimized.
+     It's only a big switch in fact with boring code.
+     It's important to declare and initialize the
+     variables IN each case for optimization reasons. */
+  switch (d) {
+  case 2 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set1_pd (J);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load1_pd(fijd    ),h),h);
+      u1 =             _mm_mul_pd (_mm_load1_pd(fijd + 1),h);
+      u2 =                         _mm_load1_pd(fijd + 2);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd (_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 3 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set_sd (J); _MM_SHUFFLE_EPI32(g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd(fijd    ),h),g);
+      u2 =             _mm_mul_sd (_mm_load_pd(fijd + 2),h);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 4 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set1_pd (J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32(g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g);
+      u2 =             _mm_mul_pd (_mm_load_pd  (fijd + 2),h);
+      u4 =                         _mm_load1_pd (fijd + 4);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd (h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 5 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4, u5;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set_sd (J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd    ),h),g),g);
+      u2 =             _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 2),h),g);
+      u4 =                         _mm_mul_sd (_mm_load_pd (fijd + 4),h);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 6 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4, u5, u6;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set1_pd (J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32 (g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g),g);
+      u2 =             _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd + 2),h),g);
+      u4 =                         _mm_mul_pd (_mm_load_pd  (fijd + 4),h);
+      u6 =                                     _mm_load1_pd (fijd + 6);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 7 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set_sd (J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd    ),h),g);
+      u2 =             _mm_mul_sd (_mm_load_pd (fijd + 2),h);
+      u4 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 4),h),g);
+      u6 =             _mm_mul_sd (_mm_load_pd (fijd + 6),h);
+      g = _mm_mul_pd (g, g); u2 = _mm_mul_pd (u2, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 8 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set1_pd (J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32 (g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g);
+      u2 =             _mm_mul_pd (_mm_load_pd  (fijd + 2),h);
+      u4 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd + 4),h),g);
+      u6 =             _mm_mul_pd (_mm_load_pd  (fijd + 6),h);
+      u8 =                         _mm_load1_pd (fijd + 8);
+      g = _mm_mul_pd (g, g); u2 = _mm_mul_pd (u2, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  case 9 : {
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
+    for (; J < endJ; S += I, J++) {
+      h = _mm_set_sd (J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 =             _mm_mul_sd (_mm_load_pd (fijd    ),h);
+      u2 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 2),h),g);
+      u4 =             _mm_mul_sd (_mm_load_pd (fijd + 4),h);
+      u6 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 6),h),g);
+      u8 =             _mm_mul_sd (_mm_load_pd (fijd + 8),h);
+      g = _mm_mul_pd (g, g); u4 = _mm_mul_pd (u4, g); u2 = _mm_mul_pd (u2, g);
+      g = _mm_mul_pd (g, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      _MM_SHUFFLE_EPI32 (u9, u8, 0xEE); u8 = _mm_unpacklo_pd (u8, u8);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  default: { /* This default could remplace all (optimized) previous cases. */
+    ALG_CONST_INIT; __m128i cumul; __m128d h, g, u[d+1];
+    for (; J < endJ; S += I, J++) {
+      poly_scale_m128d (u, fijd, d, (double) J);
+      for (ih = -Idiv2, h = _mm_set_pd (1 - Idiv2, -Idiv2); ih < Idiv2; *(__m128i *) &S[ih] = cumul, ih += 16) {
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_slli_si128  (_mm_lg2abs (&g, _add, _scale), 14);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	h = _mm_add_pd(h, _two); cumul = _mm_alignr_epi8 (_mm_lg2abs (&g, _add, _scale), cumul, 2);
+      }}}
+    break;
+  } /* End of the big switch of the SSE version - and end of the function */
+#undef _MM_SHUFFLE_EPI32
+#undef ALG_CONST_INIT
+#endif /* End of HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+  /* Special ultra rare case. The correction of log2(F(0,0)) is false, because
+     the fast algorithm of log2 is not good in 0.0. */
+  if (UNLIKELY(!beginJ)) *beginS = GUARD;
+}
+
+/* Smart initialization. Computes only one initialization value F(i+3.5,const j)
+   for a bloc of 8 horizontal values F(i,const j)... F(i+7,const j). After this,
+   the initialization is corrected around the possible roots of
+   d^2(log2(F(i,const j)))/d(i)^2,
+   i.e. around the inflexion points of log2(F(i, const j)), and around i = 0.
+   NB: in fact, the function is log2(fabs(F(i, const j)))... Don't care ?
+   2 versions: SSE version (32bits compatible) & non SSE versions.
+   Internal function, only with simple types, for unit/integration testing */
+void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_t J, uint32_t I, double scale, unsigned int d, double *fijd, unsigned int nroots, double *roots)
+{ 
+  ASSERT (d >= 2);
+  unsigned char *beginS;
+  uint32_t beginJ, endJ = LOG_BUCKET_REGION - ctz (I);
+  ssize_t ih;
+  const ssize_t Idiv2 = (ssize_t) I >> 1;
+  J <<= endJ;
+  beginJ = J;
+  endJ = (1U << endJ) + J;
+  S += Idiv2;
+  beginS = S;
+  scale *= (1./0x100000);
+  const double add = ((double) 0x3FF00000) - GUARD / scale;
+
+#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+
+  for ( ; J < endJ; S += I, ++J) {
+    double g, h, u[d];
+    poly_scale_double (u, fijd, d, (double) J);
+    h = (double) (3.5 - Idiv2);
+    for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
+      g = u[d]; for (size_t k = d; k--; g = g * h + u[k]);
+      w64lg2abs (g, add, scale, S, ih);
+    }
+  }
+
+#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM, optimized part */
 
   /*************** Some SSE macros for this function ***********************/
   /* This macro avoids a stupid & boring C types control */
 #define _MM_SHUFFLE_EPI32(A,B,C) __asm__ __volatile__ ("pshufd $" #C ", %1, %0\n":"=x"(A):"x"(B))
 
   /* Initialisation of the data with intrinsics. */
-#define ALG_INIT_SCALE_ADD_ONE_SIXTEEN const __m128d			\
-    _one MAYBE_UNUSED = _mm_set1_pd(1.),				\
-    _sixteen MAYBE_UNUSED = _mm_set1_pd(16.),				\
-    _scale = _mm_set1_pd(scale * (1./0x100000)),			\
-    _add = _mm_set1_pd(0x3FF00000 - GUARD / (scale * (1./0x100000)))	\
+#define ALG_CONST_INIT const __m128d \
+	_scale = _mm_set1_pd (scale), _add = _mm_set1_pd(add), _sixteen = _mm_set1_pd(16.)
   /*************** End of the macros for this function *****************/
   
   /* This function is only a big switch in fact */
-  switch (d) {
-  case 0 : {
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    memset (S-Idiv2, inttruncfastlog2(fabs(fijd[0]), *(double *)&_add, *(double *)&_scale),
-	    I * (eJ - J)); 
-  }
-    return;
-  case 1 : {
-    __m128d h, g, u0, u1;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      u1 = _mm_load1_pd(fijd+1);    
-      u0 = _mm_set1_pd((double)(J + (p >> 1))*fijd[0]);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(g,u1),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+  switch (d) { /* d >= 2 */
   case 2 : {
-    __m128d h, g, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set1_pd((double)(J + (p >> 1)));
-      u2 = _mm_load1_pd(fijd+2);
-      u1 = _mm_load1_pd(fijd+1);
-      u0 = _mm_load1_pd(fijd);
-      u1 = _mm_mul_pd(u1,h);
-      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),h);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u2),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}	
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set1_pd((double) J);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load1_pd(fijd    ),h),h);
+      u1 =             _mm_mul_pd (_mm_load1_pd(fijd + 1),h);
+      u2 =                         _mm_load1_pd(fijd + 2);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u2),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}	
+    break;
   case 3 : {
-    __m128d h, g, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set_sd((double)(J + (p >> 1)));
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      g = _mm_mul_pd(g,g);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u2 = _mm_mul_sd(u2,h);
-      u0 = _mm_mul_pd(_mm_mul_sd(u0,h),g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u3),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set_sd((double) J); _MM_SHUFFLE_EPI32(g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd(fijd    ),h),g);
+      u2 =             _mm_mul_sd (_mm_load_pd(fijd + 2),h);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u3),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 4 : {
-    __m128d h, g, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set1_pd((double)(J + (p >> 1)));
-      h = _mm_mul_sd(h,h);
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      u4 = _mm_load1_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u2 = _mm_mul_pd(u2,h);
-      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u4),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set1_pd((double) J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32(g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g);
+      u2 =             _mm_mul_pd (_mm_load_pd  (fijd + 2),h);
+      u4 =                         _mm_load1_pd (fijd + 4);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u4),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 5 : {
-    __m128d h, g, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set_sd((double)(J + (p >> 1)));
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      g = _mm_mul_pd(g,g);
-      u4 = _mm_load_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u4 = _mm_mul_sd(u4,h);
-      u2 = _mm_mul_pd(_mm_mul_sd(u2,h),g);
-      u0 = _mm_mul_pd(_mm_mul_pd(_mm_mul_sd(u0,h),g),g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
-      u4 = _mm_unpacklo_pd(u4,u4);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; 
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u5),u4),h),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4, u5;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set_sd((double) J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd    ),h),g),g);
+      u2 =             _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 2),h),g);
+      u4 =                         _mm_mul_sd (_mm_load_pd (fijd + 4),h);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u5),u4),h),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 6 : {
-    __m128d h, g, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set1_pd((double)(J + (p >> 1)));
-      h = _mm_mul_sd(h,h);
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      u6 = _mm_load1_pd(fijd+6);
-      u4 = _mm_load_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u4 = _mm_mul_pd(u4,h);
-      u2 = _mm_mul_pd(_mm_mul_pd(u2,h),g);
-      u0 = _mm_mul_pd(_mm_mul_pd(_mm_mul_pd(u0,h),g),g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
-      u4 = _mm_unpacklo_pd(u4,u4);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4, u5, u6;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set1_pd((double) J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32 (g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g),g);
+      u2 =             _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd + 2),h),g);
+      u4 =                         _mm_mul_pd (_mm_load_pd  (fijd + 4),h);
+      u6 =                                     _mm_load1_pd (fijd + 6);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u6),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 7 : {
-    __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set_sd((double)(J + (p >> 1)));
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      g = _mm_mul_pd(g,g);
-      u6 = _mm_load_pd(fijd+6);
-      u4 = _mm_load_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u6 = _mm_mul_sd(u6,h);
-      u2 = _mm_mul_sd(u2,h);
-      u4 = _mm_mul_pd(_mm_mul_sd(u4,h),g);
-      u0 = _mm_mul_pd(_mm_mul_sd(u0,h),g);
-      g = _mm_mul_pd(g,g);
-      u2 = _mm_mul_pd(u2,g);
-      u0 = _mm_mul_pd(u0,g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
-      u4 = _mm_unpacklo_pd(u4,u4);
-      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
-      u6 = _mm_unpacklo_pd(u6,u6);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; 
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set_sd((double) J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd    ),h),g);
+      u2 =             _mm_mul_sd (_mm_load_pd (fijd + 2),h);
+      u4 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 4),h),g);
+      u6 =             _mm_mul_sd (_mm_load_pd (fijd + 6),h);
+      g = _mm_mul_pd (g, g); u2 = _mm_mul_pd (u2, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u7),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 8 : {
-    __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set1_pd((double)(J + (p >> 1)));
-      h = _mm_mul_sd(h,h);
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      u8 = _mm_load1_pd(fijd+8);
-      u6 = _mm_load_pd(fijd+6);
-      u4 = _mm_load_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u6 = _mm_mul_pd(u6,h);
-      u2 = _mm_mul_pd(u2,h);
-      u4 = _mm_mul_pd(_mm_mul_pd(u4,h),g);
-      u0 = _mm_mul_pd(_mm_mul_pd(u0,h),g);
-      g = _mm_mul_pd(g,g);
-      u2 = _mm_mul_pd(u2,g);
-      u0 = _mm_mul_pd(u0,g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
-      u4 = _mm_unpacklo_pd(u4,u4);
-      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
-      u6 = _mm_unpacklo_pd(u6,u6);
-      h = _mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h; 
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set1_pd((double) J); h = _mm_mul_sd (h, h); _MM_SHUFFLE_EPI32 (g, h, 0x44);
+      u0 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd    ),h),g);
+      u2 =             _mm_mul_pd (_mm_load_pd  (fijd + 2),h);
+      u4 = _mm_mul_pd (_mm_mul_pd (_mm_load_pd  (fijd + 4),h),g);
+      u6 =             _mm_mul_pd (_mm_load_pd  (fijd + 6),h);
+      u8 =                         _mm_load1_pd (fijd + 8);
+      g = _mm_mul_pd (g, g); u2 = _mm_mul_pd (u2, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u8),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   case 9 : {
-    __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      h = _mm_set_sd((double)(J + (p >> 1)));
-      _MM_SHUFFLE_EPI32(g, h, 0x44);
-      g = _mm_mul_pd(g,g);
-      u8 = _mm_load_pd(fijd+8);
-      u6 = _mm_load_pd(fijd+6);
-      u4 = _mm_load_pd(fijd+4);
-      u2 = _mm_load_pd(fijd+2);
-      u0 = _mm_load_pd(fijd);
-      u8 = _mm_mul_sd(u8,h);
-      u4 = _mm_mul_sd(u4,h);
-      u0 = _mm_mul_sd(u0,h);
-      u6 = _mm_mul_pd(_mm_mul_sd(u6,h),g);
-      u2 = _mm_mul_pd(_mm_mul_sd(u2,h),g);
-      g = _mm_mul_pd(g,g);
-      u4 = _mm_mul_pd(u4,g);
-      u2 = _mm_mul_pd(u2,g);
-      g = _mm_mul_pd(g,g);
-      u0 = _mm_mul_pd(u0,g);
-      _MM_SHUFFLE_EPI32(u1, u0, 0xEE);
-      u0 = _mm_unpacklo_pd(u0,u0);
-      _MM_SHUFFLE_EPI32(u3, u2, 0xEE);
-      u2 = _mm_unpacklo_pd(u2,u2);
-      _MM_SHUFFLE_EPI32(u5, u4, 0xEE);
-      u4 = _mm_unpacklo_pd(u4,u4);
-      _MM_SHUFFLE_EPI32(u7, u6, 0xEE);
-      u6 = _mm_unpacklo_pd(u6,u6);
-      _MM_SHUFFLE_EPI32(u9, u8, 0xEE);
-      u8 = _mm_unpacklo_pd(u8,u8);
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = h;
-	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
+    for ( ; J < endJ; S += I, ++J) {
+      h = _mm_set_sd((double) J); _MM_SHUFFLE_EPI32 (g, h, 0x44); g = _mm_mul_pd (g, g);
+      u0 =             _mm_mul_sd (_mm_load_pd (fijd    ),h);
+      u2 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 2),h),g);
+      u4 =             _mm_mul_sd (_mm_load_pd (fijd + 4),h);
+      u6 = _mm_mul_pd (_mm_mul_sd (_mm_load_pd (fijd + 6),h),g);
+      u8 =             _mm_mul_sd (_mm_load_pd (fijd + 8),h);
+      g = _mm_mul_pd (g, g); u4 = _mm_mul_pd (u4, g); u2 = _mm_mul_pd (u2, g);
+      g = _mm_mul_pd (g, g); u0 = _mm_mul_pd (u0, g);
+      _MM_SHUFFLE_EPI32 (u1, u0, 0xEE); u0 = _mm_unpacklo_pd (u0, u0);
+      _MM_SHUFFLE_EPI32 (u3, u2, 0xEE); u2 = _mm_unpacklo_pd (u2, u2);
+      _MM_SHUFFLE_EPI32 (u5, u4, 0xEE); u4 = _mm_unpacklo_pd (u4, u4);
+      _MM_SHUFFLE_EPI32 (u7, u6, 0xEE); u6 = _mm_unpacklo_pd (u6, u6);
+      _MM_SHUFFLE_EPI32 (u9, u8, 0xEE); u8 = _mm_unpacklo_pd (u8, u8);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = _mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(h,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0);
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   default: { /* This default could remplace all (optimized) previous cases. */
-    __m128d h, g, u[d+1];
-    ALG_INIT_SCALE_ADD_ONE_SIXTEEN;
-    while (J < eJ) {
-      { /* Generic initialization of all the u?. */
-	double du[d+1];
-	poly_scale(du, fijd, d, (double) (J + (p >> 1)));
-	for (unsigned int k = 0; k <= d; k++) u[k] = _mm_set1_pd(du[k]);
-      }
-      h =_mm_set_pd(11 - Idiv2, 3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 16) {
-	g = u[d];
-	for (unsigned int k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
-	w128itruncfastlog2fabs(g, _add, _scale, S, ih, _one);
-	h = _mm_add_pd(h, _sixteen);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
+    ALG_CONST_INIT; __m128d h, g, u[d+1];
+    for ( ; J < endJ; S += I, ++J) {
+      poly_scale_m128d (u, fijd, d, (double) J);
+      for (ih = -Idiv2, h = _mm_set_pd (11.5 - Idiv2, 3.5 - Idiv2); ih < Idiv2; ih += 16, h = _mm_add_pd(h, _sixteen)) {
+	g = u[d]; for (size_t k = d; k--; g = _mm_add_pd(_mm_mul_pd(g,h),u[k]));
+	w128lg2abs (g, _add, _scale, S, ih);
+      }}}
+    break;
   } /* End of the big switch of the SSE version - and end of the function */
 #undef _MM_SHUFFLE_EPI32
 #undef ALG_INIT_SCALE_ADD_ONE_SIXTEEN
 
-#else /* !HAVE_GCC_STYLE_AMD64_INLINE_ASM, end of SSE version of the function */
-
-  /* Initialisation of the double data for the non SSE version. */
-#define ALG_INIT_SCALE_ADD_ONE						\
-  const double one MAYBE_UNUSED = 1.;					\
-  scale *= (1./0x100000);						\
-  const double add = ((double) 0x3FF00000) - GUARD / scale
-	
-  /* This function is only a big switch in fact */
-  switch (d) {
-  case 0: {
-    ALG_INIT_SCALE_ADD_ONE;
-    memset(S - Idiv2, 0x0101010101010101 * inttruncfastlog2(fabs(fijd[0]),add,scale),
-	   I * (eJ - J));
-  }
-    return;
-  case 1 : {
-    double g, h, u0, u1;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u1 = fijd[1];			
-      u0 = fijd[0] * ((double) (J + (p >> 1)));
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*u1);
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 2 : {
-    double g, h, u0, u1, u2;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u2 = fijd[2]    ; h  = ((double) (J + (p >> 1)));
-      u1 = fijd[1] * h; h *= h;
-      u0 = fijd[0] * h;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*u2));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 3 : {
-    double g, h, u0, u1, u2, u3;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u3 = fijd[3]    ; h  = ((double) (J + (p >> 1)));
-      u2 = fijd[2] * h; g  = h * h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*u3)));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 4 : {
-    double g, h, u0, u1, u2, u3, u4;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u4 = fijd[4]    ; h  = ((double) (J + (p >> 1)));
-      u3 = fijd[3] * h; g  = h * h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*u4))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 5 : {
-    double g, h, u0, u1, u2, u3, u4, u5;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u5 = fijd[5]    ; h  = ((double) (J + (p >> 1)));
-      u4 = fijd[4] * h; g  = h * h;
-      u3 = fijd[3] * g; g *= h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*u5)))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 6 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u6 = fijd[6]    ; h  = ((double) (J + (p >> 1)));
-      u5 = fijd[5] * h; g  = h * h;
-      u4 = fijd[4] * g; g *= h;
-      u3 = fijd[3] * g; g *= h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*u6))))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 7 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u7 = fijd[7]    ; h  = ((double) (J + (p >> 1)));
-      u6 = fijd[6] * h; g  = h * h;
-      u5 = fijd[5] * g; g *= h;
-      u4 = fijd[4] * g; g *= h;
-      u3 = fijd[3] * g; g *= h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*u7)))))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 8 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u8 = fijd[8]    ; h  = ((double) (J + (p >> 1)));
-      u7 = fijd[7] * h; g  = h * h;
-      u6 = fijd[6] * g; g *= h;
-      u5 = fijd[5] * g; g *= h;
-      u4 = fijd[4] * g; g *= h;
-      u3 = fijd[3] * g; g *= h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*u8))))))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  case 9 : {
-    double g, h, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9;
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      u9 = fijd[9]    ; h  = ((double) (J + (p >> 1)));
-      u8 = fijd[8] * h; g  = h * h;
-      u7 = fijd[7] * g; g *= h;
-      u6 = fijd[6] * g; g *= h;
-      u5 = fijd[5] * g; g *= h;
-      u4 = fijd[4] * g; g *= h;
-      u3 = fijd[3] * g; g *= h;
-      u2 = fijd[2] * g; g *= h;
-      u1 = fijd[1] * g; g *= h;
-      u0 = fijd[0] * g;
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*(u8+h*u9)))))))));
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  default : {
-    double g, h, u[d];
-    ALG_INIT_SCALE_ADD_ONE;
-    while (J < eJ) {
-      poly_scale(u, fijd, d, (double) (J + (p >> 1)));
-      h = (double) (3 - Idiv2);
-      for (ih = -Idiv2; ih < Idiv2; ih += 8, h += 8.) {
-	g = u[d]; for (unsigned int k = d; k--; g = g * h + u[k]); g = fabs(g);
-	g += one;
-	uint64truncfastlog2(g,add,scale,S,ih);
-      }
-      FILL_OTHER_LINES;
-    }}
-    return;
-  } /* End of the big switch of the non SSE version - and end of the function */
-#undef ALG_INIT_SCALE_ADD_ONE
-#endif /* End of !HAVE_GCC_STYLE_AMD64_INLINE_ASM */
+#endif /* !HAVE_GCC_STYLE_AMD64_INLINE_ASM */
 #undef FILL_OTHER_LINES
+
+  /* Now, the value near the roots must be corrected. */
+  J = beginJ;
+  S = beginS;
+  double dIdiv2 = (double) Idiv2;
+  for (; J < endJ; S += I, J++) {
+    double u[d+1];
+    poly_scale_double (u, fijd, d, (double) J);
+    for (size_t r = 0; r < nroots; r++) {
+      double hl = floor((double)J * roots[r]), hr = hl + 1.;
+      ssize_t ih;
+      if (hl >= -dIdiv2) {
+	unsigned char c1, c2 = 0;
+	hl = MIN(hl, dIdiv2 - 1.);
+	ih = (ssize_t) hl; 
+	do {
+	  double g = u[d]; for (size_t k = d; k--; g = g * hl + u[k]);
+	  c1 = lg2abs (g,add,scale);
+	  --hl;
+	  if (UNLIKELY(abs (c1 - S[ih]))) {
+	    S[ih] = c1;
+	    c2 = 0;
+	  } else if (++c2 > 4) break;
+	} while (--ih >= -Idiv2);
+      }
+      if (hr < dIdiv2) {
+	unsigned char c1, c2 = 0;
+	hr = MAX(hr, -dIdiv2);
+	ih = (ssize_t) hr;
+	do {
+	  double g = u[d]; for (size_t k = d; k--; g = g * hr + u[k]);
+	  c1 = lg2abs (g,add,scale);
+	  ++hr;
+	  if (UNLIKELY(abs (c1 - S[ih]))) {
+	    S[ih] = c1;
+	    c2 = 0;
+	  } else if (++c2 > 4) break;
+	} while (++ih < Idiv2);
+      }
+    }
+  }
+  /* Special ultra rare case. The correction of log2(F(0,0)) is false, because
+     the fast algorithm of log2 is not good in 0.0. */
+  if (UNLIKELY(!beginJ)) *beginS = GUARD;
 } /* True end of the function (finally!) */
 
-/* This function is used only to extract the interesting parameters of the
-   complex structure si and call the previous function */
-void init_alg_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, int side)
+/* This function is used to initialize lognorms (=log2(F(i,j)*scale+GUARD)
+   for the bucket_region S[] number J.
+   It's a wrapper; except for trivial degree = 0, it extracts the interesting
+   parameters of the complex structure si and calls the right function.
+
+   - For degree 0, S[] is initialized by a memset: always exact.
+   - A special ultra fast init function is used for degree = 1; it's could be
+     considered as exact (the maximal error is always -/+ 1 on S[]).
+   - For smart = 0 and others degrees, the exact values F(i,j) are computed with
+     a fast log2. The maximal error is always -/+ 1 on S[]. It's obvious slow.
+
+   - For smart != 0 and others degrees, only 1 value each 8 values is computed.
+   The value of F(i+3.5,const j) is used to initialize F(i..i+7,const j).
+   Then around the neigborhood of the inflexion points of F(i,j), the roots of 
+   d^2(F(i,1)/d(i)^2 =  F(i,1)*F"(i,1) - F'^2(i,1), the computed values are
+   corrected. It's 4 to 5 times faster than the exact init.
+
+   This smart algo needs :
+   -> The roots of d^2(F(i,1)/d(i)^2 must be in si->sides[side]->roots;
+   -> si->sides[side]->nroots is the number of roots + 1;
+   -> si->roots[si->sides[side]->nroots - 1] must be = 0.0 : it's a "pseudo" root
+      in order to correct the neigborhood of F(0, const j).
+   Of course, if si->sides[side]->nroots = 0, no correction is done.
+*/
+void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, unsigned int side, unsigned int smart)
 {
-  int deg = si->sides[side]->fij->deg;
-  init_alg_norms_bucket_region_internal(S, J, si->I, deg,
-          si->sides[side]->scale, si->sides[side]->fijd);
+  unsigned int degree = si->sides[side]->fij->deg;
+  switch (degree) {
+  case 0 :
+    memset (S, (int) (log2(1.+fabs(si->sides[side]->fijd[0])) * si->sides[side]->scale) + GUARD, 1U << LOG_BUCKET_REGION);
+    break;
+  case 1 :
+    init_degree_one_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, si->sides[side]->fijd[0], si->sides[side]->fijd[1], si->sides[side]->cexp2);
+    break;
+  default:
+    if (smart)
+      init_smart_degree_X_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, degree, si->sides[side]->fijd, si->sides[side]->nroots, si->sides[side]->roots);
+    else
+      init_exact_degree_X_norms_bucket_region_internal (S, J, si->I, si->sides[side]->scale, degree, si->sides[side]->fijd);
+    break;
+  }
 }
 
 /* return max |g(x)| for x in (0, s) where s can be negative,
@@ -1026,8 +1220,11 @@ void sieve_info_init_norm_data(sieve_info_ptr si)
       mpz_poly_init (si->sides[side]->fij, d);
       si->sides[side]->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
+      /* Cf init_norms_roots to see the reason of d*3+1 */
+      si->sides[side]->roots = (double *) malloc_aligned((d * 3 + 1) * sizeof(double), 16);
+      FATAL_ERROR_CHECK(si->sides[side]->roots == NULL, "malloc failed");
+      si->sides[side]->nroots = 0;
     }
-
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
@@ -1036,6 +1233,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
         sieve_side_info_ptr s = si->sides[side];
         mpz_poly_clear (s->fij);
         free(s->fijd);
+        free(s->roots);
     }
 }
 
@@ -1059,8 +1257,14 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 static unsigned int
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  const double fudge_factor = 16.; /* How much bigger a norm than optimal
-                                      we're willing to tolerate */
+  // The following parameter controls the scaling on the norm.
+  // Relevant values are between 1.0 and 3.0. A higher value means we
+  // select higher values of J, and therefore we find more relations, but
+  // this increases the time per relations.
+  // The value 2.0 seems to be a good compromise. Setting 1.5 reduces the
+  // time per relation and number of relations by about 1.5% on a typical
+  // RSA704 benchmark.
+  const double fudge_factor = 2.0; 
   const double I = (double) (si->I);
   const double q = mpz_get_d(si->doing->p);
   const double skew = si->cpoly->skew;
@@ -1078,18 +1282,17 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double_poly_t dpoly;
       double_poly_init (dpoly, ps->deg);
       double_poly_set_mpz_poly (dpoly, ps);
-      double maxnorm = get_maxnorm_alg (dpoly, A/2., B);
+      double maxnorm = get_maxnorm_alg (dpoly, fudge_factor*A/2.,
+              fudge_factor*B);
       double_poly_clear (dpoly);
       if (side == si->doing->side)
         maxnorm /= q;
-
-      maxnorm *= fudge_factor;
 
       double_poly_t F;
       F->deg = ps->deg;
       F->coeff = s->fijd;
       
-      double v = get_maxnorm_alg (F, I, Jmax);
+      double v = get_maxnorm_alg (F, I/2, Jmax);
       
       if (v > maxnorm)
         { /* use dichotomy to determine largest Jmax */
@@ -1099,7 +1302,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
-              v = get_maxnorm_alg (F, I, c);
+              v = get_maxnorm_alg (F, I/2, c);
               if (v < maxnorm)
                 a = c;
               else
@@ -1158,6 +1361,14 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /************************** rational side **********************************/
 
+  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
+     d^2(F(i,1))/d(i)^2.
+     These roots and 0.0 are need to be corrected the norms initialization on their
+     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
+#ifdef SMART_NORM
+  if (si->cpoly->pols[RATIONAL_SIDE]->deg >= 2) init_norms_roots (si, RATIONAL_SIDE);
+#endif
+
   /* Compute the maximum norm of the rational polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */
@@ -1194,6 +1405,13 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
   /************************** algebraic side *********************************/
 
+  /* Compute the roots of the polynome F(i,1) and the roots of its inflexion points
+     d^2(F(i,1))/d(i)^2.
+     These roots and 0.0 are need to be corrected the norms initialization on their
+     neighboroods in init_smart_degree_X_norms_bucket_region_internal.  */
+#ifdef SMART_NORM
+  if (si->cpoly->pols[ALGEBRAIC_SIDE]->deg >= 2) init_norms_roots (si, ALGEBRAIC_SIDE);
+#endif
   /* Compute the maximum norm of the algebraic polynomial over the sieve
      region. The polynomial coefficient in fijd are already divided by q
      on the special-q side. */

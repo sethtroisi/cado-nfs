@@ -69,6 +69,18 @@ B) to use within another program: compile without -DMAIN, the main function
 
 /* #define DEBUG */
 
+void
+root_struct_init (root_struct *R) {
+  mpz_init (R->a);
+  mpz_init (R->b);
+}
+
+void
+root_struct_clear (root_struct *R) {
+  mpz_clear (R->a);
+  mpz_clear (R->b);
+}
+
 static int
 sign (mpz_t a)
 {
@@ -486,6 +498,7 @@ rootRefine (root_struct *r, mpz_t *p, int n)
   double a, b, c, sa, sb, sc;
   double_poly_t q;
   mpz_poly_t P;
+  unsigned long count = 0;
 
   P->coeff = p;
   P->deg = n;
@@ -496,7 +509,9 @@ rootRefine (root_struct *r, mpz_t *p, int n)
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
   ASSERT_ALWAYS (sa * sb < 0.0);
-  while (1)
+#define MAX_LOOPS (1024 + 1074) /* difference between the maximal and minimal
+                                   exponents of the double format */
+  while (count++ < MAX_LOOPS)
     {
       c = (a + b) * 0.5;
       if (c == a || c == b)
@@ -506,6 +521,14 @@ rootRefine (root_struct *r, mpz_t *p, int n)
         b = c;
       else
         a = c;
+    }
+  if (count >= MAX_LOOPS)
+    {
+      mpz_poly_fprintf (stdout, P);
+      printf ("a=%.16e\n", ldexp (mpz_get_d (r[0].a), -r[0].ka));
+      printf ("b=%.16e\n", ldexp (mpz_get_d (r[0].b), -r[0].kb));
+      printf ("sa=%.16e sb=%.16e\n", sa, sb);
+      exit (EXIT_FAILURE);
     }
   double_poly_clear (q);
   return c;

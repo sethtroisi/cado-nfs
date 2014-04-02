@@ -1099,7 +1099,14 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     return pushed;
 }
 
-
+/* Format of a file with a list of special-q (-todo option):
+ *   - Comments are allowed (start line with #)
+ *   - Blank lines are ignored
+ *   - Each valid line must have the form
+ *       s q r
+ *     where s is "a" or "r", giving the "algebraic" or "rational" side
+ *     of the special q, and q and r are as usual.
+ */
 int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 {
     if (las->todo) return 1; /* keep going */
@@ -3104,6 +3111,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int is_dup = do_check && relation_is_duplicate(las->output, rel,
                         las->nb_threads, si);
                 const char *comment = is_dup ? "# DUPE " : "";
+                if (!is_dup)
+                    cpt++;
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
@@ -3112,7 +3121,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pthread_mutex_unlock(&io_mutex);
             }
 
-            cpt++;
             /* Build histogram of lucky S[x] values */
             th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 
@@ -3537,11 +3545,11 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds_thread ();
-            if (si->cpoly->rat->deg == 1)
-                init_rat_norms_bucket_region(S[side], i, si);
-            else {
-                init_alg_norms_bucket_region(S[side], i, si, side);
-            }
+#ifdef SMART_NORM
+	    init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+	    init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
             // Invalidate the first row except (1,0)
             if (!i) {
                 int pos10 = 1+((si->I)>>1);
@@ -3552,7 +3560,7 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After rationals init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply rational buckets */
@@ -3583,11 +3591,15 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init algebraic norms */
             rep->tn[side] -= seconds_thread ();
 
-            init_alg_norms_bucket_region(S[side], i, si, side);
+#ifdef SMART_NORM
+	    init_norms_bucket_region(S[side], i, si, side, 1);
+#else
+            init_norms_bucket_region(S[side], i, si, side, 0);
+#endif
             rep->tn[side] += seconds_thread ();
 #if defined(TRACE_K) 
             if (trace_on_spot_N(w->N))
-              fprintf (stderr, "# After init_alg_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+              fprintf (stderr, "# After algebraics init_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
 
             /* Apply algebraic buckets */
@@ -3671,10 +3683,10 @@ static void thread_data_free(thread_data * thrs, int n)/*{{{*/
         for (int side = 0; side < 2; side++) {
           thread_side_data_ptr ts = thrs[i]->sides[side];
           // printf ("# Freeing thrs[%d]->sides[%d]->bucket_region\n", i, side);
-          contiguous_free(ts->bucket_region, BUCKET_REGION + MEMSET_MIN);
+          contiguous_free(ts->bucket_region);
           ts->bucket_region = NULL;
         }
-        contiguous_free(thrs[i]->SS, BUCKET_REGION);
+        contiguous_free(thrs[i]->SS);
         thrs[i]->SS = NULL;
     }
     free(thrs);

@@ -13,12 +13,8 @@
 #include <limits.h>
 #include <unistd.h>
 #include <ctype.h>
-#ifdef HAVE_LINUX_BINFMTS_H
-/* linux/binfmts.h defines MAX_ARG_STRLEN in terms of PAGE_SIZE, but does not
-   include a header where PAGE_SIZE is defined, so we include sys/user.h
-   as well. */
-#include <sys/user.h>
-#include <linux/binfmts.h>
+#ifdef HAVE_SSE2
+#include <emmintrin.h>
 #endif
 
 #ifdef HAVE_SYS_MMAN_H
@@ -28,11 +24,138 @@
 #include "macros.h"
 #include "portability.h"
 #include "misc.h"
-#include "cont_mem.h"
+#include "memory.h"
 
 #ifndef LARGE_PAGE_SIZE
 #define LARGE_PAGE_SIZE (2UL*1024*1024)
 #endif
+
+void
+*malloc_check (const size_t x)
+{
+    void *p;
+    p = malloc (x);
+    if (p == NULL)
+      {
+        fprintf (stderr, "Error, malloc of %zu bytes failed\n", x);
+        fflush (stderr);
+        abort ();
+      }
+    return p;
+}
+
+
+void *
+malloc_hugepages(const size_t size)
+{
+#ifdef MADV_HUGEPAGE
+  void *m = malloc_aligned(size, LARGE_PAGE_SIZE);
+  int r;
+  do {
+    r = madvise(m, size, MADV_HUGEPAGE);
+  } while (r == EAGAIN);
+  if (r != 0) {
+    perror("madvise failed");
+  }
+  return m;
+#else
+  return malloc_pagealigned(size);
+#endif
+}
+
+void
+*physical_malloc (const size_t x, const int affect)
+{
+  void *p;
+  p = malloc_hugepages(x);
+  if (affect) {
+    size_t i, m;
+#ifdef HAVE_SSE2
+    const __m128i a = (__m128i) {0, 0};
+#endif    
+    i = ((size_t) p + 15) & (~15ULL);
+    m = ((size_t) p + x - 1) & (~15ULL);
+    while (i < m) {
+#ifdef HAVE_SSE2
+      _mm_stream_si128((__m128i *)i, a);
+#else
+      *(unsigned char *) i = 0;
+#endif
+      i += pagesize ();
+    }
+  }
+  return p;
+}
+
+/* Not everybody has posix_memalign. In order to provide a viable
+ * alternative, we need an ``aligned free'' matching the ``aligned
+ * malloc''. We rely on posix_memalign if it is available, or else fall
+ * back on ugly pointer arithmetic so as to guarantee alignment. Note
+ * that not providing the requested alignment can have some troublesome
+ * consequences. At best, a performance hit, at worst a segv (sse-2
+ * movdqa on a pentium4 causes a GPE if improperly aligned).
+ */
+
+void *malloc_aligned(size_t size, size_t alignment)
+{
+#ifdef HAVE_POSIX_MEMALIGN
+    void *res = NULL;
+    int rc = posix_memalign(&res, alignment, size);
+    ASSERT_ALWAYS(rc == 0);
+    return res;
+#else
+    char * res;
+    res = malloc(size + sizeof(size_t) + alignment);
+    res += sizeof(size_t);
+    size_t displ = alignment - ((uintptr_t) res) % alignment;
+    res += displ;
+    memcpy(res - sizeof(size_t), &displ, sizeof(size_t));
+    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
+    return (void*) res;
+#endif
+}
+
+void free_aligned(const void * p, size_t alignment MAYBE_UNUSED)
+{
+#ifdef HAVE_POSIX_MEMALIGN
+    free((void *) p);
+#else
+    const char * res = (const char *) p;
+    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
+    size_t displ;
+    memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
+    res -= displ;
+    ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
+    res -= sizeof(size_t);
+    free((void *)res);
+#endif
+}
+
+long pagesize (void)
+{
+#if defined(_WIN32) || defined(_WIN64)
+  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+#elif defined(HAVE_SYSCONF)
+  return sysconf (_SC_PAGESIZE);
+#else
+  #error "Cannot determine page size"
+#endif
+}
+
+void *malloc_pagealigned(size_t sz)
+{
+    void *p = malloc_aligned (sz, pagesize ());
+    ASSERT_ALWAYS(p != NULL);
+    return p;
+}
+
+void free_pagealigned(const void * p)
+{
+    free_aligned(p, pagesize ());
+}
 
 /* Functions for allocating contiguous physical memory, if large pages are available.
    If not, they just return malloc_pagealigned().
@@ -122,7 +245,7 @@ void *contiguous_malloc(const size_t size)
   return ptr;
 }
 
-void contiguous_free(const void *ptr, const size_t size)
+void contiguous_free(const void *ptr)
 {
   struct largepage_chunk **next = &chunks;
   while (*next != NULL) {
@@ -147,5 +270,5 @@ void contiguous_free(const void *ptr, const size_t size)
     next = &(chunk->next);
   }
   // printf ("# large-page memory at %p not found, calling free_pagealigned()\n", ptr);
-  free_pagealigned(ptr, size);
+  free_pagealigned(ptr);
 }

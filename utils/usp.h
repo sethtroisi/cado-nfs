@@ -13,5 +13,7 @@ typedef struct {
 
 int numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *R);
 double rootRefine (root_struct *r, mpz_t *p, int n);
+void root_struct_init (root_struct *R);
+void root_struct_clear (root_struct *R);
 
 #endif  /* USP_H_ */

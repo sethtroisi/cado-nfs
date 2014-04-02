@@ -711,8 +711,8 @@ utils/double_poly.c
 utils/double_poly.h
 utils/mpz_vector.h
 utils/mpz_vector.c
-utils/cont_mem.h
-utils/cont_mem.c
+utils/memory.h
+utils/memory.c
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
@@ -732,6 +732,7 @@ tests/tests_common.h
 tests/tests_common.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
+tests/sieve/test_init_norms_bucket_region.c
 tests/sieve/test_init_alg_norms_bucket_region.c
 tests/sieve/test_init_rat_norms_bucket_region.c
 tests/sieve/F9.sievetest.sh
@@ -850,7 +851,6 @@ utils/ularith.h
 utils/usp.c
 utils/usp.h
 utils/utils.h
-utils/varlist.h
 utils/roots_mod.c
 tests/utils/test_roots_mod.c
 tests/utils/test_omega.c

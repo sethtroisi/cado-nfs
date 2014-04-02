@@ -47,12 +47,18 @@
  * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
-/* Lazy norm computation for the algebraics: compute only one norm per
- * 8 on a line, and propagate up to VERT_NORM_STRIDE rows above it. 
- * These approximations speed-up the norm computation, but put more 
- * pressure on the cofactorisation step, since the useless 
- * cofactorisations are more frequent. 
+/* Smart norm computation. Compute only one norm per n (max HORI_NORM_STRIDE)
+ * on a line, and propagate up to VERT_NORM_STRIDE rows above it. 
+ * These approximations speed-up the norm computation, but maybe put a little 
+ * more pressure on the cofactorisation step, since the useless 
+ * cofactorisations might be more frequent. 
+ * See the result of test_init_norms_bucket_region for precision.
+ * If SMART_NORM is not defined, an exact algorithm with a fast log2 is used;
+ * the result is always exact -/+ 1.
+ * HORI_NORM_STRIDE & VERT_NORM_STRIDE are useless if SMART_NORM is undefined.
  */ 
+#define SMART_NORM 1
+#define HORI_NORM_STRIDE 8
 #define VERT_NORM_STRIDE 4 
 
 /* define PROFILE to keep certain functions from being inlined, in order to

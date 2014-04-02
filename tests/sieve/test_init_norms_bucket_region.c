@@ -52,10 +52,8 @@ int main() {
     for (d = MAX_DEGREE + 1; d--;) {
       poly->deg = d;
       double coeff[poly->deg + 1] __attribute__((aligned(16))),
-	u[poly->deg + 1], roots[poly->deg + 1];
+	u[poly->deg + 1], roots[3 * poly->deg + 1];
       unsigned int nroots;
-      root_struct Roots[poly->deg + 1];
-      mpz_t p[poly->deg + 1];
       poly->coeff = coeff;
       for (k = NB_TESTS; k--;) {
 	J = rand () ^ (rand() << 15); /* 0 <= J < 2^30 at least */
@@ -65,18 +63,6 @@ int main() {
 	if (poly->coeff[poly->deg] == 0.) poly->coeff[poly->deg] = 1.;
 	if (poly->coeff[0] == 0.) poly->coeff[0] = 1.;
 
-	for (size_t y = poly->deg + 1; y--; ) {
-	  mpz_init_set_d (p[y], poly->coeff[y]);
-	  root_struct_init (&(Roots[y]));
-	}
-	nroots = numberOfRealRoots (p, poly->deg, (double) (((1U << logI) + 16) >> 1), 0, Roots);
-	for (size_t y = nroots; y--; )
-	  roots[y] = rootRefine (&(Roots[y]), p, poly->deg);
-	for (size_t y = poly->deg + 1; y--; ) {
-	  mpz_clear (p[y]);
-	  root_struct_clear (&(Roots[y]));
-	}  
-	
 	endJ = (LOG_BUCKET_REGION - logI);
 	J >>= endJ;                 /* In order to be able to compute a complete region */
 	log2max = log2(fabs(get_maxnorm_alg (poly, didiv2, didiv2) + 1.));
@@ -86,6 +72,7 @@ int main() {
 	memset (S1, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
 	memset (S2, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
 	if (poly->deg > 1) {
+	  init_norms_roots_internal (poly->deg, poly->coeff, (double) ((I + 16) >> 1), &nroots, roots);
 	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly->deg, poly->coeff, nroots, roots);
 	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly->deg, poly->coeff);
 	} else if (poly->deg == 1) {
@@ -131,8 +118,13 @@ int main() {
     }
   }
   free(S1); free(S2); free (S3);
-  count = (MAX_LOGI - MIN_LOGI + 1) * (MAX_DEGREE + 1) * (NB_TESTS << LOG_BUCKET_REGION);
+  count = (MAX_LOGI - MIN_LOGI + 1) * (MAX_DEGREE + 1) * (unsigned long long) (NB_TESTS << LOG_BUCKET_REGION);
   fprintf (stderr, "The tests are done with %llu values. All the values are between %u and %u included.\n", count, GUARD, UCHAR_MAX - 1);
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+  fprintf (stderr, "Computations done with SSE (HAVE_GCC_STYLE_AMD64_INLINE_ASM is defined).\n");
+#else
+  fprintf (stderr, "Computations done with doubles (HAVE_GCC_STYLE_AMD64_INLINE_ASM is not defined).\n");
+#endif
   double lc = 100. / count;
 
   fprintf (stderr, "\nDifferences between the exact algorithm and\nthe exact algorithm + fast log2 :\nNo difference: %6.3f%%\n", exact_err[MAX_EXACT_ERR] * lc);

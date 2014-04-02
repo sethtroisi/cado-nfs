@@ -7,6 +7,7 @@
 #include "las-norms.h"
 #include "las-debug.h"
 #include "gcd.h"
+#include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
@@ -64,7 +65,7 @@ init_unsieve_data(uint32_t I)
 void clear_unsieve_data(unsieve_aux_data_srcptr us)
 {
   free (us->entries);
-  free_aligned (us, sizeof(unsieve_aux_data), 16);
+  free_aligned (us, 16);
 }
 
 static inline void

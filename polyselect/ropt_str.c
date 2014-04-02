@@ -440,7 +440,7 @@ ropt_poly_setup ( ropt_poly_t poly )
   if (mpz_cmp_ui (t, 0) != 0) {
     fprintf (stderr, "ERROR: The following polynomial have no common"
              " root. \n");
-    print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, poly->n);
+    print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, 1, poly->n);
     exit (1);
   }
 
