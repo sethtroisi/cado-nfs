@@ -67,7 +67,7 @@ void
 *physical_malloc (const size_t x, const int affect)
 {
   void *p;
-  p = malloc_check(x);
+  p = malloc_hugepages(x);
   if (affect) {
     size_t i, m;
 #ifdef HAVE_SSE2
