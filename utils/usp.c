@@ -495,7 +495,8 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
 double
 rootRefine (root_struct *r, mpz_t *p, int n)
 {
-  double a, b, c, sa, sb, sc;
+  volatile double a, b, c;
+  double sa, sb, sc;
   double_poly_t q;
   mpz_poly_t P;
   unsigned long count = 0;
