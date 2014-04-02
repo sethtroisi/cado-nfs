@@ -7,7 +7,7 @@ set (sources
         mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c sm_utils.c memalloc.c mpz_vector.c cont_mem.c
+        ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)

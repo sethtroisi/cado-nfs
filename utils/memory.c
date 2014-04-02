@@ -28,7 +28,7 @@
 #include "macros.h"
 #include "portability.h"
 #include "misc.h"
-#include "cont_mem.h"
+#include "memory.h"
 
 #ifndef LARGE_PAGE_SIZE
 #define LARGE_PAGE_SIZE (2UL*1024*1024)
