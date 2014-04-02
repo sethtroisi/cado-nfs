@@ -7,6 +7,7 @@
 #include "las-norms.h"
 #include "las-debug.h"
 #include "gcd.h"
+#include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
