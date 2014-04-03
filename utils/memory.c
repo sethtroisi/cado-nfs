@@ -56,11 +56,13 @@ malloc_hugepages(const size_t size)
 #ifdef MADV_HUGEPAGE
   void *m = malloc_aligned(size, LARGE_PAGE_SIZE);
   int r;
+  static int printed_error = 0;
   do {
     r = madvise(m, size, MADV_HUGEPAGE);
   } while (r == EAGAIN);
-  if (r != 0) {
+  if (r != 0 && !printed_error) {
     perror("madvise failed");
+    printed_error = 1;
   }
   return m;
 #else
