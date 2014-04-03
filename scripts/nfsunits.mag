@@ -6,7 +6,7 @@ Wrapper version, to be used with
 //
 // author: morain@lix.polytechnique.fr 
 //
-// Using units in SNFS-DL
+// Using units in (S)NFS-DL
 
 NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
@@ -14,6 +14,7 @@ NFSUNITS_VERSION:="20140327.0730"; // more cleaning w.r.t. U
 NFSUNITS_VERSION:="20140329.1930"; // computing m + other stuff
 NFSUNITS_VERSION:="20140402.1830"; // ready for GF(p^2)
 NFSUNITS_VERSION:="20140402.2100"; // patching while waiting for Cyril
+NFSUNITS_VERSION:="20140403.1830"; // after Cyril's modifs
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -991,9 +992,10 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr, f)
 	    p:=StringToInteger(tmp[2], 16);
 	    r:=StringToInteger(tmp[3], 16);
 	    // patch_begin
-	    if (Integers()!Evaluate(f, r)) mod p ne 0 then continue; end if;
+//	    if (Integers()!Evaluate(f, r)) mod p ne 0 then continue; end if;
 	    // patch_end
 	    if IsDefined(lipr, p) then
+if false then
 	        // patch again_begin
 		ok:=true;
 		for ir in lipr[p] do
@@ -1001,6 +1003,7 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr, f)
 		end for;
 		if not ok then continue; end if;
 		// patch again_end
+end if;
 	        lipr[p]:=Append(lipr[p], <i, r>);
 	    else
 	        lipr[p]:=[<i, r>];
@@ -1607,5 +1610,7 @@ Simul := procedure(dir, name, gen)
 				purged,index,ficunits,false);
 end procedure;
 
+print "Simul(\"SNFS\", \"p59\", true);";
+// Simul("SNFS", "p60x4x4", false);
 ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
 exit;
