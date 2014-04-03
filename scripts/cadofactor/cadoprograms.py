@@ -901,6 +901,9 @@ class BWC(Program):
                  shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
                  **kwargs):
+        if os.name == "nt":
+            kwargs.setdefault("runprefix", "perl.exe")
+            kwargs.setdefault("execsuffix", "")
         super().__init__(locals(), **kwargs)
 
 class SM(Program):
