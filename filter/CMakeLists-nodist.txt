@@ -5,6 +5,9 @@ include_directories(${CADO_NFS_SOURCE_DIR}/ffs)
 link_directories (${CADO_NFS_BINARY_DIR}/ffs/f2)
 link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
 
+add_executable(filter_galois filter_galois.c)
+target_link_libraries(filter_galois utils_with_io)
+
 add_executable(dup2-ffs-f2 EXCLUDE_FROM_ALL dup2.c)
 target_link_libraries(dup2-ffs-f2 utils-ffs-f2)
 set_target_properties(dup2-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")

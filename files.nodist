@@ -18,6 +18,7 @@ linalg/bwc/sketch.tex
 linalg/tex.c
 filter/merge_mpi.c
 filter/merge_mpi.h
+filter/filter_galois.c
 scripts/nightly-test
 scripts/coverage-nightly.sh
 scripts/polsel_effort
