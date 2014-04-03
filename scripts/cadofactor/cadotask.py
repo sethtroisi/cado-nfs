@@ -340,7 +340,10 @@ class Statistics(object):
     @staticmethod
     def typecast(values, types):
         """ Cast the values in values to the types specified in types """
-        return [t(v) for (v, t) in zip(values, types)]
+        if type(types) is type:
+            return [types(v) for v in values]
+        else:
+            return [t(v) for (v, t) in zip(values, types)]
     
     @staticmethod
     def _to_str(stat):
@@ -373,7 +376,10 @@ class Statistics(object):
             if match:
                 assert not key in self.stats
                 # print (pattern.pattern, match.groups())
-                self.stats[key] = self.typecast(match.groups(), types)
+                # Optional groups that did not match are returned as None.
+                # Skip over those so typecast doesn't raise TypeError
+                groups = [group for group in match.groups() if not group is None]
+                self.stats[key] = self.typecast(groups, types)
                 assert not self.stats[key] is None
     
     def merge_one_stat(self, key, new_val, combine):
