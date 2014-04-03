@@ -12,6 +12,8 @@ NFSUNITS_VERSION:="20140321.2045"; // first trial with h > 1
 NFSUNITS_VERSION:="20140324.1745"; // Minimize works now for all rK
 NFSUNITS_VERSION:="20140327.0730"; // more cleaning w.r.t. U
 NFSUNITS_VERSION:="20140329.1930"; // computing m + other stuff
+NFSUNITS_VERSION:="20140402.1830"; // ready for GF(p^2)
+NFSUNITS_VERSION:="20140402.2100"; // patching while waiting for Cyril
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -124,11 +126,11 @@ FiPoBounds := function(B, Kdata, logunits)
 //	return bounds;
 	if n eq 3 then
 //	    return [125 : i in [1..n]];
-	    return [10 : i in [1..n]];
+	    return [20 : i in [1..n]];
 	elif n eq 4 then
 	    return [20 : i in [1..n]];
 	else
-	    return [10 : i in [1..n]];
+	    return [20 : i in [1..n]];
 	end if;
 end function;
 
@@ -725,7 +727,10 @@ end procedure;
 
 // U = <G, rt, funits>
 // OUTPUT: epsab[a, b] = unit if factorization of a-b*alpha
-TreatFromDir := procedure(~FB, ~epsab, p, f, g, m, Kdata, dir)
+TreatFromDir := procedure(~FB, ~epsab, p, f, g, Kdata, dir)
+
+m:=0;
+
 	tmp:=dir * ".units.listfiles";
 	cmd:="ls " * dir * ".sieving* > " * tmp;
         System(cmd);
@@ -873,8 +878,12 @@ end function;
 // INPUT: fo = file descriptor
 //        i = index
 //        gef = <gp, ep, fp> with gp in K
-PrintGenerator := procedure(fo, i, gef)
-	gp,ep,fp:=Explode(gef);
+PrintGenerator := procedure(fo, i, gef, isbad)
+	if isbad then
+	    gp,ep,fp:=Explode(gef);
+	else
+	    gp:=gef; ep:=1; fp:=1;
+	end if;
 	den:=Denominator(gp);
 	tmp:=Eltseq(den*gp);
 	fprintf fo, "%o", i;
@@ -899,12 +908,14 @@ InspectIdeals := procedure(p, r, Kdata, elt)
 	ok,gen:=IsPrincipal(id);
 	printf "gen(%o, %o)=%o\n", p, r, K!gen;
 	eltW:=FpW!Eltseq(K!elt);
-	for sig in galac[2] do
+	for cyc in galac[2] do
+	  for sig in cyc do
 	    // sigma(r) = e or sigma^(-1)(e) = r
 	    eltZ:=PolynomialRing(K)!Eltseq(K!elt);
 	    sigt:=&+ [Coefficient(sig,i)*t^i : i in [0..Degree(sig)]];
 	    gp:=Evaluate(eltZ, sigt);
 	    printf "sig=%o => gp=%o (%o)\n", sig, gp, Norm(gp);
+	  end for;
 	end for;
 end procedure;
 
@@ -962,72 +973,7 @@ FindGeneratorWithGalois := function(p, r, Kdata, lp)
 	return false, 0;
 end function;
 
-// algpr contains lines "i p r" for algebraic primes (in hexa).
-// SIDE-EFFECT: fill in file 'generators' with generators.
-// TODO: separate bad primes.
-// Should be obsolete.
-GeneratorsForPRPlain := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
-	tp:=Cputime();
-	K:=Kdata["K"];
-	OK:=Kdata["OK"];
-	U:=Kdata["UK"];
-        bad:=ReadBadIdeals(K, badidealinfo);	       
-	badp:=[x[1] : x in bad];
-	printf "# bad ideals=%o => badp=%o\n", bad, badp;
-	printf "# Extracting (p, r) from %o\n", algpr;
-	// first read algebraic ideals
-        fd:=POpen("gzip -dc " * algpr, "r");
-        fo:=POpen("gzip -c > " * generators, "w");
-	zero:=[0 : i in [1..Degree(K)-2]];
-	npr:=0;
-	oldp:=0;
-	oldr:=0;
-	oldgp:=0;
-	hasGalois:=IsDefined(Kdata, "Galois");
-	printf "# plain-computing generators\n";
-        while true do
-            s:=Gets(fd);
-            if IsEof(s) then break; end if;
-	    // s = "i p r"
-	    tmp:=Split(s, " ");
-	    i:=StringToInteger(tmp[1], 16);
-	    p:=StringToInteger(tmp[2], 16);
-	    r:=StringToInteger(tmp[3], 16);
-	    npr:=npr+1;
-	    if npr mod 10000 eq 0 then
-	        printf "# plain-computing generator for %o-th ideal[%o] at %o\n", 
-		       npr, p, Cputime();
-	    end if;
-	    if p in badp then
-	        id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
-	    	GEN[i]:=GeneratorForBad(Kdata, p, id);
-		gp:=GEN[i][1]; // for oldgp to work!
-	    else
-	        done:=false;
-	        if hasGalois and p eq oldp then
-		    done,gp:=FindGeneratorWithGalois(p, r, Kdata, [oldgp]);
-		end if;
-		if not done then
-		    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
-		    ok,gp:=IsPrincipal(id);
-	    	    if not ok then error("Not principal"); end if;
-		end if;
-	        GEN[i]:=<Minimize(Kdata, K!gp), 1, 1>;
-	    end if;
-	    if DLP_DEBUG ge 2 then
-	        printf "(p, r)=(%o, %o), gen=%o, norm(gen)=%o\n", 
-	    		   p, r, GEN[i], Norm(gp);
-	    end if;
-//if p gt 50 then error("FF"); end if;
-       	    PrintGenerator(fo, i, GEN[i]);
-	    oldp:=p;
-	    oldr:=r;
-	    oldgp:=gp;
-	end while;
-	printf "#T# plain-computing all generators: %o\n", Cputime(tp);
-end procedure;
-
-ReadAlgpr := procedure(~lipr, ~pamax, algpr)
+ReadAlgpr := procedure(~lipr, ~pamax, algpr, f)
 	printf "# Reading file %o\n", algpr;
         fd:=POpen("gzip -dc " * algpr, "r");
 	lipr:=AssociativeArray();
@@ -1044,7 +990,17 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr)
 	    i:=StringToInteger(tmp[1], 16);
 	    p:=StringToInteger(tmp[2], 16);
 	    r:=StringToInteger(tmp[3], 16);
+	    // patch_begin
+	    if (Integers()!Evaluate(f, r)) mod p ne 0 then continue; end if;
+	    // patch_end
 	    if IsDefined(lipr, p) then
+	        // patch again_begin
+		ok:=true;
+		for ir in lipr[p] do
+		    if ir[2] eq r then ok:=false; break; end if;
+		end for;
+		if not ok then continue; end if;
+		// patch again_end
 	        lipr[p]:=Append(lipr[p], <i, r>);
 	    else
 	        lipr[p]:=[<i, r>];
@@ -1053,33 +1009,18 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr)
 	end while;
 end procedure;
 
-GeneratorsForPR := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
+BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, ldone, algprimes)
 	K:=Kdata["K"];
-// OBSOLETE?? If we do not want boxes, put bounds to [-1, ..., -1]...!
-//	if Degree(K) gt 1 then
-//	    GeneratorsForPRPlain(~GEN,~BAD,Kdata,badidealinfo,algpr,generators);
-//	    return;
-//	end if;
 	OK:=Kdata["OK"];
-	U:=Kdata["UK"];
-        bad:=ReadBadIdeals(K, badidealinfo);	       
-	badp:=[x[1] : x in bad];
-	printf "# bad ideals=%o => badp=%o\n", bad, badp;
-	// read algpr in a table
-	ReadAlgpr(~lipr, ~pamax, algpr); // useful to have in-core?
-	printf "# pamax = %o\n", pamax;
-	printf "# enumerating at %o\n", Cputime();
-	l:=EnumeratePrimeNorms(Kdata, lipr, pamax);
-//	printf "K:=%m;\nOK:=MaximalOrder(K);\n", K;
-//	print l;
-	npcp:=0;
-	ndone:=0;
-	printf "# inspecting at %o\n", Cputime();
 	zero:=[0 : i in [1..Degree(K)-2]];
-	npr:=0;
+	imin:=-1;
+	imax:=-1;
 	tot:=Cputime();
 	totmb:=0.0;
-	for p in Sort([x : x in Keys(lipr)]) do // humf!
+	npcp:=0;
+	ndone:=0;
+	npr:=0;
+	for p in algprimes do
 	  npr:=npr+1;
 	  if npr mod 1000 eq 0 then
 	        printf "# computing generator for %o-th ideal[%o] at %o\n", 
@@ -1087,26 +1028,28 @@ GeneratorsForPR := procedure(~GEN,~BAD,Kdata,badidealinfo,algpr,generators)
 	  end if;
 	  for ir in lipr[p] do
 	    i,r:=Explode(ir);
+	    if imin eq -1 or i lt imin then imin:=i; end if;
+	    if imax eq -1 or i gt imax then imax:=i; end if;
 	    id:=ideal<OK | [p, 0] cat zero, [p-r, 1] cat zero>;
 	    if p in badp then
 	        printf "bad: id(<%o, %o>) = %o\n", p, r, id;
-	        GEN[i]:=GeneratorForBad(Kdata, p, id);
+	        bad[i]:=GeneratorForBad(Kdata, p, id);
 	    else
 		ok:=false;
-		if IsDefined(l, p) then
+		if IsDefined(ldone, p) then
 		    tp:=Cputime();
-//		    printf "%o: %o\n", lipr[p], #l[p];
-		    ok,gp:=FindGeneratorWithGalois(p, r, Kdata, l[p]);
+//		    printf "%o: %o\n", lipr[p], #ldone[p];
+		    ok,gp:=FindGeneratorWithGalois(p, r, Kdata, ldone[p]);
 		    if ok then
 //		        printf "FG(%o, %o) -> %o (%o)\n", p, r, gp, Norm(gp);
 //		    	assert(gp in id);
-			GEN[i]:=<Minimize(Kdata, K!gp), 1, 1>;
+			good[i]:=Minimize(Kdata, K!gp);
 		    else // obsolete or cautious?
 error("obsolete?");
-		      for elt in l[p] do
+		      for elt in ldone[p] do
 		        if elt in id then
 			    ok:=true;
-			    GEN[i]:=<Minimize(Kdata, K!elt), 1, 1>;
+			    good[i]:=Minimize(Kdata, K!elt);
 			    break;
 			end if;
 		      end for;
@@ -1117,8 +1060,8 @@ error("obsolete?");
 		    ndone:=ndone+1;
 		end if;
 		if ok then
-//		    printf "found: %o\n", GEN[i][1];
-//		    Exclude(~l[p], GEN[i][1]);
+//		    printf "found: %o\n", good[i][1];
+//		    Exclude(~l[p], good[i][1]);
 		else // most probably, lp[p] = NULL
 		    if DLP_DEBUG ge 2 then
 		        printf "I need to principalize: %o %o^%o\n", 
@@ -1131,30 +1074,58 @@ error("obsolete?");
 		        printf "#T# pcp: %o\n", tp;
 		    end if;
 		    if not ok then error("Not principal in Gen"); end if;
-		    GEN[i]:=<K!gp, 1, 1>;// FIXME: useless since bad are known?
+		    good[i]:=K!gp;
 		    // trick: add it to lp[]
 		    npcp:=npcp+1;
-		    l[p]:=[K!gp];
+		    ldone[p]:=[K!gp];
 		end if;
 	    end if;
 //if i gt 20 then error("FFF"); end if;
 	  end for;
 	end for;
-	printf "#T# totpcp=%o totmb=%o npcp=%o ndone=%o\n", 
-	       Cputime(tot), totmb, npcp, ndone;
+	printf "#T# imin=%o imax=%o totpcp=%o totmb=%o npcp=%o ndone=%o\n", 
+	       imin, imax, Cputime(tot), totmb, npcp, ndone;
 	tp:=Cputime();
         fo:=POpen("gzip -c > " * generators, "w");
-	for i in Sort([x : x in Keys(GEN)]) do
-       	    PrintGenerator(fo, i, GEN[i]);
+	for i:=imin to imax do
+	    if IsDefined(good, i) then
+       	        PrintGenerator(fo, i, good[i], false);
+	    elif IsDefined(bad, i) then
+       	        PrintGenerator(fo, i, bad[i], true);
+	    end if;
 	end for;
 	printf "#T# output: %o\n", Cputime(tp);
 end procedure;
 
+// SIDE-EFFECT: fills in GEN with generators of all ideals, good or bad.
+GeneratorsForPR := procedure(~GEN,Kdata,badidealinfo,algpr,generators)
+	K:=Kdata["K"];
+        badid:=ReadBadIdeals(K, badidealinfo);	       
+	badp:=[x[1] : x in badid];
+	printf "# bad ideals=%o\n", badid;
+	// read algpr in a table: useful to have in-core?
+	ReadAlgpr(~lipr, ~pamax, algpr, DefiningPolynomial(K));
+	printf "# pamax = %o\n", pamax;
+	printf "# enumerating at %o\n", Cputime();
+	l:=EnumeratePrimeNorms(Kdata, lipr, pamax);
+//	printf "K:=%m;\nOK:=MaximalOrder(K);\n", K;
+//	print l;
+	printf "# inspecting at %o\n", Cputime();
+	good:=AssociativeArray();
+	bad:=AssociativeArray();
+	algprimes:=Sort([x : x in Keys(lipr)]);
+	BatchGenerators(~good,~bad,generators,Kdata,badp,lipr,l,algprimes);
+	GEN["good"]:=good;
+	GEN["bad"]:=bad;
+end procedure;
+
 // GEN[i] = x
 // BAD[i] = <x, ind, deg>
-ReadGeneratorsForPR := procedure(~GEN, ~BAD, K, generators)
+ReadGeneratorsForPR := procedure(~GEN, K, generators)
 	printf "# Reading generators for (p, r) from %o\n", generators;
 	t:=K.1;
+	good:=AssociativeArray();
+	bad:=AssociativeArray();
         fd:=POpen("gzip -dc " * generators, "r");
 	npr:=0;
         while true do
@@ -1186,24 +1157,28 @@ ReadGeneratorsForPR := procedure(~GEN, ~BAD, K, generators)
 	    end for;
 	    // GEN[i], BAD[i] = <elt_of_K, ...>
 	    if j0 eq 3 then
-	        GEN[i]:=x/den;
-//	    	printf "GEN[%o]=%o (%o)\n", i, GEN[i], Norm(GEN[i][1]);
+	        good[i]:=x/den;
+//	    	printf "good[%o]=%o (%o)\n", i, good[i], Norm(good[i][1]);
 	    else
-		BAD[i]:=<x/den, ind, deg>;
-	    	printf "BAD[%o]=%o (%o)\n", i, BAD[i], Norm(BAD[i][1]);
+		bad[i]:=<x/den, ind, deg>;
+	    	printf "bad[%o]=%o (%o)\n", i, bad[i], Norm(bad[i][1]);
 	    end if;
 	end while;
+	GEN["good"]:=good;
+	GEN["bad"]:=bad;
 end procedure;
 
 // now read all ab pairs from purged, together with the ideal numbers
 // eps[(a, b)_i] <- unit for (a-b*theta) given its algebraic factorization.
 // All that matters is that index i.
-UnitsForPurged := procedure(~epsab,Kdata,~GEN,~BAD,purged)
+UnitsForPurged := procedure(~epsab,Kdata,GEN,purged)
 	tp:=Cputime();
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
 	U:=Kdata["UK"];
 	t:=K.1;
+	good:=GEN["good"];
+	bad:=GEN["bad"];
         fd:=POpen("gzip -dc " * purged, "r");
 	s:=Gets(fd);
 	// read first line: s = "# 10807 37271 10805"
@@ -1234,7 +1209,7 @@ UnitsForPurged := procedure(~epsab,Kdata,~GEN,~BAD,purged)
 	    exi:=1;
 	    for stri in tmp2 do
 	    	i:=StringToInteger(stri, 16);
-	        if not IsDefined(GEN, i) and not IsDefined(BAD, i) then
+	        if not IsDefined(good, i) and not IsDefined(bad, i) then
 		    continue;
 		end if;
 		if i eq oldi then
@@ -1251,19 +1226,19 @@ UnitsForPurged := procedure(~epsab,Kdata,~GEN,~BAD,purged)
 	    prod:=1;
 	    for iexi in li do
 	        i,exi:=Explode(iexi);
-		if IsDefined(GEN, i) then
+		if IsDefined(good, i) then
 		    if DLP_DEBUG ge 2 then
-		        printf "multiplying by GEN[%o]^e=%o^%o",i,GEN[i],exi;
-		        printf " of norm %o\n", Norm(GEN[i]);
+		        printf "multiplying by good[%o]^e=%o^%o",i,good[i],exi;
+		        printf " of norm %o\n", Norm(good[i]);
 		    end if;
-		    prod:=prod * GEN[i]^exi;
-		elif IsDefined(BAD, i) then
+		    prod:=prod * good[i]^exi;
+		elif IsDefined(bad, i) then
 		    if DLP_DEBUG ge 2 then
-		        printf "multiplying by BAD[%o]^e=%o^%o", 
-			       i, BAD[i][1], exi div BAD[i][3];
-		        printf " of norm %o\n", Norm(BAD[i][1]);
+		        printf "multiplying by bad[%o]^e=%o^%o", 
+			       i, bad[i][1], exi div bad[i][3];
+		        printf " of norm %o\n", Norm(bad[i][1]);
 		    end if;
-		    prod:=prod * BAD[i][1]^(exi div BAD[i][3]);
+		    prod:=prod * bad[i][1]^(exi div bad[i][3]);
 		end if;
 	    end for;
 	    eta:=((a-b*t)^Kdata["hK"])/prod;
@@ -1410,13 +1385,9 @@ ReadDataFromPolyFile := function(name)
 	    end if;
 	end while;
 	FpW:=PolynomialRing(GF(p));
-	tmp:=Gcd(FpW!Eltseq(f), FpW!Eltseq(g));
-	if Degree(tmp) ne 1 then error("gcd(f, g)"); end if;
-	m:=Integers()!(-Coefficient(tmp, 0));
-	printf "## check f, g, f(m), g(m): ";
-	printf "%o, %o, %o, %o\n", f, g, (Integers()!Evaluate(f, m)) mod p,
-	      (Integers()!Evaluate(g, m)) mod p;
-	return p, m, f, g;
+	varphi:=Gcd(FpW!Eltseq(f), FpW!Eltseq(g));
+	printf "# gcd = %o\n", varphi;
+	return p, f, g, varphi;
 end function;
 
 // Useful for verification.
@@ -1469,9 +1440,9 @@ DLReadSM := procedure(~M, sm, rK)
 	end while;	
 end procedure;
 
-// OUTPUT: if generate then FB,epsab,G,GEN,BAD;
-UnitsWithParams := function(Kdata, FB, epsab, GEN, BAD, generate, params)
-	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
+// OUTPUT: if generate then FB,epsab,G,GEN;
+UnitsWithParams := function(Kdata, FB, epsab, GEN, generate, params)
+	p,f,g,varphi:=ReadDataFromPolyFile(params["poly"]);
         if DLP_VERIFICATION then
 	    ell:=params["ell"];
 	end if;
@@ -1505,13 +1476,13 @@ UnitsWithParams := function(Kdata, FB, epsab, GEN, BAD, generate, params)
 	    BAD:=AssociativeArray();
 	    epsab:=AssociativeArray();
 	    if IsDefined(params, "relsdir") then
-	    	TreatFromDir(~FB,~epsab,p,f,g,m,Kdata,params["relsdir"]);
+	    	TreatFromDir(~FB,~epsab,p,f,g,Kdata,params["relsdir"]);
 	    elif IsDefined(params, "algpr") then
-	        GeneratorsForPR(~GEN,~BAD,Kdata,params["badidealinfo"],
+	        GeneratorsForPR(~GEN,Kdata,params["badidealinfo"],
 				params["algpr"],params["generators"]);
-		UnitsForPurged(~epsab,Kdata,~GEN,~BAD,purged);
+		UnitsForPurged(~epsab,Kdata,~GEN,purged);
 	    end if;
-	    return FB,epsab,GEN,BAD,Kdata; // OHHHHHHHHHHHHHHHH!
+	    return FB,epsab,GEN,Kdata; // OHHHHHHHHHHHHHHHH!
 	else
 	    printf "# epsab already computed\n";
 	end if;
@@ -1569,7 +1540,7 @@ UnitsFromCADO := function(dir, name, ell, Kdata, FB, epsab, G, GEN, BAD, gen_eps
 	params["purged"]:=dir * "/" * name * ".purge.purged.gz";
 	params["index"]:=dir * "/" * name * ".merge.index.gz";
 	params["ficunits"]:=dir * "/" * name * ".units.units";
-	return UnitsWithParams(Kdata, FB, epsab, GEN, BAD, gen_epsab, params);
+	return UnitsWithParams(Kdata, FB, epsab, GEN, gen_epsab, params);
 end function;
 
 // ComputeUnits("SNFS", "p59", 63682780151674075656521332710720136307);
@@ -1599,20 +1570,17 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,badideal
 
 	FB:=[];
 	GEN:=AssociativeArray();
-	BAD:=AssociativeArray();
-	p,m,f,g:=ReadDataFromPolyFile(params["poly"]);
+	p,f,g,varphi:=ReadDataFromPolyFile(params["poly"]);
 	K<t>:=ext<QQ | f>;
 	Kdata:=PrepareField(K, true); // FIXME
 	if generate then
-	    GeneratorsForPR(~GEN,~BAD,Kdata,params["badidealinfo"],
+	    GeneratorsForPR(~GEN,Kdata,params["badidealinfo"],
 			    params["algpr"],params["generators"]);
 	else
-	    BAD:=AssociativeArray();
-	    ReadGeneratorsForPR(~GEN, ~BAD, K, generators);
-	    printf "# bad primes = %o\n", Keys(BAD);
+	    ReadGeneratorsForPR(~GEN, K, generators);
 	    epsab:=AssociativeArray();
-	    UnitsForPurged(~epsab,Kdata,~GEN,~BAD,purged);
-	    UnitsWithParams(Kdata, FB, epsab, GEN, BAD, false, params);
+	    UnitsForPurged(~epsab,Kdata,GEN,purged);
+	    UnitsWithParams(Kdata, FB, epsab, GEN, false, params);
 	end if;
 end procedure;
 
