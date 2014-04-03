@@ -1255,7 +1255,9 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
     # Stat: total phase took 55.47s
     # Stat: rootsieve took 54.54s
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        return (
         (
             "stats_collisions",
             (float,),
@@ -1311,9 +1313,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
         )
     )
-    @property
-    def stat_conversions(self):
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -1496,7 +1495,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         """ Return number of seconds of cpu time spent by polyselect2l """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
-class Polysel1Task(ClientServerTask, patterns.Observer):
+class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
     """ Finds a number of size-optimized polynomial, uses client/server """
     @property
     def name(self):
@@ -2253,7 +2252,12 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         return self.join_params(super().paramnames, {
             "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int, 
             "import": None, "gzip": True})
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
+        # Total cpu time 7.0s [precise timings available only for mono-thread]
+        # Total 26198 reports [0.000267s/r, 155.9r/sq]
+        return (
         (
             "stats_avg_J",
             (float, int),
@@ -2283,12 +2287,6 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             re.compile(r"# Total time %ss" % CAP_FP)
         )
     )
-    @property
-    def stat_conversions(self):
-        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
-        # Total cpu time 7.0s [precise timings available only for mono-thread]
-        # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -2487,7 +2485,11 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
+        # Without leading "# " !
+        return (
         (
             "stats_dup1_time",
             (float, ),
@@ -2496,11 +2498,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
         ),
     )
-    @property
-    def stat_conversions(self):
-        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
-        # Without leading "# " !
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -2707,7 +2704,11 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
+        # Without leading "# " !
+        return (
         (
             "stats_dup2_time",
             (float, ),
@@ -2716,11 +2717,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
         ),
     )
-    @property
-    def stat_conversions(self):
-        # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
-        # Without leading "# " !
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -3464,7 +3460,9 @@ class LinAlgTask(Task, HasStatistics):
     @property
     def paramnames(self):
         return super().paramnames
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        return (
         (
             "krylov_time",
             (float,),
@@ -3501,9 +3499,6 @@ class LinAlgTask(Task, HasStatistics):
             re.compile(r"mksol done, N=\d+ ; COMM: %s" % CAP_FP)
         ),
     )
-    @property
-    def stat_conversions(self):
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
