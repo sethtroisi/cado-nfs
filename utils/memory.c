@@ -21,6 +21,11 @@
 #include <sys/mman.h>
 #endif
 
+/* For MinGW Build */
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
+
 #include "macros.h"
 #include "portability.h"
 #include "misc.h"
