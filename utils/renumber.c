@@ -796,12 +796,22 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
       renumber_get_p_r_from_index (tab, &p, &r, &side, i, pol);
       fprintf (output, "i=%" PRxid " tab[i]=%" PRpr " p=%" PRpr "",
                        i, tab->table[i], p);
-      if (side == tab->rat)
-        fprintf (output, " rat side\n");
-      else if (r == p)
-        fprintf (output, " r=%" PRpr " alg side proj\n", r);
+      if (tab->rat == -1)
+      {
+        if (r == p)
+          fprintf (output, " r=%" PRpr " side %d proj\n", r, side);
+        else
+          fprintf (output, " r=%" PRpr " side %d\n", r, side);
+      }
       else
-        fprintf (output, " r=%" PRpr " alg side\n", r);
+      {
+        if (side == tab->rat)
+          fprintf (output, " rat side\n");
+        else if (r == p)
+          fprintf (output, " r=%" PRpr " alg side proj\n", r);
+        else
+          fprintf (output, " r=%" PRpr " alg side\n", r);
+      }
     }
   }
 
