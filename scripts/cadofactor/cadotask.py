@@ -23,14 +23,6 @@ import workunit
 from struct import error as structerror
 from workunit import Workunit
 
-# Some parameters are provided by the param file but can change during
-# the factorization, like rels_wanted. On one hand, we want automatic
-# updates to parameters to be stored in the DB, otoh, we want to allow
-# externally setting new parameters. Need to distinguish between new
-# external parameters that overwrite DB, and old external parameters
-# that don't overwrite. Or maybe two ways to specify external params:
-# --defaults which does not overwrite, and --forceparam which does
-
 # Pattern for floating-point number
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
@@ -205,8 +197,7 @@ class Polynomials(object):
         return not (self == other)
 
     def create_file(self, filename):
-        # Write polynomial to a file, and add lines with parameters such as
-        # "alim" if supplied in params
+        # Write polynomial to a file
         with open(str(filename), "w") as poly_file:
             poly_file.write(str(self))
 
