@@ -427,14 +427,14 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
-    si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
+    si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
-    if (si->nb_buckets < THRESHOLD_K_BUCKETS)
-      fprintf(las->output, "# nb_buckets = %u, one pass for the buckets sort\n", si->nb_buckets);
-    else if (si->nb_buckets < THRESHOLD_M_BUCKETS)
-      fprintf(las->output, "# nb_buckets = %u, two passes for the buckets sort\n", si->nb_buckets);
+    if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
+      fprintf(las->output, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
+    else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
+      fprintf(las->output, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
     else
-      fprintf(las->output, "# nb_buckets = %u, three passes for the buckets sort\n", si->nb_buckets);
+      fprintf(las->output, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
 
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
@@ -584,7 +584,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 
 static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/*{{{*/
 {
-  /* essentially update the fij polynomials */
+  /* essentially update the fij polynomials and J value */
   sieve_info_update_norm_data(output, si, nb_threads);
 
   /* update number of buckets */
@@ -3719,15 +3719,20 @@ static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
     thread_data_ptr th = thrs[i];
     for(unsigned int side = 0 ; side < 2 ; side++) {
       thread_side_data_ptr ts = th->sides[side];
-      uint32_t nb_buckets = thrs[i]->si->nb_buckets;
+      /* We used to re-allocate whenever the number of buckets changed. Now we
+         always allocate memory for the max. number of buckets, so that we
+         never have to re-allocate */
+      uint32_t nb_buckets = thrs[i]->si->nb_buckets_max;
       
       uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
       /* The previous buckets are identical ? */
       if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {
+        // printf ("# Keeping same buckets, thread->id=%d, side=%d\n", th->id, side);
 	/* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
 	re_init_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
 	/* Buckets are ready to be filled */
       } else {
+        // printf ("# Allocating buckets, thread->id=%d, side=%d\n", th->id, side);
         /* No. We free the buckets, if we have already malloc them. */
         if (ts->BA.n_bucket) clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
         /* We (re)create the buckets */
@@ -3747,6 +3752,7 @@ static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
   for (unsigned int i = 0; i < n ; ++i) {
     thread_side_data_ptr ts;
     for(unsigned int side = 0 ; side < 2 ; side++) {
+      // fprintf ("# Freeing buckets, thread->id=%d, side=%d\n", thrs[i]->id, side);
       ts = thrs[i]->sides[side];
       /* if there is no special-q in the interval, the arrays are not malloced */
       if (ts->BA.bucket_write != NULL)

@@ -187,7 +187,8 @@ struct sieve_info_s {
     int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
-    uint32_t nb_buckets;
+    uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
+    uint32_t nb_buckets_max; /* Max number of buckets, if J=I/2 */
 
     sieve_side_info sides[2];
 
