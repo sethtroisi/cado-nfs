@@ -48,6 +48,21 @@ re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t
   BA->nr_logp = 0;
 }
 
+static void
+init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA)
+{
+  BA->n_bucket = n_bucket;
+  BA->bucket_size = size_bucket;
+  BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
+  BA->nr_logp = 0;
+  BA->size_arr_logp = diff_logp;
+  BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
+  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
+  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
+  BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
+  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
+}
+
 /* This function is called only in the one pass sort in big buckets sieve.
    The parameter diff_logp should be size_arr_logp, the number of different logp
    in the corresponding fb_iterators.
@@ -55,17 +70,7 @@ re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t
 void
 init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  long pagesz = pagesize();
-  BA->n_bucket = n_bucket;
-  BA->bucket_size = size_bucket;
-  BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
-  BA->nr_logp = 0;
-  BA->size_arr_logp = diff_logp;
-  BA->bucket_write = (bucket_update_t **) malloc_aligned (BA->size_b_align, pagesz);
-  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
-  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
+  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
 
   uint8_t *big_data = physical_malloc (BA->n_bucket * BA->bucket_size * sizeof(bucket_update_t), 1);
 
@@ -79,29 +84,25 @@ init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const uns
   re_init_bucket_array(BA, kBA, mBA);
 }
 
-/* This function is called only in the two passes sort in big buckets sieve.
- */
 void 
-init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
 {
-  BA->n_bucket = n_bucket;
-  BA->bucket_size = size_bucket;
-  BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
-  BA->nr_logp = 0;
-  BA->size_arr_logp = diff_logp;
-  BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
-  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
-  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
-  
   kBA->n_bucket = (BA->n_bucket >> 8) + ((unsigned char) BA->n_bucket != 0 ? 1 : 0); 
   kBA->bucket_size = bucket_misalignment (BA->bucket_size << 8, sizeof(k_bucket_update_t));
   kBA->size_b_align = (sizeof(void *) * kBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
   kBA->bucket_write = (k_bucket_update_t **) malloc_pagealigned (kBA->size_b_align);
   kBA->bucket_start = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align, 0x40);
   kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->size_arr_logp, 0x40);
+}
 
+/* This function is called only in the two passes sort in big buckets sieve.
+ */
+void 
+init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+{
+  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
+  init_k_bucket_array_common(BA, kBA);
+  
   uint8_t *big_data = physical_malloc (kBA->bucket_size * (kBA->n_bucket * sizeof(k_bucket_update_t) + sizeof(bucket_update_t)), 1);
 
   bucket_start_init((void **) BA->bucket_start, (void **) (BA->bucket_start + BA->n_bucket),
@@ -121,24 +122,9 @@ init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
 void
 init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
-  BA->n_bucket = n_bucket;
-  BA->bucket_size = size_bucket;
-  BA->size_b_align = ((sizeof(void *) * BA->n_bucket + 0x3F) & ~((size_t) 0x3F));
-  BA->nr_logp = 0;
-  BA->size_arr_logp = diff_logp;
-  BA->bucket_write = (bucket_update_t **) malloc_pagealigned (BA->size_b_align);
-  BA->bucket_start = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->bucket_read = (bucket_update_t **) malloc_aligned (BA->size_b_align, 0x40);
-  BA->logp_val = (unsigned char *) malloc_check (BA->size_arr_logp);
-  BA->logp_idx = (bucket_update_t **) malloc_aligned (BA->size_b_align * BA->size_arr_logp, 0x40);
+  init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
+  init_k_bucket_array_common(BA, kBA);
   
-  kBA->n_bucket = (BA->n_bucket >> 8) + ((unsigned char) BA->n_bucket != 0 ? 1 : 0); 
-  kBA->bucket_size = bucket_misalignment (BA->bucket_size << 8, sizeof(k_bucket_update_t));
-  kBA->size_b_align = (sizeof(void *) * kBA->n_bucket + 0x3F) & ~((size_t) 0x3F);
-  kBA->bucket_write = (k_bucket_update_t **) malloc_pagealigned (kBA->size_b_align);
-  kBA->bucket_start = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align, 0x40);
-  kBA->logp_idx = (k_bucket_update_t **) malloc_aligned (kBA->size_b_align * BA->size_arr_logp, 0x40);
-
   mBA->n_bucket = (kBA->n_bucket >> 8) + ((unsigned char) kBA->n_bucket != 0 ? 1 : 0); 
   mBA->bucket_size = bucket_misalignment (kBA->bucket_size << 8, sizeof(m_bucket_update_t));
 
