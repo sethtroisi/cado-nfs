@@ -730,6 +730,7 @@ tests/test_iter.c
 tests/test_iter.h
 tests/tests_common.h
 tests/tests_common.c
+tests/test_iceildiv.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/test_init_norms_bucket_region.c
