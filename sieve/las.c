@@ -2846,7 +2846,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 #endif  /* }}} */
 
-    if (las->verbose) {
+    if (las->verbose >= 2) {
         /* Update the checksums over the bucket regions */
         for (int side = 0; side < 2; side++)
             th->checksum_post_sieve[side] = bucket_checksum(S[side], th->checksum_post_sieve[side]);
@@ -3002,11 +3002,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             int pass = 1;
 
+            int i;
+            unsigned int j;
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 int lim = si->conf->sides[side]->lim;
-                int i;
-                unsigned int j;
 
                 // Trial divide rational norm
                 /* Compute the norms using the polynomials transformed to 
@@ -3116,6 +3116,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
+                }
+                if (las->verbose >= 2) {
+                  fprintf(las->output, "# i=%d, j=%u\n", i, j);
                 }
                 fprint_relation(las->output, rel, comment);
                 pthread_mutex_unlock(&io_mutex);
