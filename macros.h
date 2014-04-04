@@ -84,7 +84,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
    cases, we have to distinguish by sign of arguments. Note that (afaik) the
    sign and truncation direction of the quotient with any negative operads was
    undefined in C89. */
-#define iceildiv(x,y)	(((x) < 0) + ((y) < 0) == 1 ? (x)/(y) : (x) == 0 ? x : ((x)-1+2*((y)<0))/(y)+1)
+#define iceildiv(x,y)	(((x) < 0) + ((y) < 0) == 1 ? (x)/(y) : (x) == 0 ? (x) : ((x)-1+2*((y)<0))/(y)+1)
 #endif
 
 #define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
