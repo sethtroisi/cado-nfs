@@ -11,7 +11,9 @@ shift 4
 
 REFERENCE_SHA1="c12c10808914fb445dd32e6801ffb8f320db36e6"
 # The Git revision that created the REFERENCE_SHA1 hash
-REFERENCE_REVISION="0bd0c87d93c709279cc5c3dd471292b28ae04198"
+REFERENCE_REVISION="0bd0c87d93c709279cc5c3dd471292b28ae04198" # 430 relations
+# Previous revisions and number of relations found (most recent first):
+# 9253f54766c5438fe3198053f9edd811ee254a17 (421 relations)
 
 rlim=2300000
 alim=1200000
