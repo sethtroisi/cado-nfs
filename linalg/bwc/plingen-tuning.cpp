@@ -750,7 +750,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 #endif  /* HAVE_MPIR */
 
 
-void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl)/*{{{*/
+void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl MAYBE_UNUSED)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
@@ -980,7 +980,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
     polymat_cutoff_info_clear(improved);
 }/*}}}*/
 
-void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl)/*{{{*/
+void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list cl MAYBE_UNUSED)/*{{{*/
 {
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
