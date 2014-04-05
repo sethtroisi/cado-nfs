@@ -118,7 +118,7 @@
 
    [6. Bugs]
 
-   Please report bugs to Shi Bai (shi.bai AT anu.edu.au).
+   Please report bugs to Shi Bai (shih.bai AT gmail.com).
 */
 
 

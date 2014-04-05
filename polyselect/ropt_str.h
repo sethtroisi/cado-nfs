@@ -163,7 +163,8 @@ typedef _ropt_bestpoly_t ropt_bestpoly_t[1];
 typedef struct {
   double ave_MurphyE;
   double best_MurphyE;
-  int mode;
+  /* tuning mode = 1 */
+  int mode; 
   /* record quadratic rotation information */
   int w; 
 } _ropt_info_t;
