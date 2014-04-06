@@ -233,6 +233,7 @@ ropt_polyselect ( mpz_t *f,
                   mpz_t m,
                   mpz_t l,
                   const mpz_t N ,
+                  const int effort,
                   const int verbose )
 {
   int i;
@@ -250,9 +251,11 @@ ropt_polyselect ( mpz_t *f,
   ropt_info_t info;
   ropt_info_init (info);
 
+  /* passed params from polyselect2l */
   ropt_param_t param;
   ropt_param_init (param);
   param->verbose = verbose;
+  param->effort = effort;
 
   ropt_bestpoly_t bestpoly;
   ropt_bestpoly_init (bestpoly, poly->d);
@@ -261,7 +264,7 @@ ropt_polyselect ( mpz_t *f,
   /* cal main function */
   ropt_do_both_stages (poly, bestpoly, param, info);
   
-  /* bring bestpoly back to polyselect2* */
+  /* bring bestpoly back to polyselect2l */
   for (i = 0; i <= d; i++)
     mpz_set (f[i], bestpoly->f[i]);
   mpz_set (m, bestpoly->g[0]);

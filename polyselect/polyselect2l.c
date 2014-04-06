@@ -46,6 +46,7 @@ int nq = INT_MAX;
 int keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
+int rseffort = 1; /* sieving effort, among 1-5 */
 static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
@@ -303,8 +304,10 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
 
 #ifdef NEW_ROOTSIEVE
   if (d > 3) {
-    ropt_polyselect (F->coeff, d, g[0], g[1], N, 0); // verbose = 2 to see details.
-  } else {
+    /* verbose = 2 to see details */
+    ropt_polyselect (F->coeff, d, g[0], g[1], N, rseffort, 0);
+  }
+  else {
     unsigned long alim = 2000;
     long jmin, kmin;
     mpz_t m;
@@ -2019,6 +2022,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
   param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
+  param_list_decl_usage(pl, "rseffort", "root-sieve effort ranging from 1 to 5 (default 1)");
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "save", "save state in given file");
@@ -2106,10 +2110,19 @@ main (int argc, char *argv[])
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
 
+  /* filename for doing rootsieve only */
   rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
   if (rootsieve_filename != NULL) {
     read_raw_poly_file(rootsieve_filename);
     goto print_statistics;
+  }
+
+  /* sieving effort that passed to ropt */
+  param_list_parse_int (pl, "rseffort", &rseffort);
+  if (rseffort < 1 || rseffort > 5)
+  {
+    fprintf (stderr, "Error, -rseffort should be in [1,5]\n");
+    exit (1);
   }
 
   /* parse and check N in the first place */

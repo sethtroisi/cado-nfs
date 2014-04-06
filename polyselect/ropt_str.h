@@ -142,6 +142,10 @@ typedef struct {
      flag == 2, manually input stage 2 params */
   int stage_flag;
 
+  /* check between 1 and 5 */
+  int effort;
+
+  /* verbose */
   int verbose;
 } _ropt_param_t;
 typedef _ropt_param_t ropt_param_t[1];

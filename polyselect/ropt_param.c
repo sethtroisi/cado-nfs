@@ -23,25 +23,29 @@ unsigned int size_tune_sievearray = 6144;
 
 
 /**
- * Total number of sublattices to be root-sieved in the final step.
+ * Total number of sublattices in the tuning and sieving steps.
  * If with the default parametes (SIZE_SIEVEARRAY_V_MAX 4194304),
- * each root sieve takes about 2-4 seconds. The left column is 
+ * each root sieve takes about 2-4 seconds. The first column is 
  * ranked by the digits of integers to be factored and the right
  * column is the number (actually number+1).
  *
  * Usually, there is one or more tunning steps before the final root
  * sieve. In that case, more sublattices are checked (e.g. double/quad
  * the following valeus).
+ * 
+ * The number is linearly scaled by param->effort, but a larger value
+ * is not always necessary since the sieving is done in order with
+ * the best sublattices first.
  */
 const unsigned int size_total_sublattices[8][2] = {
-  // {digits, num_of_sublattices} 
-  {80, 4},   /* for up to 79 digits */
-  {100, 8},  /* up to 99 digits */
-  {140, 32}, /* up to 139 digits */
-  {170, 32}, /* up to 169 digits */
-  {180, 64}, /* up to 179 digits */
-  {220, 128}, /* up to 219 digits */
-  {260, 128}, /* up to 259 digits */
+  /* {digits, num_of_sublattices} */
+  {80,  2},  /* for up to 79 digits */
+  {100, 4},  /* up to 99 digits */
+  {140, 8},  /* up to 139 digits */
+  {170, 16}, /* up to 169 digits */
+  {180, 32}, /* up to 179 digits */
+  {220, 64}, /* up to 219 digits */
+  {260, 64}, /* up to 259 digits */
   {300, 128} /* up to 299 digits */
 };
 
@@ -50,11 +54,11 @@ const unsigned int size_total_sublattices[8][2] = {
  * Number of top sublattice for individual primes[i] in stage 1,
  * where i < NUM_SUBLATTICE_PRIMES. The constrcution should depends
  * on the total num of primes in s1param->e_sl[]. 
- * 
  * The main purpose is to prevent too much crt computations in stage 1.
+ * They will be passed to s1param->individual_nbest_sl[] later.
  */
 const unsigned int
-size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
+s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
   { 64,  0,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 1
   { 64, 64,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 2
   { 64, 64, 64,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 3
@@ -72,7 +76,7 @@ size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
  * Therefore, the values are much smaller than above.
  */
 const unsigned int
-size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
+s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
   8,  8,  4,  4,  4,  2,  2,  2,  2
 };
 

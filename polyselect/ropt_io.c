@@ -51,12 +51,16 @@ ropt_common ( ropt_poly_t poly,
   ropt_bestpoly_init (bestpoly, poly->d);
   ropt_bestpoly_setup (bestpoly, poly->f, poly->g, poly->d);
 
-  /* print f, g */
+  /* print f, g and effort */
   mpz_poly_t F;
   F->coeff = poly->f;
   F->deg = poly->d;
   print_poly_fg (F, poly->g, poly->n, 1);
-
+  if (param->verbose) {
+    fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
+    fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+  }
+  
   /* call ropt */
   ropt (poly, bestpoly, param, info);
 

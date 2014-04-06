@@ -566,7 +566,6 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
 
   /* v bound */
   rotate_bounds_V_mpz (poly, bound);
-
 }
 
 
@@ -794,7 +793,7 @@ ropt_s1param_setup_individual_nbest_sl (ropt_s1param_t s1param)
   unsigned int i;
   for (i = 0; i < s1param->len_e_sl; i ++)
     s1param->individual_nbest_sl[i] =
-      size_each_sublattice[s1param->tlen_e_sl - 1][i];
+        s1_size_each_sublattice[s1param->tlen_e_sl - 1][i];
 }
 
 
@@ -806,7 +805,8 @@ ropt_s1param_setup_individual_nbest_sl_tune (ropt_s1param_t s1param)
 {
   unsigned int i;
   for (i = 0; i < s1param->len_e_sl; i ++)
-    s1param->individual_nbest_sl[i] = size_each_sublattice_tune[i];
+    s1param->individual_nbest_sl[i]
+        = s1_size_each_sublattice_tune[i];
 }
 
 
@@ -831,8 +831,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
     if (size_total_sublattices[i][0] > j)
       break;
   
-  s1param->nbest_sl = size_total_sublattices[i][1];
-
+  s1param->nbest_sl = size_total_sublattices[i][1] * param->effort;
   //printf ("s1param->nbest_sl: %u\n", s1param->nbest_sl);
   
   /* Set 3: set "e_sl[]" */
@@ -1187,6 +1186,7 @@ ropt_param_init ( ropt_param_t param )
     param->s1_e_sl[i] = 0;
   param->d = 0;
   param->verbose = 0;
+  param->effort = 1;
 }
 
 
