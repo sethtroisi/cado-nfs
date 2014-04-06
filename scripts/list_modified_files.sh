@@ -17,7 +17,7 @@ function list_modified() {
   echo '"'
 }
 
-TEMPFILE="`mktemp`"
+TEMPFILE="`mktemp /tmp/XXXXXXX`"
 list_modified >> "$TEMPFILE"
 if ! [ -f "$OUTPUT_FILE" ] || ! cmp -s "$TEMPFILE" "$OUTPUT_FILE"
 then
