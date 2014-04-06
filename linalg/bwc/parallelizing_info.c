@@ -22,6 +22,7 @@
 #include "portability.h"
 #include "macros.h"
 #include "misc.h"
+#include "memory.h"
 
 #include <sys/time.h>   // gettimeofday
 #ifdef  HAVE_UTSNAME_H

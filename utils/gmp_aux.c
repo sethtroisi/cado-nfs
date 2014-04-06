@@ -60,7 +60,8 @@ mpz_get_int64 (mpz_srcptr z)
     return mpz_get_uint64(z) * (int64_t) mpz_sgn(z);
 }
 
-int mpz_fits_int64_p(mpz_srcptr z)
+int
+mpz_fits_int64_p (mpz_srcptr z)
 {
     int l = mpz_sizeinbase(z, 2);
     if (l <= 63) return 1;
@@ -69,16 +70,10 @@ int mpz_fits_int64_p(mpz_srcptr z)
     return 0;
 }
 
-int mpz_fits_uint64_p(mpz_srcptr z)
-{
-    ASSERT_ALWAYS(mpz_sgn(z) >= 0);
-    return mpz_sizeinbase(z, 2) <= 64;
-}
-
 void
 mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 {
-  if (sizeof (unsigned long) == 8)
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
     mpz_mul_ui (a, b, (unsigned long) c);
   else
     {
@@ -87,6 +82,54 @@ mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
       mpz_set_uint64 (d, c);
       mpz_mul (a, b, d);
       mpz_clear (d);
+    }
+}
+
+void
+mpz_submul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    mpz_submul_ui (a, b, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      mpz_submul (a, b, d);
+      mpz_clear (d);
+    }
+}
+
+void
+mpz_divexact_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    mpz_divexact_ui (a, b, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      mpz_divexact (a, b, d);
+      mpz_clear (d);
+    }
+}
+
+int
+mpz_divisible_uint64_p (mpz_t a, uint64_t c)
+{
+  if (sizeof (unsigned long) >= sizeof (uint64_t))
+    return mpz_divisible_ui_p (a, (unsigned long) c);
+  else
+    {
+      mpz_t d;
+      int ret;
+
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      ret = mpz_divisible_p (a, d);
+      mpz_clear (d);
+      return ret;
     }
 }
 
@@ -105,6 +148,7 @@ mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
+/* a <- a + b * c */
 void
 mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
@@ -120,39 +164,42 @@ mpz_addmul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
     }
 }
 
-/* returns the smallest prime > q */
-uint64_t
-uint64_nextprime (uint64_t q)
-{
-  mpz_t p;
-
-  mpz_init (p);
-  mpz_set_uint64 (p, q);
-  mpz_nextprime (p, p);
-  q = mpz_get_uint64 (p);
-  mpz_clear (p);
-  return q;
-}
-
-/* same as above, for an unsigned long */
+/* returns the smallest prime p, q < p <= ULONG_MAX, or 0 if no such prime
+   exists. guaranteed correct for q < 300M */
 unsigned long
 ulong_nextprime (unsigned long q)
 {
   mpz_t p;
+  unsigned long s[] = {16661633, 18790021, 54470491, 73705633, 187546133,
+                       300164287, (unsigned long) (-1L)};
+  int i;
 
   mpz_init (p);
   mpz_set_ui (p, q);
-  mpz_nextprime (p, p);
-  ASSERT_ALWAYS (mpz_fits_ulong_p (p));
-  q = mpz_get_ui (p);
+  do
+    {
+      mpz_nextprime (p, p);
+      if (mpz_fits_ulong_p (p))
+        q = mpz_get_ui (p);
+      else {
+        q = 0;
+        break;
+      }
+      for (i = 0; q > s[i]; i++);
+    }
+  while (q == s[i]);
   mpz_clear (p);
   return q;
 }
 
-#define REPS 1 /* number of Miller-Rabin tests in isprime */
+#define REPS 3 /* number of Miller-Rabin tests in isprime */
 
+/* with REPS=1, the smallest composite reported prime is 1537381
+   with REPS=2, it is 1943521
+   with REPS=3, correct for p < 300M
+*/
 int
-isprime (unsigned long p)
+ulong_isprime (unsigned long p)
 {
   mpz_t P;
   int res;
@@ -174,8 +221,9 @@ int nbits (uintmax_t p)
 
 /* q <- n/d rounded to nearest, assuming d <> 0
    r <- n - q*d
+   Output: -d/2 <= r < d/2
 */
-void
+static void
 mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
 {
   int s;
@@ -192,6 +240,9 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
+/* q <- n/d rounded to nearest, assuming d <> 0
+   Output satisfies |n-q*d| <= |d|/2
+*/
 void
 mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
 {
@@ -202,4 +253,14 @@ mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
   mpz_clear (r);
 }
 
-
+/* Return non-zero if a and b are coprime, else return 0 if gcd(a, b) != 1 */
+int
+mpz_coprime_p (mpz_t a, mpz_t b)
+{
+  mpz_t g;
+  mpz_init(g);
+  mpz_gcd (g, a, b);
+  int ret = mpz_cmp_ui (g, 1);
+  mpz_clear(g);
+  return (ret == 0) ? 1 : 0;
+}

@@ -910,7 +910,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   tmpBmin = s2param->Bmin;
 
   /* for each i -> each u = A + MOD * i */
-  int st = milliseconds ();
+  unsigned long st = milliseconds ();
   do {
 
     /* fo reach block of size size_B_block */
@@ -968,7 +968,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
       mpz_set (s2param->g[0], poly->g[0]);
       mpz_set (s2param->g[1], poly->g[1]);
 
-      optimize_aux (F, s2param->g, 0, 0, CIRCULAR);
+      optimize_aux (F, s2param->g, 0, 0);
 
       MurphyE = print_poly_fg (F, s2param->g, poly->n, 0);
 
@@ -977,9 +977,8 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
 
       /* // Further approximate.
       double skew = L2_skewness (s2param->f, poly->d,
-                                 SKEWNESS_DEFAULT_PREC, 
-                                 DEFAULT_L2_METHOD);
-      MurphyE = L2_lognorm (s2param->f, poly->d, skew, DEFAULT_L2_METHOD);
+                                 SKEWNESS_DEFAULT_PREC, 0);
+      MurphyE = L2_lognorm (s2param->f, poly->d, skew, 0);
       double alpha = get_alpha (s2param->f, poly->d, ALPHA_BOUND);
       insert_MurphyE_pq (local_E_pqueue, info->w, tmpu, tmpv, 
                          s2param->MOD,

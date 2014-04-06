@@ -1029,6 +1029,7 @@ struct sqrt_globals {
     mpz_poly_t f_hat_diff;
     double f_hat_coeffs;
     cado_poly pol;
+    mpz_t root_m;
     ab_source ab;
     int lll_maxdim;
     int rank;
@@ -1063,12 +1064,6 @@ static const char * size_disp(size_t s, char buf[16])
 
 // {{{ TODO: Now that the v field is gone, replace the polymodF layer.
 // Here's the only fragments which need to remain.
-    static int
-mpz_poly_normalized_p (const mpz_poly_t f)
-{
-    return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
-}
-
 static void
 mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
     tmp->deg = b != 0;
@@ -1906,7 +1901,7 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
         mpz_mod(zN, zN, glob.pol->n);
         // gmp_printf("[X^%d] %Zd\n", k, zN);
         // good. we have the coefficient !
-        mpz_mul(e, e, glob.pol->m);
+        mpz_mul(e, e, glob.root_m);
         mpz_mul(e, e, glob.pol->alg->coeff[glob.n]);
         mpz_add(e, e, zN);
         mpz_mod(e, e, glob.pol->n);
@@ -1985,7 +1980,7 @@ void crtalgsqrt_knapsack_prepare(struct crtalgsqrt_knapsack * cks, size_t lc_exp
     {
         mpz_t alpha_hat;
         mpz_init(alpha_hat);
-        mpz_mul(alpha_hat, glob.pol->m, glob.pol->alg->coeff[glob.n]);
+        mpz_mul(alpha_hat, glob.root_m, glob.pol->alg->coeff[glob.n]);
         mpz_poly_eval_mod_mpz(cks->fhdiff_modN,
                 glob.f_hat_diff, alpha_hat, glob.pol->n);
         mpz_clear(alpha_hat);
@@ -3550,6 +3545,8 @@ int main(int argc, char **argv)
     ret = cado_poly_read(glob.pol, param_list_lookup_string(pl, "polyfile"));
     glob.n = glob.pol->alg->deg;
     ASSERT_ALWAYS(ret == 1);
+    mpz_init(glob.root_m);
+    cado_poly_getm(glob.root_m, glob.pol, glob.pol->n);
 
     /* {{{ create f_hat, the minimal polynomial of alpha_hat = lc(f) *
      * alpha */

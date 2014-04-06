@@ -94,7 +94,10 @@ for NODE in `cat "$OAR_NODE_FILE" | uniq`
 do 
     for I in `seq 1 "$NRCLIENTS"`
     do
-    	echo "Running command: oarsh $NODE ${COMMAND[@]} -d $@"
-        oarsh "$NODE" "${COMMAND[@]}" -d "$@"
+        echo "Running command: oarsh $NODE ${COMMAND[@]} $@"
+        oarsh "$NODE" "${COMMAND[@]}" "$@" &
     done
 done
+
+# Wait for wuclient jobs to finish.
+wait

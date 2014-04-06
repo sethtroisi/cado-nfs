@@ -1,0 +1,33 @@
+The cadofactor.py script and the factor.sh wrapper can be used to compute
+discrete logarithms in a prime field GF(p).
+
+For the moment, it is required to have Magma installed (it seems to fail
+with version of Magma before 2.19). It is only capable to handle tiny
+examples, since the linear algebra is currently done within Magma. This
+should change soon (hopefully). Using the linalg/bwc/bwc-ptrace.sh
+script, it might be possible to run the linear algebra step by hand for
+larger examples.
+
+In principle, just typing
+  ./factor.sh p -dlp
+should start a computation of discrete logarithms in GF(p), where p is a
+prime of (around) 59 digits. For other sizes, the default parameters may
+not be yet available.
+
+A direct use of cadofactor.py allows more flexibility. An example of
+parameter file is given in params_dl/param.p59. The main difference is
+the presence of the "dlp=true" line, and the lines related to characters
+and sqrt disappear.
+
+By default, the script will factor p-1 and compute discrete logs modulo
+the largest prime factor ell of p-1. This can be overridden by giving
+explicitly ell=... in the parameter file.
+
+The process is automatic up to the reconstruction of logarithms from the
+output of the linear algebra and the data remembered during the filtering
+phase. The result is in the $wordir/$name.reconstruclog.dlog file.
+
+Individual logarithms, using a descent stage, must be computed by hand
+with the help of the sieve/las binary. For that it needs to be recompiled
+with DLP_DESCENT and SUPPORT_LARGE_Q (see las-config.h).
+

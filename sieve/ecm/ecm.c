@@ -1652,6 +1652,11 @@ ell_pointorder (const residue_t sigma, const int parameterization,
     if (Montgomery12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 0;
   }
+  else if (parameterization == MONTY16)
+  {
+    if (Montgomery16_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
+      return 0;
+  }
   else
   {
     fprintf (stderr, "ecm: Unknown parameterization\n");

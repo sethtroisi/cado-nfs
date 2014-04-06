@@ -4,11 +4,18 @@ script in relation to various distributions' Python installations.
 
 1. Python 3
 
-Python 3, version 3.2 or greater, is required for cadofactor.py. If you do
-not wish to use cadofactor.py, for example because you want to use the old
-cadofactor.pl Perl script or, for the brave, run all commands by hand, you
-can disable the Python check in CMake by setting NO_PYTHON_CHECK to any
-non-empty string in local.sh. See local.sh.example for a template.
+Python 3, version 3.2 or greater, is required for cadofactor.py. If you
+do not wish to use cadofactor.py, maybe because you plan to run all
+commands by hand, you can disable the Python check in CMake by setting
+NO_PYTHON_CHECK to any non-empty string in local.sh. See local.sh.example
+for a template.
+
+Some operating systems don't have a Python 3 interpreter installed by
+default. The safest bet is to install a distribution-supplied package
+for Python 3. If no such package is available, you can download the
+Python source code, compile and and install it by yourself. For a good
+introduction to installing Python from source, see
+https://www.digitalocean.com/community/articles/how-to-set-up-python-2-7-6-and-3-3-3-on-centos-6-4
 
 
 2. Sqlite 3
@@ -43,7 +50,15 @@ and then running
 emerge  --deep --newuse world
 
 
-3. SSL
+3. Python 2 or 3 for the workunit client
+
+The client script wuclient2.py can run under both Python 2, version 2.6 or
+newer, and Python 3, version 3.2 or newer. This backward compatibility is
+supported to simplify deployment on many different machines over which the
+user may not have administrative control.
+
+
+4. SSL
 
 The workunit server and clients use SSL for communication to prevent an
 attacker on the same network from injecting text into workunits which could

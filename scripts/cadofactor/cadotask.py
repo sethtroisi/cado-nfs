@@ -12,6 +12,7 @@ from math import log, sqrt
 import logging
 import socket
 import gzip
+import heapq
 import patterns
 import wudb
 import cadoprograms
@@ -22,17 +23,10 @@ import workunit
 from struct import error as structerror
 from workunit import Workunit
 
-# Some parameters are provided by the param file but can change during
-# the factorization, like rels_wanted. On one hand, we want automatic
-# updates to parameters to be stored in the DB, otoh, we want to allow
-# externally setting new parameters. Need to distinguish between new
-# external parameters that overwrite DB, and old external parameters
-# that don't overwrite. Or maybe two ways to specify external params:
-# --defaults which does not overwrite, and --forceparam which does
-
 # Pattern for floating-point number
-re_fp = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
-cap_fp = "(%s)" % re_fp
+RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
+CAP_FP = "(%s)" % RE_FP
+
 
 class Polynomial(list):
     """
@@ -53,7 +47,7 @@ class Polynomial(list):
         list.__setitem__(self, index, value)
 
     def __str__(self):
-        xpow = ["", "*x"] + ["*x^%d" % i for i in range(2,len(self))]
+        xpow = ["", "*x"] + ["*x^%d" % i for i in range(2, len(self))]
         arr = ["%+d%s" % (self[idx], xpow[idx]) for idx in range(0, len(self))
                if self[idx]]
         poly = "".join(reversed(arr)).lstrip('+')
@@ -61,6 +55,7 @@ class Polynomial(list):
         return poly
 
     def eval(self, x):
+        """ Evaluate the polynomial at x """
         if len(self) == 0:
             return 0
         deg = self.degree
@@ -71,7 +66,9 @@ class Polynomial(list):
 
 
 class PolynomialParseException(Exception):
+    """ Exception class for signaling errors during polynomial parsing """
     pass
+
 
 class Polynomials(object):
     r""" A class that represents a polynomial
@@ -79,28 +76,28 @@ class Polynomials(object):
     >>> Polynomials([""])
     Traceback (most recent call last):
     cadotask.PolynomialParseException: No polynomials found
-    >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nm: 4\nskew: 1.0\n"
+    >>> t="n: 1021\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
-    'n: 1021\nm: 4\nskew: 1.0\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\n# f(x) = x^5-x+1\n# g(x) = -x+4\n'
-    >>> t="n: 1021\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\nm: 4\nskew: 1.0\n"
+    'n: 1021\nskew: 1.0\nc0: 1\nc1: -1\nc5: 1\nY0: 4\nY1: -1\n# f(x) = x^5-x+1\n# g(x) = -x+4\n'
+    >>> t="n: 1021\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\nskew: 1.0\n"
     >>> p=Polynomials(t.splitlines())
     >>> str(p)
-    'n: 1021\nm: 4\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
+    'n: 1021\nskew: 1.0\nc0: -1\nc1: 1\nc5: -1\nY0: -4\nY1: 1\n# f(x) = -x^5+x-1\n# g(x) = x-4\n'
     """
 
-    re_pol_f = re.compile("c(\d+)\s*:\s*(-?\d+)")
-    re_pol_g = re.compile("Y(\d+)\s*:\s*(-?\d+)")
-    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=(.*)$")
+    re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
+    re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
+    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % CAP_FP)
+    re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % CAP_FP)
     
-    # Keys that can occur in a polynomial file in their preferred ordering,
+    # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string.
     keys = OrderedDict(
         (
             ("n", (int, True)),
-            ("m", (int, True)),
-            ("skew", (float, True)),
+            ("skew", (float, False)),
             ("type", (str, False))
         ))
     
@@ -108,6 +105,7 @@ class Polynomials(object):
         """ Parse a polynomial file in the syntax as produced by polyselect2l
         """
         self.MurphyE = 0.
+        self.lognorm = 0.
         self.params = {}
         polyf = Polynomial()
         polyg = Polynomial()
@@ -124,12 +122,18 @@ class Polynomials(object):
             return False
 
         for line in lines:
-            # print ("Parsing line: >%s<" % line)
+            # print ("Parsing line: >%s<" % line.strip())
             # If this is a comment line telling the Murphy E value,
             # extract the value and store it
             match = self.re_Murphy.match(line)
             if match:
                 self.MurphyE = float(match.group(1))
+                continue
+            # If this is a comment line telling the lognorm,
+            # extract the value and store it
+            match = self.re_lognorm.match(line)
+            if match:
+                self.lognorm = float(match.group(1))
                 continue
             # Drop comment, strip whitespace
             line2 = line.split('#', 1)[0].strip()
@@ -149,7 +153,7 @@ class Polynomials(object):
             
             if not key in self.keys:
                 raise PolynomialParseException("Invalid key '%s' in line '%s'" %
-                                (key, line))
+                                               (key, line))
             if key in self.params:
                 raise PolynomialParseException("Key %s in line %s has occurred "
                                                "before" % (key, line))
@@ -166,13 +170,6 @@ class Polynomials(object):
         for (key, (_type, isrequired)) in self.keys.items():
             if isrequired and not key in self.params:
                 raise PolynomialParseException("Key %s missing" % key)
-        # Test that the roots mod n are correct
-        val_f = polyf.eval(self.params["m"]) % self.params["n"]
-        if val_f != 0:
-            raise PolynomialParseException("Error: m is not a root of f(x) mod n")
-        val_g = polyg.eval(self.params["m"]) % self.params["n"]
-        if val_g != 0:
-            raise PolynomialParseException("Error: m is not a root of g(x) mod n")
         self.polyf = polyf
         self.polyg = polyg
         return
@@ -186,24 +183,27 @@ class Polynomials(object):
                 in enumerate(self.polyg) if not coeff == 0]
         if not self.MurphyE == 0.:
             arr.append("# MurphyE = %g\n" % self.MurphyE)
+        if not self.lognorm == 0.:
+            arr.append("# lognorm %g\n" % self.lognorm)
         arr.append("# f(x) = %s\n" % str(self.polyf))
         arr.append("# g(x) = %s\n" % str(self.polyg))
         return "".join(arr)
 
     def __eq__(self, other):
         return self.polyf == other.polyf and self.polyg == other.polyg \
-                and self.params == other.params
+            and self.params == other.params
+
     def __ne__(self, other):
         return not (self == other)
 
     def create_file(self, filename):
-        # Write polynomial to a file, and add lines with parameters such as
-        # "alim" if supplied in params
+        # Write polynomial to a file
         with open(str(filename), "w") as poly_file:
             poly_file.write(str(self))
 
     def getN(self):
-        return self.poly["N"]
+        return self.params["n"]
+
 
 class FilePath(object):
     """ A class that represents a path to a file, where the path should be
@@ -214,17 +214,23 @@ class FilePath(object):
     the path relative to the workdir should be used, whereas for any file
     accesses, the full path needs to be used.
     """
+
     def __init__(self, workdir, filepath):
         self.workdir = workdir.rstrip(os.sep)
         self.filepath = filepath
+
     def __str__(self):
         return "%s%s%s" % (self.workdir, os.sep, self.filepath)
+
     def get_wdir_relative(self):
         return self.filepath
+
     def isfile(self):
         return os.path.isfile(str(self))
+
     def isdir(self):
         return os.path.isdir(str(self))
+
     def mkdir(self, *, parent=False, mode=None):
         """ Creates a directory.
         
@@ -268,13 +274,13 @@ class WorkDir(object):
     workdir/jobname.taskname/subdir/file
     
     >>> f = WorkDir("/foo/bar", "jobname", "taskname")
-    >>> str(f.make_dirname())
+    >>> str(f.make_dirname()).replace(os.sep,'/')
     '/foo/bar/jobname.taskname/'
-    >>> str(f.make_filename('file'))
+    >>> str(f.make_filename('file')).replace(os.sep,'/')
     '/foo/bar/jobname.taskname.file'
-    >>> str(f.make_filename('file', use_subdir=True))
+    >>> str(f.make_filename('file', use_subdir=True)).replace(os.sep,'/')
     '/foo/bar/jobname.taskname/file'
-    >>> str(f.make_filename('file', use_subdir=True, subdir='subdir'))
+    >>> str(f.make_filename('file', use_subdir=True, subdir='subdir')).replace(os.sep,'/')
     '/foo/bar/jobname.taskname/subdir/file'
     """
     def __init__(self, workdir, jobname=None, taskname=None):
@@ -302,7 +308,7 @@ class WorkDir(object):
         """ Make a directory name of the form workdir/jobname.taskname/ """
         return self._make_path(os.sep)
     
-    def make_filename(self, name, use_subdir = False, subdir = None):
+    def make_filename(self, name, use_subdir=False, subdir=None):
         """ If use_subdir is False, make a filename of the form
         workdir/jobname.taskname.name
         If use_subdir is True and subdir is None, make a filename of the form
@@ -334,7 +340,10 @@ class Statistics(object):
     @staticmethod
     def typecast(values, types):
         """ Cast the values in values to the types specified in types """
-        return [t(v) for (v, t) in zip(values, types)]
+        if type(types) is type:
+            return [types(v) for v in values]
+        else:
+            return [t(v) for (v, t) in zip(values, types)]
     
     @staticmethod
     def _to_str(stat):
@@ -350,8 +359,7 @@ class Statistics(object):
         """ Initialise values in self from the strings in the "stats"
         dictionary
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in stats:
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
@@ -363,13 +371,15 @@ class Statistics(object):
         
         If they are found, they are added to self.stats.
         """
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        for (key, types, defaults, combine, regex) in self.conversions:
             match = regex.match(line)
             if match:
                 assert not key in self.stats
                 # print (pattern.pattern, match.groups())
-                self.stats[key] = self.typecast(match.groups(), types)
+                # Optional groups that did not match are returned as None.
+                # Skip over those so typecast doesn't raise TypeError
+                groups = [group for group in match.groups() if not group is None]
+                self.stats[key] = self.typecast(groups, types)
                 assert not self.stats[key] is None
     
     def merge_one_stat(self, key, new_val, combine):
@@ -385,14 +395,13 @@ class Statistics(object):
         "new_stats"
         """
         
-        assert self.conversions is new_stats.conversions
-        for conversion in self.conversions:
-            (key, types, defaults, combine, regex) = conversion
+        assert self.conversions == new_stats.conversions
+        for (key, types, defaults, combine, regex) in self.conversions:
             if key in new_stats.stats:
                 self.merge_one_stat(key, new_stats.stats[key], combine)
     
     def as_dict(self):
-        return {key:self._to_str(self.stats[key]) for key in self.stats}
+        return {key: self._to_str(self.stats[key]) for key in self.stats}
     
     def as_strings(self):
         """ Convert statistics to lines of output
@@ -406,12 +415,11 @@ class Statistics(object):
         printed if the value is not known.
         """
         result = []
-        stats = self.stats
         for format_arr in self.stat_formats:
             line = []
             for format_str in format_arr:
                 try:
-                    line.append(format_str.format(**stats))
+                    line.append(format_str.format(**self.stats))
                 except (KeyError, IndexError):
                     pass
             if line:
@@ -437,7 +445,7 @@ class Statistics(object):
         return [sum(items) for items in zip_longest(*lists, fillvalue=0)]
     
     def weigh(samples, weights):
-        return [sample*weight for (sample, weight) in zip(samples, weights)]
+        return [sample * weight for (sample, weight) in zip(samples, weights)]
     
     def combine_mean(means, samples):
         """ From two lists, one containing values and the other containing
@@ -526,12 +534,25 @@ class Statistics(object):
                 abs(combined1[1] / combined2[1] - 1) < 1e-10 and \
                 abs(combined1[2] - combined2[2]) <= 1e-10 * combined2[2]
     
-    def smallest_10(*lists):
+    def smallest_n(*lists, n=10):
         concat = []
         for l in lists:
             concat += l
         concat.sort()
-        return concat[0:10]
+        return concat[0:n]
+
+    def parse_stats(self, filename):
+        """ Parse statistics from the file with name "filename" and merge them
+        into self
+        
+        Returns the newly parsed stats as a dictionary
+        """
+        new_stats = Statistics(self.conversions, self.stat_formats)
+        with open(str(filename), "r") as inputfile:
+            for line in inputfile:
+                new_stats.parse_line(line)
+        self.merge_stats(new_stats)
+        return new_stats.as_dict()
 
 
 class HasName(object, metaclass=abc.ABCMeta):
@@ -564,7 +585,7 @@ class MakesTablenames(HasName):
         """
         return self.name
     
-    def make_tablename(self, extra = None):
+    def make_tablename(self, extra=None):
         """ Return a name for a DB table """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ?
         # Could be tricky to avoid collisions
@@ -629,17 +650,22 @@ class BaseStatistics(object):
     def print_stats(self):
         pass
 
-class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
-    @abc.abstractproperty
+
+class HasStatistics(BaseStatistics, HasState, DoesLogging, metaclass=abc.ABCMeta):
+    @property
     def stat_conversions(self):
-        pass
-    @abc.abstractproperty
+        """ Sub-classes should override """
+        return []
+
+    @property
     def stat_formats(self):
-        pass
+        """ Sub-classes should override """
+        return []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.statistics = Statistics(self.stat_conversions, self.stat_formats)
+        self.statistics.from_dict(self.state)
 
     def get_statistics_as_strings(self):
         """ Return the statistics collected so far as a List of strings.
@@ -655,9 +681,22 @@ class HasStatistics(BaseStatistics, DoesLogging, metaclass=abc.ABCMeta):
             for msg in stat_msgs:
                 self.logger.info(msg)
         super().print_stats()
+    
+    def parse_stats(self, filename, *, commit):
+        new_stats = self.statistics.parse_stats(filename)
+        self.logger.debug("Newly arrived stats: %s", new_stats)
+        update = self.statistics.as_dict()
+        self.logger.debug("Combined stats: %s", update)
+        self.state.update(update, commit=commit)
+
 
 class SimpleStatistics(BaseStatistics, HasState, DoesLogging, 
         metaclass=abc.ABCMeta):
+
+    @abc.abstractproperty
+    def programs(self):
+        # A list of classes of Programs which this tasks uses
+        pass
 
     def print_cpu_real_time(self, cputotal, realtotal, program):
         """ Print cpu and/or real time to logger """
@@ -665,12 +704,12 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         pairs = zip((cputotal, realtotal), ("cpu", "real"))
         usepairs = [pair for pair in pairs if pair[0]]
         if usepairs:
-            format = "/".join(["%g"] * len(usepairs))
+            printformat = "/".join(["%g"] * len(usepairs))
             usepairs = tuple(zip(*usepairs))
             timestr = '/'.join(usepairs[1])
-            self.logger.info("Total %s time for %s: " + format,
+            self.logger.info("Total %s time for %s: " + printformat,
                     timestr, program, *usepairs[0])
-                                                
+    
     def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
@@ -687,7 +726,7 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         """ Return number of seconds of cpu time spent by all programs of
         this Task
         """
-        total = 0.;
+        total = 0.
         for program in self.programs:
             total += self.update_cpu_or_real_time(is_cpu, program.name, 0.,
                     commit=False)
@@ -714,14 +753,20 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # A list of classes of Programs which this tasks uses
         pass
     @abc.abstractproperty
+    def progparam_override(self):
+        # A list of lists of program parameters that get overridden by the
+        # Task, such as admin for polyselect2l. Specifying these overridden
+        # parameters here lets cadofactor print a warning message when the
+        # user tries to supply them in the parameter file. Not specifying
+        # them here may also lead to a program abort, when a parameter is
+        # specified both in the progparams dictionary (as extracted via
+        # .myparams()) and as a direct parameter as supplied by the Task.
+        pass
+    @abc.abstractproperty
     def paramnames(self):
-        # A list of parameter keywords which this task uses.
-        # This is used for extracting relevant parameters from the parameter
-        # hierarchical dictionary.
-        # Sub-classes need to define a property 'paramnames' which returns a
-        # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
-        return ("name", "workdir", "run")
+        return self.join_params(super().paramnames, 
+            {"name": str, "workdir": str, "run": True})
     @property
     def param_nodename(self):
         return self.name
@@ -734,8 +779,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         parameter dictionary.
         '''
         
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.logger.debug("Enter Task.__init__(%s)",
                           self.name)
         self.logger.debug("state = %s", self.state)
@@ -745,19 +790,25 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
-        for prog in self.programs:
+        for prog, override in zip(self.programs, self.progparam_override):
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
+            for param in set(override) & set(progparams):
+                self.logger.warn('Parameter "%s" for program "%s" is '
+                                 'generated at run time and cannot be '
+                                 'supplied through the parameter file',
+                                 param, prog.name)
+                del(progparams[param])
+            
             self.progparams.append(progparams)
         # FIXME: whether to init workdir or not should not be controlled via
         # presence of a "workdir" parameter, but by class definition
         if "workdir" in self.params:
             self.workdir = WorkDir(self.params["workdir"], self.params["name"],
                                self.name)
-        self.init_stats()
         # Request mediator to run this task, unless "run" parameter is set
         # to false
-        if self.params.get("run", True):
+        if self.params["run"]:
             self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
@@ -775,15 +826,15 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         
         Raise IOError if any check fails, return None
         """
-        for f in filenames:
-            if isinstance(f, FilePath):
-                exists = f.isfile()
+        for filename in filenames:
+            if isinstance(filename, FilePath):
+                exists = filename.isfile()
             else:
-                exists = os.path.isfile(f)
+                exists = os.path.isfile(filename)
             if shouldexist and not exists:
-                raise IOError("%s file %s does not exist" % (filedesc, f))
+                raise IOError("%s file %s does not exist" % (filedesc, filename))
             elif not shouldexist and exists:
-                raise IOError("%s file %s already exists" % (filedesc, f))
+                raise IOError("%s file %s already exists" % (filedesc, filename))
         return
     
     # These two function go together, one produces a workunit name from the
@@ -851,7 +902,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.stderrfile = program.get_stderr()
             # stderr must be either in a string or in a file, but not both
             assert self.stderr is None or not self.stderrfile
-            self.output_files = program.get_regular_output_files()
+            self.output_files = program.get_output_files(with_stdio=False)
             self.cmd_line = cmd_line
             self.host = host
         def get_wu_id(self):
@@ -880,21 +931,21 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             return self.host
 
     def log_failed_command_error(self, message, command_nr):
-            host = message.get_host()
-            host_msg = " run on %s" % host if host else ""
-            self.logger.error("Program%s failed with exit code %d", 
-                              host_msg, message.get_exitcode(command_nr))
-            cmd_line = message.get_command_line(command_nr)
-            if cmd_line:
-                self.logger.error("Command line was: %s", cmd_line)
-            stderr = message.read_stderr(command_nr).decode('ascii')
-            stderrfilename = message.get_stderrfile(command_nr)
-            if stderrfilename:
-                stderrmsg = " (stored in file %s)" % stderrfilename
-            else:
-                stderrmsg = ""
-            if stderr:
-                self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
+        host = message.get_host()
+        host_msg = " run on %s" % host if host else ""
+        self.logger.error("Program%s failed with exit code %d", 
+                          host_msg, message.get_exitcode(command_nr))
+        cmd_line = message.get_command_line(command_nr)
+        if cmd_line:
+            self.logger.error("Command line was: %s", cmd_line)
+        stderr = message.read_stderr(command_nr)
+        stderrfilename = message.get_stderrfile(command_nr)
+        if stderrfilename:
+            stderrmsg = " (stored in file %s)" % stderrfilename
+        else:
+            stderrmsg = ""
+        if stderr:
+            self.logger.error("Stderr output follows%s:\n%s", stderrmsg, stderr)
 
     def submit_command(self, command, identifier, commit=True, log_errors=False):
         ''' Run a command.
@@ -923,8 +974,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     def filter_notification(self, message):
         wuid = message.get_wu_id()
         rc = message.get_exitcode(0)
-        stdout = message.read_stdout(0).decode("ascii")
-        stderr = message.read_stderr(0).decode("ascii")
+        stdout = message.read_stdout(0)
+        stderr = message.read_stderr(0)
         output_files = message.get_output_files()
         self.logger.message("%s: Received notification for wuid=%s, rc=%d, "
                             "output_files=[%s]",
@@ -993,42 +1044,25 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         if did_increment:
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
-    
-    def init_stats(self):
-        if not isinstance(self, HasStatistics):
-            return
-        self.statistics.from_dict(self.state)
-    
-    def parse_stats(self, filename, *, commit):
-        if not isinstance(self, HasStatistics):
-            return
-        new_stats = Statistics(self.stat_conversions, self.stat_formats)
-        with open(str(filename), "r") as inputfile:
-            for line in inputfile:
-                new_stats.parse_line(line)
-        self.logger.debug("Newly arrived stats: %s", new_stats.as_dict())
-        self.statistics.merge_stats(new_stats)
-        update = self.statistics.as_dict()
-        self.logger.debug("Combined stats: %s", update)
-        self.state.update(update, commit=commit)
 
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
-        return super().paramnames + ("maxwu", "wutimeout", "maxresubmit", 
-                                     "maxtimedout", "maxfailed")
+        return self.join_params(super().paramnames,  
+            {"maxwu": 10, 
+             "wutimeout": 10800,  # Default: 3h
+             "maxresubmit": 5, 
+             "maxtimedout": 100, 
+             "maxfailed": 100})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.state.setdefault("wu_timedout", 0)
         self.state.setdefault("wu_failed", 0)
-        self.params.setdefault("maxwu", 10)
-        self.params.setdefault("maxtimedout", 100)
-        self.params.setdefault("maxfailed", 100)
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -1041,7 +1075,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     def cancel_wu(self, wuid, commit=True):
         """ Cancel a WU and update wu_timedout counter """
         key = "wu_timedout"
-        maxtimedout = int(self.params["maxtimedout"])
+        maxtimedout = self.params["maxtimedout"]
         if not self.state[key] < maxtimedout:
             self.logger.error("Exceeded maximum number of timed out "
                               "workunits, maxtimedout=%d ", maxtimedout)
@@ -1115,7 +1149,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         (name, task, identifier, attempt) = self.split_wuname(wuid)
         attempt = 2 if attempt is None else attempt + 1
         if maxresubmit is None:
-            maxresubmit = int(self.params.get("maxresubmit", 5))
+            maxresubmit = self.params["maxresubmit"]
         if attempt > maxresubmit:
             self.logger.info("Not resubmitting workunit %s, failed %d times",
                              wuid, attempt - 1)
@@ -1143,14 +1177,15 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return
         self.last_timeout_check = now
         
-        timeout = int(self.params.get("wutimeout", 10800)) # Default: 3h
+        timeout = self.params["wutimeout"]
         delta = datetime.timedelta(seconds=timeout)
         cutoff = str(datetime.datetime.utcnow() - delta)
-        self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
-                          cutoff, now)
+        # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
+        #                   cutoff, now)
         results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
         if not results:
-            self.logger.debug("Found no timed-out workunits")
+            # self.logger.debug("Found no timed-out workunits")
+            pass
         for entry in results:
             self.cancel_wu(entry["wuid"], commit=False)
             self.resubmit_one_wu(Workunit(entry["wu"]), commit=True)
@@ -1166,7 +1201,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
             return False
         self.log_failed_command_error(message, 0)
         key = "wu_failed"
-        maxfailed = int(self.params["maxfailed"])
+        maxfailed = self.params["maxfailed"]
         if not self.state[key] < maxfailed:
             self.logger.error("Exceeded maximum number of failed "
                               "workunits, maxfailed=%d ", maxfailed)
@@ -1193,9 +1228,18 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     def programs(self):
         return (cadoprograms.Polyselect2l,)
     @property
+    def progparam_override(self):
+        # admin and admax are special, which is a bit ugly: these parameters
+        # to the Polyselect2l constructor are supplied by the task, but the
+        # task has itself admin, admax parameters, which specify the total
+        # size of the search range. Thus we don't include admin, admax here,
+        # or PolyselTask would incorrectly warn about them not being used.
+        return [[]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("adrange", "admin", "admax", "import")
+        return self.join_params(super().paramnames, {
+            "adrange": int, "admin": 0, "admax": int, "import": None,
+            "I": int, "alim": int, "rlim": int})
     def update_lognorms(old_lognorm, new_lognorm):
         lognorm = [0, 0, 0, 0, 0]
         # print("update_lognorms: old_lognorm: %s" % old_lognorm)
@@ -1217,31 +1261,33 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
     # Stat: best logmu: 20.10 21.05 21.41 21.48 21.51 21.57 21.71 21.74 21.76 21.76
     # Stat: total phase took 55.47s
     # Stat: rootsieve took 54.54s
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        return (
         (
             "stats_collisions",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: potential collisions=%s" % cap_fp)
+            re.compile(r"# Stat: potential collisions=%s" % CAP_FP)
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((cap_fp,) * 4))
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
         ),
         (
             "stats_tries",
-            (int, )*3,
+            int,
             "0 0 0",
             Statistics.add_list,
             re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
@@ -1253,29 +1299,26 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         # so that in the end, only the last match is in the capture group.
         (
             "stats_logmu",
-            (float, )*10,
+            float,
             "",
-            Statistics.smallest_10,
-            re.compile(r"# Stat: best logmu:" + (" " + cap_fp)*10)
+            Statistics.smallest_n,
+            re.compile(r"# Stat: best logmu:" + (" " + CAP_FP)*10)
         ),
         (
             "stats_total_time",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: total phase took %ss" % cap_fp)
+            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
         ),
         (
             "stats_rootsieve_time",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: rootsieve took %ss" % cap_fp)
+            re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
         )
     )
-    @property
-    def stat_conversions(self):
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -1291,14 +1334,18 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.state["adnext"] = \
-            max(self.state.get("adnext", 0), self.params.get("admin", 0))
+            max(self.state.get("adnext", 0), self.params["admin"])
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
         self.did_import = False
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["alim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
     
     def run(self):
         self.logger.info("Starting")
@@ -1318,8 +1365,7 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.did_import = True
         
         if self.is_done():
-            self.logger.info("Polynomial selection already finished - "
-                             "nothing to do")
+            self.logger.info("Already finished - nothing to do")
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
             if filename is None or not filename.isfile():
@@ -1356,9 +1402,11 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         if self.handle_error_result(message):
             return
         (filename, ) = message.get_output_files()
-        ok = self.process_polyfile(filename, commit=False)
+        self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
-        self.verification(message.get_wu_id(), ok, commit=True)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
     
     def process_polyfile(self, filename, commit=True):
         poly = self.parse_poly(filename)
@@ -1366,7 +1414,6 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             self.bestpoly = poly
             update = {"bestpoly": str(poly), "bestfile": filename}
             self.state.update(update, commit=commit)
-        return True
     
     def read_log_warning(self, filename):
         """ Read lines from file. If a "# WARNING" line occurs, log it.
@@ -1454,6 +1501,654 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         """ Return number of seconds of cpu time spent by polyselect2l """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
+class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
+    """ Finds a number of size-optimized polynomial, uses client/server """
+    @property
+    def name(self):
+        return "polyselect1"
+    @property
+    def title(self):
+        return "Polynomial Selection (size optimized)"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def progparam_override(self):
+        # admin and admax are special, which is a bit ugly: these parameters
+        # to the Polyselect2l constructor are supplied by the task, but the
+        # task has itself admin, admax parameters, which specify the total
+        # size of the search range. Thus we don't include admin, admax here,
+        # or PolyselTask would incorrectly warn about them not being used.
+        return [[]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {
+            "adrange": int, "admin": 0, "admax": int, "import": None,
+            "I": int, "alim": int, "rlim": int, "nrkeep": 20})
+    @staticmethod
+    def update_lognorms(old_lognorm, new_lognorm):
+        lognorm = [0, 0, 0, 0, 0]
+        # print("update_lognorms: old_lognorm: %s" % old_lognorm)
+        # print("update_lognorms: new_lognorm: %s" % new_lognorm)
+        # New minimum. Don't use default value of 0 for minimum
+        lognorm[1] = min(old_lognorm[1] or new_lognorm[1], new_lognorm[1])
+        # New maximum
+        lognorm[3] = max(old_lognorm[3], new_lognorm[3])
+        # Rest is done by combine_stats(). [0::2] selects indices 0,2,4
+        lognorm[0::2] = Statistics.combine_stats(old_lognorm[0::2],
+                                                 new_lognorm[0::2])
+        return lognorm
+    
+    # Stat: potential collisions=124.92 (2.25e+00/s)
+    # Stat: raw lognorm (nr/min/av/max/std): 132/18.87/21.83/24.31/0.48
+    # Stat: optimized lognorm (nr/min/av/max/std): 125/20.10/22.73/24.42/0.69
+    # Stat: av. g0/adm2 ratio: 8.594e+04
+    # Stat: tried 83 ad-value(s), found 132 polynomial(s), 125 below maxnorm
+    # Stat: best raw logmu: 20.25 20.88
+    # Stat: best opt logmu: 19.68 20.25
+    # Stat: best logmu: 19.68 20.25
+    # Stat: total phase took 55.47s
+    @property
+    def stat_conversions(self):
+        return (
+        (
+            "stats_collisions",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: potential collisions=%s" % CAP_FP)
+        ),
+        (
+            "stats_rawlognorm",
+            (int, float, float, float, float),
+            "0 0 0 0 0",
+            self.update_lognorms,
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+        ),
+        (
+            "stats_optlognorm",
+            (int, float, float, float, float),
+            "0 0 0 0 0",
+            self.update_lognorms,
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+        ),
+        (
+            "stats_tries",
+            int,
+            "0 0 0",
+            Statistics.add_list,
+            re.compile(r"# Stat: tried (\d+) ad-value\(s\), found (\d+) polynomial\(s\), (\d+) below maxnorm")
+        ),
+        # Note for "best raw logmu" pattern: a regex like (%s )* does not work;
+        # the number of the capture group is determined by the parentheses
+        # in the regex string, so trying to repeat a group like this will
+        # always capture to the *same* group, overwriting previous matches,
+        # so that in the end, only the last match is in the capture group.
+        (
+            "stats_raw_logmu",
+            float,
+            "",
+            Statistics.smallest_n,
+            re.compile(r"# Stat: best raw logmu:" + ("(?: " + CAP_FP + ")?")*10)
+        ),
+        (
+            "stats_opt_logmu",
+            float,
+            "",
+            Statistics.smallest_n,
+            re.compile(r"# Stat: best opt logmu:" + ("(?: " + CAP_FP + ")?")*10)
+        ),
+        (
+            "stats_total_time",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
+        ),
+    )
+    @property
+    def stat_formats(self):
+        return (
+            ["potential collisions: {stats_collisions[0]:g}"],
+            ["raw lognorm (nr/min/av/max/std): {stats_rawlognorm[0]:d}"] + 
+                ["/{stats_rawlognorm[%d]:.3f}" % i for i in range(1, 5)],
+            ["optimized lognorm (nr/min/av/max/std): {stats_optlognorm[0]:d}"] +
+                ["/{stats_optlognorm[%d]:.3f}" % i for i in range(1, 5)],
+            ["10 best raw logmu:"] +
+                [" {stats_raw_logmu[%d]}" % i for i in range(10)],
+            ["10 best opt logmu:"] +
+                [" {stats_opt_logmu[%d]}" % i for i in range(10)],
+            ["Total time: {stats_total_time[0]:g}",
+             ", rootsieve time: {stats_rootsieve_time[0]:g}"]
+            )
+    
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        assert self.params["nrkeep"] > 0
+        self.state["adnext"] = \
+            max(self.state.get("adnext", 0), self.params["admin"])
+        self.did_import = False
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["alim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        # Remove admin and admax from the parameter-file-supplied program
+        # parameters as those would conflict with the computed values
+        self.progparams[0].pop("admin", None)
+        self.progparams[0].pop("admax", None)
+
+        tablename = self.make_tablename("bestpolynomials")
+        self.best_polynomials = self.make_db_dict(
+                tablename, connection=self.db_connection)
+        self._check_best_polynomials()
+
+        self.poly_heap = []
+        self.import_existing_polynomials()
+        self._check_best_polynomials()
+        self._compare_heap_db()
+    
+    def _check_best_polynomials(self):
+        # Check that the keys form a sequence of consecutive non-negative
+        # integers
+        oldkeys = list(self.best_polynomials.keys())
+        oldkeys.sort(key=int)
+        assert oldkeys == list(map(str, range(len(self.best_polynomials))))
+
+    def _compare_heap_db(self):
+        """ Compare that the polynomials in the heap and in the DB agree
+        
+        They must contain an equal number of entries, and each polynomial
+        stored in the heap must be at the specified index in the DB.
+        """
+        assert len(self.poly_heap) == len(self.best_polynomials)
+        for lognorm, (key, poly) in self.poly_heap:
+            assert self.best_polynomials[key] == str(poly)
+
+    def import_existing_polynomials(self):
+        debug = False
+        oldkeys = list(self.best_polynomials.keys())
+        oldkeys.sort(key=int) # Sort by numerical value
+        for oldkey in oldkeys:
+            if debug:
+                print("Adding old polynomial at DB index %s: %s" %
+                      (oldkey, self.best_polynomials[oldkey]))
+            poly = Polynomials(self.best_polynomials[oldkey].splitlines())
+            if not poly.lognorm:
+                self.logger.error("Polynomial at DB index %s has no lognorm", oldkey)
+                continue
+            newkey = self._add_poly_heap(poly)
+            if newkey is None:
+                # Heap is full, and the poly was worse than the worst one on
+                # the heap. Thus it did not get added and must be removed from
+                # the DB
+                if debug:
+                    print("Deleting polynomial lognorm=%f, key=%s" % 
+                          (poly.lognorm, oldkey))
+                del(self.best_polynomials[oldkey])
+            elif newkey != oldkey:
+                # Heap is full, worst one in heap (with key=newkey) was
+                # overwritten and its DB entry gets replaced with poly from
+                # key=oldkey
+                if debug:
+                    print("Overwriting poly lognorm=%f, key=%s with poly "
+                          "lognorm=%f, key=%s" %
+                          (self.poly_heap[0][0], newkey, poly, oldkey))
+                self.best_polynomials.clear(oldkey, commit=False)
+                self.best_polynomials.update({newkey: poly}, commit=True)
+            else:
+                # Last case newkey == oldkey: nothing to do
+                if debug:
+                    print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
+
+    def run(self):
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        
+        worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
+                if self.poly_heap else ""
+        self.logger.info("%d polynomials in queue from previous run%s", 
+                         len(self.poly_heap), worstmsg)
+        
+        if "import" in self.params and not self.did_import:
+            self.process_polyfile(self.params["import"])
+            self.did_import = True
+        
+        if self.is_done():
+            self.logger.info("Already finished - nothing to do")
+            return True
+        
+        # Submit all the WUs we need to reach admax
+        while self.need_more_wus():
+            self.submit_one_wu()
+        
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
+            self.wait()
+        
+        self._compare_heap_db()
+        self.logger.info("Finished")
+        return True
+    
+    def is_done(self):
+        return not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
+    
+    def updateObserver(self, message):
+        identifier = self.filter_notification(message)
+        if not identifier:
+            # This notification was not for me
+            return
+        if self.handle_error_result(message):
+            return
+        (filename, ) = message.get_output_files()
+        self.process_polyfile(filename, commit=False)
+        self.parse_stats(filename, commit=False)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        self.verification(message.get_wu_id(), True, commit=True)
+    
+    @staticmethod
+    def read_blocks(input):
+        """ Return blocks of consecutive non-empty lines from input
+        
+        Whitespace is stripped; a line containing only whitespace is
+        considered empty. An empty block is never returned.
+        
+        >>> list(Polysel1Task.read_blocks(['', 'a', 'b', '', 'c', '', '', 'd', 'e', '']))
+        [['a', 'b'], ['c'], ['d', 'e']]
+        """
+        block = []
+        for line in input:
+            line = line.strip()
+            if line:
+                block.append(line)
+            else:
+                if block:
+                    yield block
+                block = []
+        if block:
+            yield block
+
+    def process_polyfile(self, filename, commit=True):
+        """ Read all size-optimized polynomials in a file and add them to the
+        DB and priority queue if worthwhile.
+        
+        Different polynomials must be separated by a blank line.
+        """
+        try:
+            polyfile = self.read_log_warning(filename)
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        totalparsed, totaladded = 0, 0
+        for block in self.read_blocks(polyfile):
+            parsed, added = self.parse_and_add_poly(block, filename)
+            totalparsed += parsed
+            totaladded += added
+        have = len(self.poly_heap)
+        nrkeep = self.params["nrkeep"]
+        fullmsg = ("%d/%d" % (have, nrkeep)) if have < nrkeep else "%d" % nrkeep
+        self.logger.info("Parsed %d polynomials, added %d to priority queue (has %s)",
+                         totalparsed, totaladded, fullmsg)
+        if totaladded:
+            self.logger.info("Worst polynomial in queue now has lognorm %f",
+                             -self.poly_heap[0][0])
+                                     
+    
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                yield line
+
+    def parse_and_add_poly(self, text, filename):
+        """ Parse a polynomial from an iterable of lines and add it to the
+        priority queue and DB. Return a two-element list with the number of
+        polynomials parsed and added, i.e., (0,0) or (1,0) or (1,1).
+        """
+        poly = self.parse_poly(text, filename)
+        if poly is None:
+            return (0, 0)
+        if not poly.lognorm:
+            self.logger.warn("Polynomial in file %s has no lognorm, skipping it",
+                             filename)
+            return (0, 0)
+        if self._add_poly_heap_db(poly):
+            return (1, 1)
+        else:
+            return (1, 0)
+
+    def _add_poly_heap_db(self, poly):
+        """ Add a polynomial to the heap and DB, if it's good enough.
+        
+        Returns True if the poly was added, False if not. """
+        key = self._add_poly_heap(poly)
+        if key is None:
+            return False
+        self.best_polynomials[key] = str(poly)
+        return True
+
+    def _add_poly_heap(self, poly):
+        """ Add a polynomial to the heap
+        
+        If the heap is full (nrkeep), the worst polynomial (i.e., with the
+        largest lognorm) is replaced if the new one is better.
+        Returns the key (as a str) under which the polynomial was added,
+        or None if it was not added.
+        """
+        assert len(self.poly_heap) <= self.params["nrkeep"]
+        debug = False
+
+        # Find DB index under which to store this new poly. If the heap
+        # is not full, use the next bigger index.
+        key = len(self.poly_heap)
+        # Is the heap full?
+        if key == self.params["nrkeep"]:
+            # Should we store this poly at all, i.e., is it better than
+            # the worst one in the heap?
+            worstnorm = -self.poly_heap[0][0]
+            if worstnorm <= poly.lognorm:
+                if debug:
+                    self.logger.debug("_add_poly_heap(): new poly lognorm %f, "
+                          "worst in heap has %f. Not adding",
+                          poly.lognorm, worstnorm)
+                return None
+            # Pop the worst poly from heap and re-use its DB index
+            key = heapq.heappop(self.poly_heap)[1][0]
+            if debug:
+                self.logger.debug("_add_poly_heap(): new poly lognorm %f, "
+                    "worst in heap has %f. Replacing DB index %s",
+                     poly.lognorm, worstnorm, key)
+        else:
+            # Heap was not full
+            if debug:
+                self.logger.debug("_add_poly_heap(): heap was not full, adding "
+                    "poly with lognorm %f at DB index %s", poly.lognorm, key)
+
+        # The DB requires the key to be a string. In order to have
+        # identical data in DB and heap, we store key as str everywhere.
+        key = str(key)
+
+        # Python heapq stores a minheap, so in order to have the worst
+        # polynomial (with largest norm) easily accessible, we use
+        # -lognorm as the heap key
+        new_entry = (-poly.lognorm, (key, poly))
+        heapq.heappush(self.poly_heap, new_entry)
+        return key
+
+    def parse_poly(self, text, filename):
+        poly = None
+        try:
+            poly = Polynomials(text)
+        except PolynomialParseException as e:
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+            return None
+        
+        if not poly:
+            return None
+        return poly
+    
+    def get_raw_polynomials(self):
+        # Extract polynomials from heap and return as list
+        return [entry[1][1] for entry in self.poly_heap]
+    
+    def need_more_wus(self):
+        return self.state["adnext"] < self.params["admax"]
+    
+    def submit_one_wu(self):
+        adstart = self.state["adnext"]
+        adend = adstart + self.params["adrange"]
+        adend = min(adend, self.params["admax"])
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            p = cadoprograms.Polyselect2l(admin=adstart, admax=adend,
+                                          stdout=str(outputfile),
+                                          sizeonly=True,
+                                          **self.progparams[0])
+            self.submit_command(p, "%d-%d" % (adstart, adend), commit=False)
+        self.state.update({"adnext": adend}, commit=True)
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect2l """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
+
+class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
+    """ Finds a polynomial, uses client/server """
+    @property
+    def name(self):
+        return "polyselect2"
+    @property
+    def title(self):
+        return "Polynomial Selection (root optimized)"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def progparam_override(self):
+        return [[]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {
+            "import": None, "I": int, "alim": int, "rlim": int, "batch": 5})
+    @property
+    def stat_conversions(self):
+        return (
+        (
+            "stats_total_time",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
+        ),
+        (
+            "stats_rootsieve_time",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
+        )
+    )
+    @property
+    def stat_formats(self):
+        return (
+            ["Total time: {stats_total_time[0]:g}",
+             ", rootsieve time: {stats_rootsieve_time[0]:g}"],
+            )
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        self.bestpoly = None
+        if "bestpoly" in self.state:
+            self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
+        self.did_import = False
+        self.state.setdefault("nr_poly_submitted", 0)
+        self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
+                * self.params["alim"])
+        self.progparams[0].setdefault("Bf", float(self.params["alim"]))
+        self.progparams[0].setdefault("Bg", float(self.params["rlim"]))
+        self.poly_to_submit = None
+
+    def run(self):
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        
+        if self.bestpoly is None:
+            self.logger.info("No polynomial was previously found")
+        else:
+            self.logger.info("Best polynomial previously found in %s has "
+                             "Murphy_E = %g",
+                             self.state["bestfile"], self.bestpoly.MurphyE)
+        
+        if "import" in self.params and not self.did_import:
+            self.process_polyfile(self.params["import"])
+            if not self.bestpoly is None:
+                self.write_poly_file()
+            self.did_import = True
+        
+        # Get the list of polynomials to submit
+        self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
+        
+        if self.is_done():
+            self.logger.info("Already finished - nothing to do")
+            # If the poly file got lost somehow, write it again
+            filename = self.get_state_filename("polyfilename")
+            if filename is None or not filename.isfile():
+                self.logger.warn("Polynomial file disappeared, writing again")
+                self.write_poly_file()
+            return True
+        
+        # Submit all the WUs we need
+        while self.need_more_wus():
+            self.submit_one_wu()
+        
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
+            self.wait()
+        
+        if self.bestpoly is None:
+            self.logger.error ("No polynomial found. Consider increasing the "
+                               "search range bound admax, or maxnorm")
+            return False
+        self.logger.info("Finished, best polynomial from file %s has Murphy_E "
+                         "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
+        self.write_poly_file()
+        return True
+    
+    def is_done(self):
+        return not self.bestpoly is None and not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
+    
+    def need_more_wus(self):
+        return self.state["nr_poly_submitted"] < len(self.poly_to_submit)
+    
+    def updateObserver(self, message):
+        identifier = self.filter_notification(message)
+        if not identifier:
+            # This notification was not for me
+            return
+        if self.handle_error_result(message):
+            return
+        (filename, ) = message.get_output_files()
+        self.process_polyfile(filename, commit=False)
+        self.parse_stats(filename, commit=False)
+        # Always mark ok to avoid warning messages about WUs that did not
+        # find a poly
+        # FIXME: wrong, we should always get an optimized poly for a raw one
+        self.verification(message.get_wu_id(), True, commit=True)
+    
+    def process_polyfile(self, filename, commit=True):
+        poly = self.parse_poly(filename)
+        if not poly is None:
+            self.bestpoly = poly
+            update = {"bestpoly": str(poly), "bestfile": filename}
+            self.state.update(update, commit=commit)
+    
+    def read_log_warning(self, filename):
+        """ Read lines from file. If a "# WARNING" line occurs, log it.
+        """
+        re_warning = re.compile("# WARNING")
+        with open(filename, "r") as inputfile:
+            for line in inputfile:
+                if re_warning.match(line):
+                    self.logger.warn("File %s contains: %s",
+                                     filename, line.strip())
+                yield line
+
+    def parse_poly(self, filename):
+        poly = None
+        try:
+            poly = Polynomials(self.read_log_warning(filename))
+        except (OSError, IOError) as e:
+            if e.errno == 2: # No such file or directory
+                self.logger.error("File '%s' does not exist", filename)
+                return None
+            else:
+                raise
+        except PolynomialParseException as e:
+            if str(e) != "No polynomials found":
+                self.logger.warn("Invalid polyselect file '%s': %s",
+                                  filename, e)
+                return None
+        except UnicodeDecodeError as e:
+            self.logger.error("Error reading '%s' (corrupted?): %s", filename, e)
+            return None
+        
+        if not poly:
+            self.logger.info('No polynomial found in %s', filename)
+            return None
+        if not poly.MurphyE:
+            self.logger.warn("Polynomial in file %s has no Murphy E value",
+                             filename)
+        if self.bestpoly is None or poly.MurphyE > self.bestpoly.MurphyE:
+            self.logger.info("New best polynomial from file %s:"
+                             " Murphy E = %g" % (filename, poly.MurphyE))
+            self.logger.debug("New best polynomial is:\n%s", poly)
+            return poly
+        else:
+            self.logger.info("Best polynomial from file %s with E=%g is "
+                             "no better than current best with E=%g",
+                             filename, poly.MurphyE, self.bestpoly.MurphyE)
+        return None
+    
+    def write_poly_file(self):
+        filename = self.workdir.make_filename("poly")
+        self.bestpoly.create_file(filename)
+        self.state["polyfilename"] = filename.get_wdir_relative()
+    
+    def get_poly(self):
+        if not "bestpoly" in self.state:
+            return None
+        return Polynomials(self.state["bestpoly"].splitlines())
+    
+    def get_poly_filename(self):
+        return self.get_state_filename("polyfilename")
+
+    def submit_one_wu(self):
+        assert self.need_more_wus()
+        to_submit = len(self.poly_to_submit)
+        nr = self.state["nr_poly_submitted"]
+        inputfilename = self.workdir.make_filename("raw_%d" % nr)
+        # Write one raw polynomial to inputfile
+        batchsize = min(to_submit - nr, self.params["batch"])
+        with inputfilename.open("w") as inputfile:
+            for i in range(batchsize):
+                inputfile.write(str(self.poly_to_submit[nr + i]))
+                inputfile.write("\n")
+        outputfile = self.workdir.make_filename("opt_%d" % nr)
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            p = cadoprograms.Polyselect2l(rootsieve=str(inputfilename),
+                                          stdout=str(outputfile),
+                                          **self.progparams[0])
+            self.submit_command(p, "%d" % nr, commit=False)
+        self.state.update({"nr_poly_submitted": nr + batchsize}, commit=True)
+
+    def get_total_cpu_or_real_time(self, is_cpu):
+        """ Return number of seconds of cpu time spent by polyselect2l """
+        return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
     @property
@@ -1466,13 +2161,15 @@ class FactorBaseTask(Task):
     def programs(self):
         return (cadoprograms.MakeFB,)
     @property
+    def progparam_override(self):
+        return [["poly", "out"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("alim", "gzip", "I")
+        return self.join_params(super().paramnames, {"gzip": True, "I": int})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"])
         if "outputfile" in self.state:
@@ -1506,13 +2203,17 @@ class FactorBaseTask(Task):
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = self.workdir.make_filename("roots" + use_gz)
 
             # Run command to generate factor base/free relations file
-            self.progparams[0].setdefault("maxbits", int(self.params["I"]) - 1)
+            self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.MakeFB.name)
             p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
+                                    stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
                                     **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
@@ -1541,17 +2242,20 @@ class FreeRelTask(Task):
     def programs(self):
         return (cadoprograms.FreeRel,)
     @property
+    def progparam_override(self):
+        return [["poly", "renumber", "badideals", "out"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("alim", "rlim", "gzip")
+        return self.join_params(super().paramnames,
+                {"dlp": False, "gzip": True, "addfullcol": None})
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
     }
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"])
         if "freerelfilename" in self.state:
@@ -1587,19 +2291,35 @@ class FreeRelTask(Task):
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             freerelfilename = self.workdir.make_filename("freerel" + use_gz)
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
-
-            # Run command to generate factor base/free relations file
-            p = cadoprograms.FreeRel(poly=polyfilename,
-                                     renumber=renumberfilename,
-                                     out=str(freerelfilename),
-                                     **self.progparams[0])
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.FreeRel.name)
+            if self.params["dlp"]:
+                badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
+                # default for dlp is addfullcol
+                if not "addfullcol" in self.progparams[0]:
+                    self.progparams[0]["addfullcol"] = True;
+                p = cadoprograms.FreeRel(poly=polyfilename,
+                                         renumber=renumberfilename,
+                                         badideals=badidealfilename,
+                                         out=str(freerelfilename),
+                                         stdout=str(stdoutpath),
+                                         stderr=str(stderrpath),
+                                         **self.progparams[0])
+            else:
+                # Run command to generate factor base/free relations file
+                p = cadoprograms.FreeRel(poly=polyfilename,
+                                         renumber=renumberfilename,
+                                         out=str(freerelfilename),
+                                         stdout=str(stdoutpath),
+                                         stderr=str(stderrpath),
+                                         **self.progparams[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            stderr = message.read_stderr(0).decode("ascii")
+            stderr = message.read_stderr(0).decode("utf-8")
             update = self.parse_file(stderr.splitlines())
             update["freerelfilename"] = freerelfilename.get_wdir_relative()
             update["renumberfilename"] = renumberfilename.get_wdir_relative()
@@ -1653,69 +2373,72 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def programs(self):
         return (cadoprograms.Las,)
     @property
+    def progparam_override(self):
+        return [["q0", "q1", "poly", "factorbase", "out", "stats_stderr"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("qmin", "qrange", "rels_wanted", "alim", "import")
-    _stat_conversions = (
+        return self.join_params(super().paramnames, {
+            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int, 
+            "import": None, "gzip": True})
+    @property
+    def stat_conversions(self):
+        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
+        # Total cpu time 7.0s [precise timings available only for mono-thread]
+        # Total 26198 reports [0.000267s/r, 155.9r/sq]
+        return (
         (
             "stats_avg_J",
             (float, int),
             "0 0",
             Statistics.zip_combine_mean,
-            re.compile(r"# Average J=%s for (\d+) special-q's" % cap_fp)
+            re.compile(r"# Average J=%s for (\d+) special-q's" % CAP_FP)
         ),
         (
             "stats_max_bucket_fill",
-            (float, ),
+            float,
             "0",
             max,
-            re.compile(r"#.*max bucket fill %s" % cap_fp)
+            re.compile(r"#.*max bucket fill %s" % CAP_FP)
         ),
         (
             "stats_total_cpu_time",
-            (float, ),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Total cpu time %ss" % cap_fp)
+            re.compile(r"# Total cpu time %ss" % CAP_FP)
         ),
         (
             "stats_total_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"# Total time %ss" % cap_fp)
+            re.compile(r"# Total time %ss" % CAP_FP)
         )
     )
     @property
-    def stat_conversions(self):
-        # Average J=1017 for 168 special-q's, max bucket fill 0.737035
-        # Total cpu time 7.0s [precise timings available only for mono-thread]
-        # Total 26198 reports [0.000267s/r, 155.9r/sq]
-        return self._stat_conversions
-    @property
     def stat_formats(self):
         return (
-            ["Average J: {stats_avg_J[0]} for {stats_avg_J[1]} special-q",
-                ", max bucket fill: {stats_max_bucket_fill[0]}"],
-            ["Total CPU time: {stats_total_cpu_time[0]}s"],
-            ["Total time: {stats_total_time[0]}s"],
+            ["Average J: {stats_avg_J[0]:g} for {stats_avg_J[1]:d} special-q",
+                ", max bucket fill: {stats_max_bucket_fill[0]:g}"],
+            ["Total CPU time: {stats_total_cpu_time[0]:g}s"],
+            ["Total time: {stats_total_time[0]:g}s"],
         )
     # We seek to this many bytes before the EOF to look for the
     # "Total xxx reports" message
     file_end_offset = 1000
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
-        qmin = self.params.get("qmin", 0)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        qmin = self.params["qmin"]
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
         else:
-            self.state["qnext"] = self.params.get("qmin", self.params["alim"])
+            # qmin = 0 is magic value that uses alim instead. Not pretty.
+            self.state["qnext"] = qmin if qmin > 0 else self.params["alim"]
         
         self.state.setdefault("rels_found", 0)
-        self.state["rels_wanted"] = self.params.get("rels_wanted", 0)
-        self.params.setdefault("maxwu", "10")
+        self.state["rels_wanted"] = self.params["rels_wanted"]
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
@@ -1734,7 +2457,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             outputfilename = \
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output",
@@ -1743,7 +2466,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
             p = cadoprograms.Las(q0=q0, q1=q1,
                                  poly=polyfilename, factorbase=factorbase,
-                                 out=outputfilename, stats_stderr = True,
+                                 out=outputfilename, stats_stderr=True,
                                  **self.progparams[0])
             self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
             self.state.update({"qnext": q1}, commit=True)
@@ -1830,7 +2553,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             if filename in self.get_output_filenames():
                 self.logger.info("Re-scanning file %s", filename)
                 nrels = self.get_nrels() - self.get_nrels(filename)
-                self.state.update({"rels_found": nrels})
+                self.state.update({"rels_found": nrels}, commit=False)
                 self.forget_output_filenames([filename], commit=True)
             self.add_file(filename)
 
@@ -1839,7 +2562,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         strings += super().get_statistics_as_strings()
         return strings
     
-    def get_nrels(self, filename = None):
+    def get_nrels(self, filename=None):
         """ Return the number of relations found, either the total so far or
         for a given file
         """
@@ -1885,32 +2608,33 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
     def programs(self):
         return (cadoprograms.Duplicates1,)
     @property
+    def progparam_override(self):
+        return [["filelist", "prefix", "out"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("nslices_log",)
-    _stat_conversions = (
-        (
-            "stats_dup1_time",
-            (float, ),
-            "0",
-            Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
-        ),
-    )
+        return self.join_params(super().paramnames, {"nslices_log": 1})
     @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return self._stat_conversions
+        return (
+        (
+            "stats_dup1_time",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
+        ),
+    )
     @property
     def stat_formats(self):
         return (
             ["CPU time for dup1: {stats_dup1_time[0]}s"],
         )
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
-        self.nr_slices = 2**self.params.get("nslices_log", 1)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
         self.already_split_input = self.make_db_dict(tablename,
                                                      connection=self.db_connection)
@@ -1956,7 +2680,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             self.logger.info("Splitting %d new files", len(newfiles))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
-            self.check_files_exist(newfiles, "input", shouldexist = True)
+            self.check_files_exist(newfiles, "input", shouldexist=True)
             # Split the new files
             if self.nr_slices == 1:
                 # If we should split into only 1 part, we don't actually
@@ -2102,22 +2826,25 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def programs(self):
         return (cadoprograms.Duplicates2,)
     @property
+    def progparam_override(self):
+        return [["poly", "rel_count", "badidealinfo", "renumber", "filelist"]]
+    @property
     def paramnames(self):
-        return super().paramnames + ("nslices_log", "alim", "rlim")
-    _stat_conversions = (
-        (
-            "stats_dup2_time",
-            (float, ),
-            "0",
-            Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % cap_fp)
-        ),
-    )
+        return self.join_params(super().paramnames, 
+            {"dlp": False, "nslices_log": 1})
     @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
-        return self._stat_conversions
+        return (
+        (
+            "stats_dup2_time",
+            float,
+            "0",
+            Statistics.add_list,
+            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
+        ),
+    )
     @property
     def stat_formats(self):
         return (
@@ -2125,9 +2852,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
-        self.nr_slices = 2**self.params.get("nslices_log", 1)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        self.nr_slices = 2**self.params["nslices_log"]
         tablename = self.make_tablename("infiles")
         self.already_done_input = self.make_db_dict(tablename, connection=self.db_connection)
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"), connection=self.db_connection)
@@ -2162,10 +2889,17 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             name = "%s.slice%d" % (cadoprograms.Duplicates2.name, i)
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(name, do_increment=(i == 0))
+             
+            if self.params["dlp"]:
+                badinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
+            else:
+                badinfofilename = None
+
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
                                              poly=polyfilename,
                                              rel_count=rel_count,
+                                             badidealinfo=badinfofilename,
                                              renumber=renumber_filename,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
@@ -2176,6 +2910,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                     filelistfile.write("\n".join(files) + "\n")
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count,
+                                             badidealinfo=badinfofilename,
                                              renumber=renumber_filename,
                                              filelist=filelistname,
                                              stdout=str(stdoutpath),
@@ -2266,12 +3001,16 @@ class PurgeTask(Task):
     def programs(self):
         return (cadoprograms.Purge,)
     @property
+    def progparam_override(self):
+        return [["nrels", "out", "minindex", "outdel", "nprimes", "filelist"]]
+    @property
     def paramnames(self):
-        return super().paramnames + ("alim", "rlim")
+        return self.join_params(super().paramnames, 
+            {"dlp": False, "alim": int, "rlim": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.state.setdefault("input_nrels", 0)
     
     def run(self):
@@ -2300,15 +3039,25 @@ class PurgeTask(Task):
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, input_nrels))
-        purgedfile = self.workdir.make_filename("purged.gz")
+        use_gz = ".gz" if self.params["gzip"] else ""
+        purgedfile = self.workdir.make_filename("purged" + use_gz)
+        if self.params["dlp"]:
+            relsdelfile = self.workdir.make_filename("relsdel" + use_gz)
+        else:
+            relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         files = unique_filenames + [str(freerel_filename)]
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
+        if self.params["dlp"]:
+            nmaps = self.send_request(Request.GET_NMAPS)
+            self.progparams[0]["keep"] = nmaps
+        
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
+                                   outdel=relsdelfile,
                                    minindex=minindex, nprimes=nprimes,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -2319,19 +3068,23 @@ class PurgeTask(Task):
                 filelistfile.write("\n".join(files))
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
+                                   outdel=relsdelfile,
                                    nprimes=nprimes, filelist=filelistname,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         message = self.submit_command(p, "")
-        stdout = message.read_stdout(0).decode('ascii')
-        stderr = message.read_stderr(0).decode('ascii')
+        stdout = message.read_stdout(0).decode('utf-8')
+        stderr = message.read_stderr(0).decode('utf-8')
         if self.parse_stderr(stderr, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
-            self.state.update({"purgedfile": purgedfile.get_wdir_relative(),
-                               "input_nrels": input_nrels})
+            update = {"purgedfile": purgedfile.get_wdir_relative(),
+                      "input_nrels": input_nrels }
+            if self.params["dlp"]:
+                update["relsdelfile"] = relsdelfile.get_wdir_relative()
+            self.state.update(update)
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
@@ -2387,6 +3140,9 @@ class PurgeTask(Task):
     def get_purged_filename(self):
         return self.get_state_filename("purgedfile")
     
+    def get_relsdel_filename(self):
+        return self.get_state_filename("relsdelfile")
+    
     def parse_stderr(self, stderr, input_nrels):
         # If stderr ends with
         # b'excess < 0.10 * #primes. See -required_excess argument.'
@@ -2420,12 +3176,10 @@ class PurgeTask(Task):
         # input_nrels, input_nprimes: rels and primes among input
         # nrels, nprimes, excess: rels and primes when purging stopped
         if not input_nprimes is None:
-            self.update_excess_per_input(input_nrels, input_nprimes, nrels,
-                                         nprimes)
+            self.update_excess_per_input(input_nrels, nrels, nprimes)
         return have_enough
     
-    def update_excess_per_input(self, input_nrels, input_nprimes, nrels,
-                                nprimes):
+    def update_excess_per_input(self, input_nrels, nrels, nprimes):
         if input_nrels == 0:
             return # Nothing sensible that we can do
         last_input_nrels = self.state.get("last_input_nrels", 0)
@@ -2483,6 +3237,105 @@ class PurgeTask(Task):
                                 % (self.title, self.programs[0].name, key, stdout))
         return [r[key] for key in keys]
 
+class MergeDLPTask(Task):
+    """ Merges relations """
+    @property
+    def name(self):
+        return "merge"
+    @property
+    def title(self):
+        return "Filtering - Merging"
+    @property
+    def programs(self):
+        return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
+    @property
+    def progparam_override(self):
+        return [["mat", "out", "keep"],
+            ["purged", "ideals", "history", "index", "out"]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {"gzip": True})
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        self.progparams[0]["skip"] = 0
+
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "mergedfile" in self.state:
+            self.logger.info("Starting")
+            if "idealfile" in self.state:
+                del(self.state["idealfile"])
+            if "indexfile" in self.state:
+                del(self.state["indexfile"])
+            if "mergedfile" in self.state:
+                del(self.state["mergedfile"])
+            if "densefile" in self.state:
+                del(self.state["densefile"])
+            
+            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
+            keep = self.send_request(Request.GET_NMAPS)
+            # We use .gzip by default, unless set to no in parameters
+            use_gz = ".gz" if self.params["gzip"] else ""
+            historyfile = self.workdir.make_filename("history" + use_gz)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MergeDLP.name)
+            p = cadoprograms.MergeDLP(mat=purged_filename,
+                                   out=historyfile,
+                                   keep=keep,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath),
+                                   **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            indexfile = self.workdir.make_filename("index" + use_gz)
+            mergedfile = self.workdir.make_filename("small.txt")
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
+            idealfile = self.workdir.make_filename("ideal")
+            p = cadoprograms.ReplayDLP(purged=purged_filename,
+                                    ideals=idealfile,
+                                    history=historyfile, index=indexfile,
+                                    out=mergedfile, stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
+                                    **self.progparams[1])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            if not idealfile.isfile():
+                raise Exception("Output file %s does not exist" % idealfile)
+            if not indexfile.isfile():
+                raise Exception("Output file %s does not exist" % indexfile)
+            if not mergedfile.isfile():
+                raise Exception("Output file %s does not exist" % mergedfile)
+            update = {"indexfile": indexfile.get_wdir_relative(),
+                      "mergedfile": mergedfile.get_wdir_relative(),
+                      "idealfile": idealfile.get_wdir_relative()}
+            densefilename = self.workdir.make_filename("small.dense.bin")
+            if densefilename.isfile():
+                update["densefile"] = densefilename.get_wdir_relative()
+            self.state.update(update)
+            
+        self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        return True
+    
+    def get_index_filename(self):
+        return self.get_state_filename("indexfile")
+    
+    def get_ideal_filename(self):
+        return self.get_state_filename("idealfile")
+    
+    def get_merged_filename(self):
+        return self.get_state_filename("mergedfile")
+    
+    def get_dense_filename(self):
+        return self.get_state_filename("densefile")
+
+
 class MergeTask(Task):
     """ Merges relations """
     @property
@@ -2495,14 +3348,17 @@ class MergeTask(Task):
     def programs(self):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
+    def progparam_override(self):
+        return [["mat", "out"], ["purged", "history", "index"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio", "gzip")
+        return self.join_params(super().paramnames,  \
+            {"skip": None, "keep": None, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
-        skip = self.progparams[0].get("skip", 32)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+        skip = int(self.progparams[0].get("skip", 32))
         self.progparams[0].setdefault("skip", skip)
         self.progparams[0].setdefault("keep", skip + 128)
 
@@ -2521,7 +3377,7 @@ class MergeTask(Task):
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             # We use .gzip by default, unless set to no in parameters
-            use_gz = ".gz" if self.params.get("gzip", True) else ""
+            use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
             p = cadoprograms.Merge(mat=purged_filename,
@@ -2568,6 +3424,152 @@ class MergeTask(Task):
     def get_dense_filename(self):
         return self.get_state_filename("densefile")
 
+class NmbrthryTask(Task):
+    """ Number theory tasks for dlp"""
+    @property
+    def name(self):
+        return "magmanmbrthry"
+    @property
+    def title(self):
+        return "Number Theory for DLP"
+    @property
+    def programs(self):
+        return (cadoprograms.MagmaNmbrthry,)
+    @property
+    def progparam_override(self):
+        return [["poly", "badidealinfo", "badideals"]]
+    @property
+    def paramnames(self):
+        return super().paramnames
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        self.logger.info("Starting")
+        
+        badfile = self.workdir.make_filename("badideals")
+        badinfofile = self.workdir.make_filename("badidealinfo")
+        polyfile = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
+        p = cadoprograms.MagmaNmbrthry(poly=polyfile,
+                               badidealinfo=badinfofile,
+                               badideals=badfile,
+                               stdout=str(stdoutpath),
+                               stderr=str(stderrpath),
+                               **self.progparams[0])
+        message = self.submit_command(p, "", log_errors=True)
+        if message.get_exitcode(0) != 0:
+            raise Exception("Program failed")
+
+        stdout = message.read_stdout(0).decode("utf-8")
+        update = {}
+        for line in stdout.splitlines():
+            match = re.match(r'ell (\d+)', line)
+            if match:
+                update["ell"] = int(match.group(1))
+            match = re.match(r'smexp (\d+)', line)
+            if match:
+                update["smexp"] = int(match.group(1))
+            match = re.match(r'nmaps (\d+)', line)
+            if match:
+                update["nmaps"] = int(match.group(1))
+        update["badinfofile"] = badinfofile.get_wdir_relative()
+        update["badfile"] = badfile.get_wdir_relative()
+        
+        if not "ell" in update:
+            raise Exception("Stdout does not give ell")
+        if not "smexp" in update:
+            raise Exception("Stdout does not give smexp")
+        if not "nmaps" in update:
+            raise Exception("Stdout does not give nmaps")
+        if not badfile.isfile():
+            raise Exception("Output file %s does not exist" % badfile)
+        if not badinfofile.isfile():
+            raise Exception("Output file %s does not exist" % badinfofile)
+        # Update the state entries atomically
+        self.state.update(update)
+
+        self.logger.info("Will computing Dlog modulo %s", self.state["ell"])
+        self.logger.debug("Exit NmbrthryTask.run(" + self.name + ")")
+        return True
+
+    def get_badinfo_filename(self):
+        return self.get_state_filename("badinfofile")
+    
+    def get_bad_filename(self):
+        return self.get_state_filename("badfile")
+    
+    def get_ell(self):
+        return self.state["ell"]
+    
+    def get_smexp(self):
+        return self.state["smexp"]
+    
+    def get_nmaps(self):
+        return self.state["nmaps"]
+
+
+class LinAlgDLPTask(Task):
+    """ Runs the linear algebra step for dlp"""
+    @property
+    def name(self):
+        return "magmalinalg"
+    @property
+    def title(self):
+        return "Linear Algebra for DLP"
+    @property
+    def programs(self):
+        return (cadoprograms.MagmaLinalg,)
+    @property
+    def progparam_override(self):
+        return [["sparsemat", "ker", "sm", "ell", "nmaps"]]
+    @property
+    def paramnames(self):
+        return super().paramnames
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        if not "kerfile" in self.state: 
+            self.logger.info("Starting")
+            
+            kerfile = self.workdir.make_filename("ker")
+            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+            smfile = self.send_request(Request.GET_SM_FILENAME)
+            gorder = self.send_request(Request.GET_ELL)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
+            p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
+                                   ker=kerfile,
+                                   sm=smfile,
+                                   ell=gorder,
+                                   nmaps=nmaps,
+                                   stdout=str(stdoutpath),
+                                   stderr=str(stderrpath),
+                                   **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            
+            if not kerfile.isfile():
+                raise Exception("Output file %s does not exist" % kerfile)
+            update = {"kerfile": kerfile.get_wdir_relative()}
+            self.state.update(update)
+            
+        self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
+        return True
+    
+    def get_kernel_filename(self):
+        return self.get_state_filename("kerfile")
+
 
 class LinAlgTask(Task, HasStatistics):
     """ Runs the linear algebra step """
@@ -2581,48 +3583,50 @@ class LinAlgTask(Task, HasStatistics):
     def programs(self):
         return (cadoprograms.BWC,)
     @property
+    def progparam_override(self):
+        return [["complete", "matrix",  "wdir", "nullspace"]]
+    @property
     def paramnames(self):
         return super().paramnames
-    _stat_conversions = (
+    @property
+    def stat_conversions(self):
+        return (
         (
             "krylov_time",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; CPU: %s" % cap_fp)
+            re.compile(r"krylov done, N=\d+ ; CPU: %s" % CAP_FP)
         ),
         (
             "krylov_comm",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; COMM: %s" % cap_fp)
+            re.compile(r"krylov done, N=\d+ ; COMM: %s" % CAP_FP)
         ),
         (
             "lingen_time",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"Total computation took %s" % cap_fp)
+            re.compile(r"Total computation took %s" % CAP_FP)
         ),
         (
             "mksol_time",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; CPU: %s" % cap_fp)
+            re.compile(r"mksol done, N=\d+ ; CPU: %s" % CAP_FP)
         ),
         (
             "mksol_comm",
-            (float,),
+            float,
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; COMM: %s" % cap_fp)
+            re.compile(r"mksol done, N=\d+ ; COMM: %s" % CAP_FP)
         ),
     )
-    @property
-    def stat_conversions(self):
-        return self._stat_conversions
     @property
     def stat_formats(self):
         return (
@@ -2632,8 +3636,8 @@ class LinAlgTask(Task, HasStatistics):
         )
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -2658,7 +3662,7 @@ class LinAlgTask(Task, HasStatistics):
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
-            dependencyfilename = self.workdir.make_filename("W", use_subdir = True)
+            dependencyfilename = self.workdir.make_filename("W", use_subdir=True)
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
@@ -2687,12 +3691,15 @@ class CharactersTask(Task):
     def programs(self):
         return (cadoprograms.Characters,)
     @property
+    def progparam_override(self):
+        return [["poly", "purged", "index", "wfile", "out", "heavyblock"]]
+    @property
     def paramnames(self):
-        return super().paramnames + ()
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -2741,13 +3748,16 @@ class SqrtTask(Task):
     def programs(self):
         return (cadoprograms.Sqrt,)
     @property
+    def progparam_override(self):
+        return [["ab", "poly", "purged", "index", "kernel", "prefix", "rat",
+                 "alg", "gcd", "dep"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ("N",)
+        return self.join_params(super().paramnames, {"N": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.factors = self.make_db_dict(self.make_tablename("factors"), connection=self.db_connection)
         self.add_factor(self.params["N"])
     
@@ -2761,10 +3771,12 @@ class SqrtTask(Task):
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
+            if self.params["gzip"]:
+                prefix += ".gz"
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(cadoprograms.Sqrt.name)
             self.logger.info("Creating file of (a,b) values")
-            p = cadoprograms.Sqrt(ab = True,
+            p = cadoprograms.Sqrt(ab=True,
                     poly=polyfilename, purged=purgedfilename,
                     index=indexfilename, kernel=kernelfilename,
                     prefix=prefix, stdout=str(stdoutpath),
@@ -2912,6 +3924,162 @@ class SqrtTask(Task):
             N += 2     
         return N
 
+class SMTask(Task):
+    """ Computes Schirokauer Maps """
+    @property
+    def name(self):
+        return "sm"
+    @property
+    def title(self):
+        return "Schirokauer Maps"
+    @property
+    def programs(self):
+        return (cadoprograms.SM,)
+    @property
+    def progparam_override(self):
+        return [["poly", "renumber", "purged", "index", "ell", "smexp",
+                 "nmaps", "out"]]
+    @property
+    def paramnames(self):
+        return super().paramnames
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "sm" in self.state:
+            self.logger.info("Starting")
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
+            badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            smfilename = self.workdir.make_filename("sm")
+
+            gorder = self.send_request(Request.GET_ELL)
+            smexp = self.send_request(Request.GET_SMEXP)
+            
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.SM.name)
+            p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
+	      	    badidealinfo=badidealinfofilename,
+                    purged=purgedfilename, index=indexfilename,
+                    ell=gorder, smexp=smexp,
+                    nmaps=nmaps,
+                    out=smfilename,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            if not smfilename.isfile():
+                raise Exception("Output file %s does not exist" % smfilename)
+            self.state["sm"] = smfilename.get_wdir_relative()
+        self.logger.debug("Exit SMTask.run(" + self.name + ")")
+        return True
+    
+    def get_sm_filename(self):
+        return self.get_state_filename("sm")
+
+
+
+class ReconstructLogTask(Task):
+    """ Logarithms Reconstruction Task """
+    @property
+    def name(self):
+        return "reconstructlog"
+    @property
+    def title(self):
+        return "Logarithms Reconstruction"
+    @property
+    def programs(self):
+        return (cadoprograms.ReconstructLog,)
+    @property
+    def progparam_override(self):
+        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
+                 "nmaps", "partial", "ker", "ideals", "relsdel", "nrels"]]
+    @property
+    def paramnames(self):
+        return super().paramnames
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+
+        if not "dlog" in self.state:
+            self.logger.info("Starting")
+            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            kerfilename = self.send_request(Request.GET_KERNEL_FILENAME)
+            idealfilename = self.send_request(Request.GET_IDEAL_FILENAME)
+            relsdelfilename = self.send_request(Request.GET_RELSDEL_FILENAME)
+            dlogfilename = self.workdir.make_filename("dlog")
+            gorder = self.send_request(Request.GET_ELL)
+            smexp = self.send_request(Request.GET_SMEXP)
+            nmaps = self.send_request(Request.GET_NMAPS)
+
+            nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
+            nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+            nrels = nfree+nunique
+            
+            (stdoutpath, stderrpath) = \
+                    self.make_std_paths(cadoprograms.SM.name)
+            p = cadoprograms.ReconstructLog(poly=polyfilename,
+                    purged=purgedfilename,
+                    renumber=renumberfilename,
+                    dlog=dlogfilename,
+                    ell=gorder, smexp=smexp,
+                    nmaps=nmaps,
+                    partial=True,
+                    ker=kerfilename,
+                    ideals=idealfilename,
+                    relsdel=relsdelfilename,
+                    nrels=nrels,
+                    stdout=str(stdoutpath),
+                    stderr=str(stderrpath),
+                    **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            if not dlogfilename.isfile():
+                raise Exception("Output file %s does not exist" % dlogfilename)
+            self.state["dlog"] = dlogfilename.get_wdir_relative()
+        self.logger.debug("Exit ReconstructLogTask.run(" + self.name + ")")
+        return True
+    
+    def get_dlog_filename(self):
+        return self.get_state_filename("dlog")
+    
+    def get_log2log3(self):
+        filename = self.get_state_filename("dlog").get_wdir_relative()
+        fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
+        log2 = None
+        log3 = None
+        myfile = open(fullfile, "rb")
+        data = myfile.read()
+        for line in data.splitlines():
+            match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+            if match:
+                log2 = match.group(2)
+            match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+            if match:
+                log3 = match.group(2)
+            if log2 != None and log3 != None:
+                myfile.close()
+                return [ log2, log3 ]
+        raise Exception("Could not find log2 and log3 in %s" % filename)
+
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
     """ Starts HTTP server """
     @property
@@ -2922,8 +4090,9 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         return "Server Launcher"
     @property
     def paramnames(self):
-        return ("name", "workdir", "address", "port", "threaded", "ssl", "whitelist", 
-                "only_registered")
+        return {"name": str, "workdir": None, "address": None, "port": 8001,
+                "threaded": False, "ssl": True, "whitelist": None,
+                "only_registered": True}
     @property
     def param_nodename(self):
         return self.name
@@ -2937,16 +4106,16 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
         # self.logger.info("path_prefix = %s, parameters = %s", path_prefix, parameters)
         self.params = self.parameters.myparams(self.paramnames)
         serveraddress = self.params.get("address", None)
-        serverport = self.params.get("port", 8001)
+        serverport = self.params["port"]
         basedir = self.params.get("workdir", default_workdir).rstrip(os.sep) + os.sep
         uploaddir = basedir + self.params["name"] + ".upload/"
-        threaded = self.params.get("threaded", False)
+        threaded = self.params["threaded"]
         # By default, allow access only to files explicitly registered by tasks,
         # i.e., those files required by clients when downloading input files for
         # their workunits. By setting only_registered=False, access to all files
         # under the server working directory is allowed.
-        only_registered = self.params.get("only_registered", True)
-        if self.params.get("ssl", True):
+        only_registered = self.params["only_registered"]
+        if self.params["ssl"]:
             cafilename = basedir + self.params["name"] + ".server.cert"
         else:
             cafilename = None
@@ -2956,6 +4125,24 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
             server_whitelist += whitelist
         if "whitelist" in self.params:
             server_whitelist += [h.strip() for h in self.params["whitelist"].split(",")]
+
+        # If (1) any clients are to be started on localhost, but (2) the server
+        # is listening on a network-visible address, then we need to whitelist
+        # the network-visible address(es) of the current host as well, because
+        # the client's connection will come from (one of) the network-visible
+        # addresses of the current host.
+        # For test (1), it should suffice to look for "localhost" or
+        # "127.0.0.1" in the existing whitelist, as the host names on which to
+        # start clients are inserted verbatim.
+        # For (2), we check that serveraddress is either None (i.e., the
+        # wildcard address which is network-visible), or anything other than
+        # "localhost"
+        if (serveraddress is None or socket.getfqdn(serveraddress) != "localhost") \
+                and set(server_whitelist) & {"localhost", "127.0.0.1"}:
+            hostname = socket.gethostname()
+            if not hostname in server_whitelist:
+                self.logger.info("Adding %s to whitelist to allow clients on localhost to connect", hostname)
+                server_whitelist.append(hostname)
         if not server_whitelist:
             server_whitelist = None
 
@@ -3007,16 +4194,18 @@ class StartClientsTask(Task):
     def programs(self):
         return (cadoprograms.WuClient,)
     @property
+    def progparam_override(self):
+        return [["clientid", "certsha1"]]
+    @property
     def paramnames(self):
-        return super().paramnames + \
-            ('hostnames', 'scriptpath', "nrclients")
+        return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
     @property
     def param_nodename(self):
         return None
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
-        super().__init__(mediator = mediator, db = db, parameters = parameters,
-                         path_prefix = path_prefix)
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"), connection=self.db_connection)
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"), connection=self.db_connection)
@@ -3041,7 +4230,7 @@ class StartClientsTask(Task):
 
         if "nrclients" in self.params:
             self.hosts_to_launch = self.make_multiplicity(self.hosts_to_launch,
-                    self.params["nrclients"])
+                   self.params["nrclients"])
 
     @staticmethod
     def make_multiplicity(names, multi):
@@ -3071,6 +4260,20 @@ class StartClientsTask(Task):
         (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
+    def _add_cid(self, clientid, pid, host):
+        """ Add a client id atomically to both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.update({clientid: pid}, commit=False)
+        self.hosts.update({clientid: host}, commit=True)
+
+    def _del_cid(self, clientid):
+        """ Remove a client id atomically from both the "pids" and "hosts"
+        dictionaries
+        """
+        self.pids.clear([clientid], commit=False)
+        self.hosts.clear([clientid], commit=True)
+    
     def launch_clients(self, server, certsha1=None):
         for host in self.hosts_to_launch:
             self.launch_one_client(host.strip(), server, certsha1=certsha1)
@@ -3091,8 +4294,7 @@ class StartClientsTask(Task):
                                  "launched this time, seems to have died. "
                                  "I'll forget about this client.",
                                  cid, self.hosts[cid], self.pids[cid])
-                del(self.hosts[cid])
-                del(self.pids[cid])
+                self._del_cid(cid)
     
     def make_unique_id(self, host):
         # Make a unique client id for host
@@ -3102,7 +4304,7 @@ class StartClientsTask(Task):
             assert clientid in self.pids
             assert clientid in self.hosts
             i += 1
-            clientid = "%s%d" % (host, i)
+            clientid = "%s+%d" % (host, i)
         return clientid
     
     # Cases:
@@ -3126,8 +4328,7 @@ class StartClientsTask(Task):
             else:
                 self.logger.info("Client %s on host %s with PID %d seems to have died",
                                  clientid, host, self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
         wuclient = cadoprograms.WuClient(server=server,
@@ -3142,23 +4343,22 @@ class StartClientsTask(Task):
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
             if stdout:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if stderr:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         match = None
         if not stdout is None:
-            match = re.match(r"PID: (\d+)", stdout.decode("ascii"))
+            match = re.match(r"PID: (\d+)", stdout.decode("utf-8"))
         if not match:
             self.logger.warning("Client did not print PID")
             if not stdout is None:
-                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
             if not stderr is None:
-                self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
             return
         self.used_ids[clientid] = True
-        self.pids[clientid] = int(match.group(1))
-        self.hosts[clientid] = host
+        self._add_cid(clientid, int(match.group(1)), host)
 
     def kill_all_clients(self):
         # Need the list() to make a copy as dict will change in loop body
@@ -3167,21 +4367,19 @@ class StartClientsTask(Task):
             if rc == 0:
                 self.logger.info("Stopped client %s (Host %s, PID %d)",
                                  clientid, self.hosts[clientid], self.pids[clientid])
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
             else:
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
                 if stdout:
-                    self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                    self.logger.warning("Stdout: %s", stdout.decode("utf-8").strip())
                 if stderr:
-                    self.logger.warning("Stderr: %s", stderr.decode("ASCII").strip())
+                    self.logger.warning("Stderr: %s", stderr.decode("utf-8").strip())
                 # Assume that the client is already dead and remove it from
                 # the list of running clients
-                del(self.pids[clientid])
-                del(self.hosts[clientid])
+                self._del_cid(clientid)
     
-    def kill_client(self, clientid, signal = None):
+    def kill_client(self, clientid, signal=None):
         pid = self.pids[clientid]
         host = self.hosts[clientid]
         kill = cadoprograms.Kill(pid, signal=signal)
@@ -3192,7 +4390,7 @@ class StartClientsTask(Task):
         return process.wait()
 
 class Message(object):
-    def __init__(self, sender, key, value = None):
+    def __init__(self, sender, key, value=None):
         self.sender = sender
         self.key = key
         self.value = value
@@ -3219,8 +4417,9 @@ class Notification(Message):
     SUBSCRIBE_WU_NOTIFICATIONS = object()
 
 class Request(Message):
-    # Lacking a proper enum before Python 3.3, we generate dummy objects
+    # Lacking a proper enum before Python 3.4, we generate dummy objects
     # which have separate identity and can be used as dict keys
+    GET_RAW_POLYNOMIALS = object()
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
     GET_FACTORBASE_FILENAME = object()
@@ -3237,13 +4436,21 @@ class Request(Message):
     GET_PURGED_FILENAME = object()
     GET_MERGED_FILENAME = object()
     GET_INDEX_FILENAME = object()
+    GET_IDEAL_FILENAME = object()
     GET_DENSE_FILENAME = object()
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
+    GET_RELSDEL_FILENAME = object()
+    GET_SM_FILENAME = object()
+    GET_BADIDEAL_FILENAME = object()
+    GET_BADIDEALINFO_FILENAME = object()
+    GET_SMEXP = object()
+    GET_ELL = object()
+    GET_NMAPS = object()
     GET_WU_RESULT = object()
 
-class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess, 
+class CompleteFactorization(HasState, wudb.DbAccess, 
         DoesLogging, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     @property
@@ -3253,12 +4460,20 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
     def param_nodename(self):
         return self.name
     @property
+    def paramnames(self):
+        # This isn't a Task subclass so we don't really need to define
+        # paramnames, but we do it out of habit
+        return {"name": str, "workdir": str, "N": int, "dlp": False}
+    @property
     def title(self):
         return "Complete Factorization"
+    @property
+    def programs(self):
+        return []
     
     def __init__(self, db, parameters, path_prefix):
-        super().__init__(db = db, parameters = parameters, path_prefix = path_prefix)
-        self.params = self.parameters.myparams(("name", "workdir", "N"))
+        super().__init__(db=db, parameters=parameters, path_prefix=path_prefix)
+        self.params = self.parameters.myparams(self.paramnames)
         self.db_listener = self.make_db_listener()
         
         # Init WU BD
@@ -3273,10 +4488,10 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         self.clients = []
         whitelist = set()
         for (path, key) in self.parameters.get_parameters().find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(mediator = self,
-                                                 db = db,
-                                                 parameters = self.parameters,
-                                                 path_prefix = path))
+            self.clients.append(StartClientsTask(mediator=self,
+                                                 db=db,
+                                                 parameters=self.parameters,
+                                                 path_prefix=path))
             hostnames = self.clients[-1].get_hosts_to_launch()
             whitelist |= set(hostnames)
 
@@ -3287,64 +4502,101 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 whitelist=whitelist)
 
         parampath = self.parameters.get_param_path()
+        polyselpath = parampath + ['polyselect']
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
-        self.polysel = PolyselTask(mediator = self,
-                                   db = db,
-                                   parameters = self.parameters,
-                                   path_prefix = parampath)
-        self.fb = FactorBaseTask(mediator = self,
-                                 db = db,
-                                 parameters = self.parameters,
-                                 path_prefix = sievepath)
-        self.freerel = FreeRelTask(mediator = self,
-                                   db = db,
-                                   parameters = self.parameters,
-                                   path_prefix = sievepath)
-        self.sieving = SievingTask(mediator = self,
-                                   db = db,
-                                   parameters = self.parameters,
-                                   path_prefix = sievepath)
-        self.dup1 = Duplicates1Task(mediator = self,
-                                    db = db,
-                                    parameters = self.parameters,
-                                    path_prefix = filterpath)
-        self.dup2 = Duplicates2Task(mediator = self,
-                                    db = db,
-                                    parameters = self.parameters,
-                                    path_prefix = filterpath)
-        self.purge = PurgeTask(mediator = self,
-                               db = db,
-                               parameters = self.parameters,
-                               path_prefix = filterpath)
-        self.merge = MergeTask(mediator = self,
-                               db = db,
-                               parameters = self.parameters,
-                               path_prefix = filterpath)
-        self.linalg = LinAlgTask(mediator = self,
-                                 db = db,
-                                 parameters = self.parameters,
-                                 path_prefix = linalgpath)
-        self.characters = CharactersTask(mediator = self,
-                                         db = db,
-                                         parameters = self.parameters,
-                                         path_prefix = linalgpath)
-        self.sqrt = SqrtTask(mediator = self,
-                             db = db,
-                             parameters = self.parameters,
-                             path_prefix = parampath)
+        ## tasks that are common to factorization and dlp
+        self.polysel1 = Polysel1Task(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=polyselpath)
+        self.polysel2 = Polysel2Task(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=polyselpath)
+        self.fb = FactorBaseTask(mediator=self,
+                                 db=db,
+                                 parameters=self.parameters,
+                                 path_prefix=sievepath)
+        self.freerel = FreeRelTask(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=sievepath)
+        self.sieving = SievingTask(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=sievepath)
+        self.dup1 = Duplicates1Task(mediator=self,
+                                    db=db,
+                                    parameters=self.parameters,
+                                    path_prefix=filterpath)
+        self.dup2 = Duplicates2Task(mediator=self,
+                                    db=db,
+                                    parameters=self.parameters,
+                                    path_prefix=filterpath)
+        self.purge = PurgeTask(mediator=self,
+                               db=db,
+                               parameters=self.parameters,
+                               path_prefix=filterpath)
+        if self.params["dlp"]:
+            ## Tasks specific to dlp
+            self.nmbrthry = NmbrthryTask(mediator=self,
+                             db=db,
+                             parameters=self.parameters,
+                             path_prefix=parampath)
+            self.sm = SMTask(mediator=self,
+                             db=db,
+                             parameters=self.parameters,
+                             path_prefix=filterpath)
+            self.merge = MergeDLPTask(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=filterpath)
+            self.linalg = LinAlgDLPTask(mediator=self,
+                                     db=db,
+                                     parameters=self.parameters,
+                                     path_prefix=linalgpath)
+            self.reconstructlog = ReconstructLogTask(mediator=self,
+                                     db=db,
+                                     parameters=self.parameters,
+                                     path_prefix=filterpath)
+        else:
+            ## Tasks specific to factorization
+            self.merge = MergeTask(mediator=self,
+                                   db=db,
+                                   parameters=self.parameters,
+                                   path_prefix=filterpath)
+            self.linalg = LinAlgTask(mediator=self,
+                                     db=db,
+                                     parameters=self.parameters,
+                                     path_prefix=linalgpath)
+            self.characters = CharactersTask(mediator=self,
+                                             db=db,
+                                             parameters=self.parameters,
+                                             path_prefix=linalgpath)
+            self.sqrt = SqrtTask(mediator=self,
+                                 db=db,
+                                 parameters=self.parameters,
+                                 path_prefix=parampath)
         
         # Defines an order on tasks in which tasks that want to run should be
         # run
-        self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
-                      self.dup1, self.dup2, self.purge, self.merge,
-                      self.linalg, self.characters, self.sqrt)
+        if self.params["dlp"]:
+            self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
+                          self.freerel, self.sieving,
+                          self.dup1, self.dup2, self.purge, self.merge,
+                          self.sm, self.linalg, self.reconstructlog)
+        else:
+            self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
+                          self.dup1, self.dup2, self.purge, self.merge,
+                          self.linalg, self.characters, self.sqrt)
         
         self.request_map = {
-            Request.GET_POLYNOMIAL: self.polysel.get_poly,
-            Request.GET_POLYNOMIAL_FILENAME: self.polysel.get_poly_filename,
+            Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
+            Request.GET_POLYNOMIAL: self.polysel2.get_poly,
+            Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
             Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
@@ -3360,16 +4612,30 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
             Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
             Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
-            Request.GET_DEPENDENCY_FILENAME: \
-                self.linalg.get_dependency_filename,
-            Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
-            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result
         }
+        ## add requests specific to dlp or factoring
+        if self.params["dlp"]:
+            self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
+            self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
+            self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
+            self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
+            self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
+            self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
+            self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
+            self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
+        else:
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
+            self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename
+            self.request_map[Request.GET_LINALG_PREFIX] = self.linalg.get_prefix
 
     def run(self):
         had_interrupt = False
-        self.logger.info("Factoring %s", self.params["N"])
+        if self.params["dlp"]:
+            self.logger.info("Computing Discrete Logs in GF(%s)", self.params["N"])
+        else:
+            self.logger.info("Factoring %s", self.params["N"])
         self.start_elapsed_time()
 
         self.servertask.run()
@@ -3396,17 +4662,21 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
         if had_interrupt:
             return None
 
-        cputotal = self.get_total_cpu_or_real_time(True)
+        cputotal = self.get_sum_of_cpu_or_real_time(True)
         # Do we want the sum of real times over all sub-processes for
         # something?
-        # realtotal = self.get_total_cpu_or_real_time(False)
-        self.print_cpu_real_time(cputotal, elapsed, "everything");
+        # realtotal = self.get_sum_of_cpu_or_real_time(False)
+        self.logger.info("Total cpu/elapsed time for entire factorization: %g/%g",
+                         cputotal, elapsed)
 
         if last_task and not last_status:
             self.logger.fatal("Premature exit within %s. Bye.", last_task)
             return None
 
-        return self.sqrt.get_factors()
+        if self.params["dlp"]:
+            return [ self.params["N"], self.nmbrthry.get_ell() ] + self.reconstructlog.get_log2log3()
+        else:
+            return self.sqrt.get_factors()
     
     def start_all_clients(self):
         url = self.servertask.get_url()
@@ -3447,16 +4717,14 @@ class CompleteFactorization(SimpleStatistics, HasState, wudb.DbAccess,
                 return [task.run(), task.title]
         return [False, None]
     
-    def get_total_cpu_or_real_time(self, is_cpu):
-        total = 0;
+    def get_sum_of_cpu_or_real_time(self, is_cpu):
+        total = 0
         for task in self.tasks:
             task_time = task.get_total_cpu_or_real_time(is_cpu)
             total += task_time
             # self.logger.info("Task %s reports %s time of %g, new total: %g",
             #         task.name, "cpu" if is_cpu else "real", task_time, total)
         return total
-        return sum([task.get_total_cpu_or_real_time(is_cpu) \
-                for task in self.tasks])
 
     def register_filename(self, d):
         return self.servertask.register_filename(d)

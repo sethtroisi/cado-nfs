@@ -10,9 +10,6 @@
 #include <limits.h>
 #include <unistd.h>
 #include <ctype.h>
-#ifdef HAVE_SSE2
-#include <emmintrin.h>
-#endif
 #ifdef HAVE_LINUX_BINFMTS_H
 /* linux/binfmts.h defines MAX_ARG_STRLEN in terms of PAGE_SIZE, but does not
    include a header where PAGE_SIZE is defined, so we include sys/user.h
@@ -29,102 +26,6 @@
 #include "portability.h"
 #include "misc.h"
 #include "typecast.h"
-
-void
-*malloc_check (const size_t x)
-{
-    void *p;
-    p = malloc (x);
-    if (p == NULL)
-      {
-        fprintf (stderr, "Error, malloc of %zu bytes failed\n", x);
-        fflush (stderr);
-        abort ();
-      }
-    return p;
-}
-
-void
-*physical_malloc (const size_t x, const int affect)
-{
-  void *p;
-  p = malloc_check(x);
-  if (affect) {
-    size_t i, m;
-#ifdef HAVE_SSE2
-    const __m128i a = (__m128i) {0, 0};
-#endif    
-    i = ((size_t) p + 15) & (~15ULL);
-    m = ((size_t) p + x - 1) & (~15ULL);
-    while (i < m) {
-#ifdef HAVE_SSE2
-      _mm_stream_si128((__m128i *)i, a);
-#else
-      *(unsigned char *) i = 0;
-#endif
-      i += cast_long_size(pagesize ());
-    }
-  }
-  return p;
-}
-
-/* Not everybody has posix_memalign. In order to provide a viable
- * alternative, we need an ``aligned free'' matching the ``aligned
- * malloc''. We rely on posix_memalign if it is available, or else fall
- * back on ugly pointer arithmetic so as to guarantee alignment. Note
- * that not providing the requested alignment can have some troublesome
- * consequences. At best, a performance hit, at worst a segv (sse-2
- * movdqa on a pentium4 causes a GPE if improperly aligned).
- */
-
-void *malloc_aligned(size_t size, size_t alignment)
-{
-#ifdef HAVE_POSIX_MEMALIGN
-    void *res = NULL;
-    int rc = posix_memalign(&res, alignment, size);
-    ASSERT_ALWAYS(rc == 0);
-    return res;
-#else
-    char * res;
-    res = malloc(size + sizeof(size_t) + alignment);
-    res += sizeof(size_t);
-    size_t displ = alignment - ((uintptr_t) res) % alignment;
-    res += displ;
-    memcpy(res - sizeof(size_t), &displ, sizeof(size_t));
-    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
-    return (void*) res;
-#endif
-}
-
-void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNUSED)
-{
-#ifdef HAVE_POSIX_MEMALIGN
-    free(p);
-#else
-    char * res = (char *) p;
-    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
-    size_t displ;
-    memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
-    res -= displ;
-    ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
-    res -= sizeof(size_t);
-    free(res);
-#endif
-}
-
-long pagesize (void)
-{
-#if defined(_WIN32) || defined(_WIN64)
-  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
-  SYSTEM_INFO si;
-  GetSystemInfo(&si);
-  return si.dwPageSize;
-#elif defined(HAVE_SYSCONF)
-  return sysconf (_SC_PAGESIZE);
-#else
-  #error "Cannot determine page size"
-#endif
-}
 
 /* Wrapper around sysconf(ARG_MAX) that deals with availability of sysconf()
    and additional constraints on command line length */
@@ -150,18 +51,6 @@ long get_arg_max(void)
     arg_max = MAX_ARG_STRLEN;
 #endif
   return arg_max;
-}
-
-void *malloc_pagealigned(size_t sz)
-{
-    void *p = malloc_aligned (sz, pagesize ());
-    ASSERT_ALWAYS(p != NULL);
-    return p;
-}
-
-void free_pagealigned(void * p, size_t sz)
-{
-    free_aligned(p, sz, pagesize ());
 }
 
 int has_suffix(const char * path, const char * sfx)
@@ -194,7 +83,7 @@ char * derived_filename(const char * prefix, const char * what, const char * ext
 }
 
 
-void chomp(char *s) {
+static void chomp(char *s) {
     char *p;
     if (s && (p = strrchr(s, '\n')) != NULL)
         *p = '\0';
@@ -214,12 +103,6 @@ strlcpy(char *dst, const char *src, const size_t size)
   return strlen(src);
 }
 #endif
-
-void strlcpy_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcpy(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
 
 #ifndef HAVE_STRLCAT
 size_t
@@ -246,12 +129,6 @@ strlcat(char *dst, const char *src, const size_t size)
   return dst_len + src_len;
 }
 #endif
-
-void strlcat_check(char *dst, const char *src, const size_t size)
-{
-  size_t res = strlcat(dst, src, size);
-  ASSERT_ALWAYS(res < size);
-}
 
 /* Return a NULL-terminated list of file names read from filename.
    Empty lines and comment lines (starting with '#') are skipped.

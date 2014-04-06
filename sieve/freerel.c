@@ -47,13 +47,20 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
   index_t old_table_size = renumber_table->size;
   FILE *fpout = stdout;
+  mpz_t * c[2];
 
   fpout = fopen_maybe_compressed (outfilename, "w");
 
   rat_side = renumber_table->rat;
+  if (rat_side == -1) {
+      // Two algebraic sides. Let's call rational the side 0
+      rat_side = 0;
+  }
   alg_side = 1 - rat_side;
   d[rat_side] = pol->rat->deg;
   d[alg_side] = pol->alg->deg;
+  c[rat_side] = pol->rat->coeff;
+  c[alg_side] = pol->alg->coeff;
 
   /* we generate all free relations up to the *minimum* of the two large
      prime bounds, since larger primes will never occur on both sides */
@@ -79,24 +86,26 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {
     /* first compute the roots */
-    if (p < lpb[rat_side])
-      k[rat_side] = 1;
-    else
-      k[rat_side] = 0;
-
-    if (p < lpb[alg_side])
-    {
-      k[alg_side] = poly_roots_ulong(roots[alg_side],pol->alg->coeff,d[alg_side],p);
+    for (int side = 0; side < 2; side++) {
+      if (p >= lpb[side]) {
+        k[side] = 0;
+        continue;
+      }
+      if (d[side] == 1) {
+        k[side] = 1;
+        continue;
+      }
+      k[side] = poly_roots_ulong(roots[side], c[side], d[side], p);
       // Check for a projective root
-      if (mpz_divisible_ui_p (pol->alg->coeff[d[alg_side]], p))
-        roots[alg_side][k[alg_side]++] = p;
+      if (mpz_divisible_ui_p ((c[side])[d[side]], p))
+        roots[side][k[side]++] = p;
     }
-    else
-      k[alg_side] = 0;
 
     renumber_write_p (renumber_table, p, roots, k);
 
-    if (p >= pmin && p <= pmax && k[alg_side] == d[alg_side])
+    if (p >= pmin && p <= pmax
+            && k[alg_side] == d[alg_side]
+            && k[rat_side] == d[rat_side])
     {
       //print the free rels
       index_t l;

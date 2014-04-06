@@ -15,6 +15,7 @@
 
 #include "cado.h"
 #include "auxiliary.h"
+#include "area.h"
 #include "utils.h"
 #include "portability.h"
 #include "murphyE.h"
@@ -28,6 +29,9 @@ const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 #define swap(x, y) { long _tmp = (x); (x) = (y); (y) = _tmp; }
 #define mpz_swap_n(x, y) { mpz_t *_tmp = (x); (x) = (y); (y) = _tmp; }
 
+double area=AREA;
+double bound_f=BOUND_F;
+double bound_g=BOUND_G;
 
 /* This uses Paul Zimmermann implementaion. I kept the header here:
 
@@ -515,13 +519,19 @@ print_nonlinear_poly_info ( mpz_t *f,
 {
     unsigned int i;
     double skew[2], logmu[2], alpha[2];
+    mpz_poly_t ff;
+    ff->deg = df;
+    ff->coeff = f;
+    mpz_poly_t gg;
+    gg->deg = dg;
+    gg->coeff = g;
 
-    skew[0] = L2_skewness (f, df, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu[0] = L2_lognorm (f, df, skew[0], DEFAULT_L2_METHOD);
-    alpha[0] = get_alpha (f, df, ALPHA_BOUND);
-    skew[1] = L2_skewness (g, dg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu[1] = L2_lognorm (g, dg, skew[0], DEFAULT_L2_METHOD);
-    alpha[1] = get_alpha (g, dg, ALPHA_BOUND);
+    skew[0] = L2_skewness (ff, SKEWNESS_DEFAULT_PREC);
+    logmu[0] = L2_lognorm (ff, skew[0]);
+    alpha[0] = get_alpha (ff, ALPHA_BOUND);
+    skew[1] = L2_skewness (gg, SKEWNESS_DEFAULT_PREC);
+    logmu[1] = L2_lognorm (gg, skew[0]);
+    alpha[1] = get_alpha (gg, ALPHA_BOUND);
 
     if (format == 1) {
         for (i = df + 1; i -- != 0; )
@@ -572,7 +582,6 @@ polygen_JL_f ( mpz_t n,
     rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
 
     /* find irreducible polynomial f */
-    srand(time(NULL));
     while (1)
     {
         fint[d] = ad;
@@ -583,7 +592,10 @@ polygen_JL_f ( mpz_t n,
         }
 
         /* content test (not necessary for now) */
-        content_poly (t, f, d);
+        mpz_poly_t ff;
+        ff->deg = d;
+        ff->coeff = f;
+        content_poly (t, ff);
         if (mpz_cmp_ui(t, 1) != 0 ) {
             for (i = 0; i < d+1; i ++) {
                 mpz_divexact (f[i], f[i], t);
@@ -608,7 +620,7 @@ polygen_JL_f ( mpz_t n,
             continue;
 
         /* find roots */
-        nr = poly_roots_mpz (rf, f, d, n);
+        nr = mpz_poly_roots_mpz (rf, f, d, n);
         if (nr > 0)
             break;
     }
@@ -735,7 +747,7 @@ polygen_JL ( mpz_t n,
 static void
 usage ()
 {
-    fprintf (stderr, "./dlpolyselect -n xxx -df xxx -dg xxx -ad xxx\n");
+    fprintf (stderr, "./dlpolyselect -N xxx -df xxx -dg xxx -ad xxx\n");
     exit (1);
 }
 
@@ -787,25 +799,26 @@ main (int argc, char *argv[])
 
     if (mpz_cmp_ui (N, 0) <= 0) {
         fprintf (stderr, "Error, missing input number (-N option)\n");
-        exit (1);
+        usage ();
     }
 
     if (df == 0) {
         fprintf (stderr, "Error, error degree (-df option)\n");
-        exit (1);
+        usage ();
     }
 
     if (dg == 0 || dg >= df) {
         fprintf (stderr, "Error, missing or error degree (-dg option)\n");
         fprintf (stderr, "       only support dg < df.\n");
-        exit (1);
+        usage ();
     }
 
     if (ad <= 0) {
         fprintf (stderr, "Error, need ad > 0 (-ad option)\n");
-        exit (1);
+        usage (); 
     }
 
+    srand(time(NULL));
     unsigned int bound = 1000;
     unsigned int c = 0;
     while (c < bound*bound) {

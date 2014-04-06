@@ -3,90 +3,65 @@
 ###########################################################################
 # See params/params.c91 for an example which contains some documentation.
 
-# Anything after a # is a comment, until end of line.
-# Any empty line is ignored
-#
-#
-# Each parameter should be on an individual line, like
-#   param0=42.17
-#
-
 ###########################################################################
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 156-digit gnfs input
-# Example: cadofactor.pl wdir=... name=... n=...
-
-name=c156
-parallel=1           # do we use parallel computation?
-delay=300
-
-machines=mach_desc  # file describing available computers for parallel
-					# computation
+name = c156
+tasks.threads = 2
 
 ###########################################################################
 # Polynomial selection
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
-polsel_delay=300             # time between two checks
-polsel_nice=4            # nice level for selection
+tasks.polyselect.degree = 5
 
-## Parameters of polyselect
-polsel_P=500000              # choose lc(g) with two prime factors in [P,2P]
-polsel_admax=2e7             # max value for lc(f)
-polsel_adrange=2e5           # individual tasks
-polsel_incr=60            # forced divisor of lc(f)
+tasks.polyselect.P = 500000
+tasks.polyselect.admax = 2e7
+tasks.polyselect.adrange = 2e5
+tasks.polyselect.incr = 60
+tasks.polyselect.nq = 1000
 
 ###########################################################################
 # Sieve
 ###########################################################################
 
-# (r,a) means rational or algebraic side
-# rlim/alim is the bound for sieving
-# lpbr/lpba is the (base 2 log of the) large prime bound
-# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try to
-#                                      split into large primes.
-# rlambda/alambda is the early-abort ratio: if after sieving the
-#                                      approximate norm is more than
-#                                      lambda times lpb, we reject.
-rlim=16000000
-alim=32000000
-lpbr=30
-lpba=30
-mfbr=60
-mfba=90
-rlambda=2.1
-alambda=2.8
+rlim = 16000000
+alim = 32000000
+lpbr = 30
+lpba = 30
+tasks.sieve.mfbr = 60
+tasks.sieve.mfba = 90
+tasks.sieve.rlambda = 2.1
+tasks.sieve.alambda = 2.8
 
-I=13                    # Sieving range in lattice siever
-qmin=32000000           # Start of the special-q range
-qrange=80000            # The size of an elementary sieving task
-checkrange=500000       # We check if we have enough after each step
-                        # of that many relations found.
-firstcheck=81000000
-sievenice=10
-sieve_max_threads=2
+tasks.I = 13
+tasks.sieve.qmin = 32000000
+tasks.sieve.qrange = 8000
+tasks.sieve.rels_wanted = 81000000
+slaves.niceness = 10
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-keeppurge=160           # shrink in purge if excess exceeds keeppurge
-maxlevel=25             # maximal merge level
-ratio=1.1
-bwstrat=3               
+tasks.filter.purge.keep = 160
+tasks.filter.maxlevel = 25
+tasks.filter.ratio = 1.1
+tasks.filter.merge.forbw = 3
+tasks.merge.coverNmax = 100
 
 ###########################################################################
 # Linear algebra
 ###########################################################################
 
-bwmt=2x2                # Multithreading level of Block-Wiedemann
+tasks.linalg.bwc.interval = 1000
+tasks.linalg.bwc.interleaving = 0
+tasks.linalg.bwc.mn = 64
+tasks.linalg.bwc.shuffled_product = 1
 
 ###########################################################################
 # Characters
 ###########################################################################
 
-nkermax=30              # maximal size of computed kernel
-nchar=50                # number of characters
+tasks.linalg.characters.nchar = 50

@@ -36,8 +36,13 @@ struct siever_config_s {
     unsigned int bitsize;  /* bitsize == 0 indicates end of table */
     int side;
     int logI;
+    double skewness;
+    unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned int td_thresh;
+    unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
+        unsigned long powlim; /* bound on powers in the factor base */
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
         double lambda;     /* lambda sieve parameter */
@@ -91,7 +96,8 @@ void las_todo_pop(las_todo_ptr * d);
 
 /* {{{ sieve_side_info */
 struct sieve_side_info_s {
-    unsigned char bound;
+    unsigned char bound; /* A sieve array entry is a sieve survivor if it is
+                            at most "bound" on each side */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
     struct {
@@ -108,21 +114,21 @@ struct sieve_side_info_s {
         int rs[2];
         int rest[2];
     } fb_parts_x[1];
-    /* The call to dispatch_fb from thread_data alloc splits up the main
-     * fb field into several fields, by reallocation. All fields are
-     * still owned by the sieve_info struct in the end, and stored here
+    /* The reading, mapping or generating the factor base all create the
+     * factor base in several pieces: small primes, and large primes split
+     * into one piece for each thread.
      */
     factorbase_degn_t * fb;
     factorbase_degn_t ** fb_bucket_threads;
+    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
+       if it is created by malloc() */
+    int fb_is_mmapped;
     /* log_steps[i] contains the largest integer x such that 
        fb_log(x, scale, 0.) == i, i.e., the integer after which the 
        rounded logarithm increases, i.o.w., x = floor(scale^(i+0.5)),
        for 0 <= i <= log_steps_max, where log_steps_max = fb_log(fbb, scale)
        For i > log_steps_max, log_steps[i] is undefined.
     */
-    /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
-       if it is created by malloc() */
-    int fb_is_mmapped;
     fbprime_t log_steps[256];
     unsigned char log_steps_max;
     /* When threads pick up this sieve_info structure, they should check
@@ -140,7 +146,9 @@ struct sieve_side_info_s {
     mpz_poly_t fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-
+    unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
+    double *roots;     /* d^2(F(i, const j))/d(i)^2 */
+			    
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
     small_sieve_data_t ssd[1];
@@ -179,15 +187,15 @@ struct sieve_info_s {
     int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
-    unsigned int td_thresh;
-    int bucket_thresh;    // bucket sieve primes >= bucket_thresh
-    uint32_t nb_buckets;
+    uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
+    uint32_t nb_buckets_max; /* Max number of buckets, if J=I/2 */
 
     sieve_side_info sides[2];
 
-    /* I think that by default, unsieving is not done */
-    unsieve_aux_data us;
-    j_div_ptr j_div;
+    /* Data for unsieving locations where gcd(i,j) > 1 */
+    unsieve_aux_data_srcptr us;
+    /* Data for divisibility tests p|i in lines where p|j */
+    j_div_srcptr j_div;
 
     /* used in check_leftover_norm */
     mpz_t BB[2], BBB[2], BBBB[2];
@@ -209,7 +217,6 @@ struct las_info_s {
     FILE *output;
     const char * outputname; /* keep track of whether it's gzipped or not */
     int verbose;
-    int bench;
     int suppress_duplicates;
 
     /* It's not ``general operational'', but global enough to be here */

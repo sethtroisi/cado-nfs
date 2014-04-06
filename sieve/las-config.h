@@ -27,8 +27,12 @@
  * Mandatory: THRESHOLD_K_BUCKETS >= 16;
  * THRESHOLD_M_BUCKETS >= (THRESHOLD_K_BUCKETS) * 4.
 */
+#ifndef THRESHOLD_K_BUCKETS
 #define THRESHOLD_K_BUCKETS 32768   /* 512 */
+#endif
+#ifndef THRESHOLD_M_BUCKETS
 #define THRESHOLD_M_BUCKETS 1048576 /* 131072 */
+#endif
 
 #if THRESHOLD_K_BUCKETS < 16
 #error THRESHOLD_K_BUCKETS must be >= 16
@@ -43,36 +47,20 @@
  * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
-/* Lazy norm computation for the algebraics: compute only one norm per
- * 8 on a line, and propagate up to VERT_NORM_STRIDE rows above it. 
- * These approximations speed-up the norm computation, but put more 
- * pressure on the cofactorisation step, since the useless 
- * cofactorisations are more frequent. 
- * Comment the first line to get an accurate, slower, norm computation.
+/* Smart norm computation. Compute only one norm per n (max HORI_NORM_STRIDE)
+ * on a line, and propagate up to VERT_NORM_STRIDE rows above it. 
+ * These approximations speed-up the norm computation, but maybe put a little 
+ * more pressure on the cofactorisation step, since the useless 
+ * cofactorisations might be more frequent. 
+ * See the result of test_init_norms_bucket_region for precision.
+ * If SMART_NORM is not defined, an exact algorithm with a fast log2 is used;
+ * the result is always exact -/+ 1.
+ * HORI_NORM_STRIDE & VERT_NORM_STRIDE are useless if SMART_NORM is undefined.
  */ 
-#define ALG_LAZY
+#define SMART_NORM 1
+#define HORI_NORM_STRIDE 8
 #define VERT_NORM_STRIDE 4 
 
-/* If ALG_RAT is set, the algebraics norm computation is done only if
- * the corresponding rational is <= rat->bound (~5% of the rationals).
- * Without ALG_LAZY, all the rationals are verified, one by one, and
- * the norm of the corresponding algebraic could be computed. It's
- * slow, because there are many tests.
- * With ALG_LAZY, the rationals are tested 8 by 8. If one (at least)
- * is <= bound, the corresponding 8 algebraics (1st to 8th) are
- * initialized by the norm computation of the 3th algebraic.
- * By default, ALG_RAT is commented for maximal speed.
- */
-/* #define ALG_RAT */
-
-/* Rough comparison speeds of all the combinaison on a SSE/non SEE 
- * X86 machine with log2(I)=15 :
- * !ALG_LAZY, !ALG_RAT : SSE: x01.9 faster,       non SSE: base (slowest)
- * !ALG_LAZY,  ALG_RAT : SSE: x03.3 (desactived), non SSE: x6.0 
- *  ALG_LAZY,  ALG_RAT : SSE: x10.8 faster,       non SSE: x8.5
- *  ALG_LAZY, !ALG_RAT : SSE: x19.9 faster,       non SSE: x11.6 
- */
- 
 /* define PROFILE to keep certain functions from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE
@@ -104,6 +92,9 @@
  * context, augments the scope of the tracking here by performing a
  * divisibility test on each sieve update. This is obviously very
  * expensive, but provides nice checking.
+ *
+ * Another useful tool for debugging is the sieve-area checksums that get
+ * printed with verbose output (-v) enabled.
  */
 #define xxxTRACK_CODE_PATH
 #define xxxWANT_ASSERT_EXPENSIVE

@@ -89,7 +89,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 /* This has the same effect as enforcing -Werror on the command line, so
- * as to trigger as many warnings as we can, and fource ourselves to get
+ * as to trigger as many warnings as we can, and force ourselves to get
  * them fixed.
  * (useful to enable temporarily before releases, at least)
  */

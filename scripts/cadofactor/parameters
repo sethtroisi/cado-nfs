@@ -101,6 +101,7 @@ tasks.mfbr=22
 tasks.mfba=22
 tasks.rlambda=1.2
 tasks.alambda=1.2
+tasks.I = 11
 
 
 # threads: number of threads to use in sub-programs.
@@ -134,6 +135,11 @@ tasks.polyselect.admin = 0
 tasks.polyselect.admax = 10000
 tasks.polyselect.adrange = 5000
 tasks.polyselect.maxnorm = 21.5
+# nrkeep: Keep the 20 best size-optimized polynomials from polyselect 
+# phase 1 and rootsieve them in polyselect phase 2
+tasks.polyselect.nrkeep = 20
+# batch: how many polynomial to put in each WU in the rootsieve phase
+tasks.polyselect.batch = 10                              
 
 # define tasks.sieve.ratq to True if you want special-q's to be taken on
 # the rational side (by default they are on the algebraic side), this can be
@@ -142,7 +148,6 @@ tasks.sieve.ratq=False
 
 tasks.sieve.rels_wanted = 122540
 tasks.sieve.qrange = 2000
-tasks.sieve.I = 11
 tasks.filter.nslices_log=1
 tasks.filter.keep = 160
 tasks.filter.skip = 32

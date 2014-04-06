@@ -49,12 +49,6 @@
  * - 2 if not enough relations
  */
 
-/*
- * index_t : (32 + 32 * need64) bits. Signed.
- * p_r_values_t : 32 if H.hm < 2^32-1, otherwise 64 bits.
- * Note : sizeof(p_r_values_t) >= sizeof(index_t)
-*/
-
 #include "cado.h"
 #include <gmp.h>
 #include <stdio.h>
@@ -721,7 +715,7 @@ int main(int argc, char **argv)
     if (((nprimemax >> 32) != 0 || (nrelmax >> 32) != 0) && sizeof(index_t) < 8)
     {
       fprintf(stderr, "Error, -nrels or -nprimes is too large for a 32-bit "
-                      "program\nSee #define index_size in typedefs.h\n");
+                      "program\nSee #define __SIZEOF_INDEX__ in typedefs.h\n");
       exit(EXIT_FAILURE);
     }
 
@@ -764,7 +758,7 @@ int main(int argc, char **argv)
     size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
     tot_alloc_bytes += cur_alloc;					\
     fprintf(stderr,                                                     \
-            "Allocated rel_used of %zuMB (total %zuMB so far)\n",       \
+            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",       \
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
 } while (0)
     /* }}} */

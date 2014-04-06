@@ -24,6 +24,16 @@ double_poly_clear (double_poly_ptr p)
   free (p->coeff);
 }
 
+/* Set r = s. Assumes r has enough memory allocated. */
+void
+double_poly_set (double_poly_ptr r, double_poly_srcptr s)
+{
+  r->deg = s->deg;
+  for (unsigned int i = 0; i <= s->deg; i++) {
+    r->coeff[i] = s->coeff[i];
+  }
+}
+
 /* Evaluate the polynomial p at point x */
 double
 double_poly_eval (double_poly_srcptr p, const double x)
@@ -76,16 +86,94 @@ void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
   unsigned int n;
+  double d_n;
   if (f->deg == 0) {
     df->deg = 0; /* How do we store deg -\infty polynomials? */
-    df->coeff[0] = 0;
+    df->coeff[0] = 0.;
     return;
   }
   // at this point, f->deg >=1
-  df->deg = f->deg-1;
-  for(n=0; n<=f->deg-1; n++)
-    df->coeff[n] = f->coeff[n+1] * (double)(n+1);
+  df->deg = f->deg - 1;
+  for(n = 0, d_n = 1.; n < f->deg; n++, d_n += 1.)
+    df->coeff[n] = f->coeff[n + 1] * d_n;
 }
+
+/* Stores the product of f and g in h (h = f * g).
+   Assumes h != f && h != g (f *= g is not accepted for example).
+   Assumes h has been initialized with degree at least f->deg + g->deg.
+*/
+void
+double_poly_product(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+{
+  ASSERT(h->coeff != f->coeff && h->coeff != g->coeff);
+  ASSERT(h->deg >= f->deg + g->deg);
+  h->deg = f->deg + g->deg;
+  memset (h->coeff, 0, sizeof(double) * (h->deg + 1));
+  for (size_t i_f = f->deg + 1; i_f--; ) {
+    double fcoeff = f->coeff[i_f], *hcoeff = h->coeff + i_f;
+    for (size_t i_g = g->deg + 1; i_g--; )
+      hcoeff[i_g] += fcoeff * g->coeff[i_g];
+  }
+}
+
+/* Stores the sum of f and g in h (h = f + g).
+   Assumes h has been initialized with degree at least MAX(f->deg, g->deg).
+*/
+void
+MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+{
+  size_t i;
+  if (f->deg <= g->deg) {
+    ASSERT(h->deg >= g->deg);
+    h->deg = g->deg;
+    for (i = 0; i <= f->deg; ++i) h->coeff[i] = f->coeff[i] + g->coeff[i];
+    for (     ; i <= g->deg; ++i) h->coeff[i] = g->coeff[i];
+  } else {
+    ASSERT(h->deg >= f->deg);
+    h->deg = f->deg;
+    for (i = 0; i <= g->deg; ++i) h->coeff[i] = f->coeff[i] + g->coeff[i];
+    for (     ; i <= f->deg; ++i) h->coeff[i] = f->coeff[i];
+  }
+}
+
+/* Stores the substraction of g to f in h (h = f - g).
+   Assumes h has been initialized with degree at least MAX(f->deg, g->deg).
+*/
+void
+double_poly_substract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+{
+  size_t i;
+  if (f->deg <= g->deg) {
+    ASSERT(h->deg >= g->deg);
+    h->deg = g->deg;
+    for (i = 0; i <= f->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
+    for (     ; i <= g->deg; ++i) h->coeff[i] =             - g->coeff[i];
+  } else {
+    ASSERT(h->deg >= f->deg);
+    h->deg = f->deg;
+    for (i = 0; i <= g->deg; ++i) h->coeff[i] = f->coeff[i] - g->coeff[i];
+    for (     ; i <= f->deg; ++i) h->coeff[i] = f->coeff[i];
+  }
+}
+
+/* Revert the coefficients in-place: f(x) => f(1/x) * x^degree */
+void
+double_poly_revert (double_poly_ptr f)
+{
+  const unsigned int d = f->deg;
+
+  if (d <= 0)
+    return;
+
+  /* if d is even, nothing to do for k=d/2 */
+  for (unsigned int k = 0; k <= (d - 1) / 2; k++)
+    {
+      double tmp = f->coeff[k];
+      f->coeff[k] = f->coeff[d - k];
+      f->coeff[d - k] = tmp;
+    }
+}
+
 
 static unsigned int
 recurse_roots(double_poly_srcptr poly, double *roots,
@@ -127,6 +215,14 @@ double_poly_compute_roots(double *roots, double_poly_ptr poly, double s)
 {
   const unsigned int d = poly->deg;
   double_poly_t *dg; /* derivatives of poly */
+  
+  /* The roots of the zero polynomial are ill-defined. Bomb out */
+  ASSERT_ALWAYS(d > 0 || poly->coeff[0] != 0.);
+
+  /* Handle constant polynomials separately */
+  if (d == 0)
+    return 0; /* Constant non-zero poly -> no roots */
+
   dg = (double_poly_t *) malloc (d * sizeof (double_poly_t));
   FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
 
@@ -189,9 +285,9 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
 void
 double_poly_set_mpz_poly (double_poly_ptr p, mpz_poly_ptr q)
 {
-  unsigned int d = p->deg, i;
+  unsigned int d = q->deg, i;
 
-  ASSERT_ALWAYS (d == (unsigned int) q->deg);
   for (i = 0; i <= d; i++)
     p->coeff[i] = mpz_get_d (q->coeff[i]);
+  p->deg = d;
 }

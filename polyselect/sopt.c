@@ -27,6 +27,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
+#include "area.h"
 
 #define MAX_LINE_LENGTH 1024
 
@@ -150,8 +151,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
 			   // need to output raw, since we may re-optimize this using updated optimize.c
                            nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-			   logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+			   logmu = L2_lognorm (F, skew);
 			   alpha = get_alpha (F, ALPHA_BOUND);
 			   fprintf (stderr, "\n# Raw polynomial (#%6d):", count + 1);
 			   polyprint (f, g, deg, N);
@@ -161,8 +162,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
 			   optimize (F, g, 0, 1); // no verbose
 			   // optimized polynomial
 			   nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
-			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-			   logmu = L2_lognorm (F, skew, DEFAULT_L2_METHOD);
+			   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+			   logmu = L2_lognorm (F, skew);
 			   alpha = get_alpha (F, ALPHA_BOUND);
 			   fprintf (stderr, "# Optimized polynomial (#%10d): ", count + 1);
 			   polyprint (f, g, deg, N);

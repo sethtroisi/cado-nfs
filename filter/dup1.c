@@ -121,7 +121,10 @@ split_iter_write_next(split_output_iter_t *iter, const char *line)
 {
   if (iter->lines_left == 0)
     split_iter_open_next_file(iter);
-  fputs (line, iter->file);
+  if (fputs (line, iter->file) == EOF) {
+    perror("Error writing relation");
+    abort();
+  }
   iter->lines_left--;
 }
 
@@ -173,7 +176,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "n", "log of number of slices (default: 1)");
   param_list_decl_usage(pl, "only", "do only slice i (default: all)");
   param_list_decl_usage(pl, "outfmt",
-                               "format of output file (default same as input");
+                               "format of output file (default same as input)");
   param_list_decl_usage(pl, "ab", "(switch) only print a and b in the output");
   param_list_decl_usage(pl, "abhexa",
                                   "(switch) read a and b as hexa not decimal");

@@ -223,7 +223,7 @@ bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
 bwc_program(mksol mksol.c xymats.c xdotprod.c)
 bwc_program(gather gather.c)
 bwc_program(secure secure.c)
-bwc_program(test test.c)
+bwc_program(spmv_test spmv_test.c)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION bin/linalg/bwc)
 

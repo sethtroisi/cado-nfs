@@ -186,7 +186,7 @@ mod_V_ul (residue_t r, const residue_t b, const unsigned long e,
   mod_clear (two, m);
 }
 
-
+#if 0 /* not used for now, but keep around for reference */
 /* Compute r = V_e(b), where V_e(x) is the Chebyshev polynomial defined by
    V_e(x + 1/x) = x^e + 1/x^e. Here e is a multiple precision integer 
    sum_{i=0}^{e_nrwords} e[i] * (machine word base)^i */
@@ -254,3 +254,4 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
   mod_clear (t1, m);
   mod_clear (two, m);
 }
+#endif

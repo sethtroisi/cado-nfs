@@ -41,6 +41,10 @@ void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
   ASSERT_ALWAYS(n == c->n);
   for (i = 0; i < iceildiv(n, BV_BITS); i++)
     b->p[i] = ~c->p[i];
+  /* For the last byte, put the bits to 0 if the bitmap count does not
+   * correspond to an integer number of words */
+  if (n & (BV_BITS - 1))
+    b->p[n >> LN2_BV_BITS] &= (((bv_t) 1) << (n & (BV_BITS - 1))) - 1;
 }
 
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
@@ -66,10 +70,12 @@ int bit_vector_clearbit(bit_vector_ptr b, size_t pos)
     return (val & mask) != 0;
 }
 
+/* return old value */
 int bit_vector_flipbit(bit_vector_ptr b, size_t pos)
 {
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
-    bv_t val = b->p[pos >> LN2_BV_BITS] ^= mask;
+    bv_t val = b->p[pos >> LN2_BV_BITS];
+    b->p[pos >> LN2_BV_BITS] ^= mask;
     return (val & mask) != 0;
 }
 
@@ -110,21 +116,21 @@ size_t bit_vector_memory_footprint(bit_vector_srcptr b)
 
 void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
 {
-    FILE * f = fopen_maybe_compressed(fname, "r");
+    FILE * f = fopen_maybe_compressed(fname, "rb");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
-    int rz = fread(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz >= 0 && (size_t) rz == z);
+    size_t rz = fread(b->p, sizeof(bv_t), z, f);
+    ASSERT_ALWAYS(rz == z);
     fclose(f);
 }
 
 void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname)
 {
-    FILE * f = fopen_maybe_compressed(fname, "w");
+    FILE * f = fopen_maybe_compressed(fname, "wb");
     ASSERT_ALWAYS(f);
     size_t z = iceildiv(b->n, BV_BITS);
-    int rz = fwrite(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz >= 0 && (size_t) rz == z);
+    size_t rz = fwrite(b->p, sizeof(bv_t), z, f);
+    ASSERT_ALWAYS(rz == z);
     fclose(f);
 }
 

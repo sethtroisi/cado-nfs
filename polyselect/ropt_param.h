@@ -36,8 +36,6 @@
 
 #define MAX_LINE_LENGTH 4096
 
-#define MAX_DEGREE 6
-
 /* number of default parameters for various sublattices */
 #define NUM_DEFAULT_SUBLATTICE 26
 
@@ -78,9 +76,9 @@ extern const unsigned int default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBL
 
 extern const unsigned long default_sublattice_prod[NUM_DEFAULT_SUBLATTICE];
 
-extern const unsigned int size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES];
+extern const unsigned int s1_size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES];
 
-extern const unsigned int size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
+extern const unsigned int s1_size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
 extern const unsigned int size_total_sublattices[8][2];
 

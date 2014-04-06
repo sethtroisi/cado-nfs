@@ -5,6 +5,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
+#include "area.h"
 
 extern int MAX_k;
 
@@ -50,7 +51,7 @@ main (int argc, char **argv)
     mpz_poly_t F;
     F->coeff = poly->alg->coeff;
     F->deg = poly->alg->deg;
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
     printf ("Initial polynomial:\n");
     if (verbose)
@@ -59,7 +60,7 @@ main (int argc, char **argv)
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (F, ALPHA_BOUND));
     optimize (F, poly->rat->coeff, verbose - 1, 1);
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     
     printf ("After norm optimization:\n");
     if (verbose)
@@ -70,13 +71,13 @@ main (int argc, char **argv)
 
     mpz_set (b, poly->rat->coeff[1]);
     mpz_neg (m, poly->rat->coeff[0]);
-    rotate (F, alim, m, b, &jmin, &kmin, 0, verbose - 1, DEFAULT_L2_METHOD);
+    rotate (F, alim, m, b, &jmin, &kmin, 0, verbose - 1);
     mpz_set (poly->rat->coeff[1], b);
     mpz_neg (poly->rat->coeff[0], m);
     /* optimize again, but only translation */
     mpz_poly_fprintf (stdout, poly->rat);
     optimize (F, poly->rat->coeff, verbose - 1, 0);
-    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
 

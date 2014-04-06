@@ -1,6 +1,7 @@
 #ifndef LAS_DEBUG_H_
 #define LAS_DEBUG_H_
 
+#include <limits.h>
 #include <stdint.h>
 
 #include "las-config.h"
@@ -10,19 +11,21 @@
 extern "C" {
 #endif
 
+struct trace_Nx_t { unsigned int N; unsigned int x; };
+struct trace_ab_t { int64_t a; uint64_t b; };
+struct trace_ij_t { int i; unsigned int j; };
+
+extern void trace_per_sq_init(sieve_info_srcptr si,
+        const struct trace_Nx_t *Nx, const struct trace_ab_t *ab,
+        const struct trace_ij_t *ij);
+extern void trace_per_sq_clear(sieve_info_srcptr si);
+
 /* When TRACE_K is defined, we are exposing some non trivial stuff.
  * Otherwise this all collapses to no-ops */
 
 #ifdef TRACE_K
 
 extern int test_divisible(where_am_I_ptr w);
-extern void trace_per_sq_init(sieve_info_srcptr si);
-extern void trace_per_sq_clear(sieve_info_srcptr si);
-
-struct trace_Nx_t { unsigned int N; unsigned int x; };
-struct trace_ab_t { int64_t a; uint64_t b; };
-struct trace_ij_t { int i; unsigned int j; };
-
 extern struct trace_Nx_t trace_Nx;
 extern struct trace_ab_t trace_ab;
 extern struct trace_ij_t trace_ij;
@@ -61,8 +64,6 @@ void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w
 
 #else
 static inline int test_divisible(where_am_I_ptr w MAYBE_UNUSED) { return 1; }
-static inline void trace_per_sq_init(sieve_info_srcptr si MAYBE_UNUSED) { }
-static inline void trace_per_sq_clear(sieve_info_srcptr si MAYBE_UNUSED) { }
 static inline int trace_on_spot_N(unsigned int N MAYBE_UNUSED) { return 0; }
 static inline int trace_on_spot_Nx(unsigned int N MAYBE_UNUSED, unsigned int x MAYBE_UNUSED) { return 0; }
 static inline int trace_on_range_Nx(unsigned int N MAYBE_UNUSED, unsigned int x0 MAYBE_UNUSED, unsigned int x1 MAYBE_UNUSED) { return 0; }
@@ -77,7 +78,7 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
 static inline void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w MAYBE_UNUSED)
 {
 #ifdef CHECK_UNDERFLOW
-  if (*S + (unsigned int) logp > (unsigned char) ~0)
+  if (*S > UCHAR_MAX - logp)
     sieve_increase_underflow_trap(S, logp, w);
 #endif  /* CHECK_UNDERFLOW */
     *S += logp;

@@ -473,13 +473,20 @@ renumber_read_table (renumber_t tab, const char * filename)
     v = parse_one_line(s);
     tab->table[i] = v;
 
-    if ((v >> MAX_LOG_CACHED))
+    p_r_values_t p;
+    if (tab->rat >= 0) {
+      p = (v > 0) ? (v - 1) : 0;
+    } else { // two alg sides, v is 2*p +1
+      p = v >> 1;
+    }
+
+    if ((p >> MAX_LOG_CACHED))
     {
       i++;
       break;
     }
     if (v > prev_v)
-      tab->cached[v] = i;
+      tab->cached[p] = i;
 
     prev_v = v;
     i++;
@@ -600,7 +607,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     /* assert that p is below the large prime bound */
     unsigned long lpb = (side==RATIONAL_SIDE) ? renumber_info->lpbr :
                                                 renumber_info->lpba ;
-    if (p >> lpb)
+    if (((uint64_t) p) >> lpb)
     {
       fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%lu\n",
                        __func__, __LINE__, p, lpb);
@@ -672,7 +679,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   }
   else //p is cached
   {
-    i = renumber_info->cached[vp];
+    i = renumber_info->cached[p];
 #ifdef DEBUG_RENUMB
     ASSERT_ALWAYS (renumber_info->table[i] == vp);
 #endif
@@ -789,12 +796,22 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
       renumber_get_p_r_from_index (tab, &p, &r, &side, i, pol);
       fprintf (output, "i=%" PRxid " tab[i]=%" PRpr " p=%" PRpr "",
                        i, tab->table[i], p);
-      if (side == tab->rat)
-        fprintf (output, " rat side\n");
-      else if (r == p)
-        fprintf (output, " r=%" PRpr " alg side proj\n", r);
+      if (tab->rat == -1)
+      {
+        if (r == p)
+          fprintf (output, " r=%" PRpr " side %d proj\n", r, side);
+        else
+          fprintf (output, " r=%" PRpr " side %d\n", r, side);
+      }
       else
-        fprintf (output, " r=%" PRpr " alg side\n", r);
+      {
+        if (side == tab->rat)
+          fprintf (output, " rat side\n");
+        else if (r == p)
+          fprintf (output, " r=%" PRpr " alg side proj\n", r);
+        else
+          fprintf (output, " r=%" PRpr " alg side\n", r);
+      }
     }
   }
 

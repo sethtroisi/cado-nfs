@@ -80,8 +80,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 /* Handy, and does not require libm */
 #ifndef iceildiv
-/* unfortunately this fails miserably if x+y-1 overflows */
-#define iceildiv(x,y)	(((x)+(y)-1)/(y))
+/* C99 defines division as truncating, i.e. rounding to 0. To get ceil in all
+   cases, we have to distinguish by sign of arguments. Note that (afaik) the
+   sign and truncation direction of the quotient with any negative operads was
+   undefined in C89. */
+/* This ridiculous macro is to avoid useless "comparison of unsigned expression
+   < 0 is always false" warnings when arguments are unsigned type */
+#define uisneg(x) ((x) < 1 && (x) != 0)
+#define iceildiv(x,y) ((x) == 0 ? 0 : uisneg(x) + uisneg(y) == 1 ? (x)/(y) : ((x)-1+2*uisneg(y))/(y)+1)
 #endif
 
 #define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))

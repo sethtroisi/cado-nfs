@@ -92,27 +92,27 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
-    weight_t e = rel->primes[i].e;
+    exponent_t e = rel->primes[i].e;
     mat->tot_weight++;
     /* For factorization, they should not be any multiplicity here.
        For DL we do not want to count multiplicity in mat->wt */
 #ifndef FOR_DL
     ASSERT_ALWAYS (e == 1);
 #endif
-	  if (mat->wt[h] == 0)
+    if (mat->wt[h] == 0)
     {
-	    mat->wt[h] = 1;
-	    mat->rem_ncols++;
-	  }
+      mat->wt[h] = 1;
+      mat->rem_ncols++;
+    }
     else if (mat->wt[h] != SMAX(int32_t))
-	    mat->wt[h]++;
+      mat->wt[h]++;
 
-	  if (h >= mat->nburied)
+    if (h >= mat->nburied)
     {
       mat->weight++;
       setCell(buf[next_id], h, e);
       next_id++;
-	  }
+    }
   }
 
   //FIXME for now can't use my malloc, because rows is realloc later
@@ -170,7 +170,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       if (w < bmin)
         bmin = w;
 #if DEBUG >= 1
-      fprintf(stderr, "# Burying j=%d (wt=%d)\n", h, w);
+      fprintf(stderr, "# Burying j=%" PRIu64 " (wt=%" PRId32 ")\n", h, w);
 #endif
     }
     printf("# Number of buried columns is %" PRid " (min_weight=%" PRId32 ", "

@@ -460,7 +460,7 @@ void * fill_in_rows (void *context_data, earlyparsed_relation_ptr rel)
   for (unsigned int j = 0; j < rel->nb; j++)
   {
     index_t h = rel->primes[j].h;
-    weight_t e = rel->primes[j].e;
+    exponent_t e = rel->primes[j].e;
 #ifndef FOR_DL
     ASSERT_ALWAYS (e == 1);
 #endif

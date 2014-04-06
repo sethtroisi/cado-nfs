@@ -5,7 +5,9 @@
 #include "las-unsieve.h"
 #include "ularith.h"
 #include "las-norms.h"
+#include "las-debug.h"
 #include "gcd.h"
+#include "memory.h"
 
 static const int verify_gcd = 0; /* Enable slow but thorough test */
 
@@ -19,19 +21,21 @@ minisieve(unsieve_pattern_t * const array, const size_t stride)
       ((unsigned char *) array)[i] = 255;
 }
 
-void
-sieve_info_init_unsieve_data(sieve_info_ptr si)
+unsieve_aux_data_srcptr
+init_unsieve_data(uint32_t I)
 {
-  /* Store largest prime factor of k in si->us->lpf[k], 0 for k=0, 1 for k=1 */
-  si->us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) << si->conf->logI);
-  FATAL_ERROR_CHECK(si->us->entries == NULL, "malloc failed");
-  si->us->entries[0].lpf = 0U;
-  si->us->entries[0].cof = 0U;
-  si->us->entries[0].start = 0U;
-  si->us->entries[1].lpf = 1U;
-  si->us->entries[1].cof = 1U;
-  si->us->entries[1].start = 0U;
-  for (unsigned int k = 2U; k < si->I; k++)
+  unsieve_aux_data_ptr us;
+  us = malloc_aligned(sizeof(unsieve_aux_data), 16);
+  /* Store largest prime factor of k in us->lpf[k], 0 for k=0, 1 for k=1 */
+  us->entries = (unsieve_entry_t *) malloc (sizeof (unsieve_entry_t) * I);
+  FATAL_ERROR_CHECK(us->entries == NULL, "malloc failed");
+  us->entries[0].lpf = 0U;
+  us->entries[0].cof = 0U;
+  us->entries[0].start = 0U;
+  us->entries[1].lpf = 1U;
+  us->entries[1].cof = 1U;
+  us->entries[1].start = 0U;
+  for (unsigned int k = 2U; k < I; k++)
     {
       unsigned int p, c = k;
       for (p = 2U; p * p <= c; p += 1U + p % 2U)
@@ -43,22 +47,25 @@ sieve_info_init_unsieve_data(sieve_info_ptr si)
         }
       p = (c == 1U) ? p : c;
       c = k; do {c /= p;} while (c % p == 0);
-      si->us->entries[k].lpf = p;
-      si->us->entries[k].cof = c;
-      si->us->entries[k].start = (si->I / 2U) % p;
+      us->entries[k].lpf = p;
+      us->entries[k].cof = c;
+      us->entries[k].start = (I / 2U) % p;
     }
 
     /* Create pattern for sieving 3 */
-    minisieve(si->us->pattern3, 3);
+    minisieve(us->pattern3, 3);
     /* Create pattern for sieving 5 */
-    minisieve(si->us->pattern5, 5);
+    minisieve(us->pattern5, 5);
     /* Create pattern for sieving 7 */
-    minisieve(si->us->pattern7, 7);
+    minisieve(us->pattern7, 7);
+
+  return us;
 }
 
-void sieve_info_clear_unsieve_data(sieve_info_ptr si)
+void clear_unsieve_data(unsieve_aux_data_srcptr us)
 {
-  free (si->us->entries);
+  free (us->entries);
+  free_aligned (us, 16);
 }
 
 static inline void
@@ -283,22 +290,22 @@ unsieve_not_coprime_line(unsigned char * restrict line_start,
 }
 
 
-void
-sieve_info_init_j_div(sieve_info_ptr si)
+j_div_srcptr
+init_j_div(uint32_t J)
 {
-  /* Store largest prime factor of k in si->j_div[k].p, for 1 < k < J,
+  /* Store largest prime factor of k in j_div[k].p, for 1 < k < J,
      and store 0 for k=0, 1 for k=1 */
-  si->j_div = (j_div_ptr) malloc (sizeof (struct j_div_s) * si->J);
-  FATAL_ERROR_CHECK(si->j_div == NULL, "malloc failed");
-  si->j_div[0].p   = 0U;
-  si->j_div[0].cof = 0U;
-  si->j_div[0].inv = 0U;
-  si->j_div[0].bound = 0U;
-  si->j_div[1].p   = 1U;
-  si->j_div[1].cof = 1U;
-  si->j_div[1].inv = 1U;
-  si->j_div[1].inv = UINT_MAX;
-  for (unsigned int k = 2U; k < si->J; k++) {
+  j_div_ptr j_div = (j_div_ptr) malloc (sizeof (struct j_div_s) * J);
+  FATAL_ERROR_CHECK(j_div == NULL, "malloc failed");
+  j_div[0].p   = 0U;
+  j_div[0].cof = 0U;
+  j_div[0].inv = 0U;
+  j_div[0].bound = 0U;
+  j_div[1].p   = 1U;
+  j_div[1].cof = 1U;
+  j_div[1].inv = 1U;
+  j_div[1].inv = UINT_MAX;
+  for (unsigned int k = 2U; k < J; k++) {
     /* Find largest prime factor of k */
     unsigned int p, c = k;
     for (p = 2U; p * p <= c; p += 1U + p % 2U)
@@ -310,18 +317,18 @@ sieve_info_init_j_div(sieve_info_ptr si)
       }
     p = (c == 1U) ? p : c;
     c = k; do {c /= p;} while (c % p == 0);
-    si->j_div[k].p = p;
-    si->j_div[k].cof = c;
-    si->j_div[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
-    si->j_div[k].bound = UINT_MAX / p;
+    j_div[k].p = p;
+    j_div[k].cof = c;
+    j_div[k].inv = p == 2 ? 0 : (unsigned int)ularith_invmod(p);
+    j_div[k].bound = UINT_MAX / p;
   }
+  return (j_div_srcptr) j_div;
 }
 
 void
-sieve_info_clear_j_div(sieve_info_ptr si)
+clear_j_div(j_div_srcptr j_div)
 {
-  free(si->j_div);
-  si->j_div = NULL;
+  free((void *)j_div);
 }
 
 static inline unsigned int 
@@ -345,6 +352,72 @@ extract_j_div(unsigned int (*div)[2], const unsigned int j, j_div_srcptr j_div,
     }
     return nr_div;
 }
+static inline int 
+sieve_info_test_lognorm (const unsigned char C1, 
+                         const unsigned char C2, 
+                         const unsigned char S1,
+                         const unsigned char S2)
+{
+  return S1 <= C1 && S2 <= C2;
+}
+
+#ifdef HAVE_SSE2
+static inline int 
+sieve_info_test_lognorm_sse2(__m128i * restrict S0, const __m128i pattern0,
+                             const __m128i *restrict S1, const __m128i pattern1)
+{
+    const __m128i zero = _mm_set1_epi8(0);
+    const __m128i ff = _mm_set1_epi8(0xff);
+    const __m128i sign_conversion = _mm_set1_epi8(-128);
+    __m128i a = *S0;
+    __m128i r = *S1;
+    __m128i m1, m2;
+    /* _mm_cmpgt_epi8() performs signed comparison, but we have unsigned
+       bytes. We can switch to signed in a way that preserves ordering by
+       flipping the MSB, e.g., 0xFF (255 unsigned) becomes 0x7F (+127 signed), 
+       and 0x00 (0 unsigned) becomes 0x80 (-128 signed).
+
+       If a byte in the first operand is greater than the corresponding byte in
+       the second operand, the corresponding byte in the result is set to all 1s
+       (i.e., to 0xFF); otherwise, it is set to all 0s.
+       
+       Normally, S[x] <= bound means a sieve survivor. However, for skipping over
+       locations where 3 | gcd(i,j), we set the bound to 0 in the pattern at
+       those locations. We then need a comparison that never produces a survivor
+       in those locations, even when S[x] is in fact 0. Thus we initialise the
+       pattern to bound + 1, then set the bound to 0 where 3 | gcd(i,j), and
+       change the comparison to S[x] < bound, which is guaranteed not to let any
+       survivors through where the pattern byte is 0. */
+    m1 = _mm_cmpgt_epi8 (pattern0, _mm_xor_si128(a, sign_conversion));
+    m2 = _mm_cmpgt_epi8 (pattern1, _mm_xor_si128(r, sign_conversion));
+    /* m1 is 0xFF where pattern[x] > S0[x], i.e., where it survived.
+       Same for S1. */
+    /* Logically AND the two masks: survivor only where both sided survived */
+    m1 = _mm_and_si128(m1, m2);
+
+    /* m1 is 0xFF in those locations where there the sieve entry survived on
+       both sides */
+    /* For the OR mask we need the bit complement, via m1 XOR 0xFF */
+    m2 = _mm_xor_si128(m1, ff);
+    *S0 = _mm_or_si128(a, m2);
+    /* Do we want to update this one? */
+    // *S1 = _mm_or_si128(r, m2);
+
+    /* Compute number of non-zero bytes. We want 1 is those bytes that
+    survived, and 0 in the others. m1 has 0xFF in those bytes that
+    survived, 0 in the others. First sign flip: 0xFF -> 0x1 */
+    m1 = _mm_sub_epi8(zero, m1);
+    /* Using Sum of Absolute Differences with 0, which for us gives the
+    number of non-zero bytes. This Sum of Absolute Differences uses
+    unsigned arithmetic, thus we needed the sign flip first */
+    m1 = _mm_sad_epu8(m1, zero);
+    /* Sum is stored in two parts */
+    int nr_set = _mm_extract_epi16(m1, 0) + _mm_extract_epi16(m1, 4);
+    /* Return number of bytes that were not set to 255 */
+    return nr_set;
+}
+#endif
+
 
 /* In SS[2][x_start] ... SS[2][x_start * x_step - 1], look for survivors.
    If SSE is available, the bounds check was already done. If no SSE2 is
@@ -394,7 +467,7 @@ search_single_survivors(unsigned char * const restrict SS[2],
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
               fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
-                      trace_Nx.x, trace_Nx.N, i, j);
+                      x, N, i, j);
           }
 #endif
           SS[0][x] = 255;
@@ -404,7 +477,7 @@ search_single_survivors(unsigned char * const restrict SS[2],
 #ifdef TRACE_K
           if (trace_on_spot_Nx(N, x)) {
               fprintf(stderr, "# Slot [%u] in bucket %u is survivor with coprime (i,j)\n",
-                      trace_Nx.x, trace_Nx.N);
+                      x, N);
           }
 #endif
       }

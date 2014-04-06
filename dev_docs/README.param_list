@@ -21,7 +21,8 @@ pb=256
 EOF
 
 The syntax of config files that can be read is the union of the
-ggnfs/cado format, and the params file for cadofactor.pl:
+ggnfs/cado format, and the params file for the now obsolete cadofactor.pl
+script:
 
 file=(<comment-line> | <non-comment>)*
 comment-line = <empty-line>|<white>#.*

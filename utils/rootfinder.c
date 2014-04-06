@@ -8,6 +8,7 @@
 #include "rootfinder.h"
 #include "mpz_poly.h"
 #include "modul_poly.h"
+#include "gmp_aux.h"
 
 /* put in r[0], ..., r[n-1] the roots of f (of degree d) modulo p,
    and the return value n is the number of roots (without multiplicities) */
@@ -44,23 +45,43 @@ poly_roots_ulong (unsigned long *r, mpz_t *f, int d, unsigned long p)
     return n;
 }
 
-int poly_roots_long(long * r, mpz_t * f, int d, unsigned long p)
-{
-    FATAL_ERROR_CHECK(p >= LONG_MAX, "Cannot use poly_roots_long here");
-    return poly_roots_ulong((unsigned long *) r, f, d, p);
-}
-
 int
 poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
 {
-    FATAL_ERROR_CHECK(p >= ULONG_MAX, "poly_roots_uint64 is a stub");
     /* This is glue around poly_roots_ulong, nothing more. When uint64
-     * means asking a lot more than ulong, we miss code. */
+       is larger than ulong, we call mpz_poly_roots_mpz as a fallback */
     unsigned long *rr;
     int i, n;
 
+    if (p > (uint64_t) ULONG_MAX)
+      {
+        mpz_t pp;
+
+        mpz_init (pp);
+        mpz_set_uint64 (pp, p);
+        if (r == NULL)
+          n = mpz_poly_roots_mpz (NULL, f, d, pp);
+        else
+          {
+            mpz_t *rr;
+            rr = malloc ((d + 1) * sizeof (mpz_t));
+            for (i = 0; i <= d; i++)
+              mpz_init (rr[i]);
+            n = mpz_poly_roots_mpz (NULL, f, d, pp);
+            for (i = 0; i <= d; i++)
+              {
+                if (i < n)
+                  r[i] = mpz_get_uint64 (rr[i]);
+                mpz_clear (rr[i]);
+              }
+            free (rr);
+          }
+        mpz_clear (pp);
+        return n;
+      }
+
     if (r == NULL)
-      return poly_roots_ulong(NULL, f, d, p);
+      return poly_roots_ulong (NULL, f, d, p);
 
     if (sizeof (unsigned long) != sizeof (uint64_t))
       rr = (unsigned long *) malloc(d * sizeof(unsigned long));
@@ -76,7 +97,8 @@ poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
     return n;
 }
 
-int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p)
+int
+poly_roots (mpz_t * r, mpz_t * f, int d, mpz_t p)
 {
     if (mpz_cmp_ui(p, ULONG_MAX) <= 0) {
         /* There's a chance of using one of our layers. */

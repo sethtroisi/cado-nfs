@@ -12,7 +12,7 @@ More details follow.
 Important note: For a larger factorization (distributed on several machines),
 please use directly the main script scripts/cadofactor/cadofactor.py (whose
 documentation is in scripts/cadofactor/README, and documented example parameter
-files are in params_py/params.c91 and scripts/cadofactor/parameters) instead of
+files are in params/params.c91 and scripts/cadofactor/parameters) instead of
 factor.sh (see section "Run a factorization on current machine").
 
 Supported platforms:
@@ -46,12 +46,14 @@ Required software tools:
 *) GNU make and CMake for building (CMake is installed on the fly if missing
    (requires an Internet connection))
 *) Support for posix threads.
-*) The main cadofactor.py script uses a lot of unix tools: Python, Python3, 
-   ssh, rsync, gzip to mention but a few.
+*) The main cadofactor.py script uses a lot of unix tools: Python3, ssh,
+   rsync, gzip, and libsqlite3 to mention but a few. For more information
+   about the supported Python versions and required modules, see
+   README.Python.
 
 Optionally:
 *) Support for curl library.
-*) Support for MPI (see local.sh.example).
+*) Support for MPI (see local.sh.example and linalg/bwc/README)
 
 
 Configure
@@ -229,7 +231,7 @@ Factoring with SNFS:
 
 It is possible to take advantage of the special form of an integer and
 use the Special Number Field Sieve. See the doc in
-params_py/parameters.F9 for that. Note in particular that you can force
+params/parameters.F9 for that. Note in particular that you can force
 the special-q to be on the rational side if this is more appropriate
 for your number, with tasks.sieve.ratq=True on the factor.sh or
 cadofactor.py command line.
@@ -252,9 +254,14 @@ factorization in local.sh.example).
 Factoring with two non-linear polynomials:
 ==========================================
 
-This is not yet possible with this release. You can find a bit of
-information on this topic in the development version, in the GIT repository
-(see file README.nonlinear).
+You can find a bit of information on this topic in the development version,
+in the GIT repository (see file README.nonlinear).
+
+Importing polynomials or relations:
+===================================
+
+If you have already computed a good polynomial and/or relations, you can
+tell CADO-NFS to use them, see scripts/cadofactor/README.
 
 Using CADO-NFS under Windows:
 =============================

@@ -182,7 +182,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
 {
     const factorbase_degn_t *fb_sav = fb;
     int size = 0;
-    const unsigned int thresh = si->bucket_thresh;
+    const unsigned int thresh = si->conf->bucket_thresh;
     const int verbose = 0;
     const int do_bad_primes = 1;
     where_am_I w;
@@ -994,7 +994,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             for (j = 0; j < nj; j ++) {
                 WHERE_AM_I_UPDATE(w, j, j);
                 for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
-                    if (S_ptr[i] == 255) continue;
+                    if (LIKELY(S_ptr[i] == 255)) continue;
                     bucket_prime_t prime;
                     unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {
@@ -1007,7 +1007,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     }
                     prime.p = p;
                     prime.x = x;
-                    ASSERT(prime.p >= si->td_thresh);
+                    ASSERT(prime.p >= si->conf->td_thresh);
                     push_bucket_prime (BP, prime);
                 }
                 i0 += r;
@@ -1035,7 +1035,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 bucket_prime_t prime;
                 prime.p = g;
                 prime.x = 1+(I>>1);
-                ASSERT(prime.p >= si->td_thresh);
+                ASSERT(prime.p >= si->conf->td_thresh);
                 push_bucket_prime (BP, prime);
             }
             // Same as in sieving: we discard after checking for row 0.
@@ -1068,7 +1068,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             }
                             prime.p = g;
                             prime.x = x;
-                            ASSERT(prime.p >= si->td_thresh);
+                            ASSERT(prime.p >= si->conf->td_thresh);
                             push_bucket_prime (BP, prime);
                         }
                     }
@@ -1087,7 +1087,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             }
                             prime.p = g;
                             prime.x = x;
-                            ASSERT(prime.p >= si->td_thresh);
+                            ASSERT(prime.p >= si->conf->td_thresh);
                             push_bucket_prime (BP, prime);
                         }
                     }

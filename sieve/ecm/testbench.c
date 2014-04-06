@@ -44,13 +44,20 @@ print_pointorder (const unsigned long p, const unsigned long s,
 {
   residue_t sigma;
   modulus_t m;
-  unsigned long o;
+  unsigned long o, knownfac;
 
   modredcul_initmod_ul (m, p);
   modredcul_init (sigma, m);
   modredcul_set_ul (sigma, s, m);
-      
-  o = ell_pointorder_ul (sigma, parameterization, 12, 0, m, verbose);
+  
+  if (parameterization == BRENT12 || parameterization == MONTY12)
+    knownfac = 12;
+  else if (parameterization == MONTY16)
+    knownfac = 16;
+  else
+    abort();
+  
+  o = ell_pointorder_ul (sigma, parameterization, knownfac, 0, m, verbose);
   if (verbose)
     printf ("%lu %lu\n", p, o);
 
@@ -131,6 +138,7 @@ void print_help (char *programname)
   printf ("-inp <f> Read decimal numbers to factor from file <f>\n");
   printf ("-inpraw <f>  Read numbers in GMP raw format from file <f>\n");
   printf ("-inpstop <n> Stop after reading <n> numbers\n");
+  printf ("-po <s>, -pom12 <s>, -pom16 <s> Compute order of starting point. Use -vf\n");
 }
 
 int main (int argc, char **argv)
@@ -422,7 +430,7 @@ int main (int argc, char **argv)
 	  
 	  total++;
 	  if (do_pointorder)
-	    print_pointorder (i, po_sigma, po_parameterization, verbose);
+	    print_pointorder (i, po_sigma, po_parameterization, printfactors);
           else
 	    {
               mpz_mul_ui (N, cof, i);
@@ -466,7 +474,7 @@ int main (int argc, char **argv)
         if (do_pointorder)
           {
             if (mpz_fits_ulong_p (N))
-              print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+              print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, printfactors);
             else
               gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", N);
           }

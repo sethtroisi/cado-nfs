@@ -75,11 +75,11 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, DEFAULT_L2_METHOD);
+    optimize_aux (F, g, 0, 0);
 
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -104,12 +104,12 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, DEFAULT_L2_METHOD);
+    optimize_aux (F, g, 0, 0);
 
     /* get lognorm */
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
 
     if (lognorm > bound->bound_lognorm)
       break;
@@ -171,11 +171,11 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0);
 
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
       "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
@@ -204,11 +204,11 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0);
 
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, "
       "bound_lognorm: %f\n", i, w, lognorm,  bound->bound_lognorm);
@@ -268,11 +268,11 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0);
 
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
 
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, "
@@ -301,11 +301,11 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0, CIRCULAR);
+    optimize_aux (F, g, 0, 0);
 
-    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
-    lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD);
+    lognorm = L2_lognorm (F, skewness);
 
     /*
       fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f,
@@ -345,8 +345,8 @@ ropt_poly_init ( ropt_poly_t poly )
   mpz_init (poly->m);
 
   /* fx, gx holds pre-computed values f(r), g(r) where 0 <= r < p. */
-  poly->f = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
-  poly->g = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
+  poly->f = (mpz_t*) malloc ((MAXDEGREE + 1) * sizeof (mpz_t));
+  poly->g = (mpz_t*) malloc ((MAXDEGREE + 1) * sizeof (mpz_t));
   (poly->fx) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
   (poly->gx) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
   (poly->numerator) = (mpz_t *) malloc ((primes[NP-1]+1) * sizeof (mpz_t));
@@ -359,7 +359,7 @@ ropt_poly_init ( ropt_poly_t poly )
     exit(1);
   }
 
-  for (i = 0; i <= MAX_DEGREE; i++) {
+  for (i = 0; i <= MAXDEGREE; i++) {
     mpz_init (poly->f[i]);
     mpz_init (poly->g[i]);
   }
@@ -418,7 +418,7 @@ ropt_poly_setup ( ropt_poly_t poly )
 
   mpz_init (t);
   /* degree */
-  for ( (poly->d) = MAX_DEGREE; 
+  for ( (poly->d) = MAXDEGREE; 
         (poly->d) > 0 && mpz_cmp_ui ((poly->f[poly->d]), 0) == 0;
         poly->d -- );
 
@@ -440,7 +440,7 @@ ropt_poly_setup ( ropt_poly_t poly )
   if (mpz_cmp_ui (t, 0) != 0) {
     fprintf (stderr, "ERROR: The following polynomial have no common"
              " root. \n");
-    print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, poly->n);
+    print_cadopoly_fg (stderr, poly->f, poly->d, poly->g, 1, poly->n);
     exit (1);
   }
 
@@ -471,7 +471,7 @@ ropt_poly_free ( ropt_poly_t poly )
     mpz_clear(poly->numerator[i]);
   }
 
-  for (i = 0; i <= MAX_DEGREE; i++) {
+  for (i = 0; i <= MAXDEGREE; i++) {
     mpz_clear (poly->f[i]);
     mpz_clear (poly->g[i]);
   }
@@ -520,8 +520,8 @@ ropt_bound_setup_normbound ( ropt_poly_t poly,
   F->coeff = poly->f;
   F->deg = poly->d;
 
-  skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD );
-  bound->init_lognorm = L2_lognorm (F, skewness, DEFAULT_L2_METHOD );
+  skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  bound->init_lognorm = L2_lognorm (F, skewness);
 
   /* setup lognorm bound, either from input or by default. */
   if (param->bound_lognorm > 0) {
@@ -566,7 +566,6 @@ ropt_bound_setup_globalbound ( ropt_poly_t poly,
 
   /* v bound */
   rotate_bounds_V_mpz (poly, bound);
-
 }
 
 
@@ -758,7 +757,7 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
   mpz_poly_t F;
   F->coeff = poly->f;
   F->deg = poly->d;
-  double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+  double skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
   /* fix for small skewness but large bound */
   if ( (double) sublattice > (skew / 16.0) )
@@ -794,7 +793,7 @@ ropt_s1param_setup_individual_nbest_sl (ropt_s1param_t s1param)
   unsigned int i;
   for (i = 0; i < s1param->len_e_sl; i ++)
     s1param->individual_nbest_sl[i] =
-      size_each_sublattice[s1param->tlen_e_sl - 1][i];
+        s1_size_each_sublattice[s1param->tlen_e_sl - 1][i];
 }
 
 
@@ -806,7 +805,8 @@ ropt_s1param_setup_individual_nbest_sl_tune (ropt_s1param_t s1param)
 {
   unsigned int i;
   for (i = 0; i < s1param->len_e_sl; i ++)
-    s1param->individual_nbest_sl[i] = size_each_sublattice_tune[i];
+    s1param->individual_nbest_sl[i]
+        = s1_size_each_sublattice_tune[i];
 }
 
 
@@ -831,8 +831,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
     if (size_total_sublattices[i][0] > j)
       break;
   
-  s1param->nbest_sl = size_total_sublattices[i][1];
-
+  s1param->nbest_sl = size_total_sublattices[i][1] * param->effort;
   //printf ("s1param->nbest_sl: %u\n", s1param->nbest_sl);
   
   /* Set 3: set "e_sl[]" */
@@ -1187,6 +1186,7 @@ ropt_param_init ( ropt_param_t param )
     param->s1_e_sl[i] = 0;
   param->d = 0;
   param->verbose = 0;
+  param->effort = 1;
 }
 
 

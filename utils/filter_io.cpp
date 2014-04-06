@@ -649,74 +649,112 @@ earlyparser_abline_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
  * unsorted relations.
  */
 static int
-earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
+earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
+        int parseab)
 {
     const char *p = r->rhead;
 
     /* c is always the first-after-parsed-data byte */
-    int c = earlyparser_inner_skip_ab(r, &p);
+    int c;
+    if (parseab) {
+        c = earlyparser_inner_read_ab_hexa(r, &p, rel);
+    } else {
+        c = earlyparser_inner_skip_ab(r, &p);
+    }
     
     unsigned int n = 0;
 
-    // int64_t last_prime = -1;
-    // int sorted = 1;
-    // int side = -1;
-
     for( ; ; ) {
         uint64_t pr;
+        int sgn = 1;
         if (c == '\n') break;
-	// if (c == ':') { last_prime = -1; side++; }
+        if (c == '-') {
+            sgn = -1;
+            RINGBUF_GET_ONE_BYTE(c, r, p);
+        }
         c = earlyparser_inner_read_prime(r, &p, &pr);
-        // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
-        // sorted = sorted && pr < last_prime;
         if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
+            rel->primes[n-1].e += sgn;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            // rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
             rel->primes[n].h = (index_t) pr;
             rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
+            rel->primes[n].e = sgn;
             n++;
         }
-        // last_prime = pr;
     }
-    // if (!sorted) { /* sort the primes ? */ }
     rel->nb = n;
 
     return 1;
 }
 
 static int
-earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
+earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
-    const char *p = r->rhead;
-
-    /* c is always the first-after-parsed-data byte */
-    int c = earlyparser_inner_read_ab_hexa(r, &p, rel);
-    
-    unsigned int n = 0;
-
-    for( ; ; ) {
-        uint64_t pr;
-        if (c == '\n') break;
-        c = earlyparser_inner_read_prime(r, &p, &pr);
-        if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
-        } else {
-            if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            rel->primes[n].h = (index_t) pr;
-            rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
-            n++;
-        }
-    }
-    rel->nb = n;
-
-    return 1;
+    return earlyparser_index_maybeabhexa(rel, r, 0);
 }
 
+static int
+earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
+{
+    return earlyparser_index_maybeabhexa(rel, r, 1);
+}
+
+
 /*}}}*/
+
+/************************************************************************/
+
+/* struct and functions that handle printing stats during the reading */
+struct filter_io_stats_s
+{
+  double t0; /* Time at init */
+  size_t nB; /* number of bytes read */
+  uint64_t nrels; /* number of rels read */
+  uint64_t nrels_at_last_report;
+  double t_at_last_report;
+};
+
+typedef struct filter_io_stats_s filter_io_stats_t[1];
+typedef struct filter_io_stats_s * filter_io_stats_ptr;
+
+void
+filter_io_stats_init (filter_io_stats_ptr s)
+{
+  s->nB = 0;
+  s->nrels = s->nrels_at_last_report = 0;
+  s->t0 = s->t_at_last_report = wct_seconds();
+}
+
+/* Return 1 if more than 2^18 relations were read since last progress report 
+        and if more than 1 seconds was spent since last progress report.
+   Otherwise return 0 */
+int
+filter_io_stats_test_progress (filter_io_stats_ptr s)
+{
+  if ((s->nrels >> 18) == (s->nrels_at_last_report >> 18))
+    return 0;
+  if (wct_seconds() < s->t_at_last_report + 1)
+    return 0;
+  return 1;
+}
+
+void
+filter_io_stats_print_progress (filter_io_stats_ptr s, const char *prefix)
+{
+  double t, dt, mb_s, rels_s;
+  t = wct_seconds();
+  dt = t - s->t0;
+  mb_s = dt > 0.01 ? (s->nB/dt * 1.0e-6) : 0;
+  rels_s = dt > 0.01 ? s->nrels/dt : 0;
+  const char * pre1 = (prefix == NULL) ? "" : prefix;
+  const char * pre2 = (prefix == NULL) ? "Read" : ", read";
+  fprintf(stderr, "%s%s %" PRIu64 " relations in %.1fs -- %.1f MB/s -- "
+                  "%.1f rels/s\n", pre1, pre2, s->nrels, dt, mb_s, rels_s);
+  s->t_at_last_report = t;
+  s->nrels_at_last_report = s->nrels;
+}
+
 
 /************************************************************************/
 
@@ -832,7 +870,7 @@ uint64_t filter_rels2_inner(char ** input_files,
         bit_vector_srcptr active,
         timingstats_dict_ptr stats)
 {
-    relation_stream rs;         /* only for displaying progress */
+    filter_io_stats_t infostats;  /* for displaying progress */
 
     /* {{{ setup and start the producer thread (for the first pipe) */
     char ** commands = prepare_grouped_command_lines(input_files);
@@ -954,7 +992,7 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* }}} */
 
     /* {{{ main loop */
-    relation_stream_init(rs);
+    filter_io_stats_init (infostats);
     inflight->enter(0);
     for(size_t avail_seen = 0 ; ; ) {
         pthread_mutex_lock(rb->mx);
@@ -976,7 +1014,7 @@ uint64_t filter_rels2_inner(char ** input_files,
         int nl;
         for(size_t avail_offset = 0; avail_offset < avail_seen && (nl = ringbuf_strchr(rb, '\n', 0)) > 0 ; ) {
             if (*rb->rhead != '#') {
-                uint64_t relnum = rs->nrels++;
+                uint64_t relnum = infostats->nrels++;
                 if (!active || bit_vector_getbit(active, relnum)) {
                     earlyparsed_relation_ptr slot = inflight->schedule(0);
                     slot->num = relnum;
@@ -986,14 +1024,12 @@ uint64_t filter_rels2_inner(char ** input_files,
             }
             /* skip the newline byte as well */
             nl++;
-            rs->pos += nl;
+            infostats->nB += nl;
             ringbuf_skip_get(rb, nl);
             avail_seen -= nl;
             avail_offset += nl;
-            if (relation_stream_disp_progress_now_p(rs))
-                fprintf(stderr, "Read %" PRIu64 " relations in %.1fs -- %.1f "
-                                "MB/s -- %.1f rels/s\n", rs->nrels, rs->dt,
-                                rs->mb_s, rs->rels_s);
+            if (filter_io_stats_test_progress(infostats))
+              filter_io_stats_print_progress (infostats, NULL);
         }
     }
     inflight->drain();
@@ -1011,17 +1047,13 @@ uint64_t filter_rels2_inner(char ** input_files,
 
     /* NOTE: the inflight dtor is called automatically */
 
-    uint64_t nrels = rs->nrels;
+    filter_io_stats_print_progress (infostats, "Done");
 
     /* clean producer stuff */
-    relation_stream_trigger_disp_progress(rs);
-    fprintf(stderr, "Done, read %" PRIu64 " relations in %.1fs -- %.1f MB/s -- "
-            "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    relation_stream_clear(rs);
     ringbuf_clear(rb);
     filelist_clear(commands);
 
-    return nrels;
+    return infostats->nrels;
 }
 
 uint64_t filter_rels2(char ** input_files,

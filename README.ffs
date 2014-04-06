@@ -1,0 +1,53 @@
+This file explains how to use the FFS possibilities of CADO-NFS. It is
+possible to deal with finite fields of one of the two following forms:
+  - finite fields of characteristic 2   
+  - finite fields of characteristic 3
+
+There is no general script for FFS.  We describe here the sequence of
+steps to be performed.  It is assumed that the user has some background
+knowledge on the algorithm.
+
+
+Notation:
+  p, n:   we want to compute dlog in GF(p^n), with p=2 or p=3.
+  
+You should first compile the FFS-related binaries. Visit the ffs/
+subdirectory, copy Makefile.local.example to Makefile.local and edit it
+to configure according to what you want; then type 'make'.
+
+- polynomial selection:
+  Nothing automatic. There are some tools in the polyselect subdirectory.
+  The code presently assumes that curves with only one place at infinity
+  are chosen.
+
+- relation collection:
+  Create a parameter file, imitating the ones in the ffs/params/
+  directory.
+  Then run
+    ffs/f2/makefb <paramfile>
+  or 
+    ffs/f3/makefb <paramfile>
+  depending whether you are in characteristic 2 or 3. From now on, we assume
+  characteristic 2.
+
+  Computing relations is done with
+    ffs/f2/sieve <paramfile>
+  You'll have to deal by yourself with the special-q ranges, and so on.
+
+- freerels/filtering
+  The script ffs/filter/filter.sh is available for doing all this step.
+  (like for NFS-DL, bad ideals must be taken care of in a way or antoher,
+  and it is up to you; nothing automatic yet). No Schirokauer maps are
+  needed here.
+
+- Linear algebra:
+  Exactly the same as for NFS-DL.
+  Have a look at the ouput and log files of "./factor.sh p -dlp" and try
+  to imitate.
+
+- Reconstruct dlogs of fb elements
+  The same as for NFS-DL, again.
+  
+- Individual logarithms
+  Nothing automatic. Use ffs/descent_init and ffs/sieve to do the
+  descent.

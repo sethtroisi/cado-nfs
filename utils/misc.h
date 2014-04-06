@@ -47,11 +47,9 @@ char * strndup(const char * a, size_t n);
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused_result__));
 #endif
-void strlcpy_check(char *dst, const char *src, size_t size);
 #ifndef HAVE_STRLCAT
 size_t strlcat(char *dst, const char *src, size_t size) ATTRIBUTE((__warn_unused_result__));
 #endif
-void strlcat_check(char *dst, const char *src, size_t size);
 
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
@@ -60,17 +58,7 @@ extern char ** filelist_from_file(const char * basepath, const char * filename,
                                   int typ);
 extern void filelist_clear(char ** filelist);
 
-extern void * malloc_check(const size_t x);
-extern void * physical_malloc(const size_t x, const int affect);
-
-extern long pagesize (void);
 long get_arg_max(void);
-extern void * malloc_aligned(size_t size, size_t alignment);
-extern void free_aligned(void * ptr, size_t size, size_t alignment);
-
-extern void * malloc_pagealigned(size_t sz);
-extern void free_pagealigned(void * ptr, size_t sz);
-
 extern int mkdir_with_parents(const char * dir, int fatal);
 
 extern char * path_resolve(const char * progname, char * resolved);
@@ -84,13 +72,31 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
     ASSERT((k & (k-1)) == 0);
     return ((n-1)|(k-1)) + 1;
 }
+
 /* those builtins seem to have appeared in 3.4 (April 2004) */
 #ifndef HAVE_clzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
+#define clzll(x)        __builtin_clzll(x)
 #define clzl(x)         __builtin_clzl(x)
+#define clz(x)          __builtin_clz(x)
 #define HAVE_clzl
 #else
 /* provide slow fallbacks */
+static inline int clzll(unsigned long long x)
+{
+        /* We assume exactly 64 bits in a long long for now */
+        static const int t[4] = { 2, 1, 0, 0 };
+        int a = 0;
+        int res;
+        if (x >> 32) { a += 32; x >>= 32; }
+        if (x >> 16) { a += 16; x >>= 16; }
+        if (x >>  8) { a +=  8; x >>=  8; }
+        if (x >>  4) { a +=  4; x >>=  4; }
+        if (x >>  2) { a +=  2; x >>=  2; }
+        res = 64 - 2 - a + t[x];
+        return res;
+}
+
 static inline int clzl(unsigned long x)
 {
         static const int t[4] = { 2, 1, 0, 0 };
@@ -104,6 +110,19 @@ static inline int clzl(unsigned long x)
         if (x >>  4) { a +=  4; x >>=  4; }
         if (x >>  2) { a +=  2; x >>=  2; }
         res = GMP_LIMB_BITS - 2 - a + t[x];
+        return res;
+}
+
+static inline int clz(unsigned int x)
+{
+        static const int t[4] = { 2, 1, 0, 0 };
+        int a = 0;
+        int res;
+        if (x >> 16) { a += 16; x >>= 16; }
+        if (x >>  8) { a +=  8; x >>=  8; }
+        if (x >>  4) { a +=  4; x >>=  4; }
+        if (x >>  2) { a +=  2; x >>=  2; }
+        res = 30 - a + t[x];
         return res;
 }
 #define HAVE_clzl
@@ -124,15 +143,26 @@ static inline void aligned_medium_memcpy(void *dst, void *src, size_t lg) {
 
 #ifndef HAVE_ctzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
+#define ctzll(x)        __builtin_ctzll(x)
 #define ctzl(x)         __builtin_ctzl(x)
+#define ctz(x)          __builtin_ctz(x)
 #define HAVE_ctzl
 #else
 /* the following code is correct because if x = 0...0abc10...0, then
    -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
+static inline int ctzll(unsigned long long x)
+{
+  return (64 - 1) - clzll(x & - x);
+}
 static inline int ctzl(unsigned long x)
 {
   ASSERT(GMP_LIMB_BITS == sizeof(unsigned long) * CHAR_BIT);
+  return (GMP_LIMB_BITS - 1) - clzl(x & - x);
+}
+static inline int ctz(unsigned int x)
+{
+  ASSERT(GMP_LIMB_BITS == sizeof(unsigned int) * CHAR_BIT);
   return (GMP_LIMB_BITS - 1) - clzl(x & - x);
 }
 #define HAVE_ctzl

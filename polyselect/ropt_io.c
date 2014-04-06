@@ -44,17 +44,23 @@ ropt_common ( ropt_poly_t poly,
   ropt_info_t info;
   ropt_info_init (info);
 
+  /* set input polynomial as the initial bestpoly,
+     assuming that its content is 1. */
   ropt_bestpoly_t bestpoly;
   ropt_poly_setup (poly);
   ropt_bestpoly_init (bestpoly, poly->d);
   ropt_bestpoly_setup (bestpoly, poly->f, poly->g, poly->d);
 
-  /* print f, g */
+  /* print f, g and effort */
   mpz_poly_t F;
   F->coeff = poly->f;
   F->deg = poly->d;
   print_poly_fg (F, poly->g, poly->n, 1);
-
+  if (param->verbose) {
+    fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
+    fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+  }
+  
   /* call ropt */
   ropt (poly, bestpoly, param, info);
 
@@ -115,7 +121,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
     /* ci: coeff of degree i */
     else if (sscanf (s, "c%d:", &i) == 1) {
-      if (i > MAX_DEGREE) {
+      if (i > MAXDEGREE) {
         fprintf (stderr, "Error, too large degree %d\n", i);
         exit (1);
       }
@@ -145,7 +151,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
     }
   }
 
-  for (d = MAX_DEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
+  for (d = MAXDEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
   if (mpz_cmp_ui (M, 0) == 0) {
     mpz_t t;
     /* M = -Y0/Y1 mod N */
@@ -214,11 +220,11 @@ ropt_on_cadopoly ( FILE *file,
     if ( str[0] == 'Y' ) {
       if ( str[1] == '1' ) {
         gmp_sscanf (str, "Y1: %Zd\n", poly->g[1]);
-        (flag) ^= (1<<8);
+        (flag) ^= (1<<9);
       }
       else if ( str[1] == '0' ) {
         gmp_sscanf (str, "Y0: %Zd\n", poly->g[0]);
-        (flag) ^= (1<<7);
+        (flag) ^= (1<<8);
       }
       else {
         fprintf (stderr, "Error in parsing line %s.\n", str);
@@ -254,6 +260,10 @@ ropt_on_cadopoly ( FILE *file,
         gmp_sscanf (str, "c6: %Zd\n", poly->f[6]);
         (flag) ^= (1<<6);
       }
+      else if ( str[1] == '7' ) {
+        gmp_sscanf (str, "c7: %Zd\n", poly->f[6]);
+        (flag) ^= (1<<7);
+      }
       else {
         fprintf (stderr, "Error in parsing line %s.\n", str);
         exit (1);
@@ -261,15 +271,16 @@ ropt_on_cadopoly ( FILE *file,
     }
     else if ( str[0] == 'n') {
       gmp_sscanf (str, "n: %Zd\n", poly->n);
-      (flag) ^= (1<<9);
+      (flag) ^= (1<<10);
     }
     else
       continue;
 
-    if ( flag == 1023 || // deg 6
-         flag == 959 || // deg 5
-         flag == 927 || // deg 4
-         flag == 911 ) // deg 3
+    if ( flag == 2047 || // deg 7
+         flag == 1919 || // deg 6
+         flag == 1855 || // deg 5
+         flag == 1823 || // deg 4
+         flag == 1807 ) // deg 3
     {
       fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
       ropt_common (poly, param);
@@ -397,7 +408,7 @@ print_poly_info_short ( mpz_t *f,
   cpoly->alg->degree = d;
   cpoly->rat->degree = 1;
   cpoly->skew = skew;
-  e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+  e = MurphyE (cpoly, bound_f, bound_g, area, MURPHY_K);
 
   printf ("# lognorm: %.2f, alpha: %.2f, (proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
           logmu,

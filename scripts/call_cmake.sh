@@ -85,6 +85,8 @@ export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
 export DISABLE_SHARED
 export NO_PYTHON_CHECK
+export NO_SSE
+export NO_INLINE_ASSEMBLY
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -115,17 +117,14 @@ if [ "$1" = "show" ] ; then
 fi
 
 # Make sure we have cmake, by the way !
-cmake_path="`which cmake 2>/dev/null`"
+:  ${cmake_path:="`which cmake 2>/dev/null`"}
 cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
 if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2
     cmake_path=
 # Recall that (some versions of) bash do not want quoting for regex patterns.
-elif ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[678] ]] ; then
-    echo "CMake found, but not with version 2.6 or 2.7 or 2.8" >&2
-    cmake_path=
-elif [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.6-patch\ [012] ]] ; then
-    echo "CMake found, but with early, buggy 2.6 version" >&2
+elif ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
+    echo "CMake found, but not with version 2.8 or newer" >&2
     cmake_path=
 fi
 if ! [ "$cmake_path" ] ; then
