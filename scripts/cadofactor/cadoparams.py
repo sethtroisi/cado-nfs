@@ -150,9 +150,13 @@ class Parameters(object):
             source = source.get(segment, None)
             if not isinstance(source, dict):
                 return {}
-        return {key:source[key] for key in keys 
-                if key in source and not isinstance(source[key], dict)}
-    
+        result = {}
+        for key in keys:
+            if key in source and not isinstance(source[key], dict):
+                result[key] = source[key][0]
+                source[key][1] = True
+        return result
+
     def __iter__(self):
         return self._recurse_iter(self.data, [])
     
@@ -161,7 +165,7 @@ class Parameters(object):
         # First return all keys on this node
         for key in sorted(source):
             if not isinstance(source[key], dict):
-                yield (path, key, source[key])
+                yield (path, key, source[key][0])
         # Then process sub-nodes
         for key in sorted(source):
             if isinstance(source[key], dict):
@@ -226,13 +230,12 @@ class Parameters(object):
                 if not isinstance(dest[segment], dict):
                     raise KeyError('Subdirectory %s already exists as key' 
                                    % segment)
-                dest = dest[segment]
             else:
                 dest[segment] = {}
-                dest = dest[segment]
+            dest = dest[segment]
         if key in dest.keys() and isinstance(dest[key], dict):
             raise KeyError('Key %s already exists as subdictionary' % key)
-        dest[key] = value
+        dest[key] = [value, False]
     
     @staticmethod
     def subst_env_var(fqn, value):
@@ -279,7 +282,7 @@ class Parameters(object):
             if isinstance(dic[key], dict):
                 self._subst_references(dic[key], path + [key])
             else:
-                dic[key] = self._subst_reference(path, key, dic[key])
+                dic[key][0] = self._subst_reference(path, key, dic[key][0])
     
     @staticmethod
     def _cast_to_int(value):
