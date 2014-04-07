@@ -10,7 +10,7 @@
 #include "portability.h"
 
 
-#if 1
+#if 0
 /**
  * Print the info for the node
  */
@@ -23,7 +23,6 @@ print_node ( node *pnode )
   /* for (i = 0; i < pnode->nr; i++) */
   /* printf ("pnode->r[%d]: %lu\n", i, pnode->r[i]); */
 }
-
 
 /**
  * Print a tree, non-recursive. Two styles.
