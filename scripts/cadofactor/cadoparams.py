@@ -66,8 +66,8 @@ class Parameters(object):
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
     
-    def __init__(self, *args, **kwargs):
-        self.data = dict(*args, **kwargs)
+    def __init__(self):
+        self.data = {}
         self._have_read_defaults = False
         self.key_types = {}
     
@@ -85,36 +85,39 @@ class Parameters(object):
         then we assume that there is no default value and the key is mandatory;
         an error will be raised if it is not found in the parameter hierarchy.
         
-        >>> d = {'a':'1','b':'2','c':'3','foo':{'a':'3'},'bar':{'a':'4','baz':{'a':'5'}}}
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': '3', 'b': '2'}
+        >>> p = Parameters()
+        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> p.myparams(keys=('a', 'b'), path = 'foo') == {'a': '3', 'b': '2'}
         True
         
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': '5', 'b': '2'}
+        >>> p.myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': '5', 'b': '2'}
         True
 
         Test returning the default value of a parameter not provided in the
         parameter file
-        >>> Parameters(d).myparams(keys={'d': 1}, path=[])
+        >>> p.myparams(keys={'d': 1}, path=[])
         {'d': 1}
 
         Test converting to the same type as the default value
-        >>> Parameters(d).myparams(keys={'a': 1}, path='foo')
+        >>> p.myparams(keys={'a': 1}, path='foo')
         {'a': 3}
         
         Test converting to an explicit type
-        >>> Parameters(d).myparams(keys={'a': int}, path='foo')
+        >>> p.myparams(keys={'a': int}, path='foo')
         {'a': 3}
 
         Test converting to a non-mandatory explicit type
-        >>> Parameters(d).myparams(keys={'a': [int], 'x': [int]}, path='foo')
+        >>> p.myparams(keys={'a': [int], 'x': [int]}, path='foo')
         {'a': 3}
 
         Test converting if default value is bool
-        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': False}, path=[])
+        >>> p = Parameters()
+        >>> p.readparams(("foo=yes",))
+        >>> p.myparams(keys={'foo': False}, path=[])
         {'foo': True}
         
         Test converting if explicit type is bool
-        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': bool}, path=[])
+        >>> p.myparams(keys={'foo': bool}, path=[])
         {'foo': True}
         '''
         # path can be an array of partial paths, i.e., each entry can contain
@@ -192,16 +195,17 @@ class Parameters(object):
         and a sub-dictionary causes a KeyError (similar to open('filepath','w')
         when filepath exists as a subdirectory).
         
-        >>> p=Parameters({'a':1, 'b':2, 'foo':{'a':3}, 'bar':{'a':4}})
+        >>> p=Parameters()
+        >>> p.readparams(['a=1', 'b=2', 'foo.a=3', 'bar.a=4'])
         >>> p._insertkey('c', 3)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nfoo.a = 3'
         >>> p._insertkey('bar.c', 5)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nbar.c = 5\\nfoo.a = 3'
         >>> p._insertkey('bar.baz.c', 6)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5, 'baz': {'c': 6}}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nbar.c = 5\\nbar.baz.c = 6\\nfoo.a = 3'
         >>> p._insertkey('bar.baz.c.d', 6)
         Traceback (most recent call last):
         KeyError: 'Subdirectory c already exists as key'
@@ -442,8 +446,8 @@ class Parameters(object):
         >>> p.readparams(["tasks.sieve.rels_wanted = 1", \
                           "tasks.polyselect.degree=5", \
                           "tasks.polyselect.incr =60"])
-        >>> p.data["tasks"]["sieve"]["rels_wanted"]
-        '1'
+        >>> p.myparams(["rels_wanted"], "tasks.sieve")
+        {'rels_wanted': '1'}
         >>> p.myparams(["degree", "incr"], "tasks.polyselect") == \
         {'incr': '60', 'degree': '5'}
         True
