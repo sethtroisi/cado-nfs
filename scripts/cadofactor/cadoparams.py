@@ -16,7 +16,8 @@ threads = 2
 tasks.sieve.threads = 1
 
 the sieving task will use the value 1 for the threads parameter, while other 
-tasks use the value 2 (unless they specify a different value in their subtree).
+tasks use the value 2 (unless they specify a different value in their
+subtree).
 
 Tasks run programs, and those have their own node in the parameter tree.
 For example, with
@@ -24,7 +25,7 @@ threads = 2
 tasks.sieve.las.threads = 1
 the theads=1 parameter would apply only to the las program, but not to any 
 other programs run during the sieving tasks, if there were any. The name of 
-the node of a program is equal to the name of the binary executable.
+the node of a program is usually equal to the name of the binary executable.
 """
 
 import os
@@ -124,49 +125,28 @@ class Parameters(object):
         else:
             joinpath = '.'.join(path)
         splitpath = joinpath.split('.')
-        
-        source = self.data
-        result = self._extract_by_keys(source, keys)
-        for segment in splitpath:
-            if not segment in source:
-                break
-            source = source[segment]
-            result.update(self._extract_by_keys(source, keys))
+
+        # We process nodes in the parameter tree starting from the full path
+        # and going toward the root. At each node we extract those keys which
+        # are requested in keys, but which have not been extracted already at
+        # from deeper node. This lets _extract_from_node_by_keys() update 
+        # .used correctly.
+        result = {}
+        for i in range(len(splitpath), -1, -1): # len, len-1, ..., 1, 0
+            result.update(self._extract_from_node_by_keys(
+                            splitpath[:i], set(keys) - set(result)))
+        # If keys is a dictionary with default values/target types, set
+        # defaults and cast types
         if isinstance(keys, dict):
-            for key in keys:
-                # A default of None means no default or type given: if the
-                # parameter is in the parameter file, then store it in result
-                # as a string, and if not, then don't store it in result
-                if keys[key] is None:
-                    continue
-                # If only the type without default value is specified, then
-                # the value must exist in the parameter file, and is converted
-                # to the specified type
-                if type(keys[key]) is type:
-                    target_type = keys[key]
-                    if not key in result:
-                        logger.critical("Parameter %s not found under path %s",
-                            key, joinpath)
-                        raise(KeyError)
-                elif type(keys[key]) is list:
-                    # If a list is given as the default value, its first
-                    # element must be a type and we interpret it as a non-
-                    # mandatory type: if the parameter exists in the parameter
-                    # file, it is cast to that type.
-                    target_type = keys[key][0]
-                    if not key in result:
-                        continue
-                else:
-                    target_type = type(keys[key])
-                    result.setdefault(key, keys[key])
-                
-                # Convert type
-                result[key] = self._convert_one_type(splitpath, key,
-                                                     result[key], target_type)
+            self._convert_types(result, keys, splitpath)
         return result
     
-    @staticmethod
-    def _extract_by_keys(source, keys):
+    def _extract_from_node_by_keys(self, path, keys):
+        source = self.data
+        for segment in path:
+            source = source.get(segment, None)
+            if not isinstance(source, dict):
+                return {}
         return {key:source[key] for key in keys 
                 if key in source and not isinstance(source[key], dict)}
     
@@ -390,6 +370,53 @@ class Parameters(object):
 
         return value
 
+    def _convert_types(self, data, keytypes, path):
+        """ In the dictionary "data", convert types in-place and apply any
+        default values specified in the dictionary "keytypes"
+        """
+        for key in keytypes:
+            # A default of None means no default or type given: if the
+            # parameter is in the parameter file, then store it in data as a
+            # string, and if not, then don't store it in data
+            if keytypes[key] is None:
+                optional = True
+                target_type = None
+            # If only the type without any default value is specified, then
+            # the value must exist in the parameter file, and is converted to
+            # the specified type
+            elif type(keytypes[key]) is type:
+                optional = False
+                target_type = keytypes[key]
+            elif type(keytypes[key]) is list:
+                # If a list is given as the default value, its first element
+                # must be a type and we interpret it as an optional parameter:
+                # if the parameter exists in the parameter file, it is cast to
+                # that type.
+                optional = True
+                target_type = keytypes[key][0]
+            else:
+                # If a value is given, it will be used as the default value,
+                # and its type is used as the type to which we cast the
+                # parameter, if it is specified in the parameter file.
+                # Optional is set to true here, but that does not matter as
+                # we set the value in data anyway
+                optional = True
+                target_type = type(keytypes[key])
+                data.setdefault(key, keytypes[key])
+            
+            if not target_type is None and not type(target_type) is type:
+                msg = "Target type %s for key %s is not a type" \
+                    % (target_type, key)
+                logger.critical(msg)
+                raise TypeError(msg)
+            if not optional and not key in data:
+                msg = "Required parameter %s not found under path %s" \
+                    % (key, ".".join(path))
+                logger.critical(msg)
+                raise KeyError(msg)
+            if key in data and not target_type is None:
+                data[key] = self._convert_one_type(
+                    path, key, data[key], target_type)
 
     def parseline(self, line):
         line2 = line.split('#', 1)[0] if '#' in line else line
