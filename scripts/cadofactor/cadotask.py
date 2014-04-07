@@ -4592,7 +4592,11 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
                           self.dup1, self.dup2, self.purge, self.merge,
                           self.linalg, self.characters, self.sqrt)
-        
+
+        for (path, key, value) in parameters.get_unused_parameters():
+            self.logger.warning("Parameter %s = %s was not used anywhere",
+                                ".".join(path + [key]), value)
+
         self.request_map = {
             Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
             Request.GET_POLYNOMIAL: self.polysel2.get_poly,
