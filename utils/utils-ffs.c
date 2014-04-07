@@ -33,11 +33,11 @@ ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
   if (!fppol64_invmod (pol_b, pol_b, pol_p))
-      return (index_t) p;
+      return (p_r_values_t) p;
 
   fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
 
-  return (index_t) fppol64_get_ui_sparse(pol_r);
+  return (p_r_values_t) fppol64_get_ui_sparse(pol_r);
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)
