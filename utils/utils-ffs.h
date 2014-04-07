@@ -5,6 +5,7 @@
 #include "utils_with_io.h"
 
 p_r_values_t ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p);
+int ffs_is_zero_mod (uint64_t x, uint64_t m);
 int ffs_poly_read(cado_poly poly, const char *filename);
 
 

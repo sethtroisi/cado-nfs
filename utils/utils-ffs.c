@@ -40,6 +40,19 @@ ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)
   return (p_r_values_t) fppol64_get_ui_sparse(pol_r);
 }
 
+/* Return non-zero if pol(m) divides pol(x). Else return 0.
+   Use should be the same as ((x % m) == 0) if x and m were integers
+*/
+int
+ffs_is_zero_mod (uint64_t x, uint64_t m)
+{
+  fppol64_t pol_x, pol_m;
+  fppol64_set_ui_sparse (pol_x, x);
+  fppol64_set_ui_sparse (pol_m, m);
+  fppol64_rem (pol_x, pol_x, pol_m);
+  return (fppol64_is_zero(pol_x));
+}
+
 int ffs_poly_set_plist(cado_poly poly, param_list pl)
 {
   unsigned long lim;
