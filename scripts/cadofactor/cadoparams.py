@@ -133,7 +133,7 @@ class Parameters(object):
         # and going toward the root. At each node we extract those keys which
         # are requested in keys, but which have not been extracted already at
         # from deeper node. This lets _extract_from_node_by_keys() update 
-        # .used correctly.
+        # the used flag correctly.
         result = {}
         for i in range(len(splitpath), -1, -1): # len, len-1, ..., 1, 0
             result.update(self._extract_from_node_by_keys(
@@ -144,6 +144,18 @@ class Parameters(object):
             self._convert_types(result, keys, splitpath)
         return result
     
+    def get_unused_parameters(self):
+        ''' Returns all entries in the parameters that were never returned
+        by myparams() so far
+        >>> p = Parameters()
+        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> _ = p.myparams(keys=('a', 'b'), path = 'foo')
+        >>> p.get_unused_parameters()
+        [([], 'a', '1'), ([], 'c', '3'), (['bar'], 'a', '4'), (['bar', 'baz'], 'a', '5')]
+        '''
+        return [(path, key, value) for (path, key, (value, used)) in self
+                if not used]
+
     def _extract_from_node_by_keys(self, path, keys):
         source = self.data
         for segment in path:
