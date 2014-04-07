@@ -155,12 +155,15 @@ class Parameters(object):
     
     @staticmethod
     def _recurse_iter(source, path):
-        for key in source:
+        # First return all keys on this node
+        for key in sorted(source):
+            if not isinstance(source[key], dict):
+                yield (path, key, source[key])
+        # Then process sub-nodes
+        for key in sorted(source):
             if isinstance(source[key], dict):
                 for y in Parameters._recurse_iter(source[key], path + [key]):
                     yield y
-            else:
-                yield (path, key, source[key])
     
     def _get_subdict(self, path):
         source = self.data
