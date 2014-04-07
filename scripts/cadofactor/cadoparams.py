@@ -165,7 +165,7 @@ class Parameters(object):
         # First return all keys on this node
         for key in sorted(source):
             if not isinstance(source[key], dict):
-                yield (path, key, source[key][0])
+                yield (path, key, source[key])
         # Then process sub-nodes
         for key in sorted(source):
             if isinstance(source[key], dict):
@@ -186,8 +186,8 @@ class Parameters(object):
         if not source:
             source = {}
         pattern = re.compile(regex)
-        result = [[l[0], l[1]] for l in self._recurse_iter(source, path)
-            if pattern.search(l[1])]
+        result = [[p, k] for (p, k, v) in self._recurse_iter(source, path)
+            if pattern.search(k)]
         return result
     
     def _insertkey(self, path, value):
@@ -476,7 +476,7 @@ class Parameters(object):
         in an array
         '''
         return ("%s = %s" % (".".join(path + [key]), value) for
-                (path, key, value) in self)
+                (path, key, (value, used)) in self)
     
     def __str__(self):
         r = self.__str_internal__()
