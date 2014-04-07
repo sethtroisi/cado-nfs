@@ -65,20 +65,18 @@ for i := 1 to m do
     end for;
 end for;
 
-/*
-// Column for the J ideal.
-IndexFile := Read("/localdisk/p59/c59.index");
-Lines := Split(IndexFile);
-mm, nn := Explode(StringToIntegerSequence(Lines[1]));
-assert mm eq m and nn eq n;
+// If the system is overdetermined, let's erase the last rows because
+// Magma 2.20 (upto at least patch-level 4) has a bug.
+if NumberOfRows(M) gt NumberOfColumns(M) then
+    for i := NumberOfColumns(M)+1 to NumberOfRows(M) do
+        S := Support(M, i);
+        for j in S do
+            SetEntry(~M, i, j, 0);
+        end for;
+    end for;
+end if;
 
-for i := 1 to m do
-    C := ReadLineIndex(Lines[i+1]);
-    nJ := &+[x[2] : x in C];
-    SetEntry(~M, i, n+nmaps+1, nJ);
-end for;
-*/
-
+// Computing...
 printf "Computing kernel...\n";
 time v := ModularSolution(M, ell);
 
