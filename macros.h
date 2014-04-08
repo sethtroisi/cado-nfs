@@ -84,10 +84,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
    cases, we have to distinguish by sign of arguments. Note that (afaik) the
    sign and truncation direction of the quotient with any negative operads was
    undefined in C89. */
-/* This ridiculous macro is to avoid useless "comparison of unsigned expression
-   < 0 is always false" warnings when arguments are unsigned type */
-#define uisneg(x) ((x) < 1 && (x) != 0)
-#define iceildiv(x,y) ((x) == 0 ? 0 : uisneg(x) + uisneg(y) == 1 ? (x)/(y) : ((x)-1+2*uisneg(y))/(y)+1)
+/* iceildiv requires *unsigned* operands in spite of the name suggesting
+   (signed) integer type. For negative operands, the result is wrong. */
+#define iceildiv(x,y) ((x) == 0 ? 0 : ((x)-1)/(y)+1)
+/* siceildiv requires signed operands, or the compiler will throw warnings
+   with -Wtype-limits */
+#define siceildiv(x,y) ((x) == 0 ? 0 : ((x)<0) + ((y)<0) == 1 ? (x)/(y) : ((x)-1+2*((y)<0))/(y)+1)
 #endif
 
 #define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
