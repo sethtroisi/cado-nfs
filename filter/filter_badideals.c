@@ -13,6 +13,37 @@
 
 #define MAXLINE 1024
 
+/*
+  A line in badidealinfo has the form:
+    p k r v0 v1 ... vs
+  If means that if (a/b) mod p^k is r (with the usual convention for
+  projective roots, see below), then the s corresponding columns should
+  be filled with the values v0, v1, ... vs.
+
+  More precisely, if vi is positive, then this is indeed the value, but if vi
+  is negative, then the value (e - vi) should be put in the column, where e
+  is the valuation of p in the norm.
+
+  Remarks:
+  - there should be a line of the form
+     p,(r mod p):side: s
+    in the .badideals file, in order to "declare" the appropriate number of
+    columns for this (p,r).
+  - the badidealinfo is supposed to cover all the cases, but not necessarily
+    in a simple way (the set of congruences might involve some "mod p" and
+    some "mod p^2" rules, for instance).
+
+  Projective roots:
+  If we are in the case where (b/a) == 0 mod p, we write "p^k + (1/r)"
+  instead of r.
+  E.g.
+    2 3 10 -2 2
+  means that we are dealing with the case (a:b) = (1:2) mod 2^3, and that in
+  that case, we should write (e-2) and 2 in the two corresponding columns.
+
+ */
+
+
 void read_bad_ideals_info(const char *filename, allbad_info_t info)
 {
     FILE *file = fopen(filename, "r");
