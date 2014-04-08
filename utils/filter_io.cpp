@@ -668,7 +668,8 @@ earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
         uint64_t pr;
         int sgn = 1;
         if (c == '\n') break;
-        if (c == '-') {
+        if (p[0] == '-') {
+        //if (c == '-') {
             sgn = -1;
             RINGBUF_GET_ONE_BYTE(c, r, p);
         }
