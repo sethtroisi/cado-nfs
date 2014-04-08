@@ -2075,19 +2075,19 @@ main (int argc, char *argv[])
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
 
-  /* filename for doing rootsieve only */
-  rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
-  if (rootsieve_filename != NULL) {
-    read_raw_poly_file(rootsieve_filename);
-    goto print_statistics;
-  }
-
   /* sieving effort that passed to ropt */
   param_list_parse_int (pl, "rseffort", &rseffort);
   if (rseffort < 1 || rseffort > 5)
   {
     fprintf (stderr, "Error, -rseffort should be in [1,5]\n");
     exit (1);
+  }
+
+  /* filename for doing rootsieve only */
+  rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
+  if (rootsieve_filename != NULL) {
+    read_raw_poly_file(rootsieve_filename);
+    goto print_statistics;
   }
 
   /* parse and check N in the first place */
