@@ -617,6 +617,7 @@ class Polyselect2l(Program):
                  resume : Parameter(is_input_file=True)=None,
                  rootsieve : Parameter(is_input_file=True)=None,
                  maxtime : Parameter(checktype=float)=None,
+                 rseffort: Parameter(checktype=int)=None,
                  out : Parameter(is_output_file=True)=None,
                  printdelay : Parameter("s", checktype=int)=None,
                  area : Parameter(checktype=float)=None,

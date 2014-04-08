@@ -7,6 +7,9 @@
 #include "filter_badideals.h"
 #include "mod_ul.h"
 
+#ifdef FOR_FFS
+#include "utils-ffs.h"
+#endif
 
 #define MAXLINE 1024
 
@@ -68,6 +71,7 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
 static inline p_r_values_t
 compute_r_wrapper (int64_t x, int64_t y, p_r_values_t p)
 {
+#ifndef FOR_FFS
   if (y < 0)
   {
     p_r_values_t r = relation_compute_r (x, (uint64_t) (-y), p);
@@ -75,6 +79,19 @@ compute_r_wrapper (int64_t x, int64_t y, p_r_values_t p)
   }
   else
     return relation_compute_r (x, (uint64_t) y, p);
+#else
+  return ffs_relation_compute_r (x, (uint64_t) y, p);
+#endif
+}
+
+static inline int
+is_divisible_wrapper (uint64_t b, p_r_values_t p)
+{
+#ifndef FOR_FFS
+  return ((b % p) == 0);
+#else
+  return ffs_is_zero_mod (b, (uint64_t) p);
+#endif
 }
 
 void
@@ -82,7 +99,7 @@ handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
                    allbad_info_t info)
 {
     p_r_values_t r;
-    if ((b % p) == 0)
+    if (is_divisible_wrapper(b, p)) /* same as ((b % p) == 0) */
         r = p + compute_r_wrapper (b, a, p);
     else
         r = compute_r_wrapper (a, b, p);
@@ -93,7 +110,7 @@ handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
             continue;
         p_r_values_t rk;
         p_r_values_t pk = info->badid_info[i].pk;
-        if ((b % p) == 0)
+        if (is_divisible_wrapper(b, p)) /* same as ((b % p) == 0) */
             rk = pk + compute_r_wrapper (b, a, pk);
         else
             rk = compute_r_wrapper (a, b, pk);

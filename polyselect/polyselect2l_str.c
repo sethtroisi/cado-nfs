@@ -35,20 +35,6 @@ static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 
 //#define LESS_P
 
-static inline uint64_t cputicks()
-{
-        uint64_t r;
-        __asm__ __volatile__(
-                "rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rdx, %%rax\n\t"
-                : "=a"(r)
-                :
-                : "%rdx", "cc");
-        return r;
-}
-
-
 /* init prime array */
 unsigned long
 initPrimes ( unsigned long P,

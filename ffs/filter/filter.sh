@@ -22,6 +22,7 @@
 #     maxlevel=nn                   (default 30)
 #     addfullcol=[0|1]              (default 0)
 #     badideals=file                (default "")
+#     badidealinfo=file             (default "", mandatory if badideals is given)
 #     verbose=[0|1]                 (default 0)
 # ex (FFS):
 #  ./filter.sh name=ffs809 rels=/local/rsa768/ffs809/rels cadobuild=$HOME/cado-nfs/build/`hostname` param=/local/rsa768/ffs809/param.2.809
@@ -123,6 +124,8 @@ for i in "$@" ; do
         fi
       elif [ "x${p}" = "xbadideals" ] ; then
         declare BADIDEALS="-badideals $value"
+      elif [ "x${p}" = "xbadidealinfo" ] ; then
+        declare BADIDEALINFO="-badidealinfo $value"
       elif [ "x${p}" = "xnfsdl" ] ; then
         if [ "x$value" = "x1" ] ; then
           declare NFSDL="1"
@@ -357,6 +360,7 @@ fi
  
 ls -1 "${NODUPDIR}/0/" > ${FILELIST_DUP2}
 argsd2="-filelist ${FILELIST_DUP2} -poly ${PARAMFILE} -renumber ${RENUMBERFILE} "
+argsd2="$argsd2 ${BADIDEALINFO} "
 
 ###### DUP2_0 ######
 if [ "${DO_DUP20}" -eq "1" ] ; then

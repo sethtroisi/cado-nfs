@@ -70,20 +70,6 @@ double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP + 1];
 double rootsieve_time = 0.0;
 int raw = 0;
 
-static inline uint64_t cputicks()
-{
-        uint64_t r;
-        __asm__ __volatile__(
-                "rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rdx, %%rax\n\t"
-                : "=a"(r)
-                :
-                : "rdx");
-        return r;
-}
-
-
 static void
 mutex_lock(pthread_mutex_t *lock)
 {
@@ -1016,16 +1002,8 @@ collision_on_each_sq ( header_t header,
 #else
 #define CURRENT(V) (H->current + ((V) & (SHASH_NBUCKETS - 1)))
 #endif
-  /*
-  uint64_t t1, t2;
-  static uint64_t sum1 = 0, sum2 = 0;
-  */
 
   shash_init (H, 4 * lenPrimes);
-
-  /*
-  t1 = cputicks();
-  */
 
   pc = (long *) inv_qq;
   nv = *pc;
@@ -1157,17 +1135,8 @@ collision_on_each_sq ( header_t header,
 
   for (i = 0; i < SHASH_NBUCKETS; i++) assert (H->current[i] <= H->base[i+1]);
 
-  /*
-  t2 = cputicks();
-  sum1 += t2 - t1;
-  */
-
   found = shash_find_collision (H);
   shash_clear (H);
-
-  /*
-  sum2 += cputicks() - t2;
-  */
 
   if (found) /* do the real work */
     {
@@ -1212,10 +1181,6 @@ collision_on_each_sq ( header_t header,
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
-
-  /*
-  fprintf (stderr, "%lu %lu\n", sum1 / 3000000, sum2 / 3000000);
-  */
 }
 
 
@@ -2110,19 +2075,19 @@ main (int argc, char *argv[])
   if (param_list_parse_double (pl, "Bg", &bound_g) == 0) /* no -Bg */
     bound_g = BOUND_G;
 
-  /* filename for doing rootsieve only */
-  rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
-  if (rootsieve_filename != NULL) {
-    read_raw_poly_file(rootsieve_filename);
-    goto print_statistics;
-  }
-
   /* sieving effort that passed to ropt */
   param_list_parse_int (pl, "rseffort", &rseffort);
   if (rseffort < 1 || rseffort > 5)
   {
     fprintf (stderr, "Error, -rseffort should be in [1,5]\n");
     exit (1);
+  }
+
+  /* filename for doing rootsieve only */
+  rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
+  if (rootsieve_filename != NULL) {
+    read_raw_poly_file(rootsieve_filename);
+    goto print_statistics;
   }
 
   /* parse and check N in the first place */
