@@ -12,6 +12,9 @@ char *argv0; /* = argv[0] */
 /* Renumbering table to convert from (p,r) to an index */
 renumber_t renumber_tab;
 
+static uint32_t *H; /* H contains the hash table */
+static unsigned long K = 0; /* Size of the hash table */
+
 /* return in *oname and *oname_tmp two file names for writing the output
  * of processing the given input file infilename. Both files are placed
  * in the directory outdir if not NULL, otherwise in the current
@@ -145,10 +148,54 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
   }
 }
 
+// Hash value that is the same for (a,b) and (b,a)
+// (with sign normalization).
+static inline uint64_t myhash(int64_t a, uint64_t b)
+{
+  uint64_t h0, h1;
+  h0 = CA_DUP2 * (uint64_t) a + CB_DUP2 * b;
+  if (a > 0) {
+    h1 = CA_DUP2 * b + CB_DUP2 * (uint64_t)a;
+  } else {
+    int64_t bb = -((int64_t)b);
+    h1 = CA_DUP2 *(uint64_t) bb + CB_DUP2 * (uint64_t) (-a);
+  }
+  return h0 ^ h1;
+}
+
+static inline uint32_t
+insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel,
+    unsigned int *is_dup)
+{
+  uint64_t h;
+  uint32_t i, j;
+
+  h = myhash(rel->a, rel->b);
+  i = h % K;
+  j = (uint32_t) (h >> 32);
+  while (H[i] != 0 && H[i] != j) {
+    i++;
+    if (UNLIKELY(i == K))
+      i = 0;
+  }
+
+  if (H[i] == j) {
+    *is_dup = 1;
+  } else {
+    H[i] = j;
+    *is_dup = 0;
+  }
+  return i;
+}
+
 static void *
 thread_galois (void * context_data, earlyparsed_relation_ptr rel)
 {
+  unsigned int is_dup;
   FILE * output = (FILE*) context_data;
+  insert_relation_in_dup_hashtable (rel, &is_dup);
+  if (is_dup)
+    return NULL;
   
   char buf[1 << 12], *p, *op;
   size_t t;
@@ -204,6 +251,7 @@ static void declare_usage(param_list pl)
       "format of output file (default same as input)");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  param_list_decl_usage(pl, "nrels", "(approximate) number of input relations");
 }
 
 static void
@@ -218,6 +266,7 @@ main (int argc, char *argv[])
 {
   argv0 = argv[0];
   cado_poly cpoly;
+  unsigned long nrels_expected = 0;
 
   param_list pl;
   param_list_init(pl);
@@ -251,6 +300,7 @@ main (int argc, char *argv[])
   const char * outdir = param_list_lookup_string(pl, "outdir");
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
+  param_list_parse_ulong(pl, "nrels", &nrels_expected);
 
   if (param_list_warn_unused(pl))
   {
@@ -280,6 +330,17 @@ main (int argc, char *argv[])
     fprintf(stderr, "Error, provide either -filelist or freeform file names\n");
     usage(pl, argv0);
   }
+  if (nrels_expected == 0)
+  {
+    fprintf(stderr, "Error, missing -nrels command line argument "
+                    "(or nrels = 0)\n");
+    usage(pl, argv0);
+  }
+  K = 100 + 1.2 * nrels_expected;
+
+  H = (uint32_t*) malloc (K * sizeof (uint32_t));
+  ASSERT_ALWAYS(H);
+  memset (H, 0, K * sizeof (uint32_t));
 
   cado_poly_init (cpoly);
   if (!cado_poly_read (cpoly, polyfilename)) {
@@ -341,5 +402,6 @@ main (int argc, char *argv[])
   param_list_clear(pl);
   renumber_free (renumber_tab);
   cado_poly_clear (cpoly);
+  free(H);
   return 0;
 }
