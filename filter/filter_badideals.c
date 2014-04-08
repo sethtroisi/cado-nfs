@@ -12,6 +12,11 @@
 #endif
 
 #define MAXLINE 1024
+#ifndef FOR_FFS
+#define INPUT_BASE 10
+#else
+#define INPUT_BASE 16
+#endif
 
 /*
   A line in badidealinfo has the form:
@@ -41,7 +46,29 @@
   means that we are dealing with the case (a:b) = (1:2) mod 2^3, and that in
   that case, we should write (e-2) and 2 in the two corresponding columns.
 
+  For NFS-DL, p and r are read in basis 10.
+  For FFS, p and r are read in hexadecimal.
  */
+
+static inline void
+compute_pk_r_wrapper (p_r_values_t *pk, p_r_values_t *r, p_r_values_t p,
+                      p_r_values_t rk, unsigned int k)
+{
+#ifndef FOR_FFS
+  *pk = p;
+  for (unsigned int i = 1; i < k; ++i)
+    *pk *= p;
+  if (rk < *pk)
+    *r = rk % p;
+  else {
+    p_r_values_t x = rk - (*pk);
+    *r = p + (x % p);
+  }
+#else
+  /* For FFS we call a function in utils-ffs.c that used fppol arithmetic */
+  ffs_compute_pk_r (pk, r, p, rk, k);
+#endif
+}
 
 
 void read_bad_ideals_info(const char *filename, allbad_info_t info)
@@ -59,28 +86,21 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         if (str[0] == '#' || str[0] == '\n')
             continue;
         errno = 0;
-        p_r_values_t p = strtoul(str, &ptr, 10);
+        p_r_values_t p = strtoul(str, &ptr, INPUT_BASE);
         ASSERT_ALWAYS(errno == 0);
-        unsigned long k = strtoul(ptr, &nptr, 10);
+        unsigned long k = strtoul(ptr, &nptr, 10); /* always in base 10 */
         ASSERT_ALWAYS(errno == 0);
-        p_r_values_t rk = strtoul(nptr, &ptr, 10);
+        p_r_values_t rk = strtoul(nptr, &ptr, INPUT_BASE);
         ASSERT_ALWAYS(errno == 0);
 
         badid_info_struct_t item;
         item.p = p;
         item.k = k;
         item.rk = rk;
-        item.pk = p;
-        for (unsigned int i = 1; i < k; ++i)
-            item.pk *= p;
-        if (rk < item.pk)
-            item.r = item.rk % p;
-        else {
-            p_r_values_t x = item.rk-item.pk;
-            item.r = p + (x % p);
-        }
+        compute_pk_r_wrapper (&(item.pk), &(item.r), p, rk, k);
         item.ncol = 0;
         do {
+            /* here we read exponents, always base 10 */
             long v = strtol(ptr, &nptr, 10);
             ASSERT_ALWAYS(errno == 0);
             if (ptr == nptr)
@@ -98,30 +118,27 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
     }
     fclose(file);
 }
+#undef INPUT_BASE
 
 static inline p_r_values_t
-compute_r_wrapper (int64_t x, int64_t y, p_r_values_t p)
+compute_r_wrapper (int64_t a, uint64_t b, p_r_values_t p, p_r_values_t pk)
 {
 #ifndef FOR_FFS
-  if (y < 0)
+  if ((b % p) == 0)
   {
-    p_r_values_t r = relation_compute_r (x, (uint64_t) (-y), p);
-    return (r == 0) ? r : p - r;
+    if (a < 0)
+    {
+      p_r_values_t rk = relation_compute_r (b, (uint64_t) (-a), pk);
+      return (rk == 0) ? pk : 2*pk - rk;
+    }
+    else
+      return pk + relation_compute_r (b, (uint64_t) a, pk);
   }
   else
-    return relation_compute_r (x, (uint64_t) y, p);
+    return relation_compute_r (a, b, pk);
 #else
-  return ffs_relation_compute_r (x, (uint64_t) y, p);
-#endif
-}
-
-static inline int
-is_divisible_wrapper (uint64_t b, p_r_values_t p)
-{
-#ifndef FOR_FFS
-  return ((b % p) == 0);
-#else
-  return ffs_is_zero_mod (b, (uint64_t) p);
+  /* For FFS we call a function in utils-ffs.c that used fppol arithmetic */
+  return ffs_compute_r (a, b, p, pk);
 #endif
 }
 
@@ -130,21 +147,14 @@ handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
                    allbad_info_t info)
 {
     p_r_values_t r;
-    if (is_divisible_wrapper(b, p)) /* same as ((b % p) == 0) */
-        r = p + compute_r_wrapper (b, a, p);
-    else
-        r = compute_r_wrapper (a, b, p);
+    r = compute_r_wrapper (a, b, p, p);
     for(int i = 0; i < info->n; ++i) {
         if (p != info->badid_info[i].p)
             continue;
         if (r != info->badid_info[i].r)
             continue;
-        p_r_values_t rk;
         p_r_values_t pk = info->badid_info[i].pk;
-        if (is_divisible_wrapper(b, p)) /* same as ((b % p) == 0) */
-            rk = pk + compute_r_wrapper (b, a, pk);
-        else
-            rk = compute_r_wrapper (a, b, pk);
+        p_r_values_t rk = compute_r_wrapper (a, b, p, pk);
         if (rk != info->badid_info[i].rk)
             continue;
         for (unsigned int j = 0; j < info->badid_info[i].ncol; ++j) {
