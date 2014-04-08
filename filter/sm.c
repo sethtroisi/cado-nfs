@@ -196,7 +196,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
     pthread_join(threads[threads_head], NULL);
     active_threads--;
     for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt)
-      print_sm (out, SM[threads_head][k], nsm);
+      print_sm (out, SM[threads_head][k], nsm, F->deg);
 
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
@@ -238,7 +238,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
   for (uint64_t i=0; i<sr; i++) {
     mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
-    print_sm (out, SM, nsm);
+    print_sm (out, SM, nsm, F->deg);
   }
 
   mpz_poly_clear (SM);
