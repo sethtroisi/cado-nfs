@@ -26,7 +26,7 @@
   be filled with the values v0, v1, ... vs.
 
   More precisely, if vi is positive, then this is indeed the value, but if vi
-  is negative, then the value (e - vi) should be put in the column, where e
+  is negative, then the value (e - |vi|) should be put in the column, where e
   is the valuation of p in the norm.
 
   Remarks:
