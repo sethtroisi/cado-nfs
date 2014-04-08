@@ -27,8 +27,11 @@ class Observable(object):
             pass
     
     def notifyObservers(self, message):
+        was_received = False
         for observer in self.__observers:
-            observer.updateObserver(message)
+            if observer.updateObserver(message):
+                was_received = True
+        return was_received
 
 class Observer(object):
     """ Defines the interface of the client part of the Observer pattern. 

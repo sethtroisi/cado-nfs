@@ -1398,15 +1398,16 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
-            return
+            return False
         if self.handle_error_result(message):
-            return
+            return True
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
         # Always mark ok to avoid warning messages about WUs that did not
         # find a poly
         self.verification(message.get_wu_id(), True, commit=True)
+        return True
     
     def process_polyfile(self, filename, commit=True):
         poly = self.parse_poly(filename)
@@ -1739,15 +1740,16 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
-            return
+            return False
         if self.handle_error_result(message):
-            return
+            return True
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
         # Always mark ok to avoid warning messages about WUs that did not
         # find a poly
         self.verification(message.get_wu_id(), True, commit=True)
+        return True
     
     @staticmethod
     def read_blocks(input):
@@ -2045,9 +2047,9 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
-            return
+            return False
         if self.handle_error_result(message):
-            return
+            return False
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
@@ -2055,6 +2057,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         # find a poly
         # FIXME: wrong, we should always get an optimized poly for a raw one
         self.verification(message.get_wu_id(), True, commit=True)
+        return True
     
     def process_polyfile(self, filename, commit=True):
         poly = self.parse_poly(filename)
@@ -2479,14 +2482,15 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
-            return
+            return False
         if self.handle_error_result(message):
-            return
+            return False
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderrfile(0)
         ok = self.add_file(output_files[0], stderrfilename, commit=False)
         self.verification(message.get_wu_id(), ok, commit=True)
+        return True
 
     def add_file(self, filename, stats_filename=None, commit=True):
         use_stats_filename = stats_filename
@@ -4463,7 +4467,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
     def paramnames(self):
         # This isn't a Task subclass so we don't really need to define
         # paramnames, but we do it out of habit
-        return {"name": str, "workdir": str, "N": int, "dlp": False}
+        return {"name": str, "workdir": str, "N": int, "dlp": False,
+                "trybadwu": False}
     @property
     def title(self):
         return "Complete Factorization"
@@ -4479,6 +4484,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         # Init WU BD
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
+        if self.params["trybadwu"]:
+            # Test behaviour when a WU is in the DB that does not belong to
+            # any task. It should get cancelled with an error message.
+            self.wuar.create(["WORKUNIT FAKE_WU_%s\nCOMMAND true" % time.time()])
 
         # Start with an empty list of tasks that want to run. Tasks will add
         # themselves during __init__().
