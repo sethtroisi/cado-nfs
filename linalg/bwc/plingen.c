@@ -55,6 +55,12 @@ static int with_timings = 0;
  * (input) and F (output) */
 static unsigned int io_block_size = 1 << 20;
 
+/* If non-zero, then reading from A is actually replaced by reading from
+ * a random generator */
+static unsigned int random_input_length = 0;
+
+gmp_randstate_t rstate;
+
 #ifdef HAVE_MPIR
 static int caching = 1;
 #else
@@ -814,9 +820,9 @@ double avg_matsize(abdst_field ab, unsigned int m, unsigned int n, int ascii)/*{
     avg = k - mpz_get_d(a) / mpz_get_d(p);
     mpz_clear(p);
     mpz_clear(a);
-    printf("Expect roughly %.2f decimal digits for integers mod p.\n", avg);
+    // printf("Expect roughly %.2f decimal digits for integers mod p.\n", avg);
     double matsize = (avg + 1) * m * n + 1;
-    printf("Expect roughly %.2f bytes for each sequence matrix.\n", matsize);
+    // printf("Expect roughly %.2f bytes for each sequence matrix.\n", matsize);
     return matsize;
 }/*}}}*/
 
@@ -864,7 +870,8 @@ void bm_io_write_one_F_coeff(bm_io_ptr aa, unsigned int deg)
     abdst_field ab = d->ab;
     unsigned int n = d->n;
     deg = deg % aa->F->alloc;
-    if (aa->ascii) {
+    // if (random_input_length) return;
+    if (aa->ascii && !random_input_length) {
             for(unsigned int j = 0 ; j < n ; j++) {
                 for(unsigned int i = 0 ; i < n ; i++) {
                     if (i) fprintf(aa->f, " ");
@@ -923,7 +930,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     /* Decide on the temp storage size */
     double avg = avg_matsize(ab, n, n, aa->ascii);
     unsigned int B = iceildiv(io_block_size, avg);
-    if (!rank)
+    if (!rank && !random_input_length)
         printf("Writing F by blocks of %u coefficients (%.1f bytes each)\n",
                 B, avg);
     /* This is only temp storage ! */
@@ -1181,6 +1188,7 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
     unsigned int m = d->m;
     unsigned int n = d->n;
     matpoly_ptr A = aa->A;
+    static unsigned int generated_random_coefficients = 0;
 
     unsigned int pos = aa->k;
     if (io_window) {
@@ -1193,6 +1201,21 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
         }
         A->size++;
     }
+    if (random_input_length) {
+        if (generated_random_coefficients >= random_input_length)
+            return 0;
+
+        for (unsigned int i = 0; i < m ; i++) {
+            for (unsigned int j = 0; j < n ; j++) {
+                abdst_elt x = matpoly_coeff(ab, A, i, j, pos);
+                abrandom(ab, x, rstate);
+            }
+        }
+        generated_random_coefficients++;
+        aa->k++;
+        return 1;
+    }
+
     for (unsigned int i = 0; i < m ; i++) {
         for (unsigned int j = 0; j < n ; j++) {
             abdst_elt x = matpoly_coeff(ab, A, i, j, pos);
@@ -1242,10 +1265,14 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
     MPI_Comm_rank(aa->bm->world, &rank);
     if (rank) return;
 
+    matpoly_init(ab, aa->A, m, n, 1);
+
+    if (random_input_length)
+        return;
+
     aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
     DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->input_file);
 
-    matpoly_init(ab, aa->A, m, n, 1);
     /* read and discard the first coefficient */
     if (!bm_io_read1(aa, 0)) {
         fprintf(stderr, "Read error from %s\n", aa->input_file);
@@ -1260,9 +1287,10 @@ void bm_io_end_read(bm_io_ptr aa)/*{{{*/
     int rank;
     MPI_Comm_rank(aa->bm->world, &rank);
     if (rank) return;
+    matpoly_clear(aa->bm->d->ab, aa->A);
+    if (random_input_length) return;
     fclose(aa->f);
     aa->f = NULL;
-    matpoly_clear(aa->bm->d->ab, aa->A);
 }/*}}}*/
 
 void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
@@ -1275,10 +1303,16 @@ void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
     MPI_Comm_rank(aa->bm->world, &rank);
     if (rank) return;
 
-    aa->f = fopen(aa->output_file, aa->ascii ? "w" : "wb");
-    DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->output_file);
-
     matpoly_init(ab, aa->F, n, n, aa->t0 + 1);
+
+    if (random_input_length) {
+        /* It's horrible. I really want "checksum" to be printed at the
+         * exact right moment, hence the following hack...  */
+        aa->f = popen("(echo \"checksum:\" ; sha1sum) | xargs echo", "w");
+    } else {
+        aa->f = fopen(aa->output_file, aa->ascii ? "w" : "wb");
+    }
+    DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->output_file);
 }/*}}}*/
 
 void bm_io_end_write(bm_io_ptr aa)/*{{{*/
@@ -1286,9 +1320,13 @@ void bm_io_end_write(bm_io_ptr aa)/*{{{*/
     int rank;
     MPI_Comm_rank(aa->bm->world, &rank);
     if (rank) return;
-    fclose(aa->f);
-    aa->f = NULL;
     matpoly_clear(aa->bm->d->ab, aa->F);
+    if (random_input_length) {
+        pclose(aa->f);
+    } else {
+        fclose(aa->f);
+    }
+    aa->f = NULL;
 }/*}}}*/
 
 void bm_io_clear(bm_io_ptr aa)/*{{{*/
@@ -1306,6 +1344,11 @@ void bm_io_guess_length(bm_io_ptr aa)/*{{{*/
     abdst_field ab = d->ab;
     int rank;
     MPI_Comm_rank(aa->bm->world, &rank);
+
+    if (random_input_length) {
+        aa->guessed_length = random_input_length;
+        return;
+    }
 
     if (!rank) {
         struct stat sbuf[1];
@@ -1327,13 +1370,15 @@ void bm_io_guess_length(bm_io_ptr aa)/*{{{*/
         } else {
             double avg = avg_matsize(ab, m, n, aa->ascii);
             double expected_length = filesize / avg;
-            printf("Expect roughly %.2f items in the sequence.\n", expected_length);
+            if (!rank)
+                printf("Expect roughly %.2f items in the sequence.\n", expected_length);
 
             /* First coefficient is always lighter, so we add a +1. The
              * 5% are here really only to take into account the
              * deviations, but we don't expect much */
             size_t guessed_length = 1 + ceil(1.05 * expected_length);
-            printf("With safety margin: expect length %zu at most\n", guessed_length);
+            if (!rank)
+                printf("With safety margin: expect length %zu at most\n", guessed_length);
 
             aa->guessed_length = guessed_length;
         }
@@ -1607,45 +1652,6 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
     matpoly_clear(ab, E);
 }/*}}}*/
 
-void set_random_input(bmstatus_ptr bm, matpoly A, unsigned int length) /* {{{ */
-{
-    dims * d = bm->d;
-    unsigned int m = d->m;
-    unsigned int n = d->n;
-    abdst_field ab = d->ab;
-
-    matpoly_init(ab, A, m, n, length);
-    A->size = length;
-
-    gmp_randstate_t rstate;
-    gmp_randinit_default(rstate);
-    for(unsigned int k = 0 ; k < length ; k++) {
-	for (unsigned int i = 0; i < m ; i++) {
-	    for (unsigned int j = 0; j < n ; j++) {
-                abdst_elt x = matpoly_coeff(ab, A, i, j, k);
-                abrandom(ab, x, rstate);
-            }
-        }
-    }
-
-    /* we force an existing generator. This will be a fairly trivial one,
-     * but that's not really an issue as far as I can tell */
-    if (length > 20) {
-        for(unsigned int k = length-10 ; k < length ; k++) {
-            for (unsigned int i = 0; i < m ; i++) {
-                for (unsigned int j = 0; j < n ; j++) {
-                    absrc_elt x = matpoly_coeff(ab, A, i, (j*1009)%n, k - (length - 10));
-                    abdst_elt y = matpoly_coeff(ab, A, i, j, k);
-                    abset(ab, y, x);
-                }
-            }
-        }
-    }
-
-    gmp_randclear(rstate);
-} /* }}} */
-
-
 void usage()
 {
     fprintf(stderr, "Usage: ./plingen [options, to be documented]\n");
@@ -1688,6 +1694,7 @@ unsigned int count_lucky_columns(bmstatus_ptr bm)/*{{{*/
 void check_luck_condition(bmstatus_ptr bm)/*{{{*/
 {
     dims * d = bm->d;
+    unsigned int m = d->m;
     unsigned int n = d->n;
     unsigned int nlucky = count_lucky_columns(bm);
 
@@ -1700,6 +1707,24 @@ void check_luck_condition(bmstatus_ptr bm)/*{{{*/
     if (!rank) {
         fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
     }
+    if (random_input_length) {
+        static int once=0;
+        if (once++) {
+            if (!rank) {
+                fprintf(stderr, "Solution-faking loop crashed\n");
+            }
+            MPI_Abort(bm->world, EXIT_FAILURE);
+        }
+        if (!rank) {
+            printf("Random input: faking successful computation\n");
+        }
+        for(unsigned int j = 0 ; j < n ; j++) {
+            bm->lucky[(j * 1009) % (m+n)] = expected_pi_length(d, 0);
+        }
+        check_luck_condition(bm);
+        return;
+    }
+
     MPI_Abort(bm->world, EXIT_FAILURE);
 }/*}}}*/
 
@@ -1731,11 +1756,11 @@ int main(int argc, char *argv[])
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
-    unsigned int random_input_length = 0;
-
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+
+    gmp_randinit_default(rstate);
 
     /* {{{ Parameter list. Feed the common bw[] struct */
     param_list pl;
@@ -1815,6 +1840,13 @@ int main(int argc, char *argv[])
     param_list_parse_uint(pl, "display-threshold", &(display_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
     param_list_parse_uint(pl, "io-block-size", &(io_block_size));
+    {
+        unsigned long random_seed = 0;
+        param_list_parse_ulong(pl, "random_seed", &random_seed);
+        gmp_randseed_ui(rstate, random_seed);
+    }
+
+
 #if defined(FAKEMPI_H_)
     bm->lingen_mpi_threshold = UINT_MAX;
 #endif
@@ -1896,18 +1928,6 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-
-    if (random_input_length) {
-        fprintf(stderr, "random input feature temporarily disabled\n");
-        exit(EXIT_FAILURE);
-#if 0
-            matpoly_init(ab, E, m, b, random_input_length);
-            gmp_randstate_t rstate;
-            gmp_randinit_default(rstate);
-            abvec_random(ab, E->x, m * b * random_input_length, rstate);
-            gmp_randclear(rstate);
-#endif
-    }
 
     /* We now have a protected structure for a_reading task which does
      * the right thing concerning parallelism among MPI nodes (meaning
@@ -1993,6 +2013,8 @@ int main(int argc, char *argv[])
     bw_common_clear(bw);
     param_list_clear(pl);
     if (ffile) free(ffile);
+
+    gmp_randclear(rstate);
 
     MPI_Finalize();
     return 0;
