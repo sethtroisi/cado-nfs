@@ -1048,7 +1048,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
      * coefficients from index maxdelta downwards.
      */
 
-    unsigned int kpi;
+    unsigned int kpi = maxdelta;
     /* index kpi1 is end fence for window */
     for(unsigned int kpi1 = iceildiv(maxdelta + 1, B) * B ; kpi1 > 0 ; kpi1 -= B) {
         unsigned int kpi0 = kpi1 - B;
@@ -1164,7 +1164,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         }
     }
     /* flush the pipe */
-    if (!rank) {
+    if (!rank && kpi + window <= maxdelta) {
         for(unsigned int s = window ; s-- > 0 ; kpi--)
             bm_io_write_one_F_coeff(aa, maxdelta - kpi - window);
     }
@@ -1586,7 +1586,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
     double next_report_t = tt0 + 10;
     unsigned next_report_k = guess / 100;
 
-    unsigned int kE;
+    unsigned int kE = 0;
 
     for(unsigned int kE0 = 0 ; kE0 + aa->t0 < aa->guessed_length ; kE0 += B) {
         /* Setting E->size is rather artificial, since we use E essentially
