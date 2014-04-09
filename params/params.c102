@@ -39,7 +39,6 @@ tasks.I = 12
 tasks.sieve.qmin = 4000000
 tasks.sieve.qrange = 2000
 tasks.sieve.rels_wanted = 4000000
-slaves.niceness = 10
 
 ###########################################################################
 # Filtering

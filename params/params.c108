@@ -38,7 +38,6 @@ tasks.sieve.alambda = 2.2
 tasks.I = 12
 tasks.sieve.qmin = 4000000
 tasks.sieve.qrange = 1000
-slaves.niceness = 10
 tasks.sieve.rels_wanted = 1
 
 ###########################################################################
