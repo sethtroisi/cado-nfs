@@ -60,6 +60,8 @@ test_modul_poly_is_irreducible (unsigned long iter)
       d = 1 + lrand48 () % (MAXDEGREE - 1);
       q = lrand48 ();
       q = ulong_nextprime (q);
+      /* modul_poly_cantor_zassenhaus only works for odd primes */
+      q += (q == 2);
       modul_initmod_ul (p, q);
       for (i = 0; i <= d; i++)
         modul_set_ul (f->coeff[i], lrand48 (), p);
@@ -114,7 +116,7 @@ test_modul_poly_roots_ulong (unsigned long iter)
       ASSERT_ALWAYS(0 <= n && n <= d);
       modul_poly_init (fp, d);
       modul_poly_set_mod (fp, f, d, p);
-      if (n > 0 && d > 1)
+      if (n > 0 && fp->degree > 1)
         ASSERT_ALWAYS(modul_poly_is_irreducible (fp, p) == 0);
       /* if n=0, f might be irreducible or not mod p (product of two
          degree-2 factors for example),

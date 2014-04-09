@@ -624,9 +624,9 @@ mpz_poly_mul_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t a)
   mpz_clear (aux);
 }
 
-/* h=rem(h, f) mod p, f not necessarily monic. */
-static void
-mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
+/* h=rem(h, f) mod N, f not necessarily monic, N not necessarily prime */
+static int
+mpz_poly_pseudodiv_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t N, mpz_t factor)
 {
   int i, d = f->deg, dh = h->deg;
   mpz_t tmp, inv;
@@ -635,35 +635,48 @@ mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
   mpz_init_set_ui (tmp, 1);
 
   mpz_set (tmp, f->coeff[d]);
-  if (mpz_cmp_ui(tmp, 1) != 0)
-    /* inv is 1/f[d] mod p */
-    mpz_invert (inv, tmp, p);
+  if (mpz_cmp_ui(tmp, 1) != 0) {
+    /* inv is 1/f[d] mod N */
+    if (!mpz_invert (inv, tmp, N)) {
+      if (factor != NULL)
+        mpz_gcd(factor, tmp, N);
+      return 0;
+    }
+  }
 
   while (dh >= d)
   {
     /* subtract h[dh]/f[d]*x^(dh-d)*f from h */
     if (mpz_cmp_ui(inv, 1) != 0) {
       mpz_mul (h->coeff[dh], h->coeff[dh], inv);
-      mpz_fdiv_r (h->coeff[dh], h->coeff[dh], p);
+      mpz_fdiv_r (h->coeff[dh], h->coeff[dh], N);
     }
 
     for (i = 0; i < d; i++) {
       mpz_mul (tmp, h->coeff[dh], f->coeff[i]);
-      mpz_fdiv_r (tmp, tmp, p);
+      mpz_fdiv_r (tmp, tmp, N);
       mpz_sub (h->coeff[dh - d + i], h->coeff[dh - d + i], tmp);
-      mpz_fdiv_r (h->coeff[dh - d + i], h->coeff[dh - d + i], p);
+      mpz_fdiv_r (h->coeff[dh - d + i], h->coeff[dh - d + i], N);
     }
 
     do {
       dh --;
     }
-    while (dh >= 0 && mpz_divisible_p (h->coeff[dh],p));
+    while (dh >= 0 && mpz_divisible_p (h->coeff[dh],N));
 
     h->deg = dh;
   }
 
   mpz_clear (inv);
   mpz_clear (tmp);
+  return 1;
+}
+
+/* h=rem(h, f) mod p, f not necessarily monic. */
+static void
+mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
+{
+  mpz_poly_pseudodiv_r (h, f, p, NULL);
 }
 
 /*
@@ -799,6 +812,17 @@ void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
                        const mpz_t m)
 {
     mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
+}
+
+/* Return 1 if poly(root) % modulus == 0, return 0 otherwise */
+int mpz_poly_is_root(const mpz_poly_t poly, mpz_t root, mpz_t modulus)
+{
+    mpz_t x;
+    mpz_init(x);
+    mpz_poly_eval_mod_mpz(x, poly, root, modulus);
+    int is_root = (mpz_cmp_ui(x, 0) == 0);
+    mpz_clear(x);
+    return is_root;
 }
 
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
@@ -1314,12 +1338,16 @@ mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk)
   int i;
 
   /* first check P[k] exists and is not zero */
-  for (i = 0; i <= k; i++)
-    if (P[i]->deg == -1)
-      return;
+  if (P[k]->deg == -1)
+    return;
 
-  for (i = 0; i <= P[k]->deg; i++)
+  mpz_poly_realloc (a, P[k]->deg + 1);
+
+  for (i = 0; i <= P[k]->deg && i <= a->deg; i++)
     mpz_addmul (a->coeff[i], P[k]->coeff[i], pk);
+
+  for (; i <= P[k]->deg; i++)
+    mpz_mul (a->coeff[i], P[k]->coeff[i], pk);
 
   mpz_poly_cleandeg (a, (a->deg >= P[k]->deg) ? a->deg : P[k]->deg);
 }
@@ -1385,6 +1413,33 @@ mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
       mpz_poly_swap (f, g);
     }
 }
+
+/* Attempt to compute the f=gcd(f,g) mod N, where N is not necessarily a
+ * prime. If at some point a division fails, this gives a proper factor
+ * of N that is put in the corresponding argument.
+ * The return value tells whether the process was successful (1 means
+ * that no inversion failed, 0 means that a factor was found).
+ * WARNING: this function destroys its input.
+ */
+int
+mpz_poly_pseudogcd_mpz(mpz_poly_t f, mpz_poly_t g, const mpz_t N, mpz_t factor)
+{
+  for (int k = 0; k <= f->deg; ++k)
+    mpz_mod(f->coeff[k], f->coeff[k], N);
+  for (int k = 0; k <= g->deg; ++k)
+    mpz_mod(g->coeff[k], g->coeff[k], N);
+  while (g->deg >= 0)
+  {
+    int ret = mpz_poly_pseudodiv_r(f, g, N, factor);
+    if (!ret)
+        return ret;
+    /* now deg(f) < deg(g): swap f and g */
+    mpz_poly_swap (f, g);
+  }
+  // success: all inversions mod N worked.
+  return 1;
+}
+
 
 /* computes d = gcd(f,g) = u*f + v*g mod p, with p in mpz_t */
 void

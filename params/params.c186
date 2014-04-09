@@ -61,7 +61,6 @@ tasks.sieve.qmin = 80000000
 # Sam Wagstaff did sieve special-q's < 1660M
 tasks.sieve.qrange = 20000
 # of that many relations found.
-slaves.niceness = 10
 tasks.sieve.rels_wanted = 1
 
 ###########################################################################

@@ -65,7 +65,7 @@ double get_alpha (mpz_poly_ptr, unsigned long);
 double get_biased_alpha_projective (mpz_poly_ptr f, unsigned long B);
 
 /* poly info, being called in order */
-void print_cadopoly_fg (FILE*, mpz_t*, int, mpz_t*, mpz_t);
+void print_cadopoly_fg (FILE*, mpz_t*, int, mpz_t*, int, mpz_t);
 double print_cadopoly (FILE*, cado_poly);
 void print_cadopoly_extra (FILE*, cado_poly, int, char**, double);
 double print_poly_fg (mpz_poly_ptr, mpz_t*, mpz_t, int);

@@ -12,6 +12,7 @@ test_usp ()
   mpz_t p[MAX_DEGREE], u;
   int n, i, d;
   root_struct R[1];
+  double root;
 
   for (i = 0; i < MAX_DEGREE; i++)
     mpz_init (p[i]);
@@ -27,9 +28,6 @@ test_usp ()
   /* check [a/2^ka, b/2^kb] contains root 0 */
   ASSERT_ALWAYS (mpz_cmp_ui (R[0].a, 0) <= 0);
   ASSERT_ALWAYS (0 <= mpz_cmp_ui (R[0].b, 0));
-
-  mpz_clear (R[0].a);
-  mpz_clear (R[0].b);
 
   /* polynomial x+1 */
   mpz_set_ui (p[0], 1);
@@ -172,6 +170,20 @@ test_usp ()
   n = numberOfRealRoots (p, 4, 0, 0, NULL);
   ASSERT_ALWAYS (n == 4);
 
+  /* infinite loop that appeared on 32-bit computers, 2nd April 2014 */
+  mpz_set_str (p[0], "202156081496031128767910903808", 10);
+  mpz_set_str (p[1], "-1014774808369763543554925264896", 10);
+  mpz_set_str (p[2], "305592973565950609559904059392", 10);
+  mpz_set_str (p[3], "532741928198739321928042938368", 10);
+  mpz_set_str (p[4], "-265275048860303928171627020288", 10);
+  mpz_set_str (p[5], "152821965764546794524860481536", 10);
+  mpz_set_str (p[6], "-40951570592501524318484692992", 10);
+  mpz_set_ui (R[0].a, 2);
+  mpz_set_ui (R[0].b, 4);
+  R[0].ka = R[0].kb = 0;
+  root = rootRefine (R, p, 6); /* root is near 3.00763029864372 */
+  ASSERT_ALWAYS(3.00763 <= root && root <= 3.00764);
+
   mpz_init (u);
   mpz_set_ui (u, 1);
   mpz_mul_2exp (u, u, 127);
@@ -199,6 +211,8 @@ test_usp ()
   for (i = 0; i < MAX_DEGREE; i++)
     mpz_clear (p[i]);
   mpz_clear (u);
+  mpz_clear (R[0].a);
+  mpz_clear (R[0].b);
 }
 
 int

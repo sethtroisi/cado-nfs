@@ -649,72 +649,58 @@ earlyparser_abline_decimal(earlyparsed_relation_ptr rel, ringbuf_ptr r)
  * unsorted relations.
  */
 static int
-earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
+earlyparser_index_maybeabhexa(earlyparsed_relation_ptr rel, ringbuf_ptr r,
+        int parseab)
 {
     const char *p = r->rhead;
 
     /* c is always the first-after-parsed-data byte */
-    int c = earlyparser_inner_skip_ab(r, &p);
+    int c;
+    if (parseab) {
+        c = earlyparser_inner_read_ab_hexa(r, &p, rel);
+    } else {
+        c = earlyparser_inner_skip_ab(r, &p);
+    }
     
     unsigned int n = 0;
 
-    // int64_t last_prime = -1;
-    // int sorted = 1;
-    // int side = -1;
-
     for( ; ; ) {
         uint64_t pr;
+        int sgn = 1;
         if (c == '\n') break;
-	// if (c == ':') { last_prime = -1; side++; }
+        if (p[0] == '-') {
+        //if (c == '-') {
+            sgn = -1;
+            RINGBUF_GET_ONE_BYTE(c, r, p);
+        }
         c = earlyparser_inner_read_prime(r, &p, &pr);
-        // ASSERT_ALWAYS(pr >= last_prime);        /* relations must be sorted */
-        // sorted = sorted && pr < last_prime;
         if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
+            rel->primes[n-1].e += sgn;
         } else {
             if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            // rel->primes[n++] = (prime_t) { .h = (index_t) pr,.p = 0,.e = 1};
             rel->primes[n].h = (index_t) pr;
             rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
+            rel->primes[n].e = sgn;
             n++;
         }
-        // last_prime = pr;
     }
-    // if (!sorted) { /* sort the primes ? */ }
     rel->nb = n;
 
     return 1;
 }
 
 static int
+earlyparser_index(earlyparsed_relation_ptr rel, ringbuf_ptr r)
+{
+    return earlyparser_index_maybeabhexa(rel, r, 0);
+}
+
+static int
 earlyparser_abindex_hexa (earlyparsed_relation_ptr rel, ringbuf_ptr r)
 {
-    const char *p = r->rhead;
-
-    /* c is always the first-after-parsed-data byte */
-    int c = earlyparser_inner_read_ab_hexa(r, &p, rel);
-    
-    unsigned int n = 0;
-
-    for( ; ; ) {
-        uint64_t pr;
-        if (c == '\n') break;
-        c = earlyparser_inner_read_prime(r, &p, &pr);
-        if (n && pr == rel->primes[n-1].h) {
-            rel->primes[n-1].e++;
-        } else {
-            if (rel->nb_alloc == n) realloc_buffer_primes(rel);
-            rel->primes[n].h = (index_t) pr;
-            rel->primes[n].p = 0;
-            rel->primes[n].e = 1;
-            n++;
-        }
-    }
-    rel->nb = n;
-
-    return 1;
+    return earlyparser_index_maybeabhexa(rel, r, 1);
 }
+
 
 /*}}}*/
 

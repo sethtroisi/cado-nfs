@@ -44,6 +44,6 @@ echo $CMD
 
 $CMD
 
-else
-$HOME/Cnt/ChengWang/cravate/NTL/bin/x86_64/linalg4catrel -ell $ELL -sparse $SPARSE -sm $SM -mode sparse -nthreads 2 > $KER
+else # I have my own personal program to do that
+mylinalg.sh $ELL $SPARSE $SM > $KER
 fi

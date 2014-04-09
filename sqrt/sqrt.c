@@ -180,7 +180,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
       if (ret != 2)
         {
-          fprintf (stderr, "Invalid line %lu\n", line_number);
+          fprintf (stderr, "Invalid line %lu in file %s\n", line_number,
+                   depname);
+          fflush (stderr);
           break;
         }
 
@@ -853,7 +855,18 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   
     mpz_init(algsqrt);
     mpz_init(aux);
-    mpz_poly_eval_mod_mpz(algsqrt, prd->p, pol->m, Np);
+    mpz_t m;
+    int ret;
+    mpz_init(m);
+    do {
+        ret = cado_poly_getm(m, pol, Np);
+        if (!ret) {
+            gmp_fprintf(stderr, "When trying to compute m, got the factor %Zd\n", m);
+            mpz_divexact(Np, Np, m);
+        }
+    } while (!ret);
+    mpz_poly_eval_mod_mpz(algsqrt, prd->p, m, Np);
+    mpz_clear(m);
     mpz_invert(aux, F->coeff[F->deg], Np);  // 1/fd mod n
     mpz_powm_ui(aux, aux, prd->v, Np);      // 1/fd^v mod n
     mpz_mul(algsqrt, algsqrt, aux);

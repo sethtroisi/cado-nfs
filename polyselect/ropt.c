@@ -25,11 +25,12 @@ ropt_get_bestpoly ( ropt_poly_t poly,
 {
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
-  mpz_t m, *fuv, *guv;
+  mpz_t m, t, *fuv, *guv;
   mpz_poly_t Fuv;
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
+  mpz_init (t);
 
   /* var for computing E */
   mpz_poly_init (Fuv, poly->d);
@@ -52,18 +53,23 @@ ropt_get_bestpoly ( ropt_poly_t poly,
     old_i = 0;
     old_i = rotate_aux (poly->f, poly->g[1], m, old_i,
                         global_E_pqueue->w[i], 2);
+
     for (k = 0; k <= poly->d; k++)
       mpz_set (fuv[k], poly->f[k]);
 
     for (k = 0; k < 2; k++)
       mpz_set (guv[k], poly->g[k]);
 
-    compute_fuv_mp (fuv, poly->f, poly->g, poly->d,
-                    global_E_pqueue->u[i], global_E_pqueue->v[i]);
+    compute_fuv_mp (fuv, poly->f, poly->g, poly->d, global_E_pqueue->u[i],
+                    global_E_pqueue->v[i]);
+
     optimize_aux (Fuv, guv, 0, 0);
+
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
-    if (ave_MurphyE > best_E) {
+    mpz_poly_content (t, Fuv);
+
+    if ( (ave_MurphyE > best_E) && (mpz_cmp_ui (t, 1) == 0) ) {
       best_E = ave_MurphyE;
       for (k = 0; k <= poly->d; k++)
         mpz_set (bestpoly->f[k], fuv[k]);
@@ -73,11 +79,11 @@ ropt_get_bestpoly ( ropt_poly_t poly,
     rotate_aux (poly->f, poly->g[1], m, old_i, 0, 2);
   }
 
-
   mpz_poly_clear (Fuv);
   for (i = 0; i < 2; i++)
     mpz_clear (guv[i]);
   mpz_clear (m);
+  mpz_clear (t);
   free (guv);
 }
 
@@ -223,11 +229,12 @@ ropt ( ropt_poly_t poly,
  */
 void
 ropt_polyselect ( mpz_t *f,
-                  int d,
+                  const int d,
                   mpz_t m,
                   mpz_t l,
-                  mpz_t N ,
-                  int verbose )
+                  const mpz_t N ,
+                  const int effort,
+                  const int verbose )
 {
   int i;
   ropt_poly_t poly;
@@ -235,7 +242,7 @@ ropt_polyselect ( mpz_t *f,
 
   /* setup poly */
   mpz_set (poly->g[1], l);
-  mpz_neg (poly->g[0], m);
+  mpz_set (poly->g[0], m);
   for (i = 0; i <=d; i ++)
     mpz_set (poly->f[i], f[i]);
   mpz_set (poly->n, N);
@@ -244,9 +251,11 @@ ropt_polyselect ( mpz_t *f,
   ropt_info_t info;
   ropt_info_init (info);
 
+  /* passed params from polyselect2l */
   ropt_param_t param;
   ropt_param_init (param);
   param->verbose = verbose;
+  param->effort = effort;
 
   ropt_bestpoly_t bestpoly;
   ropt_bestpoly_init (bestpoly, poly->d);
@@ -255,10 +264,10 @@ ropt_polyselect ( mpz_t *f,
   /* cal main function */
   ropt_do_both_stages (poly, bestpoly, param, info);
   
-  /* bring bestpoly back to polyselect2* */
+  /* bring bestpoly back to polyselect2l */
   for (i = 0; i <= d; i++)
     mpz_set (f[i], bestpoly->f[i]);
-  mpz_neg (m, bestpoly->g[0]);
+  mpz_set (m, bestpoly->g[0]);
   mpz_set (l, bestpoly->g[1]);
 
   /* free */

@@ -14,7 +14,7 @@ sed 's/ *#.*$//' < "${INPUTFILE}" | grep . | cut -d " " -f 2- > "${REQUIRED_OUTP
 ACTUAL_OUTPUT="`mktemp`"
 "${TESTBENCH}" -inp "${INPUTNUMBERS}" "$@" > "${ACTUAL_OUTPUT}"
 
-if ! cmp "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}"
+if ! diff -b "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}" > /dev/null
 then
   echo "testbench produced output in file \"${ACTUAL_OUTPUT}\", but expected result as in \"${REQUIRED_OUTPUT}\", input numbers are in \"${INPUTNUMBERS}\""
   # diff "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}"

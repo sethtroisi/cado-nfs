@@ -92,6 +92,8 @@ set_tests_properties(tests_common_2 tests_common_4 tests_common_5 PROPERTIES WIL
 run_test(tests_common_6 test_tests_common -iter 10)
 set_tests_properties(tests_common_6 PROPERTIES PASS_REGULAR_EXPRESSION "Using 10 iterations")
 
+build_and_run_test(test_iceildiv.c "")
+
 add_subdirectory (utils)
 add_subdirectory (sieve)
 add_subdirectory (polyselect)

@@ -234,7 +234,11 @@ fprint_relation (FILE *file, relation_t * rel, const char *prefix)
 	  }
       }
   p[-1] = '\n';
-  fwrite (buf, sizeof(*buf), p - buf, file);
+  size_t written = fwrite (buf, sizeof(*buf), p - buf, file);
+  if (written != (size_t) (p - buf)) {
+    perror("Error writing relation");
+    abort();
+  }
 }
 
 static int rat_prime_cmp(rat_prime_t * a, rat_prime_t * b)

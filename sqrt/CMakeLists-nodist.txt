@@ -1,10 +1,3 @@
-
-# add_executable(fmalgsqrt fmalgsqrt.c poly.c)
-# target_link_libraries(fmalgsqrt gmp)
-
-add_executable(ratsqrt EXCLUDE_FROM_ALL ratsqrt.c)
-target_link_libraries(ratsqrt utils m)
-
 add_executable(lift EXCLUDE_FROM_ALL lift.c powers_of_p.cpp)
 target_link_libraries(lift utils m)
 

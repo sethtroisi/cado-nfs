@@ -1805,30 +1805,20 @@ rotate (mpz_poly_ptr f, unsigned long alim, mpz_t m, mpz_t b,
    Note: it's a backend for print_cadopoly().
 */
 void
-print_cadopoly_fg (FILE *fp, mpz_t *f, int deg, mpz_t *g, mpz_t n )
+print_cadopoly_fg (FILE *fp, mpz_t *f, int df, mpz_t *g, int dg, mpz_t n )
 {
    int i;
 
    /* n */
-   fprintf (fp, "\nn: ");
-   mpz_out_str (fp, 10, n);
-   fprintf (fp, "\n");
+   gmp_fprintf (fp, "\nn: %Zd\n", n);
 
    /* Y[i] */
-   fprintf (fp, "Y1: ");
-   mpz_out_str (fp, 10, g[1]);
-   fprintf (fp, "\n");
-   fprintf (fp, "Y0: ");
-   mpz_out_str (fp, 10, g[0]);
-   fprintf (fp, "\n");
+   for (i = dg; i >= 0; i--)
+     gmp_fprintf (fp, "Y%d: %Zd\n", i, g[i]);
 
    /* c[i] */
-   for (i = deg; i >= 0; i--)
-   {
-      fprintf (fp, "c%d: ", i);
-      mpz_out_str (fp, 10, f[i]);
-      fprintf (fp, "\n");
-   }
+   for (i = df; i >= 0; i--)
+     gmp_fprintf (fp, "c%d: %Zd\n", i, f[i]);
 }
 
 
@@ -1841,49 +1831,43 @@ print_cadopoly (FILE *fp, cado_poly p)
 {
    unsigned int nroots = 0;
    double alpha, alpha_proj, logmu, e;
-   mpz_poly_t F;
+   mpz_poly_t F, G;
 
    F->coeff = p->alg->coeff;
    F->deg = p->alg->deg;
+   G->coeff = p->rat->coeff;
+   G->deg = p->rat->deg;
 
    /* print f, g only*/
-   print_cadopoly_fg (fp, F->coeff, F->deg, p->rat->coeff, p->n);
+   print_cadopoly_fg (fp, F->coeff, F->deg, G->coeff, G->deg, p->n);
 
 #ifdef DEBUG
    fprintf (fp, "# ");
-   fprint_polynomial (fp, p->alg->coeff, p->alg->deg);
+   fprint_polynomial (fp, F->coeff, F->deg);
+   fprintf (fp, "# ");
+   fprint_polynomial (fp, G->coeff, G->deg);
 #endif
 
-   /* m and type */
-   fprintf (fp, "m: ");
-   /* if f[1]<>1, then m = -f[0]/f[1] mod n */
-   if (mpz_cmp_ui (p->rat->coeff[1], 1) != 0)
-   {
-      mpz_invert (p->m, p->rat->coeff[1], p->n);
-      mpz_neg (p->m, p->m);
-      mpz_mul (p->m, p->m, p->rat->coeff[0]);
-      mpz_mod (p->m, p->m, p->n);
-   }
-   else
-      mpz_neg (p->m, p->rat->coeff[0]);
-   mpz_out_str (fp, 10, p->m);
-   fprintf (fp, "\n");
-
    fprintf (fp, "skew: %1.3f\n", p->skew);
+
+   if (G->deg > 1)
+   {
+    logmu = L2_lognorm (G, p->skew);
+    alpha = get_alpha (G, ALPHA_BOUND);
+    alpha_proj = get_biased_alpha_projective (G, ALPHA_BOUND);
+    nroots = numberOfRealRoots (G->coeff, G->deg, 0, 0, NULL);
+    fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, "
+                 "nr: %u\n", logmu, alpha, alpha_proj, logmu + alpha, nroots);
+   }
 
    logmu = L2_lognorm (F, p->skew);
    alpha = get_alpha (F, ALPHA_BOUND);
    alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
-   nroots = numberOfRealRoots (p->alg->coeff, p->alg->deg, 0, 0, NULL);
+   nroots = numberOfRealRoots (F->coeff, F->deg, 0, 0, NULL);
+   fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, "
+                "nr: %u\n", logmu, alpha, alpha_proj, logmu + alpha, nroots);
+
    e = MurphyE (p, bound_f, bound_g, area, MURPHY_K);
-
-   fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
-        logmu,
-        alpha,
-        alpha_proj,
-        logmu + alpha,
-        nroots);
-
    fprintf (fp, "# MurphyE(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e\n",
         bound_f, bound_g, area, e);
 

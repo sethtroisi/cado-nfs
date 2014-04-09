@@ -118,7 +118,7 @@
 
    [6. Bugs]
 
-   Please report bugs to Shi Bai (shi.bai AT anu.edu.au).
+   Please report bugs to Shi Bai (shih.bai AT gmail.com).
 */
 
 
@@ -160,8 +160,9 @@ usage (char **argv)
   fprintf (stderr, " -amax R       R is the upper bound for quadratic rotation.\n");
   fprintf (stderr, " -bmax U       U and -U are the sieving length for linear rotation.\n");
   fprintf (stderr, " -cmax V       V and -V are the sieving length for constant rotation.\n");
-  fprintf (stderr, " -e N E_1 E_2 ... E_N   N is the number of small primes in finding sublattices.\n");
-  fprintf (stderr, "                        E_1 to E_N are the prime powers in finding sublattices.\n");
+  fprintf (stderr, " -e N E_1 E_2 ... E_N\n");
+  fprintf (stderr, "               N is the number of small primes in finding sublattices.\n");
+  fprintf (stderr, "               E_1 to E_N are the prime powers in finding sublattices.\n");
   fprintf (stderr, " -norm M       M is the (estimated) lognorm upper bound in ropt.\n");
   fprintf (stderr, " -v            number of occurrences defines verbose level {0, 1, 2, 3} (default 0).\n");
   fprintf (stderr, " --s2          (switch) sieve-only mode (use together with the following\n");
@@ -174,6 +175,7 @@ usage (char **argv)
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
+  fprintf (stderr, " -effort M     sieving effort ranging from 1 to 5 (default 1).\n");
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
@@ -296,6 +298,16 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-effort") == 0)
+        {
+          param->effort = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+          if (param->effort < 1 || param->effort > 5) {
+            fprintf (stderr, "Error: -effort not in range (1-5).\n");
+            exit(1);
+          }       
+        }
         else {
           usage (argv);
         }
@@ -374,13 +386,22 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
+        else if (argc >= 3 && strcmp (argv[1], "-effort") == 0)
+        {
+          param->effort = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+          if (param->effort < 1 || param->effort > 5) {
+            fprintf (stderr, "Error: -effort not in range (1-5).\n");
+            exit(1);
+          }
+        }
         else if (argc >= 3 && strcmp (argv[1], "-e") == 0)
         {
           param->stage_flag = 1;
           param->s1_num_e_sl = atoi (argv[2]);
           argv += 2;
           argc -= 2;
-
           int j = 0;
           for (j = 0; j < param->s1_num_e_sl; j ++) {
             param->s1_e_sl[j] = (unsigned short) atoi (argv[1]);
@@ -435,8 +456,6 @@ main (int argc, char **argv)
 
     /* parse parameters */
     ropt_parse_param (argc, argv, param);
-
-    fprintf(stderr, "# verbose level: %d\n", param->verbose);;
 
     /* call ropt_on_cadopoly() */
     ropt_on_cadopoly (file, param);

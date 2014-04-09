@@ -11,7 +11,13 @@ endif()
 
 # Test that the version is something sane
 # First get the version string from "python --version"
-execute_process(COMMAND "${PYTHON_EXECUTABLE}" --version ERROR_VARIABLE _VERSION OUTPUT_QUIET ERROR_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND "${PYTHON_EXECUTABLE}" --version OUTPUT_VARIABLE PYTHON_OUT ERROR_VARIABLE PYTHON_ERR OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE)
+if ("${PYTHON_OUT}" MATCHES "Python")
+  set(_VERSION "${PYTHON_OUT}")
+else()
+  set(_VERSION "${PYTHON_ERR}")
+endif()
+
 string(REPLACE "Python " "" PYTHON_VERSION_STRING "${_VERSION}")
 string(REGEX REPLACE "^([0-9]+)\\.[0-9]+\\.[0-9]+.*" "\\1" PYTHON_VERSION_MAJOR "${PYTHON_VERSION_STRING}")
 string(REGEX REPLACE "^[0-9]+\\.([0-9])+\\.[0-9]+.*" "\\1" PYTHON_VERSION_MINOR "${PYTHON_VERSION_STRING}")
@@ -19,7 +25,7 @@ string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" PYTHON_VERSION_PATCH 
 
 # List acceptable Python versions. Although 3.4 is not released at this time,
 # presumably will be ok, too
-set(_Python_ACCEPTED 3.4 3.3 3.2)
+set(_Python_ACCEPTED 3.9 3.8 3.7 3.6 3.5 3.4 3.3 3.2)
 
 # Check that the interpreter is one of the accepted versions
 foreach(_TEST_VERSION ${_Python_ACCEPTED})

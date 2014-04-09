@@ -10,7 +10,7 @@
 #include "portability.h"
 
 
-#if 1
+#if 0 /* Leave them for debug */
 /**
  * Print the info for the node
  */
@@ -23,7 +23,6 @@ print_node ( node *pnode )
   /* for (i = 0; i < pnode->nr; i++) */
   /* printf ("pnode->r[%d]: %lu\n", i, pnode->r[i]); */
 }
-
 
 /**
  * Print a tree, non-recursive. Two styles.
@@ -115,73 +114,6 @@ alloc_r_node ( node *pnode )
 }
 
 
-#if 0
-/**
- * Initialise new list for (u, v) p-valuations.
- */
-void
-new_list ( listnode **top )
-{
-  *top = NULL;
-}
-
-
-/**
- * Free non-empty listnode.
- */
-void
-free_listnode ( listnode **pplistnode )
-{
-  if (*pplistnode)
-    free (*pplistnode);
-}
-
-
-/**
- * Del the list pointed by top.
- */
-void
-free_list ( listnode **pptop )
-{
-  if (*pptop != NULL) {
-    listnode *ptr;
-    while ( (*pptop)->next != NULL) {
-      ptr = (*pptop);
-      (*pptop) = (*pptop)->next;
-      free_listnode (&ptr);
-    }
-    free_listnode (pptop);
-  }
-}
-
-
-/**
- * Print the info for the listnode
- */
-void
-print_listnode ( listnode *plistnode )
-{
-  printf("(u, v): (%u,%u), val: %.2f, e: %d\n", plistnode->u, plistnode->v, plistnode->val, plistnode->e);
-}
-
-
-/**
- * Print the list pointed by top.
- */
-void
-print_list ( listnode *ptop )
-{
-  if (ptop) {
-    while ( ptop->next ) {
-      print_listnode (ptop);
-      ptop = ptop->next;
-    }
-    print_listnode (ptop);
-  }
-}
-#endif
-
-
 /**
  * Some indices, note the queue is shifted by 1.
  */
@@ -189,18 +121,6 @@ static inline int
 pq_parent ( int i )
 {
   return (i>>1);
-}
-
-static inline int
-pq_leftchild ( int i )
-{
-  return (i<<1);
-}
-
-static inline int
-pq_rightchild ( int i )
-{
-  return ( (i << 1) + 1 );
 }
 
 
@@ -212,32 +132,6 @@ new_tree ( node **root )
 {
   *root = NULL;
 }
-
-
-#if 0
-/**
- *  Free tree given by root.
- */
-void
-free_tree ( node *root )
-{
-  node *ptr = root;
-
-  /* if empty */
-  if (!ptr)
-    return;
-
-  if (ptr->firstchild)
-    free_tree (ptr->firstchild);
-
-  if (ptr->nextsibling)
-    free_tree (ptr->nextsibling);
-
-  //print_node (ptr);
-  free_node (&ptr);
-  return;
-}
-#endif
 
 
 /**
@@ -1357,68 +1251,3 @@ insert_MurphyE_pq ( MurphyE_pq *pqueue,
   }
 }
 
-
-#if 0
-/**
- * partition.
- */
-static long
-quick_sort_2d_ld_partition  ( long **array,
-                              const unsigned short dim,
-                              const long l,
-                              const long h )
-{
-  long pivot_index = l + (h - l) / 2, tmp = 0, i, first_large = l;
-
-  tmp = array [h][dim];
-  array [h][dim] = array [pivot_index][dim];
-  array [pivot_index][dim] = tmp;
-  tmp = array [h][1-dim];
-  array [h][1-dim] = array [pivot_index][1-dim];
-  array [pivot_index][1-dim] = tmp;
-
-  for (i = l; i <= h; i ++) {
-    if ( abs(array[i][dim]) < abs(array[h][dim]) ) {
-
-      tmp = array [i][dim];
-      array [i][dim] = array [first_large][dim];
-      array [first_large][dim] = tmp;
-      tmp = array [i][1-dim];
-      array [i][1-dim] = array [first_large][1-dim];
-      array [first_large][1-dim] = tmp;
-
-      first_large ++;
-    }
-  }
-
-  tmp = array [h][dim];
-  array [h][dim] = array [first_large][dim];
-  array [first_large][dim] = tmp;
-  tmp = array [h][1-dim];
-  array [h][1-dim] = array [first_large][1-dim];
-  array [first_large][1-dim] = tmp;
-
-  return first_large;
-}
-
-
-/**
- * Do a quick_selection since we only want the nbest.
- */
-static void
-quick_sort_2d_ld ( long **array,
-                   const unsigned short dim,
-                   const long l,
-                   const long h,
-                   const long nbest )
-{
-  /* quick selection */
-  if (l < h) {
-    long pivot = quick_sort_2d_ld_partition  (array, dim, l, h);
-    if (pivot > nbest)
-      quick_sort_2d_ld (array, dim, l, pivot - 1, nbest);
-    if (pivot < nbest)
-      quick_sort_2d_ld (array, dim, pivot + 1, h, nbest);
-  }
-}
-#endif

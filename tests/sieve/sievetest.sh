@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
 
+# Print and run a command
+function run {
+  echo "Running: $*"
+  "$@"
+}
+
 # Input files. First parameter is the polynomial file to use, second is root of the build directory, third is the expected SHA1 value
-MAKEFB="$1"
+FB="$1"
 LAS="$2"
 POLY="$3"
 REFERENCE_SHA1="$4"
 REFERENCE_REVISION="$5"
-shift 5
+CHECKSUM_FILE="$6"
+shift 6
 
-if [[ -z "${MAKEFB}" || ! -x "${MAKEFB}" ]]
+if [[ -z "${FB}" || ! -f "${FB}" ]]
 then
-  echo "Makefb binary ${MAKEFB} is not a executable file" >&2
+  echo "Factor base ${FB} is not a file" >&2
   exit 1
 fi
 
 if [[ -z "${LAS}" || ! -x "${LAS}" ]]
 then
-  echo "Las binary ${LAS} is not a executable file" >&2
+  echo "Las binary ${LAS} is not an executable file" >&2
   exit 1
 fi
 
@@ -35,6 +42,12 @@ then
   exit 1
 fi
 
+if [ "$1" = "-regex" ]
+then
+  REGEX="$2"
+  shift 2
+fi
+
 BASENAME="`basename "${POLY}"`"
 BASENAME="${BASENAME%%.*}"
 
@@ -42,7 +55,6 @@ BASENAME="${BASENAME%%.*}"
 TMPDIR=`mktemp -d /tmp/cadotest.XXXXXXXXXX`
 # Make temp direcotry world-readable for easier debugging
 chmod a+rx "${TMPDIR}"
-FB="${TMPDIR}/${BASENAME}.roots"
 RELS="${TMPDIR}/${BASENAME}.rels"
 FBC="${TMPDIR}/${BASENAME}.fbc"
 
@@ -54,12 +66,10 @@ if [ -n "$rho" ]
 then
   end=("-rho" "$rho")
 fi
-
-"$MAKEFB" -poly "$POLY" -alim $alim -maxbits $maxbits -out "${FB}" || exit 1
 # first exercise the -fbc command-line option to create a cache file
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" -q1 "$q0" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 # then use the cache file created above
-"$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
+run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "$mfbr" -rlambda "$rlambda" -alim "$alim" -lpba "$lpba" -mfba "$mfba" -alambda "$alambda" -q0 "$q0" "${end[@]}" -out "${RELS}" -fbc "${FBC}" "$@" || exit 1
 
 
 SHA1BIN=sha1sum
@@ -85,6 +95,45 @@ then
   exit 1
 fi
 
+if [ -n "${CHECKSUM_FILE}" ]
+then
+  MYCHECKSUM_FILE="${TMPDIR}/${BASENAME}.checksums"
+  grep "# Checksums over sieve region:" "${RELS}" > "${MYCHECKSUM_FILE}"
+  if [ -f "${CHECKSUM_FILE}" ]
+  then
+    # File with checksums already exists, compare
+    if diff -b "${CHECKSUM_FILE}" "${MYCHECKSUM_FILE}" > /dev/null
+    then
+      echo "Checksums agree"
+    else
+      echo "Error, reference checksums in ${CHECKSUM_FILE} differ from mine in ${MYCHECKSUM_FILE}" >&2
+      exit 1
+    fi
+  else
+    # File with checksums does not exists, create it
+    cp "${MYCHECKSUM_FILE}" "${CHECKSUM_FILE}"
+    echo "Created checksum file"
+  fi
+fi
 
-rm -f "${FB}" "${RELS}" "${FBC}"
-rmdir "${TMPDIR}"
+if [ -n "${REGEX}" ]
+then
+  echo "Searching for regex \"${REGEX}\"" >&2
+  if ! grep "${REGEX}" "${RELS}" >&2
+  then
+    echo "Error, regular expression \"${REGEX}\" does not match output file"
+    exit 1
+  fi
+fi
+
+if [ -z "$KEEP_SIEVETEST" ]
+then
+  rm -f "${RELS}" "${FBC}"
+  if [ -n "${MYCHECKSUM_FILE}" ]
+  then
+    rm -f "${MYCHECKSUM_FILE}"
+  fi
+  rmdir "${TMPDIR}"
+else
+  echo "Keeping files in ${TMPDIR}"
+fi

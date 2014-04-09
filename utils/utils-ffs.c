@@ -10,6 +10,15 @@
 #include "polyfactor.h"
 
 
+/* Set r to a/b mod p. Assume b and p are coprime. */
+static inline void
+ffs_mulinvmod (fppol64_t r, fppol64_t a, fppol64_t b, fppol64_t p)
+{
+  fppol64_t t;
+  int ret = fppol64_invmod (t, b, p);
+  ASSERT (ret);
+  fppol64_mulmod (r, a, t, p);
+}
 
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
@@ -23,21 +32,70 @@ ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)
   fppol64_set_ui_sparse (pol_b, b);
   fppol64_set_ui_sparse (pol_p, (uint64_t) p);
 
-#if DEBUG
-  if (UNLIKELY(fppol64_deg(pol_p) == -1))
-    {
-      fprintf(stderr, "p: ul=%lu lx=%lx str=%s\n", p, p, s);
-    }
-#endif
-
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
-  if (!fppol64_invmod (pol_b, pol_b, pol_p))
-      return (index_t) p;
+  if (fppol64_is_zero(pol_b))
+    return (p_r_values_t) p;
+  else
+  {
+    ffs_mulinvmod (pol_r, pol_a, pol_b, pol_p);
+    return (p_r_values_t) fppol64_get_ui_sparse(pol_r);
+  }
+}
 
-  fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
+p_r_values_t
+ffs_compute_r (int64_t a, uint64_t b, p_r_values_t p, p_r_values_t pk)
+{
+  fppol64_t pol_a, pol_b, pol_p, pol_pk, pol_rk, pol_tmp;
 
-  return (index_t) fppol64_get_ui_sparse(pol_r);
+  fppol64_set_ui_sparse (pol_a, (uint64_t) a);
+  fppol64_set_ui_sparse (pol_b, b);
+  fppol64_set_ui_sparse (pol_p, (uint64_t) p);
+  fppol64_set_ui_sparse (pol_pk, (uint64_t) pk);
+
+  fppol64_rem (pol_tmp, pol_b, pol_p);
+
+  fppol64_rem (pol_a, pol_a, pol_pk);
+  fppol64_rem (pol_b, pol_b, pol_pk);
+
+  if (fppol64_is_zero(pol_tmp))
+  {
+    ffs_mulinvmod (pol_rk, pol_b, pol_a, pol_pk);
+    fppol64_add (pol_rk, pol_pk, pol_rk);
+    return (p_r_values_t) fppol64_get_ui_sparse (pol_rk);
+  }
+  else
+  {
+    ffs_mulinvmod (pol_rk, pol_a, pol_b, pol_pk);
+    return (p_r_values_t) fppol64_get_ui_sparse (pol_rk);
+  }
+}
+
+void
+ffs_compute_pk_r (p_r_values_t *pk, p_r_values_t *r, p_r_values_t p,
+                  p_r_values_t rk, unsigned int k)
+{
+  fppol64_t pol_r, pol_rk, pol_p, pol_pk;
+
+  fppol64_set_ui_sparse (pol_p, (uint64_t) p);
+  fppol64_set_ui_sparse (pol_pk, (uint64_t) p);
+  fppol64_set_ui_sparse (pol_rk, (uint64_t) rk);
+  for (unsigned int i = 1; i < k; ++i)
+    fppol64_mul (pol_pk, pol_pk, pol_p);
+  *pk = (p_r_values_t) fppol64_get_ui_sparse (pol_pk);
+
+  if (fppol64_deg(pol_rk) < fppol64_deg(pol_pk))
+  {
+    fppol64_rem (pol_r, pol_rk, pol_p);
+    *r = (p_r_values_t) fppol64_get_ui_sparse (pol_r);
+  }
+  else {
+    fppol64_t x;
+    fppol64_sub (x, pol_rk, pol_pk);
+    fppol64_rem (x, x, pol_p);
+    fppol64_add (pol_r, pol_p, x);
+    *r = (p_r_values_t) fppol64_get_ui_sparse (pol_r);
+  }
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)

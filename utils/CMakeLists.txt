@@ -7,7 +7,7 @@ set (sources
         mpz_poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
-        ringbuf.c sm_utils.c memalloc.c mpz_vector.c
+        ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
@@ -37,6 +37,7 @@ add_custom_target(renew_modified_files
 # date if this file has changed
 add_custom_command(
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/modified_files.h"
+  COMMAND "${CMAKE_COMMAND}" -E echo
   DEPENDS renew_modified_files
 )
 

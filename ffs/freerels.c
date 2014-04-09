@@ -18,6 +18,11 @@
 
 #define MAX_FFS_DEG 20
 
+/* XXX This prototype is here because freerels.c includes the params.h file from
+ * ffs directory but links the param_* functions from utils library.
+ */
+int param_list_configure_switch(param_list pl, const char *, int *);
+
 int sq_is_split(sq_t * roots, sq_srcptr q, ffspol_srcptr F) {
     fq_info_t Fq;
     fq_info_init(Fq, q);

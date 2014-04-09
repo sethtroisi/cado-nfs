@@ -4,7 +4,10 @@
 
 #include "utils_with_io.h"
 
-index_t ffs_relation_compute_all_r (int64_t a, uint64_t b, index_t p);
+p_r_values_t ffs_relation_compute_r (int64_t a, uint64_t b, p_r_values_t p);
+p_r_values_t ffs_compute_r (int64_t, uint64_t, p_r_values_t, p_r_values_t);
+void ffs_compute_pk_r (p_r_values_t *, p_r_values_t *, p_r_values_t,
+                       p_r_values_t, unsigned int);
 int ffs_poly_read(cado_poly poly, const char *filename);
 
 

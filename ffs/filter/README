@@ -36,7 +36,7 @@ Step 1: Compile utils library from CADO-NFS
 
   In cado-nfs/utils directory, type:
 
-    make utils_with_io
+    make utils
 
 Step 2: Compile freerels binary for FFS and libfppol-f*.a
 

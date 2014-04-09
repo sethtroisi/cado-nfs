@@ -16,10 +16,8 @@ set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 # set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
 # set(CMAKE_COLOR_MAKEFILE OFF)
 
-# Unfortunately cmake 2.6.0 at least seems to have some bugs with the
-# find_program command, which prevent mpi from being properly detected.
-# version 2.6.3 is known to work
-cmake_minimum_required(VERSION 2.6.3)
+# If you change the min version, also change scripts/call_cmake.sh
+cmake_minimum_required(VERSION 2.8.0)
 if(COMMAND cmake_policy)
         cmake_policy(SET CMP0003 NEW)
 endif(COMMAND cmake_policy)

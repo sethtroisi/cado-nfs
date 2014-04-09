@@ -16,7 +16,8 @@ threads = 2
 tasks.sieve.threads = 1
 
 the sieving task will use the value 1 for the threads parameter, while other 
-tasks use the value 2 (unless they specify a different value in their subtree).
+tasks use the value 2 (unless they specify a different value in their
+subtree).
 
 Tasks run programs, and those have their own node in the parameter tree.
 For example, with
@@ -24,7 +25,7 @@ threads = 2
 tasks.sieve.las.threads = 1
 the theads=1 parameter would apply only to the las program, but not to any 
 other programs run during the sieving tasks, if there were any. The name of 
-the node of a program is equal to the name of the binary executable.
+the node of a program is usually equal to the name of the binary executable.
 """
 
 import os
@@ -65,8 +66,8 @@ class Parameters(object):
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
     
-    def __init__(self, *args, **kwargs):
-        self.data = dict(*args, **kwargs)
+    def __init__(self):
+        self.data = {}
         self._have_read_defaults = False
         self.key_types = {}
     
@@ -84,36 +85,39 @@ class Parameters(object):
         then we assume that there is no default value and the key is mandatory;
         an error will be raised if it is not found in the parameter hierarchy.
         
-        >>> d = {'a':'1','b':'2','c':'3','foo':{'a':'3'},'bar':{'a':'4','baz':{'a':'5'}}}
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo') == {'a': '3', 'b': '2'}
+        >>> p = Parameters()
+        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> p.myparams(keys=('a', 'b'), path = 'foo') == {'a': '3', 'b': '2'}
         True
         
-        >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': '5', 'b': '2'}
+        >>> p.myparams(keys=('a', 'b'), path = 'bar.baz') == {'a': '5', 'b': '2'}
         True
 
         Test returning the default value of a parameter not provided in the
         parameter file
-        >>> Parameters(d).myparams(keys={'d': 1}, path=[])
+        >>> p.myparams(keys={'d': 1}, path=[])
         {'d': 1}
 
         Test converting to the same type as the default value
-        >>> Parameters(d).myparams(keys={'a': 1}, path='foo')
+        >>> p.myparams(keys={'a': 1}, path='foo')
         {'a': 3}
         
         Test converting to an explicit type
-        >>> Parameters(d).myparams(keys={'a': int}, path='foo')
+        >>> p.myparams(keys={'a': int}, path='foo')
         {'a': 3}
 
         Test converting to a non-mandatory explicit type
-        >>> Parameters(d).myparams(keys={'a': [int], 'x': [int]}, path='foo')
+        >>> p.myparams(keys={'a': [int], 'x': [int]}, path='foo')
         {'a': 3}
 
         Test converting if default value is bool
-        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': False}, path=[])
+        >>> p = Parameters()
+        >>> p.readparams(("foo=yes",))
+        >>> p.myparams(keys={'foo': False}, path=[])
         {'foo': True}
         
         Test converting if explicit type is bool
-        >>> Parameters({'foo': 'yes'}).myparams(keys={'foo': bool}, path=[])
+        >>> p.myparams(keys={'foo': bool}, path=[])
         {'foo': True}
         '''
         # path can be an array of partial paths, i.e., each entry can contain
@@ -124,63 +128,61 @@ class Parameters(object):
         else:
             joinpath = '.'.join(path)
         splitpath = joinpath.split('.')
-        
-        source = self.data
-        result = self._extract_by_keys(source, keys)
-        for segment in splitpath:
-            if not segment in source:
-                break
-            source = source[segment]
-            result.update(self._extract_by_keys(source, keys))
+
+        # We process nodes in the parameter tree starting from the full path
+        # and going toward the root. At each node we extract those keys which
+        # are requested in keys, but which have not been extracted already at
+        # from deeper node. This lets _extract_from_node_by_keys() update 
+        # the used flag correctly.
+        result = {}
+        for i in range(len(splitpath), -1, -1): # len, len-1, ..., 1, 0
+            result.update(self._extract_from_node_by_keys(
+                            splitpath[:i], set(keys) - set(result)))
+        # If keys is a dictionary with default values/target types, set
+        # defaults and cast types
         if isinstance(keys, dict):
-            for key in keys:
-                # A default of None means no default or type given: if the
-                # parameter is in the parameter file, then store it in result
-                # as a string, and if not, then don't store it in result
-                if keys[key] is None:
-                    continue
-                # If only the type without default value is specified, then
-                # the value must exist in the parameter file, and is converted
-                # to the specified type
-                if type(keys[key]) is type:
-                    target_type = keys[key]
-                    if not key in result:
-                        logger.critical("Parameter %s not found under path %s",
-                            key, joinpath)
-                        raise(KeyError)
-                elif type(keys[key]) is list:
-                    # If a list is given as the default value, its first
-                    # element must be a type and we interpret it as a non-
-                    # mandatory type: if the parameter exists in the parameter
-                    # file, it is cast to that type.
-                    target_type = keys[key][0]
-                    if not key in result:
-                        continue
-                else:
-                    target_type = type(keys[key])
-                    result.setdefault(key, keys[key])
-                
-                # Convert type
-                result[key] = self._convert_one_type(splitpath, key,
-                                                     result[key], target_type)
+            self._convert_types(result, keys, splitpath)
         return result
     
-    @staticmethod
-    def _extract_by_keys(source, keys):
-        return {key:source[key] for key in keys 
-                if key in source and not isinstance(source[key], dict)}
-    
+    def get_unused_parameters(self):
+        ''' Returns all entries in the parameters that were never returned
+        by myparams() so far
+        >>> p = Parameters()
+        >>> p.readparams(('a=1', 'b=2', 'c=3', 'foo.a=3', 'bar.a=4', 'bar.baz.a=5'))
+        >>> _ = p.myparams(keys=('a', 'b'), path = 'foo')
+        >>> p.get_unused_parameters()
+        [([], 'a', '1'), ([], 'c', '3'), (['bar'], 'a', '4'), (['bar', 'baz'], 'a', '5')]
+        '''
+        return [(path, key, value) for (path, key, (value, used)) in self
+                if not used]
+
+    def _extract_from_node_by_keys(self, path, keys):
+        source = self.data
+        for segment in path:
+            source = source.get(segment, None)
+            if not isinstance(source, dict):
+                return {}
+        result = {}
+        for key in keys:
+            if key in source and not isinstance(source[key], dict):
+                result[key] = source[key][0]
+                source[key][1] = True
+        return result
+
     def __iter__(self):
         return self._recurse_iter(self.data, [])
     
     @staticmethod
     def _recurse_iter(source, path):
-        for key in source:
+        # First return all keys on this node
+        for key in sorted(source):
+            if not isinstance(source[key], dict):
+                yield (path, key, source[key])
+        # Then process sub-nodes
+        for key in sorted(source):
             if isinstance(source[key], dict):
                 for y in Parameters._recurse_iter(source[key], path + [key]):
                     yield y
-            else:
-                yield (path, key, source[key])
     
     def _get_subdict(self, path):
         source = self.data
@@ -196,8 +198,8 @@ class Parameters(object):
         if not source:
             source = {}
         pattern = re.compile(regex)
-        result = [[l[0], l[1]] for l in self._recurse_iter(source, path)
-            if pattern.search(l[1])]
+        result = [[p, k] for (p, k, v) in self._recurse_iter(source, path)
+            if pattern.search(k)]
         return result
     
     def _insertkey(self, path, value):
@@ -209,16 +211,17 @@ class Parameters(object):
         and a sub-dictionary causes a KeyError (similar to open('filepath','w')
         when filepath exists as a subdirectory).
         
-        >>> p=Parameters({'a':1, 'b':2, 'foo':{'a':3}, 'bar':{'a':4}})
+        >>> p=Parameters()
+        >>> p.readparams(['a=1', 'b=2', 'foo.a=3', 'bar.a=4'])
         >>> p._insertkey('c', 3)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nfoo.a = 3'
         >>> p._insertkey('bar.c', 5)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nbar.c = 5\\nfoo.a = 3'
         >>> p._insertkey('bar.baz.c', 6)
-        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5, 'baz': {'c': 6}}, 'foo': {'a': 3}}
-        True
+        >>> str(p)
+        'a = 1\\nb = 2\\nc = 3\\nbar.a = 4\\nbar.c = 5\\nbar.baz.c = 6\\nfoo.a = 3'
         >>> p._insertkey('bar.baz.c.d', 6)
         Traceback (most recent call last):
         KeyError: 'Subdirectory c already exists as key'
@@ -239,13 +242,12 @@ class Parameters(object):
                 if not isinstance(dest[segment], dict):
                     raise KeyError('Subdirectory %s already exists as key' 
                                    % segment)
-                dest = dest[segment]
             else:
                 dest[segment] = {}
-                dest = dest[segment]
+            dest = dest[segment]
         if key in dest.keys() and isinstance(dest[key], dict):
             raise KeyError('Key %s already exists as subdictionary' % key)
-        dest[key] = value
+        dest[key] = [value, False]
     
     @staticmethod
     def subst_env_var(fqn, value):
@@ -292,7 +294,7 @@ class Parameters(object):
             if isinstance(dic[key], dict):
                 self._subst_references(dic[key], path + [key])
             else:
-                dic[key] = self._subst_reference(path, key, dic[key])
+                dic[key][0] = self._subst_reference(path, key, dic[key][0])
     
     @staticmethod
     def _cast_to_int(value):
@@ -336,7 +338,7 @@ class Parameters(object):
         scientific notation.
         Add datatype to key_types, and check for conflict.
         
-        >>> p = Parameters({})
+        >>> p = Parameters()
         
         >>> p._convert_one_type([], "foo", "1", int)
         1
@@ -390,6 +392,53 @@ class Parameters(object):
 
         return value
 
+    def _convert_types(self, data, keytypes, path):
+        """ In the dictionary "data", convert types in-place and apply any
+        default values specified in the dictionary "keytypes"
+        """
+        for key in keytypes:
+            # A default of None means no default or type given: if the
+            # parameter is in the parameter file, then store it in data as a
+            # string, and if not, then don't store it in data
+            if keytypes[key] is None:
+                optional = True
+                target_type = None
+            # If only the type without any default value is specified, then
+            # the value must exist in the parameter file, and is converted to
+            # the specified type
+            elif type(keytypes[key]) is type:
+                optional = False
+                target_type = keytypes[key]
+            elif type(keytypes[key]) is list:
+                # If a list is given as the default value, its first element
+                # must be a type and we interpret it as an optional parameter:
+                # if the parameter exists in the parameter file, it is cast to
+                # that type.
+                optional = True
+                target_type = keytypes[key][0]
+            else:
+                # If a value is given, it will be used as the default value,
+                # and its type is used as the type to which we cast the
+                # parameter, if it is specified in the parameter file.
+                # Optional is set to true here, but that does not matter as
+                # we set the value in data anyway
+                optional = True
+                target_type = type(keytypes[key])
+                data.setdefault(key, keytypes[key])
+            
+            if not target_type is None and not type(target_type) is type:
+                msg = "Target type %s for key %s is not a type" \
+                    % (target_type, key)
+                logger.critical(msg)
+                raise TypeError(msg)
+            if not optional and not key in data:
+                msg = "Required parameter %s not found under path %s" \
+                    % (key, ".".join(path))
+                logger.critical(msg)
+                raise KeyError(msg)
+            if key in data and not target_type is None:
+                data[key] = self._convert_one_type(
+                    path, key, data[key], target_type)
 
     def parseline(self, line):
         line2 = line.split('#', 1)[0] if '#' in line else line
@@ -412,8 +461,8 @@ class Parameters(object):
         >>> p.readparams(["tasks.sieve.rels_wanted = 1", \
                           "tasks.polyselect.degree=5", \
                           "tasks.polyselect.incr =60"])
-        >>> p.data["tasks"]["sieve"]["rels_wanted"]
-        '1'
+        >>> p.myparams(["rels_wanted"], "tasks.sieve")
+        {'rels_wanted': '1'}
         >>> p.myparams(["degree", "incr"], "tasks.polyselect") == \
         {'incr': '60', 'degree': '5'}
         True
@@ -439,7 +488,7 @@ class Parameters(object):
         in an array
         '''
         return ("%s = %s" % (".".join(path + [key]), value) for
-                (path, key, value) in self)
+                (path, key, (value, used)) in self)
     
     def __str__(self):
         r = self.__str_internal__()

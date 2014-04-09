@@ -910,7 +910,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
   tmpBmin = s2param->Bmin;
 
   /* for each i -> each u = A + MOD * i */
-  int st = milliseconds ();
+  unsigned long st = milliseconds ();
   do {
 
     /* fo reach block of size size_B_block */

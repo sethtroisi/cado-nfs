@@ -10,8 +10,7 @@ unset ELL
 unset SMEXP
 unset NMAPS
 unset MT
-## for units
-unset RELSDIR
+
 EXPLICIT="no"
 
 while [ -n "$1" ]
@@ -56,10 +55,6 @@ do
   then
     MT="$2"
     shift 2
-  elif [ "$1" = "-rels" ]
-  then
-    RELSDIR="$2"
-    shift 2
   elif [ "$1" = "-explicit_units" ]
   then
     EXPLICIT="yes"
@@ -100,8 +95,9 @@ else
 
     if [ ! -s $algpr ]; then
 	echo "Building file $algpr using debug_renumber"
+	# we have to make it work for rat/alg or side 0/1
 	$prgm -poly $POLY -renumber $RENUMBER |\
-        grep " alg " | sed 's/alg side//' | sed 's/=/ /g' |\
+        egrep "(alg side|side 1)" | sed 's/=/ /g' |\
         awk '{print $2, $6, $8}' |\
         gzip -c > $algpr
     fi

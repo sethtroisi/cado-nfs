@@ -73,7 +73,7 @@ Currently the following are implemented:
 The main use of this type is for vectors to be multiplied by the binary
 matrix. We have for instance in matmul.[ch] a function called:
   void matmul_mul(matmul_ptr M , abt * B , abt const * A , int d)
-that computes B = M . A  (or transpose of d=1), where A and B are vectors
+that computes B = M . A  (or transpose if d=1), where A and B are vectors
 of "abase".
 
 Matrix - vector product
@@ -123,3 +123,83 @@ generated on first use, and saved on disk
   trying to interact with memory simultaneously. ]
 
 (documentation to be continued).
+
+Matrix - vector product -- high-level
+-------------------------------------
+
+The files matmul_top.[ch] do the high-level stuff.
+Things are complicated by the fact that the same code can do right or
+left multiplications. A parameter, usally called "d" means:
+  d=0: vector times matrix, i.e. a vector is a row. Used for left
+       nullspace computations (in factorization, for instance)
+  d=1: matrix times vector, i.e. a vector is a column. Used for right
+       nullspace computations (in discrete log)
+Most of the comments in the source code takes the "d=1" point-of-view,
+even though "d=0" is probably the most extensively tested.
+This convention is visible also in the main bw_param structure. In the
+matmul_top.[ch], it also indicates where the source vector is.
+
+The main function is matmul_top_mul(), which decomposes in two steps:
+  matmul_top_mul_cpu(), which does no communication
+  matmul_top_mul_comm(), which does (almost) no computation
+
+Each thread has room for two pieces of vectors (src and dst). The vector
+number 1 is the source when doing nullspace=right (d=1), and the
+destination otherwise. [ in a sense, vector 0 is seen as a row,
+and vector 1 as a column; although this does not really make sense, we
+can see such a convention in the source as well ]
+
+In a Wiedemann setting, bw->dir (nullspace=... at the top-level) should
+be the same as the d-parameter passed to matmul_top_mul(). However, if a
+Lanczos implementation end-up being implemented, this will refer to
+separate notions.
+
+Apart from this d=[0|1] nightmare, the mul_cpu() just calls matmul_mul(),
+and put the result in the destination (partial) vector.  The tricky part
+is (of course) the mul_comm() part.
+
+The communication phase is split in two phases:
+  - reduce_accross()
+  - broadcast_down()
+It takes as input the result of the cpu step, which is in the
+"destination" vector, and does all the communications to reconstruct the
+vector for the next iteration (thus, stored again in the "source"
+vector).
+
+Here, another complication occurs: there is a flag called
+FLAG_SHUFFLED_MUL (that corresponds to the --shuffled-product option of
+mf_bal.c and bwc.pl). If it is set, then matmul_top_mul() will not
+compute exactly the expected w = M*v product but a shuffle of it. In
+other words, what is computed correspond to a matrix M' = P*M, where P is
+a permutation matrix. This reduces / simplifies the mul_comm() part, and
+if the goal is to find a kernel vector, knowing one for M' is
+equivalent to knowing one for M.
+In the following, we assume that we are indeed in the case where
+FLAG_SHUFFLED_MUL is activated.
+
+*** Reduce_accross:
+
+If at the top-level, one has d=1 (nullspace=right), then reduce_accross()
+will be called with d=0, i.e. we want to reduce accross rows. 
+First, the reduction is done at the thread level. This is just some
+additions of vectors, done in the appropriate places of memory. Advantage
+is taken of multithread, here: each thread is in charge of a subset of
+the rows. This done in-place (i.e., still in the dst-vector).
+Second, the reduction is done at the mpi level. Here, only the thread 0
+is working in each node. This is done with MPI_Reduce_scatter (or any
+replacement routine). And this is where the shuffle is implicitly
+started. Indeed, each job will take care of reducing only a portion of
+its indices. And therefore, in the end, the pieces of the vector are not
+where they should be.
+The reduction at the MPI level is where the result is written back in the
+src vector in order to be ready for the next iteration.
+
+*** Broadcast_down:
+
+The broadcast is simply a nop at the thread level, since with shared
+memory, everyone sees everyone else's data.
+At the MPI level, though, again, there is some work to do, and only the
+thread number 0 in each node is in charge. The MPI primitive that is used
+here is MPI_Allgather. If at the top-level on has d=1, then this is
+called with d=1, i.e. the communications are down within columns.
+

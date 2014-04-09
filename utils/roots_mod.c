@@ -866,7 +866,7 @@ sort_roots (uint64_t *r, int n)
 #define MAX_DEGREE 10
 
 /* put in r[0], r[1], ... the roots of x^d = a (mod p),
-   and return the number of roots.
+   sorted by increasing value, and return the number of roots.
    Assumes 0 <= a < p.
 */
 int

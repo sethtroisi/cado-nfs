@@ -19,7 +19,7 @@ void sm_build_one_relset (sm_relset_ptr, uint64_t *, int64_t *, int,
 void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
 void compute_sm (mpz_poly_t, mpz_poly_t, const mpz_poly_t, const mpz_t,
                  const mpz_t, const mpz_t, const mpz_t);
-void print_sm (FILE *, mpz_poly_t, int);
+void print_sm (FILE *, mpz_poly_t, int, int);
 void sm_single_rel (mpz_poly_t, int64_t, uint64_t, mpz_poly_t, const mpz_t,
                     const mpz_t, const mpz_t, const mpz_t);
 

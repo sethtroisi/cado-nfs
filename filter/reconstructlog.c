@@ -153,7 +153,7 @@ add_sm_contribution (mpz_ptr l, sm_data_t *sm, int64_t a, uint64_t b)
   mpz_poly_setcoeff_si(SMres, 0, 1);
   sm_single_rel(SMres, a, b, sm->F, sm->smexp, sm->q, sm->q2, sm->invq2);
   unsigned int i;
-  for (i = 0; i < sm->nbsm && i <= (unsigned int) SMres->deg; i++)
+  for (i = sm->F->deg - sm->nbsm; i <= (unsigned int) SMres->deg; i++)
     mpz_add_log_mod_mpz (l, sm->smlog[i], SMres->coeff[i], sm->q);
   mpz_poly_clear(SMres);
 }
@@ -321,7 +321,7 @@ insert_rel_into_table(void * context_data, earlyparsed_relation_ptr rel)
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
-    weight_t e = rel->primes[i].e;
+    exponent_t e = rel->primes[i].e;
 
     if (data->w[h] == 0)
     {

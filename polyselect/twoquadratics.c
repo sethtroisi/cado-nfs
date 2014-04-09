@@ -42,31 +42,24 @@ cado_poly_extended_clear (cado_poly_extended poly)
 }
 
 void
-cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, mpz_t m,
-                mpz_t p, mpz_t skew)
+cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, 
+                mpz_t skew)
 {
   mpz_poly_set (poly->pols[0], f->coeff, f->deg);
   mpz_poly_set (poly->pols[1], g->coeff, g->deg);
   mpz_set (poly->n, N);
   poly->skew = mpz_get_d (skew);
-  mpz_invert (poly->m, p, N);
-  mpz_mul (poly->m, poly->m, m);
-  mpz_mod (poly->m, poly->m, N);
 }
 
 void
 cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
-                        mpz_t N, mpz_t m, mpz_t p, mpz_t skew, double E)
+                        mpz_t N, mpz_t p, mpz_t skew, double E)
 {
   mpz_poly_set (poly->poly->pols[0], f->coeff, f->deg);
   mpz_poly_set (poly->poly->pols[1], g->coeff, g->deg);
   mpz_set (poly->poly->n, N);
   poly->poly->skew = mpz_get_d (skew);
-  mpz_invert (poly->poly->m, p, N);
-  mpz_mul (poly->poly->m, poly->poly->m, m);
-  mpz_mod (poly->poly->m, poly->poly->m, N);
 
-  mpz_set (poly->m, m);
   mpz_set (poly->p, p);
   mpz_set (poly->skew, skew);
   poly->E = E;
@@ -107,7 +100,6 @@ cado_poly_extended_print (FILE *out, cado_poly_extended poly, char *pre)
   gmp_fprintf (out, "%sm = %Zd\n", pre, poly->m);
   mpz_mod (tmp, poly->m, poly->p);
   gmp_fprintf (out, "%sr = %Zd\n", pre, tmp);
-  gmp_fprintf (out, "%scommon_root = %Zd\n", pre, poly->poly->m);
 
   mpz_clear (tmp);
 }
@@ -464,13 +456,13 @@ main (int argc, char *argv[])
         // m is the first integer >= sqrtN such that m = r (mod P)
         compute_m (m, sqrtN, r, P);
         MontgomeryTwoQuadratics (f, g, skew_used, N, P, m, max_skewness);
-        cado_poly_set2 (cur_poly, f, g, N, P, m, skew_used);
+        cado_poly_set2 (cur_poly, f, g, N, skew_used);
         double E = MurphyE (cur_poly, bound_f, bound_g, area, MURPHY_K);
         if(E > cado_poly_extended_get_E(best_poly))
-          cado_poly_extended_set (best_poly, f, g, N, m, P, skew_used, E);
+          cado_poly_extended_set (best_poly, f, g, N, P, skew_used, E);
         if (verbose >= 1)
         {
-          cado_poly_extended_set (poly, f, g, N, m, P, skew_used, E);
+          cado_poly_extended_set (poly, f, g, N, P, skew_used, E);
           cado_poly_extended_print (stdout, poly, "# ");
         }
       }

@@ -37,8 +37,12 @@ struct siever_config_s {
     int side;
     int logI;
     double skewness;
+    unsigned long bucket_thresh;    // bucket sieve primes >= bucket_thresh
+    unsigned int td_thresh;
+    unsigned int unsieve_thresh;
     struct {
         unsigned long lim; /* factor base bound */
+        unsigned long powlim; /* bound on powers in the factor base */
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
         double lambda;     /* lambda sieve parameter */
@@ -142,7 +146,9 @@ struct sieve_side_info_s {
     mpz_poly_t fij;   /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-
+    unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
+    double *roots;     /* d^2(F(i, const j))/d(i)^2 */
+			    
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
     small_sieve_data_t ssd[1];
@@ -181,16 +187,15 @@ struct sieve_info_s {
     int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
-    unsigned int td_thresh;
-    int bucket_thresh;    // bucket sieve primes >= bucket_thresh
-    uint32_t nb_buckets;
+    uint32_t nb_buckets; /* Actual number of buckets used by current special-q */
+    uint32_t nb_buckets_max; /* Max number of buckets, if J=I/2 */
 
     sieve_side_info sides[2];
 
     /* Data for unsieving locations where gcd(i,j) > 1 */
-    unsieve_aux_data us;
+    unsieve_aux_data_srcptr us;
     /* Data for divisibility tests p|i in lines where p|j */
-    j_div_ptr j_div;
+    j_div_srcptr j_div;
 
     /* used in check_leftover_norm */
     mpz_t BB[2], BBB[2], BBBB[2];

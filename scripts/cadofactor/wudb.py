@@ -1244,9 +1244,12 @@ class DbListener(patterns.Observable):
         if not r:
             return False
         message = ResultInfo(r)
-        self.notifyObservers(message)
-        return True
-
+        was_received = self.notifyObservers(message)
+        if not was_received:
+            logger.error("Result for workunit %s was not processed by any task. "
+                         "Setting it to status CANCELLED", message.get_wu_id())
+            self.wuar.cancel(message.get_wu_id())
+        return was_received
 
 class IdMap(object):
     """ Identity map. Ensures that DB-backed dictionaries of the same table

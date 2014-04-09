@@ -31,15 +31,14 @@ alim = 10000000
 lpbr = 27
 lpba = 27
 tasks.sieve.mfbr = 54
-tasks.sieve.mfba = 81
+tasks.sieve.mfba = 54
 tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.8
+tasks.sieve.alambda = 2.2
 
 tasks.I = 12
 tasks.sieve.qmin = 10000000
 tasks.sieve.qrange = 2500
 tasks.sieve.rels_wanted = 10000000
-slaves.niceness = 10
 
 ###########################################################################
 # Filtering

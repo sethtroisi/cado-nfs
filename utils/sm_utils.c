@@ -3,7 +3,7 @@
 #include "portability.h"
 #include "utils.h"
 
-/* Init polynomial rel and set it to b*x - a */
+/* Init polynomial rel and set it to a - b*x */
 void
 mpz_poly_init_set_ab (mpz_poly_ptr rel, int64_t a, uint64_t b)
 {
@@ -30,18 +30,20 @@ compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
 
 /* Assume nSM > 0 */
 void
-print_sm (FILE *f, mpz_poly_t SM, int nSM)
+print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
 {
-  if (0 > SM->deg)
+  d--;
+  if (d > SM->deg)
     fprintf(f, "0");
   else
-    gmp_fprintf(f, "%Zu", SM->coeff[0]);
+    gmp_fprintf(f, "%Zu", SM->coeff[d]);
   for(int j = 1; j < nSM; j++)
   {
-    if (j > SM->deg)
+    d--;
+    if (d > SM->deg)
       fprintf(f, " 0");
     else
-      gmp_fprintf(f, " %Zu", SM->coeff[j]);
+      gmp_fprintf(f, " %Zu", SM->coeff[d]);
   }
   fprintf(f, "\n");
 }
