@@ -52,6 +52,8 @@ void matpoly_submat(abdst_field ab,
 
 void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int size);
 void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size);
+void matpoly_zero_column(abdst_field ab,
+        matpoly_ptr dst, unsigned int jdst, unsigned int kdst);
 void matpoly_extract_column(abdst_field ab,
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst,
         matpoly_ptr src, unsigned int jsrc, unsigned int ksrc);

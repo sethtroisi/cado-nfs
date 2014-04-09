@@ -171,6 +171,14 @@ void matpoly_extract_column(abdst_field ab,/*{{{*/
             matpoly_coeff(ab, src, i, jsrc, ksrc));
 }/*}}}*/
 
+void matpoly_zero_column(abdst_field ab,/*{{{*/
+        matpoly_ptr dst, unsigned int jdst, unsigned int kdst)
+{
+    for(unsigned int i = 0 ; i < dst->m ; i++)
+        abset_zero(ab,
+            matpoly_coeff(ab, dst, i, jdst, kdst));
+}/*}}}*/
+
 void matpoly_extract_row_fragment(abdst_field ab,/*{{{*/
         matpoly_ptr dst, unsigned int i1, unsigned int j1,
         matpoly_ptr src, unsigned int i0, unsigned int j0,
