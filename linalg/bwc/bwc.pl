@@ -308,7 +308,7 @@ while (defined($_ = shift @ARGV)) {
     elsif (/^(-.*)$/) { $k=$1; $v=undef; }
     elsif (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
     if (!defined($k)) {
-        usage "Garbage not undertood on command line: $_";
+        usage "Garbage not understood on command line: $_";
     }
     if ($k eq 'bwc_bindir') { $bindir=$v; next; }
     if (!defined($param->{$k})) {
