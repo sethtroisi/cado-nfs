@@ -832,6 +832,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
                         if (peer == 0) {
                             /* talk to ourself */
                             matpoly_ptr me = bigmatpoly_my_cell(src);
+                            ASSERT_ALWAYS(offset + length <= me->alloc);
                             abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
                             abvec_set(ab, to, from, length);
                         } else {
