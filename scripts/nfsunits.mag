@@ -15,6 +15,7 @@ NFSUNITS_VERSION:="20140329.1930"; // computing m + other stuff
 NFSUNITS_VERSION:="20140402.1830"; // ready for GF(p^2)
 NFSUNITS_VERSION:="20140402.2100"; // patching while waiting for Cyril
 NFSUNITS_VERSION:="20140403.1830"; // after Cyril's modifs
+NFSUNITS_VERSION:="20140410.1645"; // ready to shoot
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 // SetDebugOnError(true);
@@ -33,6 +34,8 @@ CCZ<Z>:=PolynomialRing(CC);
 
 DLP_DEBUG:=1;
 DLP_VERIFICATION:=false; // for expert debug mode only...
+
+SetColumns(0);
 
 // precompute all products of units^ex with |ex| <= bound.
 BuildGroupTable := function(UK, bound)
@@ -129,6 +132,8 @@ FiPoBounds := function(B, Kdata, logunits)
 //	    return [125 : i in [1..n]];
 	    return [20 : i in [1..n]];
 	elif n eq 4 then
+	    return [20 : i in [1..n]];
+	elif n eq 5 then
 	    return [20 : i in [1..n]];
 	else
 	    return [20 : i in [1..n]];
@@ -367,7 +372,7 @@ PrepareUnits := procedure(~U, ~G, Kdata, genG)
 	// boxes will have bound^{2*rK} points
 	if rK le 2 then bound:=20;
 	elif rK le 3 then bound:=10;
-	elif rK le 4 then bound:=7;
+	elif rK le 4 then bound:=10;
 	else bound:=5; end if;
 	lr:=Kdata["roots"];
 	UK,map:=UnitGroup(K);
@@ -983,7 +988,7 @@ ReadAlgpr := procedure(~lipr, ~pamax, algpr, f)
             s:=Gets(fd);
             if IsEof(s) then break; end if;
 	    npr:=npr+1;
-	    if npr mod 10000 eq 0 then
+	    if npr mod 100000 eq 0 then
 	        printf "# reading %o-th ideal at %o\n", npr, Cputime();
 	    end if;
 	    // s = "i p r"
@@ -1020,6 +1025,7 @@ BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, ldone, 
 	imax:=-1;
 	tot:=Cputime();
 	totmb:=0.0;
+	totmin:=0.0;
 	npcp:=0;
 	ndone:=0;
 	npr:=0;
@@ -1043,23 +1049,18 @@ BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, ldone, 
 		    tp:=Cputime();
 //		    printf "%o: %o\n", lipr[p], #ldone[p];
 		    ok,gp:=FindGeneratorWithGalois(p, r, Kdata, ldone[p]);
+		    totmb:=totmb+Cputime(tp);
 		    if ok then
 //		        printf "FG(%o, %o) -> %o (%o)\n", p, r, gp, Norm(gp);
 //		    	assert(gp in id);
+			tp:=Cputime();
 			good[i]:=Minimize(Kdata, K!gp);
+			totmin:=totmin+Cputime(tp);
 		    else // obsolete or cautious?
-error("obsolete?");
-		      for elt in ldone[p] do
-		        if elt in id then
-			    ok:=true;
-			    good[i]:=Minimize(Kdata, K!elt);
-			    break;
-			end if;
-		      end for;
+		    	error("obsolete?");
 		    end if;
 //		    if not ok then printf "missed\n"; end if;
 //		    printf "# membership: %o %o\n", #l[p], Cputime(tp);
-		    totmb:=totmb+Cputime(tp);
 		    ndone:=ndone+1;
 		end if;
 		if ok then
@@ -1077,7 +1078,9 @@ error("obsolete?");
 		        printf "#T# pcp: %o\n", tp;
 		    end if;
 		    if not ok then error("Not principal in Gen"); end if;
-		    good[i]:=K!gp;
+		    tp:=Cputime();
+		    good[i]:=Minimize(Kdata, K!gp);
+		    totmin:=totmin+Cputime(tp);
 		    // trick: add it to lp[]
 		    npcp:=npcp+1;
 		    ldone[p]:=[K!gp];
@@ -1086,8 +1089,8 @@ error("obsolete?");
 //if i gt 20 then error("FFF"); end if;
 	  end for;
 	end for;
-	printf "#T# imin=%o imax=%o totpcp=%o totmb=%o npcp=%o ndone=%o\n", 
-	       imin, imax, Cputime(tot), totmb, npcp, ndone;
+	printf "#T# imin=%o imax=%o totpcp=%o totmb=%o totmin=%o npcp=%o ndone=%o\n", 
+	       imin, imax, Cputime(tot), totmb, totmin, npcp, ndone;
 	tp:=Cputime();
         fo:=POpen("gzip -c > " * generators, "w");
 	for i:=imin to imax do
@@ -1610,7 +1613,5 @@ Simul := procedure(dir, name, gen)
 				purged,index,ficunits,false);
 end procedure;
 
-print "Simul(\"SNFS\", \"p59\", true);";
-// Simul("SNFS", "p60x4x4", false);
 ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,index,ficunits,ww eq "true"); // don't ask why we should write this...!
 exit;
