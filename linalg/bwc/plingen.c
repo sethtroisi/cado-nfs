@@ -756,6 +756,7 @@ struct bm_io_s {/*{{{*/
     bmstatus_ptr bm;
     unsigned int t0;
     FILE * f;
+    char * iobuf;
     const char * input_file;
     const char * output_file;
     int ascii;
@@ -1271,7 +1272,10 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
         return;
 
     aa->f = fopen(aa->input_file, aa->ascii ? "r" : "rb");
+
     DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->input_file);
+    aa->iobuf = malloc(2 * io_block_size);
+    setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
 
     /* read and discard the first coefficient */
     if (!bm_io_read1(aa, 0)) {
@@ -1291,6 +1295,8 @@ void bm_io_end_read(bm_io_ptr aa)/*{{{*/
     if (random_input_length) return;
     fclose(aa->f);
     aa->f = NULL;
+    free(aa->iobuf);
+    aa->iobuf = 0;
 }/*}}}*/
 
 void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
@@ -1313,6 +1319,10 @@ void bm_io_begin_write(bm_io_ptr aa)/*{{{*/
         aa->f = fopen(aa->output_file, aa->ascii ? "w" : "wb");
     }
     DIE_ERRNO_DIAG(aa->f == NULL, "fopen", aa->output_file);
+    if (!random_input_length) {
+        aa->iobuf = malloc(2 * io_block_size);
+        setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
+    }
 }/*}}}*/
 
 void bm_io_end_write(bm_io_ptr aa)/*{{{*/
@@ -1327,6 +1337,8 @@ void bm_io_end_write(bm_io_ptr aa)/*{{{*/
         fclose(aa->f);
     }
     aa->f = NULL;
+    free(aa->iobuf);
+    aa->iobuf = 0;
 }/*}}}*/
 
 void bm_io_clear(bm_io_ptr aa)/*{{{*/
