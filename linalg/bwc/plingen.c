@@ -1385,14 +1385,8 @@ void bm_io_guess_length(bm_io_ptr aa)/*{{{*/
             if (!rank)
                 printf("Expect roughly %.2f items in the sequence.\n", expected_length);
 
-            /* First coefficient is always lighter, so we add a +1. The
-             * 5% are here really only to take into account the
-             * deviations, but we don't expect much */
-            size_t guessed_length = 1 + ceil(1.05 * expected_length);
-            if (!rank)
-                printf("With safety margin: expect length %zu at most\n", guessed_length);
-
-            aa->guessed_length = guessed_length;
+            /* First coefficient is always lighter, so we add a +1. */
+            aa->guessed_length = 1 + expected_length;
         }
 #if 0
         /* we don't have the struct bw at hand here... */
@@ -1579,8 +1573,17 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
     MPI_Comm_rank(aa->bm->world, &rank);
 
     unsigned int guess = aa->guessed_length;
+
+    size_t safe_guess = guess;
+
+    if (aa->ascii) {
+        /* The 5% are here really only to take into account the deviations,
+         * but we don't expect much */
+        safe_guess = ceil(1.05 * guess);
+    }
+
     ASSERT(bigmatpoly_check_pre_init(xE));
-    bigmatpoly_finish_init(ab, xE, m, b, guess);
+    bigmatpoly_finish_init(ab, xE, m, b, safe_guess);
 
     /* Decide on the temp storage size */
     double avg = avg_matsize(ab, m, n, aa->ascii);
@@ -1600,7 +1603,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
 
     unsigned int kE = 0;
 
-    for(unsigned int kE0 = 0 ; kE0 + aa->t0 < aa->guessed_length ; kE0 += B) {
+    for(unsigned int kE0 = 0 ; kE0 + aa->t0 < safe_guess ; kE0 += B) {
         /* Setting E->size is rather artificial, since we use E essentially
          * as an area where we may write coefficients freely. The only aim is
          * to escape some safety checks involving ->size in matpoly_part */
@@ -1620,8 +1623,8 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
                     break;
                 }
 
-                if (kE + aa->t0 > aa->guessed_length) {
-                    fprintf(stderr, "Going past guessed length ???\n");
+                if (kE + aa->t0 > safe_guess) {
+                    fprintf(stderr, "Going way past guessed length%s ???\n", aa->ascii ? " (more than 5%%)" : "");
                 }
 
                 for(unsigned int j = 0 ; j < n ; j++) {
