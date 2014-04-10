@@ -863,32 +863,27 @@ class WuAccess(object): # {
             logger.error ("WuAccess._checkstatus(): %s", msg)
             raise StatusUpdateError(msg)
 
-    @staticmethod
-    def check(data):
+    # Which fields should be None for which status
+    should_be_unset = {
+        "errorcode": (WuStatus.AVAILABLE, WuStatus.ASSIGNED),
+        "timeresult": (WuStatus.AVAILABLE, WuStatus.ASSIGNED),
+        "resultclient": (WuStatus.AVAILABLE, WuStatus.ASSIGNED),
+        "timeassigned": (WuStatus.AVAILABLE,),
+        "assignedclient": (WuStatus.AVAILABLE,),
+    }
+    def check(self, data):
         status = data["status"]
         WuStatus.check(status)
         wu = Workunit(data["wu"])
         assert wu.get_id() == data["wuid"]
-        if status > WuStatus.RECEIVED_ERROR:
-            return
         if status == WuStatus.RECEIVED_ERROR:
             assert data["errorcode"] != 0
-            return
         if status == WuStatus.RECEIVED_OK:
             assert data["errorcode"] is None or data["errorcode"] == 0
-            return
-        assert data["errorcode"] is None
-        assert data["timeresult"] is None
-        assert data["resultclient"] is None
-        if status == WuStatus.ASSIGNED:
-            return
-        assert data["timeassigned"] is None
-        assert data["assignedclient"] is None
-        if status == WuStatus.AVAILABLE:
-            return
-        assert data["timecreated"] is None
-        # etc.
-    
+        for field in self.should_be_unset:
+            if status in self.should_be_unset[field]:
+                assert data[field] is None
+
     # Here come the application-visible functions that implement the 
     # "business logic": creating a new workunit from the text of a WU file,
     # assigning it to a client, receiving a result for the WU, marking it as
