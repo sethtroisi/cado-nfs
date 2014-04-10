@@ -84,6 +84,147 @@ struct bmstatus_s {
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
 
+
+struct tree_level_stats_s {
+    unsigned int ncalled;
+    unsigned int min_inputsize;
+    unsigned int max_inputsize;
+    unsigned int sum_inputsize;
+    double spent;
+    double projected_time;;
+    const char * func;
+    int warned;
+    double last_printed_projected_time;
+};
+typedef struct tree_level_stats_s tree_level_stats[1];
+typedef struct tree_level_stats_s *tree_level_stats_ptr;
+
+struct tree_running_stats_s {
+    const char * func;
+    unsigned int inputsize;
+    double time_self;
+    double time_children;
+};
+
+typedef struct tree_running_stats_s tree_running_stats[1];
+typedef struct tree_running_stats_s *tree_running_stats_ptr;
+
+
+
+struct {
+    struct tree_level_stats_s stats_stack[64];
+    struct tree_running_stats_s stats_curstack[64];
+    unsigned int depth;
+
+    unsigned tree_total_breadth;
+    double last_print_time;
+} stats[1];
+
+void tree_stats_print(unsigned int level)
+{
+    double sum = 0;
+    for(unsigned int k = 1 ; k < 64 ; k++) {
+        tree_level_stats_ptr u = stats->stats_stack + k;
+
+        if (k > level && !u->ncalled)
+            break;
+
+        if (!u->ncalled) {
+            printf("%u *\n", k);
+            continue;
+        }
+        u->projected_time = stats->tree_total_breadth * u->spent / u->sum_inputsize;
+        sum += u->projected_time;
+        printf("%u [%u-%u] %u/%u %.1f -> %.1f (total: %.1f)\n",
+                k-1, u->min_inputsize, u->max_inputsize,
+                u->ncalled, stats->tree_total_breadth * u->ncalled / u->sum_inputsize, u->spent / u->ncalled, u->projected_time, sum);
+        u->last_printed_projected_time = u->projected_time;
+    }
+}
+
+void tree_stats_enter(const char * func, unsigned int inputsize)
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return;
+    tree_running_stats_ptr s = stats->stats_curstack + ++stats->depth;
+    memset(s, 0, sizeof(struct tree_running_stats_s));
+    s->time_self -= wct_seconds();
+    s->func = func;
+    s->inputsize = inputsize;
+}
+
+int tree_stats_leave(int rc)
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank) return rc;
+    double now = wct_seconds();
+    tree_running_stats_ptr s = stats->stats_curstack + stats->depth;
+    s->time_self += now;
+    double tt = s->time_self;
+    s->time_self -= s->time_children;
+    unsigned int level = stats->depth;
+
+    tree_level_stats_ptr t = stats->stats_stack + level;
+    if (t->ncalled == 0) {
+        t->min_inputsize = s->inputsize;
+        t->max_inputsize =s-> inputsize;
+        t->func = s->func;
+    }
+    t->ncalled++;
+    if (s->inputsize < t->min_inputsize)
+        t->min_inputsize = s->inputsize;
+    if (s->inputsize > t->max_inputsize)
+        t->max_inputsize = s->inputsize;
+    t->sum_inputsize += s->inputsize;
+    t->spent += s->time_self;
+    if (t->func != s->func && !t->warned) {
+        fprintf(stderr, "Warning: at depth level %d (input size %u to %u), function called is not constant: %s or %s\n",
+                level, t->min_inputsize, t->max_inputsize, t->func, s->func);
+        t->warned=1;
+    }
+
+    stats->stats_curstack[stats->depth - 1].time_children += tt;
+    --stats->depth;
+
+    /* Is it any useful to print something new ? */
+
+    if (now < stats->last_print_time + 2)
+        return rc;
+
+    int needprint = 0;
+    for(unsigned int k = 0 ; !needprint && k < 64 ; k++) {
+        tree_level_stats_ptr u = stats->stats_stack + k;
+
+        if (k > level && !u->ncalled)
+            break;
+
+        if (!u->ncalled)
+            continue;
+
+        /* compute the projected time */
+        u->projected_time = stats->tree_total_breadth * u->spent / u->sum_inputsize;
+        if (u->projected_time < 0.98 * u->last_printed_projected_time)
+            needprint = 1;
+        else if (u->projected_time > 1.02 * u->last_printed_projected_time)
+            needprint = 1;
+    }
+
+    if (!needprint)
+        return rc;
+
+    stats->last_print_time = now;
+
+    tree_stats_print(level);
+
+    return rc;
+}
+
+
+
+
+
 /* {{{ col sorting */
 /* We sort only with respect to the global delta[] parameter. As it turns
  * out, we also access the column index in the same aray and sort with
@@ -158,6 +299,7 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
 
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
+    tree_stats_enter(__func__, E->size);
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -424,7 +566,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
 
-    return generator_found;
+    return tree_stats_leave(generator_found);
 }/*}}}*/
 
 double start_time = -1;
@@ -530,6 +672,7 @@ void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)/*{{{
 
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
+    tree_stats_enter(__func__, E->size);
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -559,7 +702,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         matpoly_swap(pi_left, pi);
         matpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return 1;
+        return tree_stats_leave(1);
     }
 
     tt = seconds();
@@ -582,12 +725,15 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     matpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return done;
+    return tree_stats_leave(done);
 }/*}}}*/
 
 /* This version works over MPI */
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
+
+    tree_stats_enter(__func__, E->size);
+
     dims * d = bm->d;
     abdst_field ab = d->ab;
     int done;
@@ -619,7 +765,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
         bigmatpoly_swap(pi_left, pi);
         bigmatpoly_clear(ab, pi_left);
         // fprintf(stderr, "Leave %s\n", __func__);
-        return 1;
+        return tree_stats_leave(1);
     }
 
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
@@ -658,7 +804,7 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     bigmatpoly_clear(ab, pi_right);
 
     // fprintf(stderr, "Leave %s\n", __func__);
-    return done;
+    return tree_stats_leave(done);
 }/*}}}*/
 
 static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
@@ -1959,6 +2105,8 @@ int main(int argc, char *argv[])
     unsigned int t0 = bm->t;
     unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
     for(unsigned int j = 0 ; j < m + n ; delta[j++]=t0);
+
+    stats->tree_total_breadth = aa->guessed_length;
 
     int go_mpi = aa->guessed_length >= bm->lingen_mpi_threshold;
 
