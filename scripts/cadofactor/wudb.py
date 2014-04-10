@@ -1428,20 +1428,19 @@ class DbThreadPool(object):
 if __name__ == '__main__': # {
     import argparse
 
-    queries = {"avail" : ("Available workunits: ", {"eq": {"status": WuStatus.AVAILABLE}}), 
-               "assigned": ("Assigned workunits: ", {"eq": {"status": WuStatus.ASSIGNED}}), 
-               "receivedok": ("Received ok workunits: ", {"eq":{"status": WuStatus.RECEIVED_OK}}), 
-               "receivederr": ("Received with error workunits: ", {"eq": {"status": WuStatus.RECEIVED_ERROR}}), 
-               "verifiedok": ("Verified ok workunits: ", {"eq": {"status": WuStatus.VERIFIED_OK}}), 
-               "verifiederr": ("Verified with error workunits: ", {"eq": {"status": WuStatus.VERIFIED_ERROR}}), 
-               "cancelled": ("Cancelled workunits: ", {"eq": {"status": WuStatus.CANCELLED}}), 
-               "all": ("All existing workunits: ", {})
+    queries = {"avail" : ("Available workunits", {"eq": {"status": WuStatus.AVAILABLE}}), 
+               "assigned": ("Assigned workunits", {"eq": {"status": WuStatus.ASSIGNED}}), 
+               "receivedok": ("Received ok workunits", {"eq":{"status": WuStatus.RECEIVED_OK}}), 
+               "receivederr": ("Received with error workunits", {"eq": {"status": WuStatus.RECEIVED_ERROR}}), 
+               "verifiedok": ("Verified ok workunits", {"eq": {"status": WuStatus.VERIFIED_OK}}), 
+               "verifiederr": ("Verified with error workunits", {"eq": {"status": WuStatus.VERIFIED_ERROR}}), 
+               "cancelled": ("Cancelled workunits", {"eq": {"status": WuStatus.CANCELLED}}), 
+               "all": ("All existing workunits", {})
               }
 
     use_pool = False
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-dbname', help='Name of the database file')
     parser.add_argument('-dbfile', help='Name of the database file')
     parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
@@ -1450,8 +1449,10 @@ if __name__ == '__main__': # {
                         'read from stdin, separated by blank line')
     parser.add_argument('-assign', nargs = 1, metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
-    parser.add_argument('-cancel', nargs = 1, metavar = 'wuid', 
-                        help = 'Cancel a WU with the given id')
+    parser.add_argument('-cancel', action="store_true",
+                        help = 'Cancel selected WUs')
+    # parser.add_argument('-setstatus', metavar = 'STATUS', 
+    #                    help = 'Forcibly set selected workunits to status (integer)')
     parser.add_argument('-prio', metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' 
                         'receive priority N')
@@ -1469,9 +1470,11 @@ if __name__ == '__main__': # {
                         metavar = ("dictname", "keyname", "type", "keyvalue"),
                         help='Set an entry of a DB-backed dictionary')
     
-
+    parser.add_argument('-wuid', help="Select workunit with given id",
+                        metavar="WUID")
     for arg in queries:
-        parser.add_argument('-' + arg, action="store_true", required = False)
+        parser.add_argument('-' + arg, action="store_true", required=False,
+                            help="Select %s" % queries[arg][0].lower())
     parser.add_argument('-dump', nargs='?', default = None, const = "all", 
                         metavar = "FIELD", 
                         help='Dump WU contents, optionally a single field')
@@ -1482,8 +1485,6 @@ if __name__ == '__main__': # {
     # print(args)
 
     dbname = "wudb"
-    if args["dbname"]:
-        dbname = args["dbname"]
     if args["dbfile"]:
         dbname = args["dbfile"]
 
@@ -1519,28 +1520,39 @@ if __name__ == '__main__': # {
         db_pool.create(wus, priority=prio)
 
     # Functions for queries
+    queries_list = []
     for (arg, (msg, condition)) in queries.items():
-        if not args[arg]:
-            continue
-        print(msg)
+        if args[arg]:
+            queries_list.append([msg, condition])
+    if args["wuid"]:
+        for wuid in args["wuid"].split(","):
+            msg = "Workunit %s" % wuid
+            condition = {"eq": {"wuid": wuid}}
+            queries_list.append([msg, condition])
+
+    for (msg, condition) in queries_list:
+        print("%s: " % msg)
         if not args["dump"]:
-            count = db_pool.count(limit=limit, **condition)
+            count = db_pool.count(limit=args["limit"], **condition)
             print (count)
-        elif args["dump"]:
-            wus = db_pool.query(limit=limit, **condition)
+        else:
+            wus = db_pool.query(limit=args["limit"], **condition)
             if wus is None:
-                print("None")
-                continue
-            print (len(wus))
-            field = args["sort"] 
-            if field:
-                wus.sort(key=lambda wu: str(wu[field]))
-            if args["dump"] == "all":
-                print(WuAccess.to_str(wus))
+                print("0")
             else:
-                field = args["dump"]
-                for wu in wus:
-                    print(wu[field])
+                print (len(wus))
+                if args["sort"]:
+                    wus.sort(key=lambda wu: str(wu[args["sort"]]))
+                if args["dump"] == "all":
+                    print(WuAccess.to_str(wus))
+                else:
+                    for wu in wus:
+                        print(wu[args["dump"]])
+        if args["cancel"]:
+            print("Cancelling selected workunits")
+            db_pool.cancel_by_condition(**condition)
+        # if args["setstatus"]:
+        #    db_pool.set_status(int(args["setstatus"]), **condition)
 
     # Dict manipulation
     if args["setdict"]:
@@ -1555,15 +1567,6 @@ if __name__ == '__main__': # {
     if args["assign"]:
         clientid = args["assign"][0]
         wus = db_pool.assign(clientid)
-
-    if args["cancel"]:
-        wuid = args["cancel"][0]
-        if wuid == "available":
-            wus = db_pool.cancel_all_available()
-        if wuid == "assigned":
-            wus = db_pool.cancel_all_assigned()
-        else:
-            wus = db_pool.cancel(wuid)
 
     if args["result"]:
         result = args["result"]
