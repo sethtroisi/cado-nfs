@@ -1326,7 +1326,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         if (!rank && kpi > next_report_k) {
             double tt = wct_seconds();
             if (tt > next_report_t) {
-                fprintf(stderr,
+                printf(
                         "Written %u coefficients (%.1f%%) in %.1f s\n",
                         kpi, 100.0 * kpi / pilen,
                         tt-tt0);
@@ -1789,7 +1789,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
                     /* the +1 is because we're playing a nasty trick by
                      * forcibly discarding the first coefficient in the
                      * sequence. Just don't convey bad information... */
-                    fprintf(stderr, "EOF met after reading %u coefficients\n",
+                    printf("EOF met after reading %u coefficients\n",
                             aa->k + 1);
                     break;
                 }
@@ -1821,7 +1821,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
             if (aa->k > next_report_k) {
                 double tt = wct_seconds();
                 if (tt > next_report_t) {
-                    fprintf(stderr,
+                    printf(
                             "Read %u coefficients (%.1f%%)"
                             " in %.1f s (%.1f MB/s)\n",
                             aa->k, 100.0 * aa->k / guess,
