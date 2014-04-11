@@ -146,7 +146,7 @@ void tree_stats_print(unsigned int level)
             firstok = u->projected_time;
         } else if (nstars && nok == 1) {
             double ratio = firstok / u->projected_time;
-            complement = firstok * (pow(ratio, nstars) - 1) / (ratio - 1);
+            complement = ratio * firstok * (pow(ratio, nstars) - 1) / (ratio - 1);
         }
         nok++;
 
