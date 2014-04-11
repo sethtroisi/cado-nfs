@@ -2063,6 +2063,12 @@ int main(int argc, char *argv[])
         param_list_parse_ulong(pl, "random_seed", &random_seed);
         gmp_randseed_ui(rstate, random_seed);
     }
+    if (bm->lingen_mpi_threshold < bm->lingen_threshold) {
+        bm->lingen_mpi_threshold = bm->lingen_threshold;
+        fprintf(stderr, "Argument fixing: setting lingen-mpi-threshold=%u (because lingen-threshold=%u)\n",
+                bm->lingen_mpi_threshold, bm->lingen_threshold);
+    }
+
 
 
 #if defined(FAKEMPI_H_)
