@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
+
 
 #include <assert.h>
 
@@ -123,6 +125,10 @@ struct {
 void tree_stats_print(unsigned int level)
 {
     double sum = 0;
+    int nstars=0;
+    int nok=0;
+    double firstok = 0;
+    double complement = 0;
     for(unsigned int k = 1 ; k < 64 ; k++) {
         tree_level_stats_ptr u = stats->stats_stack + k;
 
@@ -130,15 +136,29 @@ void tree_stats_print(unsigned int level)
             break;
 
         if (!u->ncalled) {
-            printf("%u *\n", k);
+            printf("%u *\n", k-1);
+            nstars++;
             continue;
         }
         u->projected_time = stats->tree_total_breadth * u->spent / u->sum_inputsize;
+        if (nstars && nok == 0) {
+            firstok = u->projected_time;
+        } else if (nstars && nok == 1) {
+            double ratio = firstok / u->projected_time;
+            complement = firstok * (pow(ratio, nstars) - 1) / (ratio - 1);
+        }
+        nok++;
+
         sum += u->projected_time;
-        printf("%u [%u-%u] %u/%u %.1f -> %.1f (total: %.1f)\n",
+        printf("%u [%u-%u, %s] %u/%u %.1f -> %.1f (total: %.1f)\n",
                 k-1, u->min_inputsize, u->max_inputsize,
+                u->func,
                 u->ncalled, stats->tree_total_breadth * u->ncalled / u->sum_inputsize, u->spent / u->ncalled, u->projected_time, sum);
         u->last_printed_projected_time = u->projected_time;
+    }
+    if (nstars && nok >= 2) {
+        printf("expected time for levels 0-%u: %.1f (total: %.1f)\n",
+                nstars-1, complement, sum + complement);
     }
 }
 
@@ -1910,6 +1930,35 @@ void display_deltas(bmstatus_ptr bm, unsigned int * delta)/*{{{*/
     }
 }/*}}}*/
 
+void print_node_assignment(MPI_Comm comm)
+{
+    int rank;
+    int size;
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
+
+    struct utsname me[1];
+    int rc = uname(me);
+    if (rc < 0) { perror("uname"); MPI_Abort(comm, 1); }
+    size_t sz = 1 + sizeof(me->nodename);
+    char * global = malloc(size * sz);
+    memset(global, 0, size * sz);
+    memcpy(global + rank * sz, me->nodename, sizeof(me->nodename));
+
+    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+            global, sz, MPI_BYTE, comm);
+    if (rank == 0) {
+        char name[80];
+        int len=80;
+        MPI_Comm_get_name(comm, name, &len);
+        name[79]=0;
+        for(int i = 0 ; i < size ; i++) {
+            printf("%s rank %d: %s\n", name, i, global + i * sz);
+        }
+    }
+    free(global);
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -2019,6 +2068,9 @@ int main(int argc, char *argv[])
     bm->mpi_dims[1] = 1;
     param_list_parse_intxint(pl, "mpi", bm->mpi_dims);
     {
+        /* Display node index wrt MPI_COMM_WORLD */
+        print_node_assignment(MPI_COMM_WORLD);
+
         /* Reorder all mpi nodes so that each node gets the given number
          * of jobs, but close together.
          */
@@ -2070,6 +2122,8 @@ int main(int argc, char *argv[])
         int jrank = ml_jrank * thr[1] + tl_jrank;
         int newrank = irank * mpi[1] * thr[1] + jrank;
         MPI_Comm_split(MPI_COMM_WORLD, 0, newrank, &(bm->world));
+        MPI_Comm_set_name(bm->world, "bm->world");
+        print_node_assignment(bm->world);
     }
     /* }}} */
 
