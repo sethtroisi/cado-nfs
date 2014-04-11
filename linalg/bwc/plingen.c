@@ -65,6 +65,7 @@ gmp_randstate_t rstate;
 
 #ifdef HAVE_MPIR
 static int caching = 1;
+static unsigned int caching_threshold = 10;
 #else
 static int caching = 0;
 #endif
@@ -644,7 +645,7 @@ void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)/*{{{*/
     }
 }/*}}}*/
 
-void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)/*{{{*/
+void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B, int caching)/*{{{*/
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -667,7 +668,7 @@ void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)/*{{{*
     }
 }/*}}}*/
 
-void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)/*{{{*/
+void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B, int caching)/*{{{*/
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -727,19 +728,19 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
 
     tt = seconds();
     matpoly_rshift(ab, E, E, half - pi_left->size + 1);
-    if (E->size > display_threshold) print_info_mp(bm->t, E, pi_left);
+    if (E->size >= display_threshold) print_info_mp(bm->t, E, pi_left);
     matpoly_mp(ab, E_right, E, pi_left);
     tt = seconds() - tt;
-    if (with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    if (with_timings && E->size >= display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mp += tt;
     done = bw_lingen_single(bm, pi_right, E_right, delta);
     matpoly_clear(ab, E_right);
 
     tt = seconds();
-    if (E->size > display_threshold) print_info_mul(bm->t, pi_left, pi_right);
+    if (E->size >= display_threshold) print_info_mul(bm->t, pi_left, pi_right);
     matpoly_mul(ab, pi, pi_left, pi_right);
     tt = seconds() - tt;
-    if (with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    if (with_timings && E->size >= display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mul += tt;
     matpoly_clear(ab, pi_left);
     matpoly_clear(ab, pi_right);
@@ -790,35 +791,39 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 
     bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
     tt = wct_seconds();
-    if (E->size > display_threshold) print_info_mpi_mp(bm->t, E, pi_left);
 #ifdef  HAVE_MPIR
-    if (caching) {
+    if (caching && E->size >= caching_threshold) {
+        if (E->size >= display_threshold) print_info_mpi_mp(bm->t, E, pi_left, 1);
         bigmatpoly_mp_caching(ab, E_right, E, pi_left);
     } else {
+        if (E->size >= display_threshold) print_info_mpi_mp(bm->t, E, pi_left, 0);
         bigmatpoly_mp(ab, E_right, E, pi_left);
     }
 #else
+        if (E->size >= display_threshold) print_info_mpi_mp(bm->t, E, pi_left, 0);
         bigmatpoly_mp(ab, E_right, E, pi_left);
 #endif
     tt = wct_seconds() - tt;
-    if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    if (!rank && with_timings && E->size >= display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mp = tt;
     done = bw_biglingen_collective(bm, pi_right, E_right, delta);
     bigmatpoly_clear(ab, E_right);
 
     tt = wct_seconds();
-    if (E->size > display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right);
 #ifdef  HAVE_MPIR
-    if (caching) {
+    if (caching && E->size >= caching_threshold) {
+        if (E->size >= display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right, 1);
         bigmatpoly_mul_caching(ab, pi, pi_left, pi_right);
     } else {
+        if (E->size >= display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right, 0);
         bigmatpoly_mul(ab, pi, pi_left, pi_right);
     }
 #else
-    bigmatpoly_mul(ab, pi, pi_left, pi_right);
+        if (E->size >= display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right, 0);
+        bigmatpoly_mul(ab, pi, pi_left, pi_right);
 #endif
     tt = wct_seconds() - tt;
-    if (!rank && with_timings && E->size > display_threshold) printf("\t[%.2f]\n", tt);
+    if (!rank && with_timings && E->size >= display_threshold) printf("\t[%.2f]\n", tt);
     bm->t_mul += tt;
     bigmatpoly_clear(ab, pi_left);
     bigmatpoly_clear(ab, pi_right);
@@ -2048,6 +2053,9 @@ int main(int argc, char *argv[])
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "display-threshold", &(display_threshold));
+#ifdef HAVE_MPIR
+    param_list_parse_uint(pl, "caching-threshold", &(caching_threshold));
+#endif
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
     param_list_parse_uint(pl, "io-block-size", &(io_block_size));
     {
