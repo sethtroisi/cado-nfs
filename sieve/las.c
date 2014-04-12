@@ -1144,19 +1144,19 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
         case 'r' : side = RATIONAL_SIDE; 
                    mpz_set_ui(r, 0);
                    for( ; *x && !isdigit(*x) ; x++) ;
-                   rc = gmp_sscanf(x, "%Zi%n", p, &nread);
+                   rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
                    x+=nread;
-                   ASSERT_ALWAYS(rc == 1);  /* %n does not count */
+                   ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
                    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
+                   if (rc == 2)
+                       break;
+                   // If the root is not specified, then we assume that
+                   // the side is really rational, and then we compute
+                   // the root.
                    mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
                    ASSERT_ALWAYS(f->deg == 1);
                    int nroots = poly_roots(&r, f->coeff, f->deg, p);
                    ASSERT_ALWAYS(nroots == 1);
-                   /* We may in fact also have the root specified. We
-                    * ignore what is in the file, the root is computed
-                    * unconditionally above */
-                   gmp_sscanf(x, "%*Zi%n", &nread);
-                   x+=nread;
                    break;
         default:
                    /* We may as well default on the command-line switch
