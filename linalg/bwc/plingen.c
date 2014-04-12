@@ -50,6 +50,9 @@
  *    |->bw_lingen_basecase
  *
  */
+
+#define MPI_MY_SIZE_T   MPI_UNSIGNED_LONG
+
 static unsigned int display_threshold = 10;
 static int with_timings = 0;
 
@@ -70,6 +73,11 @@ static unsigned int caching_threshold = 10;
 static int caching = 0;
 #endif
 
+static const char * checkpoint_directory;
+static unsigned int checkpoint_threshold = 100;
+static int save_gathered_checkpoints = 0;
+
+
 struct bmstatus_s {
     dims d[1];
     unsigned int t;
@@ -88,6 +96,7 @@ typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
 
 
+/*{{{ statistics for projected running time. One global struct. */
 struct tree_level_stats_s {
     unsigned int ncalled;
     unsigned int min_inputsize;
@@ -167,7 +176,7 @@ void tree_stats_enter(const char * func, unsigned int inputsize)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank) return;
+    if (rank) { ++stats->depth; return; }
     tree_running_stats_ptr s = stats->stats_curstack + ++stats->depth;
     memset(s, 0, sizeof(struct tree_running_stats_s));
     s->time_self -= wct_seconds();
@@ -179,7 +188,7 @@ int tree_stats_leave(int rc)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank) return rc;
+    if (rank) { --stats->depth; return rc; }
     double now = wct_seconds();
     tree_running_stats_ptr s = stats->stats_curstack + stats->depth;
     s->time_self += now;
@@ -242,9 +251,9 @@ int tree_stats_leave(int rc)
     return rc;
 }
 
+/*}}}*/
 
-
-
+/*{{{ basecase */
 
 /* {{{ col sorting */
 /* We sort only with respect to the global delta[] parameter. As it turns
@@ -304,10 +313,6 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     unsigned int safety = iceildiv(64, m * l);
     return res + safety;
 }/*}}}*/
-
-/* Forward declaration, it's used by the recursive version */
-static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
-static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
 
 /* This destructively cancels the first len coefficients of E, and
  * computes the appropriate matrix pi which achieves this. The
@@ -590,12 +595,15 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     return tree_stats_leave(generator_found);
 }/*}}}*/
 
+/*}}}*/
+
 double start_time = -1;
 void info_init_timer()
 {
     start_time = wct_seconds();
 }
 
+/* {{{ Progress info */
 static const char *size_disp(size_t s, char buf[16])/*{{{*/
 {
     char *prefixes = "bkMGT";
@@ -691,6 +699,608 @@ void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B, int 
     }
 }/*}}}*/
 
+/* }}} */
+
+double avg_matsize(abdst_field ab, unsigned int m, unsigned int n, int ascii)/*{{{*/
+{
+    if (!ascii) {
+        /* Easy case first. If we have binary input, then we know a priori
+         * that the input data must have size a multiple of the element size.
+         */
+        size_t elemsize = abvec_elt_stride(ab, 1);
+        size_t matsize = elemsize * m * n;
+        return matsize;
+    }
+
+    /* Ascii is more complicated. We're necessarily fragile here.
+     * However, assuming that each coefficient comes with only one space,
+     * and each matrix with an extra space (this is how the GPU program
+     * prints data -- not that this ends up having a considerable impact
+     * anyway...), we can guess the number of bytes per matrix. */
+
+    /* Formula for the average number of digits of an integer mod p,
+     * written in base b:
+     *
+     * (k-((b^k-1)/(b-1)-1)/p)  with b = Ceiling(Log(p)/Log(b)).
+     */
+    double avg;
+    mpz_t p, a;
+    mpz_init(p);
+    mpz_init(a);
+    abfield_characteristic(ab, p);
+    unsigned long k = ceil(log(mpz_get_d(p))/log(10));
+    unsigned long b = 10;
+    mpz_ui_pow_ui(a, b, k);
+    mpz_sub_ui(a, a, 1);
+    mpz_fdiv_q_ui(a, a, b-1);
+    avg = k - mpz_get_d(a) / mpz_get_d(p);
+    mpz_clear(p);
+    mpz_clear(a);
+    // printf("Expect roughly %.2f decimal digits for integers mod p.\n", avg);
+    double matsize = (avg + 1) * m * n + 1;
+    // printf("Expect roughly %.2f bytes for each sequence matrix.\n", matsize);
+    return matsize;
+}/*}}}*/
+
+/* {{{ I/O helpers */
+/* {{{ matpoly_write
+ * writes some of the matpoly data to f, either in ascii or binary
+ * format. This can be used to write only part of the data (degrees
+ * [k0..k1[). Returns the number of coefficients (i.e., matrices, so at
+ * most k1-k0) successfully written, or
+ * -1 on error (e.g. when some matrix was only partially written).
+ */
+int matpoly_write(abdst_field ab, FILE * f, matpoly_srcptr M, unsigned int k0, unsigned int k1, int ascii, int transpose)
+{
+    unsigned int m = transpose ? M->n : M->m;
+    unsigned int n = transpose ? M->m : M->n;
+    ASSERT_ALWAYS(k0 == k1 || (k0 < M->size && k1 <= M->size));
+    abelt tmp;
+    abinit(ab, &tmp);
+    for(unsigned int k = k0 ; k < k1 ; k++) {
+        int err = 0;
+        int matnb = 0;
+        for(unsigned int i = 0 ; !err && i < m ; i++) {
+            for(unsigned int j = 0 ; !err && j < n ; j++) {
+                absrc_elt x;
+                x = transpose ? matpoly_coeff_const(ab, M, j, i, k)
+                              : matpoly_coeff_const(ab, M, i, j, k);
+                if (ascii) {
+                    if (j) err = fprintf(f, " ") <= 0;
+                    if (!err) err = abfprint(ab, f, x) <= 0;
+                } else {
+                    err = fwrite(x, abvec_elt_stride(ab, 1), 1, f) < 1;
+                }
+                if (!err) matnb++;
+            }
+            if (!err && ascii) err = fprintf(f, "\n") <= 0;
+        }
+        if (ascii) err = err || fprintf(f, "\n") <= 0;
+        if (err) return (matnb == 0) ? (int) (k - k0) : -1;
+    }
+    abclear(ab, &tmp);
+    return k1 - k0;
+}/* }}} */
+
+/* {{{ matpoly_read
+ * reads some of the matpoly data from f, either in ascii or binary
+ * format. This can be used to parse only part of the data (degrees
+ * [k0..k1[, k1 being an upper bound). Returns the number of coefficients
+ * (i.e., matrices, so at most k1-k0) successfully read, or
+ * -1 on error (e.g. when some matrix was only partially read).
+ *
+ * Note that the matrix must *not* be in pre-init state. It must have
+ * been already allocated.
+ */
+
+int matpoly_read(abdst_field ab, FILE * f, matpoly_ptr M, unsigned int k0, unsigned int k1, int ascii, int transpose)
+{
+    ASSERT_ALWAYS(!matpoly_check_pre_init(M));
+    unsigned int m = transpose ? M->n : M->m;
+    unsigned int n = transpose ? M->m : M->n;
+    ASSERT_ALWAYS(k0 == k1 || (k0 < M->size && k1 <= M->size));
+    abelt tmp;
+    abinit(ab, &tmp);
+    for(unsigned int k = k0 ; k < k1 ; k++) {
+        int err = 0;
+        int matnb = 0;
+        for(unsigned int i = 0 ; !err && i < m ; i++) {
+            for(unsigned int j = 0 ; !err && j < n ; j++) {
+                abdst_elt x;
+                x = transpose ? matpoly_coeff(ab, M, j, i, k)
+                              : matpoly_coeff(ab, M, i, j, k);
+                if (ascii) {
+                    err = abfscan(ab, f, x) != 1;
+                } else {
+                    err = fread(x, abvec_elt_stride(ab, 1), 1, f) < 1;
+                }
+                if (!err) matnb++;
+            }
+        }
+        if (err) return (matnb == 0) ? (int) (k - k0) : -1;
+    }
+    abclear(ab, &tmp);
+    return k1 - k0;
+}/* }}} */
+
+/* }}} */
+
+/*{{{ Checkpoints */
+
+/* There's much copy-paste here */
+
+struct cp_info {
+    bmstatus_ptr bm;
+    int level;
+    unsigned int t0;
+    unsigned int t1;
+    int mpi;
+    int rank;
+    char * auxfile;
+    char * sdatafile;
+    char * gdatafile;
+    const char * datafile;
+    FILE * aux;
+    FILE * data;
+};
+
+void cp_info_init_backend(struct cp_info * cp)
+{
+    int rc;
+    cp->level = stats->depth;
+    rc = asprintf(&cp->auxfile, "%s/pi.%d.%u.%u.aux",
+            checkpoint_directory, cp->level, cp->t0, cp->t1);
+    ASSERT_ALWAYS(rc >= 0);
+    rc = asprintf(&cp->gdatafile, "%s/pi.%d.%u.%u.single.data",
+            checkpoint_directory, cp->level, cp->t0, cp->t1);
+    ASSERT_ALWAYS(rc >= 0);
+    rc = asprintf(&cp->sdatafile, "%s/pi.%d.%u.%u.%d.data",
+            checkpoint_directory, cp->level, cp->t0, cp->t1, cp->rank);
+    ASSERT_ALWAYS(rc >= 0);
+}
+
+void cp_info_init(struct cp_info * cp, bmstatus_ptr bm, unsigned int t0, unsigned int t1)
+{
+    memset(cp, 0, sizeof(*cp));
+    cp->bm = bm;
+    cp->t0 = t0; cp->t1 = t1;
+    cp_info_init_backend(cp);
+    cp->datafile = cp->gdatafile;
+}
+
+void cp_info_init_mpi(struct cp_info * cp, bmstatus_ptr bm, unsigned int t0, unsigned int t1)
+{
+    memset(cp, 0, sizeof(*cp));
+    cp->mpi = 1;
+    cp->bm = bm;
+    cp->t0 = t0; cp->t1 = t1;
+    MPI_Comm_rank(bm->world, &(cp->rank));
+    cp_info_init_backend(cp);
+    /* a priori default. However load_mpi_checkpoint_file looks up both */
+    cp->datafile = cp->sdatafile;
+}
+
+void cp_info_clear(struct cp_info * cp)
+{
+    free(cp->sdatafile);
+    free(cp->gdatafile);
+    free(cp->auxfile);
+}
+
+int cp_save_aux_file(struct cp_info * cp, size_t pi_size, unsigned int *delta, int done)
+{
+    dims * d = cp->bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    if (cp->rank) return 1;
+    FILE * aux = fopen(cp->auxfile, "w");
+    int rc;
+    if (aux == NULL) {
+        fprintf(stderr, "Warning: cannot open %s\n", cp->auxfile);
+        return 0;
+    }
+    rc = fprintf(aux, "%zu\n", pi_size);
+    if (rc <= 0) goto cp_save_aux_file_bailout;
+    for(unsigned int i = 0 ; i < m + n ; i++) {
+        rc = fprintf(aux, "%s%u", i?" ":"", delta[i]);
+        if (rc <= 0) goto cp_save_aux_file_bailout;
+    }
+    rc = fprintf(aux, "\n");
+    if (rc <= 0) goto cp_save_aux_file_bailout;
+    for(unsigned int i = 0 ; i < m + n ; i++) {
+        rc = fprintf(aux, "%s%d", i?" ":"", cp->bm->lucky[i]);
+        if (rc <= 0) goto cp_save_aux_file_bailout;
+    }
+    rc = fprintf(aux, "\n");
+    if (rc <= 0) goto cp_save_aux_file_bailout;
+    rc = fprintf(aux, "%d\n", done);
+    if (rc <= 0) goto cp_save_aux_file_bailout;
+    rc = fclose(aux);
+    if (rc == 0) return 1;
+cp_save_aux_file_bailout:
+    fclose(aux);
+    unlink(cp->auxfile);
+    return 0;
+}
+
+int cp_load_aux_file(struct cp_info * cp, size_t * p_pi_size, unsigned int *delta, int * p_done)
+{
+    dims * d = cp->bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    if (cp->rank) return 1;
+    FILE * aux = fopen(cp->auxfile, "r");
+    int rc;
+    if (aux == NULL) {
+        // fprintf(stderr, "Warning: cannot open %s\n", cp->auxfile);
+        return 0;
+    }
+    rc = fscanf(aux, "%zu", p_pi_size);
+    if (rc != 1) { fclose(aux); return 0; }
+    for(unsigned int i = 0 ; i < m + n ; i++) {
+        rc = fscanf(aux, "%u", delta + i);
+        if (rc != 1) { fclose(aux); return 0; }
+    }
+    for(unsigned int i = 0 ; i < m + n ; i++) {
+        rc = fscanf(aux, "%d", cp->bm->lucky + i);
+        if (rc != 1) { fclose(aux); return 0; }
+    }
+    rc = fscanf(aux, "%d", p_done);
+    if (rc != 1) { fclose(aux); return 0; }
+    rc = fclose(aux);
+    return rc == 0;
+}
+
+int cp_load_data_file(struct cp_info * cp, matpoly pi, size_t pi_size)
+{
+    dims * d = cp->bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    FILE * data = fopen(cp->datafile, "rb");
+    int rc;
+    if (data == NULL) {
+        fprintf(stderr, "Warning: cannot open %s\n", cp->datafile);
+        return 0;
+    }
+    matpoly_init(ab, pi, m+n, m+n, pi_size);
+    pi->size = pi_size;
+    rc = matpoly_read(ab, data, pi, 0, pi->size, 0, 0);
+    if (rc != (int) pi->size) { fclose(data); return 0; }
+    rc = fclose(data);
+    return rc == 0;
+}
+
+/* I think we always have pi_size == pi->size, the only questionable
+ * situation is when we're saving part of a big matrix */
+int cp_save_data_file(struct cp_info * cp, matpoly pi, size_t pi_size)
+{
+    abdst_field ab = cp->bm->d->ab;
+    FILE * data = fopen(cp->datafile, "wb");
+    int rc;
+    if (data == NULL) {
+        fprintf(stderr, "Warning: cannot open %s\n", cp->datafile);
+        unlink(cp->auxfile);
+        return 0;
+    }
+    rc = matpoly_write(ab, data, pi, 0, pi_size, 0, 0);
+    if (rc != (int) pi->size) goto cp_save_data_file_bailout;
+    rc = fclose(data);
+    if (rc == 0)
+        return 1;
+cp_save_data_file_bailout:
+    fclose(data);
+    unlink(cp->datafile);
+    unlink(cp->auxfile);
+    return 0;
+}
+
+int load_checkpoint_file(bmstatus_ptr bm, matpoly pi, unsigned int t0, unsigned int t1, unsigned int *delta, int * p_done)/*{{{*/
+{
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    struct cp_info cp[1];
+    cp_info_init(cp, bm, t0, t1);
+    ASSERT_ALWAYS(matpoly_check_pre_init(pi));
+    size_t pi_size;
+    int ok = cp_load_aux_file(cp, &pi_size, delta, p_done);
+    if (ok) {
+        printf("Reading checkpoint %s\n", cp->datafile);
+        ok = cp_load_data_file(cp, pi, pi_size);
+        if (!ok)
+            fprintf(stderr, "Warning: I/O error while reading %s\n", cp->datafile);
+    }
+    cp_info_clear(cp);
+    if (ok) bm->t = t1;
+    return ok;
+}/*}}}*/
+
+int save_checkpoint_file(bmstatus_ptr bm, matpoly pi, unsigned int t0, unsigned int t1, unsigned int *delta, int done)/*{{{*/
+{
+    /* corresponding t is bm->t - E->size ! */
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    struct cp_info cp[1];
+    cp_info_init(cp, bm, t0, t1);
+    if (!cp->rank) printf("Saving checkpoint %s%s\n",
+            cp->datafile,
+            cp->mpi ? " (MPI, scattered)" : "");
+    int ok = cp_save_aux_file(cp, pi->size, delta, done);
+    if (ok) ok = cp_save_data_file(cp, pi, pi->size);
+    if (!ok && !cp->rank)
+        fprintf(stderr, "Warning: I/O error while saving %s\n", cp->datafile);
+    cp_info_clear(cp);
+    return ok;
+}/*}}}*/
+
+int load_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int * p_done)/*{{{*/
+{
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    dims * d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    struct cp_info cp[1];
+    cp_info_init_mpi(cp, bm, t0, t1);
+    ASSERT_ALWAYS(bigmatpoly_check_pre_init(xpi));
+    size_t pi_size;
+    int ok = cp_load_aux_file(cp, &pi_size, delta, p_done);
+    MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+    MPI_Bcast(&pi_size, 1, MPI_MY_SIZE_T, 0, bm->world);
+    MPI_Bcast(delta, m + n, MPI_UNSIGNED, 0, bm->world);
+    MPI_Bcast(bm->lucky, m + n, MPI_INT, 0, bm->world);
+    MPI_Bcast(p_done, 1, MPI_INT, 0, bm->world);
+    if (ok) {
+        if (!rank)
+            printf("Reading checkpoint %s (MPI, scattered)\n", cp->datafile);
+        do {
+            FILE * data = fopen(cp->datafile, "rb");
+            int rc;
+            ok = data != NULL;
+            MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_MIN, bm->world);
+            if (!ok) {
+                if (!rank)
+                    fprintf(stderr, "Warning: cannot open %s\n", cp->datafile);
+                if (data) free(data);
+                break;
+            }
+            bigmatpoly_finish_init(ab, xpi, m+n, m+n, pi_size);
+            bigmatpoly_set_size(xpi, pi_size);
+            rc = matpoly_read(ab, data, bigmatpoly_my_cell(xpi), 0, xpi->size, 0, 0);
+            ok = ok && rc == (int) xpi->size;
+            rc = fclose(data);
+            ok = ok && (rc == 0);
+        } while (0);
+        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_MIN, bm->world);
+        if (!ok && !rank) {
+            fprintf(stderr, "Warning: I/O error while reading %s\n",
+                    cp->datafile);
+        }
+    }
+    cp_info_clear(cp);
+    if (ok) bm->t = t1;
+    return ok;
+}/*}}}*/
+
+int save_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int done)/*{{{*/
+{
+    /* corresponding t is bm->t - E->size ! */
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    struct cp_info cp[1];
+    cp_info_init_mpi(cp, bm, t0, t1);
+    int ok = cp_save_aux_file(cp, xpi->size, delta, done);
+    MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+    if (!ok && !rank) unlink(cp->auxfile);
+    if (ok) {
+        if (!rank)
+            printf("Saving checkpoint %s (MPI, scattered)\n", cp->datafile);
+        ok = cp_save_data_file(cp, bigmatpoly_my_cell(xpi), xpi->size);
+        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_MIN, bm->world);
+        if (!ok) {
+            if (cp->datafile) unlink(cp->datafile);
+            if (!rank) unlink(cp->auxfile);
+        }
+    }
+    if (!ok && !rank) {
+        fprintf(stderr, "Warning: I/O error while saving %s\n", cp->datafile);
+    }
+    cp_info_clear(cp);
+    return ok;
+}/*}}}*/
+
+int load_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int * p_done)/*{{{*/
+{
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    dims * d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    struct cp_info cp[1];
+    cp_info_init_mpi(cp, bm, t0, t1);
+    cp->datafile = cp->gdatafile;
+    size_t pi_size;
+    int ok = cp_load_aux_file(cp, &pi_size, delta, p_done);
+    MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+    MPI_Bcast(&pi_size, 1, MPI_MY_SIZE_T, 0, bm->world);
+    MPI_Bcast(delta, m + n, MPI_UNSIGNED, 0, bm->world);
+    MPI_Bcast(bm->lucky, m + n, MPI_INT, 0, bm->world);
+    MPI_Bcast(p_done, 1, MPI_INT, 0, bm->world);
+    if (ok) {
+        if (!rank)
+            printf("Reading checkpoint %s (MPI, gathered)\n", cp->datafile);
+        do {
+            FILE * data = NULL;
+            if (!rank) ok = (data = fopen(cp->datafile, "rb")) != NULL;
+            MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+            if (!ok) {
+                if (!rank)
+                    fprintf(stderr, "Warning: cannot open %s\n", cp->datafile);
+                if (data) free(data);
+                break;
+            }
+
+            bigmatpoly_finish_init(ab, xpi, m+n, m+n, pi_size);
+            bigmatpoly_set_size(xpi, pi_size);
+
+            double avg = avg_matsize(ab, m + n, m + n, 0);
+            unsigned int B = iceildiv(io_block_size, avg);
+
+            /* This is only temp storage ! */
+            matpoly pi;
+            matpoly_init(ab, pi, m + n, m + n, B);
+            pi->size = B;
+
+            for(unsigned int k = 0 ; ok && k < xpi->size ; k += B) {
+                unsigned int nc = MIN(B, xpi->size - k);
+                if (!rank)
+                    ok = matpoly_read(ab, data, pi, 0, nc, 0, 0) == (int) nc;
+                MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+                bigmatpoly_scatter_mat_partial(ab, xpi, pi, k, nc);
+            }
+            matpoly_clear(ab, pi);
+
+            if (!rank) {
+                int rc = fclose(data);
+                ok = ok && (rc == 0);
+            }
+        } while (0);
+        MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+        if (!ok && !rank) {
+            fprintf(stderr, "Warning: I/O error while reading %s\n",
+                    cp->datafile);
+        }
+    }
+    cp_info_clear(cp);
+    if (ok) bm->t = t1;
+    return ok;
+}/*}}}*/
+
+int save_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int done)/*{{{*/
+{
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    dims * d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    struct cp_info cp[1];
+    cp_info_init_mpi(cp, bm, t0, t1);
+    cp->datafile = cp->gdatafile;
+    if (!rank)
+        printf("Saving checkpoint %s (MPI, gathered)\n", cp->datafile);
+    int ok = cp_save_aux_file(cp, xpi->size, delta, done);
+    MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+    if (ok) {
+        do {
+            FILE * data = NULL;
+            int rc;
+            if (!rank) ok = (data = fopen(cp->datafile, "wb")) != NULL;
+            MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+            if (!ok) {
+                if (!rank)
+                    fprintf(stderr, "Warning: cannot open %s\n", cp->datafile);
+                if (data) free(data);
+                break;
+            }
+
+            double avg = avg_matsize(ab, m + n, m + n, 0);
+            unsigned int B = iceildiv(io_block_size, avg);
+
+            /* This is only temp storage ! */
+            matpoly pi;
+            matpoly_init(ab, pi, m + n, m + n, B);
+            pi->size = B;
+
+            for(unsigned int k = 0 ; ok && k < xpi->size ; k += B) {
+                unsigned int nc = MIN(B, xpi->size - k);
+                bigmatpoly_gather_mat_partial(ab, pi, xpi, k, nc);
+                if (!rank)
+                    ok = matpoly_write(ab, data, pi, 0, nc, 0, 0) == (int) nc;
+                MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+            }
+            matpoly_clear(ab, pi);
+
+            if (!rank) {
+                rc = fclose(data);
+                ok = ok && (rc == 0);
+            }
+        } while (0);
+        MPI_Bcast(&ok, 1, MPI_INT, 0, bm->world);
+        if (!ok && !rank) {
+            if (cp->datafile) unlink(cp->datafile);
+            unlink(cp->auxfile);
+        }
+    }
+    if (!ok && !rank) {
+        fprintf(stderr, "Warning: I/O error while saving %s\n", cp->datafile);
+    }
+    cp_info_clear(cp);
+    return ok;
+}/*}}}*/
+
+int load_mpi_checkpoint_file(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int * p_done)/*{{{*/
+{
+    /* read scattered checkpoint with higher priority if available,
+     * because we like distributed I/O. Otherwise, read gathered
+     * checkpoint if we could find one.
+     */
+    if (!checkpoint_directory) return 0;
+    if ((t1 - t0) < checkpoint_threshold) return 0;
+    int rank;
+    MPI_Comm_rank(bm->world, &rank);
+    struct cp_info cp[1];
+    cp_info_init_mpi(cp, bm, t0, t1);
+    int ok = 0;
+    int aux_ok = rank || access(cp->auxfile, R_OK) == 0;
+    int sdata_ok = access(cp->sdatafile, R_OK) == 0;
+    int scattered_ok = aux_ok && sdata_ok;
+    MPI_Allreduce(MPI_IN_PLACE, &scattered_ok, 1, MPI_INT, MPI_MIN, bm->world);
+    if (scattered_ok) {
+        ok = load_mpi_checkpoint_file_scattered(bm, xpi, t0, t1, delta, p_done);
+        if (ok) return ok;
+    }
+    int gdata_ok = rank || access(cp->gdatafile, R_OK) == 0;
+    int gathered_ok = aux_ok && gdata_ok;
+    MPI_Bcast(&gathered_ok, 1, MPI_INT, 0, bm->world);
+    if (gathered_ok) {
+        ok = load_mpi_checkpoint_file_gathered(bm, xpi, t0, t1, delta, p_done);
+    }
+    cp_info_clear(cp);
+    return ok;
+}/*}}}*/
+
+int save_mpi_checkpoint_file(bmstatus_ptr bm, bigmatpoly xpi, unsigned int t0, unsigned int t1, unsigned int *delta, int done)/*{{{*/
+{
+    if (save_gathered_checkpoints) {
+        return save_mpi_checkpoint_file_gathered(bm, xpi, t0, t1, delta, done);
+    } else {
+        return save_mpi_checkpoint_file_scattered(bm, xpi, t0, t1, delta, done);
+    }
+}/*}}}*/
+
+/*}}}*/
+
+/**********************************************************************/
+
+/*{{{ Main entry points and recursive algorithm (with and without MPI) */
+
+/* Forward declaration, it's used by the recursive version */
+static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
+static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
+
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     tree_stats_enter(__func__, E->size);
@@ -749,7 +1359,6 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     return tree_stats_leave(done);
 }/*}}}*/
 
-/* This version works over MPI */
 static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
 
@@ -839,11 +1448,17 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
     int rank;
     MPI_Comm_rank(bm->world, &rank);
     ASSERT_ALWAYS(!rank);
+    unsigned int t0 = bm->t;
+    unsigned int t1 = bm->t + E->size;
+
+    int done;
+
+    if (load_checkpoint_file(bm, pi, t0, t1, delta, &done))
+        return done;
 
     // ASSERT_ALWAYS(E->size < bm->lingen_mpi_threshold);
 
     // fprintf(stderr, "Enter %s\n", __func__);
-    int done;
     if (E->size < bm->lingen_threshold) {
         bm->t_basecase -= seconds();
         done = bw_lingen_basecase(bm, pi, E, delta);
@@ -852,6 +1467,9 @@ static int bw_lingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int
         done = bw_lingen_recursive(bm, pi, E, delta);
     }
     // fprintf(stderr, "Leave %s\n", __func__);
+
+    save_checkpoint_file(bm, pi, t0, t1, delta, done);
+
     return done;
 }/*}}}*/
 
@@ -863,8 +1481,15 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
     unsigned int n = d->n;
     unsigned int b = m + n;
     int done;
-        int rank;
-        MPI_Comm_rank(bm->world, &rank);
+    int rank;
+    int size;
+    MPI_Comm_rank(bm->world, &rank);
+    MPI_Comm_size(bm->world, &size);
+    unsigned int t0 = bm->t;
+    unsigned int t1 = bm->t + E->size;
+
+    if (load_mpi_checkpoint_file(bm, pi, t0, t1, delta, &done))
+        return done;
 
     // fprintf(stderr, "Enter %s\n", __func__);
     if (E->size >= bm->lingen_mpi_threshold)  {
@@ -877,23 +1502,29 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
         matpoly sE, spi;
         matpoly_init(ab, sE, m, b, E->size);
         matpoly_init(ab, spi, 0, 0, 0);
+
         bigmatpoly_gather_mat_alt2(ab, sE, E);
         /* Only the master node does the local computation */
         if (!rank)
             done = bw_lingen_single(bm, spi, sE, delta);
+        bigmatpoly_scatter_mat_alt2(ab, pi, spi);
+
         MPI_Bcast(&done, 1, MPI_INT, 0, bm->world);
         MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->world);
         MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->world);
         MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
-        bigmatpoly_scatter_mat_alt2(ab, pi, spi);
         /* Don't forget to broadcast delta from root node to others ! */
         matpoly_clear(ab, spi);
         matpoly_clear(ab, sE);
     }
     // fprintf(stderr, "Leave %s\n", __func__);
 
+    save_mpi_checkpoint_file(bm, pi, t0, t1, delta, done);
+
     return done;
 }/*}}}*/
+
+/*}}}*/
 
 /**********************************************************************/
 
@@ -959,47 +1590,6 @@ typedef struct bm_io_s * bm_io_ptr;/*}}}*/
  * is the same as for the reading mode.
  */
 
-double avg_matsize(abdst_field ab, unsigned int m, unsigned int n, int ascii)/*{{{*/
-{
-    if (!ascii) {
-        /* Easy case first. If we have binary input, then we know a priori
-         * that the input data must have size a multiple of the element size.
-         */
-        size_t elemsize = abvec_elt_stride(ab, 1);
-        size_t matsize = elemsize * m * n;
-        return matsize;
-    }
-
-    /* Ascii is more complicated. We're necessarily fragile here.
-     * However, assuming that each coefficient comes with only one space,
-     * and each matrix with an extra space (this is how the GPU program
-     * prints data -- not that this ends up having a considerable impact
-     * anyway...), we can guess the number of bytes per matrix. */
-
-    /* Formula for the average number of digits of an integer mod p,
-     * written in base b:
-     *
-     * (k-((b^k-1)/(b-1)-1)/p)  with b = Ceiling(Log(p)/Log(b)).
-     */
-    double avg;
-    mpz_t p, a;
-    mpz_init(p);
-    mpz_init(a);
-    abfield_characteristic(ab, p);
-    unsigned long k = ceil(log(mpz_get_d(p))/log(10));
-    unsigned long b = 10;
-    mpz_ui_pow_ui(a, b, k);
-    mpz_sub_ui(a, a, 1);
-    mpz_fdiv_q_ui(a, a, b-1);
-    avg = k - mpz_get_d(a) / mpz_get_d(p);
-    mpz_clear(p);
-    mpz_clear(a);
-    // printf("Expect roughly %.2f decimal digits for integers mod p.\n", avg);
-    double matsize = (avg + 1) * m * n + 1;
-    // printf("Expect roughly %.2f bytes for each sequence matrix.\n", matsize);
-    return matsize;
-}/*}}}*/
-
 
 /* We write the coefficients of the reversed polynomial \hat{F*\pi}, in
  * increasing degree order. Thus the first coefficients written
@@ -1045,30 +1635,10 @@ void bm_io_write_one_F_coeff(bm_io_ptr aa, unsigned int deg)
     bmstatus_ptr bm = aa->bm;
     dims * d = bm->d;
     abdst_field ab = d->ab;
-    unsigned int n = d->n;
     deg = deg % aa->F->alloc;
     // if (random_input_length) return;
-    if (aa->ascii && !random_input_length) {
-            for(unsigned int j = 0 ; j < n ; j++) {
-                for(unsigned int i = 0 ; i < n ; i++) {
-                    if (i) fprintf(aa->f, " ");
-                    abfprint(ab, aa->f, matpoly_coeff(ab, aa->F, i, j, deg));
-                }
-                fprintf(aa->f, "\n");
-            }
-            fprintf(aa->f, "\n");
-    } else {
-        abelt tmp;
-        abinit(ab, &tmp);
-            for(unsigned int j = 0 ; j < n ; j++) {
-                for(unsigned int i = 0 ; i < n ; i++) {
-                    abset(ab, tmp, matpoly_coeff(ab, aa->F, i, j, deg));
-                    size_t elemsize = abvec_elt_stride(ab, 1);
-                    fwrite(tmp, elemsize, 1, aa->f);
-                }
-            }
-        abclear(ab, &tmp);
-    }
+    if (!aa->ascii || !random_input_length)
+        matpoly_write(ab, aa->f, aa->F, deg, deg + 1, aa->ascii, 1);
 }
 
 void bm_io_clear_one_F_coeff(bm_io_ptr aa, unsigned int deg)
@@ -1266,6 +1836,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                                 sols[j], delta[sols[j]], delta[sols[j]]-1);
                         window++;
                         matpoly_realloc(ab, aa->F, window);
+                        aa->F->size = window;
                         delta[sols[j]]--;
                         /* shift this column */
                         for(unsigned int k = 1 ; k < window ; k++) {
@@ -2075,6 +2646,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Argument fixing: setting lingen-mpi-threshold=%u (because lingen-threshold=%u)\n",
                 bm->lingen_mpi_threshold, bm->lingen_threshold);
     }
+    checkpoint_directory = param_list_lookup_string(pl, "checkpoint-directory");
+    param_list_parse_uint(pl, "checkpoint-threshold", &checkpoint_threshold);
+    param_list_parse_int(pl, "save_gathered_checkpoints", &save_gathered_checkpoints);
 
 
 
@@ -2203,21 +2777,22 @@ int main(int argc, char *argv[])
     bm_io_compute_E(aa, xE);
     bm_io_end_read(aa);
 
-    /* If we're running over MPI, we have done a dispatching read of E.
-     * Probably there's a good reason for it, since we expect our
-     * mpi_threshold to be below the size of E. In the degenerate case
-     * where we're running over MPI while the mpi threshold is too large,
-     * then: 1) it's silly 2) we'll run the MPI code still, since this is
-     * the one which is capable of running gather & scatter. There will
-     * be copies, we somehow we asked for it.
-     */
-    if (size) {
+    if (size > 1) {
         bw_biglingen_collective(bm, xpi, xE, delta);
     } else {
-        /* When communicator has size 1 (hence no mpi), we may save a few
-         * copies by taking a shortcut */
-        bw_lingen_single(bm, bigmatpoly_my_cell(xpi), bigmatpoly_my_cell(xE), delta);
-        bigmatpoly_set_size(xpi, bigmatpoly_my_cell(xpi)->size);
+        /* We have to gather and scatter, but these are fairly trivial.
+         * Avoid copies, and wrap around bw_lingen_single. */
+        matpoly E, pi;
+        matpoly_init(ab, E, 0, 0, 0);
+        matpoly_init(ab, pi, 0, 0, 0);
+        matpoly_swap(E, bigmatpoly_my_cell(xE));
+        bw_lingen_single(bm, pi, E, delta);
+        matpoly_swap(E, bigmatpoly_my_cell(xE));
+        bigmatpoly_finish_init(ab, xpi, m + n, m + n, 1);
+        xpi->size = pi->size;
+        matpoly_swap(pi, bigmatpoly_my_cell(xpi));
+        matpoly_clear(ab, E);
+        matpoly_clear(ab, pi);
     }
 
     /* This possibly aborts */
