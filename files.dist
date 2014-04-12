@@ -736,6 +736,7 @@ tests/sieve/CMakeLists.txt
 tests/sieve/test_init_norms_bucket_region.c
 tests/sieve/test_init_alg_norms_bucket_region.c
 tests/sieve/test_init_rat_norms_bucket_region.c
+tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh
 tests/sieve/sievetest.sh
