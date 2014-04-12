@@ -42,6 +42,32 @@
 /* Assignment of random values */
 
 /* Arithmetic operations on elements */
+/* *Mpfq::defaults::pow::code_for_powz, Mpfq::gf2n::trivialities */
+void mpfq_2_64_powz(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt y, mpfq_2_64_src_elt x, mpz_srcptr z)
+{
+        if (mpz_sgn(z) < 0) {
+            mpz_t mz;
+            mpz_init(mz);
+            mpz_neg(mz, z);
+            mpfq_2_64_powz(k, y, x, mz);
+            mpfq_2_64_inv(k, y, y);
+            mpz_clear(mz);
+        } else if (mpz_sizeinbase(z, 2) > mpfq_2_64_field_degree(k) * mpfq_2_64_field_characteristic_bits(k)) {
+            mpz_t zr;
+            mpz_init(zr);
+            mpz_t ppz;
+            mpfq_2_64_field_characteristic(k, ppz);
+            mpz_pow_ui(ppz,ppz,mpfq_2_64_field_degree(k));
+            mpz_sub_ui(ppz,ppz,1);
+            mpz_fdiv_r(zr, z, ppz);
+            mpfq_2_64_powz(k, y, x, zr);
+            mpz_clear(ppz);
+            mpz_clear(zr);
+        } else {
+            mpfq_2_64_pow(k, y, x, z->_mp_d, mpz_size(z));
+        }
+}
+
 
 /* Operations involving unreduced elements */
 
@@ -49,7 +75,7 @@
 
 /* Input/output functions */
 /* *Mpfq::gf2n::io::code_for_asprint */
-void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x)
+int mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x)
 {
     int type = k->io_type;
     int i, n; 
@@ -57,9 +83,7 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
     // Numerical io.
     if (type <= 16) {
         // allocate enough room for base 2 conversion.
-        *pstr = (char *)malloc((64+1)*sizeof(char));
-        if (*pstr == NULL)
-            MALLOC_FAILED();
+        *pstr = (char *)mpfq_malloc_check((64+1)*sizeof(char));
     
         mp_limb_t tmp[1 + 1];
         for (i = 0; i < 1; ++i)
@@ -73,7 +97,7 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
         if ((msl == 1) && (tmp[0] == 0)) {
             (*pstr)[0] = '0';
             (*pstr)[1] = '\0';
-            return;
+            return 1;
         }
         n = mpn_get_str((unsigned char*)(*pstr), type, tmp, msl);
         for (i = 0; i < n; ++i) {
@@ -89,28 +113,24 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
         while (((*pstr)[shift] == '0') && ((*pstr)[shift+1] != '\0')) 
             shift++;
         if (shift>0) {
-            i = 0;
-            while ((*pstr)[i+shift] != '\0') {
-                (*pstr)[i] = (*pstr)[i+shift];
-                i++;
-            }
-            (*pstr)[i] = '\0';
+            memmove(*pstr, (*pstr) + shift, n + 1 - shift);
+            n -= shift;
         }
     
         // Return '0' instead of empty string for zero element
         if ((*pstr)[0] == '\0') {
             (*pstr)[0] = '0';
             (*pstr)[1] = '\0';
+            n = 1;
         }
+        return n;
     } 
     // Polynomial io.
     else {
         char c = (char)type;
         // allocate (more than) enough room for polynomial conversion.
         // Warning: this is for exponent that fit in 3 digits
-        *pstr = (char *)malloc((8*64+1)*sizeof(char));
-        if (*pstr == NULL)
-            MALLOC_FAILED();
+        *pstr = (char *)mpfq_malloc_check((8*64+1)*sizeof(char));
         {
             unsigned int j;
             int sth = 0;
@@ -137,17 +157,20 @@ void mpfq_2_64_asprint(mpfq_2_64_dst_field k, char * * pstr, mpfq_2_64_src_elt x
                 *ptr++ = '0';
             }
             *ptr = '\0';
+            return ptr - *pstr;
         }
     }
 }
 
 /* *Mpfq::defaults::code_for_fprint */
-void mpfq_2_64_fprint(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_src_elt x)
+int mpfq_2_64_fprint(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_src_elt x)
 {
     char *str;
+    int rc;
     mpfq_2_64_asprint(k,&str,x);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
 /* *Mpfq::gf2n::io::code_for_sscan */
@@ -156,7 +179,7 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
     if (k->io_type <= 16) {
         unsigned char *tmp;
         int len = strlen(str);
-        tmp = (unsigned char *)malloc(len+1);
+        tmp = (unsigned char *)mpfq_malloc_check(len+1);
         int i;
         for (i = 0; i < len; ++i) {
             if (str[i] > '9')
@@ -166,7 +189,7 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
         }
         mp_limb_t *zz;
         // Allocate one limb per byte... very conservative.
-        zz = (mp_limb_t *)malloc(len*sizeof(mp_limb_t));
+        zz = (mp_limb_t *)mpfq_malloc_check(len*sizeof(mp_limb_t));
         int ret = mpn_set_str(zz, tmp, len, k->io_type);
         free(tmp);
         if (ret > 1) {
@@ -192,9 +215,7 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -225,16 +246,16 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec */
 void mpfq_2_64_vec_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n)
 {
     unsigned int i;
     *v = (mpfq_2_64_vec) malloc (n*sizeof(mpfq_2_64_elt));
-    for(i = 0; i < n; i+=1)
+    for(i = 0; i < n; i++)
         mpfq_2_64_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec */
 void mpfq_2_64_vec_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -250,7 +271,7 @@ void mpfq_2_64_vec_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v,
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec */
 void mpfq_2_64_vec_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -259,17 +280,17 @@ void mpfq_2_64_vec_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, 
     free(*v);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults */
-void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec */
+int mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)malloc(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
-        return;
+        return strlen(*pstr);
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)malloc(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -294,24 +315,27 @@ void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mp
     (*pstr)[len++] = ' ';
     (*pstr)[len++] = ']';
     (*pstr)[len] = '\0';
+    return len;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults */
-void mpfq_2_64_vec_fprint(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_64_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec */
+int mpfq_2_64_vec_fprint(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_64_src_vec w, unsigned int n)
 {
     char *str;
+    int rc;
     mpfq_2_64_vec_asprint(K,&str,w,n);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults */
-void mpfq_2_64_vec_print(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec */
+int mpfq_2_64_vec_print(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec w, unsigned int n)
 {
-    mpfq_2_64_vec_fprint(K,stdout,w,n);
+    return mpfq_2_64_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec */
 int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -355,16 +379,14 @@ int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, u
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec */
 int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_64_vec * w, unsigned int * n)
 {
     char *tmp;
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -388,7 +410,7 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec */
 void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -397,7 +419,7 @@ void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur 
         mpfq_2_64_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec */
 void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -413,7 +435,7 @@ void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_u
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec */
 void mpfq_2_64_vec_ur_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -436,16 +458,16 @@ void mpfq_2_64_poly_setmonic(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_p
         mpfq_2_64_elt aux;
         mpfq_2_64_init(K, &aux);
         mpfq_2_64_set_ui(K, aux, 1);
-        mpfq_2_64_poly_setcoef(K, q, aux, 0);
+        mpfq_2_64_poly_setcoeff(K, q, aux, 0);
         mpfq_2_64_clear(K, &aux);
         q->size = 1;
         return;
     }
     mpfq_2_64_elt lc;
     mpfq_2_64_init(K, &lc);
-    mpfq_2_64_poly_getcoef(K, lc, p, degp);
+    mpfq_2_64_poly_getcoeff(K, lc, p, degp);
     mpfq_2_64_inv(K, lc, lc);
-    mpfq_2_64_poly_setcoef_ui(K, q, 1, degp);
+    mpfq_2_64_poly_setcoeff_ui(K, q, 1, degp);
     mpfq_2_64_vec_scal_mul(K, q->c, p->c, lc, degp);
     q->size = degp+1;
     mpfq_2_64_clear(K, &lc);
@@ -481,11 +503,14 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     int bmonic;
     mpfq_2_64_elt ilb;
     mpfq_2_64_init(K, &ilb);
-    if (mpfq_2_64_cmp_ui(K, (b->c)[degb], 1) == 0) {
+    mpfq_2_64_elt temp;
+    mpfq_2_64_init(K, &temp);
+    mpfq_2_64_poly_getcoeff(K, temp, b, degb);
+    if (mpfq_2_64_cmp_ui(K, temp, 1) == 0) {
         mpfq_2_64_set_ui(K, ilb, 1);
         bmonic = 1;
     } else {
-        mpfq_2_64_inv(K, ilb, (b->c)[degb]);
+        mpfq_2_64_inv(K, ilb, temp);
         bmonic = 0;
     }
     
@@ -502,13 +527,17 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     int i;
     int j;
     for (i = dega; i >= (int)degb; --i) {
-        mpfq_2_64_poly_getcoef(K, aux, rr, i);
+        mpfq_2_64_poly_getcoeff(K, aux, rr, i);
         if (!bmonic) 
             mpfq_2_64_mul(K, aux, aux, ilb);
-        mpfq_2_64_poly_setcoef(K, qq, aux, i-degb);
+        mpfq_2_64_poly_setcoeff(K, qq, aux, i-degb);
         for (j = i-1; j >= (int)(i - degb); --j) {
-            mpfq_2_64_mul(K, aux2, aux, (b->c)[j-i+degb]);
-            mpfq_2_64_sub(K, (rr->c)[j], (rr->c)[j], aux2);
+            mpfq_2_64_poly_getcoeff(K, temp, b, j-i+degb);
+            mpfq_2_64_mul(K, aux2, aux, temp);
+            mpfq_2_64_poly_getcoeff(K, temp, rr, j);
+    
+            mpfq_2_64_sub(K, temp, temp, aux2);
+            mpfq_2_64_poly_setcoeff(K, rr, temp, j);
         }
     }    
     
@@ -520,6 +549,7 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
         mpfq_2_64_poly_set(K, q, qq);
     if (r != NULL)
         mpfq_2_64_poly_set(K, r, rr);
+    mpfq_2_64_clear(K, &temp);
     mpfq_2_64_clear(K, &aux);
     mpfq_2_64_clear(K, &aux2);
     mpfq_2_64_poly_clear(K, rr);
@@ -534,11 +564,14 @@ void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    assert (mpfq_2_64_cmp_ui(K, p->c[0], 1) == 0);
+    mpfq_2_64_elt temp;
+    mpfq_2_64_init(K, &temp);
+    mpfq_2_64_poly_getcoeff(K, temp, p, 0);//Should be in the assert
+    assert( mpfq_2_64_cmp_ui(K, temp, 1) == 0);
     assert (p != q);
     int m;
     if (n <= 2) {
-        mpfq_2_64_poly_setcoef_ui(K, q, 1, 0);
+        mpfq_2_64_poly_setcoeff_ui(K, q, 1, 0);
         q->size = 1;
         m = 1;
         if (n == 1)
@@ -560,11 +593,14 @@ void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     mpfq_2_64_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
     int nn = MIN(n, MIN(n, p->size) + m -1);
     mpfq_2_64_vec_neg(K, tmp, tmp, nn);
-    mpfq_2_64_add_ui(K, tmp[0], tmp[0], 1);
+    mpfq_2_64_vec_getcoeff(K, temp, tmp, 0);
+    mpfq_2_64_add_ui(K, temp, temp, 1);
+    mpfq_2_64_vec_setcoeff(K, tmp, temp, 0);
     mpfq_2_64_vec_conv(K, tmp, q->c, m, tmp, nn);
-    mpfq_2_64_vec_set(K, q->c + m, tmp + m, n-m);
+    mpfq_2_64_vec_set(K, mpfq_2_64_vec_subvec(K, q->c, m), mpfq_2_64_vec_subvec(K, tmp, m), n-m);
     q->size = n;
     
+    mpfq_2_64_clear(K, &temp);
     mpfq_2_64_vec_clear(K, &tmp, m+n-1);
 }
 

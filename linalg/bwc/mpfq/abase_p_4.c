@@ -80,78 +80,47 @@ static int abase_p_4_impl_mpi_use_count;   /* several stacked init()/clear() pai
 
 
 /* Functions operating on the field structure */
-/* *Mpfq::gfp::field::code_for_field_characteristic, Mpfq::gfp */
-void abase_p_4_field_characteristic(abase_p_4_dst_field k, mpz_t z)
-{
-    int i;
-    int n = k->kl;
-    mpz_set_ui(z, k->p[n-1]);
-    for (i = n-2; i >= 0; --i) {
-        mpz_mul_2exp(z, z, 64);
-        mpz_add_ui(z, z, k->p[i]);
-    }
-}
-
 /* *Mpfq::gfp::field::code_for_field_clear, Mpfq::gfp */
 void abase_p_4_field_clear(abase_p_4_dst_field k)
 {
-    if (k->p != NULL) {
-        free(k->p);
-        k->p = NULL;
-    }
-    if (k->bigmul_p != NULL) {
-        free(k->bigmul_p);
-        k->bigmul_p = NULL;
-    }
-    if (k->ts_info.e > 0) {
-        free(k->ts_info.hh);
-        free(k->ts_info.z);
-    }
-    mpz_clear(k->factor);
+        mpz_clear(k->p);
+        mpz_clear(k->bigmul_p);
+        if (k->ts_info.e > 0) {
+            free(k->ts_info.hh);
+            free(k->ts_info.z);
+        }
+        mpz_clear(k->factor);
 }
 
 /* *Mpfq::gfp::field::code_for_field_specify, Mpfq::gfp */
 void abase_p_4_field_specify(abase_p_4_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-        if (k->p == NULL) k->p = (mp_limb_t *)malloc(4*sizeof(mp_limb_t));
-        if (k->bigmul_p == NULL) k->bigmul_p = (mp_limb_t *)malloc(9*sizeof(mp_limb_t));
-        if ((!k->p) || (!k->bigmul_p))
-            MALLOC_FAILED();
-        k->kl = 4;
-        k->url = 9;
         k->url_margin = LONG_MAX;
-        int i;
         if (dummy == MPFQ_PRIME_MPN) {
-            mp_limb_t *p = (mp_limb_t*) vp;
-            memcpy(k->p, p, 4*sizeof(mp_limb_t));
+            fprintf(stderr, "MPFQ_PRIME_MPN is deprecated\n");
+            return;
         } else if (dummy == MPFQ_PRIME_MPZ) {
             mpz_srcptr p = (mpz_srcptr) vp;
             if (!(mpz_size(p) == 4)) {
                 fprintf(stderr, "This binary requires the use of a 4-machine words prime number. Here, p spans %zu machine words. Please adapt linalg/bwc/CMakeLists.txt accordingly and re-run\n", mpz_size(p));
                 abort();
             }
-            for(i = 0 ; i < 4 ; i++) {
-                k->p[i] = mpz_getlimbn(p, i);
+            mpz_set(k->p, p);
+            {
+                /* precompute bigmul_p = largest multiple of p that fits in an
+                 * elt_ur: p*Floor( (2^(9*64)-1)/p )
+                 */
+                mpz_ui_pow_ui(k->bigmul_p, 2, 9*64);
+                mpz_sub_ui(k->bigmul_p, k->bigmul_p, 1);
+                mpz_fdiv_q(k->bigmul_p, k->bigmul_p, k->p);
+                mpz_mul(k->bigmul_p, k->bigmul_p, k->p);
             }
         } else if (dummy == MPFQ_GROUPSIZE && *(int*)vp == 1) {
             /* Do nothing, this is an admitted condition */
+            return;
         } else {
-            abort();
+            return;
         }
-    // precompute bigmul_p = largest multiple of p that fits in an elt_ur,
-    //   p*Floor( (2^(9*64)-1)/p )
-    {
-        abase_p_4_elt_ur big;
-        mp_limb_t q[9-4+1], r[4], tmp[9+1];
-        
-        for (i = 0; i < 9; ++i)
-            big[i] = ~0UL;
-        mpn_tdiv_qr(q, r, 0, big, 9, k->p, 4);
-        mpn_mul(tmp, q, 9-4+1, k->p, 4);
-        for (i = 0; i < 9; ++i)
-            (k->bigmul_p)[i] = tmp[i];
-        assert (tmp[9] == 0UL);
-    }
 }
 
 
@@ -171,7 +140,7 @@ void abase_p_4_init_ts(abase_p_4_dst_field k)
     mp_limb_t s[4];
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    sub_ui_nc_4(pp, k->p, 1);
+    sub_ui_nc_4(pp, k->p->_mp_d, 1);
     int e = 0;
     while (*ptr == 0) {
         ptr++;
@@ -196,10 +165,8 @@ void abase_p_4_init_ts(abase_p_4_dst_field k)
     }
     k->ts_info.e = e;
     
-    k->ts_info.z = malloc(4*sizeof(mp_limb_t));
-    k->ts_info.hh = malloc(4*sizeof(mp_limb_t));
-    if (!k->ts_info.z || !k->ts_info.hh) 
-        MALLOC_FAILED();
+    k->ts_info.z = mpfq_malloc_check(4*sizeof(mp_limb_t));
+    k->ts_info.hh = mpfq_malloc_check(4*sizeof(mp_limb_t));
     
     abase_p_4_elt z, r;
     abase_p_4_init(k, &z);
@@ -273,6 +240,32 @@ int abase_p_4_sqrt(abase_p_4_dst_field k, abase_p_4_dst_elt z, abase_p_4_src_elt
     return (m==0);
 }
 
+/* *Mpfq::defaults::pow::code_for_powz, Mpfq::gfp::elt, Mpfq::gfp */
+void abase_p_4_powz(abase_p_4_dst_field k, abase_p_4_dst_elt y, abase_p_4_src_elt x, mpz_srcptr z)
+{
+        if (mpz_sgn(z) < 0) {
+            mpz_t mz;
+            mpz_init(mz);
+            mpz_neg(mz, z);
+            abase_p_4_powz(k, y, x, mz);
+            abase_p_4_inv(k, y, y);
+            mpz_clear(mz);
+        } else if (mpz_sizeinbase(z, 2) > abase_p_4_field_degree(k) * abase_p_4_field_characteristic_bits(k)) {
+            mpz_t zr;
+            mpz_init(zr);
+            mpz_t ppz;
+            abase_p_4_field_characteristic(k, ppz);
+            mpz_pow_ui(ppz,ppz,abase_p_4_field_degree(k));
+            mpz_sub_ui(ppz,ppz,1);
+            mpz_fdiv_r(zr, z, ppz);
+            abase_p_4_powz(k, y, x, zr);
+            mpz_clear(ppz);
+            mpz_clear(zr);
+        } else {
+            abase_p_4_pow(k, y, x, z->_mp_d, mpz_size(z));
+        }
+}
+
 
 /* Operations involving unreduced elements */
 
@@ -280,14 +273,23 @@ int abase_p_4_sqrt(abase_p_4_dst_field k, abase_p_4_dst_elt z, abase_p_4_src_elt
 
 /* Input/output functions */
 /* *Mpfq::gfp::io::code_for_asprint, Mpfq::gfp */
-void abase_p_4_asprint(abase_p_4_dst_field k, char * * pstr, abase_p_4_src_elt x)
+int abase_p_4_asprint(abase_p_4_dst_field k, char * * pstr, abase_p_4_src_elt x)
 {
     int i, n;
+    mp_size_t size_x;
+    i=4-1;
+    while ((i>=0)&&(x[i]==0)) {
+        i--;
+    }
+    i++;
+    size_x=i;
+    mp_limb_t y[size_x];
+    for (i = 0; i<size_x; ++i) {
+        y[i]=x[i];
+    }
     // allocate enough room for base 2 conversion.
-    *pstr = (char *)malloc((4*64+1)*sizeof(char));
-    if (*pstr == NULL)
-        MALLOC_FAILED();
-    n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) x, 4);
+    *pstr = (char *)mpfq_malloc_check((size_x*64+1)*sizeof(char));
+    n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) y, size_x);
     for (i = 0; i < n; ++i)
         (*pstr)[i] += '0';
     (*pstr)[n] = '\0';
@@ -296,27 +298,27 @@ void abase_p_4_asprint(abase_p_4_dst_field k, char * * pstr, abase_p_4_src_elt x
     while (((*pstr)[shift] == '0') && ((*pstr)[shift+1] != '\0')) 
         shift++;
     if (shift>0) {
-        i = 0;
-        while ((*pstr)[i+shift] != '\0') {
-            (*pstr)[i] = (*pstr)[i+shift];
-            i++;
-        }
-        (*pstr)[i] = '\0';
+        memmove(*pstr, (*pstr) + shift, n + 1 - shift);
+        n -= shift;
     }
     // Return '0' instead of empty string for zero element
     if ((*pstr)[0] == '\0') {
         (*pstr)[0] = '0';
         (*pstr)[1] = '\0';
+        n = 1;
     }
+    return n;
 }
 
 /* *Mpfq::defaults::code_for_fprint, Mpfq::gfp */
-void abase_p_4_fprint(abase_p_4_dst_field k, FILE * file, abase_p_4_src_elt x)
+int abase_p_4_fprint(abase_p_4_dst_field k, FILE * file, abase_p_4_src_elt x)
 {
     char *str;
+    int rc;
     abase_p_4_asprint(k,&str,x);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
 /* *Mpfq::gfp::io::code_for_sscan, Mpfq::gfp */
@@ -340,9 +342,7 @@ int abase_p_4_fscan(abase_p_4_dst_field k, FILE * file, abase_p_4_dst_elt z)
     int allocated, len=0;
     int c, start=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -374,16 +374,16 @@ int abase_p_4_fscan(abase_p_4_dst_field k, FILE * file, abase_p_4_dst_elt z)
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_init(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * v, unsigned int n)
 {
     unsigned int i;
     *v = (abase_p_4_vec) malloc (n*sizeof(abase_p_4_elt));
-    for(i = 0; i < n; i+=1)
+    for(i = 0; i < n; i++)
         abase_p_4_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_reinit(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -399,7 +399,7 @@ void abase_p_4_vec_reinit(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * v,
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_clear(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -408,17 +408,17 @@ void abase_p_4_vec_clear(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * v, 
     free(*v);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
-void abase_p_4_vec_asprint(abase_p_4_dst_field K MAYBE_UNUSED, char * * pstr, abase_p_4_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::gfp */
+int abase_p_4_vec_asprint(abase_p_4_dst_field K MAYBE_UNUSED, char * * pstr, abase_p_4_src_vec w, unsigned int n)
 {
     if (n == 0) {
-        *pstr = (char *)malloc(4*sizeof(char));
+        *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
-        return;
+        return strlen(*pstr);
     }
     int alloc = 100;
     int len = 0;
-    *pstr = (char *)malloc(alloc*sizeof(char));
+    *pstr = (char *)mpfq_malloc_check(alloc*sizeof(char));
     char *str = *pstr;
     *str++ = '[';
     *str++ = ' ';
@@ -443,24 +443,27 @@ void abase_p_4_vec_asprint(abase_p_4_dst_field K MAYBE_UNUSED, char * * pstr, ab
     (*pstr)[len++] = ' ';
     (*pstr)[len++] = ']';
     (*pstr)[len] = '\0';
+    return len;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
-void abase_p_4_vec_fprint(abase_p_4_dst_field K MAYBE_UNUSED, FILE * file, abase_p_4_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::gfp */
+int abase_p_4_vec_fprint(abase_p_4_dst_field K MAYBE_UNUSED, FILE * file, abase_p_4_src_vec w, unsigned int n)
 {
     char *str;
+    int rc;
     abase_p_4_vec_asprint(K,&str,w,n);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
-void abase_p_4_vec_print(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_src_vec w, unsigned int n)
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::gfp */
+int abase_p_4_vec_print(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_src_vec w, unsigned int n)
 {
-    abase_p_4_vec_fprint(K,stdout,w,n);
+    return abase_p_4_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::gfp */
 int abase_p_4_vec_sscan(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -504,16 +507,14 @@ int abase_p_4_vec_sscan(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec * w, u
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::gfp */
 int abase_p_4_vec_fscan(abase_p_4_dst_field K MAYBE_UNUSED, FILE * file, abase_p_4_vec * w, unsigned int * n)
 {
     char *tmp;
     int c;
     int allocated, len=0;
     allocated=100;
-    tmp = (char *)malloc(allocated*sizeof(char));
-    if (!tmp)
-        MALLOC_FAILED();
+    tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
         if (c==EOF)
@@ -537,7 +538,7 @@ int abase_p_4_vec_fscan(abase_p_4_dst_field K MAYBE_UNUSED, FILE * file, abase_p
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_ur_init(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -546,7 +547,7 @@ void abase_p_4_vec_ur_init(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec_ur 
         abase_p_4_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_ur_reinit(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -562,7 +563,7 @@ void abase_p_4_vec_ur_reinit(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec_u
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::gfp */
 void abase_p_4_vec_ur_clear(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -649,16 +650,16 @@ void abase_p_4_poly_setmonic(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_p
         abase_p_4_elt aux;
         abase_p_4_init(K, &aux);
         abase_p_4_set_ui(K, aux, 1);
-        abase_p_4_poly_setcoef(K, q, aux, 0);
+        abase_p_4_poly_setcoeff(K, q, aux, 0);
         abase_p_4_clear(K, &aux);
         q->size = 1;
         return;
     }
     abase_p_4_elt lc;
     abase_p_4_init(K, &lc);
-    abase_p_4_poly_getcoef(K, lc, p, degp);
+    abase_p_4_poly_getcoeff(K, lc, p, degp);
     abase_p_4_inv(K, lc, lc);
-    abase_p_4_poly_setcoef_ui(K, q, 1, degp);
+    abase_p_4_poly_setcoeff_ui(K, q, 1, degp);
     abase_p_4_vec_scal_mul(K, q->c, p->c, lc, degp);
     q->size = degp+1;
     abase_p_4_clear(K, &lc);
@@ -694,11 +695,14 @@ void abase_p_4_poly_divmod(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_pol
     int bmonic;
     abase_p_4_elt ilb;
     abase_p_4_init(K, &ilb);
-    if (abase_p_4_cmp_ui(K, (b->c)[degb], 1) == 0) {
+    abase_p_4_elt temp;
+    abase_p_4_init(K, &temp);
+    abase_p_4_poly_getcoeff(K, temp, b, degb);
+    if (abase_p_4_cmp_ui(K, temp, 1) == 0) {
         abase_p_4_set_ui(K, ilb, 1);
         bmonic = 1;
     } else {
-        abase_p_4_inv(K, ilb, (b->c)[degb]);
+        abase_p_4_inv(K, ilb, temp);
         bmonic = 0;
     }
     
@@ -715,13 +719,17 @@ void abase_p_4_poly_divmod(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_pol
     int i;
     int j;
     for (i = dega; i >= (int)degb; --i) {
-        abase_p_4_poly_getcoef(K, aux, rr, i);
+        abase_p_4_poly_getcoeff(K, aux, rr, i);
         if (!bmonic) 
             abase_p_4_mul(K, aux, aux, ilb);
-        abase_p_4_poly_setcoef(K, qq, aux, i-degb);
+        abase_p_4_poly_setcoeff(K, qq, aux, i-degb);
         for (j = i-1; j >= (int)(i - degb); --j) {
-            abase_p_4_mul(K, aux2, aux, (b->c)[j-i+degb]);
-            abase_p_4_sub(K, (rr->c)[j], (rr->c)[j], aux2);
+            abase_p_4_poly_getcoeff(K, temp, b, j-i+degb);
+            abase_p_4_mul(K, aux2, aux, temp);
+            abase_p_4_poly_getcoeff(K, temp, rr, j);
+    
+            abase_p_4_sub(K, temp, temp, aux2);
+            abase_p_4_poly_setcoeff(K, rr, temp, j);
         }
     }    
     
@@ -733,6 +741,7 @@ void abase_p_4_poly_divmod(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_pol
         abase_p_4_poly_set(K, q, qq);
     if (r != NULL)
         abase_p_4_poly_set(K, r, rr);
+    abase_p_4_clear(K, &temp);
     abase_p_4_clear(K, &aux);
     abase_p_4_clear(K, &aux2);
     abase_p_4_poly_clear(K, rr);
@@ -747,11 +756,14 @@ void abase_p_4_poly_preinv(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_pol
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
     // Requires p(0) = 1
     // Assume p != q (no alias)
-    assert (abase_p_4_cmp_ui(K, p->c[0], 1) == 0);
+    abase_p_4_elt temp;
+    abase_p_4_init(K, &temp);
+    abase_p_4_poly_getcoeff(K, temp, p, 0);//Should be in the assert
+    assert( abase_p_4_cmp_ui(K, temp, 1) == 0);
     assert (p != q);
     int m;
     if (n <= 2) {
-        abase_p_4_poly_setcoef_ui(K, q, 1, 0);
+        abase_p_4_poly_setcoeff_ui(K, q, 1, 0);
         q->size = 1;
         m = 1;
         if (n == 1)
@@ -773,11 +785,14 @@ void abase_p_4_poly_preinv(abase_p_4_dst_field K MAYBE_UNUSED, abase_p_4_dst_pol
     abase_p_4_vec_conv(K, tmp, p->c, MIN(n, p->size), q->c, m);
     int nn = MIN(n, MIN(n, p->size) + m -1);
     abase_p_4_vec_neg(K, tmp, tmp, nn);
-    abase_p_4_add_ui(K, tmp[0], tmp[0], 1);
+    abase_p_4_vec_getcoeff(K, temp, tmp, 0);
+    abase_p_4_add_ui(K, temp, temp, 1);
+    abase_p_4_vec_setcoeff(K, tmp, temp, 0);
     abase_p_4_vec_conv(K, tmp, q->c, m, tmp, nn);
-    abase_p_4_vec_set(K, q->c + m, tmp + m, n-m);
+    abase_p_4_vec_set(K, abase_p_4_vec_subvec(K, q->c, m), abase_p_4_vec_subvec(K, tmp, m), n-m);
     q->size = n;
     
+    abase_p_4_clear(K, &temp);
     abase_p_4_vec_clear(K, &tmp, m+n-1);
 }
 
@@ -868,9 +883,9 @@ void abase_p_4_mpi_ops_init(abase_p_4_dst_field K MAYBE_UNUSED)
 {
         if (abase_p_4_impl_mpi_use_count++) return;
     MPI_Type_create_keyval(MPI_TYPE_DUP_FN, MPI_TYPE_NULL_DELETE_FN, &abase_p_4_impl_mpi_attr, NULL);
-    MPI_Type_contiguous(sizeof(abase_p_4_elt), MPI_BYTE, &abase_p_4_impl_mpi_datatype);
+    MPI_Type_contiguous(abase_p_4_vec_elt_stride(K, 1), MPI_BYTE, &abase_p_4_impl_mpi_datatype);
     MPI_Type_commit(&abase_p_4_impl_mpi_datatype);
-    MPI_Type_contiguous(sizeof(abase_p_4_elt_ur), MPI_BYTE, &abase_p_4_impl_mpi_datatype_ur);
+    MPI_Type_contiguous(abase_p_4_vec_ur_elt_stride(K, 1), MPI_BYTE, &abase_p_4_impl_mpi_datatype_ur);
     MPI_Type_commit(&abase_p_4_impl_mpi_datatype_ur);
     MPI_Type_set_attr(abase_p_4_impl_mpi_datatype, abase_p_4_impl_mpi_attr, K);
     MPI_Type_set_attr(abase_p_4_impl_mpi_datatype_ur, abase_p_4_impl_mpi_attr, K);
@@ -941,6 +956,12 @@ static void abase_p_4_wrapper_field_characteristic(abase_vbase_ptr, mpz_t);
 static void abase_p_4_wrapper_field_characteristic(abase_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
 {
     abase_p_4_field_characteristic(vbase->obj, z);
+}
+
+static unsigned long abase_p_4_wrapper_field_characteristic_bits(abase_vbase_ptr);
+static unsigned long abase_p_4_wrapper_field_characteristic_bits(abase_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return abase_p_4_field_characteristic_bits(vbase->obj);
 }
 
 static int abase_p_4_wrapper_field_degree(abase_vbase_ptr);
@@ -1093,6 +1114,12 @@ static void abase_p_4_wrapper_pow(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_
     abase_p_4_pow(vbase->obj, res, r, x, n);
 }
 
+static void abase_p_4_wrapper_powz(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_elt, mpz_srcptr);
+static void abase_p_4_wrapper_powz(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt y MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, mpz_srcptr z MAYBE_UNUSED)
+{
+    abase_p_4_powz(vbase->obj, y, x, z);
+}
+
 static void abase_p_4_wrapper_frobenius(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_elt);
 static void abase_p_4_wrapper_frobenius(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_elt y MAYBE_UNUSED)
 {
@@ -1231,22 +1258,22 @@ static int abase_p_4_wrapper_is_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p
     return abase_p_4_is_zero(vbase->obj, r);
 }
 
-static void abase_p_4_wrapper_asprint(abase_vbase_ptr, char * *, abase_p_4_src_elt);
-static void abase_p_4_wrapper_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
+static int abase_p_4_wrapper_asprint(abase_vbase_ptr, char * *, abase_p_4_src_elt);
+static int abase_p_4_wrapper_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
 {
-    abase_p_4_asprint(vbase->obj, pstr, x);
+    return abase_p_4_asprint(vbase->obj, pstr, x);
 }
 
-static void abase_p_4_wrapper_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_elt);
-static void abase_p_4_wrapper_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
+static int abase_p_4_wrapper_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_elt);
+static int abase_p_4_wrapper_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
 {
-    abase_p_4_fprint(vbase->obj, file, x);
+    return abase_p_4_fprint(vbase->obj, file, x);
 }
 
-static void abase_p_4_wrapper_print(abase_vbase_ptr, abase_p_4_src_elt);
-static void abase_p_4_wrapper_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
+static int abase_p_4_wrapper_print(abase_vbase_ptr, abase_p_4_src_elt);
+static int abase_p_4_wrapper_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
 {
-    abase_p_4_print(vbase->obj, x);
+    return abase_p_4_print(vbase->obj, x);
 }
 
 static int abase_p_4_wrapper_sscan(abase_vbase_ptr, abase_p_4_dst_elt, const char *);
@@ -1297,22 +1324,22 @@ static void abase_p_4_wrapper_vec_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, a
     abase_p_4_vec_set_zero(vbase->obj, r, n);
 }
 
-static void abase_p_4_wrapper_vec_setcoef(abase_vbase_ptr, abase_p_4_dst_vec, abase_p_4_src_elt, unsigned int);
-static void abase_p_4_wrapper_vec_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_setcoeff(abase_vbase_ptr, abase_p_4_dst_vec, abase_p_4_src_elt, unsigned int);
+static void abase_p_4_wrapper_vec_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_setcoef(vbase->obj, w, x, i);
+    abase_p_4_vec_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_p_4_wrapper_vec_setcoef_ui(abase_vbase_ptr, abase_p_4_dst_vec, unsigned long, unsigned int);
-static void abase_p_4_wrapper_vec_setcoef_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_setcoeff_ui(abase_vbase_ptr, abase_p_4_dst_vec, unsigned long, unsigned int);
+static void abase_p_4_wrapper_vec_setcoeff_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_setcoef_ui(vbase->obj, w, x, i);
+    abase_p_4_vec_setcoeff_ui(vbase->obj, w, x, i);
 }
 
-static void abase_p_4_wrapper_vec_getcoef(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_vec, unsigned int);
-static void abase_p_4_wrapper_vec_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_getcoeff(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_vec, unsigned int);
+static void abase_p_4_wrapper_vec_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_getcoef(vbase->obj, x, w, i);
+    abase_p_4_vec_getcoeff(vbase->obj, x, w, i);
 }
 
 static void abase_p_4_wrapper_vec_add(abase_vbase_ptr, abase_p_4_dst_vec, abase_p_4_src_vec, abase_p_4_src_vec, unsigned int);
@@ -1375,22 +1402,46 @@ static int abase_p_4_wrapper_vec_is_zero(abase_vbase_ptr vbase MAYBE_UNUSED, aba
     return abase_p_4_vec_is_zero(vbase->obj, r, n);
 }
 
-static void abase_p_4_wrapper_vec_asprint(abase_vbase_ptr, char * *, abase_p_4_src_vec, unsigned int);
-static void abase_p_4_wrapper_vec_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static abase_p_4_dst_vec abase_p_4_wrapper_vec_subvec(abase_vbase_ptr, abase_p_4_dst_vec, int);
+static abase_p_4_dst_vec abase_p_4_wrapper_vec_subvec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_asprint(vbase->obj, pstr, w, n);
+    return abase_p_4_vec_subvec(vbase->obj, v, i);
 }
 
-static void abase_p_4_wrapper_vec_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_vec, unsigned int);
-static void abase_p_4_wrapper_vec_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static abase_p_4_src_vec abase_p_4_wrapper_vec_subvec_const(abase_vbase_ptr, abase_p_4_src_vec, int);
+static abase_p_4_src_vec abase_p_4_wrapper_vec_subvec_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_fprint(vbase->obj, file, w, n);
+    return abase_p_4_vec_subvec_const(vbase->obj, v, i);
 }
 
-static void abase_p_4_wrapper_vec_print(abase_vbase_ptr, abase_p_4_src_vec, unsigned int);
-static void abase_p_4_wrapper_vec_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static abase_p_4_dst_elt abase_p_4_wrapper_vec_coeff_ptr(abase_vbase_ptr, abase_p_4_dst_vec, int);
+static abase_p_4_dst_elt abase_p_4_wrapper_vec_coeff_ptr(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_print(vbase->obj, w, n);
+    return abase_p_4_vec_coeff_ptr(vbase->obj, v, i);
+}
+
+static abase_p_4_src_elt abase_p_4_wrapper_vec_coeff_ptr_const(abase_vbase_ptr, abase_p_4_src_vec, int);
+static abase_p_4_src_elt abase_p_4_wrapper_vec_coeff_ptr_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_4_vec_coeff_ptr_const(vbase->obj, v, i);
+}
+
+static int abase_p_4_wrapper_vec_asprint(abase_vbase_ptr, char * *, abase_p_4_src_vec, unsigned int);
+static int abase_p_4_wrapper_vec_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return abase_p_4_vec_asprint(vbase->obj, pstr, w, n);
+}
+
+static int abase_p_4_wrapper_vec_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_vec, unsigned int);
+static int abase_p_4_wrapper_vec_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return abase_p_4_vec_fprint(vbase->obj, file, w, n);
+}
+
+static int abase_p_4_wrapper_vec_print(abase_vbase_ptr, abase_p_4_src_vec, unsigned int);
+static int abase_p_4_wrapper_vec_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return abase_p_4_vec_print(vbase->obj, w, n);
 }
 
 static int abase_p_4_wrapper_vec_sscan(abase_vbase_ptr, abase_p_4_vec *, unsigned int *, const char *);
@@ -1447,16 +1498,16 @@ static void abase_p_4_wrapper_vec_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, aba
     abase_p_4_vec_ur_set(vbase->obj, r, s, n);
 }
 
-static void abase_p_4_wrapper_vec_ur_setcoef(abase_vbase_ptr, abase_p_4_dst_vec_ur, abase_p_4_src_elt_ur, unsigned int);
-static void abase_p_4_wrapper_vec_ur_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec_ur w MAYBE_UNUSED, abase_p_4_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_ur_setcoeff(abase_vbase_ptr, abase_p_4_dst_vec_ur, abase_p_4_src_elt_ur, unsigned int);
+static void abase_p_4_wrapper_vec_ur_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec_ur w MAYBE_UNUSED, abase_p_4_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_ur_setcoef(vbase->obj, w, x, i);
+    abase_p_4_vec_ur_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_p_4_wrapper_vec_ur_getcoef(abase_vbase_ptr, abase_p_4_dst_elt_ur, abase_p_4_src_vec_ur, unsigned int);
-static void abase_p_4_wrapper_vec_ur_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt_ur x MAYBE_UNUSED, abase_p_4_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_ur_getcoeff(abase_vbase_ptr, abase_p_4_dst_elt_ur, abase_p_4_src_vec_ur, unsigned int);
+static void abase_p_4_wrapper_vec_ur_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt_ur x MAYBE_UNUSED, abase_p_4_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_vec_ur_getcoef(vbase->obj, x, w, i);
+    abase_p_4_vec_ur_getcoeff(vbase->obj, x, w, i);
 }
 
 static void abase_p_4_wrapper_vec_ur_add(abase_vbase_ptr, abase_p_4_dst_vec_ur, abase_p_4_src_vec_ur, abase_p_4_src_vec_ur, unsigned int);
@@ -1501,10 +1552,40 @@ static void abase_p_4_wrapper_vec_reduce(abase_vbase_ptr vbase MAYBE_UNUSED, aba
     abase_p_4_vec_reduce(vbase->obj, w, u, n);
 }
 
+static abase_p_4_dst_vec_ur abase_p_4_wrapper_vec_ur_subvec(abase_vbase_ptr, abase_p_4_dst_vec_ur, int);
+static abase_p_4_dst_vec_ur abase_p_4_wrapper_vec_ur_subvec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_4_vec_ur_subvec(vbase->obj, v, i);
+}
+
+static abase_p_4_src_vec_ur abase_p_4_wrapper_vec_ur_subvec_const(abase_vbase_ptr, abase_p_4_src_vec_ur, int);
+static abase_p_4_src_vec_ur abase_p_4_wrapper_vec_ur_subvec_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_4_vec_ur_subvec_const(vbase->obj, v, i);
+}
+
+static abase_p_4_dst_elt abase_p_4_wrapper_vec_ur_coeff_ptr(abase_vbase_ptr, abase_p_4_dst_vec_ur, int);
+static abase_p_4_dst_elt abase_p_4_wrapper_vec_ur_coeff_ptr(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_4_vec_ur_coeff_ptr(vbase->obj, v, i);
+}
+
+static abase_p_4_src_elt abase_p_4_wrapper_vec_ur_coeff_ptr_const(abase_vbase_ptr, abase_p_4_src_vec_ur, int);
+static abase_p_4_src_elt abase_p_4_wrapper_vec_ur_coeff_ptr_const(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return abase_p_4_vec_ur_coeff_ptr_const(vbase->obj, v, i);
+}
+
 static ptrdiff_t abase_p_4_wrapper_vec_elt_stride(abase_vbase_ptr, int);
 static ptrdiff_t abase_p_4_wrapper_vec_elt_stride(abase_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
 {
     return abase_p_4_vec_elt_stride(vbase->obj, n);
+}
+
+static ptrdiff_t abase_p_4_wrapper_vec_ur_elt_stride(abase_vbase_ptr, int);
+static ptrdiff_t abase_p_4_wrapper_vec_ur_elt_stride(abase_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return abase_p_4_vec_ur_elt_stride(vbase->obj, n);
 }
 
 static void abase_p_4_wrapper_poly_init(abase_vbase_ptr, abase_p_4_poly, unsigned int);
@@ -1531,22 +1612,22 @@ static void abase_p_4_wrapper_poly_setmonic(abase_vbase_ptr vbase MAYBE_UNUSED, 
     abase_p_4_poly_setmonic(vbase->obj, q, p);
 }
 
-static void abase_p_4_wrapper_poly_setcoef(abase_vbase_ptr, abase_p_4_dst_poly, abase_p_4_src_elt, unsigned int);
-static void abase_p_4_wrapper_poly_setcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_poly w MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_poly_setcoeff(abase_vbase_ptr, abase_p_4_dst_poly, abase_p_4_src_elt, unsigned int);
+static void abase_p_4_wrapper_poly_setcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_poly w MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_poly_setcoef(vbase->obj, w, x, i);
+    abase_p_4_poly_setcoeff(vbase->obj, w, x, i);
 }
 
-static void abase_p_4_wrapper_poly_setcoef_ui(abase_vbase_ptr, abase_p_4_dst_poly, unsigned long, unsigned int);
-static void abase_p_4_wrapper_poly_setcoef_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_poly w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_poly_setcoeff_ui(abase_vbase_ptr, abase_p_4_dst_poly, unsigned long, unsigned int);
+static void abase_p_4_wrapper_poly_setcoeff_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_poly w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_poly_setcoef_ui(vbase->obj, w, x, i);
+    abase_p_4_poly_setcoeff_ui(vbase->obj, w, x, i);
 }
 
-static void abase_p_4_wrapper_poly_getcoef(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_poly, unsigned int);
-static void abase_p_4_wrapper_poly_getcoef(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+static void abase_p_4_wrapper_poly_getcoeff(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_poly, unsigned int);
+static void abase_p_4_wrapper_poly_getcoeff(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
 {
-    abase_p_4_poly_getcoef(vbase->obj, x, w, i);
+    abase_p_4_poly_getcoeff(vbase->obj, x, w, i);
 }
 
 static int abase_p_4_wrapper_poly_deg(abase_vbase_ptr, abase_p_4_src_poly);
@@ -1645,22 +1726,22 @@ static int abase_p_4_wrapper_poly_cmp(abase_vbase_ptr vbase MAYBE_UNUSED, abase_
     return abase_p_4_poly_cmp(vbase->obj, u, v);
 }
 
-static void abase_p_4_wrapper_poly_asprint(abase_vbase_ptr, char * *, abase_p_4_src_poly);
-static void abase_p_4_wrapper_poly_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
+static int abase_p_4_wrapper_poly_asprint(abase_vbase_ptr, char * *, abase_p_4_src_poly);
+static int abase_p_4_wrapper_poly_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
 {
-    abase_p_4_poly_asprint(vbase->obj, pstr, w);
+    return abase_p_4_poly_asprint(vbase->obj, pstr, w);
 }
 
-static void abase_p_4_wrapper_poly_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_poly);
-static void abase_p_4_wrapper_poly_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
+static int abase_p_4_wrapper_poly_fprint(abase_vbase_ptr, FILE *, abase_p_4_src_poly);
+static int abase_p_4_wrapper_poly_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
 {
-    abase_p_4_poly_fprint(vbase->obj, file, w);
+    return abase_p_4_poly_fprint(vbase->obj, file, w);
 }
 
-static void abase_p_4_wrapper_poly_print(abase_vbase_ptr, abase_p_4_src_poly);
-static void abase_p_4_wrapper_poly_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
+static int abase_p_4_wrapper_poly_print(abase_vbase_ptr, abase_p_4_src_poly);
+static int abase_p_4_wrapper_poly_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_src_poly w MAYBE_UNUSED)
 {
-    abase_p_4_poly_print(vbase->obj, w);
+    return abase_p_4_poly_print(vbase->obj, w);
 }
 
 static int abase_p_4_wrapper_poly_sscan(abase_vbase_ptr, abase_p_4_dst_poly, const char *);
@@ -1786,6 +1867,7 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->impl_max_characteristic_bits = (unsigned long (*) ()) abase_p_4_wrapper_impl_max_characteristic_bits;
     vbase->impl_max_degree = (unsigned long (*) ()) abase_p_4_wrapper_impl_max_degree;
     vbase->field_characteristic = (void (*) (abase_vbase_ptr, mpz_t)) abase_p_4_wrapper_field_characteristic;
+    vbase->field_characteristic_bits = (unsigned long (*) (abase_vbase_ptr)) abase_p_4_wrapper_field_characteristic_bits;
     vbase->field_degree = (int (*) (abase_vbase_ptr)) abase_p_4_wrapper_field_degree;
     vbase->field_init = (void (*) (abase_vbase_ptr)) abase_p_4_wrapper_field_init;
     vbase->field_clear = (void (*) (abase_vbase_ptr)) abase_p_4_wrapper_field_clear;
@@ -1811,6 +1893,7 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->is_sqr = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_is_sqr;
     vbase->sqrt = (int (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_sqrt;
     vbase->pow = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long *, size_t)) abase_p_4_wrapper_pow;
+    vbase->powz = (void (*) (abase_vbase_ptr, void *, const void *, mpz_srcptr)) abase_p_4_wrapper_powz;
     vbase->frobenius = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_frobenius;
     vbase->add_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_p_4_wrapper_add_ui;
     vbase->sub_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_p_4_wrapper_sub_ui;
@@ -1834,9 +1917,9 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->cmp = (int (*) (abase_vbase_ptr, const void *, const void *)) abase_p_4_wrapper_cmp;
     vbase->cmp_ui = (int (*) (abase_vbase_ptr, const void *, unsigned long)) abase_p_4_wrapper_cmp_ui;
     vbase->is_zero = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_is_zero;
-    vbase->asprint = (void (*) (abase_vbase_ptr, char * *, const void *)) abase_p_4_wrapper_asprint;
-    vbase->fprint = (void (*) (abase_vbase_ptr, FILE *, const void *)) abase_p_4_wrapper_fprint;
-    vbase->print = (void (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_print;
+    vbase->asprint = (int (*) (abase_vbase_ptr, char * *, const void *)) abase_p_4_wrapper_asprint;
+    vbase->fprint = (int (*) (abase_vbase_ptr, FILE *, const void *)) abase_p_4_wrapper_fprint;
+    vbase->print = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_print;
     vbase->sscan = (int (*) (abase_vbase_ptr, void *, const char *)) abase_p_4_wrapper_sscan;
     vbase->fscan = (int (*) (abase_vbase_ptr, FILE *, void *)) abase_p_4_wrapper_fscan;
     vbase->scan = (int (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_scan;
@@ -1845,9 +1928,9 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_vec_clear;
     vbase->vec_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_set;
     vbase->vec_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_vec_set_zero;
-    vbase->vec_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_setcoef;
-    vbase->vec_setcoef_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_p_4_wrapper_vec_setcoef_ui;
-    vbase->vec_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_getcoef;
+    vbase->vec_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_setcoeff;
+    vbase->vec_setcoeff_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_p_4_wrapper_vec_setcoeff_ui;
+    vbase->vec_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_getcoeff;
     vbase->vec_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_add;
     vbase->vec_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_neg;
     vbase->vec_rev = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_rev;
@@ -1858,9 +1941,13 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_random2 = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_p_4_wrapper_vec_random2;
     vbase->vec_cmp = (int (*) (abase_vbase_ptr, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_4_wrapper_vec_is_zero;
-    vbase->vec_asprint = (void (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_p_4_wrapper_vec_asprint;
-    vbase->vec_fprint = (void (*) (abase_vbase_ptr, FILE *, const void *, unsigned int)) abase_p_4_wrapper_vec_fprint;
-    vbase->vec_print = (void (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_4_wrapper_vec_print;
+    vbase->vec_subvec = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_4_wrapper_vec_subvec;
+    vbase->vec_subvec_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_4_wrapper_vec_subvec_const;
+    vbase->vec_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_4_wrapper_vec_coeff_ptr;
+    vbase->vec_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_4_wrapper_vec_coeff_ptr_const;
+    vbase->vec_asprint = (int (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_p_4_wrapper_vec_asprint;
+    vbase->vec_fprint = (int (*) (abase_vbase_ptr, FILE *, const void *, unsigned int)) abase_p_4_wrapper_vec_fprint;
+    vbase->vec_print = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_4_wrapper_vec_print;
     vbase->vec_sscan = (int (*) (abase_vbase_ptr, void *, unsigned int *, const char *)) abase_p_4_wrapper_vec_sscan;
     vbase->vec_fscan = (int (*) (abase_vbase_ptr, FILE *, void *, unsigned int *)) abase_p_4_wrapper_vec_fscan;
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_p_4_wrapper_vec_scan;
@@ -1870,8 +1957,8 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_p_4_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_set;
-    vbase->vec_ur_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_setcoef;
-    vbase->vec_ur_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_getcoef;
+    vbase->vec_ur_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_setcoeff;
+    vbase->vec_ur_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_getcoeff;
     vbase->vec_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_add;
     vbase->vec_ur_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_sub;
     vbase->vec_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_vec_ur_neg;
@@ -1879,14 +1966,19 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_scal_mul_ur = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_scal_mul_ur;
     vbase->vec_conv_ur = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int)) abase_p_4_wrapper_vec_conv_ur;
     vbase->vec_reduce = (void (*) (abase_vbase_ptr, void *, void *, unsigned int)) abase_p_4_wrapper_vec_reduce;
+    vbase->vec_ur_subvec = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_4_wrapper_vec_ur_subvec;
+    vbase->vec_ur_subvec_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_4_wrapper_vec_ur_subvec_const;
+    vbase->vec_ur_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_p_4_wrapper_vec_ur_coeff_ptr;
+    vbase->vec_ur_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_p_4_wrapper_vec_ur_coeff_ptr_const;
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_p_4_wrapper_vec_elt_stride;
+    vbase->vec_ur_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_p_4_wrapper_vec_ur_elt_stride;
     vbase->poly_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_poly_init;
     vbase->poly_clear = (void (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_poly_clear;
     vbase->poly_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_poly_set;
     vbase->poly_setmonic = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_poly_setmonic;
-    vbase->poly_setcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_poly_setcoef;
-    vbase->poly_setcoef_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_p_4_wrapper_poly_setcoef_ui;
-    vbase->poly_getcoef = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_poly_getcoef;
+    vbase->poly_setcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_poly_setcoeff;
+    vbase->poly_setcoeff_ui = (void (*) (abase_vbase_ptr, void *, unsigned long, unsigned int)) abase_p_4_wrapper_poly_setcoeff_ui;
+    vbase->poly_getcoeff = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_4_wrapper_poly_getcoeff;
     vbase->poly_deg = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_poly_deg;
     vbase->poly_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_p_4_wrapper_poly_add;
     vbase->poly_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_p_4_wrapper_poly_sub;
@@ -1903,9 +1995,9 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->poly_random = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_p_4_wrapper_poly_random;
     vbase->poly_random2 = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_p_4_wrapper_poly_random2;
     vbase->poly_cmp = (int (*) (abase_vbase_ptr, const void *, const void *)) abase_p_4_wrapper_poly_cmp;
-    vbase->poly_asprint = (void (*) (abase_vbase_ptr, char * *, const void *)) abase_p_4_wrapper_poly_asprint;
-    vbase->poly_fprint = (void (*) (abase_vbase_ptr, FILE *, const void *)) abase_p_4_wrapper_poly_fprint;
-    vbase->poly_print = (void (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_poly_print;
+    vbase->poly_asprint = (int (*) (abase_vbase_ptr, char * *, const void *)) abase_p_4_wrapper_poly_asprint;
+    vbase->poly_fprint = (int (*) (abase_vbase_ptr, FILE *, const void *)) abase_p_4_wrapper_poly_fprint;
+    vbase->poly_print = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_poly_print;
     vbase->poly_sscan = (int (*) (abase_vbase_ptr, void *, const char *)) abase_p_4_wrapper_poly_sscan;
     vbase->poly_fscan = (int (*) (abase_vbase_ptr, FILE *, void *)) abase_p_4_wrapper_poly_fscan;
     vbase->poly_scan = (int (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_poly_scan;

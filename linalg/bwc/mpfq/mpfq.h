@@ -3,6 +3,10 @@
 
 /* This header contains common declarations used by mpfq modules */
 
+/* we always include stdio.h, otherwise our inclusion of gmp.h might
+ * prevent gmp's I/O functions to ever be exposed... */
+#include <stdio.h>
+#include <stdlib.h>
 #include <gmp.h>
 
 #ifdef __cplusplus
@@ -21,13 +25,6 @@ extern "C" {
 #define MPFQ_GROUPSIZE 5        /* int (SIMD group size) */
 #define MPFQ_PRIME_MPZ 6        /* mpz_t */
 
-/***  Some useful macros ***/
-
-#define MALLOC_FAILED()                                                 \
-        do {                                                            \
-                fprintf(stderr, "malloc failed in %s\n", __func__);     \
-                abort();                                                \
-        } while (0)
 
 #define BUILD_BITMASK(x) ((x) == GMP_LIMB_BITS ? ((mp_limb_t) - 1) : (~ - ((mp_limb_t) 1 << (x))))
 
@@ -193,6 +190,46 @@ static inline int ctzlx(unsigned long * x, int n)
 	if (n == 0) return r;
 	r += ctzl(*x);
 	return r;
+}
+
+/***  Some useful macros ***/
+
+/* use these only for the large malloc()s, please */
+static inline void * mpfq_malloc_check(size_t s) {
+    void * r = malloc(s);
+#ifdef  MPFQ_TRACK_MALLOC
+    if (s>>28) { fprintf(stderr, "MALLOC(%.1f)\n", s/1048576.); }
+#endif
+    if (!r) {
+        fprintf(stderr, "malloc(%zu) failed\n", s);
+        abort();
+    }
+    return r;
+}
+
+static inline void * mpfq_realloc_check(void * p, size_t os, size_t s) {
+    void * r = realloc(p, s);
+#ifdef  MPFQ_TRACK_MALLOC
+    if (s>>28) { fprintf(stderr, "REALLOC(%.1f, %.1f)\n", os/1048576., s/1048576.); }
+#endif
+    if (s && !r) {
+        fprintf(stderr, "realloc(%zu, %zu) failed\n", os, s);
+        abort();
+    }
+    return r;
+}
+
+static inline void mpfq_free(void * p, size_t s MAYBE_UNUSED)
+{
+#ifdef  MPFQ_TRACK_MALLOC
+    if (s>>28) { fprintf(stderr, "FREE(%.1f)\n", s/1048576.); }
+#endif
+    free(p);
+}
+
+static inline void malloc_failed() {
+    fprintf(stderr, "malloc() failed\n");
+    abort();
 }
 
 #ifdef __cplusplus

@@ -3088,7 +3088,11 @@ sub_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
 static void 
 mul_1(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
 {
-  mpfq_umul_ppmm(z[1], z[0], x[0], y[0]);
+  __asm__ volatile(
+   "    mulq %3\n"
+  : "=a" (z[0]), "=d" (z[1])
+  : "0" (x[0]), "rm1" (y[0])
+  : "cc");
 }
 
 #define HAVE_NATIVE_MUL_2 1
