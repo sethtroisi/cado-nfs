@@ -785,6 +785,8 @@ static int bw_biglingen_recursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
     if (done) {
         bigmatpoly_swap(pi_left, pi);
         bigmatpoly_clear(ab, pi_left);
+        bigmatpoly_clear(ab, pi_right);
+        bigmatpoly_clear(ab, E_right);
         // fprintf(stderr, "Leave %s\n", __func__);
         return tree_stats_leave(1);
     }
@@ -1028,6 +1030,9 @@ unsigned int bm_io_set_write_behind_size(bm_io_ptr aa, unsigned int * delta)
     unsigned int mindelta = res[0];
     unsigned int maxdelta = res[1];
     unsigned int window = maxdelta - mindelta + aa->t0 + 1;
+    int rank;
+    MPI_Comm_rank(aa->bm->world, &rank);
+    if (rank) return window;
     matpoly_realloc(ab, aa->F, window);
     matpoly_zero(ab, aa->F);
     aa->F->size = window;
@@ -1340,6 +1345,8 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         for(unsigned int s = window ; s-- > 0 ; kpi--)
             bm_io_write_one_F_coeff(aa, maxdelta - kpi - window);
     }
+
+    matpoly_clear(ab, pi);
 
     free(sols);
 }/*}}}*/
