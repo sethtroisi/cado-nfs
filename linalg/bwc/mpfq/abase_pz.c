@@ -420,14 +420,14 @@ void abase_pz_normalize(abase_pz_dst_field k, abase_pz_dst_elt z)
 
 /* Input/output functions */
 /* *pz::code_for_asprint */
-void abase_pz_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_elt x)
+int abase_pz_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_elt x)
 {
         // deal with 0
         if (abase_pz_is_zero(k, x)) {
         char * s = *pstr = (char *) malloc(2);
         s[0] = '0';
         s[1] = '\0';
-        return;
+        return 1;
         }
         // allocate enough room for base 2 conversion.
         *pstr = (char *) malloc(((mpz_size(k->p)) * 64 + 1));
@@ -447,23 +447,22 @@ void abase_pz_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_elt x)
         int shift = 0;
         while (((*pstr)[shift] == '0') && ((*pstr)[shift + 1] != '\0'))
         shift++;
-        if (shift > 0) {
-        int i = 0;
-        while ((*pstr)[i + shift] != '\0') {
-            (*pstr)[i] = (*pstr)[i + shift];
-            i++;
+        if (shift) {
+            memmove(*pstr, (*pstr) + shift, n + 1 - shift);
+            n -= shift;
         }
-        (*pstr)[i] = '\0';
-        }
+        return n;
 }
 
 /* *pz::code_for_fprint */
-void abase_pz_fprint(abase_pz_dst_field k, FILE * file, abase_pz_src_elt x)
+int abase_pz_fprint(abase_pz_dst_field k, FILE * file, abase_pz_src_elt x)
 {
         char *str;
+        int rc;
         abase_pz_asprint(k, &str, x);
-        fprintf(file, "%s", str);
+        rc = fprintf(file, "%s", str);
         free(str);
+        return rc;
 }
 
 /* *pz::code_for_sscan */
@@ -635,12 +634,12 @@ int abase_pz_vec_is_zero(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int 
 }
 
 /* *pz::code_for_vec_asprint */
-void abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec v, unsigned int n)
+int abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec v, unsigned int n)
 {
         if (n == 0) {
         *pstr = (char *) malloc(4);
         sprintf(*pstr, "[ ]");
-        return;
+        return strlen(*pstr);
         }
         int alloc = 100;
         int len = 0;
@@ -669,21 +668,24 @@ void abase_pz_vec_asprint(abase_pz_dst_field k, char * * pstr, abase_pz_src_vec 
         (*pstr)[len++] = ' ';
         (*pstr)[len++] = ']';
         (*pstr)[len] = '\0';
+        return len;
 }
 
 /* *pz::code_for_vec_fprint */
-void abase_pz_vec_fprint(abase_pz_dst_field k, FILE * file, abase_pz_src_vec v, unsigned int n)
+int abase_pz_vec_fprint(abase_pz_dst_field k, FILE * file, abase_pz_src_vec v, unsigned int n)
 {
         char *str;
+        int rc;
         abase_pz_vec_asprint(k, &str, v, n);
-        fprintf(file, "%s", str);
+        rc = fprintf(file, "%s", str);
         free(str);
+        return rc;
 }
 
 /* *pz::code_for_vec_print */
-void abase_pz_vec_print(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int n)
+int abase_pz_vec_print(abase_pz_dst_field k, abase_pz_src_vec v, unsigned int n)
 {
-        abase_pz_vec_fprint(k, stdout, v, n);
+        return abase_pz_vec_fprint(k, stdout, v, n);
 }
 
 /* *pz::code_for_vec_sscan */
@@ -1539,22 +1541,22 @@ static int abase_pz_wrapper_is_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz
     return abase_pz_is_zero(vbase->obj, x);
 }
 
-static void abase_pz_wrapper_asprint(abase_vbase_ptr, char * *, abase_pz_src_elt);
-static void abase_pz_wrapper_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
+static int abase_pz_wrapper_asprint(abase_vbase_ptr, char * *, abase_pz_src_elt);
+static int abase_pz_wrapper_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
 {
-    abase_pz_asprint(vbase->obj, pstr, x);
+    return abase_pz_asprint(vbase->obj, pstr, x);
 }
 
-static void abase_pz_wrapper_fprint(abase_vbase_ptr, FILE *, abase_pz_src_elt);
-static void abase_pz_wrapper_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
+static int abase_pz_wrapper_fprint(abase_vbase_ptr, FILE *, abase_pz_src_elt);
+static int abase_pz_wrapper_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
 {
-    abase_pz_fprint(vbase->obj, file, x);
+    return abase_pz_fprint(vbase->obj, file, x);
 }
 
-static void abase_pz_wrapper_print(abase_vbase_ptr, abase_pz_src_elt);
-static void abase_pz_wrapper_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
+static int abase_pz_wrapper_print(abase_vbase_ptr, abase_pz_src_elt);
+static int abase_pz_wrapper_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_elt x MAYBE_UNUSED)
 {
-    abase_pz_print(vbase->obj, x);
+    return abase_pz_print(vbase->obj, x);
 }
 
 static int abase_pz_wrapper_sscan(abase_vbase_ptr, abase_pz_dst_elt, const char *);
@@ -1707,22 +1709,22 @@ static abase_pz_src_elt abase_pz_wrapper_vec_coeff_ptr_const(abase_vbase_ptr vba
     return abase_pz_vec_coeff_ptr_const(vbase->obj, v, i);
 }
 
-static void abase_pz_wrapper_vec_asprint(abase_vbase_ptr, char * *, abase_pz_src_vec, unsigned int);
-static void abase_pz_wrapper_vec_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static int abase_pz_wrapper_vec_asprint(abase_vbase_ptr, char * *, abase_pz_src_vec, unsigned int);
+static int abase_pz_wrapper_vec_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    abase_pz_vec_asprint(vbase->obj, pstr, v, n);
+    return abase_pz_vec_asprint(vbase->obj, pstr, v, n);
 }
 
-static void abase_pz_wrapper_vec_fprint(abase_vbase_ptr, FILE *, abase_pz_src_vec, unsigned int);
-static void abase_pz_wrapper_vec_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static int abase_pz_wrapper_vec_fprint(abase_vbase_ptr, FILE *, abase_pz_src_vec, unsigned int);
+static int abase_pz_wrapper_vec_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    abase_pz_vec_fprint(vbase->obj, file, v, n);
+    return abase_pz_vec_fprint(vbase->obj, file, v, n);
 }
 
-static void abase_pz_wrapper_vec_print(abase_vbase_ptr, abase_pz_src_vec, unsigned int);
-static void abase_pz_wrapper_vec_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static int abase_pz_wrapper_vec_print(abase_vbase_ptr, abase_pz_src_vec, unsigned int);
+static int abase_pz_wrapper_vec_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
 {
-    abase_pz_vec_print(vbase->obj, v, n);
+    return abase_pz_vec_print(vbase->obj, v, n);
 }
 
 static int abase_pz_wrapper_vec_sscan(abase_vbase_ptr, abase_pz_vec *, unsigned int *, const char *);
@@ -2007,22 +2009,22 @@ static int abase_pz_wrapper_poly_cmp(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p
     return abase_pz_poly_cmp(vbase->obj, u, v);
 }
 
-static void abase_pz_wrapper_poly_asprint(abase_vbase_ptr, char * *, abase_pz_src_poly);
-static void abase_pz_wrapper_poly_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
+static int abase_pz_wrapper_poly_asprint(abase_vbase_ptr, char * *, abase_pz_src_poly);
+static int abase_pz_wrapper_poly_asprint(abase_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
 {
-    abase_pz_poly_asprint(vbase->obj, pstr, w);
+    return abase_pz_poly_asprint(vbase->obj, pstr, w);
 }
 
-static void abase_pz_wrapper_poly_fprint(abase_vbase_ptr, FILE *, abase_pz_src_poly);
-static void abase_pz_wrapper_poly_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
+static int abase_pz_wrapper_poly_fprint(abase_vbase_ptr, FILE *, abase_pz_src_poly);
+static int abase_pz_wrapper_poly_fprint(abase_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
 {
-    abase_pz_poly_fprint(vbase->obj, file, w);
+    return abase_pz_poly_fprint(vbase->obj, file, w);
 }
 
-static void abase_pz_wrapper_poly_print(abase_vbase_ptr, abase_pz_src_poly);
-static void abase_pz_wrapper_poly_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
+static int abase_pz_wrapper_poly_print(abase_vbase_ptr, abase_pz_src_poly);
+static int abase_pz_wrapper_poly_print(abase_vbase_ptr vbase MAYBE_UNUSED, abase_pz_src_poly w MAYBE_UNUSED)
 {
-    abase_pz_poly_print(vbase->obj, w);
+    return abase_pz_poly_print(vbase->obj, w);
 }
 
 static int abase_pz_wrapper_poly_sscan(abase_vbase_ptr, abase_pz_dst_poly, const char *);
@@ -2197,9 +2199,9 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->cmp = (int (*) (abase_vbase_ptr, const void *, const void *)) abase_pz_wrapper_cmp;
     vbase->cmp_ui = (int (*) (abase_vbase_ptr, const void *, unsigned long)) abase_pz_wrapper_cmp_ui;
     vbase->is_zero = (int (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_is_zero;
-    vbase->asprint = (void (*) (abase_vbase_ptr, char * *, const void *)) abase_pz_wrapper_asprint;
-    vbase->fprint = (void (*) (abase_vbase_ptr, FILE *, const void *)) abase_pz_wrapper_fprint;
-    vbase->print = (void (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_print;
+    vbase->asprint = (int (*) (abase_vbase_ptr, char * *, const void *)) abase_pz_wrapper_asprint;
+    vbase->fprint = (int (*) (abase_vbase_ptr, FILE *, const void *)) abase_pz_wrapper_fprint;
+    vbase->print = (int (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_print;
     vbase->sscan = (int (*) (abase_vbase_ptr, void *, const char *)) abase_pz_wrapper_sscan;
     vbase->fscan = (int (*) (abase_vbase_ptr, FILE *, void *)) abase_pz_wrapper_fscan;
     vbase->scan = (int (*) (abase_vbase_ptr, void *)) abase_pz_wrapper_scan;
@@ -2225,9 +2227,9 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_subvec_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_pz_wrapper_vec_subvec_const;
     vbase->vec_coeff_ptr = (void * (*) (abase_vbase_ptr, void *, int)) abase_pz_wrapper_vec_coeff_ptr;
     vbase->vec_coeff_ptr_const = (const void * (*) (abase_vbase_ptr, const void *, int)) abase_pz_wrapper_vec_coeff_ptr_const;
-    vbase->vec_asprint = (void (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_pz_wrapper_vec_asprint;
-    vbase->vec_fprint = (void (*) (abase_vbase_ptr, FILE *, const void *, unsigned int)) abase_pz_wrapper_vec_fprint;
-    vbase->vec_print = (void (*) (abase_vbase_ptr, const void *, unsigned int)) abase_pz_wrapper_vec_print;
+    vbase->vec_asprint = (int (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_pz_wrapper_vec_asprint;
+    vbase->vec_fprint = (int (*) (abase_vbase_ptr, FILE *, const void *, unsigned int)) abase_pz_wrapper_vec_fprint;
+    vbase->vec_print = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_pz_wrapper_vec_print;
     vbase->vec_sscan = (int (*) (abase_vbase_ptr, void *, unsigned int *, const char *)) abase_pz_wrapper_vec_sscan;
     vbase->vec_fscan = (int (*) (abase_vbase_ptr, FILE *, void *, unsigned int *)) abase_pz_wrapper_vec_fscan;
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_pz_wrapper_vec_scan;
@@ -2275,9 +2277,9 @@ void abase_pz_oo_field_init(abase_vbase_ptr vbase)
     vbase->poly_random = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_pz_wrapper_poly_random;
     vbase->poly_random2 = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_pz_wrapper_poly_random2;
     vbase->poly_cmp = (int (*) (abase_vbase_ptr, const void *, const void *)) abase_pz_wrapper_poly_cmp;
-    vbase->poly_asprint = (void (*) (abase_vbase_ptr, char * *, const void *)) abase_pz_wrapper_poly_asprint;
-    vbase->poly_fprint = (void (*) (abase_vbase_ptr, FILE *, const void *)) abase_pz_wrapper_poly_fprint;
-    vbase->poly_print = (void (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_poly_print;
+    vbase->poly_asprint = (int (*) (abase_vbase_ptr, char * *, const void *)) abase_pz_wrapper_poly_asprint;
+    vbase->poly_fprint = (int (*) (abase_vbase_ptr, FILE *, const void *)) abase_pz_wrapper_poly_fprint;
+    vbase->poly_print = (int (*) (abase_vbase_ptr, const void *)) abase_pz_wrapper_poly_print;
     vbase->poly_sscan = (int (*) (abase_vbase_ptr, void *, const char *)) abase_pz_wrapper_poly_sscan;
     vbase->poly_fscan = (int (*) (abase_vbase_ptr, FILE *, void *)) abase_pz_wrapper_poly_fscan;
     vbase->poly_scan = (int (*) (abase_vbase_ptr, void *)) abase_pz_wrapper_poly_scan;

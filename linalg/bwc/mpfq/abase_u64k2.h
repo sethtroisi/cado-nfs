@@ -208,8 +208,8 @@ static inline
 int abase_u64k2_is_zero(abase_u64k2_dst_field, abase_u64k2_src_elt);
 
 /* Input/output functions */
-void abase_u64k2_asprint(abase_u64k2_dst_field, char * *, abase_u64k2_src_elt);
-void abase_u64k2_fprint(abase_u64k2_dst_field, FILE *, abase_u64k2_src_elt);
+int abase_u64k2_asprint(abase_u64k2_dst_field, char * *, abase_u64k2_src_elt);
+int abase_u64k2_fprint(abase_u64k2_dst_field, FILE *, abase_u64k2_src_elt);
 /* *io::code_for_print */
 #define abase_u64k2_print(k, x)	abase_u64k2_fprint(k,stdout,x)
 int abase_u64k2_sscan(abase_u64k2_dst_field, abase_u64k2_dst_elt, const char *);
@@ -255,9 +255,9 @@ static inline
 abase_u64k2_dst_elt abase_u64k2_vec_coeff_ptr(abase_u64k2_dst_field, abase_u64k2_dst_vec, int);
 static inline
 abase_u64k2_src_elt abase_u64k2_vec_coeff_ptr_const(abase_u64k2_dst_field, abase_u64k2_src_vec, int);
-void abase_u64k2_vec_asprint(abase_u64k2_dst_field, char * *, abase_u64k2_src_vec, unsigned int);
-void abase_u64k2_vec_fprint(abase_u64k2_dst_field, FILE *, abase_u64k2_src_vec, unsigned int);
-void abase_u64k2_vec_print(abase_u64k2_dst_field, abase_u64k2_src_vec, unsigned int);
+int abase_u64k2_vec_asprint(abase_u64k2_dst_field, char * *, abase_u64k2_src_vec, unsigned int);
+int abase_u64k2_vec_fprint(abase_u64k2_dst_field, FILE *, abase_u64k2_src_vec, unsigned int);
+int abase_u64k2_vec_print(abase_u64k2_dst_field, abase_u64k2_src_vec, unsigned int);
 int abase_u64k2_vec_sscan(abase_u64k2_dst_field, abase_u64k2_vec *, unsigned int *, const char *);
 int abase_u64k2_vec_fscan(abase_u64k2_dst_field, FILE *, abase_u64k2_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */

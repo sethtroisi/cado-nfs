@@ -71,9 +71,9 @@ struct abase_vbase_s {
     int (*cmp)(abase_vbase_ptr, const void *, const void *);
     int (*cmp_ui)(abase_vbase_ptr, const void *, unsigned long);
     int (*is_zero)(abase_vbase_ptr, const void *);
-    void (*asprint)(abase_vbase_ptr, char * *, const void *);
-    void (*fprint)(abase_vbase_ptr, FILE *, const void *);
-    void (*print)(abase_vbase_ptr, const void *);
+    int (*asprint)(abase_vbase_ptr, char * *, const void *);
+    int (*fprint)(abase_vbase_ptr, FILE *, const void *);
+    int (*print)(abase_vbase_ptr, const void *);
     int (*sscan)(abase_vbase_ptr, void *, const char *);
     int (*fscan)(abase_vbase_ptr, FILE *, void *);
     int (*scan)(abase_vbase_ptr, void *);
@@ -99,9 +99,9 @@ struct abase_vbase_s {
     const void * (*vec_subvec_const)(abase_vbase_ptr, const void *, int);
     void * (*vec_coeff_ptr)(abase_vbase_ptr, void *, int);
     const void * (*vec_coeff_ptr_const)(abase_vbase_ptr, const void *, int);
-    void (*vec_asprint)(abase_vbase_ptr, char * *, const void *, unsigned int);
-    void (*vec_fprint)(abase_vbase_ptr, FILE *, const void *, unsigned int);
-    void (*vec_print)(abase_vbase_ptr, const void *, unsigned int);
+    int (*vec_asprint)(abase_vbase_ptr, char * *, const void *, unsigned int);
+    int (*vec_fprint)(abase_vbase_ptr, FILE *, const void *, unsigned int);
+    int (*vec_print)(abase_vbase_ptr, const void *, unsigned int);
     int (*vec_sscan)(abase_vbase_ptr, void *, unsigned int *, const char *);
     int (*vec_fscan)(abase_vbase_ptr, FILE *, void *, unsigned int *);
     int (*vec_scan)(abase_vbase_ptr, void *, unsigned int *);
@@ -149,9 +149,9 @@ struct abase_vbase_s {
     void (*poly_random)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     void (*poly_random2)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     int (*poly_cmp)(abase_vbase_ptr, const void *, const void *);
-    void (*poly_asprint)(abase_vbase_ptr, char * *, const void *);
-    void (*poly_fprint)(abase_vbase_ptr, FILE *, const void *);
-    void (*poly_print)(abase_vbase_ptr, const void *);
+    int (*poly_asprint)(abase_vbase_ptr, char * *, const void *);
+    int (*poly_fprint)(abase_vbase_ptr, FILE *, const void *);
+    int (*poly_print)(abase_vbase_ptr, const void *);
     int (*poly_sscan)(abase_vbase_ptr, void *, const char *);
     int (*poly_fscan)(abase_vbase_ptr, FILE *, void *);
     int (*poly_scan)(abase_vbase_ptr, void *);

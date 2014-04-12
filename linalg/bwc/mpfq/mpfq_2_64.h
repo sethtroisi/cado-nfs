@@ -227,8 +227,8 @@ static inline
 int mpfq_2_64_is_zero(mpfq_2_64_dst_field, mpfq_2_64_src_elt);
 
 /* Input/output functions */
-void mpfq_2_64_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_elt);
-void mpfq_2_64_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_elt);
+int mpfq_2_64_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_elt);
+int mpfq_2_64_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_elt);
 /* *Mpfq::defaults::code_for_print */
 #define mpfq_2_64_print(k, x)	mpfq_2_64_fprint(k,stdout,x)
 int mpfq_2_64_sscan(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, const char *);
@@ -278,9 +278,9 @@ static inline
 mpfq_2_64_dst_elt mpfq_2_64_vec_coeff_ptr(mpfq_2_64_dst_field, mpfq_2_64_dst_vec, int);
 static inline
 mpfq_2_64_src_elt mpfq_2_64_vec_coeff_ptr_const(mpfq_2_64_dst_field, mpfq_2_64_src_vec, int);
-void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_vec, unsigned int);
-void mpfq_2_64_vec_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_vec, unsigned int);
-void mpfq_2_64_vec_print(mpfq_2_64_dst_field, mpfq_2_64_src_vec, unsigned int);
+int mpfq_2_64_vec_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_vec, unsigned int);
+int mpfq_2_64_vec_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_vec, unsigned int);
+int mpfq_2_64_vec_print(mpfq_2_64_dst_field, mpfq_2_64_src_vec, unsigned int);
 int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field, mpfq_2_64_vec *, unsigned int *, const char *);
 int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field, FILE *, mpfq_2_64_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
@@ -371,11 +371,11 @@ void mpfq_2_64_poly_random2(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned in
 static inline
 int mpfq_2_64_poly_cmp(mpfq_2_64_dst_field, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 static inline
-void mpfq_2_64_poly_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_poly);
+int mpfq_2_64_poly_asprint(mpfq_2_64_dst_field, char * *, mpfq_2_64_src_poly);
 static inline
-void mpfq_2_64_poly_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_poly);
+int mpfq_2_64_poly_fprint(mpfq_2_64_dst_field, FILE *, mpfq_2_64_src_poly);
 static inline
-void mpfq_2_64_poly_print(mpfq_2_64_dst_field, mpfq_2_64_src_poly);
+int mpfq_2_64_poly_print(mpfq_2_64_dst_field, mpfq_2_64_src_poly);
 static inline
 int mpfq_2_64_poly_sscan(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, const char *);
 static inline
@@ -1943,23 +1943,23 @@ int mpfq_2_64_poly_cmp(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_src_poly u,
 
 /* *Mpfq::defaults::poly::code_for_poly_asprint */
 static inline
-void mpfq_2_64_poly_asprint(mpfq_2_64_dst_field k MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_poly w)
+int mpfq_2_64_poly_asprint(mpfq_2_64_dst_field k MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_poly w)
 {
-    mpfq_2_64_vec_asprint(k, pstr, w->c, w->size);
+    return mpfq_2_64_vec_asprint(k, pstr, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_fprint */
 static inline
-void mpfq_2_64_poly_fprint(mpfq_2_64_dst_field k MAYBE_UNUSED, FILE * file, mpfq_2_64_src_poly w)
+int mpfq_2_64_poly_fprint(mpfq_2_64_dst_field k MAYBE_UNUSED, FILE * file, mpfq_2_64_src_poly w)
 {
-    mpfq_2_64_vec_fprint(k, file, w->c, w->size);
+    return mpfq_2_64_vec_fprint(k, file, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_print */
 static inline
-void mpfq_2_64_poly_print(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_src_poly w)
+int mpfq_2_64_poly_print(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_src_poly w)
 {
-    mpfq_2_64_vec_print(k, w->c, w->size);
+    return mpfq_2_64_vec_print(k, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_sscan */

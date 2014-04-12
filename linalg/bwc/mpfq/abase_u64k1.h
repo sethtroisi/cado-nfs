@@ -208,8 +208,8 @@ static inline
 int abase_u64k1_is_zero(abase_u64k1_dst_field, abase_u64k1_src_elt);
 
 /* Input/output functions */
-void abase_u64k1_asprint(abase_u64k1_dst_field, char * *, abase_u64k1_src_elt);
-void abase_u64k1_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_elt);
+int abase_u64k1_asprint(abase_u64k1_dst_field, char * *, abase_u64k1_src_elt);
+int abase_u64k1_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_elt);
 /* *io::code_for_print */
 #define abase_u64k1_print(k, x)	abase_u64k1_fprint(k,stdout,x)
 int abase_u64k1_sscan(abase_u64k1_dst_field, abase_u64k1_dst_elt, const char *);
@@ -255,9 +255,9 @@ static inline
 abase_u64k1_dst_elt abase_u64k1_vec_coeff_ptr(abase_u64k1_dst_field, abase_u64k1_dst_vec, int);
 static inline
 abase_u64k1_src_elt abase_u64k1_vec_coeff_ptr_const(abase_u64k1_dst_field, abase_u64k1_src_vec, int);
-void abase_u64k1_vec_asprint(abase_u64k1_dst_field, char * *, abase_u64k1_src_vec, unsigned int);
-void abase_u64k1_vec_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_vec, unsigned int);
-void abase_u64k1_vec_print(abase_u64k1_dst_field, abase_u64k1_src_vec, unsigned int);
+int abase_u64k1_vec_asprint(abase_u64k1_dst_field, char * *, abase_u64k1_src_vec, unsigned int);
+int abase_u64k1_vec_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_vec, unsigned int);
+int abase_u64k1_vec_print(abase_u64k1_dst_field, abase_u64k1_src_vec, unsigned int);
 int abase_u64k1_vec_sscan(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned int *, const char *);
 int abase_u64k1_vec_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec */
@@ -358,9 +358,9 @@ MPI_Op abase_u64k1_mpi_addition_op_ur(abase_u64k1_dst_field);
 void abase_u64k1_mpi_ops_clear(abase_u64k1_dst_field);
 
 /* Object-oriented interface */
-void abase_u64k1_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_u64k1_oo_field_clear(abase_vbase_ptr);
+void abase_u64k1_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif

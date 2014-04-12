@@ -75,7 +75,7 @@ void mpfq_2_128_powz(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt y, mpfq_2_128_sr
 
 /* Input/output functions */
 /* *Mpfq::gf2n::io::code_for_asprint */
-void mpfq_2_128_asprint(mpfq_2_128_dst_field k, char * * pstr, mpfq_2_128_src_elt x)
+int mpfq_2_128_asprint(mpfq_2_128_dst_field k, char * * pstr, mpfq_2_128_src_elt x)
 {
     int type = k->io_type;
     int i, n; 
@@ -97,7 +97,7 @@ void mpfq_2_128_asprint(mpfq_2_128_dst_field k, char * * pstr, mpfq_2_128_src_el
         if ((msl == 1) && (tmp[0] == 0)) {
             (*pstr)[0] = '0';
             (*pstr)[1] = '\0';
-            return;
+            return 1;
         }
         n = mpn_get_str((unsigned char*)(*pstr), type, tmp, msl);
         for (i = 0; i < n; ++i) {
@@ -113,19 +113,17 @@ void mpfq_2_128_asprint(mpfq_2_128_dst_field k, char * * pstr, mpfq_2_128_src_el
         while (((*pstr)[shift] == '0') && ((*pstr)[shift+1] != '\0')) 
             shift++;
         if (shift>0) {
-            i = 0;
-            while ((*pstr)[i+shift] != '\0') {
-                (*pstr)[i] = (*pstr)[i+shift];
-                i++;
-            }
-            (*pstr)[i] = '\0';
+            memmove(*pstr, (*pstr) + shift, n + 1 - shift);
+            n -= shift;
         }
     
         // Return '0' instead of empty string for zero element
         if ((*pstr)[0] == '\0') {
             (*pstr)[0] = '0';
             (*pstr)[1] = '\0';
+            n = 1;
         }
+        return n;
     } 
     // Polynomial io.
     else {
@@ -159,17 +157,20 @@ void mpfq_2_128_asprint(mpfq_2_128_dst_field k, char * * pstr, mpfq_2_128_src_el
                 *ptr++ = '0';
             }
             *ptr = '\0';
+            return ptr - *pstr;
         }
     }
 }
 
 /* *Mpfq::defaults::code_for_fprint */
-void mpfq_2_128_fprint(mpfq_2_128_dst_field k, FILE * file, mpfq_2_128_src_elt x)
+int mpfq_2_128_fprint(mpfq_2_128_dst_field k, FILE * file, mpfq_2_128_src_elt x)
 {
     char *str;
+    int rc;
     mpfq_2_128_asprint(k,&str,x);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
 /* *Mpfq::gf2n::io::code_for_sscan */
@@ -280,12 +281,12 @@ void mpfq_2_128_vec_clear(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_vec * 
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec */
-void mpfq_2_128_vec_asprint(mpfq_2_128_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_128_src_vec w, unsigned int n)
+int mpfq_2_128_vec_asprint(mpfq_2_128_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_128_src_vec w, unsigned int n)
 {
     if (n == 0) {
         *pstr = (char *)mpfq_malloc_check(4*sizeof(char));
         sprintf(*pstr, "[ ]");
-        return;
+        return strlen(*pstr);
     }
     int alloc = 100;
     int len = 0;
@@ -314,21 +315,24 @@ void mpfq_2_128_vec_asprint(mpfq_2_128_dst_field K MAYBE_UNUSED, char * * pstr, 
     (*pstr)[len++] = ' ';
     (*pstr)[len++] = ']';
     (*pstr)[len] = '\0';
+    return len;
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec */
-void mpfq_2_128_vec_fprint(mpfq_2_128_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_128_src_vec w, unsigned int n)
+int mpfq_2_128_vec_fprint(mpfq_2_128_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_128_src_vec w, unsigned int n)
 {
     char *str;
+    int rc;
     mpfq_2_128_vec_asprint(K,&str,w,n);
-    fprintf(file,"%s",str);
+    rc = fprintf(file,"%s",str);
     free(str);
+    return rc;
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec */
-void mpfq_2_128_vec_print(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_vec w, unsigned int n)
+int mpfq_2_128_vec_print(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_vec w, unsigned int n)
 {
-    mpfq_2_128_vec_fprint(K,stdout,w,n);
+    return mpfq_2_128_vec_fprint(K,stdout,w,n);
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec */

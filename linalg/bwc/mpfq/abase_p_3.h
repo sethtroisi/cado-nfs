@@ -247,8 +247,8 @@ static inline
 int abase_p_3_is_zero(abase_p_3_dst_field, abase_p_3_src_elt);
 
 /* Input/output functions */
-void abase_p_3_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_elt);
-void abase_p_3_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_elt);
+int abase_p_3_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_elt);
+int abase_p_3_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_elt);
 /* *Mpfq::defaults::code_for_print, Mpfq::gfp */
 #define abase_p_3_print(k, x)	abase_p_3_fprint(k,stdout,x)
 int abase_p_3_sscan(abase_p_3_dst_field, abase_p_3_dst_elt, const char *);
@@ -298,9 +298,9 @@ static inline
 abase_p_3_dst_elt abase_p_3_vec_coeff_ptr(abase_p_3_dst_field, abase_p_3_dst_vec, int);
 static inline
 abase_p_3_src_elt abase_p_3_vec_coeff_ptr_const(abase_p_3_dst_field, abase_p_3_src_vec, int);
-void abase_p_3_vec_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_vec, unsigned int);
-void abase_p_3_vec_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_vec, unsigned int);
-void abase_p_3_vec_print(abase_p_3_dst_field, abase_p_3_src_vec, unsigned int);
+int abase_p_3_vec_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_vec, unsigned int);
+int abase_p_3_vec_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_vec, unsigned int);
+int abase_p_3_vec_print(abase_p_3_dst_field, abase_p_3_src_vec, unsigned int);
 int abase_p_3_vec_sscan(abase_p_3_dst_field, abase_p_3_vec *, unsigned int *, const char *);
 int abase_p_3_vec_fscan(abase_p_3_dst_field, FILE *, abase_p_3_vec *, unsigned int *);
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::gfp */
@@ -392,11 +392,11 @@ void abase_p_3_poly_random2(abase_p_3_dst_field, abase_p_3_dst_poly, unsigned in
 static inline
 int abase_p_3_poly_cmp(abase_p_3_dst_field, abase_p_3_src_poly, abase_p_3_src_poly);
 static inline
-void abase_p_3_poly_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_poly);
+int abase_p_3_poly_asprint(abase_p_3_dst_field, char * *, abase_p_3_src_poly);
 static inline
-void abase_p_3_poly_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_poly);
+int abase_p_3_poly_fprint(abase_p_3_dst_field, FILE *, abase_p_3_src_poly);
 static inline
-void abase_p_3_poly_print(abase_p_3_dst_field, abase_p_3_src_poly);
+int abase_p_3_poly_print(abase_p_3_dst_field, abase_p_3_src_poly);
 static inline
 int abase_p_3_poly_sscan(abase_p_3_dst_field, abase_p_3_dst_poly, const char *);
 static inline
@@ -1759,23 +1759,23 @@ int abase_p_3_poly_cmp(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_src_poly u,
 
 /* *Mpfq::defaults::poly::code_for_poly_asprint, Mpfq::gfp */
 static inline
-void abase_p_3_poly_asprint(abase_p_3_dst_field k MAYBE_UNUSED, char * * pstr, abase_p_3_src_poly w)
+int abase_p_3_poly_asprint(abase_p_3_dst_field k MAYBE_UNUSED, char * * pstr, abase_p_3_src_poly w)
 {
-    abase_p_3_vec_asprint(k, pstr, w->c, w->size);
+    return abase_p_3_vec_asprint(k, pstr, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_fprint, Mpfq::gfp */
 static inline
-void abase_p_3_poly_fprint(abase_p_3_dst_field k MAYBE_UNUSED, FILE * file, abase_p_3_src_poly w)
+int abase_p_3_poly_fprint(abase_p_3_dst_field k MAYBE_UNUSED, FILE * file, abase_p_3_src_poly w)
 {
-    abase_p_3_vec_fprint(k, file, w->c, w->size);
+    return abase_p_3_vec_fprint(k, file, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_print, Mpfq::gfp */
 static inline
-void abase_p_3_poly_print(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_src_poly w)
+int abase_p_3_poly_print(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_src_poly w)
 {
-    abase_p_3_vec_print(k, w->c, w->size);
+    return abase_p_3_vec_print(k, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_sscan, Mpfq::gfp */

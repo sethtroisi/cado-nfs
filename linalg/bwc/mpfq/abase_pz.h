@@ -217,8 +217,8 @@ static inline
 int abase_pz_is_zero(abase_pz_dst_field, abase_pz_src_elt);
 
 /* Input/output functions */
-void abase_pz_asprint(abase_pz_dst_field, char * *, abase_pz_src_elt);
-void abase_pz_fprint(abase_pz_dst_field, FILE *, abase_pz_src_elt);
+int abase_pz_asprint(abase_pz_dst_field, char * *, abase_pz_src_elt);
+int abase_pz_fprint(abase_pz_dst_field, FILE *, abase_pz_src_elt);
 /* *Mpfq::defaults::code_for_print, pz */
 #define abase_pz_print(k, x)	abase_pz_fprint(k,stdout,x)
 int abase_pz_sscan(abase_pz_dst_field, abase_pz_dst_elt, const char *);
@@ -253,9 +253,9 @@ static inline
 abase_pz_dst_elt abase_pz_vec_coeff_ptr(abase_pz_dst_field, abase_pz_dst_vec, int);
 static inline
 abase_pz_src_elt abase_pz_vec_coeff_ptr_const(abase_pz_dst_field, abase_pz_src_vec, int);
-void abase_pz_vec_asprint(abase_pz_dst_field, char * *, abase_pz_src_vec, unsigned int);
-void abase_pz_vec_fprint(abase_pz_dst_field, FILE *, abase_pz_src_vec, unsigned int);
-void abase_pz_vec_print(abase_pz_dst_field, abase_pz_src_vec, unsigned int);
+int abase_pz_vec_asprint(abase_pz_dst_field, char * *, abase_pz_src_vec, unsigned int);
+int abase_pz_vec_fprint(abase_pz_dst_field, FILE *, abase_pz_src_vec, unsigned int);
+int abase_pz_vec_print(abase_pz_dst_field, abase_pz_src_vec, unsigned int);
 int abase_pz_vec_sscan(abase_pz_dst_field, abase_pz_vec *, unsigned int *, const char *);
 int abase_pz_vec_fscan(abase_pz_dst_field, FILE *, abase_pz_vec *, unsigned int *);
 /* *pz::code_for_vec_scan */
@@ -330,11 +330,11 @@ void abase_pz_poly_random2(abase_pz_dst_field, abase_pz_dst_poly, unsigned int, 
 static inline
 int abase_pz_poly_cmp(abase_pz_dst_field, abase_pz_src_poly, abase_pz_src_poly);
 static inline
-void abase_pz_poly_asprint(abase_pz_dst_field, char * *, abase_pz_src_poly);
+int abase_pz_poly_asprint(abase_pz_dst_field, char * *, abase_pz_src_poly);
 static inline
-void abase_pz_poly_fprint(abase_pz_dst_field, FILE *, abase_pz_src_poly);
+int abase_pz_poly_fprint(abase_pz_dst_field, FILE *, abase_pz_src_poly);
 static inline
-void abase_pz_poly_print(abase_pz_dst_field, abase_pz_src_poly);
+int abase_pz_poly_print(abase_pz_dst_field, abase_pz_src_poly);
 static inline
 int abase_pz_poly_sscan(abase_pz_dst_field, abase_pz_dst_poly, const char *);
 static inline
@@ -370,9 +370,9 @@ MPI_Op abase_pz_mpi_addition_op_ur(abase_pz_dst_field);
 void abase_pz_mpi_ops_clear(abase_pz_dst_field);
 
 /* Object-oriented interface */
+void abase_pz_oo_field_init(abase_vbase_ptr);
 static inline
 void abase_pz_oo_field_clear(abase_vbase_ptr);
-void abase_pz_oo_field_init(abase_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -972,23 +972,23 @@ int abase_pz_poly_cmp(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_src_poly u, ab
 
 /* *Mpfq::defaults::poly::code_for_poly_asprint, pz */
 static inline
-void abase_pz_poly_asprint(abase_pz_dst_field k MAYBE_UNUSED, char * * pstr, abase_pz_src_poly w)
+int abase_pz_poly_asprint(abase_pz_dst_field k MAYBE_UNUSED, char * * pstr, abase_pz_src_poly w)
 {
-    abase_pz_vec_asprint(k, pstr, w->c, w->size);
+    return abase_pz_vec_asprint(k, pstr, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_fprint, pz */
 static inline
-void abase_pz_poly_fprint(abase_pz_dst_field k MAYBE_UNUSED, FILE * file, abase_pz_src_poly w)
+int abase_pz_poly_fprint(abase_pz_dst_field k MAYBE_UNUSED, FILE * file, abase_pz_src_poly w)
 {
-    abase_pz_vec_fprint(k, file, w->c, w->size);
+    return abase_pz_vec_fprint(k, file, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_print, pz */
 static inline
-void abase_pz_poly_print(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_src_poly w)
+int abase_pz_poly_print(abase_pz_dst_field k MAYBE_UNUSED, abase_pz_src_poly w)
 {
-    abase_pz_vec_print(k, w->c, w->size);
+    return abase_pz_vec_print(k, w->c, w->size);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_sscan, pz */
