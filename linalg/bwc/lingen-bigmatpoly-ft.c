@@ -248,6 +248,7 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
 
 void bigmatpoly_ft_mul(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a, bigmatpoly_ft_ptr b, struct fft_transform_info * fti)/*{{{*/
 {
+    abort();
     ASSERT_ALWAYS(a->n == b->m);
     ASSERT_ALWAYS(a->n1 == b->m1);
     if (bigmatpoly_ft_check_pre_init(c)) {
@@ -273,6 +274,62 @@ void bigmatpoly_ft_mul(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a,
                 bigmatpoly_ft_cell(b, k, jrank), fti);
     }
 }/*}}}*/
+
+void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a, bigmatpoly_ft_ptr b, struct fft_transform_info * fti)/*{{{*/
+{
+    ASSERT_ALWAYS(a->n == b->m);
+    ASSERT_ALWAYS(a->n1 == b->m1);
+    if (bigmatpoly_ft_check_pre_init(c)) {
+        bigmatpoly_ft_finish_init(ab, c, a->m, b->n, fti);
+    }
+    ASSERT_ALWAYS(c->m);
+    ASSERT_ALWAYS(c->m == a->m);
+    ASSERT_ALWAYS(c->n == b->n);
+    int irank;
+    int jrank;
+    MPI_Comm_rank(c->col, &irank);
+    MPI_Comm_rank(c->row, &jrank);
+
+    size_t fft_alloc_sizes[3];
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    size_t tsize = fft_alloc_sizes[0];
+
+    matpoly_ft_ptr lc = bigmatpoly_ft_my_cell(c);
+    bigmatpoly_ft_zero(ab, c, fti);
+
+    for(unsigned int k = 0 ; k < a->n1 ; k++) {
+        /* Cells irank, * receive data from irank, k for a */
+        matpoly_ft_ptr xa;
+        int leader_a = k == (unsigned int) jrank;
+        xa = bigmatpoly_ft_cell(a, irank, k);
+        ASSERT_ALWAYS(leader_a == (xa->data != NULL));
+        if (!xa->data) matpoly_ft_init(ab, xa, a->m0, a->n0, fti);
+        if (leader_a) matpoly_ft_export(ab, xa, fti);
+        MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->row);
+        matpoly_ft_import(ab, xa, fti);
+
+        /* Cells *, jrank receive data from k, jrank for b */
+        matpoly_ft_ptr xb;
+        int leader_b = k == (unsigned int) irank;
+        xb = bigmatpoly_ft_cell(b, k, jrank);
+        ASSERT_ALWAYS(leader_b == (xb->data != NULL));
+        if (!xb->data) matpoly_ft_init(ab, xb, b->m0, b->n0, fti);
+        if (leader_b) matpoly_ft_export(ab, xb, fti);
+        MPI_Bcast(xb->data, xb->m * xb->n * tsize, MPI_BYTE, k, b->col);
+        matpoly_ft_import(ab, xb, fti);
+
+        /* This is one part of the product. */
+        matpoly_ft_addmul(ab, lc, xa, xb, fti);
+
+        /* cleanup */
+        if (!leader_a) matpoly_ft_clear(ab, xa, fti);
+        if (!leader_b) matpoly_ft_clear(ab, xb, fti);
+    }
+}/*}}}*/
+
+
+
+
 
 
 void bigmatpoly_ft_dft(abdst_field ab, bigmatpoly_ft_ptr ta, bigmatpoly_ptr a, struct fft_transform_info * fti)
@@ -312,7 +369,7 @@ void bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigm
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
     bigmatpoly_ft_dft(ab, ta, a, fti);
     bigmatpoly_ft_dft(ab, tb, b, fti);
-    bigmatpoly_ft_mul(ab, tc, ta, tb, fti);
+    bigmatpoly_ft_mul2(ab, tc, ta, tb, fti);
     c->size = a->size + b->size - 1;
     bigmatpoly_ft_ift(ab, c, tc, fti);
     bigmatpoly_ft_clear(ab, ta, fti);
@@ -341,7 +398,7 @@ void bigmatpoly_mp_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigma
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
     bigmatpoly_ft_dft(ab, ta, a, fti);
     bigmatpoly_ft_dft(ab, tb, b, fti);
-    bigmatpoly_ft_mul(ab, tc, ta, tb, fti);
+    bigmatpoly_ft_mul2(ab, tc, ta, tb, fti);
     c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
     bigmatpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti);
     bigmatpoly_ft_clear(ab, ta, fti);
