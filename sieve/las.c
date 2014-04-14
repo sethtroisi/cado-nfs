@@ -3722,8 +3722,18 @@ static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
       /* We used to re-allocate whenever the number of buckets changed. Now we
          always allocate memory for the max. number of buckets, so that we
          never have to re-allocate */
-      uint32_t nb_buckets = thrs[i]->si->nb_buckets_max;
-      
+      uint32_t nb_buckets;
+      /* If shell environment variable LAS_REALLOC_BUCKETS is *not* set,
+         always allocate memory for the max. number of buckets, so that we
+         never have to re-allocate. If it is set, allocate just enough for
+         for the current number of buckets, which will re-allocate memory
+         if number of buckets changes. */
+      if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
+        nb_buckets = thrs[i]->si->nb_buckets_max;
+      } else {
+        nb_buckets = thrs[i]->si->nb_buckets;
+      }
+
       uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
       /* The previous buckets are identical ? */
       if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {
