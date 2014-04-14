@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "lingen-matpoly.h"
 #include "lingen-matpoly-ft.h"
+#include "logline.h"
 
 /* timings made on cochon, rev 6877b97 (buggy; fixed in 76dde6c) */
 #define MP_FTI_DEPTH_ADJ_24_36_36 { { 1, 6 }, { 2, 4 }, { 3, 3 }, { 4, 2 }, { 10, 1 }, { 11, 2 }, { 13, 1 }, { 22, 2 }, { 28, 1 }, { 32, 2 }, { 33, 1 }, { 38, 0 }, { 39, 1 }, { 54, 0 }, { 55, 1 }, { 64, 0 }, { 65, 1 }, { 66, 0 }, { 103, 1 }, { 104, 0 }, { 107, 1 }, { 114, 0 }, { 115, 1 }, { 129, 0 }, }
@@ -52,7 +53,9 @@ void matpoly_ft_dft(abdst_field ab, matpoly_ft_ptr t, matpoly_ptr a, struct fft_
             abvec aij = matpoly_part(ab, a, i, j, 0);
             /* ok, casting like this is a crude hack ! */
             fft_do_dft_fppol(tij, (mp_limb_t *) aij, a->size, tt, fti, ab->p);
+            logline_printf(2, ".");
         }
+        logline_printf(2, " | ");
     }
     free(tt);
 }
@@ -190,7 +193,9 @@ void matpoly_ft_ift(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, struct fft_
             abvec aij = matpoly_part(ab, a, i, j, 0);
             /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p);
+            logline_printf(2, ".");
         }
+        logline_printf(2, " | ");
     }
     free(tt);
 }
@@ -213,7 +218,9 @@ void matpoly_ft_ift_mp(abdst_field ab, matpoly_ptr a, matpoly_ft_ptr t, unsigned
             abvec aij = matpoly_part(ab, a, i, j, 0);
             /* ok, casting like this is a crude hack ! */
             fft_do_ift_fppol_mp((mp_limb_t *) aij, a->size, tij, tt, fti, ab->p, shift);
+            logline_printf(2, ".");
         }
+        logline_printf(2, " | ");
     }
     free(tt);
 }

@@ -263,6 +263,7 @@ if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
                     bw-common-mpi.c
                     plingen.c
                     plingen-tuning.cpp
+                    logline.c
                     lingen-matpoly.c
                     lingen-bigmatpoly.c
                     lingen-polymat.c

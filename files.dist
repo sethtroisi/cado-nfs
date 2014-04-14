@@ -1062,3 +1062,5 @@ linalg/bwc/mpfq/abase_pz.c
 linalg/bwc/mpfq/abase_pz.h
 linalg/bwc/mpfq/abase_pz_t.c
 linalg/bwc/mpfq/abase_pz_t.h
+linalg/bwc/logline.c
+linalg/bwc/logline.h

@@ -5,6 +5,7 @@
 #include "macros.h"
 #include "lingen-matpoly-ft.h"
 #include "lingen-bigmatpoly-ft.h"
+#include "logline.h"
 
 /* This is the interface for doing products of polynomial matrices by
  * caching transforms, and transferring them over MPI. There are
@@ -283,6 +284,9 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
     bigmatpoly_ft_zero(ab, c, fti);
 
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
+        logline_printf(1, "MUL-round %u/%u", k, a->n1);
+
+        logline_printf(1, "; row");
         /* Cells irank, * receive data from irank, k for a */
         matpoly_ft_ptr xa;
         int leader_a = k == (unsigned int) jrank;
@@ -293,6 +297,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->com[1]);
         matpoly_ft_import(ab, xa, fti);
 
+        logline_printf(1, "; col");
         /* Cells *, jrank receive data from k, jrank for b */
         matpoly_ft_ptr xb;
         int leader_b = k == (unsigned int) irank;
@@ -303,9 +308,11 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         MPI_Bcast(xb->data, xb->m * xb->n * tsize, MPI_BYTE, k, b->com[2]);
         matpoly_ft_import(ab, xb, fti);
 
+        logline_printf(1, "; addmul");
         /* This is one part of the product. */
         matpoly_ft_addmul(ab, lc, xa, xb, fti);
 
+        logline_printf(1, "; done\n");
         /* cleanup */
         if (!leader_a) matpoly_ft_clear(ab, xa, fti);
         if (!leader_b) matpoly_ft_clear(ab, xb, fti);
@@ -345,6 +352,11 @@ void bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigm
     if (adj != UINT_MAX) {
         fft_transform_info_adjust_depth(fti, adj);
     }
+
+    size_t fft_alloc_sizes[3];
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    logline_printf(1, "FT size=%zuk\n", fft_alloc_sizes[0]>>10);
+
     bigmatpoly_clear(ab, c);
     bigmatpoly_ptr model = a;
     bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
@@ -352,10 +364,13 @@ void bigmatpoly_mul_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigm
     bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
     bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
+    logline_printf(1, "DFT(A, %u*%u)\n", a->m0, a->n0);
     bigmatpoly_ft_dft(ab, ta, a, fti);
+    logline_printf(1, "DFT(B, %u*%u)\n", b->m0, b->n0);
     bigmatpoly_ft_dft(ab, tb, b, fti);
     bigmatpoly_ft_mul2(ab, tc, ta, tb, fti);
     c->size = a->size + b->size - 1;
+    logline_printf(1, "IFT(C, %u*%u)\n", c->m0, c->n0);
     bigmatpoly_ft_ift(ab, c, tc, fti);
     bigmatpoly_ft_clear(ab, ta, fti);
     bigmatpoly_ft_clear(ab, tb, fti);
@@ -374,6 +389,11 @@ void bigmatpoly_mp_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigma
     if (adj != UINT_MAX) {
         fft_transform_info_adjust_depth(fti, adj);
     }
+
+    size_t fft_alloc_sizes[3];
+    fft_get_transform_allocs(fft_alloc_sizes, fti);
+    logline_printf(1, "FT size=%zuk\n", fft_alloc_sizes[0]>>10);
+
     bigmatpoly_clear(ab, c);
     bigmatpoly_ptr model = a;
     bigmatpoly_ft_ptr ftmodel = (bigmatpoly_ft_ptr) a;
@@ -381,10 +401,13 @@ void bigmatpoly_mp_caching_adj(abdst_field ab, bigmatpoly c, bigmatpoly a, bigma
     bigmatpoly_ft_init(ab, ta, ftmodel, a->m, a->n, fti);
     bigmatpoly_ft_init(ab, tb, ftmodel, b->m, b->n, fti);
     bigmatpoly_ft_init(ab, tc, ftmodel, a->m, b->n, fti);
+    logline_printf(1, "DFT(A, %u*%u)\n", a->m0, a->n0);
     bigmatpoly_ft_dft(ab, ta, a, fti);
+    logline_printf(1, "DFT(B, %u*%u)\n", b->m0, b->n0);
     bigmatpoly_ft_dft(ab, tb, b, fti);
     bigmatpoly_ft_mul2(ab, tc, ta, tb, fti);
     c->size = MAX(a->size, b->size) - MIN(a->size, b->size) + 1;
+    logline_printf(1, "IFT-MP(C, %u*%u)\n", c->m0, c->n0);
     bigmatpoly_ft_ift_mp(ab, c, tc, MIN(a->size, b->size) - 1, fti);
     bigmatpoly_ft_clear(ab, ta, fti);
     bigmatpoly_ft_clear(ab, tb, fti);
