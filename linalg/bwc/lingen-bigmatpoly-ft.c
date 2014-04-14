@@ -31,27 +31,17 @@ matpoly_ft_ptr bigmatpoly_ft_my_cell(bigmatpoly_ft_ptr p)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     return bigmatpoly_ft_cell(p, irank, jrank);
 }
 
-void bigmatpoly_ft_init_model(bigmatpoly_ft_ptr model, MPI_Comm comm, unsigned int m, unsigned int n)
+void bigmatpoly_ft_init_model(bigmatpoly_ft_ptr model, MPI_Comm * comm, unsigned int m, unsigned int n)
 {
-    int size;
-    int rank;
-    MPI_Comm_size(comm, &size);
-    MPI_Comm_rank(comm, &rank);
-    ASSERT_ALWAYS(size == (int) (m * n));
-    int irank = rank / n;
-    int jrank = rank % n;
-
     memset(model, 0, sizeof(bigmatpoly_ft));
     model->m1 = m;
     model->n1 = n;
-    MPI_Comm_dup(comm, &(model->comm));
-    MPI_Comm_split(comm, irank, jrank, &(model->row));
-    MPI_Comm_split(comm, jrank, irank, &(model->col));
+    memcpy(model->com, comm, 3 * sizeof(MPI_Comm));
 }
 
 /* This completes the initialization process. This is _not_ a collective
@@ -78,14 +68,12 @@ void bigmatpoly_ft_init(abdst_field ab, bigmatpoly_ft_ptr p, bigmatpoly_ft_srcpt
     ASSERT_ALWAYS(n % model->n1 == 0);
     int irank;
     int jrank;
-    MPI_Comm_rank(model->col, &irank);
-    MPI_Comm_rank(model->row, &jrank);
+    MPI_Comm_rank(model->com[2], &irank);
+    MPI_Comm_rank(model->com[1], &jrank);
     memset(p, 0, sizeof(bigmatpoly_ft));
     p->m1 = model->m1;
     p->n1 = model->n1;
-    MPI_Comm_dup(model->comm, &(p->comm));
-    MPI_Comm_dup(model->row, &(p->row));
-    MPI_Comm_dup(model->col, &(p->col));
+    memcpy(p->com, model->com, 3 * sizeof(MPI_Comm));
 
     p->cells = malloc(p->m1*p->n1*sizeof(matpoly_ft));
     memset(p->cells, 0, p->m1*p->n1*sizeof(matpoly_ft));
@@ -122,9 +110,6 @@ int bigmatpoly_ft_check_pre_init(bigmatpoly_ft_srcptr p)
 
 void bigmatpoly_ft_clear_model(bigmatpoly_ft_ptr p)
 {
-    MPI_Comm_free(&(p->comm));
-    MPI_Comm_free(&(p->row));
-    MPI_Comm_free(&(p->col));
     memset(p, 0, sizeof(bigmatpoly_ft));
 }
 
@@ -145,8 +130,8 @@ static void bigmatpoly_ft_provision_row(abdst_field ab, bigmatpoly_ft_ptr p, str
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     for(unsigned int j = 0 ; j < p->n1 ; j++) {
         if (j == (unsigned int) jrank) continue;
         matpoly_ft_ptr them = bigmatpoly_ft_cell(p, irank, j);
@@ -161,8 +146,8 @@ void bigmatpoly_ft_provision_col(abdst_field ab, bigmatpoly_ft_ptr p, struct fft
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     for(unsigned int i = 0 ; i < p->m1 ; i++) {
         if (i == (unsigned int) irank) continue;
         matpoly_ft_ptr them = bigmatpoly_ft_cell(p, i, jrank);
@@ -195,8 +180,8 @@ static void bigmatpoly_ft_allgather_row(abdst_field ab, bigmatpoly_ft_ptr a, str
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(a->col, &irank);
-    MPI_Comm_rank(a->row, &jrank);
+    MPI_Comm_rank(a->com[2], &irank);
+    MPI_Comm_rank(a->com[1], &jrank);
     bigmatpoly_ft_provision_row(ab, a, fti);
     
     /* Each node makes his cell exportable */
@@ -209,7 +194,7 @@ static void bigmatpoly_ft_allgather_row(abdst_field ab, bigmatpoly_ft_ptr a, str
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, irank, k);
-        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->row);
+        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->com[1]);
     }
 
     /* and now all nodes on the row import the cells from their friends */
@@ -222,8 +207,8 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(a->col, &irank);
-    MPI_Comm_rank(a->row, &jrank);
+    MPI_Comm_rank(a->com[2], &irank);
+    MPI_Comm_rank(a->com[1], &jrank);
     bigmatpoly_ft_provision_col(ab, a, fti);
 
     /* Each node makes his cell exportable */
@@ -236,7 +221,7 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->m1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, k, jrank);
-        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->col);
+        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->com[2]);
     }
 
     /* and now all nodes on the row import the cells from their friends */
@@ -259,8 +244,8 @@ void bigmatpoly_ft_mul(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a,
     ASSERT_ALWAYS(c->n == b->n);
     int irank;
     int jrank;
-    MPI_Comm_rank(c->col, &irank);
-    MPI_Comm_rank(c->row, &jrank);
+    MPI_Comm_rank(c->com[2], &irank);
+    MPI_Comm_rank(c->com[1], &jrank);
     bigmatpoly_ft_allgather_row(ab, a, fti);
     bigmatpoly_ft_allgather_col(ab, b, fti);
     // ASSERT_ALWAYS(c->alloc >= c->size);
@@ -287,8 +272,8 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
     ASSERT_ALWAYS(c->n == b->n);
     int irank;
     int jrank;
-    MPI_Comm_rank(c->col, &irank);
-    MPI_Comm_rank(c->row, &jrank);
+    MPI_Comm_rank(c->com[2], &irank);
+    MPI_Comm_rank(c->com[1], &jrank);
 
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
@@ -305,7 +290,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         ASSERT_ALWAYS(leader_a == (xa->data != NULL));
         if (!xa->data) matpoly_ft_init(ab, xa, a->m0, a->n0, fti);
         if (leader_a) matpoly_ft_export(ab, xa, fti);
-        MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->row);
+        MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->com[1]);
         matpoly_ft_import(ab, xa, fti);
 
         /* Cells *, jrank receive data from k, jrank for b */
@@ -315,7 +300,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         ASSERT_ALWAYS(leader_b == (xb->data != NULL));
         if (!xb->data) matpoly_ft_init(ab, xb, b->m0, b->n0, fti);
         if (leader_b) matpoly_ft_export(ab, xb, fti);
-        MPI_Bcast(xb->data, xb->m * xb->n * tsize, MPI_BYTE, k, b->col);
+        MPI_Bcast(xb->data, xb->m * xb->n * tsize, MPI_BYTE, k, b->com[2]);
         matpoly_ft_import(ab, xb, fti);
 
         /* This is one part of the product. */

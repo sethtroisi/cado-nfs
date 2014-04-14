@@ -11,27 +11,17 @@ matpoly_ptr bigmatpoly_my_cell(bigmatpoly_ptr p)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     return bigmatpoly_cell(p, irank, jrank);
 }
 
-void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm comm, unsigned int m, unsigned int n)
+void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm * comm, unsigned int m, unsigned int n)
 {
-    int size;
-    int rank;
-    MPI_Comm_size(comm, &size);
-    MPI_Comm_rank(comm, &rank);
-    ASSERT_ALWAYS(size == (int) (m * n));
-    int irank = rank / n;
-    int jrank = rank % n;
-
     memset(model, 0, sizeof(bigmatpoly));
     model->m1 = m;
     model->n1 = n;
-    MPI_Comm_dup(comm, &(model->comm));
-    MPI_Comm_split(comm, irank, jrank, &(model->row));
-    MPI_Comm_split(comm, jrank, irank, &(model->col));
+    memcpy(model->com, comm, 3 * sizeof(MPI_Comm));
 }
 
 /* This completes the initialization process. This is _not_ a collective
@@ -59,14 +49,12 @@ void bigmatpoly_init(abdst_field ab, bigmatpoly_ptr p, bigmatpoly_srcptr model, 
     ASSERT_ALWAYS(n % model->n1 == 0);
     int irank;
     int jrank;
-    MPI_Comm_rank(model->col, &irank);
-    MPI_Comm_rank(model->row, &jrank);
+    MPI_Comm_rank(model->com[2], &irank);
+    MPI_Comm_rank(model->com[1], &jrank);
     memset(p, 0, sizeof(bigmatpoly));
     p->m1 = model->m1;
     p->n1 = model->n1;
-    MPI_Comm_dup(model->comm, &(p->comm));
-    MPI_Comm_dup(model->row, &(p->row));
-    MPI_Comm_dup(model->col, &(p->col));
+    memcpy(p->com, model->com, 3 * sizeof(MPI_Comm));
 
     p->cells = malloc(p->m1*p->n1*sizeof(matpoly));
     memset(p->cells, 0, p->m1*p->n1*sizeof(matpoly));
@@ -103,9 +91,6 @@ int bigmatpoly_check_pre_init(bigmatpoly_srcptr p)
 
 void bigmatpoly_clear_model(bigmatpoly_ptr p)
 {
-    MPI_Comm_free(&(p->comm));
-    MPI_Comm_free(&(p->row));
-    MPI_Comm_free(&(p->col));
     memset(p, 0, sizeof(bigmatpoly));
 }
 
@@ -130,8 +115,8 @@ int bigmatpoly_provisioned(bigmatpoly_ptr p)
     if (bigmatpoly_check_pre_init(p)) return 0;
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     unsigned int np_row = 0;
     unsigned int np_col = 0;
     for(unsigned int j = 0 ; j < p->n1 ; j++)
@@ -150,8 +135,8 @@ void bigmatpoly_provision_row(abdst_field ab, bigmatpoly_ptr p)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     matpoly_srcptr me = bigmatpoly_my_cell(p);
     for(unsigned int j = 0 ; j < p->n1 ; j++) {
         if (j == (unsigned int) jrank) continue;
@@ -169,8 +154,8 @@ void bigmatpoly_unprovision_row(abdst_field ab, bigmatpoly_ptr p)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     for(unsigned int j = 0 ; j < p->n1 ; j++) {
         if (j == (unsigned int) jrank) continue;
         matpoly_ptr them = bigmatpoly_cell(p, irank, j);
@@ -185,8 +170,8 @@ void bigmatpoly_provision_col(abdst_field ab, bigmatpoly_ptr p)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     matpoly_srcptr me = bigmatpoly_my_cell(p);
     for(unsigned int i = 0 ; i < p->m1 ; i++) {
         if (i == (unsigned int) irank) continue;
@@ -204,8 +189,8 @@ void bigmatpoly_set_size(bigmatpoly_ptr p, size_t size)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     matpoly_ptr me = bigmatpoly_my_cell(p);
     ASSERT_ALWAYS(size <= me->alloc);
     p->size = size;
@@ -233,8 +218,8 @@ void bigmatpoly_realloc(bigmatpoly_ptr p, int newalloc)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(p->col, &irank);
-    MPI_Comm_rank(p->row, &jrank);
+    MPI_Comm_rank(p->com[2], &irank);
+    MPI_Comm_rank(p->com[1], &jrank);
     matpoly_ptr me = bigmatpoly_my_cell(p);
     matpoly_realloc(me, newalloc);
     for(unsigned int j = 0 ; j < p->n1 ; j++) {
@@ -300,34 +285,34 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(a->col, &irank);
-    MPI_Comm_rank(a->row, &jrank);
+    MPI_Comm_rank(a->com[2], &irank);
+    MPI_Comm_rank(a->com[1], &jrank);
     bigmatpoly_provision_row(ab, a);
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
         matpoly_ptr data = bigmatpoly_cell(a, irank, k);
         /* XXX: Should we ensure earlier that we agree on the size ? */
         unsigned long size = data->size;
-        MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->row);
+        MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[1]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->row);
+        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[1]);
     }
 }
 void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(a->col, &irank);
-    MPI_Comm_rank(a->row, &jrank);
+    MPI_Comm_rank(a->com[2], &irank);
+    MPI_Comm_rank(a->com[1], &jrank);
     bigmatpoly_provision_col(ab, a);
     for(unsigned int k = 0 ; k < a->m1 ; k++) {
         matpoly_ptr data = bigmatpoly_cell(a, k, jrank);
         /* XXX: Should we ensure earlier that we agree on the size ? */
         unsigned long size = data->size;
-        MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->col);
+        MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[2]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->col);
+        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[2]);
     }
 }
 /* scatter from node 0. This is not a very interesting function, in fact
@@ -339,8 +324,8 @@ static void bigmatpoly_scatter_row(abdst_field ab, bigmatpoly a)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(a->col, &irank);
-    MPI_Comm_rank(a->row, &jrank);
+    MPI_Comm_rank(a->com[2], &irank);
+    MPI_Comm_rank(a->com[1], &jrank);
     bigmatpoly_provision_row(ab, a);
 
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
@@ -352,15 +337,15 @@ static void bigmatpoly_scatter_row(abdst_field ab, bigmatpoly a)
         if (jrank == 0) {
             matpoly_ptr data = bigmatpoly_cell(a, irank, k);
             unsigned long size = data->size;
-            MPI_Send(&size, 1, MPI_UNSIGNED_LONG, k, 0, a->row);
-            MPI_Send(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, 1, a->row);
+            MPI_Send(&size, 1, MPI_UNSIGNED_LONG, k, 0, a->com[1]);
+            MPI_Send(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, 1, a->com[1]);
         } else if (jrank == (int) k) {
             matpoly_ptr data = bigmatpoly_my_cell(a);
             unsigned long size = 0;
-            MPI_Recv(&size, 1, MPI_UNSIGNED_LONG, 0, 0, a->row, MPI_STATUS_IGNORE);
+            MPI_Recv(&size, 1, MPI_UNSIGNED_LONG, 0, 0, a->com[1], MPI_STATUS_IGNORE);
             data->size = size;
             ASSERT_ALWAYS(data->size <= data->alloc);
-            MPI_Recv(data->x, data->m * data->n * data->size, abmpi_datatype(ab), 0, 1, a->row, MPI_STATUS_IGNORE);
+            MPI_Recv(data->x, data->m * data->n * data->size, abmpi_datatype(ab), 0, 1, a->com[1], MPI_STATUS_IGNORE);
         }
     }
 }
@@ -378,8 +363,8 @@ void bigmatpoly_mul(abdst_field ab, bigmatpoly c, bigmatpoly a, bigmatpoly b)/*{
     ASSERT_ALWAYS(c->n == b->n);
     int irank;
     int jrank;
-    MPI_Comm_rank(c->col, &irank);
-    MPI_Comm_rank(c->row, &jrank);
+    MPI_Comm_rank(c->com[2], &irank);
+    MPI_Comm_rank(c->com[1], &jrank);
     bigmatpoly_allgather_row(ab, a);
     bigmatpoly_allgather_col(ab, b);
     bigmatpoly_set_size(c, a->size + b->size - 1);
@@ -411,8 +396,8 @@ void bigmatpoly_mp(abdst_field ab,/*{{{*/
     ASSERT_ALWAYS(b->n == c->n);
     int irank;
     int jrank;
-    MPI_Comm_rank(b->col, &irank);
-    MPI_Comm_rank(b->row, &jrank);
+    MPI_Comm_rank(b->com[2], &irank);
+    MPI_Comm_rank(b->com[1], &jrank);
 
     bigmatpoly_allgather_row(ab, a);
     bigmatpoly_allgather_col(ab, c);
@@ -441,8 +426,8 @@ void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
     ASSERT_ALWAYS(dst->n == src->n);
     int irank;
     int jrank;
-    MPI_Comm_rank(src->col, &irank);
-    MPI_Comm_rank(src->row, &jrank);
+    MPI_Comm_rank(src->com[2], &irank);
+    MPI_Comm_rank(src->com[1], &jrank);
     /* Node 0 must receive data from everyone. Whether we seek
      * collaboration from some of the peer nodes to delegate some of the
      * receiving does not matter much, since _we_ will receive the whole
@@ -494,7 +479,7 @@ void bigmatpoly_gather_mat(abdst_field ab, matpoly dst, bigmatpoly src)
             irank ? NULL : matpoly_part(ab, dst, 0, 0, 0),
             src->m * src->n * src->size,
             abmpi_datatype(ab),
-            abmpi_addition_op(ab), 0, src->col);
+            abmpi_addition_op(ab), 0, src->com[2]);
 }
 
 /* Exactly the converse of the previous function. */
@@ -502,15 +487,15 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
 {
     int irank;
     int jrank;
-    MPI_Comm_rank(dst->col, &irank);
-    MPI_Comm_rank(dst->row, &jrank);
+    MPI_Comm_rank(dst->com[2], &irank);
+    MPI_Comm_rank(dst->com[1], &jrank);
     /* src at root must be initialized. src may be pre-init at other
      * nodes */
     int pre_init_status[2];     /* local, max-global */
     pre_init_status[0] = matpoly_check_pre_init(src);
     pre_init_status[1] = pre_init_status[0];
-    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->col);
-    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->row);
+    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->com[2]);
+    MPI_Allreduce(MPI_IN_PLACE, &(pre_init_status[1]), 1, MPI_INT, MPI_MAX, dst->com[1]);
 
     if (irank == 0 && jrank == 0) {
         ASSERT_ALWAYS(pre_init_status[0] == 0);
@@ -531,8 +516,8 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
         shell->size = src->size;
         shell->alloc = src->alloc;
         /* 2-step broadcast */
-        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->col);
-        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->row);
+        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[2]);
+        MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[1]);
         if (irank || jrank) {
             /* make sure we have exactly the same amount of allocated
              * memory everywhere */
@@ -561,7 +546,7 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
             src->m * src->n * src->alloc,
             abmpi_datatype(ab),
             0,
-            dst->col);
+            dst->com[2]);
     /* Now scatter across rows */
     bigmatpoly_provision_row(ab, dst);
     /* propagate the size info */
@@ -602,9 +587,9 @@ void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
     int rank;
     int irank;
     int jrank;
-    MPI_Comm_rank(src->comm, &rank);
-    MPI_Comm_rank(src->col, &irank);
-    MPI_Comm_rank(src->row, &jrank);
+    MPI_Comm_rank(src->com[0], &rank);
+    MPI_Comm_rank(src->com[2], &irank);
+    MPI_Comm_rank(src->com[1], &jrank);
     /* dst at root must be initialized.
      * dst at other nodes is untouched. */
 
@@ -636,7 +621,7 @@ void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
                         abvec_set(ab, to, from, count);
                     } else {
                         MPI_Irecv(to, count, abmpi_datatype(ab),
-                                peer, tag, src->comm, req);
+                                peer, tag, src->com[0], req);
                     }
 
                     req++;
@@ -671,7 +656,7 @@ void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
             unsigned int tag = ii * src->n + jj;
             abdst_vec from = matpoly_part(ab, me, i0, 0, 0);
             MPI_Isend(from, count, abmpi_datatype(ab),
-                    0, tag, src->comm, req);
+                    0, tag, src->com[0], req);
             req++;
         }
         req = reqs;
@@ -690,9 +675,9 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
     int rank;
     int irank;
     int jrank;
-    MPI_Comm_rank(dst->comm, &rank);
-    MPI_Comm_rank(dst->col, &irank);
-    MPI_Comm_rank(dst->row, &jrank);
+    MPI_Comm_rank(dst->com[0], &rank);
+    MPI_Comm_rank(dst->com[2], &irank);
+    MPI_Comm_rank(dst->com[1], &jrank);
     /* src at root must be initialized.
      * src at other nodes is untouched. */
 
@@ -704,7 +689,7 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
     shell->size = src->size;
     shell->alloc = src->alloc;
 
-    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->comm);
+    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[0]);
 
     /* dst must be in pre-init mode */
     ASSERT_ALWAYS(bigmatpoly_check_pre_init(dst));
@@ -738,7 +723,7 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
                         abvec_set(ab, to, from, count);
                     } else {
                         MPI_Isend(from, count, abmpi_datatype(ab),
-                                peer, tag, dst->comm, req);
+                                peer, tag, dst->com[0], req);
                     }
                     req++;
                 }
@@ -771,7 +756,7 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
             unsigned int tag = ii * dst->n + jj;
             abdst_vec to = matpoly_part(ab, me, i0, 0, 0);
             MPI_Irecv(to, count, abmpi_datatype(ab),
-                    0, tag, dst->comm, req);
+                    0, tag, dst->com[0], req);
             req++;
         }
         req = reqs;
@@ -802,9 +787,9 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
     int rank;
     int irank;
     int jrank;
-    MPI_Comm_rank(src->comm, &rank);
-    MPI_Comm_rank(src->col, &irank);
-    MPI_Comm_rank(src->row, &jrank);
+    MPI_Comm_rank(src->com[0], &rank);
+    MPI_Comm_rank(src->com[2], &irank);
+    MPI_Comm_rank(src->com[1], &jrank);
 
     /* sanity checks, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
@@ -837,7 +822,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
                             abvec_set(ab, to, from, length);
                         } else {
                             MPI_Irecv(to, length, abmpi_datatype(ab),
-                                    peer, tag, src->comm, req);
+                                    peer, tag, src->com[0], req);
                         }
                         req++;
                     }
@@ -874,7 +859,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
                 unsigned int tag = ii * src->n + jj;
                 abdst_vec from = matpoly_part(ab, me, i0, j0, offset);
                 MPI_Isend(from, length, abmpi_datatype(ab),
-                        0, tag, src->comm, req);
+                        0, tag, src->com[0], req);
                 req++;
             }
         }
@@ -904,9 +889,9 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
     int rank;
     int irank;
     int jrank;
-    MPI_Comm_rank(dst->comm, &rank);
-    MPI_Comm_rank(dst->col, &irank);
-    MPI_Comm_rank(dst->row, &jrank);
+    MPI_Comm_rank(dst->com[0], &rank);
+    MPI_Comm_rank(dst->com[2], &irank);
+    MPI_Comm_rank(dst->com[1], &jrank);
 
     bigmatpoly_set_size(dst, offset+length);
 
@@ -935,7 +920,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                             abvec_set(ab, to, from, length);
                         } else {
                             MPI_Isend(from, length, abmpi_datatype(ab),
-                                    peer, tag, dst->comm, req);
+                                    peer, tag, dst->com[0], req);
                         }
                         req++;
                     }
@@ -970,7 +955,7 @@ void bigmatpoly_scatter_mat_partial(abdst_field ab,
                 unsigned int tag = ii * dst->n + jj;
                 abdst_vec to = matpoly_part(ab, me, i0, j0, offset);
                 MPI_Irecv(to, length, abmpi_datatype(ab),
-                        0, tag, dst->comm, req);
+                        0, tag, dst->com[0], req);
                 req++;
             }
         }
@@ -993,7 +978,7 @@ void bigmatpoly_gather_mat_alt2(abdst_field ab, matpoly dst, bigmatpoly src)
     matpoly dst_partial;
     size_t length = 100;
     int rank;
-    MPI_Comm_rank(src->comm, &rank);
+    MPI_Comm_rank(src->com[0], &rank);
 
     if (!rank) {
         // Leader should initialize the result matrix
@@ -1039,7 +1024,7 @@ void bigmatpoly_scatter_mat_alt2(abdst_field ab,
     matpoly src_partial;
     size_t length = 100;
     int rank;
-    MPI_Comm_rank(dst->comm, &rank);
+    MPI_Comm_rank(dst->com[0], &rank);
 
     /* share allocation size. */
     matpoly shell;
@@ -1048,7 +1033,7 @@ void bigmatpoly_scatter_mat_alt2(abdst_field ab,
     shell->size = src->size;
     shell->alloc = src->alloc;
 
-    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->comm);
+    MPI_Bcast(shell, sizeof(matpoly), MPI_BYTE, 0, dst->com[0]);
 
     /* dst must be in pre-init mode */
     ASSERT_ALWAYS(bigmatpoly_check_pre_init(dst));

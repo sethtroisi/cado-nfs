@@ -12,9 +12,10 @@ struct bigmatpoly_s {
     /* XXX the first five fields must be compatible with bigmatpoly_ft_s */
     unsigned int m1;      /* number of block rows, index i */
     unsigned int n1;      /* number of block cols, index j */
-    MPI_Comm comm;       /* MPI_COMM_WORLD, but reordered */
-    MPI_Comm row;        /* size == n1 */
-    MPI_Comm col;        /* size == m1 */
+    MPI_Comm com[3]; /* [0]: MPI_COMM_WORLD, reordered.
+                        [1]: row-wise       ; size == n1
+                        [2]: column-wise    ; size == m1
+                      */
 
     unsigned int m;     /* total number of rows */
     unsigned int n;     /* total number of cols */
@@ -35,7 +36,7 @@ extern "C" {
 
 void bigmatpoly_init(abdst_field ab, bigmatpoly_ptr p, bigmatpoly_srcptr model, unsigned int m, unsigned int n, int len);
 void bigmatpoly_finish_init(abdst_field ab, bigmatpoly_ptr p, unsigned int m, unsigned int n, int len);
-void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm comm, unsigned int m, unsigned int n);
+void bigmatpoly_init_model(bigmatpoly_ptr model, MPI_Comm * comm, unsigned int m, unsigned int n);
 int bigmatpoly_check_pre_init(bigmatpoly_srcptr p);
 matpoly_ptr bigmatpoly_my_cell(bigmatpoly_ptr p);
 // void bigmatpoly_realloc(bigmatpoly_ptr p, int newalloc);
