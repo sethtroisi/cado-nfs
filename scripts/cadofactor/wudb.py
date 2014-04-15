@@ -423,6 +423,7 @@ class WuTable(DbTable):
     fields = (
         ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
+        ("submitter", "TEXT", ""),
         ("status", "INTEGER", "NOT NULL"), 
         ("wu", "TEXT", "NOT NULL"), 
         ("timecreated", "TEXT", ""), 

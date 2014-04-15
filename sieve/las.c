@@ -1144,19 +1144,19 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
         case 'r' : side = RATIONAL_SIDE; 
                    mpz_set_ui(r, 0);
                    for( ; *x && !isdigit(*x) ; x++) ;
-                   rc = gmp_sscanf(x, "%Zi%n", p, &nread);
+                   rc = gmp_sscanf(x, "%Zi %Zi%n", p, r, &nread);
                    x+=nread;
-                   ASSERT_ALWAYS(rc == 1);  /* %n does not count */
+                   ASSERT_ALWAYS(rc >= 1);  /* %n does not count */
                    ASSERT_ALWAYS(mpz_probab_prime_p(p, 2));
+                   if (rc == 2)
+                       break;
+                   // If the root is not specified, then we assume that
+                   // the side is really rational, and then we compute
+                   // the root.
                    mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
                    ASSERT_ALWAYS(f->deg == 1);
                    int nroots = poly_roots(&r, f->coeff, f->deg, p);
                    ASSERT_ALWAYS(nroots == 1);
-                   /* We may in fact also have the root specified. We
-                    * ignore what is in the file, the root is computed
-                    * unconditionally above */
-                   gmp_sscanf(x, "%*Zi%n", &nread);
-                   x+=nread;
                    break;
         default:
                    /* We may as well default on the command-line switch
@@ -3722,8 +3722,18 @@ static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
       /* We used to re-allocate whenever the number of buckets changed. Now we
          always allocate memory for the max. number of buckets, so that we
          never have to re-allocate */
-      uint32_t nb_buckets = thrs[i]->si->nb_buckets_max;
-      
+      uint32_t nb_buckets;
+      /* If shell environment variable LAS_REALLOC_BUCKETS is *not* set,
+         always allocate memory for the max. number of buckets, so that we
+         never have to re-allocate. If it is set, allocate just enough for
+         for the current number of buckets, which will re-allocate memory
+         if number of buckets changes. */
+      if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
+        nb_buckets = thrs[i]->si->nb_buckets_max;
+      } else {
+        nb_buckets = thrs[i]->si->nb_buckets;
+      }
+
       uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
       /* The previous buckets are identical ? */
       if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {

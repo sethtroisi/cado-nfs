@@ -192,8 +192,15 @@ void *contiguous_malloc(const size_t size)
   }
 
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
+  int dont_map = (getenv("LAS_NO_MAP_HUGETLB") != NULL);
+  static int printed_dont_map = 0;
+  if (dont_map && !printed_dont_map) {
+    fprintf(stderr, "mmap()-ing huge page prevented by LAS_NO_MAP_HUGETLB\n");
+    printed_dont_map = 1;
+  }
+  
   /* Try to mmap a large page, if we haven't already */
-  if (largepages == NULL) {
+  if (largepages == NULL && !dont_map) {
 #ifdef MAP_ANONYMOUS
     const int anon = MAP_ANONYMOUS;
 #else
