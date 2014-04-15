@@ -73,9 +73,11 @@ run "$LAS" -poly "$POLY" -fb "${FB}" -I "$I" -rlim "$rlim" -lpbr "$lpbr" -mfbr "
 
 
 SHA1BIN=sha1sum
-if ! echo | "$SHA1BIN" > /dev/null 2>&1
-then
-  SHA1BIN=sha1
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=sha1 fi
+if ! type -p "$SHA1BIN" > /dev/null ; then SHA1BIN=shasum fi
+if ! type -p "$SHA1BIN" > /dev/null ; then
+    echo "Could not find a SHA-1 checksumming binary !" >&2
+    exit 1
 fi
 
 # Try to make sort produce some well-defined ordering on the integers
