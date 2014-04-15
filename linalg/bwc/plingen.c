@@ -87,6 +87,7 @@ struct bmstatus_s {
     double t_basecase;
     double t_mp;
     double t_mul;
+    double t_cp_io;
 
     unsigned int lingen_threshold;
     unsigned int lingen_mpi_threshold;
@@ -902,10 +903,13 @@ int load_checkpoint_file(bmstatus_ptr bm, matpoly pi, unsigned int t0, unsigned 
     cp_info_init(cp, bm, t0, t1);
     ASSERT_ALWAYS(matpoly_check_pre_init(pi));
     size_t pi_size;
+    /* Don't output a message just now, since after all it's not
+     * noteworthy if the checkpoint file does not exist. */
     int ok = cp_load_aux_file(cp, &pi_size, delta, p_done);
     if (ok) {
-        printf("Reading checkpoint %s\n", cp->datafile);
+        logline_begin(stdout, SIZE_MAX, "Reading checkpoint %s", cp->datafile);
         ok = cp_load_data_file(cp, pi, pi_size);
+        logline_end(&bm->t_cp_io,"");
         if (!ok)
             fprintf(stderr, "Warning: I/O error while reading %s\n", cp->datafile);
     }
@@ -921,11 +925,12 @@ int save_checkpoint_file(bmstatus_ptr bm, matpoly pi, unsigned int t0, unsigned 
     if ((t1 - t0) < checkpoint_threshold) return 0;
     struct cp_info cp[1];
     cp_info_init(cp, bm, t0, t1);
-    if (!cp->rank) printf("Saving checkpoint %s%s\n",
+    logline_begin(stdout, SIZE_MAX, "Saving checkpoint %s%s",
             cp->datafile,
             cp->mpi ? " (MPI, scattered)" : "");
     int ok = cp_save_aux_file(cp, pi->size, delta, done);
     if (ok) ok = cp_save_data_file(cp, pi, pi->size);
+    logline_end(&bm->t_cp_io,"");
     if (!ok && !cp->rank)
         fprintf(stderr, "Warning: I/O error while saving %s\n", cp->datafile);
     cp_info_clear(cp);
@@ -955,8 +960,8 @@ int load_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned
     MPI_Bcast(bm->lucky, m + n, MPI_INT, 0, bm->com[0]);
     MPI_Bcast(p_done, 1, MPI_INT, 0, bm->com[0]);
     if (ok) {
-        if (!rank)
-            printf("Reading checkpoint %s (MPI, scattered)\n", cp->datafile);
+        logline_begin(stdout, SIZE_MAX, "Reading checkpoint %s (MPI, scattered)",
+                cp->datafile);
         do {
             FILE * data = fopen(cp->datafile, "rb");
             int rc;
@@ -976,6 +981,7 @@ int load_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned
             ok = ok && (rc == 0);
         } while (0);
         MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_MIN, bm->com[0]);
+        logline_end(&bm->t_cp_io,"");
         if (!ok && !rank) {
             fprintf(stderr, "Warning: I/O error while reading %s\n",
                     cp->datafile);
@@ -999,9 +1005,10 @@ int save_mpi_checkpoint_file_scattered(bmstatus_ptr bm, bigmatpoly xpi, unsigned
     MPI_Bcast(&ok, 1, MPI_INT, 0, bm->com[0]);
     if (!ok && !rank) unlink(cp->auxfile);
     if (ok) {
-        if (!rank)
-            printf("Saving checkpoint %s (MPI, scattered)\n", cp->datafile);
+        logline_begin(stdout, SIZE_MAX, "Saving checkpoint %s (MPI, scattered)",
+                cp->datafile);
         ok = cp_save_data_file(cp, bigmatpoly_my_cell(xpi), xpi->size);
+        logline_end(&bm->t_cp_io,"");
         MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_MIN, bm->com[0]);
         if (!ok) {
             if (cp->datafile) unlink(cp->datafile);
@@ -1036,8 +1043,8 @@ int load_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned 
     MPI_Bcast(bm->lucky, m + n, MPI_INT, 0, bm->com[0]);
     MPI_Bcast(p_done, 1, MPI_INT, 0, bm->com[0]);
     if (ok) {
-        if (!rank)
-            printf("Reading checkpoint %s (MPI, gathered)\n", cp->datafile);
+        logline_begin(stdout, SIZE_MAX, "Reading checkpoint %s (MPI, gathered)",
+                cp->datafile);
         do {
             FILE * data = NULL;
             if (!rank) ok = (data = fopen(cp->datafile, "rb")) != NULL;
@@ -1075,6 +1082,7 @@ int load_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned 
             }
         } while (0);
         MPI_Bcast(&ok, 1, MPI_INT, 0, bm->com[0]);
+        logline_end(&bm->t_cp_io,"");
         if (!ok && !rank) {
             fprintf(stderr, "Warning: I/O error while reading %s\n",
                     cp->datafile);
@@ -1098,8 +1106,8 @@ int save_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned 
     struct cp_info cp[1];
     cp_info_init_mpi(cp, bm, t0, t1);
     cp->datafile = cp->gdatafile;
-    if (!rank)
-        printf("Saving checkpoint %s (MPI, gathered)\n", cp->datafile);
+    logline_begin(stdout, SIZE_MAX, "Saving checkpoint %s (MPI, gathered)",
+            cp->datafile);
     int ok = cp_save_aux_file(cp, xpi->size, delta, done);
     MPI_Bcast(&ok, 1, MPI_INT, 0, bm->com[0]);
     if (ok) {
@@ -1143,6 +1151,7 @@ int save_mpi_checkpoint_file_gathered(bmstatus_ptr bm, bigmatpoly xpi, unsigned 
             unlink(cp->auxfile);
         }
     }
+    logline_end(&bm->t_cp_io,"");
     if (!ok && !rank) {
         fprintf(stderr, "Warning: I/O error while saving %s\n", cp->datafile);
     }
@@ -2710,6 +2719,7 @@ int main(int argc, char *argv[])
         printf("t_basecase = %.2f\n", bm->t_basecase);
         printf("t_mp = %.2f\n", bm->t_mp);
         printf("t_mul = %.2f\n", bm->t_mul);
+        printf("t_cp_io = %.2f\n", bm->t_cp_io);
     }
 
     /* clear everything */
