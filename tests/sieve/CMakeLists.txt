@@ -68,4 +68,7 @@ add_trialdiv_test(6)
 
 add_init_norms_bucket_region()
 
+add_executable(test_fb_make_step test_fb_make_step.c "${CADO_NFS_SOURCE_DIR}/sieve/fb.c")
+target_link_libraries(test_fb_make_step utils tests)
+
 add_subdirectory (ecm)

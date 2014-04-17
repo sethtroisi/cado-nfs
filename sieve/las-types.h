@@ -123,12 +123,9 @@ struct sieve_side_info_s {
     /* fb_is_mmapped is 1 if the factor memory is created by mmap(), and 0
        if it is created by malloc() */
     int fb_is_mmapped;
-    /* log_steps[i] contains the largest integer x such that 
-       fb_log(x, scale, 0.) == i, i.e., the integer after which the 
-       rounded logarithm increases, i.o.w., x = floor(scale^(i+0.5)),
-       for 0 <= i <= log_steps_max, where log_steps_max = fb_log(fbb, scale)
-       For i > log_steps_max, log_steps[i] is undefined.
-    */
+    /* log_steps[i] contains the largest integer x <= FBB such that 
+       fb_log(x, scale, 0.) <= i. For i > log_steps_max, log_steps[i] is
+       undefined. */
     fbprime_t log_steps[256];
     unsigned char log_steps_max;
     /* When threads pick up this sieve_info structure, they should check
