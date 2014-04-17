@@ -51,7 +51,6 @@ test_modredc_batchinv (const size_t len)
 {
   residueredcul_t *a, *r;
   modulusredcul_t m;
-  unsigned long t;
   int ok = 1;
   
   /* Random, odd modulus */
@@ -70,7 +69,7 @@ test_modredc_batchinv (const size_t len)
   }
   
   print_residues("Input numbers", a, len, m);
-  int rc = modredcul_batchinv(r, a, len, m);
+  int rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, m);
   if (rc != 0)
     print_residues("Inverses", r, len, m);
   
@@ -112,7 +111,7 @@ test_modredc_batchinv (const size_t len)
   }
 
   print_residues("Input numbers after dividing by gcd", a, len, m);
-  rc = modredcul_batchinv(r, a, len, m);
+  rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, m);
   if (rc == 0) {
     fprintf (stderr, "After dividing out common factors, modredcul_batchinv()"
              " still returned 0\n");
