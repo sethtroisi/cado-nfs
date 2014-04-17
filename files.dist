@@ -726,6 +726,8 @@ tests/utils/test_usp.c
 tests/utils/test_bit_vector.c
 tests/utils/test_discriminant.c
 tests/utils/test_intinv.c
+tests/utils/test_modredcul_batchinv.c
+tests/utils/test_modredcul_batchinv_ul.c
 tests/test_iter.c
 tests/test_iter.h
 tests/tests_common.h

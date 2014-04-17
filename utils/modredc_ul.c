@@ -241,3 +241,73 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
   r[0] = u;
   return 1;
 }
+
+
+/* Compute modular inverses for n input residues.
+   If any of the residues is not invertible, returns 0 and contents of r are
+   undefined. 
+   a and r must be non-overlapping. */
+int
+modredcul_batchinv (residueredcul_t *r, const residueredcul_t *a,
+                    const size_t n, const modulusredcul_t m)
+{
+  residueredcul_t R;
+  
+  if (n == 0)
+    return 1;
+  
+  modredcul_set(r[0], a[0], m);
+  for (size_t i = 1; i < n; i++) {
+    modredcul_mul(r[i], r[i-1], a[i], m);
+  }
+  
+  modredcul_init_noset0(R, m);
+  int rc = modredcul_inv(R, r[n-1], m);
+  if (rc == 0)
+    return 0;
+
+  for (size_t i = n-1; i > 0; i--) {
+    modredcul_mul(r[i], R, r[i-1], m);
+    modredcul_mul(R, R, a[i], m);
+  }
+  modredcul_set(r[0], R, m);
+  modredcul_clear(R, m);
+  return 1;
+}
+
+
+int
+modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
+                       const size_t n, const modulusredcul_t m)
+{
+  residueredcul_t *r = (residueredcul_t *) r_ul;
+  const residueredcul_t *a = (const residueredcul_t *) a_ul;
+  residueredcul_t R;
+  
+  /* We simply don't convert to or from Montgomery representation, but we
+     have to divide the big inverse by \beta twice.
+     Strangely enough, it all turns out well. */
+
+  if (n == 0)
+    return 1;
+  
+  modredcul_set(r[0], a[0], m);
+  for (size_t i = 1; i < n; i++) {
+    modredcul_mul(r[i], r[i-1], a[i], m);
+  }
+  
+  modredcul_init_noset0(R, m);
+  int rc = modredcul_inv(R, r[n-1], m);
+  if (rc == 0)
+    return 0;
+  R[0] = modredcul_get_ul(R, m);
+  R[0] = modredcul_get_ul(R, m);
+
+  for (size_t i = n-1; i > 0; i--) {
+    modredcul_mul(r[i], R, r[i-1], m);
+    modredcul_mul(R, R, a[i], m);
+  }
+  modredcul_set(r[0], R, m);
+  modredcul_clear(R, m);
+  return 1;
+}

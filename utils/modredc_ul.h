@@ -860,6 +860,10 @@ int modredcul_inv (residueredcul_t, const residueredcul_t,
 		   const modulusredcul_t);
 int modredcul_intinv (residueredcul_t, const residueredcul_t,
                       const modulusredcul_t);
+int modredcul_batchinv (residueredcul_t *, const residueredcul_t *,
+                        const size_t, const modulusredcul_t);
+int modredcul_batchinv_ul (unsigned long *, const unsigned long *,
+                           const size_t, const modulusredcul_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);
 
 #endif  /* MODREDC_UL_H */
