@@ -880,32 +880,53 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     return error ? 0 : 1;
 }
 
+/* Search for the minimum n in [1, fbb] such that fb_log(n, scale, 0.) >= i */
+static fbprime_t
+find_one_step(const unsigned char i, const fbprime_t fbb, const double scale)
+{
+  fbprime_t imin = 1, imax = fbb;
+  ASSERT_ALWAYS(fbb > 0);
+
+  while (imin < imax)
+    {
+      fbprime_t imid = imin + (imax - imin) / 2; /* No overflow */
+      if (fb_log(imid, scale, 0.) < i)
+        imin = imid + 1;
+      else
+        imax = imid;
+    }
+ 
+  ASSERT_ALWAYS(imin == imax);
+  ASSERT_ALWAYS(fb_log(imin, scale, 0.) >= i);
+  ASSERT_ALWAYS(imin == 1 || fb_log(imin - 1, scale, 0.) < i);
+  return imin;
+}
+
 
 unsigned char
 fb_make_steps(fbprime_t *steps, const fbprime_t fbb, const double scale)
 {
     unsigned char i;
-    const double base = exp(1. / scale);
+    // const double base = exp(1. / scale);
 
-    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f\n", (unsigned long) fbb, scale, base);
+    if (fbb == 0)
+      return 0;
     const unsigned char max = fb_log(fbb, scale, 0.);
-    for (i = 0; i <= max; i++) {
-        steps[i] = ceil(pow(base, i + 0.5)) - 1.;
-        // fprintf(stderr, "steps[%u] = %lu\n", (unsigned int) i, (long unsigned) steps[i]);
-        /* fb_log(n, scale) = floor (log (n) * scale + 0.5) 
-                            = floor (log (floor(pow(base, i + 0.5))) * scale + 0.5) 
-                            = floor (log (ceil(pow(e^(1. / scale), i + 0.5)-1)) * scale + 0.5) 
-                            < floor (log (pow(e^(1. / scale), i + 0.5)) * scale + 0.5) 
-                            = floor (log (e^((i+0.5) / scale)) * scale + 0.5) 
-                            = floor (((i+0.5) / scale) * scale + 0.5) 
-                            = floor (i + 1)
-           Thus, fb_log(n, scale) < floor (i + 1) <= i
-        */
-        /* We have to use <= in the first assert, as for very small i, multiple
-           steps[i] can have the same value */
-        ASSERT(fb_log(steps[i], scale, 0.) <= i);
-        ASSERT(fb_log(steps[i] + 1, scale, 0.) > i);
+    // fprintf(stderr, "fbb = %lu, scale = %f, base = %f, max = %hu\n", (unsigned long) fbb, scale, base, max);
+    for (i = 0; i < max; i++) {
+        fbprime_t step = find_one_step(i + 1, fbb, scale);
+        ASSERT_ALWAYS(step > 0);
+        steps[i] = step - 1;
     }
+    steps[max] = fbb;
+
+    /* One last test. steps[i] contains the largest integer such that
+       fb_log(steps[i]) <= i, and steps[max] contains FBB. */
+    for (i = 0; i < max; i++) {
+        ASSERT_ALWAYS(fb_log(steps[i], scale, 0.) <= i);
+        ASSERT_ALWAYS(fb_log(steps[i] + 1, scale, 0.) > i);
+    }
+    ASSERT_ALWAYS(fb_log(steps[max], scale, 0.) == max);
     return max;
 }
 
