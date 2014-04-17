@@ -12,6 +12,7 @@ static int rng_state_inited = 0;
 gmp_randstate_t state;
 static int parsed_iter = 0;
 unsigned long iter;
+static int verbose = 0;
 
 /* Return non-zero iff |d2| is in the interval |d1| * (1 +- err_margin) */
 int
@@ -58,6 +59,12 @@ tests_common_get_iter(unsigned long *output)
 {
   if (parsed_iter)
     *output = iter;
+}
+
+int
+tests_common_get_verbose()
+{
+  return verbose;
 }
 
 static int
@@ -124,6 +131,16 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
       *argv += 2;
       parsed_iter = 1;
       printf ("Using %lu iterations\n", iter);
+      continue;
+    }
+
+    name = "-v";
+    if ((flags & PARSE_VERBOSE) != 0 && (*argc) > 1 && 
+        strcmp(name, (*argv)[1]) == 0) {
+      verbose = 1;
+      printf ("Using verbose output\n", iter);
+      *argc -= 1;
+      *argv += 1;
       continue;
     }
     break;
