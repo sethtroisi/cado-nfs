@@ -138,7 +138,7 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
     if ((flags & PARSE_VERBOSE) != 0 && (*argc) > 1 && 
         strcmp(name, (*argv)[1]) == 0) {
       verbose = 1;
-      printf ("Using verbose output\n", iter);
+      printf ("Using verbose output\n");
       *argc -= 1;
       *argv += 1;
       continue;
