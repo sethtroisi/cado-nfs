@@ -2350,7 +2350,7 @@ unsigned int count_lucky_columns(bmstatus_ptr bm)/*{{{*/
     return nlucky;
 }/*}}}*/
 
-void check_luck_condition(bmstatus_ptr bm)/*{{{*/
+int check_luck_condition(bmstatus_ptr bm)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -2360,8 +2360,12 @@ void check_luck_condition(bmstatus_ptr bm)/*{{{*/
     int rank;
     MPI_Comm_rank(bm->com[0], &rank);
 
+    if (!rank) {
+        printf("Number of lucky columns: %u\n", nlucky);
+    }
+
     if (nlucky == n)
-        return;
+        return 1;
 
     if (!rank) {
         fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
@@ -2380,11 +2384,10 @@ void check_luck_condition(bmstatus_ptr bm)/*{{{*/
         for(unsigned int j = 0 ; j < n ; j++) {
             bm->lucky[(j * 1009) % (m+n)] = expected_pi_length(d, 0);
         }
-        check_luck_condition(bm);
-        return;
+        return check_luck_condition(bm);
     }
 
-    MPI_Abort(bm->com[0], EXIT_FAILURE);
+    return 0;
 }/*}}}*/
 
 void display_deltas(bmstatus_ptr bm, unsigned int * delta)/*{{{*/
@@ -2702,18 +2705,18 @@ int main(int argc, char *argv[])
         matpoly_clear(ab, pi);
     }
 
-    /* This possibly aborts */
-    check_luck_condition(bm);
     display_deltas(bm, delta);
     if (!rank) printf("(pi->alloc = %zu)\n", bigmatpoly_my_cell(xpi)->alloc);
 
-    /* and this is a gathering write */
-    bm_io_begin_write(aa);
-    /* this reallocates F */
+    if (check_luck_condition(bm)) {
+        /* this is a gathering write */
+        bm_io_begin_write(aa);
 
-    bm_io_set_write_behind_size(aa, delta);
-    bm_io_compute_final_F(aa, xpi, delta);
-    bm_io_end_write(aa);
+        /* this reallocates F */
+        bm_io_set_write_behind_size(aa, delta);
+        bm_io_compute_final_F(aa, xpi, delta);
+        bm_io_end_write(aa);
+    }
 
     if (!rank) {
         printf("t_basecase = %.2f\n", bm->t_basecase);

@@ -294,6 +294,20 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         ASSERT_ALWAYS(leader_a == (xa->data != NULL));
         if (!xa->data) matpoly_ft_init(ab, xa, a->m0, a->n0, fti);
         if (leader_a) matpoly_ft_export(ab, xa, fti);
+#if 0
+        static FILE * llog;
+        if (!llog) {
+            char * fname;
+            int rc = asprintf(&fname, "llog.%d.%d", irank, jrank);
+            ASSERT_ALWAYS(rc >= 0);
+            llog = fopen(fname, "w");
+            ASSERT_ALWAYS(llog);
+        }
+        fprintf(llog, "node (%d,%d) count=%zu, root=%u\n",
+                irank, jrank,
+                xa->m * xa->n * tsize, k);
+        fflush(llog);
+#endif
         MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->com[1]);
         matpoly_ft_import(ab, xa, fti);
 
