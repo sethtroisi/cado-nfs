@@ -167,7 +167,8 @@ void tree_stats_print(unsigned int level)
         printf("%u [%u-%u, %s] %u/%u %.1f -> %.1f (total: %.1f)\n",
                 k-1, u->min_inputsize, u->max_inputsize,
                 u->func,
-                u->ncalled, stats->tree_total_breadth * u->ncalled / u->sum_inputsize, u->spent / u->ncalled, u->projected_time, sum);
+                u->ncalled, 1u << (k-1),
+                u->spent / u->ncalled, u->projected_time, sum);
         u->last_printed_projected_time = u->projected_time;
     }
     if (nstars && nok >= 2) {
