@@ -132,6 +132,7 @@ fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
     mpz_init_set(new_si->BB[side], old_si->BB[side]);
     mpz_init_set(new_si->BBB[side], old_si->BBB[side]);
     mpz_init_set(new_si->BBBB[side], old_si->BBBB[side]);
+    new_si->sides[side]->strategy = old_si->sides[side]->strategy;
   }
   SkewGauss(new_si);  
 }
