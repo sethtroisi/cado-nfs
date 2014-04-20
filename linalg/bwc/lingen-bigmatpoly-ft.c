@@ -194,6 +194,7 @@ static void bigmatpoly_ft_allgather_row(abdst_field ab, bigmatpoly_ft_ptr a, str
 
     MPI_Datatype mpi_ft;
     MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
+    MPI_Type_commit(&mpi_ft);
 
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
@@ -225,6 +226,7 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
     size_t tsize = fft_alloc_sizes[0];
     MPI_Datatype mpi_ft;
     MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
+    MPI_Type_commit(&mpi_ft);
 
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->m1 ; k++) {
@@ -289,6 +291,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
     size_t tsize = fft_alloc_sizes[0];
     MPI_Datatype mpi_ft;
     MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
+    MPI_Type_commit(&mpi_ft);
 
     matpoly_ft_ptr lc = bigmatpoly_ft_my_cell(c);
     bigmatpoly_ft_zero(ab, c, fti);
