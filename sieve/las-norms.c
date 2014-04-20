@@ -549,9 +549,8 @@ poly_scale_m128d (__m128d  *u, const double *t, unsigned int d, const double h)
 
   /****** Some SSE internals macros & functions for this function *********/
 #ifndef HAVE_SSSE3
-  inline __m128i _mm_alignr_epi8 (__m128i a, __m128i b, const int c) {
-    return _mm_add_epi16 (_mm_slli_si128 (a, 16 - c), _mm_srli_si128 (b, c));
-  }
+#define _mm_alignr_epi8(a, b, c) \
+     (_mm_add_epi16 (_mm_slli_si128 ((a), 16 - (c)), _mm_srli_si128 ((b), (c))))
 #endif
   
   /* This macro avoids a stupid & boring C types control */
