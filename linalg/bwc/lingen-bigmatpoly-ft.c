@@ -192,11 +192,16 @@ static void bigmatpoly_ft_allgather_row(abdst_field ab, bigmatpoly_ft_ptr a, str
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     size_t tsize = fft_alloc_sizes[0];
 
+    MPI_Datatype mpi_ft;
+    MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
+
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->n1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, irank, k);
-        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->com[1]);
+        MPI_Bcast(data->data, data->m * data->n, mpi_ft, k, a->com[1]);
     }
+
+    MPI_Type_free(&mpi_ft);
 
     /* and now all nodes on the row import the cells from their friends */
     for(unsigned int j = 0 ; j < a->n1 ; j++) {
@@ -218,12 +223,15 @@ static void bigmatpoly_ft_allgather_col(abdst_field ab, bigmatpoly_ft_ptr a, str
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     size_t tsize = fft_alloc_sizes[0];
+    MPI_Datatype mpi_ft;
+    MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
 
     /* TODO: only transfer up to the truncated length ? */
     for(unsigned int k = 0 ; k < a->m1 ; k++) {
         matpoly_ft_ptr data = bigmatpoly_ft_cell(a, k, jrank);
-        MPI_Bcast(data->data, data->m * data->n * tsize, MPI_BYTE, k, a->com[2]);
+        MPI_Bcast(data->data, data->m * data->n, mpi_ft, k, a->com[2]);
     }
+    MPI_Type_free(&mpi_ft);
 
     /* and now all nodes on the row import the cells from their friends */
     for(unsigned int i = 0 ; i < a->m1 ; i++) {
@@ -279,6 +287,8 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
     size_t fft_alloc_sizes[3];
     fft_get_transform_allocs(fft_alloc_sizes, fti);
     size_t tsize = fft_alloc_sizes[0];
+    MPI_Datatype mpi_ft;
+    MPI_Type_contiguous(tsize, MPI_BYTE, &mpi_ft);
 
     matpoly_ft_ptr lc = bigmatpoly_ft_my_cell(c);
     bigmatpoly_ft_zero(ab, c, fti);
@@ -308,7 +318,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
                 xa->m * xa->n * tsize, k);
         fflush(llog);
 #endif
-        MPI_Bcast(xa->data, xa->m * xa->n * tsize, MPI_BYTE, k, a->com[1]);
+        MPI_Bcast(xa->data, xa->m * xa->n, mpi_ft, k, a->com[1]);
         matpoly_ft_import(ab, xa, fti);
 
         logline_printf(1, "; col");
@@ -319,7 +329,7 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         ASSERT_ALWAYS(leader_b == (xb->data != NULL));
         if (!xb->data) matpoly_ft_init(ab, xb, b->m0, b->n0, fti);
         if (leader_b) matpoly_ft_export(ab, xb, fti);
-        MPI_Bcast(xb->data, xb->m * xb->n * tsize, MPI_BYTE, k, b->com[2]);
+        MPI_Bcast(xb->data, xb->m * xb->n, mpi_ft, k, b->com[2]);
         matpoly_ft_import(ab, xb, fti);
 
         logline_printf(1, "; addmul");
@@ -331,6 +341,8 @@ void bigmatpoly_ft_mul2(abdst_field ab, bigmatpoly_ft_ptr c, bigmatpoly_ft_ptr a
         if (!leader_a) matpoly_ft_clear(ab, xa, fti);
         if (!leader_b) matpoly_ft_clear(ab, xb, fti);
     }
+
+    MPI_Type_free(&mpi_ft);
 }/*}}}*/
 
 

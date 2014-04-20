@@ -295,6 +295,7 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[1]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
+        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
         MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[1]);
     }
 }
@@ -312,6 +313,7 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[2]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
+        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
         MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[2]);
     }
 }
@@ -338,12 +340,16 @@ static void bigmatpoly_scatter_row(abdst_field ab, bigmatpoly a)
             matpoly_ptr data = bigmatpoly_cell(a, irank, k);
             unsigned long size = data->size;
             MPI_Send(&size, 1, MPI_UNSIGNED_LONG, k, 0, a->com[1]);
+            ASSERT_ALWAYS((data->m * data->n * data->size) <= (size_t) INT_MAX);
             MPI_Send(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, 1, a->com[1]);
         } else if (jrank == (int) k) {
             matpoly_ptr data = bigmatpoly_my_cell(a);
             unsigned long size = 0;
             MPI_Recv(&size, 1, MPI_UNSIGNED_LONG, 0, 0, a->com[1], MPI_STATUS_IGNORE);
             data->size = size;
+            unsigned long s = data->m * data->n * data->size;
+            ASSERT_ALWAYS(s <= (unsigned long) INT_MAX);
+            ASSERT_ALWAYS((data->m * data->n * data->size) <= (size_t) INT_MAX);
             ASSERT_ALWAYS(data->size <= data->alloc);
             MPI_Recv(data->x, data->m * data->n * data->size, abmpi_datatype(ab), 0, 1, a->com[1], MPI_STATUS_IGNORE);
         }
@@ -541,6 +547,7 @@ void bigmatpoly_scatter_mat(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr src)
      * 
      * Copy the full range of allocated bytes, not only up to size.
      */
+    ASSERT_ALWAYS((src->m * src->n * src->alloc) <= (size_t) INT_MAX);
     MPI_Bcast(
             matpoly_part(ab, src, 0, 0, 0),
             src->m * src->n * src->alloc,
@@ -598,6 +605,7 @@ void bigmatpoly_gather_mat_alt(abdst_field ab, matpoly dst, bigmatpoly src)
     ASSERT_ALWAYS(dst->m == src->m);
     ASSERT_ALWAYS(dst->n == src->n);
     ASSERT_ALWAYS(dst->size = src->size);
+    ASSERT_ALWAYS((src->n0 * alloc) <= (size_t) INT_MAX);
 
     // Node 0 receives
     if (!rank) {
@@ -701,6 +709,7 @@ void bigmatpoly_scatter_mat_alt(abdst_field ab, bigmatpoly_ptr dst, matpoly_ptr 
 
     /* sanity check, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) dst->n1 + jrank == rank);
+    ASSERT_ALWAYS((dst->n0 * shell->alloc) <= (size_t) INT_MAX);
 
     if (!rank) {
         MPI_Request * reqs = malloc(dst->m1 * dst->n1 * dst->m0 * sizeof(MPI_Request));
@@ -793,6 +802,7 @@ void bigmatpoly_gather_mat_partial(abdst_field ab, matpoly dst, bigmatpoly src,
 
     /* sanity checks, because the code below assumes this. */
     ASSERT_ALWAYS(irank * (int) src->n1 + jrank == rank);
+    ASSERT_ALWAYS(length <= (size_t) INT_MAX);
 
     // Node 0 receives data
     if (!rank) {
