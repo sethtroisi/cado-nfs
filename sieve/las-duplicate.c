@@ -189,27 +189,29 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   unsigned int nr_lp[2] = {0, 0};
 
   /* Extract the list of large primes for the rational side */
-  for (unsigned int i = 0; i < relation->nb_rp && i < max_large_primes; i++) {
+  for (unsigned int i = 0; i < relation->nb_rp; i++) {
     const unsigned long fbb = old_si->conf->sides[RATIONAL_SIDE]->lim;
     const unsigned long p = relation->rp[i].p;
     const int e = relation->rp[i].e;
     ASSERT_ALWAYS(e > 0);
     if (p > fbb) {
       for (int i = 0; i < e; i++) {
-        large_primes[RATIONAL_SIDE][nr_lp[RATIONAL_SIDE]++] = p;
+        if (nr_lp[RATIONAL_SIDE] < max_large_primes)
+          large_primes[RATIONAL_SIDE][nr_lp[RATIONAL_SIDE]++] = p;
       }
     }
   }
 
   /* Extract the list of large primes for the algebraic side */
-  for (unsigned int i = 0; i < relation->nb_ap && i < max_large_primes; i++) {
+  for (unsigned int i = 0; i < relation->nb_ap; i++) {
     const unsigned long fbb = old_si->conf->sides[ALGEBRAIC_SIDE]->lim;
     const unsigned long p = relation->ap[i].p;
     const int e = relation->ap[i].e;
     ASSERT_ALWAYS(e > 0);
     if (p > fbb) {
       for (int i = 0; i < e; i++)
-        large_primes[ALGEBRAIC_SIDE][nr_lp[ALGEBRAIC_SIDE]++] = p;
+        if (nr_lp[ALGEBRAIC_SIDE] < max_large_primes)
+          large_primes[ALGEBRAIC_SIDE][nr_lp[ALGEBRAIC_SIDE]++] = p;
     }
   }
 
