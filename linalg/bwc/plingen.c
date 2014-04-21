@@ -1573,9 +1573,11 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     /* Decide on the temp storage size */
     double avg = avg_matsize(ab, n, n, aa->ascii);
     unsigned int B = iceildiv(io_block_size, avg);
-    if (!rank && !random_input_length)
+    if (!rank && !random_input_length) {
+        printf("Writing F to %s\n", aa->output_file);
         printf("Writing F by blocks of %u coefficients (%.1f bytes each)\n",
                 B, avg);
+    }
     /* This is only temp storage ! */
     matpoly pi;
     matpoly_init(ab, pi, b, b, B);
@@ -1795,15 +1797,15 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
             }
         }
 
-        if (!rank && kpi > next_report_k) {
+        if (!rank && (maxdelta-kpi) > next_report_k) {
             double tt = wct_seconds();
             if (tt > next_report_t) {
                 printf(
                         "Written %u coefficients (%.1f%%) in %.1f s\n",
-                        kpi, 100.0 * kpi / pilen,
+                        (maxdelta-kpi), 100.0 * (maxdelta-kpi) / pilen,
                         tt-tt0);
                 next_report_t = tt + 10;
-                next_report_k = kpi + pilen/ 100;
+                next_report_k = (maxdelta-kpi) + pilen/ 100;
             }
         }
     }
@@ -2233,9 +2235,12 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
     /* Decide on the temp storage size */
     double avg = avg_matsize(ab, m, n, aa->ascii);
     unsigned int B = iceildiv(io_block_size, avg);
-    if (!rank)
+    if (!rank) {
+        if (aa->input_file)
+            printf("Reading A from %s\n", aa->input_file);
         printf("Reading A by blocks of %u coefficients (%.1f bytes each)\n",
                 B, avg);
+    }
     /* This is only temp storage ! */
     matpoly E;
     matpoly_init(ab, E, m, b, B);
@@ -2362,7 +2367,7 @@ int check_luck_condition(bmstatus_ptr bm)/*{{{*/
     MPI_Comm_rank(bm->com[0], &rank);
 
     if (!rank) {
-        printf("Number of lucky columns: %u\n", nlucky);
+        printf("Number of lucky columns: %u (%u wanted)\n", nlucky, n);
     }
 
     if (nlucky == n)
