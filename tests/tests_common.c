@@ -146,6 +146,10 @@ tests_common_cmdline(int *argc, const char ***argv, const uint64_t flags)
     break;
   }
 
+#ifdef HAVE_MINGW
+  seed = 1398166641;
+#endif
+
   if ((flags & PARSE_SEED) != 0) {
     printf ("Using random seed=%ld\n", seed);
 #ifdef HAVE_LRAND48
