@@ -35,7 +35,7 @@ test_dllist(size_t len)
     node = dll_find(head, (void *) i);
     /* Must not be found */
     if (node != NULL) {
-      fprintf(stderr, "i = %zu, j = %zu: dll_find() incorrectly found a node\n", i);
+      fprintf(stderr, "i = %zu: dll_find() incorrectly found a node\n", i);
       exit(EXIT_FAILURE);
     }
     dll_append(head, (void *) i);
