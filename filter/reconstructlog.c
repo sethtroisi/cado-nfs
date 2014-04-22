@@ -11,6 +11,20 @@
 #endif
 #define DEBUG 0
 
+/* used as mutual exclusion lock for the array of log */
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static void
+mutex_lock(pthread_mutex_t *lock)
+{
+  pthread_mutex_lock (lock);
+}
+
+static void
+mutex_unlock(pthread_mutex_t *lock)
+{
+  pthread_mutex_unlock (lock);
+}
+
 /* 2 functions to compute a <- (a + l*e) mod q (e is either int32_t or mpz_t) */
 static inline void
 mpz_add_log_mod_si (mpz_t a, mpz_t l, int32_t e, mpz_t q)
@@ -299,8 +313,8 @@ write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
   }
 
   printf ("# Writing logarithms took %.1fs\n", seconds()-tt);
-  printf ("# %" PRIu64 " logarithms are known, %" PRIu64 " are missing\n",
-          known_log, missing);
+  printf ("# %" PRIu64 " logarithms of elements of the factor base are known, "
+          "%" PRIu64 " are missing.\n", known_log, missing);
   fclose_maybe_compressed (f, filename);
   ASSERT_ALWAYS (known_log + missing == tab->size);
   return missing;
@@ -394,7 +408,11 @@ nb_unknown_log (read_data_t *data, uint64_t i)
 
   for (j = 0, k = 0; k < len; k++)
   {
-	  if (mpz_sgn(data->log[p[k].id]) < 0) // we do not know the log if this ideal
+    mutex_lock (&lock);
+    int sgn = mpz_sgn(data->log[p[k].id]);
+    mutex_unlock (&lock);
+
+	  if (sgn < 0) // we do not know the log if this ideal
     {
       if (j != k)
         p[j] = p[k];
@@ -410,16 +428,36 @@ nb_unknown_log (read_data_t *data, uint64_t i)
 }
 
 /* In a relation with 1 missing logarithm of exponent e, compute its values,
- * i.e. compute   dest <- (-vlog / e) mod q */
-static inline void
+ * i.e. compute   dest <- (-vlog / e) mod q
+ * Return 0 if dest was already known (i.e. computed between the call to
+ * nb_unknown_log and the call to this functions), return 1 otherwise.
+ */
+static inline unsigned int
 compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
 {
-  mpz_t invert_coeff;
-  mpz_init_set_si (invert_coeff, e);
-  mpz_invert (invert_coeff, invert_coeff, q);
+  unsigned int ret;
+  mpz_t tmp;
+  mpz_init_set_si (tmp, e);
+  mpz_invert (tmp, tmp, q);
   mpz_neg (vlog, vlog);
-  mpz_mul (vlog, vlog, invert_coeff);
-  mpz_mod (dest, vlog, q);
+  mpz_mul (vlog, vlog, tmp);
+  mpz_mod (tmp, vlog, q);
+
+  mutex_lock (&lock);
+
+  if (mpz_sgn(dest) < 0) // we do not already know the log
+  {
+    mpz_set (dest, tmp);
+    ret = 1;
+  }
+  else // log was already computed by another thread
+  {
+    ret = 0;
+  }
+  mutex_unlock (&lock);
+
+  mpz_clear (tmp);
+  return ret;
 }
 
 /* Compute all missing logarithms for relations in [start,end[.
@@ -456,8 +494,8 @@ do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
         else if (nb == 1)
         {
           ideal_merge_t ideal = data->rels[i].unknown[0];
-          compute_missing_log(data->log[ideal.id], vlog, ideal.e, data->q);
-          computed++;
+          computed +=
+             compute_missing_log (data->log[ideal.id], vlog, ideal.e, data->q);
         }
       }
     }
@@ -504,7 +542,7 @@ void * thread_start(void *arg)
   bit_vector_ptr not_used = ti->not_used;
   uint64_t start = ti->offset;
   uint64_t end = start + ti->nb;
-  
+
 #ifndef FOR_FFS
   sm_data_t *sm = ti->sm;
   ti->computed = do_one_part_of_iter (data, sm, not_used, start, end);
@@ -531,7 +569,7 @@ do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
   threads = (pthread_t *) malloc( nt * sizeof(pthread_t));
   int active_threads = 0;  // number of running threads
   int threads_head = 0;    // next thread to wait / restart.
-  
+
   // Prepare the main loop
   uint64_t i = 0; // counter of relation.
   uint64_t computed = 0;
@@ -557,12 +595,12 @@ do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
     {
       tis[threads_head].offset = i;
       tis[threads_head].nb = MIN(SIZE_BLOCK, nrels-i);
-      pthread_create(&threads[threads_head], NULL, 
+      pthread_create(&threads[threads_head], NULL,
           &thread_start, (void *)(&tis[threads_head]));
       i += SIZE_BLOCK;
       active_threads++;
-      threads_head++; 
-      if (threads_head == nt) 
+      threads_head++;
+      if (threads_head == nt)
         threads_head = 0;
       continue;
     }
@@ -574,9 +612,9 @@ do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
     if (i >= nrels)
-    { 
+    {
       threads_head++;
-      if (threads_head == nt) 
+      if (threads_head == nt)
         threads_head = 0;
     }
   }
@@ -630,7 +668,11 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
   if (nt > ntm)
     nt = (int) ntm;
-  printf("# Using multi thread version with %d threads\n", nt);
+
+  if (nt > 1)
+    printf("# Using multithread version with %d threads\n", nt);
+  else
+    printf("# Using monothread version\n");
 
   /* computing missing log */
   printf ("# Starting to computing missing logarithms from rels\n");
@@ -661,7 +703,7 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
 
   size_t c = bit_vector_popcount(not_used);
   if (c != 0)
-    fprintf(stderr, "Warning, %zu relations were not used\n", c);
+    fprintf(stderr, "### Warning, %zu relations were not used\n", c);
 #if DEBUG == 1
   if (c != 0)
     check_unused_rel(not_used, data->rels, nrels);
@@ -871,7 +913,8 @@ main(int argc, char *argv[])
   free (matrix_indexing);
 
   if (!partial) {
-    /* Computing log using rels in purged file */
+    /* Computing logs using rels in purged file */
+    printf ("\n###### Computing logs using rels in purged file ######\n");
     known_log +=
 #ifndef FOR_FFS
       compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes,
@@ -882,7 +925,8 @@ main(int argc, char *argv[])
     printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
     fflush(stdout);
 
-    /* Computing log using rels in del file */
+    /* Computing logs using rels in deleted file */
+    printf ("\n###### Computing log using rels in deleted file ######\n");
     known_log +=
 #ifndef FOR_FFS
       compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes,
@@ -890,7 +934,7 @@ main(int argc, char *argv[])
 #else
       compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes, mt);
 #endif
-    printf ("# %" PRIu64 " known logarithms.\n", known_log);
+    printf ("# %" PRIu64 " known logarithms at the end.\n\n", known_log);
     fflush(stdout);
   }
 
