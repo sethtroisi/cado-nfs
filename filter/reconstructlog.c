@@ -488,7 +488,7 @@ do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
         if (nb == 0 && mpz_cmp_ui (vlog, 0) != 0)
         {
           gmp_fprintf (stderr, "Error, no unknow log in rel %" PRIu64 " and sum"
-                       " of log is not zero (sum is %Zd), error!\n", i, vlog);
+                       " of log is not zero, sum is:\n%Zd\n", i, vlog);
           exit (EXIT_FAILURE);
         }
         else if (nb == 1)
