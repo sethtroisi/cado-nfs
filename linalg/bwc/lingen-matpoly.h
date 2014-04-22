@@ -21,6 +21,8 @@ typedef struct matpoly_s matpoly[1];
 typedef struct matpoly_s * matpoly_ptr;
 typedef const struct matpoly_s * matpoly_srcptr;
 
+#include "lingen-polymat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,8 +33,10 @@ void matpoly_zero(abdst_field ab, matpoly_ptr p);
 void matpoly_clear(abdst_field ab, matpoly_ptr p);
 void matpoly_fill_random(abdst_field ab MAYBE_UNUSED, matpoly_ptr a, unsigned int size, gmp_randstate_t rstate);
 void matpoly_swap(matpoly_ptr a, matpoly_ptr b);
-static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
-static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+int matpoly_cmp(abdst_field ab MAYBE_UNUSED, matpoly_srcptr a, matpoly_srcptr b);
+static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k);
+void matpoly_set_polymat(abdst_field ab MAYBE_UNUSED, matpoly_ptr dst, polymat_srcptr src);
 
 
 
@@ -48,6 +52,8 @@ void matpoly_submat(abdst_field ab,
 
 void matpoly_truncate(abdst_field ab, matpoly_ptr dst, matpoly_ptr src, unsigned int size);
 void matpoly_multiply_column_by_x(abdst_field ab, matpoly_ptr pi, unsigned int j, unsigned int size);
+void matpoly_zero_column(abdst_field ab,
+        matpoly_ptr dst, unsigned int jdst, unsigned int kdst);
 void matpoly_extract_column(abdst_field ab,
         matpoly_ptr dst, unsigned int jdst, unsigned int kdst,
         matpoly_ptr src, unsigned int jsrc, unsigned int ksrc);
@@ -62,18 +68,25 @@ void matpoly_addmul(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_addmp(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_mul(abdst_field ab, matpoly c, matpoly a, matpoly b);
 void matpoly_mp(abdst_field ab, matpoly c, matpoly a, matpoly b);
-
 #ifdef __cplusplus
 }
 #endif
 
+
 /* {{{ access interface for matpoly */
-static inline abelt * matpoly_part(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline abdst_vec matpoly_part(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     ASSERT_ALWAYS(p->size);
-    return p->x+(i*p->n+j)*p->alloc+k;
+    return abvec_subvec(ab, p->x, (i*p->n+j)*p->alloc+k);
 }
-static inline abdst_elt matpoly_coeff(matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *matpoly_part(p,i,j,k);
+static inline abdst_elt matpoly_coeff(abdst_field ab, matpoly_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr(ab, matpoly_part(ab, p,i,j,k), 0);
+}
+static inline absrc_vec matpoly_part_const(abdst_field ab, matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    ASSERT_ALWAYS(p->size);
+    return abvec_subvec_const(ab, p->x, (i*p->n+j)*p->alloc+k);
+}
+static inline absrc_elt matpoly_coeff_const(abdst_field ab, matpoly_srcptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_coeff_ptr_const(ab, matpoly_part_const(ab, p,i,j,k), 0);
 }
 /* }}} */
 

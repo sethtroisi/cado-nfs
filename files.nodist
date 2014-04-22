@@ -121,3 +121,5 @@ sieve/strategies/primedb.c
 sieve/strategies/run_stat.sh
 scripts/cadofactor/README.OAR
 scripts/plot_params.sh
+linalg/bwc/update-flint.sh
+linalg/bwc/parse-flint-fft-doc.pl
