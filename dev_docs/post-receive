@@ -16,6 +16,11 @@
 # hooks.mailinglist=Cado-NFS commits <cado-nfs-commits@lists.gforge.inria.fr>
 # hooks.envelopesender=Cado-NFS commits <cado-nfs-commits@lists.gforge.inria.fr>
 # hooks.gitweb=http://tomato.elliptic.org/gitweb/?p=cado-nfs.git;
+#
+#
+# For putting this script into production, do:
+#
+# rsync -a dev_docs/post-receive scm.gforge.inria.fr:/git/cado-nfs/cado-nfs.git/hooks/post-receive.commit-email
 
 use strict;
 use warnings;
@@ -182,8 +187,8 @@ while (defined($_=<STDIN>)) {
     }
 
     $x =~ s/^(From (\w{7})\w{33})/--$bound
-Content-Type: message\/rfc822; charset=us-ascii
-Content-Disposition: attachment; filename="$2.patch"
+Content-Type: text\/plain; charset=us-ascii
+Content-Disposition: inline; filename="$2.patch"
 
 $1/gm;
 
