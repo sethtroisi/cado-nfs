@@ -109,7 +109,7 @@ malloc_hugepages(const size_t size)
 }
 
 void
-free_hugepages(const void *m, const size_t size)
+free_hugepages(const void *m, const size_t size MAYBE_UNUSED)
 {
   ASSERT_ALWAYS(inited_lists);
 
