@@ -129,6 +129,7 @@ typedef struct {
   uint64_t           bucket_size;     // The allocated size of one bucket.
   size_t             size_b_align;    // (sizeof(void *) * n_bucket + 63) & ~63
                                       // to align bucket_* on cache line
+  size_t big_size;                    // size of bucket update memory
   unsigned int       nr_logp;         // Number of different logp
   unsigned int       size_arr_logp;   // size array logp_val & idx. 256 by default
                                       // or less if the number of different logp

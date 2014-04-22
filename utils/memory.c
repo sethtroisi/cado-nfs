@@ -30,6 +30,7 @@
 #include "portability.h"
 #include "misc.h"
 #include "memory.h"
+#include "dllist.h"
 
 #ifndef LARGE_PAGE_SIZE
 #define LARGE_PAGE_SIZE (2UL*1024*1024)
@@ -49,25 +50,87 @@ void
     return p;
 }
 
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
+/* A list of mmap()-ed and malloc()-ed memory regions, so we can call the
+   correct function to free them again */
+static dllist mmapped_regions, malloced_regions;
+static int inited_lists = 0;
 
 void *
 malloc_hugepages(const size_t size)
 {
+  if (!inited_lists) {
+    dll_init(mmapped_regions);
+    dll_init(malloced_regions);
+    inited_lists = 1;
+  }
+
+  void *m = NULL;
+  size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
+  size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
+
+#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
+  /* Start by trying mmap() */
+  m = mmap (NULL, rounded_up_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
+  if (m == MAP_FAILED) {
+    // Commented out because it's spammy
+    // perror("mmap failed");
+    m = NULL;
+  } else {
+    dll_append(mmapped_regions, m);
+    return m;
+  }
+#endif
+
 #ifdef MADV_HUGEPAGE
-  void *m = malloc_aligned(size, LARGE_PAGE_SIZE);
+  /* If mmap() didn't work, try aligned malloc() with madvise() */
+  m = malloc_aligned(rounded_up_size, LARGE_PAGE_SIZE);
+  dll_append(malloced_regions, m);
   int r;
   static int printed_error = 0;
   do {
-    r = madvise(m, size, MADV_HUGEPAGE);
+    r = madvise(m, rounded_up_size, MADV_HUGEPAGE);
   } while (r == EAGAIN);
   if (r != 0 && !printed_error) {
     perror("madvise failed");
     printed_error = 1;
   }
   return m;
-#else
-  return malloc_pagealigned(size);
 #endif
+
+  /* If all else fails, return regular page-aligned memory */
+  return malloc_pagealigned(size);
+}
+
+void
+free_hugepages(const void *m, const size_t size)
+{
+  size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
+  size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
+  dllist_ptr node;
+  ASSERT_ALWAYS(inited_lists);
+
+#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
+  node = dll_find (mmapped_regions, (void *) m);
+  if (node != NULL) {
+    dll_delete(node);
+    munmap((void *) m, rounded_up_size);
+    return;
+  }
+#endif
+  
+#ifdef MADV_HUGEPAGE
+  node = dll_find (malloced_regions, (void *) m);
+  if (node != NULL) {
+    dll_delete(node);
+    free_aligned(m, LARGE_PAGE_SIZE);
+    return;
+  }
+#endif
+  free_pagealigned(m);
 }
 
 void
@@ -92,6 +155,12 @@ void
     }
   }
   return p;
+}
+
+void
+physical_free(const void *m, const size_t size)
+{
+  free_hugepages(m, size);
 }
 
 /* Not everybody has posix_memalign. In order to provide a viable
@@ -164,7 +233,7 @@ void free_pagealigned(const void * p)
     free_aligned(p, pagesize ());
 }
 
-/* Functions for allocating contiguous physical memory, if large pages are available.
+/* Functions for allocating contiguous physical memory, if huge pages are available.
    If not, they just return malloc_pagealigned().
    
    We keep track of allocated memory with a linked list. No attempt is made to fill
@@ -173,116 +242,110 @@ void free_pagealigned(const void * p)
    by a program is allocated at the start, and all freed at the end, so that this
    restriction has no impact. */
 
-struct largepage_chunk
-{
-    size_t offset, size;
-    struct largepage_chunk *next;
+struct chunk_s {
+  void *ptr;
+  size_t size;
 };
 
-/* NULL means we never tried mmap() yet. MAP_FAILED means we tried and
-   it failed. */
-static void *largepages = NULL;
-static size_t largepage_size = 0;
-static struct largepage_chunk *chunks = NULL;
+static void *hugepages = NULL;
+static size_t hugepage_size_allocated = 0;
+static dllist chunks;
+int chunks_inited = 0;
+
+// #define VERBOSE_CONTIGUOUS_MALLOC 1
 
 void *contiguous_malloc(const size_t size)
 {
+  if (!chunks_inited) {
+    dll_init(chunks);
+    chunks_inited = 1;
+  }
+
   if (size == 0) {
     return NULL;
   }
 
-#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
-  int dont_map = (getenv("LAS_NO_MAP_HUGETLB") != NULL);
-  static int printed_dont_map = 0;
-  if (dont_map && !printed_dont_map) {
-    fprintf(stderr, "mmap()-ing huge page prevented by LAS_NO_MAP_HUGETLB\n");
-    printed_dont_map = 1;
-  }
-  
-  /* Try to mmap a large page, if we haven't already */
-  if (largepages == NULL && !dont_map) {
-#ifdef MAP_ANONYMOUS
-    const int anon = MAP_ANONYMOUS;
-#else
-    const int anon = MAP_ANON;
+  /* Allocate one huge page. Can allocate more by assigning a larger value
+     to hugepage_size_allocated. */
+  if (hugepages == NULL) {
+    hugepage_size_allocated = LARGE_PAGE_SIZE;
+    hugepages = malloc_hugepages(hugepage_size_allocated);
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+    printf ("# Allocated %zu bytes of huge page memory at = %p\n",
+            hugepage_size_allocated, hugepages);
 #endif
-    largepages = mmap (NULL, LARGE_PAGE_SIZE, PROT_READ|PROT_WRITE, anon | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
-    if (largepages != MAP_FAILED) {
-      largepage_size = LARGE_PAGE_SIZE;
-      // printf ("# mmap-ed large page at %p\n", largepages);
-      /* Try to write to the mapping so we bomb out right away if it can't be accessed */
-      ((char *)largepages)[0] = 0;
-    } else {
-      // Commented out because it's spammy
-      // perror("mmap failed");
-    }
-  }
-#endif
-
-  /* Find end of linked list. new_chunk points to the address where the
-     address of the new chunk should be written, i.e., either
-     new_chunk = &chunks, of new_chunk = &(last_chunk->next) where
-     last_chunk is the last entry in the linked list. */
-  struct largepage_chunk **new_chunk = &chunks;
-  size_t last_offset = 0, last_size = 0;
-  while (*new_chunk != NULL) {
-    last_offset = (*new_chunk)->offset;
-    last_size = (*new_chunk)->size;
-    new_chunk = &(*new_chunk)->next;
   }
 
-  /* See if there is enough memory in the large page left to serve the
+  /* Get offset and size of last entry in linked list */
+  void *free_ptr;
+  size_t free_size;
+  if (!dll_is_empty(chunks)) {
+    struct chunk_s *chunk = dll_get_nth(chunks, dll_length(chunks) - 1)->data;
+    free_ptr = (char *)(chunk->ptr) + chunk->size;
+  } else {
+    free_ptr = hugepages;
+  }
+  free_size = hugepage_size_allocated - ((char *)free_ptr - (char *)hugepages);
+
+  /* Round up to a multiple of 128, which should be a (small) multiple of the
+     cache line size. Bigger alignment should not be necessary, if the memory
+     is indeed backed by a huge page. */
+  const size_t round_up_size = iceildiv(size, 128) * 128;
+  /* See if there is enough memory in the huge page left to serve the
      current request */
-  if (last_offset + last_size + size > largepage_size) {
+  if (round_up_size > free_size) {
     /* If not, return memory allocated by malloc_pagealigned */
     void *ptr = malloc_pagealigned(size);
-    // printf ("# Not enough large page memory available, returning malloc_pagealigned() = %p\n", ptr);
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+    printf ("# Not enough huge page memory available, returning malloc_pagealigned() = %p\n", ptr);
+#endif
     return ptr;
   }
 
-  ASSERT_ALWAYS(largepages != NULL);
-#ifdef MAP_FAILED
-  ASSERT_ALWAYS(largepages != MAP_FAILED);
+  struct chunk_s *chunk = (struct chunk_s *) malloc(sizeof(struct chunk_s));
+  ASSERT_ALWAYS(chunk != NULL);
+  chunk->ptr = free_ptr;
+  chunk->size = round_up_size;
+  dll_append(chunks, chunk);
+
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+  printf ("# Returning huge-page memory at %p\n", free_ptr);
 #endif
-
-  size_t pgsize = pagesize();
-  ASSERT_ALWAYS(largepage_size % pgsize == 0);
-  size_t round_up_size = ((size - 1) / pgsize + 1) * pgsize;
-  *new_chunk = malloc(sizeof(struct largepage_chunk));
-  ASSERT_ALWAYS(*new_chunk != NULL);
-  (*new_chunk)->offset = last_offset + last_size;
-  (*new_chunk)->size = round_up_size;
-  (*new_chunk)->next = NULL;
-
-  void *ptr = largepages + (*new_chunk)->offset;  
-  // printf ("# Returning large-page memory at %p\n", ptr);
-  return ptr;
+  return free_ptr;
 }
 
 void contiguous_free(const void *ptr)
 {
-  struct largepage_chunk **next = &chunks;
-  while (*next != NULL) {
-    struct largepage_chunk *chunk = *next;
-    if (largepages + chunk->offset == ptr) {
-      *next = chunk->next;
-      // printf ("# Freeing large-page memory at %p\n", ptr);
-      free(chunk);
-#if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
-      if (chunks == NULL && largepage_size != 0) {
-        // printf ("# Last chunk freed, unmapping large page\n");
-        if (munmap(largepages, LARGE_PAGE_SIZE) != 0) {
-          perror("munmap() failed");
-        } else {
-          largepage_size = 0;
-          largepages = NULL;
-        }
-      }
-#endif
-      return;
+  ASSERT_ALWAYS(chunks_inited);
+  dllist_ptr node;
+  struct chunk_s *chunk;
+  
+  for (node = chunks->next; node != NULL; node = node->next) {
+    chunk = node->data;
+    if (chunk->ptr == ptr) {
+      break;
     }
-    next = &(chunk->next);
   }
-  // printf ("# large-page memory at %p not found, calling free_pagealigned()\n", ptr);
-  free_pagealigned(ptr);
+
+  if (node != NULL) {
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+    printf ("# Freeing %zu bytes of huge-page memory at %p\n", 
+            chunk->size, chunk->ptr);
+#endif
+    free(chunk);
+    dll_delete(node);
+    if (dll_is_empty(chunks)) {
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+      printf ("# Last chunk freed, freeing huge page\n");
+#endif
+      free_hugepages(hugepages, hugepage_size_allocated);
+      hugepages = NULL;
+      hugepage_size_allocated = 0;
+    }
+  } else {
+#ifdef VERBOSE_CONTIGUOUS_MALLOC
+    printf ("# huge-page memory at %p not found, calling free_pagealigned()\n", ptr);
+#endif
+    free_pagealigned(ptr);
+  }
 }
