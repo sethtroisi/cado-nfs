@@ -51,19 +51,21 @@ for i := 1 to m do
 end for;
 
 // SM part
-printf "Reading the SM part %o...\n", smfile;
-SMFile := Read(smfile);
-Lines := Split(SMFile);
-mm := StringToInteger(Lines[1]);
-assert mm eq m;
+if nmaps gt 0 then
+    printf "Reading the SM part %o...\n", smfile;
+    SMFile := Read(smfile);
+    Lines := Split(SMFile);
+    mm := StringToInteger(Lines[1]);
+    assert mm eq m;
 
-for i := 1 to m do
-    C := StringToIntegerSequence(Lines[i+1]);
-    assert #C ge nmaps;
-    for j := 1 to nmaps do
-        SetEntry(~M, i, n+j, C[j]);
+    for i := 1 to m do
+        C := StringToIntegerSequence(Lines[i+1]);
+        assert #C ge nmaps;
+        for j := 1 to nmaps do
+            SetEntry(~M, i, n+j, C[j]);
+        end for;
     end for;
-end for;
+end if;
 
 // If the system is overdetermined, let's erase the last rows because
 // Magma 2.20 (upto at least patch-level 4) has a bug.
