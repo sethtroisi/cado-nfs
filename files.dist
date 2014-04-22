@@ -713,6 +713,7 @@ utils/mpz_vector.h
 utils/mpz_vector.c
 utils/memory.h
 utils/memory.c
+utils/dllist.h
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
@@ -728,6 +729,7 @@ tests/utils/test_discriminant.c
 tests/utils/test_intinv.c
 tests/utils/test_modredcul_batchinv.c
 tests/utils/test_modredcul_batchinv_ul.c
+tests/utils/test_dllist.c
 tests/test_iter.c
 tests/test_iter.h
 tests/tests_common.h
