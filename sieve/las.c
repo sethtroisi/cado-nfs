@@ -3921,7 +3921,7 @@ static void declare_usage(param_list pl)
 int main (int argc0, char *argv0[])/*{{{*/
 {
     las_info las;
-    double t0, tts;
+    double t0, tts, wct;
     unsigned long nr_sq_processed = 0;
     int allow_largesq = 0;
     double totJ = 0.0;
@@ -4021,6 +4021,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_report_init(report);
 
     t0 = seconds ();
+    wct = wct_seconds();
     fprintf (las->output, "#\n");
 
     where_am_I w MAYBE_UNUSED;
@@ -4255,6 +4256,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
     t0 = seconds () - t0;
+    wct = wct_seconds() - wct;
     print_stats (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
             totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
     tts = t0;
@@ -4289,6 +4291,8 @@ int main (int argc0, char *argv0[])/*{{{*/
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
                 report->ttf);
 
+    print_stats (las->output, "# Total elapsed time %1.1fs, per special-q %gs, per relation %gs\n",
+                 wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
     print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
