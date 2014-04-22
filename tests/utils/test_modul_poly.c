@@ -109,9 +109,9 @@ test_modul_poly_roots_ulong (unsigned long iter)
       d = 1 + lrand48 () % (MAXDEGREE - 1);
       for (i = 0; i <= d; i++)
         mpz_urandomb (f[i], state, 64);
-      while (mpz_cmp_ui (f[d], 0) == 0)
-        mpz_urandomb (f[d], state, 64);
       modul_initmod_ul (p, ulong_nextprime (lrand48 ()));
+      while (mpz_divisible_ui_p (f[d], modul_getmod_ul (p)))
+        mpz_urandomb (f[d], state, 64);
       n = modul_poly_roots_ulong (r, f, d, p);
       ASSERT_ALWAYS(0 <= n && n <= d);
       modul_poly_init (fp, d);
