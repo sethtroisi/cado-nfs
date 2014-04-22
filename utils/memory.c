@@ -68,37 +68,40 @@ malloc_hugepages(const size_t size)
     inited_lists = 1;
   }
 
-  void *m = NULL;
-  size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
-  size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
-
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
-  /* Start by trying mmap() */
-  m = mmap (NULL, rounded_up_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
-  if (m == MAP_FAILED) {
-    // Commented out because it's spammy
-    // perror("mmap failed");
-    m = NULL;
-  } else {
-    dll_append(mmapped_regions, m);
-    return m;
+  {
+    size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
+    size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
+    /* Start by trying mmap() */
+    void *m = mmap (NULL, rounded_up_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_HUGETLB, -1, 0);
+    if (m == MAP_FAILED) {
+      // Commented out because it's spammy
+      // perror("mmap failed");
+    } else {
+      dll_append(mmapped_regions, m);
+      return m;
+    }
   }
 #endif
 
 #ifdef MADV_HUGEPAGE
-  /* If mmap() didn't work, try aligned malloc() with madvise() */
-  m = malloc_aligned(rounded_up_size, LARGE_PAGE_SIZE);
-  dll_append(malloced_regions, m);
-  int r;
-  static int printed_error = 0;
-  do {
-    r = madvise(m, rounded_up_size, MADV_HUGEPAGE);
-  } while (r == EAGAIN);
-  if (r != 0 && !printed_error) {
-    perror("madvise failed");
-    printed_error = 1;
+  {
+    size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
+    size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
+    /* If mmap() didn't work, try aligned malloc() with madvise() */
+    void *m = malloc_aligned(rounded_up_size, LARGE_PAGE_SIZE);
+    dll_append(malloced_regions, m);
+    int r;
+    static int printed_error = 0;
+    do {
+      r = madvise(m, rounded_up_size, MADV_HUGEPAGE);
+    } while (r == EAGAIN);
+    if (r != 0 && !printed_error) {
+      perror("madvise failed");
+      printed_error = 1;
+    }
+    return m;
   }
-  return m;
 #endif
 
   /* If all else fails, return regular page-aligned memory */
@@ -110,24 +113,27 @@ free_hugepages(const void *m, const size_t size)
 {
   size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
   size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
-  dllist_ptr node;
   ASSERT_ALWAYS(inited_lists);
 
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
-  node = dll_find (mmapped_regions, (void *) m);
-  if (node != NULL) {
-    dll_delete(node);
-    munmap((void *) m, rounded_up_size);
-    return;
+  {
+    dllist_ptr node = dll_find (mmapped_regions, (void *) m);
+    if (node != NULL) {
+      dll_delete(node);
+      munmap((void *) m, rounded_up_size);
+      return;
+    }
   }
 #endif
   
 #ifdef MADV_HUGEPAGE
-  node = dll_find (malloced_regions, (void *) m);
-  if (node != NULL) {
-    dll_delete(node);
-    free_aligned(m, LARGE_PAGE_SIZE);
-    return;
+  {
+    dllist_ptr node = dll_find (malloced_regions, (void *) m);
+    if (node != NULL) {
+      dll_delete(node);
+      free_aligned(m, LARGE_PAGE_SIZE);
+      return;
+    }
   }
 #endif
   free_pagealigned(m);
