@@ -4121,8 +4121,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (si->a0 <= -2147483648L || 2147483648L <= si->a0 ||
             si->a1 <= -2147483648L || 2147483648L <= si->a1)
           {
-            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q\n");
-            exit (1);
+            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q. Skipping this special-q.\n");
+            continue;
           }
 #endif
 
