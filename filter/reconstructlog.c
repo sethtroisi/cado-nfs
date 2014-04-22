@@ -638,7 +638,7 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
                           mpz_t *log, uint64_t nprimes, int nt)
 #endif
 {
-  double tt0, tt;
+  double tt0, tt, wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   read_data_t data;
   read_data_init(&data, log, q, nprimes, nrels);
@@ -677,11 +677,14 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   /* computing missing log */
   printf ("# Starting to computing missing logarithms from rels\n");
   tt0 = seconds();
+  wct_tt0 = wct_seconds();
   do
   {
-    printf ("# Iteration %" PRIu64 ": begin\n", iter);
+    printf ("# Iteration %" PRIu64 ": starting...\n", iter);
     fflush(stdout);
     tt = seconds();
+    wct_tt = wct_seconds();
+
 #ifndef FOR_FFS
     if (nt > 1)
       computed = do_one_iter_mt (&data, &sm, not_used, nt, nrels);
@@ -693,13 +696,26 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
     else
       computed = do_one_iter_mono (&data, not_used, nrels);
 #endif
+
     total_computed += computed;
-    printf ("# Iteration %" PRIu64 ": end with %" PRIu64 " new "
-            "logarithms computed in %.1fs.\n", iter, computed, seconds()-tt);
+    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new logarithms computed\n",
+            iter, computed);
+    if (nt > 1)
+      printf ("# Iteration %" PRIu64 " took %.1fs (CPU time), %.1fs (wall-clock"
+              " time).\n", iter, seconds() - tt, wct_seconds() - wct_tt);
+    else
+      printf ("# Iteration %" PRIu64 " took %.1fs\n", iter, seconds() - tt);
+
     iter++;
   } while (computed);
-  printf ("# Computing %" PRIu64 " new logarithms took %.1fs\n", total_computed,
-          seconds() - tt0);
+
+  if (nt > 1)
+    printf ("# Computing %" PRIu64 " new logarithms took %.1fs (CPU time), "
+            "%.1fs (wall-clock time)\n", total_computed, seconds() - tt0,
+            wct_seconds() - wct_tt0);
+  else
+    printf ("# Computing %" PRIu64 " new logarithms took %.1fs\n",
+            total_computed, seconds() - tt0);
 
   size_t c = bit_vector_popcount(not_used);
   if (c != 0)
