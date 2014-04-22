@@ -111,12 +111,12 @@ malloc_hugepages(const size_t size)
 void
 free_hugepages(const void *m, const size_t size)
 {
-  size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
-  size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
   ASSERT_ALWAYS(inited_lists);
 
 #if defined(HAVE_MMAP) && defined(MAP_HUGETLB)
   {
+    size_t nr_pages = iceildiv(size, LARGE_PAGE_SIZE);
+    size_t rounded_up_size = nr_pages * LARGE_PAGE_SIZE; 
     dllist_ptr node = dll_find (mmapped_regions, (void *) m);
     if (node != NULL) {
       dll_delete(node);
