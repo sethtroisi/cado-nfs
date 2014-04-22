@@ -15,8 +15,6 @@ Checklist for making a release of CADO-NFS:
 8. make dist
 9. If git stashed, remember git stash pop
 10. Check that build from tarball works
-11. Check that factor.sh -py works
-12. Check that factor.sh -pl works
-13. Check that make install works
-14. Check that factor.sh -py from install directory works
-15. Check that factor.sh -pl from install directory works
+11. Check that factor.sh works
+12. Check that make install works
+13. Check that factor.sh from install directory works
