@@ -497,8 +497,8 @@ void bigpolymat_gather_mat(abdst_field ab, polymat dst, bigpolymat src)
      */
     /* MPI_IN_PLACE semantics for Reduce() and Gather() are stupid. */
     MPI_Reduce(
-            irank ? polymat_part(dst, 0, 0, 0) : MPI_IN_PLACE,
-            irank ? NULL : polymat_part(dst, 0, 0, 0),
+            irank ? polymat_part(ab, dst, 0, 0, 0) : MPI_IN_PLACE,
+            irank ? NULL : polymat_part(ab, dst, 0, 0, 0),
             src->m * src->n * src->size,
             abmpi_datatype(ab),
             abmpi_addition_op(ab), 0, src->col);
@@ -557,7 +557,7 @@ void bigpolymat_scatter_mat(abdst_field ab, bigpolymat_ptr dst, polymat_ptr src)
      * We're better off with a simple bcast.
      */
     MPI_Bcast(
-            polymat_part(src, 0, 0, 0),
+            polymat_part(ab, src, 0, 0, 0),
             src->m * src->n * src->size,
             abmpi_datatype(ab),
             0,

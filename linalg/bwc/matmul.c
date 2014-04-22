@@ -48,11 +48,15 @@ void (*get_rebinder(const char * impl, const char * dimpl))(matmul_ptr mm)
     CONFIGURE_MATMUL_LIB(u64k1     , threaded)
     CONFIGURE_MATMUL_LIB(u64k2     , threaded)
 #ifdef ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
+#define DO(x) CONFIGURE_MATMUL_LIB(x, basicp)
+    MPFQ_PRIME_FIELDS_FOR_DLOG;
+    /*
     CONFIGURE_MATMUL_LIB(p_1       , basicp)
     CONFIGURE_MATMUL_LIB(p_2       , basicp)
     CONFIGURE_MATMUL_LIB(p_3       , basicp)
     CONFIGURE_MATMUL_LIB(p_4       , basicp)
     CONFIGURE_MATMUL_LIB(p_8       , basicp)
+    */
 #endif
     } else {
         fprintf(stderr, "Cannot find the proper rebinder for data backend = %s and matmul backend = %s ; are the corresponding configuration lines present both in " __FILE__ " and linalg/bwc/CMakeLists.txt ?\n", dimpl, impl);

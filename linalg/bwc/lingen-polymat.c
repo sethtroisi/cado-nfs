@@ -1,6 +1,7 @@
 #include "cado.h"
 #include "abase.h"
 #include <stdlib.h>
+#include <limits.h>
 #include <gmp.h>
 #include "portability.h"
 #include "macros.h"
@@ -43,16 +44,27 @@ void polymat_cutoff_info_clear(struct polymat_cutoff_info * c)
     c->cut = UINT_MAX;
 }
 
+void polymat_cutoff_add_step(struct polymat_cutoff_info * c, unsigned int size, unsigned int alg)
+{
+    c->table = realloc(c->table, (c->table_size + 1) * sizeof(unsigned int [2]));
+    if (c->table) ASSERT_ALWAYS(size > c->table[c->table_size-1][0]);
+    c->table[c->table_size][0] = size;
+    c->table[c->table_size][1] = alg;
+    c->table_size++;
+}
+
 static void polymat_set_generic_cutoff(struct polymat_cutoff_info * slot, const struct polymat_cutoff_info * new_cutoff, struct polymat_cutoff_info * old_cutoff)
 {
     if (old_cutoff) {
         if (old_cutoff->table) free(old_cutoff->table);
         memcpy(old_cutoff, slot, sizeof(struct polymat_cutoff_info));
+    } else if (slot->table) {
+        free(slot->table);
     }
     memcpy(slot, new_cutoff, sizeof(struct polymat_cutoff_info));
     if (slot->table) {
-        slot->table = malloc(slot->table_size * sizeof(struct polymat_cutoff_info));
-        memcpy(slot->table, new_cutoff->table, slot->table_size * sizeof(struct polymat_cutoff_info));
+        slot->table = malloc(slot->table_size * sizeof(unsigned int [2]));
+        memcpy(slot->table, new_cutoff->table, slot->table_size * sizeof(unsigned int [2]));
     }
 }
 
@@ -85,7 +97,7 @@ int polymat_cutoff_get_alg_b(const struct polymat_cutoff_info * cutoff, unsigned
 
 int polymat_cutoff_get_subdivide_ub(const struct polymat_cutoff_info * cutoff, unsigned int s0, unsigned int s1)
 {
-    return MIN(s0, s1) >= cutoff->subdivide;
+    return cutoff->table != NULL && MIN(s0, s1) >= cutoff->subdivide;
 }
 
 /*}}}*/
@@ -96,7 +108,7 @@ struct polymat_ur_s {
     unsigned int n;
     size_t size;
     size_t alloc;
-    abelt_ur * x;
+    abvec_ur x;
 };
 typedef struct polymat_ur_s polymat_ur[1];
 typedef struct polymat_ur_s * polymat_ur_ptr;
@@ -105,17 +117,17 @@ typedef const struct polymat_ur_s * polymat_ur_srcptr;
 static void polymat_ur_init(abdst_field ab, polymat_ur_ptr p, unsigned int m, unsigned int n, int len);
 static void polymat_ur_zero(abdst_field ab, polymat_ur_ptr p);
 static void polymat_ur_clear(abdst_field ab, polymat_ur_ptr p);
-static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
-static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abvec_ur polymat_ur_part(abdst_field ab, polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
+static inline abdst_elt_ur polymat_ur_coeff(abdst_field ab, polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
 
 /* {{{ access interface for polymat_ur */
-static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+static inline abdst_vec_ur polymat_ur_part(abdst_field ab, polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     /* Assume row-major in all circumstances. Old code used to support
      * various orderings, here we don't */
-    return p->x+(k*p->m+i)*p->n+j;
+    return abvec_ur_subvec(ab, p->x, (k*p->m+i)*p->n+j);
 }
-static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *polymat_ur_part(p,i,j,k);
+static inline abdst_elt_ur polymat_ur_coeff(abdst_field ab, polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
+    return abvec_ur_coeff_ptr(ab, polymat_ur_part(ab, p,i,j,k), 0);
 }
 void polymat_reducemat(abdst_field ab,
         polymat c, unsigned int kc,
@@ -182,6 +194,14 @@ void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned in
     abvec_random(ab, a->x, a->m*a->n*size, rstate);
 }
 
+int polymat_cmp(abdst_field ab MAYBE_UNUSED, polymat_srcptr a, polymat_srcptr b)
+{
+    ASSERT_ALWAYS(a->n == b->n);
+    ASSERT_ALWAYS(a->m == b->m);
+    if (a->size != b->size) return (a->size > b->size) - (b->size > a->size);
+    return abvec_cmp(ab, a->x, b->x, a->m*a->n*a->size);
+}
+
 
 /* }}} */
 
@@ -206,31 +226,35 @@ static void polymat_ur_clear(abdst_field ab, polymat_ur_ptr p) {
 /* }}} */
 
 /* It's used from lingen-bigpolymat.c as well */
-void bwmat_copy_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n)
+void bwmat_copy_coeffs(abdst_field ab MAYBE_UNUSED, abvec x0, int stride0, abvec x1, int stride1, unsigned int n)
 {
     for(unsigned int i = 0 ; i < n ; i++) {
-        abset(ab, *x0, *x1);
-        x0+=stride0;
-        x1+=stride1;
+        abset(ab,
+                    abvec_coeff_ptr(ab, x0, i * stride0),
+                    abvec_coeff_ptr(ab, x1, i * stride1));
     }
 }
-void bwmat_zero_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, unsigned int n)
+void bwmat_zero_coeffs(abdst_field ab MAYBE_UNUSED, abvec x0, int stride0, unsigned int n)
 {
     for(unsigned int i = 0 ; i < n ; i++) {
-        abset_zero(ab, *x0);
-        x0+=stride0;
+        abset_zero(ab, 
+                abvec_coeff_ptr(ab, x0, i * stride0));
     }
 }
-void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n)
+void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abvec x0, int stride0, abvec x1, int stride1, unsigned int n)
 {
     ASSERT_ALWAYS(stride0 == stride1); /* Otherwise there's probably no point */
     if (x0 < x1) {
         for(unsigned int i = 0 ; i < n ; i++) {
-            abset(ab, x0[i * stride0], x1[i * stride1]);
+            abset(ab,
+                    abvec_coeff_ptr(ab, x0, i * stride0),
+                    abvec_coeff_ptr(ab, x1, i * stride1));
         }
     } else {
         for(unsigned int i = n ; i-- ; ) {
-            abset(ab, x0[i * stride0], x1[i * stride1]);
+            abset(ab,
+                    abvec_coeff_ptr(ab, x0, i * stride0),
+                    abvec_coeff_ptr(ab, x1, i * stride1));
         }
     }
 }
@@ -245,9 +269,9 @@ void polymat_addmat(abdst_field ab,
     for(unsigned int i = 0 ; i < a->m ; i++) {
         for(unsigned int j = 0 ; j < a->n ; j++) {
             abadd(ab,
-                    polymat_coeff(c, i, j, kc),
-                    polymat_coeff(a, i, j, ka),
-                    polymat_coeff(b, i, j, kb));
+                    polymat_coeff(ab, c, i, j, kc),
+                    polymat_coeff(ab, a, i, j, ka),
+                    polymat_coeff(ab, b, i, j, kb));
         }
     }
 }
@@ -260,9 +284,9 @@ void polymat_submat(abdst_field ab,
     for(unsigned int i = 0 ; i < a->m ; i++) {
         for(unsigned int j = 0 ; j < a->n ; j++) {
             absub(ab,
-                    polymat_coeff(c, i, j, kc),
-                    polymat_coeff(a, i, j, ka),
-                    polymat_coeff(b, i, j, kb));
+                    polymat_coeff(ab, c, i, j, kc),
+                    polymat_coeff(ab, a, i, j, ka),
+                    polymat_coeff(ab, b, i, j, kb));
         }
     }
 }
@@ -278,12 +302,12 @@ void polymat_addmulmat_ur(abdst_field ab,
     for(unsigned int i = 0 ; i < a->m ; i++) {
         for(unsigned int j = 0 ; j < b->n ; j++) {
             for(unsigned int k = 0 ; k < a->n ; k++) {
-                absrc_elt ea = polymat_coeff(a, i, k, ka);
-                absrc_elt eb = polymat_coeff(b, k, j, kb);
+                absrc_elt ea = polymat_coeff(ab, a, i, k, ka);
+                absrc_elt eb = polymat_coeff(ab, b, k, j, kb);
                 abmul_ur(ab, tmp_ur, ea, eb);
                 abelt_ur_add(ab,
-                        polymat_ur_coeff(c, i, j, kc),
-                        polymat_ur_coeff(c, i, j, kc),
+                        polymat_ur_coeff(ab, c, i, j, kc),
+                        polymat_ur_coeff(ab, c, i, j, kc),
                         tmp_ur);
             }
         }
@@ -298,8 +322,8 @@ void polymat_reducemat(abdst_field ab,
     for(unsigned int i = 0 ; i < a->m ; i++) {
         for(unsigned int j = 0 ; j < a->n ; j++) {
             abreduce(ab, 
-                    polymat_coeff(c, i, j, kc),
-                    polymat_ur_coeff(a, i, j, ka));
+                    polymat_coeff(ab, c, i, j, kc),
+                    polymat_ur_coeff(ab, a, i, j, ka));
         }
     }
 }
@@ -334,11 +358,11 @@ void polymat_multiply_column_by_x(abdst_field ab, polymat_ptr pi, unsigned int j
 {
     ASSERT_ALWAYS((size + 1) <= pi->alloc);
     bwmat_move_coeffs(ab,
-            polymat_part(pi, 0, j, 1), pi->n,
-            polymat_part(pi, 0, j, 0), pi->n,
+            polymat_part(ab, pi, 0, j, 1), pi->n,
+            polymat_part(ab, pi, 0, j, 0), pi->n,
             pi->m * size);
     for(unsigned int i = 0 ; i < pi->m ; i++) {
-        abset_ui(ab, polymat_coeff(pi, i, j, 0), 0);
+        abset_ui(ab, polymat_coeff(ab, pi, i, j, 0), 0);
     }
 }/*}}}*/
 
@@ -360,8 +384,8 @@ void polymat_truncate(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned
     ASSERT_ALWAYS(size <= dst->alloc);
     dst->size = size;
     bwmat_copy_coeffs(ab,
-            polymat_part(dst,0,0,0),1,
-            polymat_part(src,0,0,0),1,
+            polymat_part(ab, dst,0,0,0),1,
+            polymat_part(ab, src,0,0,0),1,
             src->m*src->n*size);
 }/*}}}*/
 
@@ -371,8 +395,8 @@ void polymat_extract_column(abdst_field ab,/*{{{*/
 {
     ASSERT_ALWAYS(dst->m == src->m);
     bwmat_copy_coeffs(ab,
-            polymat_part(dst, 0, jdst, kdst), dst->n,
-            polymat_part(src, 0, jsrc, ksrc), src->n, src->m);
+            polymat_part(ab, dst, 0, jdst, kdst), dst->n,
+            polymat_part(ab, src, 0, jsrc, ksrc), src->n, src->m);
 }/*}}}*/
 
 void polymat_extract_row_fragment(abdst_field ab,/*{{{*/
@@ -383,8 +407,8 @@ void polymat_extract_row_fragment(abdst_field ab,/*{{{*/
     ASSERT_ALWAYS(src->size <= dst->alloc);
     for(unsigned int k = 0 ; k < src->size ; k++) {
         bwmat_copy_coeffs(ab,
-                polymat_part(dst, i1, j1, k), 1,
-                polymat_part(src, i0, j0, k), 1,
+                polymat_part(ab, dst, i1, j1, k), 1,
+                polymat_part(ab, src, i0, j0, k), 1,
                 n);
     }
 }/*}}}*/
@@ -403,14 +427,14 @@ void polymat_rshift(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned i
         ASSERT_ALWAYS(newsize <= dst->alloc);
         dst->size = newsize;
         bwmat_copy_coeffs(ab,
-                polymat_part(dst,0,0,0),1,
-                polymat_part(src,0,0,k),1,
+                polymat_part(ab, dst,0,0,0),1,
+                polymat_part(ab, src,0,0,k),1,
                 src->m*src->n*newsize);
     } else {
         dst->size = newsize;
         bwmat_move_coeffs(ab,
-                polymat_part(dst,0,0,0),1,
-                polymat_part(src,0,0,k),1,
+                polymat_part(ab, dst,0,0,0),1,
+                polymat_part(ab, src,0,0,k),1,
                 src->m*src->n*newsize);
     }
     polymat_realloc(ab, dst, newsize);
@@ -472,7 +496,7 @@ void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
     unsigned int nc = na + nb - 1;
     ASSERT_ALWAYS(c->alloc >= xc + nc);
     if (!add) {
-        bwmat_zero_coeffs(ab, polymat_part(c, 0, 0, xc), 1, c->m*c->n*nc);
+        bwmat_zero_coeffs(ab, polymat_part(ab, c, 0, 0, xc), 1, c->m*c->n*nc);
     }
     unsigned int m0 = na / 2;
     unsigned int m1 = na - m0;
@@ -521,26 +545,37 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
     if (!na || !nb) {
         return;
     }
+    /* we consider using karatsuba only when the smallest of the two
+     * operands is large enough.
+     */
     if (polymat_cutoff_get_subdivide_ub(&polymat_mul_kara_cutoff, na, nb) == 0) {
         polymat_mul_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
         return;
     }
     unsigned int nc = na + nb - 1;
     if (!add) {
-        bwmat_zero_coeffs(ab, polymat_part(c, 0, 0, xc), 1, c->m*c->n*nc);
+        bwmat_zero_coeffs(ab, polymat_part(ab, c, 0, 0, xc), 1, c->m*c->n*nc);
     }
 
     for( ; nb >= na ; ) {
-        polymat_mul_raw_kara(ab, c, xc,
-                a, xa, na, b, xb, na, transpose, 1);
+        polymat_mul_raw_kara(ab, c, xc, a, xa, na, b, xb, na, transpose, 1);
         xb += na;
         xc += na;
         nb -= na;
     }
+    /* see below comment in #if0'ed block. Seems to me that the code
+     * theere is bogus */
+    ASSERT_ALWAYS(nb < na);
+    polymat_mul_raw_subdivide(ab, c, xc, a, xa, na, b, xb, nb, transpose, 1);
+#if 0
     if (!nb) {
         /* This condition also catches the Karatsuba case n, n */
         return;
     }
+    /* FIXME: nb might be very small here. Why do we do
+     * polymat_mul_raw_kara ? This defeats the semantics of the subdivide
+     * check, apparently.
+     */
     ASSERT_ALWAYS(nb < na);
     /* Fixup needed, now. Treat the largest possible subblock. We want
      * the intervals [0,na-k[ and [0, nb[ to match a kara scheme, i.e.
@@ -551,6 +586,7 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
             a, xa, nb, b, xb, nb, transpose, 1);
     polymat_mul_raw_subdivide(ab, c, xc + na - chop,
             a, xa + nb, chop, b, xb, nb, transpose, 1);
+#endif
 }/*}}}*/
 
 void polymat_mul_raw(abdst_field ab,/*{{{*/
@@ -697,8 +733,8 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
     q1->size = m1;
     s->size = m1;
     bwmat_copy_coeffs(ab,
-            polymat_part(s,0,0,0),1,
-            polymat_part(a,0,0,span_a1[0]),1,
+            polymat_part(ab,s,0,0,0),1,
+            polymat_part(ab,a,0,0,span_a1[0]),1,
             m1*a->m*a->n);
     for(unsigned int k = 0 ; k < m0 ; k++) {
         /* We've already copied the a1 coefficients above */
@@ -849,3 +885,20 @@ void polymat_addmp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
     polymat_mp_raw(ab, b, 0, a, 0, a->size, c, 0, c->size, 0, 1);
 }/*}}}*/
 
+void polymat_set_matpoly(abdst_field ab MAYBE_UNUSED, polymat_ptr dst, matpoly_srcptr src)
+{
+    if (!polymat_check_pre_init(dst))
+        polymat_clear(ab, dst);
+    polymat_init(ab, dst, src->m, src->n, src->size);
+    dst->size = src->size;
+
+    for(unsigned int i = 0 ; i < src->m ; i++) {
+        for(unsigned int j = 0 ; j < src->n ; j++) {
+            for(unsigned int k = 0 ; k < src->size ; k++) {
+                abset(ab,
+                        polymat_coeff(ab, dst, i, j, k),
+                        matpoly_coeff_const(ab, src, i, j, k));
+            }
+        }
+    }
+}
