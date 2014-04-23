@@ -326,8 +326,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 {
   modulusul_t m;
   residueul_t r0, r1;
-  modintul_t gcd;
-  int is_projective, rc;
+  int is_projective;
 
   fb_entry->p = p;
   fb_entry->exp = newexp;
@@ -339,11 +338,14 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 
   modul_set_ul_reduced (r0, mpz_fdiv_ui (poly[0], p), m);
   modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[1], p), m);
-  modul_gcd (gcd, r1, m);
-  is_projective = (modul_intcmp_ul (gcd, 1UL) > 0);
+
+  /* We want poly[1] * a + poly[0] * b == 0 <=>
+     a/b == - poly[0] / poly[1] */
+  is_projective = (modul_inv (r1, r1, m) == 0); /* r1 = 1 / poly[1] */
 
   if (is_projective)
     {
+      ASSERT_ALWAYS(mpz_divisible_ui_p(poly[1], p));
       if (!do_projective)
 	{
 	  modul_clear (r0, m);
@@ -351,13 +353,13 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 	  modul_clearmod (m);
 	  return 0; /* If we don't do projective roots, just return */
 	}
-      modul_swap (r0, r1, m);
+      /* Set r1 = poly[0] % p, r0 = poly[1] (mod p) */
+      modul_set (r1, r0, m);
+      modul_set_ul_reduced (r0, mpz_fdiv_ui (poly[1], p), m);
+      int rc = modul_inv (r1, r1, m);
+      ASSERT_ALWAYS(rc != 0);
     }
 
-  /* We want poly[1] * a + poly[0] * b == 0 <=>
-     a/b == - poly[0] / poly[1] */
-  rc = modul_inv (r1, r1, m); /* r1 = 1 / poly[1] */
-  ASSERT_ALWAYS (rc != 0);
   modul_mul (r1, r0, r1, m); /* r1 = poly[0] / poly[1] */
   modul_neg (r1, r1, m); /* r1 = - poly[0] / poly[1] */
 
