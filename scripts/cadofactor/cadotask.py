@@ -1148,6 +1148,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         wuid = wu.get_id()
         (name, task, identifier, attempt) = self.split_wuname(wuid)
         attempt = 2 if attempt is None else attempt + 1
+        # Don't do "if not maxresubmit:" as 0 is legit value
         if maxresubmit is None:
             maxresubmit = self.params["maxresubmit"]
         if attempt > maxresubmit:
@@ -4178,10 +4179,22 @@ class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnectio
                                   key, d[key])
                 self.registered_filenames[key] = d[key]
             elif d[key] != self.registered_filenames[key]:
-                # It was already defined with a different target, error
-                raise Exception("Filename %s, to be registered for target %s, "
-                                "already registered for target %s" %
-                                (key, d[key], self.registered_filenames[key]))
+                # It was already registered with a different target. This will
+                # happen if, e.g., the user chooses a different build directory
+                # between runs. It's still fragile, as the server will try to
+                # serve the old file(s) until a new workunit is generated and
+                # overrides the target.
+                # The proper solution would be to make Program classes
+                # Templates, so Tasks can instantiate them at __init__() and
+                # register the resolved paths once. The registered_filenames
+                # dict could then be memory-backed. Tasks would also have to
+                # register their own files which may need to be served in
+                # __init__().
+                self.logger.warning("Filename %s, to be registered for "
+                                    "target %s, was previously registered for "
+                                    "target %s. Overriding with new target.",
+                                    key, d[key], self.registered_filenames[key])
+                self.registered_filenames[key] = d[key]
             else:
                 # Was already registered with the same target. Nothing to do
                 pass
