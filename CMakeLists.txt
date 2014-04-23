@@ -194,6 +194,12 @@ include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
 # on 32-bit platforms.
 set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_INLINE_ASM})
 
+set(MPFQ_PRIME_FIELDS_FOR_DLOG p_1 p_2 p_3 p_4 p_8 pz)
+set(COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG)
+foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
+    set(COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG ${COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG} "DO(${v})")
+endforeach(v)
+
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 
 configure_file(cado_mpi_config_h.in cado_mpi_config.h ESCAPE_QUOTES @ONLY)

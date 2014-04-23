@@ -13,6 +13,8 @@
 #define MPIR_INCDIR    "@MPIR_INCDIR@"
 #define MPIR_LIBDIR    "@MPIR_LIBDIR@"
 
+#cmakedefine    HAVE_MPIR
+
 #cmakedefine    HAVE_POSIX_MEMALIGN
 #cmakedefine    HAVE_GCC_STYLE_AMD64_INLINE_ASM
 #cmakedefine    HAVE_PTHREAD_BARRIER_WAIT
@@ -63,6 +65,7 @@
 #cmakedefine    VOLATILE_IF_GCC_58805_BUG
 
 #cmakedefine    ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
+#cmakedefine    MPFQ_PRIME_FIELDS_FOR_DLOG @COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG@
 
 #cmakedefine    BUILD_DYNAMICALLY_LINKABLE_BWC
 

@@ -156,9 +156,9 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[d]);
-                abaddmul_si_ur(x, rowsum, src[j], c);
+                abaddmul_si_ur(x, rowsum, abvec_coeff_ptr_const(x, src, j), c);
             }
-            abreduce(x, dst[i], rowsum);
+            abreduce(x, abvec_coeff_ptr(x, dst, i), rowsum);
         }
         ASM_COMMENT("end of critical loop");
         abelt_ur_clear(x, &rowsum);
@@ -178,11 +178,11 @@ void MATMUL_NAME(mul)(matmul_ptr mm0, void * xdst, void const * xsrc, int d)
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[!d]);
-                abaddmul_si_ur(x, tdst[j], src[i], c);
+                abaddmul_si_ur(x, abvec_ur_coeff_ptr(x, tdst, j), abvec_coeff_ptr_const(x, src, i), c);
             }
         }
         for(unsigned int j = 0 ; j < mm->public_->dim[!d] ; j++) {
-            abreduce(x, dst[j], tdst[j]);
+            abreduce(x, abvec_coeff_ptr(x, dst, j), abvec_ur_coeff_ptr(x, tdst, j));
         }
         ASM_COMMENT("end of critical loop (transposed mult)");
         abvec_ur_clear(x, &tdst, mm->public_->dim[!d]);

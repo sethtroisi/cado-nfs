@@ -5,6 +5,7 @@
 
 extern void * malloc_check(const size_t x);
 extern void * physical_malloc(const size_t x, const int affect);
+extern void physical_free(const void *, size_t);
 
 void *malloc_hugepages(size_t);
 extern long pagesize (void);
