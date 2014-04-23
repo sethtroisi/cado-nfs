@@ -345,7 +345,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 
   if (is_projective)
     {
-      ASSERT_ALWAYS(mpz_divisible_ui_p(poly[1], p));
+      ASSERT_ALWAYS(mpz_gcd_ui(NULL, poly[1], p) > 1);
       if (!do_projective)
 	{
 	  modul_clear (r0, m);
