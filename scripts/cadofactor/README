@@ -10,7 +10,7 @@ For example, running
 
 ./cadofactor.py ../../params/params.c59 N=90377629292003121684002147101760858109247336549001090677693 tasks.workdir=/tmp/c59 tasks.execpath=$HOME/build/cado-nfs/normal server.whitelist=0.0.0.0/0
 
-start the cadofactor script, which also starts the server. It does not start any clients with this command line, so those would have to be started manually:
+starts the cadofactor script, which also starts the server. It does not start any clients with this command line, so those would have to be started manually:
 
 ./wuclient2.py --server=http://quiche.loria.fr:8001
 
@@ -62,8 +62,8 @@ tasks.polyselect.admax=0
 Note that this empty search range must be specified even after interrupting
 and restarting cadofactor to prevent it from running polynomial selection;
 if after interruption a larger admax is given, cadofactor will perform
-polynomial search from the point where it left off (i.e., at ad=0) up to the
-new upper limit, admax.
+polynomial search from the point where it left off (i.e., from ad=0) up to
+the new upper limit, admax.
 
 The polynomial selection run by cadofactor is performed in two phases:
 the first phase searches for polynomials with good size property and keeps
@@ -106,6 +106,8 @@ tasks.sieve.import=@foo
 
 where "foo" is a file containing several names of relation files, one per line.
 
+Adjust the tasks.sieve.sieving.qmin parameter accordingly to prevent
+already-sieved special-q ranges from being sieved again.
 
 File locking
 ============
