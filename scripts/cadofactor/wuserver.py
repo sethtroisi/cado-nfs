@@ -648,12 +648,23 @@ subjectAltName=@altnames
         # If address was specified as IP address and fqdn could not find a
         # hostname for it, we don't store it. Then only the IP address will
         # be given in the SAN list
+        dns_counter = 1
         if not fqdn == ipaddr:
-            self.SAN += "DNS.1 = %s\n" % fqdn
+            self.SAN += "DNS.%d = %s\n" % (dns_counter, fqdn)
+            dns_counter += 1
             # If the address was given as a short host name, or if 
             # gethostname() produced a short host name, we store that
             if self.url_address != fqdn and self.url_address != ipaddr:
-                self.SAN += "DNS.2 = %s\n" % self.url_address
+                self.SAN += "DNS.%d = %s\n" % (dns_counter, self.url_address)
+                dns_counter += 1
+            # If localhost is given explicitly as the listen address, then
+            # the above adds localhost to the SAN. If nothing is given, then
+            # we listen on all addresses (including localhost), and we
+            # should add "localhost" as a SAN.
+            if self.address == "0.0.0.0":
+                self.SAN += "DNS.%d = localhost\n" % dns_counter
+                dns_counter += 1
+                self.SAN += "IP.2 = 127.0.0.1\n"
 
         self.bg = bg
         if use_db_pool:
