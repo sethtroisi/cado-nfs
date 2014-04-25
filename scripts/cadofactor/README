@@ -122,3 +122,20 @@ http://gluster.org/pipermail/gluster-users/2011-September/031720.html
 If you encounter "Database corrupted" or similar errors, try if storing the
 working directory on a local (not network-mounted) file system resolves the
 problem.
+
+Controlling the excess
+======================
+
+By default CADO-NFS requires an excess (after the first singleton removal)
+of 10% more relations than ideals. This is controlled by:
+
+tasks.filter.purge.required_excess=0.1
+
+If you want a larger excess, say 20%, just add on the cadofactor.py command
+line (or in the parameter file):
+
+tasks.filter.purge.required_excess=0.2
+
+If a positive excess is enough:
+
+tasks.filter.purge.required_excess=0.0
