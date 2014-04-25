@@ -4,14 +4,14 @@ TESTBENCH="$1"
 INPUTFILE="$2"
 shift 2
 
-REQUIRED_OUTPUT="`mktemp /tmp/ecm-XXXXXXXX.ref`"
-INPUTNUMBERS="`mktemp /tmp/ecm-XXXXXXXX.in`"
+REQUIRED_OUTPUT="`mktemp /tmp/ecm-ref.XXXXXXXX`"
+INPUTNUMBERS="`mktemp /tmp/ecm-in.XXXXXXXX`"
 # First word on each line is the input number
 sed 's/ *#.*$//' < "${INPUTFILE}" | grep . | cut -d " " -f 1 > "${INPUTNUMBERS}" || exit 1
 # Remaining words are the required output
 sed 's/ *#.*$//' < "${INPUTFILE}" | grep . | cut -d " " -f 2- > "${REQUIRED_OUTPUT}" || exit 1
 
-ACTUAL_OUTPUT="`mktemp /tmp/ecm-XXXXXXXX.out`"
+ACTUAL_OUTPUT="`mktemp /tmp/ecm-out.XXXXXXXX`"
 "${TESTBENCH}" -inp "${INPUTNUMBERS}" "$@" > "${ACTUAL_OUTPUT}"
 
 if ! diff -b "${REQUIRED_OUTPUT}" "${ACTUAL_OUTPUT}" > /dev/null
