@@ -2198,6 +2198,13 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, too small value of P\n");
     exit (1);
   }
+  /* since for each prime p in [P,2P], we convert p^2 to int64_t, we need
+     (2P)^2 < 2^63, thus P < 2^30.5 */
+  if (P >= 1518500250UL)
+    {
+      fprintf (stderr, "Error, too large value of P\n");
+      exit (1);
+    }
 
   /* detect L1 cache size */
   ropt_L1_cachesize ();
