@@ -190,6 +190,65 @@ else:
     FixedBytesGenerator = email.generator.BytesGenerator
 
 
+# Under Python 2, subclass urllib2.HTTPSHandler and httplib.HTTPSConnection
+# and check the certificate and server subject identity when opening a HTTPS
+# connection
+if sys.version_info[0] == 2:
+    import httplib
+    class MyHTTPSConnection(httplib.HTTPSConnection):
+        """ HTTPS connections with certificate subject identity check """
+        ca_file = None
+        
+        def connect(self):
+            """ Open a connection, then wrap the socket with SSL, verify the
+            server certificate, and the the server certificate's subject.
+            """
+            sock = socket.create_connection((self.host, self.port),
+                                            self.timeout, self.source_address)
+            if self._tunnel_host:
+                self.sock = sock
+                self._tunnel()
+            self.sock = ssl.wrap_socket(sock, self.key_file, self.cert_file,
+                                        ca_certs=self.ca_file,
+                                        cert_reqs=ssl.CERT_REQUIRED)
+
+            cert = self.sock.getpeercert()
+            host = self.host.split(":")[0]
+
+            had_DNS_name = False
+            certhost = ""
+            if "subjectAltName" in cert:
+                # print(cert["subjectAltName"])
+                for (typeid, value) in cert["subjectAltName"]:
+                    # Wildcard "*" not implemented, but we don't use it anyhow
+                    assert not "*" in value
+                    if typeid == "DNS" and value == host:
+                        return
+                    if typeid == "DNS":
+                        had_DNS_name = True
+                    if typeid == "IP Address" and value == host:
+                        return
+            for field in cert['subject']:
+                if field[0][0] == 'commonName':
+                    certhost = field[0][1]
+            # Check common name only if there was no SAN DNS entry
+            if not had_DNS_name and certhost == host:
+                return
+
+            raise ssl.SSLError("Host name '%s' doesn't match certificate host '%s'"
+                               % (host, certhost))	
+
+    class MyHTTPSHandler(urllib_request.HTTPSHandler):
+        """ HTTPS handler that uses MyHTTPSConnection for verifying the
+        certificate's subject identity
+        """
+        def https_open(self, req):
+            return self.do_open(MyHTTPSConnection, req)
+
+    myOpenerDirector = urllib_request.build_opener(MyHTTPSHandler)
+    urllib_request.install_opener(myOpenerDirector)
+
+
 def create_daemon(workdir=None, umask=None, keepfd=None):
     """Disk And Execution MONitor (Daemon)
 
@@ -819,11 +878,15 @@ class WorkunitClient(object):
                 # let urllib do the work for us
                 return urllib_request.urlopen(request, cafile=cafile)
             else:
-                # Python 2 urllib does not implement certificate checks.
                 # For the time being, we just use HTTPS without check.
                 # We should never get here, as we use wget or curl as
                 # fall-backs under Python 2, and if neither is available,
                 # wuclient2.py aborts in the initialisation phase.
+
+                # Ugly hack: urllib2 does not provide for parameter passing
+                # to HTTPSConnection, so we modify the class variable
+                # default_cert_file of MyHTTPSConnection. YUCK.
+                MyHTTPSConnection.ca_file = cafile
                 return urllib_request.urlopen(request)
         else:
             # If we are not using HTTPS, we can just let urllib do it, 
@@ -865,8 +928,9 @@ class WorkunitClient(object):
             except BadStatusLine as error:
                 conn = None
                 errorstr = "Bad Status line: %s" % str(error)
-            # we used to trap socket.error, but I believe it's always
-            # wrapped by urllib, so we shouldn't see it.
+            except socket.error as error:
+                conn = None
+                errorstr = "Connection error: %s" % str(error)
             if not conn:
                 givemsg = is_upload or not silent_wait or waiting_since == 0
                 if current_error > 0:
@@ -908,14 +972,13 @@ class WorkunitClient(object):
             charset = conn.info().get_content_charset()
             if charset is None:
                 charset = "latin-1"
-            return charset
         else:
-            encoding = "latin-1" # Default value
+            charset = "latin-1" # Default value
             for item in conn.info().getplist():
                 pair = item.split("=")
                 if len(pair) == 2 and pair[0].strip() == "charset":
-                    encoding = pair[1].strip()
-        return encoding
+                    charset = pair[1].strip()
+        return charset
 
     def external_get_file(self, command, url, wait):
         """ Runs a command to download a file, retrying indefinitely in case
@@ -973,7 +1036,7 @@ class WorkunitClient(object):
         # acutally checking the certificate
         # This is a rather ugly hack. It would be nicer to copy the required
         # parts from a fully functional SSL library. TODO.
-        if url.startswith("https:") and sys.version_info[0] == 2:
+        if self.settings["USE_EXTERNAL_DL"]:
             if HAVE_WGET:
                 return self.wget_file(url, wait, dlpath, cafile=cafile)
             elif HAVE_CURL:
@@ -1354,6 +1417,8 @@ if __name__ == '__main__':
                           help="Keep and upload old results when client starts")
         parser.add_option("--nosha1check", default=False, action="store_true", 
                           help="Skip checking the SHA1 for input files")
+        parser.add_option("--externdl", default=False, action="store_true", 
+                          help="Use wget or curl for HTTPS downloads")
         # Parse command line
         (options, args) = parser.parse_args()
         if args:
@@ -1412,6 +1477,7 @@ if __name__ == '__main__':
 
     SETTINGS["KEEPOLDRESULT"] = options.keepoldresult
     SETTINGS["NOSHA1CHECK"] = options.nosha1check
+    SETTINGS["USE_EXTERNAL_DL"] = options.externdl
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):
@@ -1479,7 +1545,7 @@ if __name__ == '__main__':
     client_ok = True
     bad_wu_counter = 0
     while client_ok:
-        try:
+#        try:
             try:
                 client = WorkunitClient(settings = SETTINGS)
             except WorkunitParseError:
@@ -1492,6 +1558,6 @@ if __name__ == '__main__':
                 logging.info("Client finishing: %s. Bye." % e)
                 break
             client_ok = client.process()
-        except Exception:
-            logging.exception("Exception occurred")
-            break
+#        except Exception:
+#            logging.exception("Exception occurred")
+#            break
