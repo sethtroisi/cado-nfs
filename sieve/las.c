@@ -850,23 +850,33 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     }
     mpz_clear(q0);
     sc->side = param_list_parse_switch(pl, "-ratq") ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+    param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
+    param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
     int seen = 1;
     seen  = param_list_parse_int   (pl, "I",       &(sc->logI));
     seen &= param_list_parse_ulong (pl, "lim0",    &(sc->sides[RATIONAL_SIDE]->lim));
     seen &= param_list_parse_int   (pl, "lpb0",    &(sc->sides[RATIONAL_SIDE]->lpb));
     seen &= param_list_parse_int   (pl, "mfb0",    &(sc->sides[RATIONAL_SIDE]->mfb));
-    seen &= param_list_parse_double(pl, "lambda0", &(sc->sides[RATIONAL_SIDE]->lambda));
     seen &= param_list_parse_ulong (pl, "lim1",    &(sc->sides[ALGEBRAIC_SIDE]->lim));
     seen &= param_list_parse_int   (pl, "lpb1",    &(sc->sides[ALGEBRAIC_SIDE]->lpb));
     seen &= param_list_parse_int   (pl, "mfb1",    &(sc->sides[ALGEBRAIC_SIDE]->mfb));
-    seen &= param_list_parse_double(pl, "lambda1", &(sc->sides[ALGEBRAIC_SIDE]->lambda));
     if (!seen) {
-        fprintf(stderr, "Error: options -I, -lim0, -lpb0, -mfb0, -lambda0,"
-                " -lim1, -lpb1, -mfb1, -lambda1 are mandatory.\n");
+        fprintf(stderr, "Error: options -I, -lim0, -lpb0, -mfb0, "
+                " -lim1, -lpb1, -mfb1 are mandatory.\n");
 	cado_poly_clear(las->cpoly);
 	param_list_clear(pl);
         exit(EXIT_FAILURE);
     }
+
+    /* compute lambda0 from mfb0 and lpb0 if not given */
+    if (sc->sides[RATIONAL_SIDE]->lambda == 0.0)
+      sc->sides[RATIONAL_SIDE]->lambda = (double) sc->sides[RATIONAL_SIDE]->mfb
+        / (double) sc->sides[RATIONAL_SIDE]->lpb;
+
+    /* compute lambda1 from mfb1 and lpb1 if not given */
+    if (sc->sides[ALGEBRAIC_SIDE]->lambda == 0.0)
+      sc->sides[ALGEBRAIC_SIDE]->lambda = (double) sc->sides[ALGEBRAIC_SIDE]->mfb
+        / (double) sc->sides[ALGEBRAIC_SIDE]->lpb;
 
     /* Parse optional siever configuration parameters */
     sc->td_thresh = 1024;	/* default value */
