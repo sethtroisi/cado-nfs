@@ -1074,6 +1074,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     
     def cancel_wu(self, wuid, commit=True):
         """ Cancel a WU and update wu_timedout counter """
+        self.logger.debug("Cancelling: %s", wuid)
         key = "wu_timedout"
         maxtimedout = self.params["maxtimedout"]
         if not self.state[key] < maxtimedout:
