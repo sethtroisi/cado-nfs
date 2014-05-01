@@ -203,8 +203,14 @@ if sys.version_info[0] == 2:
             """ Open a connection, then wrap the socket with SSL, verify the
             server certificate, and the the server certificate's subject.
             """
-            sock = socket.create_connection((self.host, self.port),
-                                            self.timeout, self.source_address)
+            # Python 2.6 does not have the source_address attribute
+            if sys.version_info[0:2] == (2, 7):
+                sock = socket.create_connection((self.host, self.port),
+                                                self.timeout, self.source_address)
+            else:
+                sock = socket.create_connection((self.host, self.port),
+                                                self.timeout)
+
             if self._tunnel_host:
                 self.sock = sock
                 self._tunnel()
