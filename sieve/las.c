@@ -32,18 +32,18 @@
 #include <smmintrin.h>
 #endif
 
-static inline uint64_t cputicks()
-{
-        uint64_t r;
-        __asm__ __volatile__(
-                "rdtsc\n\t"
-                "shlq $32, %%rdx\n\t"
-                "orq %%rdx, %%rax\n\t"
-                : "=a"(r)
-                :
-                : "%rdx", "cc");
-        return r;
-}
+/* static inline uint64_t cputicks() */
+/* { */
+/*         uint64_t r; */
+/*         __asm__ __volatile__( */
+/*                 "rdtsc\n\t" */
+/*                 "shlq $32, %%rdx\n\t" */
+/*                 "orq %%rdx, %%rax\n\t" */
+/*                 : "=a"(r) */
+/*                 : */
+/*                 : "%rdx", "cc"); */
+/*         return r; */
+/* } */
 
 // #define HILIGHT_START   "\e[01;31m"
 // #define HILIGHT_END   "\e[00;30m"
@@ -1328,37 +1328,37 @@ typedef uint64_t plattice_x_t;
 // This version is pretty fast on new powerful processors, but slow on others.
 // I keep it because in fews years, if the int32_t division is faster, it's
 // possible this code might be the fastest.
-NOPROFILE_INLINE int
-reduce_plattice_original (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
-{
-  int32_t a0 = -((int32_t) p), b0 = (int32_t) r, a1 = 0, b1 = 1, k;
-#if MOD2_CLASSES_BS
-  const int32_t hI = (int32_t) ((si->I) >> 1);
-#else
-  const int32_t hI = (int32_t) (si->I);
-#endif
-  const int32_t mhI = -hI;
-  /* Critical loop of the routine. The unrolling is optimal here. */
-  while (LIKELY(b0 >= hI)) {
-    k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (UNLIKELY(a0 > mhI)) break;
-    k = b0 / a0; b0 %= a0; b1 -= k * a1;
-    if (UNLIKELY(b0 < hI )) break;
-    k = a0 / b0; a0 %= b0; a1 -= k * b1;
-    if (UNLIKELY(a0 > mhI)) break;
-    k = b0 / a0; b0 %= a0; b1 -= k * a1;
-  }
-  k = b0 - hI - a0;
-  if (b0 > -a0) {
-    if (UNLIKELY(!a0)) return 0;
-    k /= a0; b0 -= k * a0; b1 -= k * a1;
-  } else {
-    if (UNLIKELY(!b0)) return 0;
-    k /= b0; a0 += k * b0; a1 += k * b1;
-  }
-  pli->a0 = (int32_t) a0; pli->a1 = (uint32_t) a1; pli->b0 = (int32_t) b0; pli->b1 = (uint32_t) b1;
-  return 1;
-}
+/* NOPROFILE_INLINE int */
+/* reduce_plattice_original (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si) */
+/* { */
+/*   int32_t a0 = -((int32_t) p), b0 = (int32_t) r, a1 = 0, b1 = 1, k; */
+/* #if MOD2_CLASSES_BS */
+/*   const int32_t hI = (int32_t) ((si->I) >> 1); */
+/* #else */
+/*   const int32_t hI = (int32_t) (si->I); */
+/* #endif */
+/*   const int32_t mhI = -hI; */
+/*   /\* Critical loop of the routine. The unrolling is optimal here. *\/ */
+/*   while (LIKELY(b0 >= hI)) { */
+/*     k = a0 / b0; a0 %= b0; a1 -= k * b1; */
+/*     if (UNLIKELY(a0 > mhI)) break; */
+/*     k = b0 / a0; b0 %= a0; b1 -= k * a1; */
+/*     if (UNLIKELY(b0 < hI )) break; */
+/*     k = a0 / b0; a0 %= b0; a1 -= k * b1; */
+/*     if (UNLIKELY(a0 > mhI)) break; */
+/*     k = b0 / a0; b0 %= a0; b1 -= k * a1; */
+/*   } */
+/*   k = b0 - hI - a0; */
+/*   if (b0 > -a0) { */
+/*     if (UNLIKELY(!a0)) return 0; */
+/*     k /= a0; b0 -= k * a0; b1 -= k * a1; */
+/*   } else { */
+/*     if (UNLIKELY(!b0)) return 0; */
+/*     k /= b0; a0 += k * b0; a1 += k * b1; */
+/*   } */
+/*   pli->a0 = (int32_t) a0; pli->a1 = (uint32_t) a1; pli->b0 = (int32_t) b0; pli->b1 = (uint32_t) b1; */
+/*   return 1; */
+/* } */
 
 // The really fastest version of reduce_plattice on processors >= Intel
 // Nehalem & AMD Opteron.
@@ -1542,98 +1542,98 @@ static inline uint32_t plattice_bound1(const plattice_info_t * pli, sieve_info_s
 
 
 /* This is for working with congruence classes only */
-NOPROFILE_INLINE
-plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, unsigned int par )
-{
-    /* With MOD2_CLASSES_BS set up, we have computed by the function
-     * above an adapted basis for the band of total width I/2 (thus from
-     * -I/4 to I/4). This adapted basis is in the coefficients a0 a1 b0
-     *  b1 of the pli data structure.
-     *
-     * Now as per Proposition 1 of FrKl05 applied to I/2, any vector
-     * whose i-coordinates are within ]-I/2,I/2[ (<ugly>We would like a
-     * closed interval on the left. Read further on for that case</ugly>)
-     * can actually be written as a combination with positive integer
-     * coefficients of these basis vectors a and b.
-     *
-     * We also know that the basis (a,b) has determinant p, thus odd. The
-     * congruence class mod 2 that we want to reach is thus accessible.
-     * It is even possible to find coefficients (k,l) in {0,1} such that
-     * ka+lb is within this congruence class. This means that we're going
-     * to consider either a,b,or a+b as a starting vector. The
-     * i-coordinates of these, as per the properties of Proposition 1, are
-     * within ]-I/2,I/2[. Now all other vectors with i-coordinates in
-     * ]-I/2,I/2[ which also belong to the same congruence class, can be
-     * written as (2k'+k)a+(2l'+l)b, with k' and l' necessarily
-     * nonnegative.
-     *
-     * The last ingredient is that (2a, 2b) forms an adapted basis for
-     * the band of width I with respect to the lattice 2p. It's just an
-     * homothety.
-     *
-     * To find (k,l), we proceed like this. First look at the (a,b)
-     * matrix mod 2:
-     *                 a0&1    a1&1
-     *                 b0&1    b1&1
-     * Its determinant is odd, thus the inverse mod 2 is:
-     *                 b1&1    a1&1
-     *                 b0&1    a0&1
-     * Now the congruence class is given by the parity argument. The
-     * vector is:
-     *                par&1,   par>>1
-     * Multiplying this vector by the inverse matrix above, we obtain the
-     * coordinates k,l, which are:
-     *            k = (b1&par&1)^(b0&(par>>1));
-     *            l = (a1&par&1)^(a0&(par>>1));
-     * Now our starting vector is ka+lb. Instead of multiplying by k and
-     * l with values in {0,1}, we mask with -k and -l, which both are
-     * either all zeroes or all ones in binary
-     *
-     */
-    /* Now for the extra nightmare. Above, we do not have the guarantee
-     * that a vector whose i-coordinate is precisely -I/2 has positive
-     * coefficients in our favorite basis. It's annoying, because it may
-     * well be that if such a vector also has positive j-coordinate, then
-     * it is in fact the first vector we will meet. An example is given
-     * by the following data:
-     *
-            f:=Polynomial(StringToIntegerSequence("
-                -1286837891385482936880099433527136908899552
-                55685111236629140623629786639929578
-                13214494134209131997428776417
-                -319664171270205889372
-                -17633182261156
-                40500"));
+/* NOPROFILE_INLINE */
+/* plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, unsigned int par ) */
+/* { */
+/*     /\* With MOD2_CLASSES_BS set up, we have computed by the function */
+/*      * above an adapted basis for the band of total width I/2 (thus from */
+/*      * -I/4 to I/4). This adapted basis is in the coefficients a0 a1 b0 */
+/*      *  b1 of the pli data structure. */
+/*      * */
+/*      * Now as per Proposition 1 of FrKl05 applied to I/2, any vector */
+/*      * whose i-coordinates are within ]-I/2,I/2[ (<ugly>We would like a */
+/*      * closed interval on the left. Read further on for that case</ugly>) */
+/*      * can actually be written as a combination with positive integer */
+/*      * coefficients of these basis vectors a and b. */
+/*      * */
+/*      * We also know that the basis (a,b) has determinant p, thus odd. The */
+/*      * congruence class mod 2 that we want to reach is thus accessible. */
+/*      * It is even possible to find coefficients (k,l) in {0,1} such that */
+/*      * ka+lb is within this congruence class. This means that we're going */
+/*      * to consider either a,b,or a+b as a starting vector. The */
+/*      * i-coordinates of these, as per the properties of Proposition 1, are */
+/*      * within ]-I/2,I/2[. Now all other vectors with i-coordinates in */
+/*      * ]-I/2,I/2[ which also belong to the same congruence class, can be */
+/*      * written as (2k'+k)a+(2l'+l)b, with k' and l' necessarily */
+/*      * nonnegative. */
+/*      * */
+/*      * The last ingredient is that (2a, 2b) forms an adapted basis for */
+/*      * the band of width I with respect to the lattice 2p. It's just an */
+/*      * homothety. */
+/*      * */
+/*      * To find (k,l), we proceed like this. First look at the (a,b) */
+/*      * matrix mod 2: */
+/*      *                 a0&1    a1&1 */
+/*      *                 b0&1    b1&1 */
+/*      * Its determinant is odd, thus the inverse mod 2 is: */
+/*      *                 b1&1    a1&1 */
+/*      *                 b0&1    a0&1 */
+/*      * Now the congruence class is given by the parity argument. The */
+/*      * vector is: */
+/*      *                par&1,   par>>1 */
+/*      * Multiplying this vector by the inverse matrix above, we obtain the */
+/*      * coordinates k,l, which are: */
+/*      *            k = (b1&par&1)^(b0&(par>>1)); */
+/*      *            l = (a1&par&1)^(a0&(par>>1)); */
+/*      * Now our starting vector is ka+lb. Instead of multiplying by k and */
+/*      * l with values in {0,1}, we mask with -k and -l, which both are */
+/*      * either all zeroes or all ones in binary */
+/*      * */
+/*      *\/ */
+/*     /\* Now for the extra nightmare. Above, we do not have the guarantee */
+/*      * that a vector whose i-coordinate is precisely -I/2 has positive */
+/*      * coefficients in our favorite basis. It's annoying, because it may */
+/*      * well be that if such a vector also has positive j-coordinate, then */
+/*      * it is in fact the first vector we will meet. An example is given */
+/*      * by the following data: */
+/*      * */
+/*             f:=Polynomial(StringToIntegerSequence(" */
+/*                 -1286837891385482936880099433527136908899552 */
+/*                 55685111236629140623629786639929578 */
+/*                 13214494134209131997428776417 */
+/*                 -319664171270205889372 */
+/*                 -17633182261156 */
+/*                 40500")); */
 
-            q:=165017009; rho:=112690811;
-            a0:=52326198; b0:=-1; a1:=60364613; b1:=2;
-            lI:=13; I:=8192; J:=5088;
-            p:=75583; r0:=54375;
-            > M;
-            [-2241    19]
-            [ 1855    18]
-            > M[1]-M[2];
-            (-4096     1)
+/*             q:=165017009; rho:=112690811; */
+/*             a0:=52326198; b0:=-1; a1:=60364613; b1:=2; */
+/*             lI:=13; I:=8192; J:=5088; */
+/*             p:=75583; r0:=54375; */
+/*             > M; */
+/*             [-2241    19] */
+/*             [ 1855    18] */
+/*             > M[1]-M[2]; */
+/*             (-4096     1) */
 
-    * Clearly, above, for the congruence class (0,1), we must start with
-    * this vector, not with the sum.
-    */
-    int32_t a0 = pli->a0;
-    int32_t a1 = pli->a1;
-    int32_t b0 = pli->b0;
-    int32_t b1 = pli->b1;
+/*     * Clearly, above, for the congruence class (0,1), we must start with */
+/*     * this vector, not with the sum. */
+/*     *\/ */
+/*     int32_t a0 = pli->a0; */
+/*     int32_t a1 = pli->a1; */
+/*     int32_t b0 = pli->b0; */
+/*     int32_t b1 = pli->b1; */
 
-    int k = -((b1&par&1)^(b0&(par>>1)));
-    int l = -((a1&par&1)^(a0&(par>>1)));
-    int32_t v[2]= { (a0&k)+(b0&l), (a1&k)+(b1&l)};
+/*     int k = -((b1&par&1)^(b0&(par>>1))); */
+/*     int l = -((a1&par&1)^(a0&(par>>1))); */
+/*     int32_t v[2]= { (a0&k)+(b0&l), (a1&k)+(b1&l)}; */
 
-    /* handle exceptional case as described above */
-    if (k && l && a0-b0 == -(1 << (si->conf->logI-1)) && a1 > b1) {
-        v[0] = a0-b0;
-        v[1] = a1-b1;
-    }
-    return (v[1] << si->conf->logI) | (v[0] + (1 << (si->conf->logI-1)));
-}
+/*     /\* handle exceptional case as described above *\/ */
+/*     if (k && l && a0-b0 == -(1 << (si->conf->logI-1)) && a1 > b1) { */
+/*         v[0] = a0-b0; */
+/*         v[1] = a1-b1; */
+/*     } */
+/*     return (v[1] << si->conf->logI) | (v[0] + (1 << (si->conf->logI-1))); */
+/* } */
 
 /* }}} */
 
