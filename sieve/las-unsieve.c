@@ -352,14 +352,14 @@ extract_j_div(unsigned int (*div)[2], const unsigned int j, j_div_srcptr j_div,
     }
     return nr_div;
 }
-static inline int 
-sieve_info_test_lognorm (const unsigned char C1, 
-                         const unsigned char C2, 
-                         const unsigned char S1,
-                         const unsigned char S2)
-{
-  return S1 <= C1 && S2 <= C2;
-}
+/* static inline int  */
+/* sieve_info_test_lognorm (const unsigned char C1,  */
+/*                          const unsigned char C2,  */
+/*                          const unsigned char S1, */
+/*                          const unsigned char S2) */
+/* { */
+/*   return S1 <= C1 && S2 <= C2; */
+/* } */
 
 #ifdef HAVE_SSE2
 static inline int 

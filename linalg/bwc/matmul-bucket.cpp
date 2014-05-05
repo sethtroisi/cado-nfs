@@ -2097,13 +2097,13 @@ void MATMUL_NAME(save_cache)(matmul_ptr mm0)/*{{{*/
     fclose(f);
 }/*}}}*/
 
-static inline uint32_t read32(uint16_t const * & q) /* {{{ */
-{
-    uint32_t res;
-    res = *q++;
-    res |= ((uint32_t) *q++) << 16;
-    return res;
-} /* }}} */
+// static inline uint32_t read32(uint16_t const * & q) /* {{{ */
+// {
+//     uint32_t res;
+//     res = *q++;
+//     res |= ((uint32_t) *q++) << 16;
+//     return res;
+// } /* }}} */
 
 #ifndef MATMUL_SUB_SMALL1_H_
 static const uint16_t * matmul_sub_small1(abdst_field x, abelt * where, abelt const * from, const uint16_t * q, unsigned int count)
@@ -2225,14 +2225,14 @@ static inline void matmul_bucket_mul_small2(struct matmul_bucket_data_s * mm, sl
     ASM_COMMENT("end of small2 (dense) slices"); /* }}} */
 }
 
-static inline void prepare_buckets_and_fences(abdst_field x MAYBE_UNUSED, abelt ** b, abelt ** f, abelt * z, const unsigned int * ql, unsigned int n)
-{
-    for(unsigned int k = 0 ; k < n ; k++) {
-        b[k] = z;
-        f[k] = b[k] + ql[k];
-        z += ql[k];
-    }
-}
+// static inline void prepare_buckets_and_fences(abdst_field x MAYBE_UNUSED, abelt ** b, abelt ** f, abelt * z, const unsigned int * ql, unsigned int n)
+// {
+//     for(unsigned int k = 0 ; k < n ; k++) {
+//         b[k] = z;
+//         f[k] = b[k] + ql[k];
+//         z += ql[k];
+//     }
+// }
 
 static inline void prepare_buckets(abdst_field x MAYBE_UNUSED, abelt ** b, abelt * z, const unsigned int * ql, unsigned int n)
 {

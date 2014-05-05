@@ -66,7 +66,7 @@ benefit from your work.
 
 /* Jenkins-Traub rootfinder */
 
-static const double are = DBL_EPSILON;
+/* static const double are = DBL_EPSILON; */
 static const double mre = 2.0 * M_SQRT2 * DBL_EPSILON;
 
 typedef struct {
