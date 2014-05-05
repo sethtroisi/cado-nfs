@@ -339,7 +339,7 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
   else
     gmp_printf ("# Optimized polynomial:\n");
   print_poly_info (f, d, g, N, 0, raw ? "" : phash);
-  printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+  printf ("# Murphy's E(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e (best so far %.2e)\n",
           bound_f, bound_g, area, E, best_E);
   printf ("\n");
   fflush (stdout);

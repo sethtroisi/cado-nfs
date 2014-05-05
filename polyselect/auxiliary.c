@@ -1868,7 +1868,7 @@ print_cadopoly (FILE *fp, cado_poly p)
                 "nr: %u\n", logmu, alpha, alpha_proj, logmu + alpha, nroots);
 
    e = MurphyE (p, bound_f, bound_g, area, MURPHY_K);
-   fprintf (fp, "# MurphyE(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e\n",
+   fprintf (fp, "# MurphyE(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e\n",
         bound_f, bound_g, area, e);
 
    return e;
