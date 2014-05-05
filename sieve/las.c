@@ -1447,7 +1447,7 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sie
 	   "movl %%edx, %0\n jge 1b\n"					\
 	   "jmp 0b\n"							\
 	   ""								\
-	   ".balign 0\n 9:\n"						\
+	   " 9:\n"						\
 	   : "+&r"(a0), "=&r"(a1), "+&r"(b0), "=&r"(b1),		\
 	     "=&rm"(mhI) : "rm"(hI) : "%rax", "%rdx", "cc");  
 #else
