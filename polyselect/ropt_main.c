@@ -175,7 +175,7 @@ usage (char **argv)
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
-  fprintf (stderr, " -effort M     sieving effort ranging from 1 to 5 (default 1).\n");
+  fprintf (stderr, " -rseffort M   sieving effort ranging from 1 to 5 (default 2).\n");
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
@@ -298,13 +298,13 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-effort") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-rseffort") == 0)
         {
           param->effort = atoi (argv[2]);
           argv += 2;
           argc -= 2;
           if (param->effort < 1 || param->effort > 5) {
-            fprintf (stderr, "Error: -effort not in range (1-5).\n");
+            fprintf (stderr, "Error: -rseffort not in range (1-5).\n");
             exit(1);
           }       
         }
@@ -386,13 +386,13 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-effort") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-rseffort") == 0)
         {
           param->effort = atoi (argv[2]);
           argv += 2;
           argc -= 2;
           if (param->effort < 1 || param->effort > 5) {
-            fprintf (stderr, "Error: -effort not in range (1-5).\n");
+            fprintf (stderr, "Error: -rseffort not in range (1-5).\n");
             exit(1);
           }
         }
