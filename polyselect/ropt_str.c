@@ -7,6 +7,7 @@
 #include "cado.h"
 #include "ropt_str.h"
 #include "portability.h"
+#include "area.h"
 
 
 /* -----------------*/
@@ -1186,7 +1187,7 @@ ropt_param_init ( ropt_param_t param )
     param->s1_e_sl[i] = 0;
   param->d = 0;
   param->verbose = 0;
-  param->effort = 2;
+  param->effort = DEFAULT_RSEFFORT;
 }
 
 

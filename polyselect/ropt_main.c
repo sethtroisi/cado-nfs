@@ -175,7 +175,7 @@ usage (char **argv)
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
-  fprintf (stderr, " -rseffort M   sieving effort ranging from 1 to 5 (default 2).\n");
+  fprintf (stderr, " -rseffort M   sieving effort ranging from 1 to 5 (default %d).\n", DEFAULT_RSEFFORT);
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
