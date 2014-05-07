@@ -146,6 +146,7 @@ tasks.polyselect.admin = 0		# min value for leading coefficient of f(x)
     # If not set, the default is 0.
 
 tasks.polyselect.admax = 250e3		# max value for leading coefficient of f(x)
+tasks.polyselect.nrkeep = 100
     # The polynomial selection search time is proportional to the
     # length of the search interval is [admin, admax]
 
