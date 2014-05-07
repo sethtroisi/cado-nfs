@@ -41,6 +41,9 @@ void las_display_config_flags(FILE * stream)
 #ifdef SUPPORT_LARGE_Q
     fprintf(stream, " SUPPORT_LARGE_Q");
 #endif
+#ifdef SKIP_GCD3
+    fprintf(stream, " SKIP_GCD3");
+#endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
     fprintf(stream, " GUARD=%1.2f", (double) GUARD);
