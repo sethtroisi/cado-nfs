@@ -31,10 +31,6 @@ void ropt_parse_param ( int argc,
 #endif
 
 
-
-
-
-
 #if SKIP_ROPT
 double print_poly_info_short ( mpz_t *f,
                                mpz_t *g,

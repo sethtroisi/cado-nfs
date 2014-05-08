@@ -335,14 +335,16 @@ ropt_on_msievepoly ( FILE *file,
     mpz_poly_t F;
     F->coeff = poly->f;
     F->deg = poly->d;
+
+    /* print before optimization */
     print_poly_fg (F, poly->g, poly->n, 1);
+
     optimize (F, poly->g, 0, 1);
 
 #if SKIP_ROPT
     /* print optimized poly in CADO format */
+    print_poly_fg (F, poly->g, poly->n, 1);
     fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
-    print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
-
     /* also print optimized poly in Msieve format */
     print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
 #else
@@ -376,17 +378,21 @@ print_poly_info_short ( mpz_t *f,
   double skew, logmu, alpha, e, alpha_proj;
   int i;
   double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
+  mpz_poly_t F;
+  F->coeff = f;
+  F->deg = d;
 
-  /* initlize cado_poly for Murphy E */
   cado_poly cpoly;
   cado_poly_init(cpoly);
-
   for (i = 0; i < (d + 1); i++) {
-    mpz_set(cpoly->alg->f[i], f[i]);
+    mpz_set(cpoly->alg->coeff[i], f[i]);
   }
   for (i = 0; i < 2; i++) {
-    mpz_set(cpoly->rat->f[i], g[i]);
+    mpz_set(cpoly->rat->coeff[i], g[i]);
   }
+  mpz_set (cpoly->n, N);
+  cpoly->alg->deg = d;
+  cpoly->rat->deg = 1;
 
   /* output original poly */
   gmp_printf ("%Zd ", f[d]);
@@ -396,18 +402,13 @@ print_poly_info_short ( mpz_t *f,
   }
   printf ("\n");
   mpz_neg (g[0], g[0]);
-
+  
   /* compute skew, logmu, nroots */
-  nroots = numberOfRealRoots (f, d, 0, 0, NULL);
-  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-  alpha = get_alpha (f, d, ALPHA_BOUND);
-  alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
-
-  mpz_set (cpoly->n, N);
-  cpoly->alg->degree = d;
-  cpoly->rat->degree = 1;
-  cpoly->skew = skew;
+  nroots = numberOfRealRoots (cpoly->alg->coeff, d, 0, 0, NULL);
+  skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (F, skew);
+  alpha = get_alpha (F, ALPHA_BOUND);
+  alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
   e = MurphyE (cpoly, bound_f, bound_g, area, MURPHY_K);
 
   printf ("# lognorm: %.2f, alpha: %.2f, (proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
