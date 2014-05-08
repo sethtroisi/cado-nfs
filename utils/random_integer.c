@@ -11,10 +11,11 @@
 
 void usage_die(const char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-p] d1 [d2]\n", argv0);
+  fprintf (stderr, "Usage: %s [-p|-b] d1 [d2]\n", argv0);
   fprintf (stderr, "       Generate a random integer of d1 digits.\n");
   fprintf (stderr, "       (resp. of d1 to d2 digits if d2 is given).\n");
   fprintf (stderr, "       With the -p option, generate prime integers.\n");
+  fprintf (stderr, "       With the -b option, generate product of two primes.\n");
   exit (EXIT_FAILURE);
 }
 
@@ -23,16 +24,19 @@ main (int argc, char *argv[])
 {
   unsigned long d, d1, d2;
   gmp_randstate_t state;
-  mpz_t n, b;
-  int prime = 0;
+  mpz_t n, n2, b;
+  int prime = 0, bicomposite = 0;
   char * argv0 = argv[0];
  
   if (argc == 1)
     usage_die(argv0);
   if (argv[1][0] == '-') {
-    if (argv[1][1] != 'p')
+    if (argv[1][1] == 'p')
+      prime = 1;
+    else if (argv[1][1] == 'b')
+      prime = bicomposite = 1;
+    else
       usage_die(argv0);
-    prime = 1;
     argc--;
     argv++;
   }
@@ -49,13 +53,22 @@ main (int argc, char *argv[])
   gmp_randseed_ui (state, getpid ());
   mpz_init (b);
   mpz_init (n);
+  mpz_init (n2);
   mpz_ui_pow_ui (b, 10, d);
+  if (bicomposite)
+    mpz_sqrt(b, b);
   do {
-      do
-          mpz_urandomm (n, state, b);
-      while (mpz_sizeinbase (n, 10) != d);
-  } while (prime && !mpz_probab_prime_p(n, 25));
+      mpz_urandomm (n, state, b);
+      if (prime || bicomposite)
+        mpz_nextprime (n, n);
+      if (bicomposite) {
+        mpz_urandomm (n2, state, b);
+        mpz_nextprime (n2, n2);
+        mpz_mul(n, n, n2);
+      }
+  } while (mpz_sizeinbase (n, 10) != d);
   gmp_printf ("%Zd\n", n);
+  mpz_clear (n2);
   mpz_clear (n);
   mpz_clear (b);
   gmp_randclear (state);
