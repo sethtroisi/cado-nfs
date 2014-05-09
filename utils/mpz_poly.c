@@ -724,7 +724,7 @@ void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_
 /* q=divexact(h, f) mod p, f not necessarily monic.
    Assumes lc(h) <> 0 mod p.
    Clobbers h. */
-static void
+void
 mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f,
                    const mpz_t p) {
   int i, d = f->deg, dh = h->deg;
@@ -926,7 +926,7 @@ void mpz_poly_reduce_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
 }
 
 /* Set Q = P/lc(P) (mod m). Q and P might be identical. */
-static void
+void
 mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
 {
   int i;
@@ -1403,7 +1403,7 @@ mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
 }
 
 /* f=gcd(f,g) mod p, with p in mpz_t */
-static void
+void
 mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
 {
   while (g->deg >= 0)
@@ -1510,146 +1510,8 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
 }
 
 
-/* Assuming f is a (squarefree) product of linear factors mod p, splits it
-   and put the corresponding roots mod p in r[]. Return number of roots
-   which should be degree of f. Assumes p is odd, and deg(f) >= 1. */
-static int
-mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
-{
-  mpz_t a, aux;
-  mpz_poly_t q, h, ff;
-  int d = f->deg, dq, n, m;
 
-  mpz_init (a);
-  mpz_init (aux);
 
-  /* linear polynomial */
-  if (d == 1) {
-    mpz_neg (aux, f->coeff[1]);
-    mpz_invert (a, aux, p);
-    mpz_mul (r[0], a, f->coeff[0]);
-    mpz_fdiv_r (r[0], r[0], p);
-    n = 1;
-    goto clear_a;
-  }
-
-  /* if f has degree d, then q,h may have up to degree 2d-1 in the
-     powering algorithm */
-  mpz_poly_init (q, 2 * d - 1);
-  mpz_poly_init (h, 2 * d - 1);
-  mpz_poly_init (ff, d);
-
-  /* random polynomial by a */
-  mpz_set_ui (a, lrand48());
-  mpz_fdiv_r (a, a, p);
-  for (;;)
-  {
-    /* q=x+a */
-    mpz_set_ui (aux, 1);
-    mpz_poly_setcoeff (q, 1, aux);
-    mpz_poly_setcoeff (q, 0, a);
-
-    /* h=(x+a)^((p-1)/2) mod (f, p) */
-    mpz_sub_ui (aux, p, 1);
-    mpz_divexact_ui (aux, aux, 2);
-    mpz_poly_power_mod_f_mod_mpz (h, q, f, aux, p);
-    mpz_poly_sub_ui (h, 1);
-
-    /* q = gcd(f,h) */
-    mpz_poly_copy (q, f);
-    mpz_poly_gcd_mpz (q, h, p);
-    dq = q->deg;
-    ASSERT (dq >= 0);
-
-    /* recursion-split */
-    if (0 < dq && dq < d)
-    {
-      n = mpz_poly_cantor_zassenhaus (r, q, p, depth+1);
-      ASSERT (n == dq);
-
-      mpz_poly_copy (ff, f);
-      /* mpz_poly_divexact clobbers its 2nd arg */
-      mpz_poly_divexact (h, ff, q, p);
-      m = mpz_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
-      ASSERT (m == h->deg);
-      n += m;
-      break;
-    }
-
-    mpz_add_ui (a, a, 1); /* no need to reduce mod p, since it will be done
-                             in mpz_poly_power_mod_f_mod_mpz */
-  }
-
-  mpz_poly_clear (q);
-  mpz_poly_clear (h);
-  mpz_poly_clear (ff);
-
-clear_a:
-  mpz_clear (a);
-  mpz_clear (aux);
-  return n;
-}
-
-typedef int (*sortfunc_t) (const void *, const void *);
-
-static int mpz_poly_coeff_cmp(const mpz_t *a, const mpz_t *b) {
-  return mpz_cmp(*a, *b) < 0 ? -1 : 1;
-}
-
-/* Solve f(x)=0 (mod p), where p is a prime. Return the number of roots.
-   Assume d (the degree of f) is at least 1.
- */
-int
-mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
-{
-  int nr = 0;
-  mpz_t tmp;
-  mpz_poly_t mpz_poly_fp, mpz_poly_f, g, h;
-
-  ASSERT(d >= 1);
-
-  mpz_init (tmp);
-  mpz_poly_init (mpz_poly_fp, d);
-  mpz_poly_init (mpz_poly_f, d);
-  mpz_poly_init (g, 2*d-1);
-  mpz_poly_init (h, 2*d-1);
-
-  /* reduce f to monic and modulo p */
-  mpz_poly_set (mpz_poly_f, f, d);
-  mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_fp, mpz_poly_f, p);
-  if (mpz_poly_fp->deg <= 0)
-    goto clear_and_exit;
-  /* h=x^p-x (mod mpz_poly_fp) */
-  mpz_set_ui (tmp, 1UL);
-  mpz_poly_setcoeff (g, 1, tmp);
-  mpz_poly_power_mod_f_mod_mpz (h, g, mpz_poly_fp, p, p);
-  mpz_poly_sub (h, h, g);
-  /* g = gcd (mpz_poly_fp, h) */
-  mpz_poly_gcd_mpz (mpz_poly_fp, h, p);
-  /* mpz_poly_fp contains gcd(x^p-x, f) */
-  nr = mpz_poly_fp->deg;
-  ASSERT (nr >= 0);
-
-  /* If r is NULL, we only return the number of roots. */
-  if (r != NULL && nr > 0)
-  {
-    int n MAYBE_UNUSED = mpz_poly_cantor_zassenhaus (r, mpz_poly_fp, p, 0);
-    ASSERT (n == nr);
-  }
-
- clear_and_exit:
-  mpz_poly_clear(mpz_poly_fp);
-  mpz_poly_clear(mpz_poly_f);
-  mpz_poly_clear(g);
-  mpz_poly_clear(h);
-  mpz_clear (tmp);
-
-  /* Sort the roots */
-  if (r && nr)
-    qsort(r, nr, sizeof(mpz_t), (sortfunc_t) &mpz_poly_coeff_cmp);
-
-  return nr;
-}
 
 
 

@@ -76,6 +76,7 @@ void mpz_poly_sub_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h,
                       const mpz_t m);
 void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
 void mpz_poly_mul_mpz(mpz_poly_t Q, const mpz_poly_t P, const mpz_t a);
+void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m);
 int mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
                         const mpz_t invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
@@ -84,6 +85,7 @@ void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_t Q, const mpz_poly_t P1, const mpz_pol
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
                                          const mpz_poly_t F, const mpz_t m);
 void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p);
+void mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mpz_t p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_t m);
   
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x);
@@ -116,9 +118,12 @@ void mpz_poly_base_modp_clear (mpz_poly_t *P);
 void mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk);
 size_t mpz_poly_sizeinbase (mpz_poly_t f, int d, int base);
 void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
+void mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p);
 void mpz_poly_xgcd_mpz(mpz_poly_t gcd, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p);
+/* int mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth); */
 
-int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
+/* void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m); */
+
 void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
 
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);

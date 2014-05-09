@@ -620,7 +620,7 @@ polygen_JL_f ( mpz_t n,
             continue;
 
         /* find roots */
-        nr = mpz_poly_roots_mpz (rf, f, d, n);
+        nr = mpz_poly_roots_mpz (rf, ff, n);
         if (nr > 0)
             break;
     }
