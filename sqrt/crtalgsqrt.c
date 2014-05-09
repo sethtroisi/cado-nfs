@@ -1495,7 +1495,7 @@ struct prime_data * suitable_crt_primes()
         modulusul_t q;
         modul_initmod_ul(q, p);
         memset(roots, 0, glob.n * sizeof(unsigned long));
-        int nr = modul_poly_roots_ulong(roots, glob.pol->alg->coeff, glob.n, q);
+        int nr = modul_poly_roots_ulong(roots, glob.pol->alg, q);
         if (nr != glob.n) continue;
         memset(&(res[i]), 0, sizeof(struct prime_data));
         res[i].r = malloc(glob.n * sizeof(unsigned long));

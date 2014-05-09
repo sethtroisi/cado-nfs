@@ -59,17 +59,16 @@ mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
     modulusul_t pp;
     modul_initmod_ul(pp, p);
     int i;
-    mpz_t *f = F->coeff;
     int d = F->deg;
         
     if (r == NULL)
-      return modul_poly_roots(NULL, f, d, pp);
+      return modul_poly_roots(NULL, F, pp);
     
     rr = (residueul_t *) malloc(d * sizeof(residueul_t));
     for(i = 0 ; i < d ; i++) {
       modul_init_noset0(rr[i], pp);
     }
-    n = modul_poly_roots(rr, f, d, pp);
+    n = modul_poly_roots(rr, F, pp);
     for(int i = 0 ; i < n ; i++) {
       /* The assumption is that p fits within an unsigned long
        * anyway. So the roots do as well.

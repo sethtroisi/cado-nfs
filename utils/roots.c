@@ -84,7 +84,7 @@ int main(int argc0, char *argv0[])
         residueul_t * r = malloc(ps->deg * sizeof(residueul_t));
         for(int i = 0 ; i < ps->deg ; i++)
             modul_init(r[i], qq);
-        int nr = modul_poly_roots(r, ps->coeff, ps->deg, qq);
+        int nr = modul_poly_roots(r, ps, qq);
         for(int i = 0 ; i < nr ; i++) {
             printf("%lu\n", modul_get_ul(r[i], qq));
         }
@@ -112,7 +112,7 @@ int main(int argc0, char *argv0[])
             residueul_t * r = malloc(ps->deg * sizeof(residueul_t));
             for(int i = 0 ; i < ps->deg ; i++)
                 modul_init(r[i], qq);
-            int nr = modul_poly_roots(r, ps->coeff, ps->deg, qq);
+            int nr = modul_poly_roots(r, ps, qq);
             if (nr) {
                 printf("%lu", mpz_get_ui(qz));
                 for(int i = 0 ; i < nr ; i++) {

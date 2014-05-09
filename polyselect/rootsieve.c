@@ -113,7 +113,10 @@ update_table (mpz_t *f, int d, mpz_t m, mpz_t b, double *A, long K0, long K1,
   modul_poly_init (fpn, d);
 
   /* first reduce f(x) and g(x) mod p^n */
-  modul_poly_set_mod_raw (fpn, f, d, Pn);
+  mpz_poly_t F;
+  F->coeff = f;
+  F->deg = d;
+  modul_poly_set_mod_raw (fpn, F, Pn);
 
   modul_set_ul (gpn, mpz_fdiv_ui (m, pn), Pn);
   /* invariant: gpn = -g(l) */

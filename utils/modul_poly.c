@@ -88,9 +88,11 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
 int
-modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
+modul_poly_set_mod (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
 {
-  d = modul_poly_set_mod_raw (fp, f, d, p);
+  int d;
+
+  d = modul_poly_set_mod_raw (fp, F, p);
   modul_poly_make_monic (fp, p);
 
   return d;
@@ -98,9 +100,11 @@ modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
 
 /* fp <- f mod p. Return degree of fp (-1 if fp=0). */
 int
-modul_poly_set_mod_raw (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
+modul_poly_set_mod_raw (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
 {
   int i;
+  mpz_t *f = F->coeff;
+  int d = F->deg;
 
   while (d >= 0 && mpz_divisible_ui_p (f[d], modul_getmod_ul (p)))
     d --;
@@ -544,15 +548,16 @@ static int coeff_cmp(
    which has lower degree? Warning: if f has root -a, we might miss it.]
 */
 int
-modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
+modul_poly_roots(residueul_t *r, mpz_poly_t F, modulusul_t p)
 {
   modul_poly_t fp, g, h;
   int df;
+  int d = F->deg;
 
   /* the number of roots is the degree of gcd(x^p-x,f) */
 
   modul_poly_init (fp, d);
-  d = modul_poly_set_mod (fp, f, d, p);
+  d = modul_poly_set_mod (fp, F, p);
 
    /* d is the degree of fp (-1 if fp=0) */
 
@@ -620,15 +625,16 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
 }
 
 int
-modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
+modul_poly_roots_ulong (unsigned long *r, mpz_poly_t F, modulusul_t p)
 {
     residueul_t * pr;
     int i, n;
-
+    int d = F->deg;
+    
     ASSERT_ALWAYS(d > 0);
     pr = malloc (d * sizeof(residueul_t));
     FATAL_ERROR_CHECK (pr == NULL, "not enough memory");
-    n = modul_poly_roots(pr,f,d,p);
+    n = modul_poly_roots(pr, F, p);
     for(i = 0 ; i < n ; i++) {
         r[i] = modul_getmod_ul (pr[i]);
     }
