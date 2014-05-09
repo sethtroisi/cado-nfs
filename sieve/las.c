@@ -1689,11 +1689,13 @@ typedef const struct thread_data_s * thread_data_srcptr;
 // #define SKIP_GCD_UV 1
 
 /* Return if a is divisible by 3 */
+#ifdef SKIP_GCD3
 static inline int 
 is_divisible_3_u32 (uint32_t a)
 {
   return (a * (- (UINT32_MAX / 3)) <= UINT32_MAX / 3);
 }
+#endif
 
 #ifdef SKIP_GCD_UV
     #define INCREASE_UV(uv) do {(uv)++;} while(0)
