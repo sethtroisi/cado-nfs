@@ -197,13 +197,17 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
     unsigned long *roots;
     mpz_t aux;
 
+    mpz_poly_t F;
+    F->coeff = f;
+    F->deg = d;
+
     if (k0 >= kmax) {
         return;
     }
     roots = (unsigned long*) malloc(d * sizeof(unsigned long));
     mpz_init(aux);
 
-    nroots = poly_roots_ulong(roots, f, d, p);
+    nroots = mpz_poly_roots_ulong (roots, F, p);
     for (int i = 0; i < nroots; ++i) {
         unsigned long r = roots[i];
         {

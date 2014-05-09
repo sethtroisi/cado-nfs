@@ -612,7 +612,7 @@ polygen_JL_f ( mpz_t n,
         */
         int test = 0;
         for (i = 0; i < LEN_QQ; i ++) {
-            test = poly_roots_ulong (rq, f, d, QQ[i]);
+            test = mpz_poly_roots_ulong (rq, ff, QQ[i]);
             if (test == 0)
                 break;
         }
@@ -620,7 +620,7 @@ polygen_JL_f ( mpz_t n,
             continue;
 
         /* find roots */
-        nr = mpz_poly_roots_mpz (rf, f, d, n);
+        nr = mpz_poly_roots_mpz (rf, ff, n);
         if (nr > 0)
             break;
     }

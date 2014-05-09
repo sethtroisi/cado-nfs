@@ -46,7 +46,7 @@ int nq = INT_MAX;
 int keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
-int rseffort = 1; /* sieving effort, among 1-5 */
+int rseffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
 static unsigned long incr = DEFAULT_INCR;
 const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
@@ -339,7 +339,7 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
   else
     gmp_printf ("# Optimized polynomial:\n");
   print_poly_info (f, d, g, N, 0, raw ? "" : phash);
-  printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+  printf ("# Murphy's E(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e (best so far %.2e)\n",
           bound_f, bound_g, area, E, best_E);
   printf ("\n");
   fflush (stdout);
@@ -1987,7 +1987,9 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
   param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
-  param_list_decl_usage(pl, "rseffort", "root-sieve effort ranging from 1 to 5 (default 1)");
+  snprintf (str, 200, "root-sieve effort ranging from 1 to 5 (default %d)",
+            DEFAULT_RSEFFORT);
+  param_list_decl_usage(pl, "rseffort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
   param_list_decl_usage(pl, "s", str);
   param_list_decl_usage(pl, "save", "save state in given file");

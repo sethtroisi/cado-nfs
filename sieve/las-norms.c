@@ -92,25 +92,15 @@ static inline uint8_t lg2abs (double i, double add, double scale) {
    no xmm -> GR conversion, no * 0x0101010101010101 (3 to 4 cycles) but only
    2 P-instructions (1 cycle).
 */
-static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
-#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
-  __asm__ __volatile__ (
-            "psllq $0x01,  %0                 \n"
-            "psrlq $0x21,  %0                 \n"
-	    "cvtdq2pd      %0,              %0\n"
-	    : "+&x" (i));
-  i = (i - add) * scale;
-  __asm__ __volatile__ ( 
-	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
-	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
-	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
-	    : "+&x" (i));
-  *(double *)&addr[decal] = i;
-#else
+#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM
+static inline void w64lg2abs(double i, double add, double scale, uint8_t *addr,
+                             ssize_t decal)
+{
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
-#endif
+  *(uint64_t *)&addr[decal] = 0x0101010101010101 *
+    (uint64_t) (((double)((*(uint64_t *)tg << 1) >> 0x21) - add) * scale);
 }
+#endif
 
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 /* This function is for the SSE2 init algebraics.

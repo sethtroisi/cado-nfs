@@ -421,7 +421,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
         gmp_printf ("# Optimized polynomial:\n");
         gmp_printf ("%sn: %Zd\n", phash, N);
         //print_poly_info (f, d, g, 0, phash);
-        printf ("# Murphy's E(Bf=%.1e,Bg=%.1e,area=%.1e)=%1.2e (best so far %1.2e)\n",
+        printf ("# Murphy's E(Bf=%.2e,Bg=%.2e,area=%.2e)=%.2e (best so far %.2e)\n",
                 bound_f, bound_g, area, E, best_E);
         printf ("\n");
         fflush (stdout);

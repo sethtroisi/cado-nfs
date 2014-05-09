@@ -231,6 +231,10 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
   int k;
   unsigned long *roots = NULL;
 
+  mpz_poly_t f;
+  f->coeff = pol;
+  f->deg = deg;
+
   // if there is a proj root, this the largest (r = p by convention)
   if (mpz_divisible_ui_p (pol[deg], p))
   {
@@ -239,7 +243,7 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
   }
 
   roots = (unsigned long*) malloc (deg * sizeof (unsigned long));
-  k = poly_roots_ulong(roots, pol, deg, p);
+  k = mpz_poly_roots_ulong (roots, f, p);
   if (k > 0)
   {
     sort(roots, k);

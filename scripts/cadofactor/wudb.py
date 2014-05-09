@@ -1068,7 +1068,7 @@ class WuAccess(object): # {
         self.cancel_by_condition(eq={"status": 1}, commit=commit)
     
     def cancel_by_condition(self, commit=True, **conditions):
-        self.set_status(WuStatus.CANCELLED, commit=commit)
+        self.set_status(WuStatus.CANCELLED, commit=commit, **conditions)
 
     def set_status(self, status, commit=True, **conditions):
         cursor = self.conn.cursor(MyCursor)

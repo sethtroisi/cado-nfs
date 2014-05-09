@@ -136,68 +136,70 @@ test_polymodF_mul ()
   mpz_clear (c);
 }
 
-void
-test_mpz_poly_roots_mpz (unsigned long iter)
-{
-  mpz_t r[10], f[10], p, res;
-  unsigned long i, n, d;
-  mpz_poly_t F;
+/* void */
+/* test_mpz_poly_roots_mpz (unsigned long iter) */
+/* { */
+/*   mpz_t r[10], f[10], p, res; */
+/*   unsigned long i, n, d; */
+/*   mpz_poly_t F; */
 
-  for (i = 0; i < 10; i++)
-    {
-      mpz_init (r[i]);
-      mpz_init (f[i]);
-    }
-  mpz_init (p);
-  mpz_init (res);
+/*   for (i = 0; i < 10; i++) */
+/*     { */
+/*       mpz_init (r[i]); */
+/*       mpz_init (f[i]); */
+/*     } */
+/*   mpz_init (p); */
+/*   mpz_init (res); */
 
-  /* -16*x^2 - x - 2 mod 17 */
-  mpz_set_si (f[2], -16);
-  mpz_set_si (f[1], -1);
-  mpz_set_si (f[0], -2);
-  mpz_set_ui (p, 17);
-  n = mpz_poly_roots_mpz (r, f, 2, p);
-  ASSERT_ALWAYS(n == 2);
-  ASSERT_ALWAYS(mpz_cmp_ui (r[0], 2) == 0);
-  ASSERT_ALWAYS(mpz_cmp_ui (r[1], 16) == 0);
+/*   /\* -16*x^2 - x - 2 mod 17 *\/ */
+/*   mpz_set_si (f[2], -16); */
+/*   mpz_set_si (f[1], -1); */
+/*   mpz_set_si (f[0], -2); */
+/*   F->coeff = f; */
+/*   F->deg = 2; */
+/*   mpz_set_ui (p, 17); */
+/*   n = mpz_poly_roots_mpz (r, F, p); */
+/*   ASSERT_ALWAYS(n == 2); */
+/*   ASSERT_ALWAYS(mpz_cmp_ui (r[0], 2) == 0); */
+/*   ASSERT_ALWAYS(mpz_cmp_ui (r[1], 16) == 0); */
 
-  /* 9*x^2 + 6*x + 3 mod 3 */
-  mpz_set_si (f[2], 9);
-  mpz_set_si (f[1], 6);
-  mpz_set_si (f[0], 3);
-  mpz_set_ui (p, 3);
-  n = mpz_poly_roots_mpz (r, f, 2, p);
-  ASSERT_ALWAYS(n == 0);
+/*   /\* 9*x^2 + 6*x + 3 mod 3 *\/ */
+/*   mpz_set_si (f[2], 9); */
+/*   mpz_set_si (f[1], 6); */
+/*   mpz_set_si (f[0], 3); */
+/*   mpz_set_ui (p, 3); */
+/*   n = mpz_poly_roots_mpz (r, F, p); */
+/*   ASSERT_ALWAYS(n == 0); */
 
-  /* try random polynomials */
-  for (i = 0; i < iter; i++)
-    {
-      d = 1 + (lrand48 () % 7);
-      for (n = 0; n <= d; n++)
-        mpz_set_si (f[n], mrand48 ());
-      mpz_urandomb (p, state, 128);
-      mpz_nextprime (p, p);
-      while (mpz_divisible_p (f[d], p))
-        mpz_set_si (f[d], mrand48 ());
-      n = mpz_poly_roots_mpz (r, f, d, p);
-      ASSERT_ALWAYS (n <= d);
-      while (n-- > 0)
-        {
-          F->coeff = f;
-          F->deg = d;
-          mpz_poly_eval (res, F, r[n]);
-          ASSERT_ALWAYS (mpz_divisible_p (res, p));
-        }
-    }
+/*   /\* try random polynomials *\/ */
+/*   for (i = 0; i < iter; i++) */
+/*     { */
+/*       d = 1 + (lrand48 () % 7); */
+/*       for (n = 0; n <= d; n++) */
+/*         mpz_set_si (f[n], mrand48 ()); */
+/*       mpz_urandomb (p, state, 128); */
+/*       mpz_nextprime (p, p); */
+/*       while (mpz_divisible_p (f[d], p)) */
+/*         mpz_set_si (f[d], mrand48 ()); */
+/*       F->coeff = f; */
+/*       F->deg = d; */
+/*       n = mpz_poly_roots_mpz (r, F, p); */
+/*       ASSERT_ALWAYS (n <= d); */
+/*       while (n-- > 0) */
+/*         { */
+/*           mpz_poly_eval (res, F, r[n]); */
+/*           ASSERT_ALWAYS (mpz_divisible_p (res, p)); */
+/*         } */
+/*     } */
 
-  for (i = 0; i < 10; i++)
-    {
-      mpz_clear (r[i]);
-      mpz_clear (f[i]);
-    }
-  mpz_clear (p);
-  mpz_clear (res);
-}
+/*   for (i = 0; i < 10; i++) */
+/*     { */
+/*       mpz_clear (r[i]); */
+/*       mpz_clear (f[i]); */
+/*     } */
+/*   mpz_clear (p); */
+/*   mpz_clear (res); */
+/* } */
 
 /* also exercises mpz_poly_mul */
 void
@@ -615,7 +617,7 @@ main (int argc, const char *argv[])
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
   test_polymodF_mul ();
-  test_mpz_poly_roots_mpz (iter);
+  /* test_mpz_poly_roots_mpz (iter); */
   test_mpz_poly_sqr_mod_f_mod_mpz (iter);
   test_mpz_poly_fprintf ();
   test_mpz_poly_div_2_mod_mpz ();

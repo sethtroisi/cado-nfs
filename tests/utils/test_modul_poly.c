@@ -99,23 +99,27 @@ test_modul_poly_roots_ulong (unsigned long iter)
   mpz_set_ui (f[1], 0);
   mpz_set_ui (f[2], 1);
   d = 2;
+  mpz_poly_t F;
+  F->coeff =  f;
+  F->deg = d;
   modul_initmod_ul (p, 113);
-  n = modul_poly_roots_ulong (r, f, d, p);
+  n = modul_poly_roots_ulong (r, F, p);
   ASSERT_ALWAYS(n == 1 && r[0] == 0);
   modul_clearmod (p);
 
   while (iter--)
     {
       d = 1 + lrand48 () % (MAXDEGREE - 1);
+      F->deg = d;
       for (i = 0; i <= d; i++)
         mpz_urandomb (f[i], state, 64);
       modul_initmod_ul (p, ulong_nextprime (lrand48 ()));
       while (mpz_divisible_ui_p (f[d], modul_getmod_ul (p)))
         mpz_urandomb (f[d], state, 64);
-      n = modul_poly_roots_ulong (r, f, d, p);
+      n = modul_poly_roots_ulong (r, F, p);
       ASSERT_ALWAYS(0 <= n && n <= d);
       modul_poly_init (fp, d);
-      modul_poly_set_mod (fp, f, d, p);
+      modul_poly_set_mod (fp, F, p);
       if (n > 0 && fp->degree > 1)
         ASSERT_ALWAYS(modul_poly_is_irreducible (fp, p) == 0);
       /* if n=0, f might be irreducible or not mod p (product of two

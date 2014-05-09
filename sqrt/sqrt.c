@@ -669,7 +669,7 @@ FindSuitableModP (mpz_poly_t F, mpz_t N)
     /*     exit (1); */
     /*   } */
 
-    d = modul_poly_set_mod (fp, F->coeff, dF, &p);
+    d = modul_poly_set_mod (fp, F, &p);
     if (d != dF)
       continue;
     if (modul_poly_is_irreducible (fp, &p))

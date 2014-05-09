@@ -53,13 +53,13 @@ test (int d, const char *pp, const char *ff[], int nroots)
         }
       mpz_init (r[i]);
     }
-  n0 = poly_roots (NULL, f, d, p);
+  n0 = mpz_poly_roots (NULL, F, p);
   if (mpz_sizeinbase (p, 2) <= 64)
     {
-      n1 = poly_roots_uint64 (NULL, f, d, mpz_get_uint64 (p));
+      n1 = mpz_poly_roots_uint64 (NULL, F, mpz_get_uint64 (p));
       ASSERT_ALWAYS(n1 == n0);
     }
-  n = poly_roots (r, f, d, p);
+  n = mpz_poly_roots (r, F, p);
   ASSERT_ALWAYS(n == n0);
   if (nroots != -1)
     ASSERT_ALWAYS(n == nroots);
