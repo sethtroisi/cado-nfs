@@ -21,10 +21,9 @@
 #endif
 
 
-/* -----------------
+/* --------------------------------------------------------------------------
    Static functions
-   ----------------- */
-
+   -------------------------------------------------------------------------- */
 
 /* Return f=g*h, where g has degree r, and h has degree s. */
 static int
@@ -218,19 +217,20 @@ mpz_poly_reducemodF(polymodF_t P, mpz_poly_t p, const mpz_poly_t F) {
 }
 
 
-/* ----------------
-   Public functions
-   ---------------- */
 
-int
-mpz_poly_normalized_p (const mpz_poly_t f) {
-  return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
-}
+/* --------------------------------------------------------------------------
+   Public functions
+   -------------------------------------------------------------------------- */
+
+
+/* Management of the structure, set and print coefficients. */
+
 
 /* Allocate a polynomial that can contain 'd+1' coefficients and set to zero.
    We allow d < 0, which is equivalent to d = -1.
  */
-void mpz_poly_init(mpz_poly_t f, int d) {
+void mpz_poly_init(mpz_poly_t f, int d)
+{
   f->deg = -1;
   if (d < 0)
   {
@@ -250,8 +250,7 @@ void mpz_poly_init(mpz_poly_t f, int d) {
 
 
 /* realloc f to (at least) nc coefficients */
-void
-mpz_poly_realloc (mpz_poly_t f, int nc)
+void mpz_poly_realloc (mpz_poly_t f, int nc)
 {
   int i;
   if (f->alloc < nc)
@@ -264,17 +263,118 @@ mpz_poly_realloc (mpz_poly_t f, int nc)
     }
 }
 
+/* Copy f to g, where g must be initialized (but there is no need it has
+   enough allocated coefficients, since mpz_poly_setcoeff reallocates if
+   needed). */
+void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f) 
+{
+  int i;
+  g->deg = f->deg;
+  for (i = f->deg; i >= 0; --i)
+    mpz_poly_setcoeff (g, i, f->coeff[i]);
+}
+
+/* swap f and g */
+void
+mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
+{
+  int i;
+  mpz_t *t;
+
+  i = f->alloc;
+  f->alloc = g->alloc;
+  g->alloc = i;
+  i = f->deg;
+  f->deg = g->deg;
+  g->deg = i;
+  t = f->coeff;
+  f->coeff = g->coeff;
+  g->coeff = t;
+}
+
 /* Free polynomial f in mpz_poly_t. */
-void mpz_poly_clear(mpz_poly_t f) {
+void mpz_poly_clear(mpz_poly_t f) 
+{
   int i;
   for (i = 0; i < f->alloc; ++i)
     mpz_clear(f->coeff[i]);
   free(f->coeff);
 }
 
+
+/* Set polynomial degree */
+void mpz_poly_set_deg(mpz_poly_t f, int deg)
+{
+  f->deg = deg;
+}
+
+
+/* Find polynomial degree. */
+void mpz_poly_cleandeg(mpz_poly_t f, int deg)
+{
+  ASSERT(deg >= -1);
+  while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
+    deg--;
+  f->deg = deg;
+}
+
+/* Sets f to the polynomial of degree d, of coefficients
+   given by coeffs. */
+void mpz_poly_set (mpz_poly_t f, mpz_t * coeffs, int d)
+{
+  int i;
+  for (i=d; i>=0; --i)
+    mpz_poly_setcoeff(f,i,coeffs[i]);
+  mpz_poly_cleandeg(f,d);
+}
+
+/* Set a zero polynomial. */
+void mpz_poly_set_zero(mpz_poly_t f) 
+{
+  f->deg = -1;
+}
+
+/* Set mpz_t coefficient for the i-th term. */
+void mpz_poly_setcoeff (mpz_poly_t f, int i, const mpz_t z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set (f->coeff[i], z);
+  if (i >= f->deg)
+    mpz_poly_cleandeg (f, i);
+}
+
+/* Set signed int coefficient for the i-th term. */
+void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_si (f->coeff[i], z);
+  if (i >= f->deg)
+    mpz_poly_cleandeg (f, i);
+}
+
+/* Set int64 coefficient for the i-th term. */
+void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z)
+{
+  mpz_poly_realloc (f, i + 1);
+  mpz_set_int64 (f->coeff[i], z);
+  if (i >= f->deg)
+    mpz_poly_cleandeg (f, i);
+}
+
+/* Get coefficient for the i-th term. */
+void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f)
+{
+  // The code below will work anyway,
+  // this assert is better called a warning.
+  ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i );
+  if (i > f->deg)
+    mpz_set_ui (res,0);
+  else
+    mpz_set (res,f->coeff[i]);
+}
+
 /* Print coefficients of f. */
-void
-mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
+void mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
 {
   int i;
 
@@ -294,88 +394,11 @@ mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
   gmp_fprintf (fp, "%Zd*x^%d\n", f->coeff[f->deg], f->deg);
 }
 
-/* Set polynomial degree */
-void mpz_poly_set_deg(mpz_poly_t f, int deg)
-{
-  f->deg = deg;
-}
-
-
-/* Find polynomial degree. */
-void mpz_poly_cleandeg(mpz_poly_t f, int deg) {
-  ASSERT(deg >= -1);
-  while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
-    deg--;
-  f->deg = deg;
-}
-
-/* Sets f to the polynomial of degree d, of coefficients
-   given by coeffs. */
-void
-mpz_poly_set (mpz_poly_t f, mpz_t * coeffs, int d)
-{
-  int i;
-  for (i=d; i>=0; --i)
-    mpz_poly_setcoeff(f,i,coeffs[i]);
-  mpz_poly_cleandeg(f,d);
-}
-
-/* Set a zero polynomial. */
-void mpz_poly_set_zero(mpz_poly_t f) {
-  f->deg = -1;
-}
-
-/* Set mpz_t coefficient for the i-th term. */
-void mpz_poly_setcoeff (mpz_poly_t f, int i, const mpz_t z)
-{
-  mpz_poly_realloc (f, i + 1);
-  mpz_set (f->coeff[i], z);
-  if (i >= f->deg)
-    mpz_poly_cleandeg (f, i);
-}
-
-/* Set int64 coefficient for the i-th term. */
-void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z)
-{
-  mpz_poly_realloc (f, i + 1);
-  mpz_set_int64 (f->coeff[i], z);
-  if (i >= f->deg)
-    mpz_poly_cleandeg (f, i);
-}
-
-
-/* Set signed int coefficient for the i-th term. */
-void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z)
-{
-  mpz_poly_realloc (f, i + 1);
-  mpz_set_si (f->coeff[i], z);
-  if (i >= f->deg)
-    mpz_poly_cleandeg (f, i);
-}
-
-/* Get coefficient for the i-th term. */
-void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f) {
-  // The code below will work anyway,
-  // this assert is better called a warning.
-  ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i );
-  if (i > f->deg)
-    mpz_set_ui (res,0);
-  else
-    mpz_set (res,f->coeff[i]);
-}
-
-/* Copy f to g, where g must be initialized (but there is no need it has
-   enough allocated coefficients, since mpz_poly_setcoeff reallocates if
-   needed). */
-void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f) {
-  int i;
-  g->deg = f->deg;
-  for (i = f->deg; i >= 0; --i)
-    mpz_poly_setcoeff (g, i, f->coeff[i]);
-}
-
-
 /* -------------------------------------------------------------------------- */
+
+/* Tests and comparison functions */
+
+
 /* return 0 if f and g are equal, non-zero otherwise
    Assumes f and g are normalized */
 int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
@@ -394,6 +417,13 @@ int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
 
   return 0;
 }
+
+/* return 1 if f is normalized, i.e. f[deg] != 0, or the null polynomial.  */
+int mpz_poly_normalized_p (const mpz_poly_t f)
+{
+  return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
+}
+
 /* -------------------------------------------------------------------------- */
 
 
@@ -1382,24 +1412,6 @@ mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
       S = s;
   }
   return S;
-}
-
-/* swap f and g */
-void
-mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
-{
-  int i;
-  mpz_t *t;
-
-  i = f->alloc;
-  f->alloc = g->alloc;
-  g->alloc = i;
-  i = f->deg;
-  f->deg = g->deg;
-  g->deg = i;
-  t = f->coeff;
-  f->coeff = g->coeff;
-  g->coeff = t;
 }
 
 /* f=gcd(f,g) mod p, with p in mpz_t */

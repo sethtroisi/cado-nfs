@@ -51,8 +51,11 @@ typedef poly_base_struct_t poly_base_t[1];
 
 /* Management of the structure, set and print coefficients. */
 void mpz_poly_init(mpz_poly_t, int d);
+void mpz_poly_realloc (mpz_poly_t f, int nc);
+void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
+void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
 void mpz_poly_clear(mpz_poly_t f);
-void mpz_poly_fprintf(FILE *fp, const mpz_poly_t f);
+
 void mpz_poly_set_deg(mpz_poly_t f, int deg);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
@@ -61,12 +64,12 @@ void mpz_poly_setcoeff(mpz_poly_t f, int i, const mpz_t z);
 void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z);
 void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z);
 void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f);
-void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
-int  mpz_poly_normalized_p (const mpz_poly_t f);
-void mpz_poly_realloc (mpz_poly_t f, int nc);
 
-/* Comparison functions */
-int mpz_poly_cmp(mpz_poly_t, mpz_poly_t);
+void mpz_poly_fprintf(FILE *fp, const mpz_poly_t f);
+
+/* Tests and comparison functions */
+int mpz_poly_cmp (mpz_poly_t, mpz_poly_t);
+int mpz_poly_normalized_p (const mpz_poly_t f);
 
 /* Polynomial arithmetic */
 void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
@@ -117,21 +120,15 @@ mpz_poly_t* mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly_t *P);
 void mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk);
 size_t mpz_poly_sizeinbase (mpz_poly_t f, int d, int base);
-void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
 void mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p);
-void mpz_poly_xgcd_mpz(mpz_poly_t gcd, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p);
-/* int mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth); */
-
-/* void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m); */
-
-void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
-
-void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
-void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
-
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.
 int mpz_poly_pseudogcd_mpz(mpz_poly_t , mpz_poly_t , const mpz_t , mpz_t );
+void mpz_poly_xgcd_mpz(mpz_poly_t gcd, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p);
+void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
+void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
+void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
+
 
 #ifdef __cplusplus
 }
