@@ -34,13 +34,16 @@ roots_mod_mpz(uint64_t *r, uint64_t a, int d, uint64_t p)
 {
   mpz_t *f;
   int n, i;
-  
+  mpz_poly_t F;
+
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   for (i = 0; i <= d; i++)
     mpz_init (f[i]);
   mpz_set_ui (f[d], 1);
   mpz_set_uint64 (f[0], p - a);
-  n = poly_roots_uint64 (r, f, d, p);
+  F->coeff = f;
+  F->deg = d;
+  n = mpz_poly_roots_uint64 (r, F, p);
   for (i = 0; i <= d; i++)
     mpz_clear (f[i]);
   free (f);
