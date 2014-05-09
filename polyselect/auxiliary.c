@@ -978,29 +978,29 @@ double
 special_val0 (mpz_poly_ptr f, unsigned long p)
 {
   double v;
-  mpz_t c, *g, *h;
+  mpz_t c,  *h;
   int v0;
   unsigned long *roots, r, r0;
-  mpz_array_t *G = NULL;
   int i, d = f->deg, nroots;
-  mpz_poly_t H;
+  mpz_poly_t g, H;
 
   mpz_init (c);
   content_poly (c, f);
   for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
   v0 = (int) v;
 
+  mpz_poly_init(g, d);
+  g->deg = d;
+
   /* g <- f/p^v */
   if (v != 0.0)
     {
-      G = alloc_mpz_array (d + 1);
-      g = G->data;
       mpz_ui_pow_ui (c, p, (unsigned long) v); /* p^v */
       for (i = 0; i <= d; i++)
-        mpz_divexact (g[i], f->coeff[i], c);
+        mpz_divexact (g->coeff[i], f->coeff[i], c);
     }
   else
-    g = f->coeff;
+    mpz_poly_copy (g, f);
 
   mpz_poly_init (H, d);
   H->deg = d;
@@ -1009,7 +1009,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   mpz_set_ui (c, 1);
   for (i = 0; i <= d; i++)
     {
-      mpz_mul (h[i], g[i], c);
+      mpz_mul (h[i], g->coeff[i], c);
       mpz_mul_ui (c, c, p);
     }
   /* Search for roots of g mod p */
@@ -1017,12 +1017,12 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
   roots = (unsigned long*) malloc (d * sizeof (unsigned long));
   FATAL_ERROR_CHECK(roots == NULL, "not enough memory");
 
-  nroots = poly_roots_ulong (roots, g, d, p);
+  nroots = mpz_poly_roots_ulong (roots, g, p);
   ASSERT (nroots <= d);
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
-      eval_poly_diff_ui (c, g, d, r);
+      eval_poly_diff_ui (c, g->coeff, d, r);
       if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
   v += 1.0 / (double) (p - 1);
       else /* hard case */
@@ -1050,9 +1050,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
     }
   free (roots);
   mpz_poly_clear (H);
-
-  if (G != NULL)
-    clear_mpz_array (G);
+  mpz_poly_clear (g);
   mpz_clear (c);
 
   return v;
@@ -1116,7 +1114,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
     if (pvaluation_disc == 0) {
   /* easy ! */
   int e;
-  e = poly_roots_ulong(NULL, f->coeff, d, p);
+  e = mpz_poly_roots_ulong (NULL, f, p);
   if (p_divides_lc) {
       /* Or the discriminant would have valuation 1 at least */
       ASSERT(mpz_divisible_ui_p(f->coeff[d - 1], p) == 0);
@@ -1126,7 +1124,7 @@ special_valuation (mpz_poly_ptr f, unsigned long p, mpz_t disc)
     } else if (pvaluation_disc == 1) {
       /* special case where p^2 does not divide disc */
   int e;
-  e = poly_roots_ulong(NULL, f->coeff, d, p);
+  e = mpz_poly_roots_ulong (NULL, f, p);
         if (p_divides_lc)
           e ++;
   /* something special here. */
@@ -1225,14 +1223,14 @@ special_valuation_affine (mpz_poly_ptr f, unsigned long p, mpz_t disc )
    if (pvaluation_disc == 0) {
       /* case 1: root must be simple*/
       int e = 0;
-      e = poly_roots_ulong(NULL, f->coeff, f->deg, p);
+      e = mpz_poly_roots_ulong (NULL, f, p);
 
       return (pd * e) / (pd * pd - 1);
    }
    /* else if (pvaluation_disc == 1) { */
    /*     /\* case 2: special case where p^2 does not divide disc *\/ */
    /*     int e = 0; */
-   /*     e = poly_roots_ulong(NULL, f->coeff, d, p); */
+   /*     e = mpz_poly_roots_ulong (NULL, f, p); */
 
    /*     /\* something special here. *\/ */
    /*     return (pd * e - 1) / (pd * pd - 1); */

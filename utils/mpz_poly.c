@@ -1651,6 +1651,8 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p)
   return nr;
 }
 
+
+
 /*  Homographic transform on polynomials */
 /* Put in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
    Assumes the coefficients of fij[] are initialized.

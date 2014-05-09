@@ -95,7 +95,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
         k[side] = 1;
         continue;
       }
-      k[side] = poly_roots_ulong(roots[side], c[side], d[side], p);
+      /* k[side] = poly_roots_ulong_1(roots[side], c[side], d[side], p); */
+      k[side] = mpz_poly_roots_ulong (roots[side], pol->pols[side], p);
       // Check for a projective root
       if (mpz_divisible_ui_p ((c[side])[d[side]], p))
         roots[side][k[side]++] = p;

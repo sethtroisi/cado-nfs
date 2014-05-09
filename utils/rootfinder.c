@@ -10,10 +10,10 @@
 #include "modul_poly.h"
 #include "gmp_aux.h"
 
-/* put in r[0], ..., r[n-1] the roots of f (of degree d) modulo p,
-   and the return value n is the number of roots (without multiplicities) */
+/* put in r[0], ..., r[n-1] the roots of F modulo p,
+   and the return value n is the number of roots (without multiplicities)     */
 int
-poly_roots_ulong (unsigned long *r, mpz_t *f, int d, unsigned long p)
+mpz_poly_roots_ulong (unsigned long *r, mpz_poly_t F, unsigned long p)
 {
     int n;
 
@@ -21,7 +21,9 @@ poly_roots_ulong (unsigned long *r, mpz_t *f, int d, unsigned long p)
     modulusul_t pp;
     modul_initmod_ul(pp, p);
     int i;
-    
+    mpz_t *f = F->coeff;
+    int d = F->deg;
+        
     if (r == NULL)
       return modul_poly_roots(NULL, f, d, pp);
     
@@ -45,18 +47,20 @@ poly_roots_ulong (unsigned long *r, mpz_t *f, int d, unsigned long p)
     return n;
 }
 
+
 int
-poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
+mpz_poly_roots_uint64 (uint64_t * r, mpz_poly_t F, uint64_t p)
 {
     /* This is glue around poly_roots_ulong, nothing more. When uint64
        is larger than ulong, we call mpz_poly_roots_mpz as a fallback */
     unsigned long *rr;
     int i, n;
+    mpz_t *f = F->coeff;
+    int d = F->deg;
 
     if (p > (uint64_t) ULONG_MAX)
       {
         mpz_t pp;
-
         mpz_init (pp);
         mpz_set_uint64 (pp, p);
         if (r == NULL)
@@ -81,13 +85,13 @@ poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
       }
 
     if (r == NULL)
-      return poly_roots_ulong (NULL, f, d, p);
+      return mpz_poly_roots_ulong (NULL, F, p);
 
     if (sizeof (unsigned long) != sizeof (uint64_t))
       rr = (unsigned long *) malloc(d * sizeof(unsigned long));
     else
       rr = (unsigned long *) r;
-    n = poly_roots_ulong (rr, f, d, p);
+    n = mpz_poly_roots_ulong (rr, F, p);
     if (sizeof (unsigned long) != sizeof (uint64_t))
       {
         for(i = 0 ; i < n ; i++)
@@ -97,21 +101,25 @@ poly_roots_uint64 (uint64_t * r, mpz_t * f, int d, uint64_t p)
     return n;
 }
 
+
 int
-poly_roots (mpz_t * r, mpz_t * f, int d, mpz_t p)
+mpz_poly_roots (mpz_t * r, mpz_poly_t F, mpz_t p)
 {
+    mpz_t *f = F->coeff;
+    int d = F->deg;
+
     if (mpz_cmp_ui(p, ULONG_MAX) <= 0) {
         /* There's a chance of using one of our layers. */
         unsigned long pp = mpz_get_ui(p);
         unsigned long * rr;
         int i;
         int n;
-
+	
         if (r == NULL)
-            return poly_roots_ulong(NULL, f, d, pp);
+            return mpz_poly_roots_ulong (NULL, F, pp);
 
         rr = (unsigned long *) malloc(d * sizeof(unsigned long));
-        n = poly_roots_ulong(rr,  f, d, pp);
+        n = mpz_poly_roots_ulong (rr, F, pp);
 
         for(i = 0 ; i < n ; i++) {
             /* The assumption is that p fits within an unsigned long

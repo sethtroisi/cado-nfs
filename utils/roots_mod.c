@@ -917,16 +917,12 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
     }
   else
     {
-      mpz_t *f;
-      f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-      for (i = 0; i <= d; i++)
-        mpz_init (f[i]);
-      mpz_set_ui (f[d], 1);
-      mpz_set_uint64 (f[0], p - a);
-      n = poly_roots_uint64 (r, f, d, p);
-      for (i = 0; i <= d; i++)
-        mpz_clear (f[i]);
-      free (f);
+      mpz_poly_t f;
+      mpz_poly_init(f, d);
+      mpz_poly_setcoeff_int64 (f, d, 1);
+      mpz_poly_setcoeff_int64 (f, 0, p-a);
+      n = mpz_poly_roots_uint64 (r, f, p);
+      mpz_poly_clear(f);
       sort_roots (r, n);
     }
 

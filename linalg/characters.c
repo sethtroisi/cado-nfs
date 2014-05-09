@@ -244,7 +244,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     for(int i = nspecchar ; i < nspecchar + nratchars && i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
-        ret = poly_roots_ulong(roots, pol->rat->coeff, pol->rat->deg, p);
+        ret = mpz_poly_roots_ulong (roots, pol->rat, p);
         for(int j = 0 ; j < ret && i < nspecchar + nratchars && i < nchars ;
                 j++, i++) {
             chars[i].p = p;
@@ -256,7 +256,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars,
     for(int i = nspecchar + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
-        ret = poly_roots_ulong(roots, pol->alg->coeff, pol->alg->deg, p);
+        ret = mpz_poly_roots_ulong (roots, pol->alg, p);
         for(int j = 0 ; j < ret && i < nchars ; j++, i++) {
             chars[i].p = p;
             chars[i].r = roots[j];

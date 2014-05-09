@@ -117,8 +117,8 @@ void mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk);
 size_t mpz_poly_sizeinbase (mpz_poly_t f, int d, int base);
 void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
 void mpz_poly_xgcd_mpz(mpz_poly_t gcd, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p);
-int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
 
+int mpz_poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
 void mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4]);
 
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);

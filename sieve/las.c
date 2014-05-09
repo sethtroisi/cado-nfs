@@ -1081,7 +1081,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
         if (mpz_cmp(q, q1) >= 0)
             break;
         mpz_poly_ptr f = las->cpoly->pols[qside];
-        int nroots = poly_roots(roots, f->coeff, f->deg, q);
+        int nroots = mpz_poly_roots (roots, f, q);
 
         /* {{{ This print is now dead (or we're going to print it at
          * weird times)
@@ -1165,7 +1165,7 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
                    // the root.
                    mpz_poly_ptr f = las->cpoly->pols[RATIONAL_SIDE];
                    ASSERT_ALWAYS(f->deg == 1);
-                   int nroots = poly_roots(&r, f->coeff, f->deg, p);
+                   int nroots = mpz_poly_roots (&r, f, p);
                    ASSERT_ALWAYS(nroots == 1);
                    break;
         default:
@@ -4104,7 +4104,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (si->cpoly->pols[si->doing->pside]->deg == 1) {
             /* compute the good rho */
             int n;
-            n = poly_roots(&si->doing->r, si->cpoly->pols[si->doing->pside]->coeff, 1, si->doing->p);
+            n = mpz_poly_roots (&si->doing->r, si->cpoly->pols[si->doing->pside], si->doing->p);
             ASSERT_ALWAYS(n);
         } else {
             mpz_set(si->doing->r, las->todo->r);
