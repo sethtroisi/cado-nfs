@@ -1910,7 +1910,36 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
     def get_raw_polynomials(self):
         # Extract polynomials from heap and return as list
         return [entry[1][1] for entry in self.poly_heap]
-    
+
+    def get_poly_rank(self, search_poly):
+        """ Return how many polynomnials with lognorm less than search_lognorm
+        there are in the priority queue
+        """
+        df = search_poly.polyf.degree
+        dg = search_poly.polyg.degree
+        # Search for the raw polynomial pair by comparing the leading
+        # coefficients of both polynomials
+        found = None
+        for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
+            if poly.polyf.degree == df and poly.polyg.degree == dg and \
+                   poly.polyf[df] == search_poly.polyf[df] and \
+                   poly.polyg[dg] == search_poly.polyg[dg]:
+               if not found is None:
+                   self.logger.error("Found more than one match for %s", search_poly)
+               else:
+                   found = index
+        if found is None:
+            self.logger.error("Could not find polynomial rank for %s", search_poly)
+            return None
+        # print("search_poly: %s" % search_poly)
+        # print("Poly found in heap: %s" % self.poly_heap[found][1][1])
+        search_lognorm = -self.poly_heap[found][0]
+        rank = 0
+        for (lognorm, (key, poly)) in self.poly_heap:
+            if -lognorm < search_lognorm:
+                rank += 1
+        return rank
+
     def need_more_wus(self):
         return self.state["adnext"] < self.params["admax"]
     
@@ -2014,6 +2043,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Already finished - nothing to do")
+            rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
+            if not rank is None:
+                self.logger.info("Best overall polynomial was %d-th in list "
+                                 "after size optimization", rank)
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
             if filename is None or not filename.isfile():
@@ -2035,6 +2068,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
             return False
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
+        rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
+        if not rank is None:
+            self.logger.info("Best overall polynomial was %d-th in list "
+                             "after size optimization", rank)
         self.write_poly_file()
         return True
     
@@ -4440,6 +4477,7 @@ class Request(Message):
     GET_RAW_POLYNOMIALS = object()
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
+    GET_POLY_RANK = object()
     GET_FACTORBASE_FILENAME = object()
     GET_FREEREL_FILENAME = object()
     GET_RENUMBER_FILENAME = object()
@@ -4622,6 +4660,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
 
         self.request_map = {
             Request.GET_RAW_POLYNOMIALS: self.polysel1.get_raw_polynomials,
+            Request.GET_POLY_RANK: self.polysel1.get_poly_rank,
             Request.GET_POLYNOMIAL: self.polysel2.get_poly,
             Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
