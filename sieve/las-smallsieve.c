@@ -854,13 +854,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 /* q > 1, more general sieving code. */
                 const unsigned int i0 = ssdpos[k];
                 const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
-                unsigned int lineoffset = i0 & (I - 1U),
-                             linestart = i0 - lineoffset;
+                size_t lineoffset = i0 & (I - 1U),
+                       linestart = i0 - lineoffset;
                 ASSERT (U < q);
                 while (linestart < (1U << LOG_BUCKET_REGION))
                 {
                     WHERE_AM_I_UPDATE(w, j, linestart / I);
-                    unsigned int i = lineoffset;
+                    size_t i = lineoffset;
                     if (((linestart & I) == 0) ^ row0_is_oddj) /* Is j even? */
                     {
                         /* Yes, sieve only odd i values */
