@@ -7,10 +7,6 @@
 #define SSE_NORM_INIT
 #endif
 
-#ifdef SSE_NORM_INIT
-#include <emmintrin.h>
-#endif
-
 /* Thresholds of the kilo-buckets & mega-buckets.
  * When the number of buckets I*J/BUCKET_REGION = I*(I/2)/65536
  * is less to THRESHOLD_K_BUCKETS, an one pass sort algorithm is
