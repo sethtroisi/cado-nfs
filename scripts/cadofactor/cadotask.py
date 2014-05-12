@@ -1912,8 +1912,12 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
         return [entry[1][1] for entry in self.poly_heap]
 
     def get_poly_rank(self, search_poly):
-        """ Return how many polynomnials with lognorm less than search_lognorm
-        there are in the priority queue
+        """ Return how many polynomnials with lognorm less than the lognorm
+        of the size-optimized version of search_poly there are in the
+        priority queue.
+        
+        The size-optimized version of search_poly is identified by comparing
+        the leading coefficients of both polynomials.
         """
         df = search_poly.polyf.degree
         dg = search_poly.polyg.degree
