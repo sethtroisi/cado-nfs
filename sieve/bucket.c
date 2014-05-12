@@ -18,10 +18,17 @@
 */
 uint64_t
 bucket_misalignment(const uint64_t sz, const size_t sr) {
-  if (LIKELY((sz * (sr << 2)) & (pagesize() - 1)))
-    return sz;
+  size_t size; 
+  if ((sz * sr * 4) & (pagesize() - 1))
+    size = sz;
   else 
-    return sz + 8 / sr + ((8 % sr) ? 1 : 0);
+    size = sz + 8 / sr + ((8 % sr) ? 1 : 0);
+#ifdef HAVE_SSE2
+  /* Round up to a multiple of CACHELINESIZE to make SSE2 aligned accesses
+     work */
+  size = iceildiv(size, 16U) * 16U;
+#endif
+  return size;
 }
 
 /* Not really interesting to do this in SSE2: this function is called max 6 times... */
