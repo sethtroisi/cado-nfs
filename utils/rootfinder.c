@@ -9,7 +9,7 @@
 #include "mpz_poly.h"
 #include "modul_poly.h"
 #include "gmp_aux.h"
-
+#include "portability.h"
 
 /* Entry point for rootfind routines */
 
