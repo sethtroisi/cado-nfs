@@ -41,9 +41,6 @@
 
 #define DEBUG 0
 
-/* Skip ropt, only used for debugging purpose. */
-#define SKIP_ROPT 0
-
 /* Don't change this. */
 #define NUM_SUBLATTICE_PRIMES 9
 

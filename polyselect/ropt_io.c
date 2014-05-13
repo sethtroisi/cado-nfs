@@ -336,20 +336,21 @@ ropt_on_msievepoly ( FILE *file,
     F->coeff = poly->f;
     F->deg = poly->d;
 
-    /* print before optimization */
+    /* print before size optimization */
     print_poly_fg (F, poly->g, poly->n, 1);
 
+    /* size optimization */
     optimize (F, poly->g, 0, 1);
 
-#if SKIP_ROPT
-    /* print optimized poly in CADO format */
-    print_poly_fg (F, poly->g, poly->n, 1);
-    fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
-    /* also print optimized poly in Msieve format */
-    print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
-#else
-    ropt_common (poly, param);
-#endif
+    if (param->skip_ropt) {
+      fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
+      /* also print optimized poly in Msieve format */
+      print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
+      /* print size-optimized poly in CADO format */
+      print_poly_fg (F, poly->g, poly->n, 1);
+    }
+    else
+      ropt_common (poly, param);
 
     count ++;
   }
@@ -363,7 +364,6 @@ ropt_on_msievepoly ( FILE *file,
 
 
 
-#if SKIP_ROPT
 /**
  * Print ad, l, m and polynomial information.
  */
@@ -425,4 +425,3 @@ print_poly_info_short ( mpz_t *f,
 
   return e;
 }
-#endif

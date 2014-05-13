@@ -145,6 +145,9 @@ typedef struct {
   /* check between 1 and 5 */
   int effort;
 
+  /* check between 1 and 5 */
+  int skip_ropt;
+
   /* verbose */
   int verbose;
 } _ropt_param_t;

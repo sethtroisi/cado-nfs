@@ -145,8 +145,8 @@ usage (char **argv)
   fprintf (stderr, "\n");
   fprintf (stderr, "Usage: %s -f fname [options]\n", argv[0]);
   fprintf (stderr, "       %s -f fname --s2 [options]\n", argv[0]);
-  fprintf (stderr, "       %s -fm fname [options]\n", argv[0]);
-  fprintf (stderr, "       %s -fm fname --s2 [options]\n", argv[0]);
+  fprintf (stderr, "       %s -fm fname -n N -d D [options]\n", argv[0]);
+  fprintf (stderr, "       %s -fm fname --s2 -n N -d D [options]\n", argv[0]);
   fprintf (stderr, "       %s [options]\n", argv[0]);
   fprintf (stderr, "       %s --s2 [options]\n", argv[0]);
   fprintf (stderr, "\n");
@@ -171,7 +171,7 @@ usage (char **argv)
   fprintf (stderr, " -b B          Fix the linear rotation of the sublattice by B.\n");
   fprintf (stderr, " -c C          Fix the constant rotation of the sublattice by C.\n");
   fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
-  fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
+  fprintf (stderr, " --skip_ropt   (switch) skip root sieve (use with option -fm).\n");
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
@@ -308,6 +308,11 @@ ropt_parse_param ( int argc,
             exit(1);
           }       
         }
+        else if (argc >= 3 && strcmp (argv[1], "--skip_ropt") == 0)
+        {
+          fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
+          exit(1);
+        }
         else {
           usage (argv);
         }
@@ -395,6 +400,12 @@ ropt_parse_param ( int argc,
             fprintf (stderr, "Error: -rseffort not in range (1-5).\n");
             exit(1);
           }
+        }
+        else if (argc >= 2 && strcmp (argv[1], "--skip_ropt") == 0)
+        {
+          param->skip_ropt = 1;
+          argv += 1;
+          argc -= 1;
         }
         else if (argc >= 3 && strcmp (argv[1], "-e") == 0)
         {

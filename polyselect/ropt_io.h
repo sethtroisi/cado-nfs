@@ -22,20 +22,16 @@ void ropt_on_cadopoly ( FILE *file,
 void ropt_on_msievepoly ( FILE *file,
                           ropt_param_t param );
 
+double print_poly_info_short ( mpz_t *f,
+                               mpz_t *g,
+                               int d,
+                               mpz_t N );
 
 #if 0
 /* parse stage 2 parameters from argv */
 void ropt_parse_param ( int argc,
                         char **argv,
                         ropt_param_t param );
-#endif
-
-
-#if SKIP_ROPT
-double print_poly_info_short ( mpz_t *f,
-                               mpz_t *g,
-                               int d,
-                               mpz_t N );
 #endif
 
 #endif
