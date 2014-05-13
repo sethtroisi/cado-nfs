@@ -871,6 +871,7 @@ utils/sm_utils.h
 utils/utils_with_io.h
 utils/utils-ffs.c
 utils/utils-ffs.h
+utils/cachebuf.h
 linalg/bwc/mpfq/abase_p_3.c
 linalg/bwc/mpfq/abase_p_3.h
 linalg/bwc/mpfq/abase_p_3_t.c
