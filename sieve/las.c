@@ -27,6 +27,7 @@
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
 #include "las-descent-helpers.h"
+#include "cachebuf.h"
 #ifdef HAVE_SSE41
 /* #define SSE_SURVIVOR_SEARCH 1 */
 #include <smmintrin.h>
@@ -1886,6 +1887,13 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   th->sides[side]->BA = BA;
 }
 
+#ifdef HAVE_SSE2
+#define USE_CACHEBUFFER 0
+#endif 
+#if USE_CACHEBUFFER
+DECLARE_CACHE_BUFFER(bucket_update_t, 256)
+#endif
+
 /* Same than fill_in_buckets, but with 2 passes (k_buckets & buckets). */
 void
 fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
@@ -2041,6 +2049,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   bucket_update_t **pbw = BA.bucket_write;
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
+#if USE_CACHEBUFFER
+    bucket_update_t_256_cachebuffer cachebuf;
+#endif
     /* First part: we rewrite 1->256 buckets, and in the same time,
        we have to deal with the rewriting of logp_idx.
        I use a block in these part to see the range of variables */
@@ -2052,12 +2063,22 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       uint8_t *kbl = (uint8_t *) *pkbl;
       /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
       for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
+#if USE_CACHEBUFFER
+        init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+#endif
 	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
 	for (;
 	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
 	     kbs += sizeof(k_bucket_update_t)*12) {
 	  /*****************************************************************/
 #ifdef CADO_LITTLE_ENDIAN
+#if USE_CACHEBUFFER
+#define KBA_2_BA(A) do {						\
+	    const size_t bucket_idx = kbs[(A) + sizeof(bucket_update_t)]; \
+	    add_bucket_update_t_256_to_cachebuffer(cachebuf, bucket_idx, \
+	                                           *(bucket_update_t *) (kbs + (A))); \
+	  } while (0)
+#else
 #define KBA_2_BA(A) do {						\
 	    bucket_update_t **pbut, *but;				\
 	    pbut = pbw + kbs[(A) + sizeof(bucket_update_t)];		\
@@ -2065,6 +2086,7 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	    memcpy(but, kbs + (A), optimal_move[sizeof(bucket_update_t)]); \
 	    *pbut = ++but;						\
 	  } while (0)
+#endif /* USE_CACHEBUFFER */
 #else
 #define KBA_2_BA(A) do {						\
 	    bucket_update_t **pbut, *but;				\
@@ -2083,6 +2105,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
 	}
 	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+#if USE_CACHEBUFFER
+        flush_bucket_update_t_256_cachebuffer(cachebuf);
+#endif
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
 	aligned_medium_memcpy(pbl, pbw, lg);
@@ -2093,6 +2118,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     }
     /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
     const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
+#if USE_CACHEBUFFER
+    init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+#endif
     for (;
 	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
 	 kbs += sizeof(k_bucket_update_t)*12) {
@@ -2104,6 +2132,9 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
     }
     for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+#if USE_CACHEBUFFER
+    flush_bucket_update_t_256_cachebuffer(cachebuf);
+#endif
     pbw += 256;
   }
   th->sides[side]->BA = BA;
@@ -2336,6 +2367,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 
   /* sort : 3th pass; kBA -> BA */
   bucket_update_t **pbw = BA.bucket_write;
+#if USE_CACHEBUFFER
+  bucket_update_t_256_cachebuffer cachebuf;
+#endif
   for (uint32_t kb = 0; kb < kBA.n_bucket; ++kb) {
     uint8_t *kbs = (uint8_t *) (kBA.bucket_start[kb]);
     /* First part: we rewrite 1->256 buckets, and in the same time,
@@ -2349,6 +2383,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       uint8_t *kbl = (uint8_t *) *pkbl;
       /* There are BA.nr_logp duplicates of all kBA.bucket_write in kBA.logp_idx. */
       for (uint8_t nr_logp = BA.nr_logp; nr_logp; --nr_logp) {
+#if USE_CACHEBUFFER
+        init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+#endif
 	/* Twelve kBA records in one time : it's the nearest of a cache line (60 bytes) */
 	for (;
 	     kbs +  sizeof(k_bucket_update_t)*12 <= kbl;
@@ -2362,6 +2399,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 	  KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
 	}
 	for (; kbs < kbl; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+#if USE_CACHEBUFFER
+        flush_bucket_update_t_256_cachebuffer(cachebuf);
+#endif
 	/* OK, let's duplicate the current (at most) 256 pointers from
 	   BA.bucket_write in BA.logp_idx */
 	aligned_medium_memcpy(pbl, pbw, lg);
@@ -2372,6 +2412,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     }
     /* 2nd part: BA.logp_idx is rewritten. We finish the rewrite of the current bucket */
     const uint8_t *kbw = (uint8_t *) (kBA.bucket_write[kb]);
+#if USE_CACHEBUFFER
+    init_bucket_update_t_256_cachebuffer(cachebuf, pbw, MIN(BA.n_bucket, 256));
+#endif
     for (;
 	 kbs +  sizeof(k_bucket_update_t)*12 <= kbw;
 	 kbs += sizeof(k_bucket_update_t)*12) {
@@ -2383,6 +2426,9 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
       KBA_2_BA(sizeof(k_bucket_update_t)*10); KBA_2_BA(sizeof(k_bucket_update_t)*11);
     }
     for (; kbs < kbw; kbs += sizeof(k_bucket_update_t)) KBA_2_BA(0);
+#if USE_CACHEBUFFER
+    flush_bucket_update_t_256_cachebuffer(cachebuf);
+#endif
     pbw += 256;
   }
   th->sides[side]->BA = BA;
