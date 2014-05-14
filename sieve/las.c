@@ -3780,9 +3780,9 @@ void thread_pickup_si(thread_data * thrs, sieve_info_ptr si, int n)/*{{{*/
 static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
 {
   for (unsigned int i = 0; i < n ; ++i) {
-    thread_data_ptr th = thrs[i];
     for(unsigned int side = 0 ; side < 2 ; side++) {
-      thread_side_data_ptr ts = th->sides[side];
+      thread_side_data_ptr ts = thrs[i]->sides[side];
+      sieve_info_srcptr si = thrs[i]->si;
       /* We used to re-allocate whenever the number of buckets changed. Now we
          always allocate memory for the max. number of buckets, so that we
          never have to re-allocate */
@@ -3793,30 +3793,12 @@ static void thread_buckets_alloc(thread_data *thrs, unsigned int n)/*{{{*/
          for the current number of buckets, which will re-allocate memory
          if number of buckets changes. */
       if (getenv("LAS_REALLOC_BUCKETS") == NULL) {
-        nb_buckets = thrs[i]->si->nb_buckets_max;
+        nb_buckets = si->nb_buckets_max;
       } else {
-        nb_buckets = thrs[i]->si->nb_buckets;
+        nb_buckets = si->nb_buckets;
       }
-
-      uint64_t bucket_size = bucket_misalignment((uint64_t) (thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION), sizeof(bucket_update_t));
-      /* The previous buckets are identical ? */
-      if (ts->BA.n_bucket == nb_buckets && ts->BA.bucket_size == bucket_size) {
-        // printf ("# Keeping same buckets, thread->id=%d, side=%d\n", th->id, side);
-	/* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
-	re_init_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
-	/* Buckets are ready to be filled */
-      } else {
-        // printf ("# Allocating buckets, thread->id=%d, side=%d\n", th->id, side);
-        /* No. We free the buckets, if we have already malloc them. */
-        if (ts->BA.n_bucket) clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
-        /* We (re)create the buckets */
-        if (nb_buckets < THRESHOLD_K_BUCKETS)
-          init_bucket_array   (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
-        else if (nb_buckets < THRESHOLD_M_BUCKETS)
-          init_k_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
-        else
-          init_m_bucket_array (nb_buckets, bucket_size, 255, &(ts->BA), &(ts->kBA), &(ts->mBA));
-      }
+      init_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA),
+                   si->sides[side]->max_bucket_fill_ratio, nb_buckets);
     }
   }
 }/*}}}*/
@@ -3830,7 +3812,7 @@ static void thread_buckets_free(thread_data * thrs, unsigned int n)/*{{{*/
       ts = thrs[i]->sides[side];
       /* if there is no special-q in the interval, the arrays are not malloced */
       if (ts->BA.bucket_write != NULL)
-        clear_bucket_array(&(ts->BA), &(ts->kBA), &(ts->mBA));
+        clear_buckets(&(ts->BA), &(ts->kBA), &(ts->mBA));
     }
   }
 }/*}}}*/

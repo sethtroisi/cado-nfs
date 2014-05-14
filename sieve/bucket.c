@@ -3,6 +3,7 @@
 #include "bucket.h"
 #include "portability.h"
 #include "memory.h"
+#include "las-config.h"
 
 /* sz is the size of a bucket for an array of buckets. In bytes, a bucket
    size is sz * sr, with sr = sizeof of one element of the bucket (a record).
@@ -16,8 +17,8 @@
    of the buckets which reach at the same time the end of their page is
    sufficient to slow down the code.
 */
-uint64_t
-bucket_misalignment(const uint64_t sz, const size_t sr) {
+size_t
+bucket_misalignment(const size_t sz, const size_t sr) {
   size_t size; 
   if ((sz * sr * 4) & (pagesize() - 1))
     size = sz;
@@ -47,7 +48,10 @@ bucket_start_init(void **ps, void **eps, size_t init, size_t add) {
   for (; ps < eps; *ps++ = (void *) init, init += add);
 }
 
-void
+/* Set the write pointers of the normal/kilo/mega buckets, and the read
+   pointers of the normal buckets, back to the respective bucket start,
+   and set nr_logp back to 0. */
+static void
 re_init_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA) {
   if (mBA->bucket_start) aligned_medium_memcpy (mBA->bucket_write, mBA->bucket_start, mBA->size_b_align);
   if (kBA->bucket_start) aligned_medium_memcpy (kBA->bucket_write, kBA->bucket_start, kBA->size_b_align);
@@ -75,7 +79,7 @@ init_bucket_array_common(const uint32_t n_bucket, const uint64_t size_bucket, co
    The parameter diff_logp should be size_arr_logp, the number of different logp
    in the corresponding fb_iterators.
  */
-void
+static void
 init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
@@ -97,7 +101,7 @@ init_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const uns
   re_init_bucket_array(BA, kBA, mBA);
 }
 
-void 
+static void 
 init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
 {
   kBA->n_bucket = (BA->n_bucket >> 8) + ((unsigned char) BA->n_bucket != 0 ? 1 : 0); 
@@ -110,7 +114,7 @@ init_k_bucket_array_common(bucket_array_t *BA, k_bucket_array_t *kBA)
 
 /* This function is called only in the two passes sort in big buckets sieve.
  */
-void 
+static void 
 init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
@@ -138,7 +142,7 @@ init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
 
 /* This function is called only in the three passes sort in big buckets sieve.
  */
-void
+static void
 init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const unsigned char diff_logp, bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   init_bucket_array_common(n_bucket, size_bucket, diff_logp, BA);
@@ -182,7 +186,34 @@ init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket, const u
 }
 
 void
-clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
+init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
+             const double max_bucket_fill_ratio, const uint32_t nb_buckets)
+{
+  const size_t bucket_region = (size_t) 1 << LOG_BUCKET_REGION;
+  const size_t bucket_size = bucket_misalignment((size_t) (max_bucket_fill_ratio * bucket_region), sizeof(bucket_update_t));
+  /* The previous buckets are identical ? */
+  if (BA->n_bucket == nb_buckets && BA->bucket_size == bucket_size) {
+    /* Yes; so (bucket_write & bucket_read) = bucket_start; nr_logp = 0 */
+    re_init_bucket_array(BA, kBA, mBA);
+    /* Buckets are ready to be filled */
+  } else {
+    /* No. We free the buckets, if we have already malloc them. */
+    if (BA->n_bucket)
+      clear_buckets(BA, kBA, mBA);
+    /* We (re)create the buckets */
+    if (nb_buckets < THRESHOLD_K_BUCKETS) {
+      init_bucket_array   (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+    } else if (nb_buckets < THRESHOLD_M_BUCKETS) {
+      init_k_bucket_array (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+    } else {
+      init_m_bucket_array (nb_buckets, bucket_size, 255, BA, kBA, mBA);
+    }
+  }
+}
+
+
+void
+clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA)
 {
   /* Never free mBA->bucket_start[0]. This is done by free BA->bucket_start[0] */
   if (mBA->logp_idx) free_aligned(mBA->logp_idx, 0x40);

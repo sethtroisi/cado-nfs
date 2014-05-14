@@ -201,29 +201,14 @@ typedef struct {
 extern "C" {
 #endif
 
-/* Copy bucket_start on bucket_write and bucket_read,
-   and reset nr_logp. */
-extern void re_init_bucket_array (bucket_array_t *BA, k_bucket_array_t *kBA,
-				  m_bucket_array_t *mBA);
-
-/* Set an allocated array of <n_bucket> buckets each having size
+/* Set an allocated array of <nb_buckets> buckets each having size
  * max_bucket_fill_ratio * BUCKET_REGION.
- * Must be freed with clear_bucket_array().
- * 3 functions with same arguments. The first uses only BA, the
- * second uses BA & kBA, the 3th uses all.
+ * Must be freed with clear_buckets().
  */
-extern void init_bucket_array  (const uint32_t n_bucket, const uint64_t size_bucket,
-				const unsigned char diff_logp, bucket_array_t *BA,
-				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
-extern void init_k_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket,
-				const unsigned char diff_logp, bucket_array_t *BA,
-				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
-extern void init_m_bucket_array(const uint32_t n_bucket, const uint64_t size_bucket,
-				const unsigned char diff_logp, bucket_array_t *BA,
-				k_bucket_array_t *kBA, m_bucket_array_t *mBA);
-
+extern void init_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA,
+                         double max_bucket_fill_ratio, uint32_t nb_buckets);
 /* Only one (clever) function to clear the buckets. */
-extern void clear_bucket_array(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA);
+extern void clear_buckets(bucket_array_t *BA, k_bucket_array_t *kBA, m_bucket_array_t *mBA);
 
 /* Main writing function: appends update to bucket number i.
  * If SAFE_BUCKETS is not #defined, then there is no checking that there is
@@ -279,7 +264,7 @@ get_next_bucket_prime (bucket_primes_t *BP);
 
 extern void purge_bucket (bucket_primes_t *BP, bucket_array_t BA, const int i, const unsigned char *S);
 
-extern uint64_t bucket_misalignment(const uint64_t sz, const size_t sr);
+extern size_t bucket_misalignment(const size_t sz, const size_t sr);
 
 /* We also forward-define some auxiliary functions which are defined in
  * bucket.c (alongside with the non-inlined functions already listed).
