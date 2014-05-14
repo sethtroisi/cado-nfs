@@ -44,6 +44,9 @@ void las_display_config_flags(FILE * stream)
 #ifdef SKIP_GCD3
     fprintf(stream, " SKIP_GCD3");
 #endif
+#ifdef USE_CACHEBUFFER
+    fprintf(stream, " USE_CACHEBUFFER");
+#endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
     fprintf(stream, " GUARD=%1.2f", (double) GUARD);
