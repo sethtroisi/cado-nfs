@@ -42,8 +42,6 @@ add_##__type##_##__indices##_to_cachebuffer(__type##_##__indices##_cachebuffer b
                     const size_t idx, const __type data)	\
 {	\
     const size_t elem_per_cl = CACHELINESIZE / sizeof(__type);	\
-    ASSERT(idx < buf->idx_used); \
-    ASSERT(buf->buf_full[idx] < elem_per_cl); \
     buf->buf[idx][buf->buf_full[idx]++] = data;	\
     if (buf->buf_full[idx] == elem_per_cl) {	\
         __m128i *ptr = (__m128i *)buf->mem[idx];	\
@@ -61,6 +59,7 @@ static inline void \
 flush_##__type##_##__indices##_cachebuffer(__type##_##__indices##_cachebuffer buf) \
 { \
   for (size_t i = 0; i < buf->idx_used; i++) { \
+    ASSERT(buf->buf_full[i] < buf->idx_used); \
     memcpy(buf->mem[i], buf->buf[i], buf->buf_full[i] * sizeof(__type)); \
     buf->mem[i] += buf->buf_full[i]; \
     buf->buf_full[i] = 0; \
