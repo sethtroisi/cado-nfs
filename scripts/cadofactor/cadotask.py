@@ -2400,10 +2400,10 @@ class FreeRelTask(Task):
         return self.get_state_filename("renumberfilename")
     
     def get_nrels(self):
-        return self.state["nfree"]
+        return self.state.get("nfree", None)
     
     def get_nprimes(self):
-        return self.state["nprimes"]
+        return self.state.get("nprimes", None)
 
 
 class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
@@ -3071,7 +3071,8 @@ class PurgeTask(Task):
         minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         if not nunique:
-            raise Exception("No unique relation count received")
+            self.logger.critical("No unique relation count received")
+            return False
         input_nrels = nfree + nunique
         
         if "purgedfile" in self.state and \
