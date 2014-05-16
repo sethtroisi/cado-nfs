@@ -1,5 +1,5 @@
-#ifndef FILTER_SM_H_
-#define FILTER_SM_H_
+#ifndef SM_UTILS_H_
+#define SM_UTILS_H_
 
 #define MAX_LEN_RELSET 1024
 
@@ -23,4 +23,4 @@ void print_sm (FILE *, mpz_poly_t, int, int);
 void sm_single_rel (mpz_poly_t, int64_t, uint64_t, mpz_poly_t, const mpz_t,
                     const mpz_t, const mpz_t, const mpz_t);
 
-#endif /* FILTER_SM_H_ */
+#endif /* SM_UTILS_H_ */
