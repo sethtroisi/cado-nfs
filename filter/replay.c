@@ -225,9 +225,10 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         free(srwname);
     }
     if (skip) {
-        fprintf(stderr, "%lu coeffs (out of %lu total) put into %s (%.1f%%)\n",
+        printf("%lu coeffs (out of %lu total) put into %s (%.1f%%)\n",
                 DW, DW+W, dmatname,
                 100.0 * (double) DW / (DW+W));
+        fflush(stdout);
 
         fclose_maybe_compressed (dmatfile, dmatname);
         fclose_maybe_compressed (drwfile, drwname);
@@ -311,8 +312,8 @@ renumber (int *small_ncols, int *colweight, uint64_t ncols,
 #ifdef FOR_DL
     fprintf (renumberfile, "# %d\n", *small_ncols);
 #endif
-    fprintf (stderr, "Sorting %d columns by decreasing weight\n",
-             *small_ncols);
+    printf ("Sorting %d columns by decreasing weight\n", *small_ncols);
+    fflush(stdout);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp_int2);
     memset(colweight, 0, ncols * sizeof(int));
     // useful for BW + skipping heavy part only...
@@ -393,16 +394,19 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
     unsigned long W;
     int small_ncols;
 
-    fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
+    printf("Renumbering columns (including sorting w.r.t. weight)\n");
+    fflush(stdout);
     renumber (&small_ncols, colweight, ncols, idealsfilename);
 
-    fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
+    printf("small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
 
     double tt = seconds();
-    fprintf(stderr, "Writing sparse representation to file\n");
+    printf("Writing sparse representation to %s\n", sparsename);
+    fflush(stdout);
     W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, skip, bin);
-    fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
-    fprintf(stderr, "# Weight(M_small) = %lu\n", W);
+    printf("# Writing matrix took %.1lfs\n", seconds()-tt);
+    printf("# Weight of the small part of the matrix: %lu\n", W);
+    fflush(stdout);
 
     return small_ncols;
 }
@@ -412,35 +416,47 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
                         index_data_t index_data)
 {
     uint64_t bwcost;
-    unsigned long addread = 0;
+    uint64_t addread = 0;
     char str[STRLENMAX];
 
-    fprintf(stderr, "Reading row additions\n");
-    double tt = wct_seconds();
-    while(fgets(str, STRLENMAX, hisfile)){
-	addread++;
-	if((addread % 100000) == 0)
-	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, wct_seconds() - tt);
-	if(str[strlen(str)-1] != '\n'){
-	    fprintf(stderr, "Gasp: not a complete a line!");
-	    fprintf(stderr, " I stop reading and go to the next phase\n");
-	    break;
-	}
-	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(newrows, str, index_data);
-	else{
-	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
-		sscanf(str+8, "%" PRIu64 "", &bwcost);
-		//	fprintf(stderr, "Read bwcost=%" PRIu64 "\n", bwcost);
-		if((bwcostmin != 0) && (bwcost == bwcostmin)){
-		    // what a damn tricky feature!!!!!!!
-		    fprintf(stderr, "Activating tricky stopping feature");
-		    fprintf(stderr, " since I reached %" PRIu64 "\n", bwcostmin);
-		    break;
-		}
+    printf("Reading row additions\n");
+    fflush(stdout);
+    stats_data_t stats; /* struct for printing progress */
+    /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
+     * 2^23 primes after that */
+    stats_init (stats, stdout, 23, "Read", "row additions", "line");
+    while(fgets(str, STRLENMAX, hisfile))
+    {
+      addread++;
+
+      if (stats_test_progress(stats, addread))
+        stats_print_progress (stats, addread, 0);
+
+      if(str[strlen(str)-1] != '\n')
+      {
+        fprintf(stderr, "Gasp: not a complete a line!");
+        fprintf(stderr, " I stop reading and go to the next phase\n");
+        break;
+      }
+      if(strncmp(str, "BWCOST", 6) != 0)
+        doAllAdds(newrows, str, index_data);
+      else
+      {
+        if(strncmp(str, "BWCOSTMIN", 9) != 0)
+        {
+          sscanf(str+8, "%" PRIu64 "", &bwcost);
+		      //fprintf(stderr, "Read bwcost=%" PRIu64 "\n", bwcost);
+          if((bwcostmin != 0) && (bwcost == bwcostmin))
+          {
+            //what a damn tricky feature!!!!!!!
+		        fprintf(stderr, "Activating tricky stopping feature");
+		        fprintf(stderr, " since I reached %" PRIu64 "\n", bwcostmin);
+            break;
+		      }
+	      }
 	    }
-	}
     }
+    stats_print_progress (stats, addread, 1);
 }
 
 typedef struct
@@ -491,7 +507,8 @@ read_purgedfile (typerow_t **mat, const char* filename, uint64_t nrows,
   uint64_t nread;
   if (for_msieve == 0)
   {
-    fprintf(stderr, "Reading sparse matrix from %s\n", filename);
+    printf("Reading sparse matrix from %s\n", filename);
+    fflush(stdout);
     char *fic[2] = {(char *) filename, NULL};
     replay_read_data_t tmp = (replay_read_data_t) {.mat= mat, .ncols = ncols};
     nread = filter_rels(fic, (filter_rels_callback_t) &fill_in_rows, &tmp,
@@ -821,6 +838,9 @@ main(int argc, char *argv[])
 
   /* Read number of rows and cols on first line of purged file */
   purgedfile_read_firstline (purgedname, &nrows, &ncols);
+  printf("Sparse matrix has %" PRIu64 " rows and %" PRIu64 " cols\n",
+         nrows, ncols);
+  fflush(stdout);
 
   /* Allocate memory for rows of the matrix */
   newrows = (typerow_t **) malloc (nrows * sizeof(typerow_t *));
@@ -828,9 +848,8 @@ main(int argc, char *argv[])
 
   /* Read the matrix from purgedfile */
   read_purgedfile (newrows, purgedname, nrows, ncols, for_msieve);
-  fprintf(stderr, "Read %" PRIu64 " rows from %s\n", nrows, purgedname);
-  fprintf(stderr, "The biggest index appearing in a relation is %" PRIu64 "\n",
-                  ncols);
+  printf("The biggest index appearing in a relation is %" PRIu64 "\n", ncols);
+  fflush(stdout);
 #if DEBUG >=1
   for(uint64_t i = 0; i < nrows; i++)
   {
