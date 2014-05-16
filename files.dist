@@ -714,6 +714,8 @@ utils/mpz_vector.c
 utils/memory.h
 utils/memory.c
 utils/dllist.h
+utils/stats.h
+utils/stats.c
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
