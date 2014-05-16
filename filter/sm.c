@@ -33,6 +33,8 @@ Output
 
 #include "filter_common.h"
 
+stats_data_t stats; /* struct for printing progress */
+
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
@@ -59,6 +61,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   ASSERT_ALWAYS (pairs != NULL);
   /* For each rel, read the a,b-pair and init the corresponding poly pairs[] */
   fprintf(stdout, "\n# Reading %" PRIu64 " (a,b) pairs\n", nrows);
+  fflush(stdout);
   char *fic[2] = {(char *) purgedname, NULL};
   filter_rels (fic, (filter_rels_callback_t) thread_sm, pairs,
           EARLYPARSE_NEED_AB_HEXA, NULL, NULL);
@@ -76,7 +79,10 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   rels = (sm_relset_ptr) malloc (*small_nrows * sizeof(sm_relset_t));
   ASSERT_ALWAYS (rels != NULL);
 
-  fprintf(stdout, "\n# Building relation-sets\n");
+  fprintf(stdout, "\n# Building %" PRIu64 " relation-sets\n", *small_nrows);
+  fflush(stdout);
+  stats_init (stats, stderr, nbits(*small_nrows)-5, "Computed", "relation-sets",
+              "relsets");
   for(uint64_t i = 0 ; i < *small_nrows ; i++)
   {
     ret = fscanf(ix, "%" SCNu64 "", &len_relset);
@@ -90,8 +96,11 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
      
     sm_relset_init (&rels[i], F->deg);
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
-  }
 
+    if (stats_test_progress(stats, i))
+      stats_print_progress (stats, i, 0);
+  }
+  stats_print_progress (stats, *small_nrows, 1);
   fclose_maybe_compressed(ix, indexname);
 
   for (uint64_t i = 0; i < nrows; i++)
@@ -133,7 +142,7 @@ void * thread_start(void *arg) {
   return NULL;
 }
 
-#define SM_BLOCK 500
+#define SM_BLOCK 512
 
 void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
             mpz_poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2,
@@ -178,6 +187,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   }
 
   // Main loop
+  stats_init (stats, stderr, nbits(sr)-5, "Computed", "SMs", "SMs");
   while ((i < sr) || (active_threads > 0)) {
     // Start / restart as many threads as allowed
     if ((active_threads < nt) && (i < sr)) { 
@@ -198,6 +208,10 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
     for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt)
       print_sm (out, SM[threads_head][k], nsm, F->deg);
 
+    // report
+    if (stats_test_progress(stats, out_cpt))
+      stats_print_progress (stats, out_cpt, 0);
+
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
     if (i >= sr) { 
@@ -206,6 +220,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
         threads_head = 0;
     }
   }
+  stats_print_progress (stats, sr, 1);
 
   mpz_clear(invl2);
   fclose(out);
@@ -235,11 +250,16 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
+  stats_init (stats, stderr, nbits(sr)-5, "Computed", "SMs", "SMs");
   for (uint64_t i=0; i<sr; i++) {
     mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm, F->deg);
+    // report
+    if (stats_test_progress(stats, i))
+      stats_print_progress (stats, i, 0);
   }
+  stats_print_progress (stats, sr, 1);
 
   mpz_poly_clear (SM);
   mpz_clear(invl2);
@@ -383,6 +403,7 @@ int main (int argc, char **argv)
   gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
                       "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
                       "exponent:\neps = %Zi\n", ell, ell2, eps);
+  fflush(stdout);
 
   t0 = seconds();
   rels = build_rel_sets(purgedfile, indexfile, &sr, F, ell2);
@@ -394,6 +415,7 @@ int main (int argc, char **argv)
 
   fprintf(stdout, "\n# Computing Shirokauer maps for %" PRIu64 " relations "
                   "using %d threads\n", sr, mt);
+  fflush(stdout);
 
   if (mt == 1)
     sm(outfile, rels, sr, F, eps, ell, ell2, nsm);
@@ -401,6 +423,7 @@ int main (int argc, char **argv)
     mt_sm(mt, outfile, rels, sr, F, eps, ell, ell2, nsm);
 
   fprintf(stdout, "\n# sm completed in %2.2lf seconds\n", seconds() - t0);
+  fflush(stdout);
 
   for (uint64_t i = 0; i < sr; i++)
     sm_relset_clear (&rels[i]);
