@@ -81,7 +81,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
   fprintf(stdout, "\n# Building %" PRIu64 " relation-sets\n", *small_nrows);
   fflush(stdout);
-  stats_init (stats, stderr, nbits(*small_nrows)-5, "Computed", "relation-sets",
+  stats_init (stats, stdout, nbits(*small_nrows)-5, "Computed", "relation-sets",
               "relsets");
   for(uint64_t i = 0 ; i < *small_nrows ; i++)
   {
@@ -187,7 +187,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   }
 
   // Main loop
-  stats_init (stats, stderr, nbits(sr)-5, "Computed", "SMs", "SMs");
+  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "SMs");
   while ((i < sr) || (active_threads > 0)) {
     // Start / restart as many threads as allowed
     if ((active_threads < nt) && (i < sr)) { 
@@ -250,7 +250,7 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
-  stats_init (stats, stderr, nbits(sr)-5, "Computed", "SMs", "SMs");
+  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "SMs");
   for (uint64_t i=0; i<sr; i++) {
     mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);

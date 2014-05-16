@@ -944,7 +944,7 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* {{{ main loop */
     /* will print report at 2^10, 2^11, ... 2^23 read rels and every 2^23 rels
      * after that */
-    stats_init (infostats, stderr, 23, "Read", "relations", "rels");
+    stats_init (infostats, stdout, 23, "Read", "relations", "rels");
     inflight->enter(0);
     for(size_t avail_seen = 0 ; ; ) {
         pthread_mutex_lock(rb->mx);
