@@ -45,6 +45,7 @@ stats_print_progress (stats_data_t r, uint64_t i, int end)
   const char * prefix = (end) ? "Done: " : "";
   fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f %s/s\n",
                   prefix, r->verb, i, r->name, dt, speed, r->abbrv);
+  fflush(r->out);
   if (r->log_report < r->max_log_report)
     r->log_report++;
   r->last_report = (i >> r->log_report);
@@ -64,6 +65,7 @@ stats_print_progress_with_MBs (stats_data_t r, uint64_t i, size_t nByte, int end
   const char * prefix = (end) ? "Done: " : "";
   fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f MB/s -- %.1f %s/s\n",
                   prefix, r->verb, i, r->name, dt, mb_s, speed, r->abbrv);
+  fflush(r->out);
   if (r->log_report < r->max_log_report)
     r->log_report++;
   r->last_report = (i >> r->log_report);
