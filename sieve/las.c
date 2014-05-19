@@ -390,8 +390,8 @@ void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int sid
         if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
         if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
     }
-    fprintf(las->output, " [hit jitter %.2f%%]\n",
-            100 * (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
+    fprintf(las->output, " [hit jitter %g]\n",
+            (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
     /* enable some margin in the bucket size */
     s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.07;
     free(nn);
