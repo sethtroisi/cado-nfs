@@ -607,7 +607,6 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   /* Init bit_vector to remember which relations were already used */
   bit_vector not_used;
   bit_vector_init(not_used, nrels);
-  FATAL_ERROR_CHECK (not_used->p == NULL, "Cannot allocate memory");
   bit_vector_set(not_used, 1);
 
   /* adjust the number of threads based on the number of relations */
