@@ -543,10 +543,11 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
        |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
     */
     const double skewness = si->conf->skewness;
-    if (0) {
+    const int verbose = 0;
+    if (verbose) {
         printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
-               "; a1=%" PRId64 "; b1=%" PRId64 "), skew=%f, nb_threads=%d)\n",
-               si->a0, si->b0, si->a1, si->b1, skewness, nb_threads);
+               "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
+               si->a0, si->b0, si->a1, si->b1, mpz_get_ui(si->doing->p), skewness, nb_threads);
     }
     double maxab1, maxab0;
     maxab1 = si->b1 * skewness;
@@ -580,6 +581,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
     /* Bug 15617: if we round up, we are not true to our promises */
     uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
 
+    if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", __func__, nJ);
     /* XXX No rounding if we intend to abort */
     if (nJ > 0) si->J = nJ;
     return nJ > 0;
