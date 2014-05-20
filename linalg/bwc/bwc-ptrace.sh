@@ -48,8 +48,8 @@ top=`dirname $0`/../..
 if ! [ "$bindir" ] ; then
     eval "export $buildopts"
     make -s -C $top -j 4
-    make -s -C $top -j 4 plingen_pz
-    # make -s -C $top -j 4 plingen_p_$nwords
+    make -s -C $top -j 4 plingen_p_$nwords
+    # make -s -C $top -j 4 plingen_pz
     eval `make -s -C $top show`
     bindir=$top/$build_tree/linalg/bwc
 fi
@@ -66,25 +66,38 @@ mkdir $wdir
 
 # -c 10 imposes a bound on the coefficients.
 
+# We only care about creating a binary matrix. Note though that we do
+# have the mechanism to transform a txt matrix to binary format, and to
+# create the auxiliary .rw and .cw files, too.
+
 if ! [ "$matrix" ] ; then
     $bindir/random_matrix  ${random_matrix_size} -c ${random_matrix_maxcoeff} --kright ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
-    matrix_txt=$mats/t${random_matrix_size}p.txt
-    matrix=$mats/t${random_matrix_size}p.bin
-
-    $bindir/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
-else
-    case "$matrix" in
-        *.txt)
-            matrix_txt="$matrix"
-            matrix="${matrix}.bin"
-            $bindir/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
-            ;;
-        *.bin)
-            matrix_txt="${matrix}.txt"
-            $bindir/mf_scan  --binary-in --withcoeffs --mfile $matrix --ascii-out -freq --ofile $matrix_txt
-            ;;
-    esac
+    matrix=$mats/t${random_matrix_size}p.txt
 fi
+
+case "$matrix" in
+    *.txt)
+        matrix_txt="$matrix"
+        matrix=${matrix%%txt}bin
+        rwfile=${matrix%%bin}rw.bin
+        cwfile=${matrix%%bin}cw.bin
+        if [ "$matrix" -nt "$matrix_txt" ] && [ "$rwfile" -nt "$matrix_txt" ] && [ "$cwfile" -nt "$matrix_txt" ] ; then
+            echo "Taking existing $mfile, $rwfile, $cwfile as accompanying $matrix_txt"
+        else
+            echo "Creating files $matrix, $rwfile, $cwfile from $matrix_txt"
+            $bindir/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
+        fi
+        ;;
+    *.bin)
+        rwfile=${matrix%%bin}rw.bin
+        cwfile=${matrix%%bin}cw.bin
+        if [ "$rwfile" -nt "$matrix" ] && [ "$cwfile" -nt "$matrix" ] ; then
+            echo "Taking existing $rwfile, $cwfile as accompanying $matrix"
+        else
+            $bindir/mf_scan  --binary-in --withcoeffs --mfile $matrix --binary-out --freq
+        fi
+        ;;
+esac
 
 nullspace=right
 interval=50
@@ -141,9 +154,15 @@ if [ $n -eq 1 ] ; then
     ln -s Y.0 $wdir/V0-1.0
 else
     # Otherwise prep won't work. Let's be stupid.
-    set `head -1 $matrix_txt`
-    ncols=$2
-    nbytes=$((bits_per_coeff/8 * $2))
+    ncols=$((`wc -c < $cwfile` / 4))
+    nrows=$((`wc -c < $rwfile` / 4))
+    if [ "$nullspace" = right ] ; then
+        nbytes=$((bits_per_coeff/8 * $ncols))
+    else
+        echo "Untested" >&2
+        exit 1
+        nbytes=$((bits_per_coeff/8 * $nrows))
+    fi
     j0=0
     while [ $j0 -lt $n ] ; do
         let j1=$j0+1
@@ -228,8 +247,6 @@ fi
 
 cmd=`dirname $0`/convert_magma.pl
 
-rwfile=${matrix%%bin}rw.bin
-cwfile=${matrix%%bin}cw.bin
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 
