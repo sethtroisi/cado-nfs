@@ -370,7 +370,7 @@ check_unused_rel (bit_vector not_used, log_rel_t *rels, uint64_t nrels)
       fprintf (stderr, "DEBUG: rel i=%" PRIu64 ": %u unknown logarithms: ",
                        i, rels[i].nb_unknown);
       for (weight_t k = 0; k < rels[i].nb_unknown; k++)
-        fprintf (stderr, "%" PRxid " ", rels[i].unknown[k].id);
+        fprintf (stderr, "%" PRid " ", rels[i].unknown[k].id);
       fprintf (stderr, "\n");
     }
   }
@@ -389,7 +389,7 @@ check_unknown_log (read_data_t *data, uint64_t nprimes)
 	    if (mpz_sgn(log[k]) < 0)
       {
         c++;
-        fprintf (stderr, "DEBUG: ideal %" PRxid " had weight %u but its "
+        fprintf (stderr, "DEBUG: ideal %" PRid " had weight %u but its "
                          "logarithm is unknown\n", k, weight[k]);
       }
   fprintf (stderr, "DEBUG: %" PRIu64 " more logarithms should be known\n", c);
