@@ -265,7 +265,7 @@ void matrix_read_pass(
                     rc = fread32_little(&c, 1, m_in->f);
                     if (!rc) abort_unexpected_eof();
                     if (withcoeffs) {
-                        rc = fread32_little(&w, 1, m_in->f);
+                        rc = fread32_little((uint32_t*) &coeff, 1, m_in->f);
                         if (!rc) abort_unexpected_eof();
                     }
                 }
@@ -298,7 +298,7 @@ void matrix_read_pass(
                         if (m_out->ascii) {
                             fprintf(m_out->f, " %" PRIu32, c);
                             if (withcoeffs) {
-                                fprintf(m_out->f, " %" PRId32, coeff);
+                                fprintf(m_out->f, ":%" PRId32, coeff);
                             }
                         } else {
                             rc = fwrite32_little(&c, 1, m_out->f);

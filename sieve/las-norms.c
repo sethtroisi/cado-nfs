@@ -1240,7 +1240,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
   divided by q on the special-q side.
 
   Then we reduce J so that the maximum norm in the image of the actual sieve
-  regionis no larger than this optimal maximum, times some constant fudge
+  region is no larger than this optimal maximum, times some constant fudge
   factor.
 */
 static unsigned int
