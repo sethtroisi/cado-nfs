@@ -223,7 +223,7 @@ MkzCheck(filter_matrix_t *mat)
 {
   uint64_t dj;
   int maxlevel = mat->mergelevelmax;
-  for(dj = 0; dj < mat->ncols - 0; dj++)
+  for(dj = 0; dj < mat->ncols; dj++)
   {
     if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	  {
