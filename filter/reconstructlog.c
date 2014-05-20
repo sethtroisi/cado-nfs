@@ -609,8 +609,6 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   bit_vector_init(not_used, nrels);
   FATAL_ERROR_CHECK (not_used->p == NULL, "Cannot allocate memory");
   bit_vector_set(not_used, 1);
-  if (nrels & (BV_BITS - 1))
-    not_used->p[nrels>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrels & (BV_BITS - 1))) - 1;
 
   /* adjust the number of threads based on the number of relations */
   double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
