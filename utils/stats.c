@@ -41,7 +41,7 @@ stats_print_progress (stats_data_t r, uint64_t i, int end)
   double t, dt, speed;
   t = wct_seconds();
   dt = t - r->t0;
-  speed = dt > 0.01 ? i/dt : 0;
+  speed = dt > 0.01 ? i/dt : INFINITY;
   const char * prefix = (end) ? "Done: " : "";
   fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f %s/s\n",
                   prefix, r->verb, i, r->name, dt, speed, r->abbrv);
@@ -60,8 +60,8 @@ stats_print_progress_with_MBs (stats_data_t r, uint64_t i, size_t nByte, int end
   double t, dt, speed, mb_s;
   t = wct_seconds();
   dt = t - r->t0;
-  speed = dt > 0.01 ? i/dt : 0;
-  mb_s = dt > 0.01 ? (nByte/dt * 1.0e-6) : 0;
+  speed = dt > 0.01 ? i/dt : INFINITY;
+  mb_s = dt > 0.01 ? (nByte/dt * 1.0e-6) : INFINITY;
   const char * prefix = (end) ? "Done: " : "";
   fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f MB/s -- %.1f %s/s\n",
                   prefix, r->verb, i, r->name, dt, mb_s, speed, r->abbrv);
