@@ -819,7 +819,7 @@ uint64_t filter_rels2_inner(char ** input_files,
         timingstats_dict_ptr stats)
 {
     stats_data_t infostats;  /* for displaying progress */
-    uint64_t nrels = 0;
+    uint64_t nrels = 0, nactive = 0;
     size_t nB = 0;
 
     /* {{{ setup and start the producer thread (for the first pipe) */
@@ -972,6 +972,7 @@ uint64_t filter_rels2_inner(char ** input_files,
                     slot->num = relnum;
                     (*earlyparser)(slot, rb);
                     inflight->complete(0, slot);
+                    nactive++;
                 }
             }
             /* skip the newline byte as well */
@@ -980,8 +981,8 @@ uint64_t filter_rels2_inner(char ** input_files,
             ringbuf_skip_get(rb, nl);
             avail_seen -= nl;
             avail_offset += nl;
-            if (stats_test_progress(infostats, nrels))
-              stats_print_progress_with_MBs (infostats, nrels, nB, 0);
+            if (stats_test_progress(infostats, nactive))
+              stats_print_progress_with_MBs (infostats, nactive, nB, 0);
         }
     }
     inflight->drain();
@@ -999,13 +1000,13 @@ uint64_t filter_rels2_inner(char ** input_files,
 
     /* NOTE: the inflight dtor is called automatically */
 
-    stats_print_progress_with_MBs (infostats, nrels, nB, 1);
+    stats_print_progress_with_MBs (infostats, nactive, nB, 1);
 
     /* clean producer stuff */
     ringbuf_clear(rb);
     filelist_clear(commands);
 
-    return nrels;
+    return nactive;
 }
 
 uint64_t filter_rels2(char ** input_files,
