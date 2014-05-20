@@ -11,10 +11,10 @@
 #endif
 #define DEBUG 0
 
-unsigned int nbsm = 0; /* number of SM that should be used. Must be 0 for FFS */
+stats_data_t stats; /* struct for printing progress */
 
-
-/* used as mutual exclusion lock for the array of log */
+/*********************** mutex for multi threaded version ********************/
+/* used as mutual exclusion lock for reading the status of logarithms */
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static void
 mutex_lock(pthread_mutex_t *lock)
@@ -28,30 +28,7 @@ mutex_unlock(pthread_mutex_t *lock)
   pthread_mutex_unlock (lock);
 }
 
-/* 2 functions to compute a <- (a + l*e) mod q (e is either int32_t or mpz_t) */
-static inline void
-mpz_add_log_mod_si (mpz_t a, mpz_t l, int32_t e, mpz_t q)
-{
-  if (e > 0)
-    mpz_addmul_ui (a, l, e);
-  else
-    mpz_submul_ui (a, l, -e);
-  mpz_mod (a, a, q);
-}
-
-static inline void
-mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
-{
-  mpz_t t;
-  mpz_init(t);
-  mpz_mul(t, l, e);  // t <- l*e
-  mpz_mod(t, t, q);  // t <- l*e mod q
-  mpz_add(t, a, t);  // t <- l*e mod q + a
-  mpz_mod (a, t, q); // a <- (a+l*e) mod q
-  mpz_clear(t);
-}
-
-/* Structure for a relation */
+/**** Relations structure used for computing the logarithms from the rels ****/
 typedef struct
 {
   weight_t nb_unknown;
@@ -84,38 +61,154 @@ log_rel_free (log_rel_t *rels, uint64_t nrels)
   free(rels);
 }
 
-/* Structure containing the data for the reading of a relation file */
+/***** Light relations structure (for constructing the dependancy graph) *****/
+typedef struct
+{
+  weight_t len;
+  index_t *needed;
+} light_rel;
+
+typedef light_rel *light_rels_t;
+
+/* Init a light_rels_t of size nrels */
+static light_rels_t
+light_rels_init (uint64_t nrels)
+{
+  light_rels_t rels;
+  rels = (light_rels_t) malloc (nrels * sizeof (light_rel));
+  FATAL_ERROR_CHECK(rels == NULL, "Cannot allocate memory");
+  memset(rels, 0, nrels * sizeof(light_rel));
+  return rels;
+}
+
+/* Free what is allocated by light_rel_init (and during reading for the
+ * "unknown" array in the light_rel structure */
+static void
+light_rels_free (light_rels_t rels)
+{
+  my_malloc_free_all();
+  free(rels);
+}
+
+/****************** Struct for the tab of log (mpz_t *) *********************/
+struct logtab_struct
+{
+  uint64_t nprimes;
+  uint64_t nknown;
+  unsigned int nbsm;
+  mpz_ptr q;
+  mpz_t *tab;
+};
+
+typedef struct logtab_struct logtab_t[1];
+typedef struct logtab_struct * logtab_ptr;
+
+static void
+logtab_init (logtab_t log, uint64_t nprimes, unsigned int nbsm, mpz_t q)
+{
+  log->tab = NULL;
+  uint64_t size = nprimes + nbsm;
+  size_t q_nbits = mpz_size(q) * GMP_LIMB_BITS;
+
+  log->nprimes = nprimes;
+  log->nknown = 0;
+  log->nbsm = nbsm;
+  log->q = q;
+  log->tab = (mpz_t *) malloc (size * sizeof(mpz_t));
+  FATAL_ERROR_CHECK(log->tab == NULL, "Cannot allocate memory");
+  for (uint64_t i = 0; i < size; i++)
+  {
+    mpz_init2 (log->tab[i], q_nbits);
+    mpz_set_si(log->tab[i], -1);
+  }
+}
+
+static void
+logtab_insert (logtab_t log, index_t h, mpz_t logvalue)
+{
+  if (mpz_cmp_ui (logvalue, 0) < 0)
+  {
+    fprintf (stderr, "Warning, log is negative for h = %" PRid "\n", h);
+    mpz_mod (logvalue, logvalue, log->q);
+  }
+  else if (mpz_cmp (logvalue, log->q) >= 0)
+  {
+    fprintf (stderr, "Warning, log >= q for h = %" PRid "\n", h);
+    mpz_mod (logvalue, logvalue, log->q);
+  }
+  if (mpz_cmp_ui (logvalue, 0) == 0)
+    fprintf (stderr, "Warning, log is zero for h = %" PRid "\n", h);
+
+  if (mpz_sgn (log->tab[h]) >= 0) //already known
+  {
+    ASSERT_ALWAYS (mpz_cmp (log->tab[h], logvalue) == 0);
+  }
+  else
+  {
+    mpz_set (log->tab[h], logvalue);
+    if (h < log->nprimes) // log of SM columns are not taken into account
+      log->nknown++;
+  }
+}
+
+static void
+logtab_free (logtab_t log)
+{
+  uint64_t size = log->nprimes + log->nbsm;
+  for (uint64_t i = 0; i < size; i++)
+    mpz_clear (log->tab[i]);
+  free (log->tab);
+}
+
+/************ Struct used for reading rels files with process_rels ***********/
 typedef struct
 {
   log_rel_t *rels;
-  int32_t *w;
-  mpz_t *log;
-  mpz_ptr q;
-  uint64_t nideals;
-
+  logtab_ptr log;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
-read_data_init (read_data_t *data, mpz_t *log, mpz_t q, uint64_t nprimes,
-                uint64_t nrels)
+read_data_init (read_data_t *data, logtab_t log, uint64_t nrels)
 {
-  data->w = (int32_t *) malloc (nprimes * sizeof(int32_t));
-  FATAL_ERROR_CHECK (data->w == NULL, "Cannot allocate memory");
-  memset(data->w, 0, nprimes * sizeof(int32_t));
   data->rels = log_rel_init(nrels);
   data->log = log;
-  data->q = q;
-  data->nideals = 0;
 }
 
 static void
 read_data_free (read_data_t *data, uint64_t nrels)
 {
-  free(data->w);
   log_rel_free (data->rels, nrels);
 }
+
+/***************** utils functions for adding logarithms *********************/
+/* Compute a <- (a + l*e) mod q  , with e being a int32_t */
+static inline void
+mpz_add_log_mod_si (mpz_t a, mpz_t l, int32_t e, mpz_t q)
+{
+  if (e > 0)
+    mpz_addmul_ui (a, l, e);
+  else
+    mpz_submul_ui (a, l, -e);
+  mpz_mod (a, a, q);
+}
+
+/* Compute a <- (a + l*e) mod q  , with e being a mpz_t */
+static inline void
+mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
+{
+  mpz_t t;
+  mpz_init(t);
+  mpz_mul(t, l, e);  // t <- l*e
+  mpz_mod(t, t, q);  // t <- l*e mod q
+  mpz_add(t, a, t);  // t <- l*e mod q + a
+  mpz_mod (a, t, q); // a <- (a+l*e) mod q
+  mpz_clear(t);
+}
+
+/************************ Handling of the SMs *******************************/
+unsigned int nbsm = 0; /* number of SM that must be used. Must be 0 for FFS */
 
 #ifndef FOR_FFS /* Not needed for FFS */
 mpz_t smexp; /* exponent for SM */
@@ -127,7 +220,7 @@ mpz_t *smlog;
 /* Init the data needed for SM computation, given the polynomial,
  * the group order and the exponent */
 static void
-sm_data_init (mpz_t q, mpz_t *log, uint64_t nprimes)
+sm_data_init (mpz_t q, logtab_t log)
 {
   mpz_init(q2);
   mpz_mul(q2, q, q);
@@ -135,7 +228,7 @@ sm_data_init (mpz_t q, mpz_t *log, uint64_t nprimes)
   mpz_init(invq2);
   barrett_init(invq2, q2);
 
-  smlog = &(log[nprimes]);
+  smlog = &(log->tab[log->nprimes]);
 }
 
 static void
@@ -161,7 +254,7 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
   mpz_poly_clear(SMres);
 }
 
-/* Callback function called by filter_rels in compute_log_from_relfile */
+/* Callback function called by filter_rels in compute_log_from_rels */
 void *
 thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 {
@@ -169,160 +262,14 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   log_rel_t *lrel = &(data->rels[rel->num]);
 
   if (nbsm > 0)
-    add_sm_contribution (lrel->log_known_part, rel->a, rel->b, data->q);
+    add_sm_contribution (lrel->log_known_part, rel->a, rel->b, data->log->q);
 
   return NULL;
 }
 #endif /* ifndef FOR_FFS */
 
-/* Read the index file produced by replay (needed to read the logarithms)*/
-static index_t *
-read_index (const char *filename, uint64_t *ncols, uint64_t nprimes)
-{
-  FILE *f = NULL;
-  uint64_t nbread = 0, i, j;
-  index_t *tab = NULL;
-
-  double tt = seconds();
-  printf ("# Reading ideals file from %s\n", filename);
-  fflush(stdout);
-  f = fopen_maybe_compressed (filename, "r");
-  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
-
-  if (fscanf (f, "# %" SCNu64 "\n", ncols) != 1)
-  {
-    fprintf(stderr, "Error while reading first line of %s\n", filename);
-    exit(EXIT_FAILURE);
-  }
-
-  tab = (index_t *) malloc (*ncols * sizeof (index_t));
-  FATAL_ERROR_CHECK(tab == NULL, "Cannot allocate memory");
-
-  while (fscanf (f, "%" SCNu64 " %" SCNx64 "\n", &i, &j) == 2)
-  {
-    FATAL_ERROR_CHECK (i >= *ncols, "Too big value of column number");
-    FATAL_ERROR_CHECK (j >= nprimes, "Too big value of index");
-    tab[i] = j;
-    nbread++;
-  }
-
-  FATAL_ERROR_CHECK (nbread != *ncols, "Not enough or too many index read");
-  fclose_maybe_compressed (f, filename);
-  printf ("# Reading %" PRIu64 " index took %.1fs\n", nbread, seconds() - tt);
-  return tab;
-}
-
-/* Read the logarithms computed by the linear algebra */
-static mpz_t *
-read_log (index_t *mat_renum, const char *filename, mpz_t q, unsigned int nbsm,
-          uint64_t ncols, uint64_t nprimes)
-{
-  uint64_t i;
-  mpz_t tmp_log, *log = NULL;
-  FILE *f = NULL;
-
-  double tt = seconds();
-  printf ("# Reading logarithms computed by LA from %s\n", filename);
-  fflush(stdout);
-  f = fopen_maybe_compressed (filename, "r");
-  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
-
-  log = (mpz_t *) malloc ((nprimes + nbsm) * sizeof(mpz_t));
-  FATAL_ERROR_CHECK(log == NULL, "Cannot allocate memory");
-  size_t q_nbits = mpz_size(q) * GMP_LIMB_BITS;
-  for (i = 0; i < nprimes + nbsm; i++)
-  {
-    mpz_init2 (log[i], q_nbits);
-    mpz_set_si(log[i], -1);
-  }
-
-  mpz_init (tmp_log);
-  i = 0;
-  while (i < ncols + nbsm)
-  {
-    int ret = gmp_fscanf (f, "%Zd\n", tmp_log);
-    FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
-
-    if (mpz_cmp_ui (tmp_log, 0) < 0)
-    {
-      fprintf (stderr, "Warning, log is negative for cols %" PRIu64 "\n", i);
-      mpz_mod (tmp_log, tmp_log, q);
-    }
-    else if (mpz_cmp (tmp_log, q) >= 0)
-    {
-      fprintf (stderr, "Warning, log >= q for cols %" PRIu64 "\n", i);
-      mpz_mod (tmp_log, tmp_log, q);
-    }
-    if (mpz_cmp_ui (tmp_log, 0) == 0)
-      fprintf (stderr, "Warning, log is zero for cols %" PRIu64 "\n", i);
-
-    if (i < ncols)
-      mpz_set (log[mat_renum[i]], tmp_log);
-    else // log that corresponds to a SM columns in the matrix
-      mpz_set (log[nprimes+(i-ncols)], tmp_log);
-    i++;
-  }
-
-  while (gmp_fscanf (f, "%Zd\n", tmp_log) == 1)
-    printf ("Warning, line %" PRIu64 " is ignored\n", i++);
-
-  printf ("# Reading %" PRIu64 " logs took %.1fs\n", ncols, seconds() - tt);
-  if (nbsm)
-    printf ("# logs for %u SM columns were also read\n", nbsm);
-  mpz_clear (tmp_log);
-  fclose_maybe_compressed (f, filename);
-  return log;
-}
-
-/* Write values of the known logarithms. Return the number of missing values */
-static uint64_t
-write_log (const char *filename, mpz_t *log, mpz_t q, renumber_t tab,
-           cado_poly poly, uint64_t known_log)
-{
-  uint64_t i, missing = 0;
-  double tt = seconds();
-  FILE *f = NULL;
-
-  printf ("# Opening %s for writing logarithms\n", filename);
-  fflush(stdout);
-  f = fopen_maybe_compressed (filename, "w");
-  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for writing");
-
-  for (i = 0; i < tab->size; i++)
-  {
-	  if (mpz_sgn(log[i]) < 0) // we do not know the log if this ideal
-      missing++;
-    else if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
-    {
-      ASSERT_ALWAYS (mpz_cmp (log[i], q) < 0);
-      if (i == 0 && tab->add_full_col)
-        gmp_fprintf (f, "%" PRid " added column %Zd\n", i, log[i]);
-      else
-        gmp_fprintf (f, "%" PRid " bad ideals %Zd\n", i, log[i]);
-    }
-    else
-    {
-      ASSERT_ALWAYS (mpz_cmp (log[i], q) < 0);
-      p_r_values_t p, r;
-      int side;
-      renumber_get_p_r_from_index (tab, &p, &r, &side, i, poly);
-      if (side != tab->rat)
-        gmp_fprintf (f, "%" PRid " %" PRpr " %d %" PRpr " %Zd\n", i, p, side,
-                                                                  r, log[i]);
-      else
-        gmp_fprintf (f, "%" PRid " %" PRpr " %d rat %Zd\n", i, p, side, log[i]);
-    }
-  }
-
-  printf ("# Writing logarithms took %.1fs\n", seconds()-tt);
-  printf ("# %" PRIu64 " logarithms of elements of the factor base are known, "
-          "%" PRIu64 " are missing.\n", known_log, missing);
-  fclose_maybe_compressed (f, filename);
-  ASSERT_ALWAYS (known_log + missing == tab->size);
-  return missing;
-}
-
-/* Callback function called by filter_rels in compute_log_from_relfile */
+/****************** Computation of missing logarithms ************************/
+/* Callback function called by filter_rels in compute_log_from_rels */
 void *
 thread_insert (void * context_data, earlyparsed_relation_ptr rel)
 {
@@ -336,16 +283,9 @@ thread_insert (void * context_data, earlyparsed_relation_ptr rel)
     index_t h = rel->primes[i].h;
     exponent_t e = rel->primes[i].e;
 
-    if (data->w[h] == 0)
-    {
-      data->w[h] = 1;
-      data->nideals++;
-    }
-    else if (data->w[h] != SMAX(int32_t))
-      data->w[h]++;
-
-	  if (mpz_sgn(data->log[h]) >= 0)
-      mpz_add_log_mod_si (lrel->log_known_part, data->log[h], e, data->q);
+	  if (mpz_sgn(data->log->tab[h]) >= 0)
+      mpz_add_log_mod_si (lrel->log_known_part, data->log->tab[h], e,
+                          data->log->q);
     else
       buf[next++] = (ideal_merge_t) {.id = h, .e = e};
   }
@@ -356,45 +296,6 @@ thread_insert (void * context_data, earlyparsed_relation_ptr rel)
 
   return NULL;
 }
-
-/* Debug functions */
-#if DEBUG == 1
-/* Debug functions */ /* List all unused relations.*/
-static void
-check_unused_rel (bit_vector not_used, log_rel_t *rels, uint64_t nrels)
-{
-  for (uint64_t i = 0; i < nrels; i++)
-  {
-    if (bit_vector_getbit(not_used, (size_t) i))
-    {
-      fprintf (stderr, "DEBUG: rel i=%" PRIu64 ": %u unknown logarithms: ",
-                       i, rels[i].nb_unknown);
-      for (weight_t k = 0; k < rels[i].nb_unknown; k++)
-        fprintf (stderr, "%" PRid " ", rels[i].unknown[k].id);
-      fprintf (stderr, "\n");
-    }
-  }
-}
-
-/* If an ideal had a non zero weight, it logarithm should be known at the end of
- * compute_log_from_relfile */
-static void
-check_unknown_log (read_data_t *data, uint64_t nprimes)
-{
-  uint64_t c = 0;
-  int32_t *weight = data->w;
-  mpz_t *log = data->log;
-  for (index_t k = 0; k < nprimes; k++)
-    if (weight[k])
-	    if (mpz_sgn(log[k]) < 0)
-      {
-        c++;
-        fprintf (stderr, "DEBUG: ideal %" PRid " had weight %u but its "
-                         "logarithm is unknown\n", k, weight[k]);
-      }
-  fprintf (stderr, "DEBUG: %" PRIu64 " more logarithms should be known\n", c);
-}
-#endif
 
 /* Return the number of unknown logarithms in the relation.
  * rels[i].nb_unknown may not be up-to-date (can only be greater than the actual
@@ -408,7 +309,7 @@ nb_unknown_log (read_data_t *data, uint64_t i)
   for (j = 0, k = 0; k < len; k++)
   {
     mutex_lock (&lock);
-    int sgn = mpz_sgn(data->log[p[k].id]);
+    int sgn = mpz_sgn(data->log->tab[p[k].id]);
     mutex_unlock (&lock);
 
 	  if (sgn < 0) // we do not know the log if this ideal
@@ -418,8 +319,8 @@ nb_unknown_log (read_data_t *data, uint64_t i)
       j++;
     }
     else // We know this log, add it to log_know_part
-      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log[p[k].id],
-                          p[k].e, data->q);
+      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log->tab[p[k].id],
+                          p[k].e, data->log->q);
   }
 
   data->rels[i].nb_unknown = j;
@@ -462,8 +363,8 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
 /* Compute all missing logarithms for relations in [start,end[.
  * Return the number of computed logarithms */
 static uint64_t
-do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
-                     uint64_t end)
+log_do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
+                         uint64_t end)
 {
   uint64_t i, computed = 0;
 
@@ -486,7 +387,8 @@ do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
         {
           ideal_merge_t ideal = data->rels[i].unknown[0];
           computed +=
-             compute_missing_log (data->log[ideal.id], vlog, ideal.e, data->q);
+             compute_missing_log (data->log->tab[ideal.id], vlog, ideal.e,
+                                  data->log->q);
         }
       }
     }
@@ -495,44 +397,220 @@ do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
   return computed;
 }
 
-/* Compute all missing logarithms possible. Run through all the relations once.
- * Mono thread version
- * Return the number of computed logarithms */
-static uint64_t
-do_one_iter_mono (read_data_t *data, bit_vector not_used, uint64_t nrels)
+#define log_do_one_iter_mono(d, bv, n) log_do_one_part_of_iter (d, bv, 0, n)
+
+/************************** Dependancy graph *********************************/
+typedef struct
 {
-  return do_one_part_of_iter (data, not_used, 0, nrels);
+  uint8_t state;
+  uint64_t i;
+} node_dep_t;
+
+typedef struct
+{
+  uint64_t size;
+  node_dep_t *tab;
+} graph_dep_t;
+
+/* Macro for state of node_dep_t. UNKNOWN must be 0. */
+#define NODE_DEP_LOG_UNKNOWN 0
+#define NODE_DEP_LOG_KNOWN_FROM_LOGFILE 1
+#define NODE_DEP_LOG_RECONSTRUCTED 2
+
+#define GRAPH_DEP_IS_LOG_UNKNOWN(G, h) (G.tab[h].state == NODE_DEP_LOG_UNKNOWN)
+
+graph_dep_t
+graph_dep_init (uint64_t size)
+{
+  node_dep_t *tab = NULL;
+  tab = (node_dep_t *) malloc (sizeof(node_dep_t) * size);
+  FATAL_ERROR_CHECK(tab == NULL, "Cannot allocate memory");
+  memset (tab, 0, sizeof(node_dep_t) * size);
+  return (graph_dep_t) {.size = size, .tab = tab};
 }
 
-/* Code for multi thread version */
+void
+graph_dep_clear (graph_dep_t G)
+{
+  free(G.tab);
+}
+
+/* Set G[h].state accordingly to log[h] values */
+void
+graph_dep_set_log_already_known (graph_dep_t G, logtab_t log)
+{
+  for (uint64_t h = 0; h < log->nprimes; h++)
+  {
+    if (mpz_sgn(log->tab[h]) >= 0)
+      G.tab[h].state = NODE_DEP_LOG_KNOWN_FROM_LOGFILE;
+  }
+}
+
+uint64_t
+graph_dep_needed_rels_from_index (graph_dep_t G, index_t h, light_rels_t rels,
+                                  bit_vector needed_rels)
+{
+  if (G.tab[h].state == NODE_DEP_LOG_UNKNOWN)
+  {
+    fprintf (stderr, "Error: logarithms of %" PRid" cannot be reconstructed "
+                     "from this set of relations. Abort!\n", h);
+    abort();
+  }
+  else if (G.tab[h].state == NODE_DEP_LOG_KNOWN_FROM_LOGFILE)
+  {
+    /* We know the wanted logarithm from linear algebra, no new relation is
+     * necessary */
+#if DEBUG >= 1
+    fprintf (stderr, "DEBUG: h = %" PRid " is known from logfile\n", h);
+#endif
+    return 0;
+  }
+  else
+  {
+    uint64_t relnum = G.tab[h].i;
+    bit_vector_setbit (needed_rels, relnum);
+    uint64_t nadded = 1;
+    weight_t nb_needed = rels[relnum].len;
+
+#if DEBUG >= 1
+    fprintf (stderr, "DEBUG: h = %" PRid " can be reconstructed\n", h);
+    fprintf (stderr, "DEBUG:     relation %" PRIu64 " added\n", relnum);
+    fprintf (stderr, "DEBUG:     depends of %u others logs\n", nb_needed-1);
+#endif
+
+    for (weight_t j = 0; j < nb_needed; j++)
+    {
+      index_t hh = rels[relnum].needed[j];
+      if (!bit_vector_getbit (needed_rels, G.tab[hh].i))
+      {
+        nadded += graph_dep_needed_rels_from_index (G, hh, rels, needed_rels);
+      }
+    }
+    return nadded;
+  }
+}
+
+/* Structure containing the data necessary for reading rels for dep. graph */
+typedef struct
+{
+  light_rels_t rels;
+  graph_dep_t G;
+} dep_read_data_t;
+
+/* Callback function called by filter_rels in compute_needed_rels */
+void *
+dep_thread_insert (void * context_data, earlyparsed_relation_ptr rel)
+{
+  dep_read_data_t *data = (dep_read_data_t *) context_data;
+  light_rels_t lrel = &(data->rels[rel->num]);
+  unsigned int next = 0;
+  index_t buf[REL_MAX_SIZE];
+
+  for (unsigned int i = 0; i < rel->nb; i++)
+  {
+    index_t h = rel->primes[i].h;
+	  if (GRAPH_DEP_IS_LOG_UNKNOWN(data->G, h))
+      buf[next++] = h;
+  }
+
+  lrel->needed = index_my_malloc (next);
+  lrel->len = next;
+  memcpy(lrel->needed, buf, next * sizeof(ideal_merge_t));
+
+  return NULL;
+}
+
+/* Return the number of unknown logarithms in the relation and put in h the last
+ * unknown logarithm of the relations (usefull when the number of unknown
+ * logarithms is 1) */
+static inline weight_t
+dep_nb_unknown_log (dep_read_data_t *data, uint64_t i, index_t *h)
+{
+  weight_t k, nb;
+  index_t *p = data->rels[i].needed;
+
+  for (nb = 0, k = 0; k < data->rels[i].len; k++)
+  {
+    mutex_lock (&lock);
+    int unknow = GRAPH_DEP_IS_LOG_UNKNOWN (data->G, p[k]);
+    mutex_unlock (&lock);
+
+	  if (unknow) // we do not know the log if this ideal
+    {
+      nb++;
+      *h = p[k];
+    }
+  }
+  return nb;
+}
+
+/* Compute all dependancies for relations in [start,end[.
+ * Return the number of dependancies found */
+static uint64_t
+dep_do_one_part_of_iter (dep_read_data_t *data, bit_vector not_used,
+                         uint64_t start, uint64_t end)
+{
+  uint64_t i, computed = 0;
+
+  for (i = start; i < end; i++)
+  {
+    if (bit_vector_getbit(not_used, (size_t) i))
+    {
+      index_t h;
+      weight_t nb = dep_nb_unknown_log(data, i, &h);
+      if (nb <= 1)
+      {
+        bit_vector_clearbit(not_used, (size_t) i);
+        if (nb == 1)
+        {
+          data->G.tab[h].state = NODE_DEP_LOG_RECONSTRUCTED;
+          data->G.tab[h].i = i;
+          computed++;
+        }
+      }
+    }
+  }
+
+  return computed;
+}
+
+#define dep_do_one_iter_mono(d, bv, n) dep_do_one_part_of_iter (d, bv, 0, n)
+
+/******************** Code for multi thread version **************************/
 #define SIZE_BLOCK 1024
 
 typedef struct {
-  read_data_t *data;
+  void *data;
   bit_vector_ptr not_used;
   uint64_t offset;
   uint64_t nb;
   uint64_t computed;
+  int version; /* 0 means call dep_* , 1 means call log_* */
 } thread_info;
 
 void * thread_start(void *arg)
 {
   thread_info *ti = (thread_info *) arg;
-  read_data_t *data = ti->data;
   bit_vector_ptr not_used = ti->not_used;
   uint64_t start = ti->offset;
   uint64_t end = start + ti->nb;
 
-  ti->computed = do_one_part_of_iter (data, not_used, start, end);
-
+  if (ti->version == 0)
+  {
+    dep_read_data_t *data = (dep_read_data_t *) ti->data;
+    ti->computed = dep_do_one_part_of_iter (data, not_used, start, end);
+  }
+  else
+  {
+    read_data_t *data = (read_data_t *) ti->data;
+    ti->computed = log_do_one_part_of_iter (data, not_used, start, end);
+  }
   return NULL;
 }
 
-/* Compute all missing logarithms possible. Run through all the relations once.
- * Multi thread version
- * Return the number of computed logarithms */
 static uint64_t
-do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
+do_one_iter_mt (void *data, bit_vector not_used, int nt, uint64_t nrels,
+                int version)
 {
   // We'll use a rotating buffer of thread id.
   pthread_t *threads;
@@ -551,6 +629,7 @@ do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
   {
     tis[i].data = data;
     tis[i].not_used = not_used;
+    tis[i].version = version;
     // offset and nb must be adjusted.
   }
 
@@ -591,26 +670,234 @@ do_one_iter_mt (read_data_t *data, bit_vector not_used, int nt, uint64_t nrels)
   return computed;
 }
 
+/* Compute all missing logarithms possible. Run through all the relations once.
+ * Multi thread version
+ * Return the number of computed logarithms */
+static inline uint64_t
+log_do_one_iter_mt (read_data_t *d, bit_vector bv, int nt, uint64_t nrels)
+{
+  return do_one_iter_mt ((void *) d, bv, nt, nrels, 1);
+}
 
+/* Compute all missing logarithms possible. Run through all the relations once.
+ * Multi thread version
+ * Return the number of computed logarithms */
+static inline uint64_t
+dep_do_one_iter_mt (dep_read_data_t *d, bit_vector bv, int nt, uint64_t nrels)
+{
+  return do_one_iter_mt ((void *) d, bv, nt, nrels, 0);
+}
+
+/***************** Important functions called by main ************************/
+/* Read the logarithms computed by the linear algebra */
+static void
+read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
+{
+  uint64_t i, ncols, col;
+  index_t h;
+  mpz_t tmp_log;
+  FILE *flog = NULL, *fid = NULL;
+
+  printf ("# Reading logarithms in LA format from %s\n", logfile);
+  printf ("# Reading links between matrix columns and ideals from %s\n",
+                                                                idealsfile);
+  fflush(stdout);
+  flog = fopen_maybe_compressed (logfile, "r");
+  FATAL_ERROR_CHECK(flog == NULL, "Cannot open file for reading logarithms");
+  fid = fopen_maybe_compressed (idealsfile, "r");
+  FATAL_ERROR_CHECK(flog == NULL, "Cannot open ideals file");
+
+  if (fscanf (fid, "# %" SCNu64 "\n", &ncols) != 1)
+  {
+    fprintf(stderr, "Error while reading first line of %s\n", idealsfile);
+    abort();
+  }
+
+  mpz_init (tmp_log);
+  i = 0;
+  stats_init (stats, stdout, nbits(ncols)-5, "Read", "logarithms", "logs");
+  while (fscanf (fid, "%" SCNu64 " %" PRid "\n", &col, &h) == 2)
+  {
+    FATAL_ERROR_CHECK (col >= ncols, "Too big value of column number");
+    FATAL_ERROR_CHECK (h >= log->nprimes, "Too big value of index");
+
+    int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
+    FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
+
+    ASSERT_ALWAYS (col == i);
+    logtab_insert (log, h, tmp_log);
+    i++;
+    if (stats_test_progress (stats, i))
+      stats_print_progress (stats, i, 0);
+  }
+  stats_print_progress (stats, i, 1);
+  ASSERT_ALWAYS (feof(fid));
+  ASSERT_ALWAYS (i == ncols);
+
+  for (unsigned int nsm = 0; nsm < nbsm; nsm++)
+  {
+    int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
+    FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
+    logtab_insert (log, log->nprimes+nsm, tmp_log);
+  }
+
+  while (gmp_fscanf (flog, "%Zd\n", tmp_log) == 1)
+    printf ("Warning, line %" PRIu64 " is ignored\n", i++);
+  ASSERT_ALWAYS (feof(flog));
+
+  if (nbsm)
+    printf ("# Logarithms for %u SM columns were also read\n", nbsm);
+  mpz_clear (tmp_log);
+  fclose_maybe_compressed (flog, logfile);
+  fclose_maybe_compressed (fid, idealsfile);
+}
+
+/* Read the logarithms in output format of reconstructlog */
+static void
+read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
+                             const char *filename)
+{
+  uint64_t nread = 0;
+  index_t h;
+  mpz_t tmp_log;
+  FILE *f = NULL;
+  int ret;
+
+  printf ("# Reading logarithms in reconstruct format from %s\n", filename);
+  fflush(stdout);
+  f = fopen_maybe_compressed (filename, "r");
+  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
+
+  mpz_init (tmp_log);
+  stats_init (stats, stdout, nbits(renumb->size)-5, "Read", "logarithms", "logs");
+  if (renumb->add_full_col)
+  {
+    ret = gmp_fscanf (f, "%" SCNid " added column %Zd\n", &h, tmp_log);
+    ASSERT_ALWAYS (ret == 2 && h == 0);
+    nread++;
+    logtab_insert (log, h, tmp_log);
+  }
+  for (int i = 0; i < renumb->bad_ideals.n; i++)
+  {
+    for (int k = 0; k < renumb->bad_ideals.nb[i]; k++)
+    {
+      ret = gmp_fscanf (f, "%" SCNid " bad ideals %Zd\n", &h, tmp_log);
+      ASSERT_ALWAYS (ret == 2);
+      nread++;
+      logtab_insert (log, h, tmp_log);
+    }
+  }
+  while (gmp_fscanf (f, "%" SCNid " %*" SCNpr " %*d %*s %Zd\n", &h, tmp_log)
+          == 2)
+  {
+    nread++;
+    logtab_insert (log, h, tmp_log);
+    if (stats_test_progress (stats, nread))
+      stats_print_progress (stats, nread, 0);
+  }
+  stats_print_progress (stats, nread, 1);
+
+  for (unsigned int nsm = 0; nsm < log->nbsm; nsm++)
+  {
+    unsigned int n;
+    if (nsm == 0) /* h was already red by previous gmp_fscanf */
+    {
+      ret = gmp_fscanf (f, "SM col %u %Zd\n", &n, tmp_log);
+      ASSERT_ALWAYS (ret == 2);
+    }
+    else
+    {
+      ret = gmp_fscanf (f, "%" SCNid " SM col %u %Zd\n", &h, &n, tmp_log);
+      ASSERT_ALWAYS (ret == 3);
+    }
+    ASSERT_ALWAYS (n == nsm);
+    ASSERT_ALWAYS (h == (index_t) nsm + log->nprimes);
+    logtab_insert (log, h, tmp_log);
+  }
+  ASSERT_ALWAYS (feof(f));
+
+  if (nbsm)
+    printf ("# Logarithms for %u SM columns were also read\n", nbsm);
+  mpz_clear (tmp_log);
+  fclose_maybe_compressed (f, filename);
+}
+
+/* Write values of the known logarithms. */
+static void
+write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
+{
+  uint64_t i, missing = 0;
+  FILE *f = NULL;
+
+  printf ("# Opening %s for writing logarithms\n", filename);
+  fflush(stdout);
+  f = fopen_maybe_compressed (filename, "w");
+  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for writing");
+
+  stats_init (stats, stdout, nbits(tab->size)-5, "Wrote", "logarithms", "logs");
+  for (i = 0; i < tab->size; i++)
+  {
+	  if (mpz_sgn(log->tab[i]) < 0) // we do not know the log if this ideal
+      missing++;
+    else if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
+    {
+      ASSERT_ALWAYS (mpz_cmp (log->tab[i], log->q) < 0);
+      if (i == 0 && tab->add_full_col)
+        gmp_fprintf (f, "%" PRid " added column %Zd\n", i, log->tab[i]);
+      else
+        gmp_fprintf (f, "%" PRid " bad ideals %Zd\n", i, log->tab[i]);
+    }
+    else
+    {
+      ASSERT_ALWAYS (mpz_cmp (log->tab[i], log->q) < 0);
+      p_r_values_t p, r;
+      int side;
+      renumber_get_p_r_from_index (tab, &p, &r, &side, i, poly);
+      if (side != tab->rat)
+        gmp_fprintf (f, "%" PRid " %" PRpr " %d %" PRpr " %Zd\n", i, p, side,
+                                                               r, log->tab[i]);
+      else
+        gmp_fprintf (f, "%" PRid " %" PRpr " %d rat %Zd\n", i, p, side,
+                                                                  log->tab[i]);
+    }
+    if (stats_test_progress (stats, i))
+      stats_print_progress (stats, i, 0);
+  }
+  stats_print_progress (stats, tab->size, 1);
+  for (unsigned int nsm = 0, i = tab->size; nsm < log->nbsm; nsm++)
+  {
+    ASSERT_ALWAYS (mpz_sgn (log->tab[i+nsm]) >= 0);
+    ASSERT_ALWAYS (mpz_cmp (log->tab[i+nsm], log->q) < 0);
+    gmp_fprintf (f, "%" PRid " SM col %u %Zd\n", i+nsm, nsm, log->tab[i+nsm]);
+  }
+
+  printf ("# %" PRIu64 " logarithms of elements of the factor base are known, "
+          "%" PRIu64 " are missing.\n", log->nknown, missing);
+  fclose_maybe_compressed (f, filename);
+  ASSERT_ALWAYS (log->nknown + missing == tab->size);
+}
 
 /* Given a filename, compute all the possible logarithms of ideals appearing in
  * the file. Return the number of computed logarithms. */
 static uint64_t
-compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
-                          mpz_t *log, uint64_t nprimes, int nt)
+compute_log_from_rels (bit_vector needed_rels,
+                       const char *relspfilename, uint64_t nrels_purged,
+                       const char *relsdfilename, uint64_t nrels_del,
+                       logtab_t log, int nt)
 {
   double tt0, tt, wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
+  size_t n_needed_rels = bit_vector_popcount (needed_rels);
+  uint64_t nrels = nrels_purged + nrels_del;
   read_data_t data;
-  read_data_init(&data, log, q, nprimes, nrels);
+  read_data_init(&data, log, nrels);
 
   /* Init bit_vector to remember which relations were already used */
   bit_vector not_used;
-  bit_vector_init(not_used, nrels);
-  bit_vector_set(not_used, 1);
+  bit_vector_init_set (not_used, nrels, 1);
 
   /* adjust the number of threads based on the number of relations */
-  double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
+  double ntm = ceil((n_needed_rels + 0.0)/SIZE_BLOCK);
   if (nt > ntm)
     nt = (int) ntm;
 
@@ -620,9 +907,9 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
     printf("# Using monothread version\n");
 
   /* Reading all relations */
-  printf ("# Reading relations from %s\n", filename);
+  printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
   fflush(stdout);
-  char *fic[2] = {(char *) filename, NULL};
+  char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
   struct filter_rels_description desc[3] = {
                    { .f = thread_insert, .arg=&data, .n=1},
 #ifndef FOR_FFS
@@ -631,7 +918,7 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
                    { .f = NULL,          .arg=0,     .n=0}
       };
   filter_rels2 (fic, desc, EARLYPARSE_NEED_AB_HEXA | EARLYPARSE_NEED_INDEX,
-                NULL, NULL);
+                needed_rels, NULL);
 
   /* computing missing log */
   printf ("# Starting to computing missing logarithms from rels\n");
@@ -645,9 +932,9 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
     wct_tt = wct_seconds();
 
     if (nt > 1)
-      computed = do_one_iter_mt (&data, not_used, nt, nrels);
+      computed = log_do_one_iter_mt (&data, not_used, nt, nrels);
     else
-      computed = do_one_iter_mono (&data, not_used, nrels);
+      computed = log_do_one_iter_mono (&data, not_used, nrels);
     total_computed += computed;
 
     printf ("# Iteration %" PRIu64 ": %" PRIu64 " new logarithms computed\n",
@@ -672,21 +959,127 @@ compute_log_from_relfile (const char *filename, uint64_t nrels, mpz_t q,
   size_t c = bit_vector_popcount(not_used);
   if (c != 0)
     fprintf(stderr, "### Warning, %zu relations were not used\n", c);
-#if DEBUG == 1
-  if (c != 0)
-    check_unused_rel(not_used, data->rels, nrels);
-  check_unknown_log (&data, nprimes);
-#endif
 
   read_data_free(&data, nrels);
   bit_vector_clear(not_used);
   return total_computed;
 }
 
+/* Given a filename, compute all the relations needed to compute the logarithms
+ * appearing in the file.
+ * Return a bit_vector, where bits of needed rels are set. */
+static void
+compute_needed_rels (bit_vector needed_rels,
+                     const char *relspfilename, uint64_t nrels_purged,
+                     const char *relsdfilename, uint64_t nrels_del,
+                     logtab_t log, const char *wanted_filename, int nt)
+{
+  double tt0, tt, wct_tt0, wct_tt;
+  uint64_t total_computed = 0, iter = 0, computed;
+  uint64_t nrels = nrels_purged + nrels_del;
+  graph_dep_t dep_graph = graph_dep_init (log->nprimes);
+  light_rels_t rels = light_rels_init (nrels);
 
+  graph_dep_set_log_already_known (dep_graph, log);
+
+  dep_read_data_t data = (dep_read_data_t) {.rels = rels, .G = dep_graph};
+
+  /* Init bit_vector to remember which relations were already used */
+  bit_vector not_used;
+  bit_vector_init_set (not_used, nrels, 1);
+
+  /* adjust the number of threads based on the number of relations */
+  double ntm = ceil((nrels + 0.0)/SIZE_BLOCK);
+  if (nt > ntm)
+    nt = (int) ntm;
+
+  if (nt > 1)
+    printf("# Using multithread version with %d threads\n", nt);
+  else
+    printf("# Using monothread version\n");
+
+  /* Reading all relations */
+  printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
+  fflush(stdout);
+  char *fic[3] = {(char *) relspfilename, (char *) relsdfilename, NULL};
+  filter_rels (fic, (filter_rels_callback_t) &dep_thread_insert, (void *) &data,
+               EARLYPARSE_NEED_INDEX, NULL, NULL);
+
+  /* computing missing log */
+  printf ("# Starting to compute dependancies from rels\n");
+  tt0 = seconds();
+  wct_tt0 = wct_seconds();
+  do
+  {
+    printf ("# Iteration %" PRIu64 ": starting...\n", iter);
+    fflush(stdout);
+    tt = seconds();
+    wct_tt = wct_seconds();
+
+    if (nt > 1)
+      computed = dep_do_one_iter_mt (&data, not_used, nt, nrels);
+    else
+      computed = dep_do_one_iter_mono (&data, not_used, nrels);
+    total_computed += computed;
+
+    printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependancies computed\n",
+            iter, computed);
+    if (nt > 1)
+      printf ("# Iteration %" PRIu64 " took %.1fs (CPU time), %.1fs (wall-clock"
+              " time).\n", iter, seconds() - tt, wct_seconds() - wct_tt);
+    else
+      printf ("# Iteration %" PRIu64 " took %.1fs\n", iter, seconds() - tt);
+
+    iter++;
+  } while (computed);
+
+  if (nt > 1)
+    printf ("# Computing dependancies took %.1fs (CPU time), %.1fs (wall-clock"
+            " time)\n", seconds() - tt0, wct_seconds() - wct_tt0);
+  else
+    printf ("# Computing dependancies took %.1fs\n", seconds() - tt0);
+
+  bit_vector_clear(not_used);
+
+  FILE *f = NULL;
+  printf ("# Reading wanted logarithms from %s\n", wanted_filename);
+  fflush(stdout);
+  f = fopen_maybe_compressed (wanted_filename, "r");
+  FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
+
+  bit_vector_set (needed_rels, 0);
+  index_t h;
+  uint64_t nadded, nrels_necessary = 0, nwanted_log = 0;
+  tt = seconds();
+  while (fscanf (f, "%" SCNid "\n", &h) == 1)
+  {
+    FATAL_ERROR_CHECK (h >= log->nprimes, "Too big value of index");
+    printf ("# Computing rels necessary for wanted log %" PRid "\n", h);
+    fflush(stdout);
+    nadded = graph_dep_needed_rels_from_index (dep_graph, h, rels, needed_rels);
+    nrels_necessary += nadded;
+    printf ("-> %" PRIu64 " needed relations were added (%" PRIu64 " so far)\n",
+            nadded, nrels_necessary);
+    nwanted_log++;
+  }
+
+  fclose_maybe_compressed (f, wanted_filename);
+  printf ("# Reading %" PRIu64 " wanted logarithms took %.1fs\n", nwanted_log,
+          seconds() - tt);
+  printf ("# %" PRIu64 " relations are needed to compute these logarithms\n",
+          nrels_necessary);
+  ASSERT_ALWAYS (nrels_necessary == bit_vector_popcount (needed_rels));
+
+  light_rels_free (rels);
+  graph_dep_clear (dep_graph);
+}
+
+/********************* usage functions and main ******************************/
 static void declare_usage(param_list pl)
 {
   param_list_decl_usage(pl, "log", "input file containing known logarithms");
+  param_list_decl_usage(pl, "logformat", "format of input log file: 'LA' or "
+                                         "'reconstruct' (default is 'LA')");
   param_list_decl_usage(pl, "gorder", "group order (see sm -gorder parameter");
   param_list_decl_usage(pl, "out", "output file for logarithms");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
@@ -706,6 +1099,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp parameter)");
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
+  param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
@@ -724,13 +1118,13 @@ main(int argc, char *argv[])
   char *argv0 = argv[0];
 
   renumber_t renumber_table;
-  uint64_t ncols_matrix, nrels_tot = 0, nrels_purged, nideals_purged, nrels_del;
-  uint64_t nprimes, i, known_log;
-  index_t *matrix_indexing = NULL;
+  uint64_t nrels_tot = 0, nrels_purged, nideals_purged, nrels_del;
+  uint64_t nprimes;
   int mt = 1;
   int partial = 0;
 
-  mpz_t q, *log = NULL;
+  mpz_t q;
+  logtab_t log;
   cado_poly poly;
 
   param_list pl;
@@ -759,12 +1153,14 @@ main(int argc, char *argv[])
 
   mpz_init (q);
   const char * logfilename = param_list_lookup_string(pl, "log");
+  const char * logformat = param_list_lookup_string(pl, "logformat");
   const char * idealsfilename = param_list_lookup_string(pl, "ideals");
   const char * relsdfilename = param_list_lookup_string(pl, "relsdel");
   const char * relspfilename = param_list_lookup_string(pl, "purged");
   const char * outfilename = param_list_lookup_string(pl, "out");
   const char * renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * polyfilename = param_list_lookup_string(pl, "poly");
+  const char * wantedfilename = param_list_lookup_string(pl, "wanted");
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
   param_list_parse_mpz(pl, "gorder", q);
 #ifndef FOR_FFS
@@ -843,6 +1239,22 @@ main(int argc, char *argv[])
     usage (pl, argv0);
   }
 
+  if (logformat != NULL)
+  {
+    if (strcmp(logformat, "LA") != 0 && strcmp(logformat, "reconstruct") != 0)
+    {
+      fprintf(stderr, "Error, unknown -formatlog argument. Must be 'LA' or "
+                      "'reconstruct'\n");
+      usage (pl, argv0);
+    }
+  }
+
+  if (wantedfilename != NULL && !partial)
+  {
+    fprintf(stderr, "Warning, -wanted command line argument is ignored if "
+                    "-partial is not set\n");
+  }
+
   cado_poly_init (poly);
 #ifndef FOR_FFS
   if (!cado_poly_read (poly, polyfilename))
@@ -853,6 +1265,7 @@ main(int argc, char *argv[])
     fprintf (stderr, "Error reading polynomial file\n");
     exit (EXIT_FAILURE);
   }
+
 #ifndef FOR_FFS
   /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
   F = poly->pols[ALGEBRAIC_SIDE];
@@ -861,10 +1274,10 @@ main(int argc, char *argv[])
   FATAL_ERROR_CHECK(nbsm != 0, "sm should be 0 for FFS");
 #endif
 
-
   set_antebuffer_path (argv0, path_antebuffer);
 
   /* Reading renumber file */
+  printf ("\n###### Reading renumber file ######\n");
   renumber_init (renumber_table, poly, NULL);
   renumber_read_table (renumber_table, renumberfilename);
   nprimes = renumber_table->size;
@@ -873,53 +1286,61 @@ main(int argc, char *argv[])
   purgedfile_read_firstline (relspfilename, &nrels_purged, &nideals_purged);
   nrels_del = nrels_tot - nrels_purged;
 
-  /* Opening ideals file, malloc'ing matrix_indexing and reading ideals file */
-  matrix_indexing = read_index (idealsfilename, &ncols_matrix, nprimes);
+  /* Malloc'ing log tab and reading values of log */
+  printf ("\n###### Reading known logarithms ######\n");
+  fflush(stdout);
+  logtab_init (log, nprimes, nbsm, q);
+  if (logformat == NULL || strcmp(logformat, "LA") == 0)
+    read_log_format_LA (log, logfilename, idealsfilename);
+  else
+    read_log_format_reconstruct (log, renumber_table, logfilename);
 
-  /* Opening log file, malloc'ing log tab and reading values of log */
-  log = read_log (matrix_indexing, logfilename, q, nbsm, ncols_matrix, nprimes);
-  known_log = ncols_matrix;
-  free (matrix_indexing);
+  /* Init bit_vector of rels that must be process by compute_log_from_rels */
+  bit_vector rels_to_process;
+  bit_vector_init (rels_to_process, nrels_tot);
 
-  if (!partial) {
-
-    /* Init data needed to compute SM */
-#ifndef FOR_FFS
-    sm_data_init(q, log, nprimes);
-#endif
-
-    /* Computing logs using rels in purged file */
-    printf ("\n###### Computing logs using rels in purged file ######\n");
-    known_log +=
-     compute_log_from_relfile (relspfilename, nrels_purged, q, log, nprimes, mt);
-    printf ("# %" PRIu64 " known logarithms so far.\n", known_log);
-    fflush(stdout);
-
-    /* Computing logs using rels in deleted file */
-    printf ("\n###### Computing log using rels in deleted file ######\n");
-    known_log +=
-      compute_log_from_relfile (relsdfilename, nrels_del, q, log, nprimes, mt);
-    printf ("# %" PRIu64 " known logarithms at the end.\n\n", known_log);
-    fflush(stdout);
-
-#ifndef FOR_FFS
-    sm_data_free();
-#endif
+  if (partial)
+  {
+    if (wantedfilename == NULL)
+      bit_vector_set (rels_to_process, 0);
+    else /* We compute needed rels for logarithms in wantedfilename */
+    {
+      printf ("\n###### Computing needed rels ######\n");
+      compute_needed_rels (rels_to_process, relspfilename, nrels_purged,
+                           relsdfilename, nrels_del, log, wantedfilename, mt);
+    }
+  }
+  else
+  {
+    bit_vector_set (rels_to_process, 1);
   }
 
-  /* Writing all the logs in outfile */
-  write_log (outfilename, log, q, renumber_table, poly, known_log);
-
-  /* freeing and closing */
-  for (i = 0; i < nprimes + nbsm; i++)
-    mpz_clear(log[i]);
-  free(log);
-  mpz_clear(q);
 #ifndef FOR_FFS
-  mpz_clear(smexp);
+  sm_data_init(q, log); /* Init data needed to compute SM */
 #endif
 
+  /* Computing logs using rels in purged file */
+  printf ("\n###### Computing logarithms using rels ######\n");
+  log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
+                                        nrels_purged, relsdfilename, nrels_del,
+                                        log, mt);
+  printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
+  fflush(stdout);
+
+  /* Writing all the logs in outfile */
+  printf ("\n###### Writing logarithms in a file ######\n");
+  write_log (outfilename, log, renumber_table, poly);
+
+  /* freeing and closing */
+#ifndef FOR_FFS
+  sm_data_free();
+  mpz_clear(smexp);
+#endif
+  logtab_free (log);
+  mpz_clear(q);
+
   renumber_free (renumber_table);
+  bit_vector_clear(rels_to_process);
   cado_poly_clear (poly);
   param_list_clear (pl);
   return EXIT_SUCCESS;
