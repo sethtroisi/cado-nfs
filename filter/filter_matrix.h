@@ -31,7 +31,7 @@ typedef struct {
                        /* 32 bits is sufficient as we only want precise weight
                           for column of low weight. If the weight exceed 2^32-1,
                           we saturate */
-  index_t nburied;     /* the number of buried columns */
+  uint64_t nburied;    /* the number of buried columns */
   uint64_t weight;     /* number of non-zero coefficients in the active part */
   uint64_t tot_weight; /* Initial total number of non-zero coefficients */
   int cwmax;           /* bound on weight of j to enter the SWAR structure */

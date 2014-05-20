@@ -9,6 +9,7 @@
 void bit_vector_init(bit_vector_ptr b, size_t n)
 {
     b->p = malloc(iceildiv(n, BV_BITS) * sizeof(bv_t));
+    FATAL_ERROR_CHECK (b->p == NULL, "Cannot allocate memory");
     b->n = n;
 }
 

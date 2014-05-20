@@ -20,7 +20,8 @@
    (in blocksize chunks) if necessary. */
 typedef struct {
   factorbase_degn_t *fb;
-  size_t size, alloc, blocksize;
+  size_t size, alloc, blocksize, nr_primes, nr_roots;
+  double weight;
 } fb_buffer_t;
 
 
@@ -72,6 +73,9 @@ fb_buffer_init(fb_buffer_t *fb_buf, const size_t blocksize)
     fb_buf->fb = NULL; /* Set to NULL so realloc() allocates */
     fb_buf->size = 0;
     fb_buf->alloc = 0;
+    fb_buf->nr_primes = 0;
+    fb_buf->nr_roots = 0;
+    fb_buf->weight = 0.;
     fb_buf->blocksize = blocksize;
 }
 
@@ -81,6 +85,16 @@ fb_buffer_clear (fb_buffer_t *fb_buf)
 {
     free (fb_buf->fb);
     fb_buf->fb = NULL;
+}
+
+/* Set a buffer to empty, but don't deallocate anything */
+static void
+fb_buffer_reset (fb_buffer_t *fb_buf)
+{
+    fb_buf->size = 0;
+    fb_buf->nr_primes = 0;
+    fb_buf->nr_roots = 0;
+    fb_buf->weight = 0.;
 }
 
 /* Extend a factor base buffer, if necessary, to have room for at least
@@ -128,6 +142,9 @@ fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
   fb_end_ptr->size = cast_size_uchar(fb_addsize);
 
   fb_buf->size += fb_addsize;
+  fb_buf->nr_primes++;
+  fb_buf->nr_roots += fb_add->nr_roots;
+  fb_buf->weight += (double) fb_add->nr_roots / (double) fb_add->p;
 
   return 1;
 }
@@ -149,56 +166,144 @@ fb_buffer_finish (fb_buffer_t *fb_buf)
   return 1;
 }
 
+/* Defines an ordering on buffers according to the lexical ordering
+   (nr_primes, nr_roots, weight) */
+static inline int
+fb_buffer_cmp(const fb_buffer_t *fb_buf_1, const fb_buffer_t *fb_buf_2)
+{
+  if (fb_buf_1->nr_primes < fb_buf_2->nr_primes)
+    return -1;
+  if (fb_buf_1->nr_primes > fb_buf_2->nr_primes)
+    return 1;
+  if (fb_buf_1->nr_roots < fb_buf_2->nr_roots)
+    return -1;
+  if (fb_buf_1->nr_roots > fb_buf_2->nr_roots)
+    return 1;
+  if (fb_buf_1->weight < fb_buf_2->weight)
+    return -1;
+  if (fb_buf_1->weight > fb_buf_2->weight)
+    return 1;
+  return 0;
+}
+
+/* Swap two adjacent entries */
+static inline void
+fb_swap(factorbase_degn_t *fb)
+{
+  factorbase_degn_t *fb2 = fb_next(fb);
+  size_t size1 = fb_entrysize(fb);
+  size_t size2 = fb_entrysize(fb2);
+  unsigned char tmp[128];
+  ASSERT_ALWAYS(size1 <= sizeof(tmp));
+  memcpy(tmp, fb, size1);
+  memmove(fb, fb2, size2);
+  memcpy((unsigned char *)fb + size2, tmp, size1);
+}
+
+/* Sort entries of the fb_buffer into order of decreasing nr_roots */
+static void
+fb_buffer_sort(fb_buffer_t *fb_buf)
+{
+  for (size_t i = 0; i + 1 < fb_buf->nr_primes; i++) {
+    factorbase_degn_t *fb = fb_buf->fb;
+    for (size_t j = 0; i + j + 1 < fb_buf->nr_primes; j++) {
+      if (fb->nr_roots < fb_next(fb)->nr_roots) {
+        fb_swap(fb);
+      }
+      fb = fb_next(fb);
+    }
+  }
+}
 
 /* A struct for building a factor base in several disjoint pieces. */
 typedef struct {
   fb_buffer_t *fb_bufs; /* fb_bufs[0] is for primes <= smalllim, rest is for 
                            larger primes. If smalllim == 0, then fb_bufs[0] 
                            is used for all primes. */
+  fb_buffer_t temp_buf; /* Collects a few new entries for balancing */
   fbprime_t smalllim;
-  size_t nr_pieces, nr_buffers, nextbuf;
+  size_t nr_pieces, nr_buffers, temp_size;
 } fb_split_t;
 
 static int
-fb_split_init (fb_split_t *split, const fbprime_t smalllim, 
+fb_split_init (fb_split_t *split, const fbprime_t smalllim,
                const size_t nr_pieces, const size_t allocblocksize)
 {
   split->smalllim = smalllim;
   if (smalllim != 0) {
-    split->nextbuf = 0;
     split->nr_pieces = nr_pieces;
     split->nr_buffers = nr_pieces + 1;
+    split->temp_size = nr_pieces; /* This could be anything, really. Larger
+                                     temp buffer means more sorting and better
+                                     balancing. Increasing it with number of
+                                     pieces seems reasonable */
+    fb_buffer_init(&split->temp_buf, 1024);
   } else {
     split->nr_pieces = 0;
     split->nr_buffers = 1;
   }
   split->fb_bufs = (fb_buffer_t *) malloc (split->nr_buffers * sizeof(fb_buffer_t));
   if (split->fb_bufs == NULL) {
-    fprintf (stderr, "# %s(): could not allocate memory for fb_bufs\n", 
+    fprintf (stderr, "# %s(): could not allocate memory for fb_bufs\n",
              __func__);
     return 0;
   }
+  
   for (size_t i = 0; i < split->nr_buffers; i++)
     fb_buffer_init(&split->fb_bufs[i], allocblocksize);
+  return 1;
+}
+
+static int
+fb_split_flush_temp(fb_split_t *split)
+{
+  fb_buffer_sort(&split->temp_buf);
+  factorbase_degn_t *fb_next_add = split->temp_buf.fb;
+  /* temp buffer might be only partially full, so can't just assume temp_size
+     many entries */
+  const factorbase_degn_t *const end =
+    fb_skip(split->temp_buf.fb, split->temp_buf.size);
   
+  while (fb_next_add < end) {
+    size_t smallest = 1;
+    for (size_t j = 2; j < split->nr_buffers; j++) {
+      if (fb_buffer_cmp(&split->fb_bufs[j], &split->fb_bufs[smallest]) < 0)
+        smallest = j;
+    }
+    if (!fb_buffer_add (&split->fb_bufs[smallest], fb_next_add))
+      return 0;
+    fb_next_add = fb_next(fb_next_add);
+  }
+  ASSERT_ALWAYS(fb_next_add == end);
+  fb_buffer_reset(&split->temp_buf);
   return 1;
 }
 
 static int
 fb_split_add (fb_split_t *split, const factorbase_degn_t *fb_add)
 {
-  size_t add_to = 0; /* To which factor base do we add? */
-  if (split->smalllim != 0 && fb_add->p > split->smalllim) {
-      add_to = split->nextbuf + 1;
-      if (++split->nextbuf == split->nr_pieces)
-          split->nextbuf = 0;
-  }
-  return fb_buffer_add (&split->fb_bufs[add_to], fb_add);
+  if (split->smalllim == 0 || fb_add->p <= split->smalllim)
+    return fb_buffer_add (&split->fb_bufs[0], fb_add);
+  /* Special case for 1 piece, so we don't go through temp buffer */
+  if (split->nr_pieces == 1)
+    return fb_buffer_add (&split->fb_bufs[1], fb_add);
+  /* First add to temp buffer */
+  if (!fb_buffer_add(&split->temp_buf, fb_add))
+    return 0;
+  /* If temp buffer is full, flush it to the real buffers */
+  if (split->temp_buf.nr_primes == split->temp_size)
+    return fb_split_flush_temp(split);
+  return 1;
 }
 
 static int
 fb_split_finish (fb_split_t *split)
 {
+  if (split->nr_pieces > 0) {
+    if (!fb_split_flush_temp(split))
+      return 0;
+    fb_buffer_clear(&split->temp_buf);
+  }
   for (size_t i = 0; i < split->nr_buffers; i++) {
     if (!fb_buffer_finish (&split->fb_bufs[i]))
           return 0;

@@ -173,7 +173,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       fprintf(stderr, "# Burying j=%" PRIu64 " (wt=%" PRId32 ")\n", h, w);
 #endif
     }
-    printf("# Number of buried columns is %" PRid " (min_weight=%" PRId32 ", "
+    printf("# Number of buried columns is %" PRIu64 " (min_weight=%" PRId32 ", "
            "max_weight=%" PRId32 ")\n", mat->nburied, bmin, bmax);
   }
   else

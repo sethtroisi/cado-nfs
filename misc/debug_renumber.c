@@ -103,10 +103,10 @@ main (int argc, char *argv[])
         renumber_get_p_r_from_index(tab, &p, &r, &side, i, cpoly);
         j = renumber_get_index_from_p_r (tab, p, r, side);
         if (i == j)
-          fprintf (stderr, "## %" PRxid ": Ok\n", i);
+          fprintf (stderr, "## %" PRid ": Ok\n", i);
         else
-          fprintf (stderr, "#### %" PRxid ": Error, p = %" PRpr " r=%" PRpr " "
-                           "give index j = %" PRxid "\n", i, p, r, j);
+          fprintf (stderr, "#### %" PRid ": Error, p = %" PRpr " r=%" PRpr " "
+                           "give index j = %" PRid "\n", i, p, r, j);
       }
     }
 

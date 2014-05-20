@@ -229,12 +229,6 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
      the lattice-reduction and coordinate-conversion functions */
   fill_in_sieve_info (si, sq, relation->a, relation->b, old_si);
   const unsigned long r = mpz_get_ui(si->doing->r);
-  sieve_info_update_norm_data(NULL, si, nb_threads);
-
-  if (verbose) {
-    fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q q=%lu; rho=%lu\n", relation->a, relation->b, sq, r);
-    fprintf(output, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
-  }
 
   const uint32_t oldI = si->I, oldJ = si->J;
   /* If resulting optimal J is so small that it's not worth sieving,
@@ -245,6 +239,13 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     }
     is_dupe = 0;
     goto clear_and_exit;
+  }
+
+  sieve_info_update_norm_data(NULL, si, nb_threads);
+
+  if (verbose) {
+    fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q q=%lu; rho=%lu\n", relation->a, relation->b, sq, r);
+    fprintf(output, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
   }
 
   const uint32_t I = si->I, J = si->J;
@@ -282,7 +283,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   }
 
   /* Check that log_logbase(cofactor) <= lambda * log_logbase(lp_bound).
-     We can cancel logbase.
+     We can cancel logbase and use log_2().
      FIXME: What we should check here is that the estimate of the log norm,
      minus the rounded norms of all the sieved primes is below the sieve
      report threshold.  */

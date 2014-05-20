@@ -25,6 +25,7 @@ scripts/polsel_effort
 scripts/plot_params.sh
 scripts/plot_sieve_region.py
 scripts/typecast.py
+scripts/check_dup.py
 scripts/cadofactor/parameters
 scripts/cadofactor/parameters.oar
 scripts/cadofactor/parameters.rsa512.oar

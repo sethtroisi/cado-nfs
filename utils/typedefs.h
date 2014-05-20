@@ -29,21 +29,21 @@
 #if __SIZEOF_P_R_VALUES__ == 4
 #define p_r_values_t uint32_t
 #define PRpr PRIx32
+#define SCNpr SCNx32
 #else /* __SIZEOF_P_R_VALUES__ == 8 */
 #define p_r_values_t uint64_t
 #define PRpr PRIx64
+#define SCNpr SCNx64
 #endif
 
 #if __SIZEOF_INDEX__ == 4
 #define index_t uint32_t
-#define PRid PRIu32
-#define PRxid PRIx32
-#define SCNid SCNu32
+#define PRid PRIx32
+#define SCNid SCNx32
 #else /* __SIZEOF_INDEX__ == 8 */
 #define index_t uint64_t
-#define PRid PRIu64
-#define PRxid PRIx64
-#define SCNid SCNu64
+#define PRid PRIx64
+#define SCNid SCNx64
 #endif 
 
 /* The weight of ideals saturates at 255 */

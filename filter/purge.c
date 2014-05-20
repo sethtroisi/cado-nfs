@@ -754,7 +754,6 @@ int main(int argc, char **argv)
 
 #define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {			\
     bit_vector_init(variable_, amount_);				\
-    ASSERT_ALWAYS(variable_->p != NULL);				\
     size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
     tot_alloc_bytes += cur_alloc;					\
     fprintf(stderr,                                                     \

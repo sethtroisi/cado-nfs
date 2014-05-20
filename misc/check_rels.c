@@ -23,8 +23,8 @@
 
 #include "mpz_poly.h"
 
-static index_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
-static index_t nrels_toolarge;
+uint64_t nrels_read, nrels_ok, nrels_err, nrels_completed, nrels_noprime;
+uint64_t nrels_toolarge;
 cado_poly cpoly;
 unsigned long lpb[2] = {0, 0};
 int verbose = 0;
@@ -477,24 +477,24 @@ main (int argc, char * argv[])
                 (abhexa ? EARLYPARSE_NEED_AB_HEXA : EARLYPARSE_NEED_AB_DECIMAL),
                 NULL, stats);
 
-    printf("Number of read relations: %" PRid "\n", nrels_read);
+    printf("Number of read relations: %" PRIu64 "\n", nrels_read);
     if (complete_rels)
     {
-      printf("Number of deleted relations: %" PRid "\n", nrels_err);
-      printf("    among which %" PRid " contained an ideal larger than a lpb\n",
+      printf("Number of deleted relations: %" PRIu64 "\n", nrels_err);
+      printf("   among which %" PRIu64 " contained an ideal larger than a lpb\n",
              nrels_toolarge);
-      printf("Number of keeped relations: %" PRid "\n", nrels_ok);
-      printf("    among which %" PRid " were completed\n"
-             "            and %" PRid " contained at least one "
+      printf("Number of keeped relations: %" PRIu64 "\n", nrels_ok);
+      printf("   among which %" PRIu64 " were completed\n"
+             "           and %" PRIu64 " contained at least one "
              "non-primes ideal\n", nrels_completed, nrels_noprime);
     }
     else
     {
-      printf("Number of correct relations: %" PRid "\n", nrels_ok);
-      printf("Number of wrong relations: %" PRid "\n", nrels_err);
-      printf("    among which %" PRid " were not complete\n"
-             "            and %" PRid " contained an ideal larger than a lpb\n"
-             "            and %" PRid " contained at least one "
+      printf("Number of correct relations: %" PRIu64 "\n", nrels_ok);
+      printf("Number of wrong relations: %" PRIu64 "\n", nrels_err);
+      printf("   among which %" PRIu64 " were not complete\n"
+             "           and %" PRIu64 " contained an ideal larger than a lpb\n"
+             "           and %" PRIu64 " contained at least one "
              "non-primes ideal\n", nrels_completed, nrels_toolarge,
              nrels_noprime);
     }

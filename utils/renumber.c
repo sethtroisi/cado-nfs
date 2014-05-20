@@ -793,12 +793,12 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
       if (i == 0 && tab->add_full_col)
         fprintf (output, "i=0 tab[i]=#   added column\n");
       else
-        fprintf (output, "i=%" PRxid " tab[i]=#   above a bad ideals\n", i);
+        fprintf (output, "i=%" PRid " tab[i]=#   above a bad ideals\n", i);
     }
     else
     {
       renumber_get_p_r_from_index (tab, &p, &r, &side, i, pol);
-      fprintf (output, "i=%" PRxid " tab[i]=%" PRpr " p=%" PRpr "",
+      fprintf (output, "i=%" PRid " tab[i]=%" PRpr " p=%" PRpr "",
                        i, tab->table[i], p);
       if (tab->rat == -1)
       {
