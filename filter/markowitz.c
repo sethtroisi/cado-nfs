@@ -221,17 +221,20 @@ MkzIsHeap(int32_t *Q)
 static void
 MkzCheck(filter_matrix_t *mat)
 {
-  index_t dj;
-    int maxlevel = mat->mergelevelmax;
-
-    for(dj = 0; dj < mat->ncols - 0; dj++)
-      if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
-	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (int32_t) dj)
-              {
-		fprintf(stderr, "GASP: %" PRId32 " <> %" PRid " in MkzCheck\n",
+  uint64_t dj;
+  int maxlevel = mat->mergelevelmax;
+  for(dj = 0; dj < mat->ncols - 0; dj++)
+  {
+    if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
+	  {
+      if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != (int32_t) dj)
+      {
+        fprintf(stderr, "GASP: %" PRId32 " <> %" PRIu64 " in MkzCheck\n",
                         MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
-                exit (1);
-              }
+        exit (1);
+      }
+    }
+  }
 }
 
 static int
@@ -372,7 +375,8 @@ void
 MkzInit(filter_matrix_t *mat)
 {
     int32_t mkz;
-    index_t j, sz = 0;
+    index_t j;
+    uint64_t sz = 0;
     int maxlevel = mat->mergelevelmax;
 
 #if MKZ_TIMINGS
@@ -387,11 +391,11 @@ MkzInit(filter_matrix_t *mat)
     
     // Allocating heap MKZQ
     size_t tmp_alloc = (sz+1) * 2 * sizeof(int32_t);
-    fprintf(stderr, "Allocating heap for %"PRid" columns (%zuMB)\n", sz,
+    fprintf(stderr, "Allocating heap for %" PRIu64 " columns (%zuMB)\n", sz,
                                                              tmp_alloc >> 20);
     mat->MKZQ = (int32_t *) malloc (tmp_alloc);
     mat->MKZQ[0] = 0;
-    mat->MKZQ[1] = sz; // why not?
+    mat->MKZQ[1] = (int32_t) sz; // why not?
     
     // every j needs a pointer (MKZA)
     tmp_alloc = (mat->ncols + 1) * sizeof(index_t);
