@@ -42,8 +42,8 @@ struct __renumber_t
   index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
   index_t first_not_cached;
   int add_full_col; //do we add a col of 1 to all relations
-  unsigned long lpbr;  // The rational side large prime bound
-  unsigned long lpba;  // The algebraic side large prime bound
+  unsigned long lpb0;  // The large prime bound on side 0
+  unsigned long lpb1;  // The large prime bound on side 1
 };
 typedef struct __renumber_t renumber_t[1];
 

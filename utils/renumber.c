@@ -2,10 +2,10 @@
 #include <stdint.h>     /* AIX wants it first (it's a bug) */
 #include <inttypes.h>
 #include <stdio.h>
-#include "portability.h"
-#include "renumber.h"
-#include "gzip.h" /* for fopen_maybe_compress */
 #include <ctype.h>
+#include "portability.h"
+#include "utils.h"
+//#include "gzip.h" /* for fopen_maybe_compress */
 
 
 /********************** internal functions *****************************/
@@ -138,13 +138,15 @@ parse_one_line (char * str)
 }
 
 static void
-print_info (FILE * f, renumber_t renumber_info)
+print_info (FILE * f, renumber_t r)
 {
-  fprintf (f, "Renumbering struct: nb_bits=%"PRIu8", sizeof(*table)=%zu, "
-              "rat=%d nb_badideals=%d add_full_col=%d\n",
-              renumber_info->nb_bits, sizeof(*(renumber_info->table)),
-              renumber_info->rat, renumber_info->bad_ideals.n,
-              renumber_info->add_full_col);
+  fprintf (f, "### INFO on renumber struct\n# INFO: nb_bits = %" PRIu8 "\n"
+              "# INFO: sizeof(p_r_values_t) = %zu\n# INFO: rat = %d %s\n"
+              "# INFO: lpb0 = %lu\n# INFO: lpb1 = %lu\n"
+              "# INFO: #badideals = %d\n# INFO: add_full_col = %d\n",
+              r->nb_bits, sizeof(p_r_values_t), r->rat,
+              (r->rat == -1) ? "(no rational side)" : "", r->lpb0, r->lpb1,
+              r->bad_ideals.n, r->add_full_col);
 }
 
 /* sort in decreasing order */
@@ -206,24 +208,6 @@ get_one_line (FILE *f, char *s)
   return n;
 }
 
-static void
-report_read (double t, uint64_t nread, size_t bytes_read, int end)
-{
-  double mb_s, dt = wct_seconds () - t;
-  if (dt > 0.01)
-    mb_s = (double) ((double) bytes_read / (double) dt) * 1.0e-6;
-  else
-    mb_s = 0.0;
-
-  if (!end)
-    fprintf(stderr, "Renumbering table: read %" PRIu64 " values from file "
-                    "in %.1fs -- %.1f MB/s\n", nread, dt, mb_s);
-  else
-    fprintf(stderr, "Renumbering table: end of read. Read %" PRIu64 " values from "
-                    "file in %.1fs -- %.1f MB/s\n", nread, dt, mb_s);
-
-}
-
 /* return zero if no roots mod p, else non-zero */
 static int
 get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
@@ -271,13 +255,8 @@ renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
     renumber_info->rat = 1;
 
   if (lpb != NULL) {
-    if (renumber_info->rat <= 0) {
-      renumber_info->lpbr = lpb[0];
-      renumber_info->lpba = lpb[1];
-    } else {
-      renumber_info->lpbr = lpb[1];
-      renumber_info->lpba = lpb[0];
-    }
+    renumber_info->lpb0 = lpb[1];
+    renumber_info->lpb1 = lpb[0];
 
     int max_nb_bits = MAX(lpb[0], lpb[1]);
     if (renumber_info->rat == -1)
@@ -288,6 +267,10 @@ renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
     else
       renumber_info->nb_bits = 64;
     ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
+  } else { /* will be set later (by renumber_read_table) */
+    renumber_info->lpb0 = 0;
+    renumber_info->lpb1 = 0;
+    renumber_info->nb_bits = 0;
   }
 
   renumber_info->add_full_col = 0;
@@ -380,7 +363,7 @@ renumber_close_write (renumber_t tab, const char *tablefile)
   // First we put some data about the renumbering table.
   fprintf (final, "%u %" PRIu64 " %d %d %lu %lu\n", tab->nb_bits, tab->size,
                                      tab->bad_ideals.n, tab->add_full_col,
-                                     tab->lpbr, tab->lpba);
+                                     tab->lpb0, tab->lpb1);
 
   char buffer[128] = "" , *retc;
   do
@@ -410,13 +393,13 @@ renumber_close_write (renumber_t tab, const char *tablefile)
 void
 renumber_read_table (renumber_t tab, const char * filename)
 {
-  uint64_t i, report = 0;
+  uint64_t i;
   int ret;
-  double t = wct_seconds ();
   uint8_t old_nb_bits = tab->nb_bits;
   char s[RENUMBER_MAXLINE];
   size_t bytes_read = 0;
   p_r_values_t v, prev_v = 0;
+  stats_data_t infostats;  /* for displaying progress */
 
   //open file for reading
   fprintf (stderr, "Opening %s to read the renumbering table\n", filename);
@@ -430,12 +413,12 @@ renumber_read_table (renumber_t tab, const char * filename)
   uint64_t tmp_size;
   ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d %lu %lu\n", &tab->nb_bits,
       &tmp_size, &tab->bad_ideals.n, &tab->add_full_col,
-      &tab->lpbr, &tab->lpba);
+      &tab->lpb0, &tab->lpb1);
   ASSERT_ALWAYS (ret == 6);
 
   ASSERT_ALWAYS (tab->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (tab->nb_bits == 32 || tab->nb_bits == 64);
-  if (old_nb_bits != tab->nb_bits)
+  if (old_nb_bits != 0 && old_nb_bits != tab->nb_bits)
   {
     fprintf (stderr, "Warning, computed value of nb_bits (%d) is different "
                      "from the read value of nb_bits (%d).\n", old_nb_bits,
@@ -470,6 +453,7 @@ renumber_read_table (renumber_t tab, const char * filename)
     }
   }
 
+  stats_init (infostats, stdout, nbits(tab->size)-5, "Read", "elements", "elts");
   // we cached value below 2^MAX_LOG_CACHED
   while (i < tab->size)
   {
@@ -494,6 +478,9 @@ renumber_read_table (renumber_t tab, const char * filename)
 
     prev_v = v;
     i++;
+
+    if (stats_test_progress(infostats, i))
+      stats_print_progress_with_MBs (infostats, i, bytes_read, 0);
   }
 
   tab->first_not_cached = i;
@@ -503,20 +490,16 @@ renumber_read_table (renumber_t tab, const char * filename)
     bytes_read += get_one_line(tab->file, s);
     tab->table[i] = parse_one_line(s);
 
-    if ((i >> 23) != (report >> 23))
-    {
-      report = i;
-      report_read (t, i, bytes_read, 0);
-    }
+    if (stats_test_progress(infostats, i))
+      stats_print_progress_with_MBs (infostats, i, bytes_read, 0);
   }
+  stats_print_progress_with_MBs (infostats, i, bytes_read, 1);
 
-  report_read (t, i, bytes_read, 1);
   ASSERT_ALWAYS(i == tab->size);
 
-  print_info (stderr, tab);
-  fprintf(stderr, "Renumbering struct: nprimes=%" PRIu64 "\n", tab->size);
-  fprintf(stderr, "Renumbering struct: first_not_cached=%" PRid "\n",
-                                                        tab->first_not_cached);
+  print_info (stdout, tab);
+  printf("# INFO: first_not_cached = 0x%" PRid "\n", tab->first_not_cached);
+  fflush(stdout);
 
   fclose_maybe_compressed (tab->file, filename);
 }
@@ -609,8 +592,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
 #ifdef DEBUG_RENUMB
     /* assert that p is below the large prime bound */
-    unsigned long lpb = (side==RATIONAL_SIDE) ? renumber_info->lpbr :
-                                                renumber_info->lpba ;
+    unsigned long lpb = (side == 0) ? renumber_info->lpb0 : renumber_info->lpb1;
     if (((uint64_t) p) >> lpb)
     {
       fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%lu\n",
@@ -753,7 +735,9 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   else
   {
     *p = tab[j] - 1;
-    if (*p > (1UL << renumber_info->lpbr) && i == j)
+    unsigned long lpbr = (renumber_info->rat == 0) ? renumber_info->lpb0 :
+                                                     renumber_info->lpb1;
+    if (*p > (1UL << lpbr) && i == j)
     {
       // Case where there is only alg side (p >= lpbr) and we are on the largest
       // root on alg side (i == j)
