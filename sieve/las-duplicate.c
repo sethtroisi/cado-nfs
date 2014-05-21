@@ -103,38 +103,65 @@ Thus the function to check for duplicates needs the following information:
 static const int verbose = 1;
 
 static void
-fill_in_sieve_info(sieve_info_ptr new_si, const unsigned long p,
-                   const int64_t a, const uint64_t b,
-                   sieve_info_srcptr old_si)
+compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p)
 {
+  mpz_set_uint64(r, b);
+  mpz_invert(r, r, p);
+  mpz_mul_int64(r, r, a);
+  mpz_mod(r, r, p);
+}
+
+static sieve_info_ptr
+fill_in_sieve_info(const unsigned long p, const int64_t a, const uint64_t b,
+                   const int sq_side, const uint32_t I, const uint32_t J,
+                   const unsigned long limits[2], facul_strategy_t *strategy[2],
+                   cado_poly_ptr cpoly, siever_config_srcptr conf)
+{
+  sieve_info_ptr new_si;
+
+  new_si = (sieve_info_ptr) malloc(sizeof(sieve_info));
+  ASSERT_ALWAYS(new_si != NULL);
+  new_si->I = I;
+  new_si->J = J;
+
   // memset(new_si, 0, sizeof(sieve_info));
-  new_si->I = old_si->I;
-  new_si->J = old_si->J;
+  new_si->cpoly = cpoly; /* A pointer, and polynomial not get modified */
 
-  new_si->cpoly = old_si->cpoly; /* A pointer, and polynomial not get modified */
-
-  memmove(new_si->conf, old_si->conf, sizeof(new_si->conf));
+  memmove(new_si->conf, conf, sizeof(new_si->conf));
 
   /* Allocate memory */
   sieve_info_init_norm_data(new_si);
 
-  /* Compute the root a/b (mod p) */
   mpz_init(new_si->doing->p);
   mpz_init(new_si->doing->r);
-  mpz_set_uint64(new_si->doing->r, b);
   mpz_set_uint64(new_si->doing->p, p);
-  mpz_invert(new_si->doing->r, new_si->doing->r, new_si->doing->p);
-  mpz_mul_int64(new_si->doing->r, new_si->doing->r, a);
-  mpz_mod(new_si->doing->r, new_si->doing->r, new_si->doing->p);
-  new_si->doing->side = old_si->doing->side;
+  compute_a_over_b_mod_p(new_si->doing->r, a, b, new_si->doing->p);
+  new_si->doing->side = sq_side;
 
   for (int side = 0; side < 2; side++) {
-    mpz_init_set(new_si->BB[side], old_si->BB[side]);
-    mpz_init_set(new_si->BBB[side], old_si->BBB[side]);
-    mpz_init_set(new_si->BBBB[side], old_si->BBBB[side]);
-    new_si->sides[side]->strategy = old_si->sides[side]->strategy;
+    const unsigned long lim = limits[side];
+    mpz_init (new_si->BB[side]);
+    mpz_init (new_si->BBB[side]);
+    mpz_init (new_si->BBBB[side]);
+    mpz_ui_pow_ui (new_si->BB[side], lim, 2);
+    mpz_mul_ui (new_si->BBB[side], new_si->BB[side], lim);
+    mpz_mul_ui (new_si->BBBB[side], new_si->BBB[side], lim);
+
+    new_si->sides[side]->strategy = strategy[side];
   }
   SkewGauss(new_si);  
+  return new_si;
+}
+
+
+static sieve_info_ptr
+fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_t b,
+                           sieve_info_srcptr old_si)
+{
+  const unsigned long lim[2] = {old_si->conf->sides[0]->lim, old_si->conf->sides[1]->lim};
+  facul_strategy_t *strategies[2] = {old_si->sides[0]->strategy, old_si->sides[1]->strategy};
+  return fill_in_sieve_info(p, a, b, old_si->doing->side, old_si->I, old_si->J,
+                            lim, strategies, old_si->cpoly, old_si->conf);
 }
 
 static void
@@ -148,6 +175,7 @@ clear_sieve_info(sieve_info_ptr new_si)
   sieve_info_clear_norm_data(new_si);
   mpz_clear(new_si->doing->r);
   mpz_clear(new_si->doing->p);
+  free (new_si);
 }
 
 /* Compute the product of the nr_lp large primes in large_primes,
@@ -184,7 +212,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
   mpz_t cof[2];
   int is_dupe = 1; /* Assumed dupe until proven innocent */
-  sieve_info si;
+  sieve_info_ptr si;
   const size_t max_large_primes = 10;
   unsigned long large_primes[2][max_large_primes];
   unsigned int nr_lp[2] = {0, 0};
@@ -227,7 +255,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
      the lattice-reduction and coordinate-conversion functions */
-  fill_in_sieve_info (si, sq, relation->a, relation->b, old_si);
+  si = fill_in_sieve_info_from_si (sq, relation->a, relation->b, old_si);
   const unsigned long r = mpz_get_ui(si->doing->r);
 
   const uint32_t oldI = si->I, oldJ = si->J;
