@@ -15,6 +15,8 @@ add_executable (polyselect2l polyselect2l.c polyselect2l_str.c polyselect2l_arit
 target_link_libraries (polyselect_common utils)
 target_link_libraries (polyselect2l polyselect_common utils ${pthread_libs})
 
-install(TARGETS polyselect_common DESTINATION lib/${package_basename})
-install(TARGETS polyselect2l RUNTIME DESTINATION bin/polyselect)
+if(ENABLE_SHARED)
+    install(TARGETS polyselect_common DESTINATION ${LIBSUFFIX})
+endif(ENABLE_SHARED)
+install(TARGETS polyselect2l RUNTIME DESTINATION ${BINSUFFIX}/polyselect)
 include(CMakeLists-nodist.txt OPTIONAL)

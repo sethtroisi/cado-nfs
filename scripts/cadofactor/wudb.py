@@ -20,6 +20,12 @@ import traceback
 import collections
 import abc
 from datetime import datetime
+import re
+
+cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"
+if re.search("/", cado_python_libs_path):
+    sys.path.append(cado_python_libs_path)
+
 from workunit import Workunit
 if sys.version_info.major == 3:
     from queue import Queue

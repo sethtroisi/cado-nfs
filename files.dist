@@ -277,7 +277,7 @@ linalg/bwc/bw-common.h
 linalg/bwc/bwc-ptrace.m
 linalg/bwc/bwc-ptrace.sh
 linalg/bwc/bwc.pl
-linalg/bwc/bwc_config.h
+linalg/bwc/bwc_config_h.in
 linalg/bwc/checks.list
 linalg/bwc/checks.list.light
 linalg/bwc/checks.sh

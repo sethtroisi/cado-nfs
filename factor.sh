@@ -137,15 +137,21 @@ done
 cado_prefix="@CMAKE_INSTALL_PREFIX@"
 cado_source_dir="@CADO_NFS_SOURCE_DIR@"
 cado_build_dir="@CADO_NFS_BINARY_DIR@"
-example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
-if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
+
+if [ "$0" -ef "$cado_prefix/lib/cado-nfs-2.0/factor.sh" ] ; then
+    # We're called in the install tree.
+    bindir="$cado_prefix/lib/cado-nfs-2.0"
+    scriptpath="$bindir"
+    cadofactor="$scriptpath/cadofactor.py"
+    paramdir="$cado_prefix/share/cado-nfs-2.0"
+elif [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     # We're called in the install tree.
     bindir="$cado_prefix/bin"
     scriptpath="$bindir"
     cadofactor="$scriptpath/cadofactor.py"
-    paramdir="$cado_prefix/$example_subdir"
+    paramdir="$cado_prefix/share/cado-nfs-2.0"
 elif [ "$0" -ef "$cado_build_dir/factor.sh" ] ; then
     # We're called in the build tree.
     scriptpath="$cado_source_dir/scripts/cadofactor"

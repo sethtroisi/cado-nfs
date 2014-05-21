@@ -977,7 +977,7 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     }
 
     if (!error && verbose) {
-        fprintf (output, "# Factor base sucessfully read, %lu primes, largest was "
+        fprintf (output, "# Factor base successfully read, %lu primes, largest was "
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 

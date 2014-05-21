@@ -32,6 +32,6 @@ target_link_libraries(reconstructlog-dl utils_with_io)
 add_executable(sm sm.c)
 target_link_libraries(sm utils_with_io)
 
-install(TARGETS ${bin_list} RUNTIME DESTINATION bin/filter)
+install(TARGETS ${bin_list} RUNTIME DESTINATION ${BINSUFFIX}/filter)
 
 include(CMakeLists-nodist.txt OPTIONAL)

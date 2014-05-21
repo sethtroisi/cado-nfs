@@ -6,12 +6,10 @@ endif (${WITH_MPI})
 add_executable(sqrt sqrt.c)
 target_link_libraries(sqrt utils_with_io)
 
-install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
-
 add_executable(checkdep ${EXCLUDE_FROM_RELEASE_BUILD} checkdep.c)
 target_link_libraries(checkdep utils)
 
-install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
+install(TARGETS sqrt RUNTIME DESTINATION ${BINSUFFIX}/sqrt)
 
 # crtalgsqrt requires both threads and mpi.
 if(${WITH_PTHREADS})

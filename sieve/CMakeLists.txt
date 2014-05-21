@@ -42,6 +42,6 @@ target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
 
-install(TARGETS makefb las freerel RUNTIME DESTINATION bin/sieve)
+install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)
 
 include(CMakeLists-nodist.txt OPTIONAL)

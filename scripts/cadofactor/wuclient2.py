@@ -32,6 +32,13 @@ import email.encoders
 import email.generator
 from string import Template
 from io import BytesIO
+
+
+cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"
+if re.search("/", cado_python_libs_path):
+    sys.path.append(cado_python_libs_path)
+
+
 from workunit import Workunit
 import ssl
 

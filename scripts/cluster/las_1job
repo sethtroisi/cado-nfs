@@ -15,7 +15,7 @@
 # Output (stdout and stderr) is written to a file in ~/rsa768/<cluster>/output, 
 # the file name is rsa-<start,len>.out, where <start,len> is as in the 
 # name of the parameter-file.
-# When the job finishes sucessfully, the relations file is moved to
+# When the job finishes successfully, the relations file is moved to
 # ~/rsa768/<cluster>/results and the parameter-file in 
 # ~/rsa768/<cluster>/inprogress is deleted.
 # The script then terminates with an exit code of 0.

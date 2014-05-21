@@ -69,6 +69,13 @@ else(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD EXCLUDE_FROM_ALL)
 endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 
+
+set(package_basename ${CADO_DIST_ARCHIVE_NAME})
+set(BINSUFFIX bin CACHE STRING "subpath below PREFIX for storing binaries")
+set(LIBSUFFIX lib/${package_basename} CACHE STRING "subpath below PREFIX for storing libraries")
+set(DATASUFFIX share/${package_basename} CACHE STRING "subpath below PREFIX for storing parameters")
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
+
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
 # Append them at the *end* of the parameter list so as to allow tweaking
@@ -144,18 +151,12 @@ endif()
 
 string(COMPARE NOTEQUAL "$ENV{ENABLE_SHARED}" "" ENABLE_SHARED)
 
-unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
 set(CADO_SHARED)
 
 if(ENABLE_SHARED)
     if(MINGW)
         message(FATAL_ERROR "ENABLE_SHARED is not supported with MINGW")
     endif(MINGW)
-    # Dynamically linkable bwc needs shared libs.
-    set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
-    # having both shared and static is possible but messy. One needs two
-    # add_library calls, and then I'm not sure whether
-    # target_link_libraries picks the static or shared ones...
     set(CADO_SHARED SHARED)
     message(STATUS "Building with dynamic libraries (ENABLE_SHARED)")
 else(ENABLE_SHARED)
@@ -188,17 +189,6 @@ endif(ENABLE_SHARED)
 
 include (${CADO_NFS_SOURCE_DIR}/config/pthreads.cmake)
 include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
-
-# The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU CC
-# idioms. As it is not used in production yet, we don't want to expose it
-# on 32-bit platforms.
-set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_INLINE_ASM})
-
-set(MPFQ_PRIME_FIELDS_FOR_DLOG p_1 p_2 p_3 p_4 p_8 pz)
-set(COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG)
-foreach(v ${MPFQ_PRIME_FIELDS_FOR_DLOG})
-    set(COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG ${COOKED_MPFQ_PRIME_FIELDS_FOR_DLOG} "DO(${v})")
-endforeach(v)
 
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 
@@ -242,14 +232,9 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 ############################################################
 
 
-set(package_basename ${CADO_DIST_ARCHIVE_NAME})
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
-set(example_subdir share/${package_basename}/examples)
 
-# These refer only to the place where files are put in the *build tree* !
-# set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
-# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/bin")
-
+# TODO: get rid of example_subdir
+set(example_subdir ${DATASUFFIX})
 
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
@@ -287,7 +272,7 @@ add_custom_target(dist
     WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
 )
 
-install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
+install(DIRECTORY params/ DESTINATION ${DATASUFFIX} FILES_MATCHING PATTERN "params.*")
 
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/factor.sh
@@ -306,7 +291,11 @@ foreach(script magma-linalg-wrapper.sh magma-nmbrthry-wrapper.sh
 endforeach(script)
 
 
-install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
+install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION ${BINSUFFIX})
+
+message(STATUS "Binaries will go to ${CMAKE_INSTALL_PREFIX}/${BINSUFFIX}")
+message(STATUS "Libraries will go to ${CMAKE_INSTALL_PREFIX}/${LIBSUFFIX}")
+message(STATUS "Data will go to ${CMAKE_INSTALL_PREFIX}/${DATASUFFIX}")
 
 IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
   include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")

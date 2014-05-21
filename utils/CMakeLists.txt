@@ -60,7 +60,9 @@ add_library (utils_with_io ${CADO_SHARED} ${sources_io})
 target_link_libraries(utils_with_io utils)
 add_dependencies(utils_with_io antebuffer)
 
-install(TARGETS utils utils_with_io DESTINATION lib/${package_basename})
+if(ENABLE_SHARED)
+install(TARGETS utils utils_with_io DESTINATION ${LIBSUFFIX})
+endif(ENABLE_SHARED)
 
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
@@ -85,5 +87,5 @@ target_link_libraries(antebuffer pthread)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
-install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION bin/utils)
-install(TARGETS cut_n_roots roots gmp_nextprime antebuffer RUNTIME DESTINATION bin/utils)
+install(TARGETS gmp_prob_prime random_integer RUNTIME DESTINATION ${BINSUFFIX}/utils)
+install(TARGETS cut_n_roots roots gmp_nextprime antebuffer RUNTIME DESTINATION ${BINSUFFIX}/utils)

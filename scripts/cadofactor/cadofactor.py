@@ -3,6 +3,12 @@ import os
 import sys
 import argparse
 import logging
+
+import re
+cado_python_libs_path="@CMAKE_INSTALL_PREFIX@/@LIBSUFFIX@"
+if re.search("/", cado_python_libs_path):
+    sys.path.append(cado_python_libs_path)
+
 import cadologger
 import cadotask
 import cadoparams

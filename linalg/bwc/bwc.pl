@@ -99,7 +99,7 @@ my $hostfile;
 ## mpiexec is substituted by cmake in case mpi has been used for the
 ## compilation. NOTE that this means that a priori, mpiexec _must_ be
 ## used for running all programs.
-my $mpiexec='@MPIEXEC@';
+my $mpiexec='';
 
 ## The mpi_extra_args argument is used to pass information to the mpiexec 
 ## command. The idea is that mpiexec, the mpi driver program, may need

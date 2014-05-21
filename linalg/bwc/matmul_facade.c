@@ -1,3 +1,5 @@
+#include "cado.h"
+#include "bwc_config.h"
 #include "matmul_facade.h"
 
 void MATMUL_NAME(rebind)(matmul_ptr mm)

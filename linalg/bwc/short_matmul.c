@@ -152,6 +152,11 @@ void short_matmul(FILE * out, FILE * v,  const char * uri, int mul_left)
     free(vec);
 }
 
+void usage()
+{
+    fprintf(stderr, "Usage: short-matmul <matrix file> <vector file>\n");
+    exit(1);
+}
 int main(int argc, char * argv[])
 {
     int mul_left = 0;
@@ -162,8 +167,7 @@ int main(int argc, char * argv[])
         }
     }
     if (argc != 3) {
-        fprintf(stderr, "Usage: short-matmul <matrix file> <vector file>\n");
-        exit(1);
+        usage();
     }
     /*
     FILE * m = fopen(argv[1], "rb");

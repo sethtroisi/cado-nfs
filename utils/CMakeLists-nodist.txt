@@ -4,7 +4,7 @@ add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c cachesize_cpuid.c
 
 add_executable(qrange_to_qlist qrange_to_qlist.c)
 target_link_libraries(qrange_to_qlist utils)
-install(TARGETS qrange_to_qlist RUNTIME DESTINATION bin/utils)
+install(TARGETS qrange_to_qlist RUNTIME DESTINATION ${BINSUFFIX}/utils)
 
 
 #utils lib for ffs

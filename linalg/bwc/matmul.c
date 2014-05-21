@@ -9,12 +9,13 @@
 #include <sys/statvfs.h>
 #endif
 
+#include "bwc_config.h"
+
 #ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
 #include <dlfcn.h>
 #endif
 
 
-#include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-libnames.h"
 #include "portability.h"
@@ -37,8 +38,11 @@ void (*get_rebinder(const char * impl, const char * dimpl))(matmul_ptr mm)
 {
     if (0) {
         return NULL;
-    /* This list MUST be in sync with the corresponding one in
-     * linalg/bwc/CMakeLists.txt, or at the bare minimum be a subset. */
+#define DO(x, y) CONFIGURE_MATMUL_LIB(x, y)
+    COOKED_BWC_BACKENDS;
+    /* There's a cmake-defined macro in cado_config.h which exposes the
+     * configuration settings. Its expansion is something like:
+     *
     CONFIGURE_MATMUL_LIB(u64k1     , bucket)
     CONFIGURE_MATMUL_LIB(u64k2     , bucket)
     CONFIGURE_MATMUL_LIB(u64k1     , basic)
@@ -47,17 +51,12 @@ void (*get_rebinder(const char * impl, const char * dimpl))(matmul_ptr mm)
     CONFIGURE_MATMUL_LIB(u64k2     , sliced)
     CONFIGURE_MATMUL_LIB(u64k1     , threaded)
     CONFIGURE_MATMUL_LIB(u64k2     , threaded)
-#ifdef ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
-#define DO(x) CONFIGURE_MATMUL_LIB(x, basicp)
-    MPFQ_PRIME_FIELDS_FOR_DLOG;
-    /*
     CONFIGURE_MATMUL_LIB(p_1       , basicp)
     CONFIGURE_MATMUL_LIB(p_2       , basicp)
     CONFIGURE_MATMUL_LIB(p_3       , basicp)
     CONFIGURE_MATMUL_LIB(p_4       , basicp)
     CONFIGURE_MATMUL_LIB(p_8       , basicp)
     */
-#endif
     } else {
         fprintf(stderr, "Cannot find the proper rebinder for data backend = %s and matmul backend = %s ; are the corresponding configuration lines present both in " __FILE__ " and linalg/bwc/CMakeLists.txt ?\n", dimpl, impl);
         return NULL;
