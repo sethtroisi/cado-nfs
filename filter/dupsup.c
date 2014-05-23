@@ -17,13 +17,15 @@
 #include "relation.h"
 #include "params.h"
 #include "cado_poly.h"
+#include "gzip.h"
 #include "sieve/las-duplicate.h"
 #include "sieve/las-coordinates.h"
 
 static void *
 dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
 {
-  gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n", sq, rho, side);
+  if (0)
+    gmp_fprintf (output, "# sq = %Zd, rho = %Zd, side = %d\n", sq, rho, side);
   fprint_relation(output, rel, is_dupe ? "# DUPE " : "");
   return NULL;
 }
@@ -210,7 +212,7 @@ main (int argc, char * argv[])
     mpz_init(rho);
 
     for (int argi = 0; argi < argc; argi++) {
-      FILE *f = fopen(argv[argi], "rb");
+      FILE *f = fopen_maybe_compressed(argv[argi], "rb");
       sieve_info_ptr si = NULL;
       while (!feof(f)) {
         char line[1024];
@@ -221,6 +223,8 @@ main (int argc, char * argv[])
           break;
         if (read_sq_comment(sq, rho, &side, line)) {
           unsigned long limits[2] = {conf->sides[0]->lim, conf->sides[1]->lim};
+          if (si != NULL)
+            clear_sieve_info(si);
           si = fill_in_sieve_info(sq, rho, side, 1U << conf->logI, 1U << (conf->logI - 1),
                                   limits, strategy, cpoly, conf);
         } else if (read_relation(&rel, line)) {
@@ -231,10 +235,12 @@ main (int argc, char * argv[])
         }
         relation_clear(&rel);
       }
-      fclose(f);
+      fclose_maybe_compressed(f, argv[argi]);
       clear_sieve_info(si);
     }
     
+    for (int side = 0; side < 2; side++)
+      facul_clear_strategy(strategy[side]);
     cado_poly_clear(cpoly);
     mpz_clear(sq);
     mpz_clear(rho);
