@@ -18,7 +18,6 @@ m = 14849204829709953721577291784724593124898329527333780861554
 
 $ cat c59.poly
 n: 71641520761751435455133616475667090434063332228247871795429
-m: 14849204829709953721577291784724593124898329527333780861554
 skew: 1.29196058385
 c0: 44337721223995
 c1: 75006949764904
@@ -60,7 +59,7 @@ $ check_rels -check_primality -complete rels.ok -poly c59.poly rels
   - Add the following to have characters also on the "rational" side:
     tasks.linalg.characters.nratchars = 25
 
-Here is an example of lines added to params.c59:
+Here is an example of lines added at the end of params.c59:
 
 slaves.nrclients = 2
 tasks.execpath = ${HOME}/svn/cado-nfs/build/coing
@@ -73,6 +72,7 @@ tasks.polyselect.admax = 0
 tasks.polyselect.import = /tmp/c59.poly
 tasks.sieve.import = /tmp/rels
 tasks.linalg.characters.nratchars = 25
+tasks.sieve.rels_wanted = 0
 
 4) Run the script:
    scripts/cadofactor/cadofactor.py params.c59
