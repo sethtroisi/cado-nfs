@@ -6,7 +6,7 @@
 #include "portability.h"
 #include "utils.h"
 
-#define RENUMBER_DO_EXPENSIVE_CHECK
+//#define RENUMBER_DO_EXPENSIVE_CHECK
 
 /********************** internal functions *****************************/
 
