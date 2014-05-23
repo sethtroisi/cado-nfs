@@ -65,6 +65,7 @@ filter/filter_common.c
 filter/filter_common.h
 filter/dup1.c
 filter/dup2.c
+filter/dupsup.c
 filter/explain.c
 filter/filter_matrix.c
 filter/filter_matrix.h

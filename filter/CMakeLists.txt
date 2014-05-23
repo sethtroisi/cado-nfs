@@ -32,6 +32,9 @@ target_link_libraries(reconstructlog-dl utils_with_io)
 add_executable(sm sm.c)
 target_link_libraries(sm utils_with_io)
 
+add_executable(dupsup dupsup.c ../sieve/las-duplicate.c ../sieve/las-norms.c ../sieve/las-qlattice.c ../sieve/las-coordinates.c ../sieve/las-cofactor.c)
+target_link_libraries(dupsup utils_with_io facul)
+
 install(TARGETS ${bin_list} RUNTIME DESTINATION ${BINSUFFIX}/filter)
 
 include(CMakeLists-nodist.txt OPTIONAL)
