@@ -664,6 +664,8 @@ sieve/las-smallsieve.h
 sieve/las-types.h
 sieve/las-unsieve.c
 sieve/las-unsieve.h
+sieve/las-cofactor.c
+sieve/las-cofactor.h
 sieve/las.c
 sieve/makefb.c
 sieve/makefb.sage

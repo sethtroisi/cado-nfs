@@ -13,7 +13,7 @@ target_link_libraries (makefb utils)
 set (las_sources las.c fb.c
     las-coordinates.c las-debug.c las-report-stats.c las-duplicate.c
     las-config.c bucket.c las-smallsieve.c las-unsieve.c las-arith.c
-    las-qlattice.c las-descent-helpers.cpp)
+    las-qlattice.c las-descent-helpers.cpp las-cofactor.c)
 set (las_libraries las-norms trialdiv facul utils ${pthread_libs})
 
 add_executable (las ${las_sources})

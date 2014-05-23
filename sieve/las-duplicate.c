@@ -69,6 +69,7 @@ Thus the function to check for duplicates needs the following information:
 #include "las-qlattice.h"
 #include "las-coordinates.h"
 #include "las-norms.h"
+#include "las-cofactor.h"
 
 
 static const int verbose = 1;
