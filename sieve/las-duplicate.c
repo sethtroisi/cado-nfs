@@ -59,35 +59,6 @@ Thus the function to check for duplicates needs the following information:
 */
 
 
-#if 0
-    From relation.h, copy-pasted for easy reference:
-
-    typedef struct {
-      unsigned long p;      /* rational prime */
-      int e;                /* exponent (may want negative exponent in sqrt) */
-    } rat_prime_t;
-
-    typedef struct {
-      unsigned long p;      /* algebraic prime */
-      unsigned long r;      /* corresponding root: r = a/b mod p */
-      int e;                /* exponent (may want negative exponent in sqrt) */
-    } alg_prime_t;
-
-    typedef struct {
-      int64_t a;	/* only a is allowed to be negative */
-      uint64_t b;
-      rat_prime_t *rp;	/* array of rational primes */
-      alg_prime_t *ap;	/* array of algebraic primes */
-      uint8_t nb_rp;	/* number of rational primes */
-      uint8_t nb_ap;	/* number of algebraic primes */
-      uint8_t nb_rp_alloc;	/* allocated space for rp */
-      uint8_t nb_ap_alloc;	/* allocated space for ap */
-    } relation_t;
-#endif
-
-
-
-
 #include "cado.h"
 #include <stdio.h>
 #include <gmp.h>
@@ -111,8 +82,8 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
   mpz_mod(r, r, p);
 }
 
-static sieve_info_ptr
-fill_in_sieve_info(const unsigned long p, const int64_t a, const uint64_t b,
+sieve_info_ptr
+fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const int sq_side, const uint32_t I, const uint32_t J,
                    const unsigned long limits[2], facul_strategy_t *strategy[2],
                    cado_poly_ptr cpoly, siever_config_srcptr conf)
@@ -132,10 +103,8 @@ fill_in_sieve_info(const unsigned long p, const int64_t a, const uint64_t b,
   /* Allocate memory */
   sieve_info_init_norm_data(new_si);
 
-  mpz_init(new_si->doing->p);
-  mpz_init(new_si->doing->r);
-  mpz_set_uint64(new_si->doing->p, p);
-  compute_a_over_b_mod_p(new_si->doing->r, a, b, new_si->doing->p);
+  mpz_init_set(new_si->doing->p, q);
+  mpz_init_set(new_si->doing->r, rho);
   new_si->doing->side = sq_side;
 
   for (int side = 0; side < 2; side++) {
@@ -160,8 +129,14 @@ fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_
 {
   const unsigned long lim[2] = {old_si->conf->sides[0]->lim, old_si->conf->sides[1]->lim};
   facul_strategy_t *strategies[2] = {old_si->sides[0]->strategy, old_si->sides[1]->strategy};
-  return fill_in_sieve_info(p, a, b, old_si->doing->side, old_si->I, old_si->J,
+  mpz_t sq, rho;
+  mpz_init_set_ui(sq, p);
+  mpz_init(rho);
+  compute_a_over_b_mod_p(rho, a, b, sq);
+  return fill_in_sieve_info(sq, rho, old_si->doing->side, old_si->I, old_si->J,
                             lim, strategies, old_si->cpoly, old_si->conf);
+  mpz_clear(sq);
+  mpz_clear(rho);
 }
 
 static void
@@ -197,8 +172,6 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
   }
   ASSERT_ALWAYS(sq == 0 || saw_sq);
 }
-
-#define WRAP(x) x
 
 /* Return 1 if the relation is probably a duplicate of an relation found
    when sieving the sq described by si. Return 0 if it is probably not a
