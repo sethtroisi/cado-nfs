@@ -1304,6 +1304,77 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
   return (unsigned int) Jmax;
 }
 
+
+/* return 0 if we should discard that special-q, in which case we intend
+ * to discard this special-q. For this reason, si->J is then set to an
+ * unrounded value, for diagnostic.
+ *
+ * The current check for discarding is whether we do fill one bucket or
+ * not. If we don't even achieve that, we should of course discard.
+ *
+ * Now for efficiency reasons, the ``minimum reasonable'' number of
+ * buckets should be more than that.
+ */
+int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
+{
+    /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
+       and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
+       Assume |u'| <= |v'|.
+       We know from Gauss reduction that u' and v' form an angle of at
+       least pi/3, thus since their determinant is q*s, we have
+       |u'|^2 <= |u'| * |v'| <= q*s/sin(pi/3) = 2*q*s/sqrt(3).
+       Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B.
+
+       If we take J <= I/2*min(s*B/|a1|, B/|b1|), then for any j <= J:
+       |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
+       |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
+    */
+    const double skewness = si->conf->skewness;
+    const int verbose = 0;
+    if (verbose) {
+        printf("# Called sieve_info_adjust_IJ((a0=%" PRId64 "; b0=%" PRId64
+               "; a1=%" PRId64 "; b1=%" PRId64 "), p=%lu, skew=%f, nb_threads=%d)\n",
+               si->a0, si->b0, si->a1, si->b1, mpz_get_ui(si->doing->p), skewness, nb_threads);
+    }
+    double maxab1, maxab0;
+    maxab1 = si->b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
+    maxab0 = si->b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->a0 * si->a0;
+    if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
+        int64_t oa[2] = { si->a0, si->a1 };
+        int64_t ob[2] = { si->b0, si->b1 };
+        si->a0 = oa[1]; si->a1 = oa[0];
+        si->b0 = ob[1]; si->b1 = ob[0];
+    }
+    maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
+    /* make sure J does not exceed I/2 */
+    /* FIXME: We should not have to compute this B a second time. It
+     * appears in sieve_info_init_norm_data already */
+    double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
+    if (maxab1 >= B * skewness)
+        si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
+    else
+        si->J = si->I >> 1;
+
+    /* Make sure the bucket region size divides the sieve region size, 
+       partly covered bucket regions may lead to problems when 
+       reconstructing p from half-empty buckets. */
+    /* Compute number of i-lines per bucket region, must be integer */
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
+    uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+    i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
+
+    /* Bug 15617: if we round up, we are not true to our promises */
+    uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
+
+    if (verbose) printf("# %s(): Final J=%" PRIu32 "\n", __func__, nJ);
+    /* XXX No rounding if we intend to abort */
+    if (nJ > 0) si->J = nJ;
+    return nJ > 0;
+}/*}}}*/
+
+
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
 /*
