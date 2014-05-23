@@ -82,7 +82,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
   fprintf(stdout, "\n# Building %" PRIu64 " relation-sets\n", *small_nrows);
   fflush(stdout);
   stats_init (stats, stdout, nbits(*small_nrows)-5, "Computed", "relation-sets",
-              "relsets");
+              "", "relsets");
   for(uint64_t i = 0 ; i < *small_nrows ; i++)
   {
     ret = fscanf(ix, "%" SCNu64 "", &len_relset);
@@ -98,9 +98,9 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
 
     if (stats_test_progress(stats, i))
-      stats_print_progress (stats, i, 0);
+      stats_print_progress (stats, i, 0, 0, 0);
   }
-  stats_print_progress (stats, *small_nrows, 1);
+  stats_print_progress (stats, *small_nrows, 0, 0, 1);
   fclose_maybe_compressed(ix, indexname);
 
   for (uint64_t i = 0; i < nrows; i++)
@@ -187,7 +187,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   }
 
   // Main loop
-  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "SMs");
+  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "", "SMs");
   while ((i < sr) || (active_threads > 0)) {
     // Start / restart as many threads as allowed
     if ((active_threads < nt) && (i < sr)) { 
@@ -210,7 +210,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
 
     // report
     if (stats_test_progress(stats, out_cpt))
-      stats_print_progress (stats, out_cpt, 0);
+      stats_print_progress (stats, out_cpt, 0, 0, 0);
 
     // If we are at the end, no job will be restarted, but head still
     // must be incremented.
@@ -220,7 +220,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
         threads_head = 0;
     }
   }
-  stats_print_progress (stats, sr, 1);
+  stats_print_progress (stats, sr, 0, 0, 1);
 
   mpz_clear(invl2);
   fclose(out);
@@ -250,16 +250,16 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
-  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "SMs");
+  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "", "SMs");
   for (uint64_t i=0; i<sr; i++) {
     mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm, F->deg);
     // report
     if (stats_test_progress(stats, i))
-      stats_print_progress (stats, i, 0);
+      stats_print_progress (stats, i, 0, 0, 0);
   }
-  stats_print_progress (stats, sr, 1);
+  stats_print_progress (stats, sr, 0, 0, 1);
 
   mpz_poly_clear (SM);
   mpz_clear(invl2);

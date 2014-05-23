@@ -12,6 +12,7 @@ struct stats_struct_s {
   const char *name;
   const char *abbrv;
   const char *verb;
+  const char *outofname;
 };
 
 typedef struct stats_struct_s stats_data_t[1];
@@ -21,10 +22,9 @@ typedef struct stats_struct_s * stats_data_ptr;
 extern "C" {
 #endif
 void stats_init (stats_data_t, FILE *, uint8_t, const char *, const char *,
-                 const char *);
+                 const char *, const char *);
 int stats_test_progress (stats_data_t, uint64_t);
-void stats_print_progress (stats_data_t, uint64_t, int);
-void stats_print_progress_with_MBs (stats_data_t, uint64_t, size_t, int);
+void stats_print_progress (stats_data_t, uint64_t, uint64_t, size_t, int);
 #ifdef __cplusplus
 }
 #endif

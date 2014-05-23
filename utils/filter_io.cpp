@@ -944,7 +944,12 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* {{{ main loop */
     /* will print report at 2^10, 2^11, ... 2^23 read rels and every 2^23 rels
      * after that */
-    stats_init (infostats, stdout, 23, "Read", "relations", "rels");
+    if (!active)
+      stats_init (infostats, stdout, 23, "Read", "relations", "", "rels");
+    else
+      stats_init (infostats, stdout, 23, "Read", "active rels", "read rels",
+                  "rels");
+
     inflight->enter(0);
     for(size_t avail_seen = 0 ; ; ) {
         pthread_mutex_lock(rb->mx);
@@ -981,8 +986,13 @@ uint64_t filter_rels2_inner(char ** input_files,
             ringbuf_skip_get(rb, nl);
             avail_seen -= nl;
             avail_offset += nl;
-            if (stats_test_progress(infostats, nactive))
-              stats_print_progress_with_MBs (infostats, nactive, nB, 0);
+            if (stats_test_progress(infostats, nrels))
+            {
+              if (!active)
+                stats_print_progress (infostats, nrels, 0, nB, 0);
+              else
+                stats_print_progress (infostats, nactive, nrels, nB, 0);
+            }
         }
     }
     inflight->drain();
@@ -1000,7 +1010,10 @@ uint64_t filter_rels2_inner(char ** input_files,
 
     /* NOTE: the inflight dtor is called automatically */
 
-    stats_print_progress_with_MBs (infostats, nactive, nB, 1);
+    if (!active)
+      stats_print_progress (infostats, nrels, 0, nB, 1);
+    else
+      stats_print_progress (infostats, nactive, nrels, nB, 1);
 
     /* clean producer stuff */
     ringbuf_clear(rb);

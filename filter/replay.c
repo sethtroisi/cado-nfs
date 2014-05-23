@@ -424,13 +424,13 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     stats_data_t stats; /* struct for printing progress */
     /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
      * 2^23 primes after that */
-    stats_init (stats, stdout, 23, "Read", "row additions", "line");
+    stats_init (stats, stdout, 23, "Read", "row additions", "", "line");
     while(fgets(str, STRLENMAX, hisfile))
     {
       addread++;
 
       if (stats_test_progress(stats, addread))
-        stats_print_progress (stats, addread, 0);
+        stats_print_progress (stats, addread, 0, 0, 0);
 
       if(str[strlen(str)-1] != '\n')
       {
@@ -456,7 +456,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
 	      }
 	    }
     }
-    stats_print_progress (stats, addread, 1);
+    stats_print_progress (stats, addread, 0, 0, 1);
 }
 
 typedef struct

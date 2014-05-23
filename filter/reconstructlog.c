@@ -715,7 +715,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
 
   mpz_init (tmp_log);
   i = 0;
-  stats_init (stats, stdout, nbits(ncols)-5, "Read", "logarithms", "logs");
+  stats_init (stats, stdout, nbits(ncols)-5, "Read", "logarithms", "", "logs");
   while (fscanf (fid, "%" SCNu64 " %" PRid "\n", &col, &h) == 2)
   {
     FATAL_ERROR_CHECK (col >= ncols, "Too big value of column number");
@@ -728,9 +728,9 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
     logtab_insert (log, h, tmp_log);
     i++;
     if (stats_test_progress (stats, i))
-      stats_print_progress (stats, i, 0);
+      stats_print_progress (stats, i, 0, 0, 0);
   }
-  stats_print_progress (stats, i, 1);
+  stats_print_progress (stats, i, 0, 0, 1);
   ASSERT_ALWAYS (feof(fid));
   ASSERT_ALWAYS (i == ncols);
 
@@ -769,7 +769,8 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
 
   mpz_init (tmp_log);
-  stats_init (stats, stdout, nbits(renumb->size)-5, "Read", "logarithms", "logs");
+  stats_init (stats, stdout, nbits(renumb->size)-5, "Read", "logarithms", "",
+              "logs");
   if (renumb->add_full_col)
   {
     ret = gmp_fscanf (f, "%" SCNid " added column %Zd\n", &h, tmp_log);
@@ -793,9 +794,9 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
     nread++;
     logtab_insert (log, h, tmp_log);
     if (stats_test_progress (stats, nread))
-      stats_print_progress (stats, nread, 0);
+      stats_print_progress (stats, nread, 0, 0, 0);
   }
-  stats_print_progress (stats, nread, 1);
+  stats_print_progress (stats, nread, 0, 0, 1);
 
   for (unsigned int nsm = 0; nsm < log->nbsm; nsm++)
   {
@@ -835,7 +836,7 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
   FATAL_ERROR_CHECK(f == NULL, "Cannot open file for writing");
 
   stats_init (stats, stdout, nbits(tab->size)-5, "Wrote", "known logarithms",
-                                                 "logs");
+                                                 "ideals", "logs");
   uint64_t nknown = 0;
   for (i = 0; i < tab->size; i++)
   {
@@ -864,10 +865,10 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
                                                                   log->tab[i]);
       }
       if (stats_test_progress (stats, nknown))
-        stats_print_progress (stats, nknown, 0);
+        stats_print_progress (stats, nknown, i+1, 0, 0);
     }
   }
-  stats_print_progress (stats, nknown, 1);
+  stats_print_progress (stats, nknown, tab->size, 0, 1);
   for (unsigned int nsm = 0, i = tab->size; nsm < log->nbsm; nsm++)
   {
     ASSERT_ALWAYS (mpz_sgn (log->tab[i+nsm]) >= 0);

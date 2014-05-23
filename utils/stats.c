@@ -5,7 +5,7 @@
 
 void
 stats_init (stats_data_t r, FILE *f, uint8_t max_log_report, const char *verb,
-            const char *name, const char *abbrv)
+            const char *name, const char *outofname, const char *abbrv)
 {
   r->last_report = 0;
   r->t0 = wct_seconds();
@@ -18,6 +18,7 @@ stats_init (stats_data_t r, FILE *f, uint8_t max_log_report, const char *verb,
   r->name = name;
   r->abbrv = abbrv;
   r->verb = verb;
+  r->outofname = outofname;
 }
 
 /* Return 1 if more than 2^r->log_report relations were read since last
@@ -33,38 +34,33 @@ stats_test_progress (stats_data_t r, uint64_t i)
 }
 
 /* Print a line of the form: 
-      (Done: )(verb) N (name) in Xs -- S(abbrv)/s
-*/
+ *    Read 42 relations in 1.4s -- 30.0 rels/s
+ * Prepend a "Done: " if end is non-zero.
+ * Add "-- xy.z MB/s " in the middle, if nByte > 0, with xy.z being
+ * nByte/time spent.
+ * Add "(out of <outof> ssss) " in the middle, if outof > 0, with ssss being
+ * r->outofname.
+ */
 void
-stats_print_progress (stats_data_t r, uint64_t i, int end)
+stats_print_progress (stats_data_t r, uint64_t i, uint64_t outof, size_t nByte,
+                      int end)
 {
+  char MBpart[32] = "";
+  char outofpart[64] = "";
   double t, dt, speed;
   t = wct_seconds();
   dt = t - r->t0;
   speed = dt > 0.01 ? i/dt : INFINITY;
+  if (nByte > 0)
+  {
+    double mb_s = dt > 0.01 ? (nByte/dt * 1.0e-6) : INFINITY;
+    snprintf (MBpart, 32, "-- %.1f MB/s ", mb_s);
+  }
+  if (outof > 0)
+    snprintf (outofpart, 64, "(out of %" PRIu64 " %s) ", outof, r->outofname);
   const char * prefix = (end) ? "Done: " : "";
-  fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f %s/s\n",
-                  prefix, r->verb, i, r->name, dt, speed, r->abbrv);
-  fflush(r->out);
-  if (r->log_report < r->max_log_report)
-    r->log_report++;
-  r->last_report = (i >> r->log_report);
-}
-
-/* Print a line of the form: 
-      (Done: )(verb) N (name) in Xs -- S MB/s -- S' (abbrv)/s
-*/
-void
-stats_print_progress_with_MBs (stats_data_t r, uint64_t i, size_t nByte, int end)
-{
-  double t, dt, speed, mb_s;
-  t = wct_seconds();
-  dt = t - r->t0;
-  speed = dt > 0.01 ? i/dt : INFINITY;
-  mb_s = dt > 0.01 ? (nByte/dt * 1.0e-6) : INFINITY;
-  const char * prefix = (end) ? "Done: " : "";
-  fprintf(r->out, "%s%s %" PRIu64 " %s in %.1fs -- %.1f MB/s -- %.1f %s/s\n",
-                  prefix, r->verb, i, r->name, dt, mb_s, speed, r->abbrv);
+  fprintf(r->out, "%s%s %" PRIu64 " %s %sin %.1fs %s-- %.1f %s/s\n",
+          prefix, r->verb, i, r->name, outofpart, dt, MBpart, speed, r->abbrv);
   fflush(r->out);
   if (r->log_report < r->max_log_report)
     r->log_report++;
