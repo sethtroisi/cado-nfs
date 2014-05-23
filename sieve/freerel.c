@@ -79,10 +79,9 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     pmax = lpb[min_side];
   ASSERT_ALWAYS (pmax <= lpb[min_side]);
 
-  fprintf (stderr, "Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
-  fprintf (stderr, "Generating renumber table for 2 <= p <= %lu\n",
-                   lpb[max_side]);
-
+  printf ("Generating freerels for %lu <= p <= %lu\n", pmin, pmax);
+  printf ("Generating renumber table for 2 <= p <= %lu\n", lpb[max_side]);
+  fflush (stdout);
 
   stats_data_t stats; /* struct for printing progress */
   uint64_t nb_p = 0;
@@ -201,6 +200,7 @@ main (int argc, char *argv[])
     }
     /* print command-line arguments */
     param_list_print_command_line (stdout, pl);
+    printf ("\n");
     fflush(stdout);
 
     polyfilename = param_list_lookup_string(pl, "poly");
@@ -248,15 +248,21 @@ main (int argc, char *argv[])
       usage (pl, argv0);
     }
 
-    renumber_init (renumber_table, cpoly, lpb);
-    renumber_init_write (renumber_table, renumberfilename, badidealsfilename,
-                         add_full_col);
+    int ratside = cado_poly_get_ratside (cpoly);
+    renumber_init_for_writing (renumber_table, ratside, add_full_col, lpb);
+    renumber_write_open (renumber_table, renumberfilename, badidealsfilename,
+                         cpoly);
 
     nfree = allFreeRelations (cpoly, pmin, pmax, lpb, renumber_table,
                               outfilename);
-    fprintf (stderr, "# Free relations: %lu\n", nfree);
 
-    renumber_close_write (renumber_table, renumberfilename);
+    /* /!\ Needed by the Python script. /!\ */
+    fprintf (stderr, "# Free relations: %lu\n", nfree);
+    fprintf (stderr, "Renumbering struct: nprimes=%" PRIu64 "\n",
+                     renumber_table->size);
+
+    renumber_write_close (renumber_table, renumberfilename);
+    renumber_clear (renumber_table);
     cado_poly_clear (cpoly);
     param_list_clear(pl);
 

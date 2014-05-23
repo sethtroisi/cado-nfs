@@ -259,7 +259,6 @@ uint64_t freerels_mono (ffspol_t pol[2], int lpb[2], int min_deg, int max_deg,
   d[1] = pol[1]->deg;
   roots[0] = (unsigned long*) malloc (d[0] * sizeof (unsigned long));
   roots[1] = (unsigned long*) malloc (d[1] * sizeof (unsigned long));
-  fprintf(stderr, "lpb[0]=%d lpb[1]=%d\n", lpb[0], lpb[1]);
 
   while (sq_deg(p) <= max_deg)
   {
@@ -328,7 +327,6 @@ int main(int argc, char **argv)
 
     param_list pl;
     param_list_init(pl);
-    param_list_configure_switch(pl, "addfullcol", &add_full_col);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -359,6 +357,8 @@ int main(int argc, char **argv)
         }
     }
 
+    param_list_parse_int(pl, "addfullcol", &add_full_col);
+
     // read function field polynomials
     {
         const char * polstr;
@@ -385,34 +385,27 @@ int main(int argc, char **argv)
 
     param_list_parse_int(pl, "mt", &nthreads);
 
-
-    cado_poly dummy_poly;
     renumber_t tab;
-    cado_poly_init(dummy_poly);
 
-    dummy_poly->pols[0]->deg = ffspol[0]->deg;
-    dummy_poly->pols[1]->deg = ffspol[1]->deg;
     unsigned long dummy_lpb[2] = { __FP_BITS + __FP_BITS * lpb[0],
-                                  __FP_BITS + __FP_BITS * lpb[1]};
+                                   __FP_BITS + __FP_BITS * lpb[1]};
+    int rat;
+    if (ffspol[0]->deg != 1 && ffspol[1]->deg != 1)
+      rat = -1; /* two algrebraic sides */
+    else if (ffspol[0]->deg == 1)
+      rat = 0;
+    else
+      rat = 1;
 
-    if (dummy_poly->pols[1]->deg == 1)
-    {
-      dummy_poly->rat  = dummy_poly->pols[1];
-      dummy_poly->alg  = dummy_poly->pols[0];
-    }
-    else if (dummy_poly->pols[0]->deg == 1)
-    {
-      dummy_poly->rat  = dummy_poly->pols[0];
-      dummy_poly->alg  = dummy_poly->pols[1];
-    }
-
-    renumber_init(tab, dummy_poly, dummy_lpb);
-    renumber_init_write (tab, renumberfilename, badidealsfilename, add_full_col);
+  fprintf (stderr, "%d\n", add_full_col);
+    renumber_init_for_writing (tab, rat, add_full_col, dummy_lpb);
+    renumber_write_open (tab, renumberfilename, badidealsfilename, NULL);
 
     int max_deg = MAX(lpb[0], lpb[1]);
     int min_deg = MIN(lpb[0], lpb[1]);
-    fprintf (stderr, "Generating freerels up to degree %d\n", min_deg);
-    fprintf (stderr, "Generating renumber up to degree %d\n", max_deg);
+    printf ("Generating freerels up to degree %d\n", min_deg);
+    printf ("Generating renumber up to degree %d\n", max_deg);
+    fflush (stdout);
 
     uint64_t nrel;
     if (nthreads > 1)
@@ -420,11 +413,12 @@ int main(int argc, char **argv)
     else
       nrel = freerels_mono (ffspol, lpb, min_deg, max_deg, tab);
 
-    fprintf(stdin, "# Computed %" PRIu64 " free relations\n", nrel);
-    fprintf(stderr, "# Computed %" PRIu64 " free relations\n", nrel);
-    renumber_close_write(tab, renumberfilename);
+    printf ("# Free relations: %lu\n", nrel);
+    printf ("Renumbering struct: nprimes=%" PRIu64 "\n", tab->size);
+    fflush(stdout);
+    renumber_write_close (tab, renumberfilename);
+    renumber_clear (tab);
     param_list_clear(pl);
-    cado_poly_clear(dummy_poly);
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
 

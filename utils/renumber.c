@@ -5,8 +5,8 @@
 #include <ctype.h>
 #include "portability.h"
 #include "utils.h"
-//#include "gzip.h" /* for fopen_maybe_compress */
 
+#define RENUMBER_DO_EXPENSIVE_CHECK
 
 /********************** internal functions *****************************/
 
@@ -28,62 +28,60 @@ static const int ugly[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-static int
-copy_bad_ideals(const char * filename, FILE *out, uint64_t *size)
+/* Skip line beginning with '#'. Return 0 if fgets return NULL.*/
+static inline size_t
+get_one_line (FILE *f, char *s)
 {
-  FILE *file = fopen(filename, "r"); /* never compressed, always small */
-  ASSERT_ALWAYS(file != NULL);
-  char str[RENUMBER_MAXLINE], *ret;
-  int n = 0, nb, count, t;
-
+  char *rets;
+  size_t n;
   do
   {
-    int c = getc(file);
-    if (c == EOF)
-      break;
-    if (c == '#')
+    rets = fgets(s, RENUMBER_MAXLINE, f);
+    if (rets == NULL)
     {
-      // skip line
-      c = ungetc(c, file);
-      ASSERT_ALWAYS(c != EOF);
-      ret = fgets(str, RENUMBER_MAXLINE, file);
-      continue;
+      n = 0;
+      break;
     }
-    c = ungetc(c, file);
-    ASSERT_ALWAYS(c != EOF);
+    else if (rets[0] != '#')
+    {
+      n = strnlen(s, RENUMBER_MAXLINE);
+      ASSERT_ALWAYS(n != RENUMBER_MAXLINE);
+      break;
+    }
+    // else we skip the line
+  } while (1);
+  return n;
+}
 
-    ret = fgets(str, RENUMBER_MAXLINE, file);
-    ASSERT_ALWAYS(ret != NULL);
-    size_t check = strnlen(str, RENUMBER_MAXLINE);
-    ASSERT_ALWAYS(check != RENUMBER_MAXLINE);
+static void
+parse_bad_ideals_file (FILE *badfile, renumber_t renum)
+{
+  renum->bad_ideals.n = 0;
+  char s[RENUMBER_MAXLINE];
 
-    const char *ptr = str;
-    for (count = 0 ; *ptr != '\n'; ptr++)
-      if (*ptr == ':')
+  while (get_one_line (badfile, s) != 0)
+  {
+    renum->bad_ideals.n++;
+    const char *ptr = s;
+    int nb, t;
+    for (int count = 0 ; *ptr != '\n'; ptr++)
+    {
+      if (!(isspace(ptr[0])))
       {
-        if (count == 0)
-          count = 1;
-        else
+        if (ptr[0] == ':')
+          count++;
+        else if (count >= 2)
           break;
       }
+    }
 
-    ASSERT_ALWAYS(*ptr == ':');
-    ptr++;
-    while (isspace(ptr[0]))
-      ptr++;
-    for (nb = 0 ; (t=ugly[(unsigned char) *ptr]) >= 0; ptr++)
+    for (nb = 0; (t = ugly[(unsigned char) *ptr]) >= 0; ptr++)
       nb = (nb * 10) + t;
-    ASSERT_ALWAYS(*ptr == '\n');
-    *size += nb;
 
-    int r = fputs (str, out);
-    ASSERT_ALWAYS (r >= 0);
-    n++;
-  } while (1);
-
-  fclose(file);
-
-  return n;
+    ASSERT_ALWAYS (*ptr == '\n');
+    renum->size += nb;
+  }
+  ASSERT_ALWAYS (feof (badfile));
 }
 
 static void
@@ -140,13 +138,13 @@ parse_one_line (char * str)
 static void
 print_info (FILE * f, renumber_t r)
 {
-  fprintf (f, "### INFO on renumber struct\n# INFO: nb_bits = %" PRIu8 "\n"
-              "# INFO: sizeof(p_r_values_t) = %zu\n# INFO: rat = %d %s\n"
-              "# INFO: lpb0 = %lu\n# INFO: lpb1 = %lu\n"
-              "# INFO: #badideals = %d\n# INFO: add_full_col = %d\n",
-              r->nb_bits, sizeof(p_r_values_t), r->rat,
-              (r->rat == -1) ? "(no rational side)" : "", r->lpb0, r->lpb1,
-              r->bad_ideals.n, r->add_full_col);
+  fprintf (f, "# INFO on renumber struct:\n# INFO: sizeof(p_r_values_t) = %zu\n"
+              "# INFO: nb_bits = %" PRIu8 "\n# INFO: rat = %d %s\n"
+              "# INFO: #badideals = %d\n# INFO: add_full_col = %d\n"
+              "# INFO: lpb0 = %lu\n# INFO: lpb1 = %lu\n",
+              sizeof(p_r_values_t), r->nb_bits, r->rat,
+              (r->rat == -1) ? "(no rational side)" : "", r->bad_ideals.n,
+              r->add_full_col, r->lpb0, r->lpb1);
 }
 
 /* sort in decreasing order */
@@ -163,49 +161,6 @@ sort (unsigned long *r, int n)
       r[j] = r[j - 1];
     r[j] = v;
   }
-}
-
-static void
-renumber_alloc (renumber_t tab)
-{
-  // Allocate the renumbering table
-  tab->table = (p_r_values_t *) malloc (tab->size * sizeof(p_r_values_t));
-  ASSERT_ALWAYS (tab->table != NULL);
-  // Allocate the cached table
-  tab->cached = (index_t*) malloc ((2<<MAX_LOG_CACHED) * sizeof(index_t));
-  ASSERT_ALWAYS (tab->cached != NULL);
-  memset (tab->cached, 0, (2 << MAX_LOG_CACHED) * sizeof(index_t));
-  // Allocate memory for bad ideals
-  tab->bad_ideals.p = (p_r_values_t *) malloc(tab->bad_ideals.n *
-                                                    sizeof(p_r_values_t));
-  tab->bad_ideals.r = (p_r_values_t *) malloc(tab->bad_ideals.n *
-                                                    sizeof(p_r_values_t));
-  tab->bad_ideals.side = (int *) malloc(tab->bad_ideals.n * sizeof(int));
-  tab->bad_ideals.nb = (int *) malloc(tab->bad_ideals.n * sizeof(int));
-  ASSERT_ALWAYS(tab->bad_ideals.p != NULL);
-  ASSERT_ALWAYS(tab->bad_ideals.r != NULL);
-  ASSERT_ALWAYS(tab->bad_ideals.nb != NULL);
-  ASSERT_ALWAYS(tab->bad_ideals.side != NULL);
-
-}
-
-static inline size_t
-get_one_line (FILE *f, char *s)
-{
-  char *rets;
-  size_t n;
-  rets = fgets(s, RENUMBER_MAXLINE, f);
-  if (rets == NULL) {
-    if (feof(f)) {
-      fprintf (stderr, "renumber.c: get_one_line() reached EOF\n");
-    } else {
-      perror("renumber.c: get_one_line()");
-    }
-    abort();
-  }
-  n = strnlen(s, RENUMBER_MAXLINE);
-  ASSERT_ALWAYS(n != RENUMBER_MAXLINE);
-  return n;
 }
 
 /* return zero if no roots mod p, else non-zero */
@@ -240,53 +195,77 @@ get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
   return 0;
 }
 
+static void
+renumber_write_first_line (renumber_t renum)
+{
+  fprintf (renum->file, "%" PRIu8 " %d %d %d %lu %lu\n", renum->nb_bits,
+           renum->rat, renum->bad_ideals.n, renum->add_full_col, renum->lpb0,
+           renum->lpb1);
+}
+
+static void
+renumber_read_first_line (renumber_t renum)
+{
+  int ret;
+  ret = fscanf (renum->file, "%" SCNu8 " %d %d %d %lu %lu\n", &(renum->nb_bits),
+                &(renum->rat), &(renum->bad_ideals.n), &(renum->add_full_col),
+                &(renum->lpb0), &(renum->lpb1));
+  ASSERT_ALWAYS (ret == 6);
+  ASSERT_ALWAYS (renum->nb_bits <= 8 * sizeof(p_r_values_t));
+  ASSERT_ALWAYS (renum->nb_bits == 32 || renum->nb_bits == 64);
+}
+
+/* Assume v correspond to p + 1 or 2p + 1 (i.e. v > 0) */
+static p_r_values_t
+get_p_from_table_value (renumber_t tab, p_r_values_t v)
+{
+  if (tab->rat >= 0) /* One alg and one rat side -> p is v-1 */
+      return (v - 1);
+  else               /* Two alg sides -> p is (v-1)/2 */
+      return (v >> 1);
+}
+
 /*********************** End internal functions  ******************************/
 
-
 void
-renumber_init (renumber_t renumber_info, cado_poly pol, unsigned long lpb[])
+renumber_init_for_reading (renumber_t renumber_info)
 {
+  memset(renumber_info, 0, sizeof(renumber_t));
+  /* Will be set later, by renumber_read_table, with the values of the first
+   * line of the renumber file */
+}
 
-  if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
-    renumber_info->rat = -1;
-  else if (pol->pols[0]->deg == 1)
-    renumber_info->rat = 0;
+/* rat contains the rational side (0 or 1) or -1 if two algebraic sides.
+ * add_full_col is non-zero if we need to add a column of 1 in the matrix, 0
+ * otherwise (for factorization, always 0, for DL 1 if one of the polynomials is
+ * not monic). */
+void
+renumber_init_for_writing (renumber_t renumber_info, int rat, int add_full_col,
+                           unsigned long lpb[])
+{
+  memset(renumber_info, 0, sizeof(renumber_t));
+
+  ASSERT_ALWAYS (-1 <= rat && rat <= 1);
+  ASSERT_ALWAYS (add_full_col == 0 || add_full_col == 1);
+  ASSERT_ALWAYS (lpb != NULL);
+  renumber_info->rat = rat;
+  renumber_info->add_full_col = add_full_col;
+  renumber_info->lpb0 = lpb[0];
+  renumber_info->lpb1 = lpb[1];
+
+  int max_nb_bits = MAX(lpb[0], lpb[1]);
+  if (renumber_info->rat == -1) /* for two alg side, we need an extra bit. */
+    max_nb_bits++;
+
+  if (max_nb_bits <= 32)
+    renumber_info->nb_bits = 32;
   else
-    renumber_info->rat = 1;
-
-  if (lpb != NULL) {
-    renumber_info->lpb0 = lpb[1];
-    renumber_info->lpb1 = lpb[0];
-
-    int max_nb_bits = MAX(lpb[0], lpb[1]);
-    if (renumber_info->rat == -1)
-      max_nb_bits++;
-
-    if (max_nb_bits <= 32)
-      renumber_info->nb_bits = 32;
-    else
-      renumber_info->nb_bits = 64;
-    ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
-  } else { /* will be set later (by renumber_read_table) */
-    renumber_info->lpb0 = 0;
-    renumber_info->lpb1 = 0;
-    renumber_info->nb_bits = 0;
-  }
-
-  renumber_info->add_full_col = 0;
-  renumber_info->size = 0;
-  renumber_info->table = NULL;
-  renumber_info->file = NULL;
-  renumber_info->cached = NULL;
-  renumber_info->bad_ideals.n = 0;
-  renumber_info->bad_ideals.p = NULL;
-  renumber_info->bad_ideals.r = NULL;
-  renumber_info->bad_ideals.nb = NULL;
-  renumber_info->bad_ideals.side = NULL;
+    renumber_info->nb_bits = 64;
+  ASSERT_ALWAYS (renumber_info->nb_bits <= 8 * sizeof(p_r_values_t));
 }
 
 void
-renumber_free (renumber_t renumber_info)
+renumber_clear (renumber_t renumber_info)
 {
   if (renumber_info->table != NULL)
     free(renumber_info->table);
@@ -311,195 +290,173 @@ renumber_free (renumber_t renumber_info)
   renumber_info->bad_ideals.side = NULL;
 }
 
-/* The renumber_t struct MUST have been initialized before */
+/* The renumber_t struct _must_ have been initialized before
+ * poly = NULL is accepted. It will not print the polynomials on the file */
 void
-renumber_init_write (renumber_t tab, const char *tablefile, const char *badfile,
-                     int add_full_col)
+renumber_write_open (renumber_t tab, const char *tablefile, const char *badfile,
+                     cado_poly poly)
 {
-  // Open a file with no extension. Compression is done later if needed
-  char * tablefile_tmp = NULL;
-  int rc;
-  rc = asprintf(&tablefile_tmp, "%s-tmp", tablefile);
-  ASSERT_ALWAYS(rc >= 0);
-  fprintf (stderr, "Opening %s to write the temporary renumbering table\n",
-                   tablefile_tmp);
-  tab->file = fopen(tablefile_tmp, "w");
+  printf ("# Opening %s to write the renumbering table\n", tablefile);
+  fflush (stdout);
+  tab->file = fopen_maybe_compressed (tablefile, "w");
   ASSERT_ALWAYS(tab->file != NULL);
-
-  tab->add_full_col = (add_full_col) ? 1 : 0;
-  tab->size = (add_full_col) ? 1 : 0;
-
-  // Write first the bad ideals information at the beginning of file
+  FILE *fbad = NULL;
   if (badfile != NULL)
-    tab->bad_ideals.n = copy_bad_ideals (badfile, tab->file, &tab->size);
-  else
-    tab->bad_ideals.n = 0;
+  {
+    printf ("# Opening %s to read the bad ideals\n", badfile);
+    fbad = fopen(badfile, "r"); /* never compressed, always small */
+    ASSERT_ALWAYS (fbad != NULL);
+  }
 
-  print_info (stderr, tab);
-  free(tablefile_tmp);
+  tab->size = (tab->add_full_col) ? 1 : 0;
+
+  /* Read bad ideals files */
+  if (badfile != NULL)
+    parse_bad_ideals_file (fbad, tab); /* update size et bad_ideals.n */
+
+  /* Write the first line */
+  renumber_write_first_line (tab);
+
+  /* Print info on stdout (~ what is written on the first line of the file) */
+  print_info (stdout, tab);
+  fflush (stdout);
+
+  /* Write the two polynomials on a line beginning by #, if given */
+  if (poly != NULL)
+  {
+    fprintf (tab->file, "# ");
+    mpz_poly_fprintf (tab->file, poly->pols[0]);
+    fprintf (tab->file, "# ");
+    mpz_poly_fprintf (tab->file, poly->pols[1]);
+  }
+
+  /* Write first the bad ideals information at the beginning of file */
+  if (badfile != NULL)
+  {
+    char s[RENUMBER_MAXLINE];
+    rewind (fbad);
+    while (get_one_line (fbad, s) != 0)
+      fputs (s, tab->file);
+    ASSERT_ALWAYS (feof (fbad));
+  }
+
+  if (fbad != NULL)
+    fclose (fbad);
 }
 
 void
-renumber_close_write (renumber_t tab, const char *tablefile)
+renumber_write_close (renumber_t tab, const char *tablefile)
 {
-  char * tablefile_tmp = NULL;
-  int rc;
-  rc = asprintf(&tablefile_tmp, "%s-tmp", tablefile);
-  ASSERT_ALWAYS(rc >= 0);
-
-
-  // Compression is now if needed
-  FILE *final = NULL;
-  fclose(tab->file);
-  fprintf (stderr, "Opening %s to read the temporary renumbering table\n",
-                   tablefile_tmp);
-  tab->file = fopen(tablefile_tmp, "r");
-  ASSERT_ALWAYS(tab->file != NULL);
-  fprintf (stderr, "Opening %s to write the final renumbering table\n",
-                   tablefile);
-  final = fopen_maybe_compressed (tablefile, "w");
-  ASSERT_ALWAYS (final != NULL);
-
-  // First we put some data about the renumbering table.
-  fprintf (final, "%u %" PRIu64 " %d %d %lu %lu\n", tab->nb_bits, tab->size,
-                                     tab->bad_ideals.n, tab->add_full_col,
-                                     tab->lpb0, tab->lpb1);
-
-  char buffer[128] = "" , *retc;
-  do
-  {
-    int ret = fputs (buffer, final);
-    ASSERT_ALWAYS (ret >= 0);
-
-    retc = fgets (buffer, 128, tab->file);
-  } while (retc != NULL);
-
-  ASSERT_ALWAYS (feof(tab->file));
-
-  fclose_maybe_compressed (final, tablefile);
-  fclose(tab->file);
-
-  //remove tmp file
-  ASSERT_ALWAYS (remove(tablefile_tmp) == 0);
-
-  free (tablefile_tmp);
-  fprintf(stderr, "Renumbering struct: nprimes=%" PRIu64 "\n", tab->size);
-  renumber_free(tab);
+  fclose_maybe_compressed (tab->file, tablefile);
 }
 
 
-/* The renumber_t struct MUST have been initialized before */
-/* renumber_free MUST be called to free the table afterwards */
+/* The renumber_t struct _must_ have been initialized before */
 void
 renumber_read_table (renumber_t tab, const char * filename)
 {
-  uint64_t i;
-  int ret;
-  uint8_t old_nb_bits = tab->nb_bits;
   char s[RENUMBER_MAXLINE];
-  size_t bytes_read = 0;
-  p_r_values_t v, prev_v = 0;
+  size_t bytes_read = 0, bytes_line;
   stats_data_t infostats;  /* for displaying progress */
 
-  //open file for reading
-  fprintf (stderr, "Opening %s to read the renumbering table\n", filename);
+  /* open file for reading */
+  printf ("# Opening %s to read the renumbering table\n", filename);
+  fflush (stdout);
   tab->file = fopen_maybe_compressed (filename, "r");
-  if (tab->file == NULL) {
-      fprintf(stderr, "Cannot open %s ; please create it with freerel\n", filename);
-      abort();
-  }
+  FATAL_ERROR_CHECK (tab->file == NULL, "Cannot open file for reading");
 
-  // read size of renumbering table
-  uint64_t tmp_size;
-  ret = fscanf (tab->file, "%"SCNu8" %"SCNu64" %d %d %lu %lu\n", &tab->nb_bits,
-      &tmp_size, &tab->bad_ideals.n, &tab->add_full_col,
-      &tab->lpb0, &tab->lpb1);
-  ASSERT_ALWAYS (ret == 6);
+  /* read size of renumbering table */
+  renumber_read_first_line (tab);
 
-  ASSERT_ALWAYS (tab->nb_bits <= 8 * sizeof(p_r_values_t));
-  ASSERT_ALWAYS (tab->nb_bits == 32 || tab->nb_bits == 64);
-  if (old_nb_bits != 0 && old_nb_bits != tab->nb_bits)
-  {
-    fprintf (stderr, "Warning, computed value of nb_bits (%d) is different "
-                     "from the read value of nb_bits (%d).\n", old_nb_bits,
-                     tab->nb_bits);
-  }
+  /* Allocating memory */
+  size_t badideals_pr_size = tab->bad_ideals.n * sizeof (p_r_values_t);
+  size_t badideals_int_size = tab->bad_ideals.n * sizeof (int);
+  size_t cached_table_size = (2 << MAX_LOG_CACHED) * sizeof (index_t);
 
-  ASSERT_ALWAYS (tmp_size != 0);
-  if (tab->nb_bits == 32)
-    ASSERT_ALWAYS (!(tmp_size >> 32));
-  tab->size = (uint64_t) tmp_size;
+    /* Do not know the size yet. Reallocating while reading */
+    /* We assume that RENUMBER_DEFAULT_SIZE is enough to hold at least the bad
+     * ideals and the added column (if add_full_col is set) */
+  uint64_t allocated = RENUMBER_DEFAULT_SIZE;
+  size_t default_size = RENUMBER_DEFAULT_SIZE * sizeof (p_r_values_t);
 
-  // Allocating memory
-  renumber_alloc(tab);
+  tab->table           = (p_r_values_t *)   malloc (default_size);
+  tab->cached          = (index_t *)      malloc (cached_table_size);
+  tab->bad_ideals.p    = (p_r_values_t *) malloc (badideals_pr_size);
+  tab->bad_ideals.r    = (p_r_values_t *) malloc (badideals_pr_size);
+  tab->bad_ideals.side = (int *)          malloc (badideals_int_size);
+  tab->bad_ideals.nb   = (int *)          malloc (badideals_int_size);
 
-  // Begin to read the renumbering table
-  i = 0;
+  ASSERT_ALWAYS (tab->table != NULL);
+  ASSERT_ALWAYS (tab->cached != NULL);
+  ASSERT_ALWAYS (tab->bad_ideals.p != NULL);
+  ASSERT_ALWAYS (tab->bad_ideals.r != NULL);
+  ASSERT_ALWAYS (tab->bad_ideals.nb != NULL);
+  ASSERT_ALWAYS (tab->bad_ideals.side != NULL);
+
+  memset (tab->cached, 0, cached_table_size);
 
   if (tab->add_full_col)
   {
-    tab->table[i] = RENUMBER_SPECIAL_VALUE;
-    i++;
+    tab->table[0] = RENUMBER_SPECIAL_VALUE;
+    tab->size = 1;
   }
+  else
+    tab->size = 0;
 
+  /* Reading the bad ideals at the top of the renumbering file */
   for (int k = 0; k < tab->bad_ideals.n; k++)
   {
     bytes_read += get_one_line(tab->file, s);
     parse_one_line_bad_ideals (&tab->bad_ideals, s, k);
     for (int j = 0; j < tab->bad_ideals.nb[k]; j++)
     {
-      tab->table[i] = RENUMBER_SPECIAL_VALUE;
-      i++;
+      tab->table[tab->size] = RENUMBER_SPECIAL_VALUE;
+      tab->size++;
     }
   }
 
-  stats_init (infostats, stdout, nbits(tab->size)-5, "Read", "elements", "elts");
-  // we cached value below 2^MAX_LOG_CACHED
-  while (i < tab->size)
+  /* Reading the renumbering table */
+  stats_init (infostats, stdout, 24, "Read", "elements", "elts");
+
+  while ((bytes_line = get_one_line(tab->file, s)) > 0)
   {
-    bytes_read += get_one_line(tab->file, s);
-    v = parse_one_line(s);
-    tab->table[i] = v;
-
-    p_r_values_t p;
-    if (tab->rat >= 0) {
-      p = (v > 0) ? (v - 1) : 0;
-    } else { // two alg sides, v is 2*p +1
-      p = v >> 1;
-    }
-
-    if ((p >> MAX_LOG_CACHED))
+    bytes_read += bytes_line;
+    if (tab->size >= allocated) /* Not enough space, reallocated tab->table */
     {
-      i++;
-      break;
+      allocated += RENUMBER_DEFAULT_SIZE;
+      size_t new_size = allocated * sizeof (p_r_values_t);
+      tab->table = (p_r_values_t *) realloc (tab->table, new_size);
     }
-    if (v > prev_v)
-      tab->cached[p] = i;
+    tab->table[tab->size] = parse_one_line(s);
 
-    prev_v = v;
-    i++;
+    if (tab->size == 0 || tab->table[tab->size-1] == RENUMBER_SPECIAL_VALUE 
+                       || tab->table[tab->size] > tab->table[tab->size-1])
+    {
+      /* We just switch to a new prime in the renumbering table, see if we need
+       * to cache it (we cached primes below 2^MAX_LOG_CACHED)
+       */
+      p_r_values_t p = get_p_from_table_value (tab, tab->table[tab->size]);
+      if ((p >> MAX_LOG_CACHED) == 0) /* p < 2^MAX_LOG_CACHED */
+      {
+        tab->cached[p] = tab->size;
+        tab->first_not_cached = tab->size + 1;
+      }
+    }
+    tab->size++;
 
-    if (stats_test_progress(infostats, i))
-      stats_print_progress_with_MBs (infostats, i, bytes_read, 0);
+    if (stats_test_progress(infostats, tab->size))
+      stats_print_progress_with_MBs (infostats, tab->size, bytes_read, 0);
   }
+  stats_print_progress_with_MBs (infostats, tab->size, bytes_read, 1);
+  size_t final_size = tab->size * sizeof (p_r_values_t);
+  tab->table = (p_r_values_t *) realloc (tab->table, final_size);
 
-  tab->first_not_cached = i;
 
-  for (; i < tab->size; i++)
-  {
-    bytes_read += get_one_line(tab->file, s);
-    tab->table[i] = parse_one_line(s);
-
-    if (stats_test_progress(infostats, i))
-      stats_print_progress_with_MBs (infostats, i, bytes_read, 0);
-  }
-  stats_print_progress_with_MBs (infostats, i, bytes_read, 1);
-
-  ASSERT_ALWAYS(i == tab->size);
+  ASSERT_ALWAYS (feof (tab->file));
 
   print_info (stdout, tab);
-  printf("# INFO: first_not_cached = 0x%" PRid "\n", tab->first_not_cached);
-  fflush(stdout);
+  printf ("# INFO: first_not_cached = 0x%" PRid "\n", tab->first_not_cached);
+  fflush (stdout);
 
   fclose_maybe_compressed (tab->file, filename);
 }
@@ -577,11 +534,10 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
   }
 }
 
-#define DEBUG_RENUMB
 /* side is 0 if (p,r) corresponds to the left part in the relation,
-   side is 1 if (p,r) corresponds to the right part.
-   For NFS the rational part (if any) corresponds to side 0, and we can
-   give any value of r. */
+ * side is 1 if (p,r) corresponds to the right part.
+ * If side corresponds to the rational side (if it exists), the value of r is
+ * meaningless. */
 index_t
 renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
                              p_r_values_t r, int side)
@@ -590,15 +546,14 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
 
-#ifdef DEBUG_RENUMB
+#ifdef RENUMBER_DO_EXPENSIVE_CHECK
+  {
     /* assert that p is below the large prime bound */
     unsigned long lpb = (side == 0) ? renumber_info->lpb0 : renumber_info->lpb1;
-    if (((uint64_t) p) >> lpb)
-    {
-      fprintf (stderr, "Error (in %s, line %d) p=%" PRpr " >= 2^%lu\n",
-                       __func__, __LINE__, p, lpb);
-      exit(EXIT_FAILURE);
-    }
+    char tmp[256];
+    snprintf (tmp, 256, "p = %" PRpr " >= 2^%lu", p, lpb);
+    FATAL_ERROR_CHECK (((uint64_t) p) >> lpb, tmp);
+  }
 #endif
 
   if (renumber_info->rat == -1)
@@ -614,7 +569,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
   if (p >> MAX_LOG_CACHED) // p is not cached
   {
-#ifdef DEBUG_RENUMB
+#ifdef RENUMBER_DO_EXPENSIVE_CHECK
     int nstep = 0;
 #endif
     index_t max = renumber_info->size - 1;
@@ -652,22 +607,28 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
         if (i == old_i)
           i--;
       }
-#ifdef DEBUG_RENUMB
-      nstep++;
-      if (nstep >= 64) {
-          fprintf(stderr, "BUG() in %s: nstep=%d>=64 (p=%"PRpr" not prime ?)\n",
-                  __func__, nstep, p);
-          abort();
+#ifdef RENUMBER_DO_EXPENSIVE_CHECK
+      {
+        /* Stop infinite loops (which indicate bug) */
+        nstep++;
+        char tmp[256];
+        snprintf (tmp, 256, "ntep=%d >= 64 (p=%" PRpr " not prime?)", nstep, p);
+        FATAL_ERROR_CHECK ((nstep >= 64), tmp);
       }
-      ASSERT_ALWAYS (nstep < 64);
 #endif
     }
   }
-  else //p is cached
+  else /* p is cached */
   {
     i = renumber_info->cached[p];
-#ifdef DEBUG_RENUMB
-    ASSERT_ALWAYS (renumber_info->table[i] == vp);
+#ifdef RENUMBER_DO_EXPENSIVE_CHECK
+    {
+      /* Check cached index */
+      char tmp[256];
+      snprintf (tmp, 256, "p = %" PRpr "; vp = %" PRpr"; i = %" PRid ";"
+                          "tab[i] = %" PRpr "", p, vp, i, tab[i]);
+      FATAL_ERROR_CHECK (tab[i] != vp, tmp);
+    }
 #endif
   }
 
@@ -758,60 +719,3 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   }
 }
 
-//for DEBUG, should be remove later
-void renumber_debug_print_tab (FILE *output, const char *filename,
-        cado_poly pol, unsigned long lpb[])
-{
-  renumber_t tab;
-  index_t i;
-  p_r_values_t p, r;
-  int side;
-
-  renumber_init (tab, pol, lpb);
-  renumber_read_table (tab, filename);
-
-  for (i = 0; i < tab->size; i++)
-  {
-    if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
-    {
-      if (i == 0 && tab->add_full_col)
-        fprintf (output, "i=0 tab[i]=#   added column\n");
-      else
-        fprintf (output, "i=%" PRid " tab[i]=#   above a bad ideals\n", i);
-    }
-    else
-    {
-      renumber_get_p_r_from_index (tab, &p, &r, &side, i, pol);
-      fprintf (output, "i=%" PRid " tab[i]=%" PRpr " p=%" PRpr "",
-                       i, tab->table[i], p);
-      if (tab->rat == -1)
-      {
-        if (r == p)
-          fprintf (output, " r=%" PRpr " side %d proj\n", r, side);
-        else
-          fprintf (output, " r=%" PRpr " side %d\n", r, side);
-      }
-      else
-      {
-        if (side == tab->rat)
-          fprintf (output, " rat side\n");
-        else if (r == p)
-          fprintf (output, " r=%" PRpr " alg side proj\n", r);
-        else
-          fprintf (output, " r=%" PRpr " alg side\n", r);
-      }
-    }
-  }
-
-  if (tab->bad_ideals.n != 0) {
-    fprintf (output, "Bad ideals:\n");
-    for (int i = 0; i < tab->bad_ideals.n; ++i) {
-      p_r_values_t p = tab->bad_ideals.p[i];
-      p_r_values_t r = tab->bad_ideals.r[i];
-      int nb = tab->bad_ideals.nb[i];
-      fprintf(output, "p=%" PRpr " r=%" PRpr " nb=%d\n", p, r, nb);
-    }
-  }
-
-  renumber_free(tab);
-}
