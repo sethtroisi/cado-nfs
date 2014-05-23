@@ -42,7 +42,8 @@ else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
         # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
         # CC idioms. As it is not used in production yet, we don't want
         # to expose it on 32-bit platforms.
-        set(BWC_GFP_ARITHMETIC_BACKENDS CACHE FORCE)
+        set(BWC_GFP_ARITHMETIC_BACKENDS CACHE STRING
+                "which GF(p) backends to compile for DLOG mode" FORCE)
         message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
     endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 endif(NOT BWC_GFP_ARITHMETIC_BACKENDS)
