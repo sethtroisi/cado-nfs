@@ -140,7 +140,7 @@ fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_
   mpz_clear(rho);
 }
 
-static void
+void
 clear_sieve_info(sieve_info_ptr new_si)
 {
   for (int side = 0; side < 2; side++) {
