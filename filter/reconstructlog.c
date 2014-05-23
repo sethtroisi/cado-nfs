@@ -895,7 +895,7 @@ compute_log_from_rels (bit_vector needed_rels,
                        const char *relsdfilename, uint64_t nrels_del,
                        uint64_t nrels_needed, logtab_t log, int nt)
 {
-  double tt0, tt, wct_tt0, wct_tt;
+  double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
@@ -935,13 +935,11 @@ compute_log_from_rels (bit_vector needed_rels,
   else
     printf("# Using monothread version\n");
 
-  tt0 = seconds();
   wct_tt0 = wct_seconds();
   do
   {
     printf ("# Iteration %" PRIu64 ": starting...\n", iter);
     fflush(stdout);
-    tt = seconds();
     wct_tt = wct_seconds();
 
     if (nt > 1)
@@ -952,22 +950,14 @@ compute_log_from_rels (bit_vector needed_rels,
 
     printf ("# Iteration %" PRIu64 ": %" PRIu64 " new logarithms computed\n",
             iter, computed);
-    if (nt > 1)
-      printf ("# Iteration %" PRIu64 " took %.1fs (CPU time), %.1fs (wall-clock"
-              " time).\n", iter, seconds() - tt, wct_seconds() - wct_tt);
-    else
-      printf ("# Iteration %" PRIu64 " took %.1fs\n", iter, seconds() - tt);
+    printf ("# Iteration %" PRIu64 " took %.1fs (wall-clock time).\n",
+            iter, wct_seconds() - wct_tt);
 
     iter++;
   } while (computed);
 
-  if (nt > 1)
-    printf ("# Computing %" PRIu64 " new logarithms took %.1fs (CPU time), "
-            "%.1fs (wall-clock time)\n", total_computed, seconds() - tt0,
-            wct_seconds() - wct_tt0);
-  else
-    printf ("# Computing %" PRIu64 " new logarithms took %.1fs\n",
-            total_computed, seconds() - tt0);
+  printf ("# Computing %" PRIu64 " new logarithms took %.1fs (wall-clock "
+          "time)\n", total_computed, wct_seconds() - wct_tt0);
 
   size_t c = bit_vector_popcount(needed_rels);
   if (c != 0)
@@ -990,7 +980,7 @@ compute_needed_rels (bit_vector needed_rels,
                      const char *relsdfilename, uint64_t nrels_del,
                      logtab_t log, const char *wanted_filename, int nt)
 {
-  double tt0, tt, wct_tt0, wct_tt;
+  double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   graph_dep_t dep_graph = graph_dep_init (log->nprimes);
@@ -1023,13 +1013,11 @@ compute_needed_rels (bit_vector needed_rels,
   else
     printf("# Using monothread version\n");
 
-  tt0 = seconds();
   wct_tt0 = wct_seconds();
   do
   {
     printf ("# Iteration %" PRIu64 ": starting...\n", iter);
     fflush(stdout);
-    tt = seconds();
     wct_tt = wct_seconds();
 
     if (nt > 1)
@@ -1040,20 +1028,14 @@ compute_needed_rels (bit_vector needed_rels,
 
     printf ("# Iteration %" PRIu64 ": %" PRIu64 " new dependancies computed\n",
             iter, computed);
-    if (nt > 1)
-      printf ("# Iteration %" PRIu64 " took %.1fs (CPU time), %.1fs (wall-clock"
-              " time).\n", iter, seconds() - tt, wct_seconds() - wct_tt);
-    else
-      printf ("# Iteration %" PRIu64 " took %.1fs\n", iter, seconds() - tt);
+    printf ("# Iteration %" PRIu64 " took %.1fs (wall-clock time).\n",
+            iter, wct_seconds() - wct_tt);
 
     iter++;
   } while (computed);
 
-  if (nt > 1)
-    printf ("# Computing dependancies took %.1fs (CPU time), %.1fs (wall-clock"
-            " time)\n", seconds() - tt0, wct_seconds() - wct_tt0);
-  else
-    printf ("# Computing dependancies took %.1fs\n", seconds() - tt0);
+  printf ("# Computing dependancies took %.1fs (wall-clock time)\n",
+          wct_seconds() - wct_tt0);
 
   FILE *f = NULL;
   printf ("# Reading wanted logarithms from %s\n", wanted_filename);
@@ -1064,7 +1046,7 @@ compute_needed_rels (bit_vector needed_rels,
   bit_vector_set (needed_rels, 0);
   index_t h;
   uint64_t nadded, nrels_necessary = 0, nwanted_log = 0;
-  tt = seconds();
+  wct_tt = wct_seconds();
   while (fscanf (f, "%" SCNid "\n", &h) == 1)
   {
     FATAL_ERROR_CHECK (h >= log->nprimes, "Too big value of index");
@@ -1079,7 +1061,7 @@ compute_needed_rels (bit_vector needed_rels,
 
   fclose_maybe_compressed (f, wanted_filename);
   printf ("# Reading %" PRIu64 " wanted logarithms took %.1fs\n", nwanted_log,
-          seconds() - tt);
+          wct_seconds() - wct_tt);
   printf ("# %" PRIu64 " relations are needed to compute these logarithms\n",
           nrels_necessary);
   ASSERT_ALWAYS (nrels_necessary == bit_vector_popcount (needed_rels));
