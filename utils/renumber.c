@@ -211,6 +211,8 @@ renumber_read_first_line (renumber_t renum)
                 &(renum->rat), &(renum->bad_ideals.n), &(renum->add_full_col),
                 &(renum->lpb0), &(renum->lpb1));
   ASSERT_ALWAYS (ret == 6);
+  ASSERT_ALWAYS (-1 <= renum->rat && renum->rat <= 1);
+  ASSERT_ALWAYS (renum->add_full_col == 0 || renum->add_full_col == 1);
   ASSERT_ALWAYS (renum->nb_bits <= 8 * sizeof(p_r_values_t));
   ASSERT_ALWAYS (renum->nb_bits == 32 || renum->nb_bits == 64);
 }
