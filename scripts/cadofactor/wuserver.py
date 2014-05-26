@@ -544,6 +544,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in query:
                         (key, value) = query.split(op, 1)
+                        key = key.strip()
+                        value = value.strip()
                         if not name in conditions:
                             conditions[name] = {}
                         # If value is of the form "now(-123)", convert it to a 
