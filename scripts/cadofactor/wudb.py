@@ -139,7 +139,7 @@ class MyCursor(sqlite3.Cursor):
         
     # This is used in where queries; it converts from named arguments such as 
     # "eq" to a binary operator such as "="
-    name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
+    name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!=", "like": "like"}
     
     def __init__(self, conn):
         # Enable foreign key support
