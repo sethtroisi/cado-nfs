@@ -554,7 +554,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                         if r:
                             minutes_ago = int(r.group(1))
                             td = datetime.timedelta(minutes = minutes_ago)
-                            value = str(datetime.datetime.now() + td)
+                            value = str(datetime.datetime.utcnow() + td)
                         conditions[name][key] = value
                         break
         logging.debug("send_query(): conditions: %s", conditions)
