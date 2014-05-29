@@ -2892,7 +2892,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             if (t >= deadline) {
                 /* Also break the outer loop (ugly!) */
-                SS_lw = SS + BUCKET_REGION;
+#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
+                SS_lw = (const __m128i *)(SS + BUCKET_REGION);
+#else
+                SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
+#endif
                 fprintf(las->output, "# [descent] Aborting, deadline passed\n");
                 break;
             }
@@ -3085,7 +3089,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                          * cpoly->pols[side]->lim, which is asserted to
                          * exceed si->conf->sides[side]->lim). Therefore
                          * the second if() is a no-op. */
-                        if (mpz_cmp_ui(f[side]->data[i], cpoly->pols[side]->lim) <= 0)
+                        if (mpz_cmp_ui(f[side]->data[i],
+                                    si->conf->sides[side]->lim) <= 0)
                             continue;
                         /*
                         if (mpz_cmp_ui(f[side]->data[i], si->conf->sides[side]->lim) <= 0)
@@ -3119,7 +3124,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     if (time_left == 0) {
                         fprintf(las->output, "# [descent] Yiippee, splitting done\n");
                         /* break both loops */
-                        SS_lw = SS + BUCKET_REGION;
+#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
+                SS_lw = (const __m128i *)(SS + BUCKET_REGION);
+#else
+                SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
+#endif
                         relation_clear(rel);
                         break;
                     } else if (delta != DBL_MAX) {
@@ -3147,7 +3156,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             int side = RATIONAL_SIDE;
             unsigned long p = winner->rp[i].p;
             /* See comment above */
-            if (p <= cpoly->pols[side]->lim)
+            if (p <= si->conf->sides[side]->lim)
                 continue;
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
@@ -3164,7 +3173,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;
             /* See comment above */
-            if (p <= cpoly->pols[side]->lim)
+            if (p <= si->conf->sides[side]->lim)
                 continue;
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
