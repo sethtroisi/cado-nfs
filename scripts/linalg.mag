@@ -9,6 +9,8 @@ Run with
 ell := StringToInteger(ell);
 nmaps := StringToInteger(nmaps);
 
+SetNthreads(4);
+SetVerbose("SparseMatrix", 1);
 
 function ReadLineIndex(str)
     S := Split(str, " ");
@@ -80,7 +82,7 @@ end if;
 
 // Computing...
 printf "Computing kernel...\n";
-time v := ModularSolution(M, ell);
+time v := ModularSolution(M, ell : Lanczos := true);
 
 printf "Write result to %o...\n", kerfile;
 SetOutputFile(kerfile: Overwrite:=true);
