@@ -3208,7 +3208,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;
             /* See comment above */
-            if (p <= (1UL<<las->default_config->sides[side]->lpb));
+            if (p <= (1UL<<las->default_config->sides[side]->lpb))
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
