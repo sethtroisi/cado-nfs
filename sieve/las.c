@@ -3207,9 +3207,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         for(int i = 0 ; i < winner->nb_ap ; i++) {
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;
-            fprintf(stderr, "GROUIK! alg p = %lu\n", p);
             /* See comment above */
-            if (p <= (1UL<<las->default_config->sides[side]->lpb))
+            if (p <= (1UL<<las->default_config->sides[side]->lpb));
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
