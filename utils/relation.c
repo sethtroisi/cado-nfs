@@ -67,6 +67,8 @@ void relation_copy (relation_t *s, relation_t * r)
 
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
+/* FIXME: the following assumption is plain WRONG!!! It seems to work,
+   though...*/
 /* We use the fact that sizeof(p_r_values_t) < sizeof(unsigned long).
    So we can use mod_initmod_ul function and mod_get_ul without risk. */
 p_r_values_t
