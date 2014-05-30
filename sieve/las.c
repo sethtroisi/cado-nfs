@@ -3119,13 +3119,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 double time_left = 0;
                 for(int side = 0 ; side < 2 ; side++) {
                     for (unsigned int i = 0; i < f[side]->length; ++i) {
-                        /* Currently we're assuming that the base of
-                         * precomputed logs goes at least as far as 
-                         * cpoly->pols[side]->lim, which is asserted to
-                         * exceed si->conf->sides[side]->lim). Therefore
-                         * the second if() is a no-op. */
+                        /* We assume that the base of the precomputed log
+                         * goes as far as the lpb given on command line.
+                         */
                         if (mpz_cmp_ui(f[side]->data[i],
-                                    si->conf->sides[side]->lim) <= 0)
+                            (1UL<<las->default_config->sides[side]->lpb)) <= 0)
                             continue;
                         /*
                         if (mpz_cmp_ui(f[side]->data[i], si->conf->sides[side]->lim) <= 0)
@@ -3191,7 +3189,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             int side = RATIONAL_SIDE;
             unsigned long p = winner->rp[i].p;
             /* See comment above */
-            if (p <= si->conf->sides[side]->lim)
+            if (p <= (1UL<<las->default_config->sides[side]->lpb))
+                continue;
+            if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
@@ -3207,8 +3207,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         for(int i = 0 ; i < winner->nb_ap ; i++) {
             int side = ALGEBRAIC_SIDE;
             unsigned long p = winner->ap[i].p;
+            fprintf(stderr, "GROUIK! alg p = %lu\n", p);
             /* See comment above */
-            if (p <= si->conf->sides[side]->lim)
+            if (p <= (1UL<<las->default_config->sides[side]->lpb))
+                continue;
+            if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
