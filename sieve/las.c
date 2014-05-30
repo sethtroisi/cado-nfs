@@ -438,8 +438,36 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* Allocate memory for transformed polynomials */
     sieve_info_init_norm_data(si);
 
-    /* TODO: This function in itself is too expensive if called often */
-    sieve_info_init_factor_bases(las, si, pl);
+    /* This function in itself is too expensive if called often.
+     * In the descent, where we initialize a sieve_info for each pair
+     * (bitsize_of_q, side), we would call it dozens of time.
+     * For the moment, we will assume that all along the hint file, the
+     * values of I, alim, rlim are the constant, so that the factor bases
+     * are exactly the same and can be shared.
+     */
+    if (las->sievers == si) {
+        sieve_info_init_factor_bases(las, si, pl);
+    } else {
+        // We are in descent mode, it seems, so let's not duplicate the
+        // factor base data.
+        // A few sanity checks, first.
+        ASSERT_ALWAYS(las->sievers->conf->logI == si->conf->logI);
+        ASSERT_ALWAYS(las->sievers->conf->bucket_thresh == si->conf->bucket_thresh);
+        ASSERT_ALWAYS(las->sievers->conf->sides[0]->lim == si->conf->sides[0]->lim);
+        ASSERT_ALWAYS(las->sievers->conf->sides[0]->powlim == si->conf->sides[0]->powlim);
+        ASSERT_ALWAYS(las->sievers->conf->sides[1]->lim == si->conf->sides[1]->lim);
+        ASSERT_ALWAYS(las->sievers->conf->sides[1]->powlim == si->conf->sides[1]->powlim);
+        // Then, copy relevant data from the first sieve_info
+        fprintf(las->output, "# Do not regenerate factor base data: copy it from first siever\n");
+        for (int side = 0; side < 2; side++) {
+            sieve_side_info_ptr sis = si->sides[side];
+            sieve_side_info_ptr sis0 = las->sievers->sides[side];
+            sis->fb = sis0->fb;
+            sis->fb_bucket_threads = sis0->fb_bucket_threads;
+            sis->fb_is_mmapped = sis0->fb_is_mmapped;
+        }
+    }
+
 
     /* TODO: We may also build a strategy book, given that several
      * strategies will be similar. Presently we spend some time creating
@@ -631,6 +659,13 @@ static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
 
         if (sc->bitsize > las->max_hint_bitsize[sc->side])
             las->max_hint_bitsize[sc->side] = sc->bitsize;
+        // Copy default value for non-given parameters
+        sc->skewness = las->default_config->skewness;
+        sc->bucket_thresh = las->default_config->bucket_thresh;
+        sc->td_thresh = las->default_config->td_thresh;
+        sc->unsieve_thresh = las->default_config->unsieve_thresh;
+        sc->sides[0]->powlim = las->default_config->sides[0]->powlim;
+        sc->sides[1]->powlim = las->default_config->sides[1]->powlim;
     }
     if (las->hint_table == NULL) {
         fprintf(stderr, "%s: no data ??\n", filename);
