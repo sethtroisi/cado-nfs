@@ -604,6 +604,7 @@ scripts/cadofactor/CMakeLists.txt
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format
+sieve/README.descent
 sieve/basicnt.h
 sieve/bucket.c
 sieve/bucket.h

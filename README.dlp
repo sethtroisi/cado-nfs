@@ -28,6 +28,5 @@ output of the linear algebra and the data remembered during the filtering
 phase. The result is in the $wordir/$name.reconstruclog.dlog file.
 
 Individual logarithms, using a descent stage, must be computed by hand
-with the help of the sieve/las binary. For that it needs to be recompiled
-with DLP_DESCENT and SUPPORT_LARGE_Q (see las-config.h).
-
+with the help of the sieve/las binary. See sieve/README.descent for some
+guidelines.

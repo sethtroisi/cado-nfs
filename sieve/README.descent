@@ -1,0 +1,89 @@
+Using las for the descent
+=========================
+
+The 'las' binary can be used not only for generating relations in the
+factorization or dlp context, but also to "descend" elements in order to
+compute the logarithms of elements that are not in the factor base.
+We assume here that the reader is familiar with the literature on the
+subject.
+
+Initialization of the descent
+-----------------------------
+
+No tool is provided yet for this stage, which relies heavily on ECM.
+We assume that it has been done by a separate program, and that we end-up
+with a bunch of not-too-large integers whose logs are required in order
+to deduce the log of the target element.
+
+WARNING: We assume that these not-too-large integers are a few bits below
+64 bits. Even for record-scale computations, this should not be a problem
+to initialize the descent up to 55 bits smooth elements.
+
+Recompiling las
+---------------
+
+The las binary must be recompiled to run in "descent" mode:
+In las-config.h, uncomment the following parameters:
+  #define DLP_DESCENT
+  #define SUPPORT_LARGE_Q
+Furthermore, in local.sh, uncomment the line:
+  FLAGS_SIZE="-D__SIZEOF_P_R_VALUES__=8"
+
+Then recompile cado-nfs, maybe in a separate build-directory.  If you are
+on a 32-bit machine, then this might actually fail at compile or
+execution time. It is highly recommended to choose a 64-bit platform.
+
+Writing a Hint File
+-------------------
+
+The descent requires a "hint file" that contains information about how to
+tune the parameters along the descent.
+
+Each line correspond to a bit-size of a special-q for one side. For
+example:
+  55r 0.028 1.00 I=15 400000,47,65,1.4 400000,48,94,2.0
+means (in order):
+  55r   : this line is about a 55-bit special-q on the rational side
+  28.2  : expected time in seconds to find a relation
+  1.00  : probability of success
+  I=15  : the I to use
+  400000,47,65,1.4 : parameters for the rational side lim,lpb,mfb,lambda
+  400000,48,94,2.0 : same for the other side.
+
+At the moment, it *mandatory* to have the same values for I, lim0, lim1
+on each line. This might change if we see a clear need to make them vary.
+
+There must be one line for each size that can occur during the descent,
+and the parameters must be so that there is a high chance to get at least
+one relation.
+
+An example hint-file will be given as example in the future.
+
+Preparing the Todo file
+-----------------------
+
+Each prime integer q for which the log is wanted must be converted into a
+rational ideal. This amounts to computing the root of the linear
+polynomial in the *.poly file modulo q. All of those must be put in a
+"todo file", each on one line, with the format
+  r <q> <root>
+where "r" stands for "rational".
+
+Running las with appropriate arguments
+--------------------------------------
+
+The command line for las must be something like (assuming the prefix name
+for files is p120):
+
+/buildpath/sieve/las -poly p120.poly -fb p120.roots.gz -I 15 \
+  -rlim 4000000 -alim 4000000 -lpbr 25 -lpba 26 -mfbr 100 -mfba 100 \
+  -todo p120.todo -allow-largesq -descent-hint p120.hints
+
+Note that:
+- using -mt is not recommended in this context (untested).
+- I, lim0, lim1 must be the same as the one in the hint file.
+- lpb0, lpb1 give the limit where to stop the descent.
+- mfb0, mfb1 are not used, but mandatory (!)
+
+If during the execution, it prints a failure message, then you should
+probably increase the corresponding parameters in the hint file.
