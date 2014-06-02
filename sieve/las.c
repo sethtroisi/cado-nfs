@@ -3094,7 +3094,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
                 if (las->verbose >= 2) {
-                  fprintf(las->output, "# i=%d, j=%u, lognorms = %hu, %hu\n",
+                  fprintf(las->output, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
                           i, j, S[0][x], S[1][x]);
                 }
                 fprint_relation(las->output, rel, comment);
