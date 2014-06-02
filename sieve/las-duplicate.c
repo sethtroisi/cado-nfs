@@ -238,7 +238,7 @@ subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
       const unsigned char p_pow_log = fb_log(p_pow, si->sides[side]->scale * LOG_SCALE, 0.);
       if (p_pow_log > new_lognorm) {
         if (0)
-          fprintf(stderr, "Warning: lognorm underflow for relation a,b = %ld, %lu\n",
+          fprintf(stderr, "Warning: lognorm underflow for relation a,b = %" PRId64 ", %" PRIu64 "\n",
                   relation->a, relation->b);
         new_lognorm = 0;
       } else {
@@ -340,12 +340,12 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     const unsigned char lognorm = estimate_lognorm(si, i, j, side);
     remaining_lognorm[side] = subtract_fb_log(lognorm, relation, si, side);
     if (remaining_lognorm[side] > si->sides[side]->bound) {
-      fprintf(output, "# DUPECHECK On side %d, remaining lognorm = %hu > bound = %hu\n",
+      fprintf(output, "# DUPECHECK On side %d, remaining lognorm = %hhu > bound = %hhu\n",
               side, remaining_lognorm[side], si->sides[side]->bound);
       is_dupe = 0;
     }
   }
-  fprintf (output, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hu, %hu\n",
+  fprintf (output, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hhu, %hhu\n",
            i, j, remaining_lognorm[0], remaining_lognorm[1]);
   if (!is_dupe) {
     goto clear_and_exit;
