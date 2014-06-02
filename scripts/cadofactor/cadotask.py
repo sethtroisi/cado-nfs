@@ -2169,6 +2169,13 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     def get_poly_filename(self):
         return self.get_state_filename("polyfilename")
 
+    def get_have_two_alg_sides(self):
+        P = Polynomials(self.state["bestpoly"].splitlines())
+        if (P.polyg.degree > 1):
+            return True
+        else:
+            return False
+
     def submit_one_wu(self):
         assert self.need_more_wus()
         to_submit = len(self.poly_to_submit)
@@ -2208,10 +2215,11 @@ class FactorBaseTask(Task):
         return (cadoprograms.MakeFB,)
     @property
     def progparam_override(self):
-        return [["poly", "out"]]
+        return [["poly", "out", "side"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"gzip": True, "I": int})
+        return self.join_params(super().paramnames,
+                {"gzip": True, "I": int, "rlim": int, "alim": int})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2230,6 +2238,7 @@ class FactorBaseTask(Task):
         if not poly:
             raise Exception("FactorBaseTask(): no polynomial "
                             "received from PolyselTask")
+        twoalgsides = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         
         # Check if we have already computed the target file for this polynomial
         if "poly" in self.state:
@@ -2250,22 +2259,54 @@ class FactorBaseTask(Task):
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
-            outputfilename = self.workdir.make_filename("roots" + use_gz)
+            if not twoalgsides:
+                outputfilename = self.workdir.make_filename("roots" + use_gz)
+            else:
+                outputfilename0 = self.workdir.make_filename("roots0" + use_gz)
+                outputfilename1 = self.workdir.make_filename("roots1" + use_gz)
 
-            # Run command to generate factor base/free relations file
+            # Run command to generate factor base file
             self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.MakeFB.name)
-            p = cadoprograms.MakeFB(poly=polyfilename,
+            if not twoalgsides:
+                p = cadoprograms.MakeFB(poly=polyfilename,
                                     out=str(outputfilename),
+                                    lim=self.params["alim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
                                     **self.progparams[0])
-            message = self.submit_command(p, "", log_errors=True)
-            if message.get_exitcode(0) != 0:
-                raise Exception("Program failed")
+                message = self.submit_command(p, "", log_errors=True)
+                if message.get_exitcode(0) != 0:
+                    raise Exception("Program failed")
+            else:
+                p = cadoprograms.MakeFB(poly=polyfilename,
+                                    out=str(outputfilename0),
+                                    side=0,
+                                    lim=self.params["rlim"],
+                                    stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
+                                    **self.progparams[0])
+                message = self.submit_command(p, "", log_errors=True)
+                if message.get_exitcode(0) != 0:
+                    raise Exception("Program failed")
+                p = cadoprograms.MakeFB(poly=polyfilename,
+                                    out=str(outputfilename1),
+                                    side=1,
+                                    lim=self.params["alim"],
+                                    stdout=str(stdoutpath),
+                                    stderr=str(stderrpath),
+                                    **self.progparams[0])
+                message = self.submit_command(p, "", log_errors=True)
+                if message.get_exitcode(0) != 0:
+                    raise Exception("Program failed")
             
-            self.state["outputfile"] = outputfilename.get_wdir_relative()
+            if not twoalgsides:
+                self.state["outputfile"] = outputfilename.get_wdir_relative()
+            else:
+                self.state["outputfile0"] = outputfilename0.get_wdir_relative()
+                self.state["outputfile1"] = outputfilename1.get_wdir_relative()
+                self.state["outputfile"] = outputfilename1.get_wdir_relative()
             self.logger.info("Finished")
 
         self.check_files_exist([self.get_filename()], "output",
@@ -2275,6 +2316,13 @@ class FactorBaseTask(Task):
     def get_filename(self):
         return self.get_state_filename("outputfile")
 
+    def get_filename0(self):
+        assert self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        return self.get_state_filename("outputfile0")
+
+    def get_filename1(self):
+        assert self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        return self.get_state_filename("outputfile1")
 
 class FreeRelTask(Task):
     """ Generates free relations for the polynomial(s) """
@@ -2509,11 +2557,21 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             self.check_files_exist([outputfilename], "output",
                                    shouldexist=False)
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
-            p = cadoprograms.Las(q0=q0, q1=q1,
-                                 poly=polyfilename, factorbase=factorbase,
-                                 out=outputfilename, stats_stderr=True,
-                                 **self.progparams[0])
+            if not self.send_request(Request.GET_HAVE_TWO_ALG_SIDES):
+                factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
+                p = cadoprograms.Las(q0=q0, q1=q1,
+                                     poly=polyfilename, factorbase=factorbase,
+                                     out=outputfilename, stats_stderr=True,
+                                     **self.progparams[0])
+            else:
+                fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
+                fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
+                p = cadoprograms.Las(q0=q0, q1=q1,
+                                     poly=polyfilename,
+                                     factorbase0=fb0,
+                                     factorbase1=fb1,
+                                     out=outputfilename, stats_stderr=True,
+                                     **self.progparams[0])
             self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
             self.state.update({"qnext": q1}, commit=True)
         self.logger.info("Reached target of %d relations, now have %d",
@@ -4482,8 +4540,11 @@ class Request(Message):
     GET_RAW_POLYNOMIALS = object()
     GET_POLYNOMIAL = object()
     GET_POLYNOMIAL_FILENAME = object()
+    GET_HAVE_TWO_ALG_SIDES = object()
     GET_POLY_RANK = object()
     GET_FACTORBASE_FILENAME = object()
+    GET_FACTORBASE0_FILENAME = object()
+    GET_FACTORBASE1_FILENAME = object()
     GET_FREEREL_FILENAME = object()
     GET_RENUMBER_FILENAME = object()
     GET_FREEREL_RELCOUNT = object()
@@ -4668,7 +4729,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             Request.GET_POLY_RANK: self.polysel1.get_poly_rank,
             Request.GET_POLYNOMIAL: self.polysel2.get_poly,
             Request.GET_POLYNOMIAL_FILENAME: self.polysel2.get_poly_filename,
+            Request.GET_HAVE_TWO_ALG_SIDES: self.polysel2.get_have_two_alg_sides,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
+            Request.GET_FACTORBASE0_FILENAME: self.fb.get_filename0,
+            Request.GET_FACTORBASE1_FILENAME: self.fb.get_filename1,
             Request.GET_FREEREL_FILENAME: self.freerel.get_freerel_filename,
             Request.GET_RENUMBER_FILENAME: self.freerel.get_renumber_filename,
             Request.GET_FREEREL_RELCOUNT: self.freerel.get_nrels,

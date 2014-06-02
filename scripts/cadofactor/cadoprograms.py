@@ -645,10 +645,10 @@ class Polyselect2l(Program):
 
 class MakeFB(Program):
     """
-    >>> p = MakeFB(poly="foo.poly", alim=1)
+    >>> p = MakeFB(poly="foo.poly", lim=1)
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1'
-    >>> p = MakeFB(poly="foo.poly", alim=1, maxbits=5, stdout="foo.roots")
+    >>> p = MakeFB(poly="foo.poly", lim=1, maxbits=5, stdout="foo.roots")
     >>> p.make_command_line().replace(defaultsuffix + " ", " ", 1)
     'makefb -poly foo.poly -alim 1 -maxbits 5 > foo.roots'
     """
@@ -658,7 +658,7 @@ class MakeFB(Program):
 
     def __init__(self, *,
                  poly: Parameter(is_input_file=True),
-                 alim: Parameter(checktype=int),
+                 lim: Parameter("alim", checktype=int),
                  maxbits: Parameter(checktype=int)=None,
                  out: Parameter(is_output_file=True)=None,
                  side: Parameter(checktype=int)=None,
@@ -698,7 +698,6 @@ class Las(Program):
     def __init__(self,
                  I: Parameter(checktype=int),
                  poly: Parameter(is_input_file=True),
-                 factorbase: Parameter("fb", is_input_file=True),
                  q0: Parameter(checktype=int),
                  q1: Parameter(checktype=int)=None,
                  rho: Parameter(checktype=int)=None,
@@ -716,6 +715,9 @@ class Las(Program):
                  verbose: Toggle("v")=None,
                  rpowlim: Parameter(checktype=int)=None,
                  apowlim: Parameter(checktype=int)=None,
+                 factorbase: Parameter("fb", is_input_file=True)=None,
+                 factorbase0: Parameter("fb0", is_input_file=True)=None,
+                 factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,
                  threads: Parameter("mt", checktype=int)=None,
                  ratq: Toggle()=None,
