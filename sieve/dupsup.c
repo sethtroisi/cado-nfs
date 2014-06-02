@@ -18,8 +18,8 @@
 #include "params.h"
 #include "cado_poly.h"
 #include "gzip.h"
-#include "sieve/las-duplicate.h"
-#include "sieve/las-coordinates.h"
+#include "las-duplicate.h"
+#include "las-coordinates.h"
 
 static void *
 dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)

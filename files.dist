@@ -65,7 +65,6 @@ filter/filter_common.c
 filter/filter_common.h
 filter/dup1.c
 filter/dup2.c
-filter/dupsup.c
 filter/explain.c
 filter/filter_matrix.c
 filter/filter_matrix.h
@@ -673,6 +672,7 @@ sieve/makefb.c
 sieve/makefb.sage
 sieve/trialdiv.c
 sieve/trialdiv.h
+sieve/dupsup.c
 sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/checkdep.c
