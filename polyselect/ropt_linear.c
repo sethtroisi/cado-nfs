@@ -116,7 +116,7 @@ ropt_linear_tune ( ropt_poly_t poly,
                        -info->ave_MurphyE);
 
       if (param->verbose >= 3) {
-        gmp_fprintf (stderr, "# Info: Have. E: %.2e, best E: %.2e on "
+        gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
                      "sublattice (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
                      info->ave_MurphyE, info->best_MurphyE,
                      w, tmpu, v, mod, i + 1, j);
@@ -441,6 +441,11 @@ ropt_linear_deg5 ( ropt_poly_t poly,
   ropt_s1param_setup (poly, s1param, bound, param);
   new_alpha_pq (&alpha_pqueue, s1param->nbest_sl);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
+
+
+
+
+
   
   /* Step 1:, find good sublattices */
   t1 = milliseconds ();

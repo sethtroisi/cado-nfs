@@ -39,14 +39,14 @@ unsigned int size_tune_sievearray = 6144;
  */
 const unsigned int size_total_sublattices[8][2] = {
   /* {digits, num_of_sublattices} */
-  {80,  2},  /* for up to 79 digits */
-  {100, 4},  /* up to 99 digits */
-  {140, 8},  /* up to 139 digits */
-  {170, 16}, /* up to 169 digits */
-  {180, 32}, /* up to 179 digits */
-  {220, 64}, /* up to 219 digits */
-  {260, 64}, /* up to 259 digits */
-  {300, 128} /* up to 299 digits */
+  {80,  4},  /* for up to 79 digits */
+  {100, 8},  /* up to 99 digits */
+  {140, 16},  /* up to 139 digits */
+  {170, 32}, /* up to 169 digits */
+  {180, 64}, /* up to 179 digits */
+  {220, 128}, /* up to 219 digits */
+  {260, 256}, /* up to 259 digits */
+  {300, 512} /* up to 299 digits */
 };
 
 

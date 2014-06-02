@@ -1987,7 +1987,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
   param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
-  snprintf (str, 200, "root-sieve effort ranging from 1 to 5 (default %d)",
+  snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
             DEFAULT_RSEFFORT);
   param_list_decl_usage(pl, "rseffort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
@@ -2079,9 +2079,9 @@ main (int argc, char *argv[])
 
   /* sieving effort that passed to ropt */
   param_list_parse_int (pl, "rseffort", &rseffort);
-  if (rseffort < 1 || rseffort > 5)
+  if (rseffort < 1 || rseffort > 10)
   {
-    fprintf (stderr, "Error, -rseffort should be in [1,5]\n");
+    fprintf (stderr, "Error, -rseffort should be in [1,10]\n");
     exit (1);
   }
 
