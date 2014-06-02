@@ -6,7 +6,6 @@
 #include <string.h>
 #include <errno.h>
 
-#include "cado_poly.h"
 #include "mod_ul.h"
 #include "relation.h"
 #include "gzip.h"
