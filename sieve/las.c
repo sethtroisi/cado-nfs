@@ -4087,9 +4087,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     }
 
     if (dont_print_tally && las->nb_threads > 1) 
-        print_stats (las->output, "# Total cpu time %1.1fs [tally only available in mono-thread]\n", t0);
+        print_stats (las->output, "# Total cpu time %1.2fs [tally only available in mono-thread]\n", t0);
     else
-        print_stats (las->output, "# Total cpu time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+        print_stats (las->output, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
@@ -4100,7 +4100,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
                 report->ttf);
 
-    print_stats (las->output, "# Total elapsed time %1.1fs, per special-q %gs, per relation %gs\n",
+    print_stats (las->output, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
     print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
