@@ -6,6 +6,7 @@
 #include "portability.h"
 #include "utils.h"
 #include "filter_common.h"
+#include "mod_ul.h"
 
 char *argv0; /* = argv[0] */
 
@@ -60,6 +61,9 @@ get_outfilename_from_infilename (char *infilename, const char *outfmt,
 }
 
 // Global variable for the table of Galois action
+// For an ideal of index idx, Gal[idx] gives the index of a
+// representative of the class under Galois action. It might be idx
+// itself, or another index.
 index_t *Gal;
 
 static void
@@ -71,13 +75,15 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
   int side, old_side;
   int nr;
   old_p = 0;
-  old_side = 42;
+  old_side = 42; // any value different from the legit ones.
   nr = 0;
 
   Gal = (index_t *) malloc(tab->size * sizeof(index_t));
   ASSERT_ALWAYS(Gal != NULL);
 
   for (i = 0; i < tab->size; i++) {
+//    if (i % (1<<16) == 0)
+//      fprintf(stderr, "at %lu\n", (unsigned long)i);
     if (tab->table[i] != RENUMBER_SPECIAL_VALUE) {
       renumber_get_p_r_from_index(tab, &p, &rr, &side, i, cpoly);
       // Is it a new (p, side) ?
@@ -85,9 +91,11 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
         r[nr] = rr;
         ind[nr] = i;
         nr++;
-      } else {
+      }
+      // If needed, take care of previous (p,side)
+      if ((old_p != p || old_side != side) || i == tab->size-1)
+      {
         if (old_p != 0) {
-          // Take care of previous (p,side):
           // Sort the roots, to put 1/r near r.
           if (nr & 1) {
             fprintf(stderr,
@@ -105,13 +113,15 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
               else if (r[k] == old_p)
                 invr = 0;
               else {
-                for (invr = 1; invr <= old_p; ++invr) {
-                  uint64_t ir64 = invr;
-                  uint64_t r64 = r[k];
-                  uint64_t p64 = old_p;
-                  if ((ir64*r64) % p64 == 1)
-                    break;
-                }
+                modulusul_t mm;
+                residueul_t xx;
+                modul_initmod_ul(mm, old_p);
+                modul_init(xx, mm);
+                modul_set_ul(xx, r[k], mm);
+                modul_inv(xx, xx, mm);
+                invr = modul_get_ul(xx, mm);
+                modul_clear(xx, mm);
+                modul_clearmod(mm);
                 ASSERT_ALWAYS(invr < old_p);
               }
               // Find the index of the conjugate
@@ -130,7 +140,7 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
               // Next
               k += 2;
             }
-            // Store the correspondance between conjugate ideals
+            // Store the correspondence between conjugate ideals
             for (k = 0; k < nr; k+=2) {
               Gal[ind[k]] = ind[k];
               Gal[ind[k+1]] = ind[k];
