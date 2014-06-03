@@ -23,9 +23,36 @@ import workunit
 from struct import error as structerror
 from workunit import Workunit
 
-# Pattern for floating-point number
+# Patterns for floating-point numbers
+# They can be used with the string.format() function, e.g.,
+# re.compile("value = {cap_fp}".format(**REGEXES))
+# where format() replaces "{cap_fp}" with the string in CAP_FP
 RE_FP = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
 CAP_FP = "(%s)" % RE_FP
+REGEXES = {"fp": RE_FP, "cap_fp": CAP_FP}
+
+def re_cap_n_fp(prefix, n, suffix=""):
+    """ Generate a regular expression that starts with prefix, then captures
+    1 up to n floating-point numbers (possibly in scientific notation)
+    separated by whitespace, and ends with suffix.
+    
+    >>> re.match(re_cap_n_fp("foo", 2), 'foo 1.23').group(1)
+    '1.23'
+    >>> re.match(re_cap_n_fp("foo", 2), 'foo1.23   4.56').groups()
+    ('1.23', '4.56')
+    
+    # The first fp pattern must match something
+    >>> re.match(re_cap_n_fp("foo", 2), 'foo')
+    """
+    template = prefix
+    if n > 0:
+        # The first CAP_FP pattern is mandatory, and can have zero or more
+        # whitespace in front
+        template += "\s*{cap_fp}"
+        # The remaining FP_CAPs are optional, and have 1 or more whitespace
+        template += "(?:\s+{cap_fp})?" * (n - 1)
+    template += suffix
+    return template.format(**REGEXES)
 
 
 class Polynomial(list):
@@ -88,8 +115,8 @@ class Polynomials(object):
 
     re_pol_f = re.compile(r"c(\d+)\s*:\s*(-?\d+)")
     re_pol_g = re.compile(r"Y(\d+)\s*:\s*(-?\d+)")
-    re_Murphy = re.compile(r"\s*#\s*MurphyE\s*(?:\(.*\))?=%s$" % CAP_FP)
-    re_lognorm = re.compile(r"\s*#\s*lognorm\s+%s" % CAP_FP)
+    re_Murphy = re.compile(re_cap_n_fp(r"\s*#\s*MurphyE\s*(?:\(.*\))?\s*=", 1))
+    re_lognorm = re.compile(re_cap_n_fp(r"\s*#\s*lognorm", 1))
     
     # Keys that can occur in a polynomial file, in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
@@ -1271,21 +1298,21 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: potential collisions=%s" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1))
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
-            update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+            self.update_lognorms,
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
-            update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+            self.update_lognorms,
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
         ),
         (
             "stats_tries",
@@ -1304,21 +1331,21 @@ class PolyselTask(ClientServerTask, HasStatistics, patterns.Observer):
             float,
             "",
             Statistics.smallest_n,
-            re.compile(r"# Stat: best logmu:" + (" " + CAP_FP)*10)
+            re.compile(re_cap_n_fp("# Stat: best logmu:", 10))
         ),
         (
             "stats_total_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
         ),
         (
             "stats_rootsieve_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s"))
         )
     )
     @property
@@ -1559,21 +1586,21 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: potential collisions=%s" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: potential collisions=", 1))
         ),
         (
             "stats_rawlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+            re.compile(r"# Stat: raw lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
         ),
         (
             "stats_optlognorm",
             (int, float, float, float, float),
             "0 0 0 0 0",
             self.update_lognorms,
-            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/%s/%s/%s/%s" % ((CAP_FP,) * 4))
+            re.compile(r"# Stat: optimized lognorm \(nr/min/av/max/std\): (\d+)/{cap_fp}/{cap_fp}/{cap_fp}/{cap_fp}".format(**REGEXES))
         ),
         (
             "stats_tries",
@@ -1592,21 +1619,21 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
             float,
             "",
             Statistics.smallest_n,
-            re.compile(r"# Stat: best raw logmu:" + ("(?: " + CAP_FP + ")?")*10)
+            re.compile(re_cap_n_fp("# Stat: best raw logmu:", 10))
         ),
         (
             "stats_opt_logmu",
             float,
             "",
             Statistics.smallest_n,
-            re.compile(r"# Stat: best opt logmu:" + ("(?: " + CAP_FP + ")?")*10)
+            re.compile(re_cap_n_fp("# Stat: best opt logmu:", 10))
         ),
         (
             "stats_total_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
         ),
     )
     @property
@@ -1994,14 +2021,14 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: total phase took %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: total phase took", 1, "s"))
         ),
         (
             "stats_rootsieve_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Stat: rootsieve took %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Stat: rootsieve took", 1, "s"))
         )
     )
     @property
@@ -2485,28 +2512,28 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
             (float, int),
             "0 0",
             Statistics.zip_combine_mean,
-            re.compile(r"# Average J=%s for (\d+) special-q's" % CAP_FP)
+            re.compile(re_cap_n_fp("# Average J=", 1, r"\s*for (\d+) special-q's"))
         ),
         (
             "stats_max_bucket_fill",
             float,
             "0",
             max,
-            re.compile(r"#.*max bucket fill %s" % CAP_FP)
+            re.compile(re_cap_n_fp("#.*max bucket fill", 1))
         ),
         (
             "stats_total_cpu_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"# Total cpu time %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Total cpu time", 1, "s"))
         ),
         (
             "stats_total_time",
             (float, ),
             "0",
             Statistics.add_list,
-            re.compile(r"# Total time %ss" % CAP_FP)
+            re.compile(re_cap_n_fp("# Total time", 1, "s"))
         )
     )
     @property
@@ -2728,7 +2755,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
+            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -2947,7 +2974,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"End of read: \d+ relations in %ss" % CAP_FP)
+            re.compile(re_cap_n_fp(r"End of read: \d+ relations in", 1, "s"))
         ),
     )
     @property
@@ -3702,35 +3729,35 @@ class LinAlgTask(Task, HasStatistics):
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; CPU: %s" % CAP_FP)
+            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; CPU:", 1))
         ),
         (
             "krylov_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"krylov done, N=\d+ ; COMM: %s" % CAP_FP)
+            re.compile(re_cap_n_fp(r"krylov done, N=\d+ ; COMM:", 1))
         ),
         (
             "lingen_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"Total computation took %s" % CAP_FP)
+            re.compile(re_cap_n_fp("Total computation took", 1))
         ),
         (
             "mksol_time",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; CPU: %s" % CAP_FP)
+            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; CPU:", 1))
         ),
         (
             "mksol_comm",
             float,
             "0",
             Statistics.add_list,
-            re.compile(r"mksol done, N=\d+ ; COMM: %s" % CAP_FP)
+            re.compile(re_cap_n_fp(r"mksol done, N=\d+ ; COMM:", 1))
         ),
     )
     @property
