@@ -737,32 +737,39 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
             self.logger.info("Total %s time for %s: " + printformat,
                     timestr, program, *usepairs[0])
     
-    def update_cpu_or_real_time(self, is_cpu, program, seconds, commit=True):
+    @staticmethod
+    def keyname(is_cpu, programname):
+        return "cputime_%s" % programname if is_cpu else "realtime_%s" % programname
+
+    def update_cpu_real_time(self, programname, cpu=None, real=None, commit=True):
         """ Add seconds to the statistics of cpu time spent by program,
         and return the new total.
         """
-        assert isinstance(program, str)
-        key = "%s_%s" % ("cputime" if is_cpu else "realtime", program)
-        total = self.state.get(key, 0.) + seconds
-        # Update only if the value changed, i.e., if seconds != 0.
-        if seconds:
-            self.state.update({key: total}, commit=commit)
-        return total
+        assert isinstance(programname, str)
+        update = {}
+        for (is_cpu, time) in ((True, cpu), (False, real)):
+            if time is not None:
+                key = self.keyname(is_cpu, programname)
+                update[key] = self.state.get(key, 0.) + time
+        if update:
+            self.state.update(update, commit=commit)
+
+    def get_cpu_real_time(self, program):
+        """ Return list of cpu and real time spent by program """
+        return [self.state.get(self.keyname(is_cpu, program.name), 0.)
+                for is_cpu in (True, False)]
 
     def get_total_cpu_or_real_time(self, is_cpu):
-        """ Return number of seconds of cpu time spent by all programs of
-        this Task
+        """ Return tuple with number of seconds of cpu and real time spent
+        by all programs of this Task
         """
-        total = 0.
-        for program in self.programs:
-            total += self.update_cpu_or_real_time(is_cpu, program.name, 0.,
-                    commit=False)
-        return total
+        times = [self.get_cpu_real_time(p) for p in self.programs]
+        times = tuple(map(sum, zip(*times)))
+        return times[0 if is_cpu else 1]
 
     def print_stats(self):
         for program in self.programs:
-            cputotal = self.update_cpu_or_real_time(True, program.name, 0.)
-            realtotal = self.update_cpu_or_real_time(False, program.name, 0.)
+            cputotal, realtotal  = self.get_cpu_real_time(program)
             self.print_cpu_real_time(cputotal, realtotal, program.name)
         super().print_stats()
 
@@ -986,8 +993,7 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         (rc, stdout, stderr) = process.wait()
         cputime_used = os.times()[2] - cputime_used
         realtime_used = time.time() - realtime_used
-        self.update_cpu_or_real_time(True, command.name, cputime_used, False)
-        self.update_cpu_or_real_time(False, command.name, realtime_used, commit)
+        self.update_cpu_real_time(command.name, cputime_used, realtime_used, commit)
         message = Task.ResultInfo(wuname, rc, stdout, stderr, command, 
                                   command.make_command_line(), "server")
         if rc != 0 and log_errors:
