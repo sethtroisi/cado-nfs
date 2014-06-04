@@ -3240,7 +3240,10 @@ class PurgeTask(Task):
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
             self.logger.info("Not enough relations")
-            self.request_more_relations(nunique)
+            if not self.params["galois"]:
+                self.request_more_relations(nunique)
+            else:
+                self.request_more_relations(input_nrels)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
         return True
     
@@ -3454,6 +3457,9 @@ class FilterGaloisTask(Task):
                 remaining = int(match.group(1))
                 return remaining
         raise Exception("Received no value for output relation count")
+
+    def request_more_relations(self, target):
+        self.send_notification(Notification.WANT_TO_RUN, None)
 
 class MergeDLPTask(Task):
     """ Merges relations """
@@ -4210,8 +4216,6 @@ class SMTask(Task):
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
-
-
 
 class ReconstructLogTask(Task):
     """ Logarithms Reconstruction Task """
@@ -5000,6 +5004,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         if key is Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
                 self.dup2.request_more_relations(value)
+                self.filtergalois.request_more_relations(value)
             elif sender is self.dup2:
                 self.dup1.request_more_relations(value)
             elif sender is self.dup1:
