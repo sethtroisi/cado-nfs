@@ -1046,7 +1046,42 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
             break;
         mpz_poly_ptr f = las->cpoly->pols[qside];
         int nroots = mpz_poly_roots (roots, f, q);
-
+        if (param_list_parse_switch(pl, "-galois")) {
+            if (nroots % 2) {
+                fprintf(stderr, "Number of roots modulo q is odd. Don't know how to interpret -galois.\n");
+                ASSERT_ALWAYS(0);
+            }
+            // Keep only one root among {r, 1/r} orbits.
+            modulusul_t mm;
+            unsigned long qq = mpz_get_ui(q);
+            modul_initmod_ul(mm, qq);
+            residueul_t r1, r2;
+            modul_init(r1, mm);
+            modul_init(r2, mm);
+            for (int k = 0; k < nroots; k++) {
+                unsigned long rr = mpz_get_ui(roots[k]);
+                modul_set_ul(r1, rr, mm);
+                int kk = 0;
+                for (int l = k+1; l < nroots; ++l) {
+                    unsigned long ss = mpz_get_ui(roots[l]);
+                    modul_set_ul(r2, ss, mm);
+                    modul_mul(r2, r2, r1, mm);
+                    if (modul_is1(r2, mm)) {
+                        kk = l;
+                        break;
+                    }
+                }
+                ASSERT_ALWAYS(kk != 0); // Should always find an inverse.
+                // Remove it from the list
+                for (int l = kk; l < nroots-1; ++l) {
+                    mpz_set(roots[l], roots[l+1]);
+                }
+                nroots--;
+            }
+            modul_clear(r1, mm);
+            modul_clear(r2, mm);
+            modul_clearmod(mm);
+        }
         /* {{{ This print is now dead (or we're going to print it at
          * weird times)
          *
@@ -3720,6 +3755,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
   param_list_decl_usage(pl, "no-prepare-hints", "(switch) defer initialization of siever precomputed structures (one per special-q side) to time of first actual use");
   param_list_decl_usage(pl, "dup", "(switch) suppress duplicate relations");
+  param_list_decl_usage(pl, "galois", "(switch) for reciprocal polynomials, sieve only half of the q's");
 #ifdef TRACE_K
   param_list_decl_usage(pl, "traceab", "Relation to trace, in a,b format");
   param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
@@ -3756,6 +3792,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-stats-stderr", NULL);
     param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_switch(pl, "-dup", NULL);
+    param_list_configure_switch(pl, "-galois", NULL);
     param_list_configure_alias(pl, "-skew", "-S");
     param_list_configure_alias(pl, "-fb1", "-fb");
     param_list_configure_alias(pl, "-lim0", "-rlim");
