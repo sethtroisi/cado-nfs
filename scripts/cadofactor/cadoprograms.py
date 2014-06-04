@@ -722,6 +722,7 @@ class Las(Program):
                  threads: Parameter("mt", checktype=int)=None,
                  ratq: Toggle()=None,
                  dup: Toggle()=None,
+                 galois: Toggle()=None,
                  allow_largesq: Toggle("allow-largesq")=None,
                  stats_stderr: Toggle("stats-stderr")=None,
                  # We have no checktype for parametes of the form <int>,<int>,

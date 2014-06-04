@@ -3138,7 +3138,8 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "alim": int, "rlim": int, "gzip": True})
+            {"dlp": False, "galois": False, "alim": int,
+                "rlim": int, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3150,15 +3151,23 @@ class PurgeTask(Task):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
-        nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+        if not self.params["galois"]:
+            nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
+            nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+            if not nunique:
+                self.logger.critical("No unique relation count received")
+                return False
+            input_nrels = nfree + nunique
+        else:
+            # Freerels and Galois are not yet fully compatible.
+            input_nrels = self.send_request(Request.GET_GAL_UNIQUE_RELCOUNT)
+            if not input_nrels:
+                self.logger.critical("No Galois unique relation count received")
+                return False
+
         minlim = min(self.params["alim"], self.params["rlim"])
         minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
-        if not nunique:
-            self.logger.critical("No unique relation count received")
-            return False
-        input_nrels = nfree + nunique
         
         if "purgedfile" in self.state and \
                 input_nrels == self.state["input_nrels"]:
@@ -3170,8 +3179,12 @@ class PurgeTask(Task):
         self.state.pop("purgedfile", None)
         self.state.pop("input_nrels", None)
         
-        self.logger.info("Reading %d unique and %d free relations, total %d"
-                         % (nunique, nfree, input_nrels))
+        if not self.params["galois"]:
+            self.logger.info("Reading %d unique and %d free relations, total %d"
+                             % (nunique, nfree, input_nrels))
+        else:
+            self.logger.info("Reading %d Galois unique" % input_nrels)
+
         use_gz = ".gz" if self.params["gzip"] else ""
         purgedfile = self.workdir.make_filename("purged" + use_gz)
         if self.params["dlp"]:
@@ -3179,8 +3192,13 @@ class PurgeTask(Task):
         else:
             relsdelfile = None
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
+        # Remark: "Galois unique" and "unique" are in the same files
+        # because filter_galois works in place. Same request.
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
-        files = unique_filenames + [str(freerel_filename)]
+        if not self.params["galois"]:
+            files = unique_filenames + [str(freerel_filename)]
+        else:
+            files = unique_filenames
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
         if self.params["dlp"]:
@@ -3369,6 +3387,73 @@ class PurgeTask(Task):
                 raise Exception("%s: output of %s did not contain value for %s: %s"
                                 % (self.title, self.programs[0].name, key, stdout))
         return [r[key] for key in keys]
+
+class FilterGaloisTask(Task):
+    """ Galois Filtering """
+    @property
+    def name(self):
+        return "galfilter"
+    @property
+    def title(self):
+        return "Filtering - Galois"
+    @property
+    def programs(self):
+        return (cadoprograms.GaloisFilter,)
+    @property
+    def progparam_override(self):
+        return [["nrels", "poly", "renumber"]]
+    @property
+    def paramnames(self):
+        return self.join_params(super().paramnames, {"galois": False})
+
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+
+    def run(self):
+        # This task must be run only if galois=true.
+        if not self.params["galois"]:
+            return True
+
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        self.logger.info("Starting")
+
+        files = self.send_request(Request.GET_UNIQUE_FILENAMES)
+        nrels = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
+
+        (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.GaloisFilter.name)
+        # TODO: if there are too many files, pass a filelist (cf PurgeTask)
+        p = cadoprograms.GaloisFilter(*files,
+                nrels=nrels,
+                poly=polyfilename,
+                renumber=renumber_filename,
+                stdout=str(stdoutpath),
+                stderr=str(stderrpath),
+                **self.progparams[0])
+        message = self.submit_command(p, "", log_errors=True)
+        if message.get_exitcode(0) != 0:
+            raise Exception("Program failed")
+        with stderrpath.open("r") as stderrfile:
+            noutrels = self.parse_remaining(stderrfile)
+        self.state["noutrels"] = noutrels
+
+        self.logger.debug("Exit FilterGaloisTask.run(" + self.name + ")")
+        return True
+
+    def get_nrels(self):
+        return self.state["noutrels"]
+
+    def parse_remaining(self, text):
+        # "Number of ouput relations: 303571"
+        for line in text:
+            match = re.match(r'Number of ouput relations:\s*(\d+)', line)
+            if match:
+                remaining = int(match.group(1))
+                return remaining
+        raise Exception("Received no value for output relation count")
 
 class MergeDLPTask(Task):
     """ Merges relations """
@@ -4580,6 +4665,7 @@ class Request(Message):
     GET_SIEVER_RELCOUNT = object()
     GET_DUP1_FILENAMES = object()
     GET_DUP1_RELCOUNT = object()
+    GET_GAL_UNIQUE_RELCOUNT = object()
     GET_UNIQUE_RELCOUNT = object()
     GET_UNIQUE_FILENAMES = object()
     GET_PURGED_FILENAME = object()
@@ -4700,6 +4786,10 @@ class CompleteFactorization(HasState, wudb.DbAccess,
                              db=db,
                              parameters=self.parameters,
                              path_prefix=parampath)
+            self.filtergalois = FilterGaloisTask(mediator=self,
+                             db=db,
+                             parameters=self.parameters,
+                             path_prefix=filterpath)
             self.sm = SMTask(mediator=self,
                              db=db,
                              parameters=self.parameters,
@@ -4740,7 +4830,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         if self.params["dlp"]:
             self.tasks = (self.polysel1, self.polysel2, self.nmbrthry, self.fb,
                           self.freerel, self.sieving,
-                          self.dup1, self.dup2, self.purge, self.merge,
+                          self.dup1, self.dup2,
+                          self.filtergalois, self.purge, self.merge,
                           self.sm, self.linalg, self.reconstructlog)
         else:
             self.tasks = (self.polysel1, self.polysel2, self.fb, self.freerel, self.sieving,
@@ -4779,6 +4870,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         ## add requests specific to dlp or factoring
         if self.params["dlp"]:
             self.request_map[Request.GET_IDEAL_FILENAME] = self.merge.get_ideal_filename
+            self.request_map[Request.GET_GAL_UNIQUE_RELCOUNT] = self.filtergalois.get_nrels
             self.request_map[Request.GET_BADIDEAL_FILENAME] = self.nmbrthry.get_bad_filename
             self.request_map[Request.GET_BADIDEALINFO_FILENAME] = self.nmbrthry.get_badinfo_filename
             self.request_map[Request.GET_NMAPS] = self.nmbrthry.get_nmaps
