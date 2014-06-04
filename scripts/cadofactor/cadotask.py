@@ -3658,7 +3658,7 @@ class NmbrthryTask(Task):
         return [["poly", "badidealinfo", "badideals"]]
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"nsm": -1})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3695,6 +3695,9 @@ class NmbrthryTask(Task):
             match = re.match(r'nmaps (\d+)', line)
             if match:
                 update["nmaps"] = int(match.group(1))
+        # Allow user-given parameter to override what we compute:
+        if self.params["nsm"] != -1:
+            update["nmaps"] = self.params["nsm"]
         update["badinfofile"] = badinfofile.get_wdir_relative()
         update["badfile"] = badfile.get_wdir_relative()
         
@@ -4170,13 +4173,16 @@ class SMTask(Task):
                           self.state)
         
         if not "sm" in self.state:
+            nmaps = self.send_request(Request.GET_NMAPS)
+            if nmaps == 0:
+                self.logger.info("Number of SM is 0: skipping this part.")
+                return True
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
             badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-            nmaps = self.send_request(Request.GET_NMAPS)
             smfilename = self.workdir.make_filename("sm")
 
             gorder = self.send_request(Request.GET_ELL)
