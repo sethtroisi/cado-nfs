@@ -15,6 +15,7 @@ renumber_t renumber_tab;
 
 static uint32_t *H; /* H contains the hash table */
 static unsigned long K = 0; /* Size of the hash table */
+static unsigned long noutrels = 0; // Number of ouput relations
 
 /* return in *oname and *oname_tmp two file names for writing the output
  * of processing the given input file infilename. Both files are placed
@@ -206,6 +207,8 @@ thread_galois (void * context_data, earlyparsed_relation_ptr rel)
   insert_relation_in_dup_hashtable (rel, &is_dup);
   if (is_dup)
     return NULL;
+
+  noutrels++;
   
   char buf[1 << 12], *p, *op;
   size_t t;
@@ -405,6 +408,8 @@ main (int argc, char *argv[])
     free(oname);
     free(oname_tmp);
   }
+
+  fprintf(stderr, "Number of ouput relations: %lu\n", noutrels);
 
   if (filelist)
     filelist_clear(files);
