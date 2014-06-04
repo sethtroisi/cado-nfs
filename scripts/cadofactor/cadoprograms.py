@@ -774,6 +774,21 @@ class Duplicates2(Program):
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
+class GaloisFilter(Program):
+    binary = "filter_galois"
+    name = binary
+    subdir = "filter"
+    def __init__(self,
+                 *args: PositionalParameter(is_input_file=True),
+                 nrels: Parameter(checktype=int),
+                 poly: Parameter(is_input_file=True),
+                 renumber: Parameter(is_input_file=True),
+                 filelist: Parameter(is_input_file=True)=None,
+                 basepath: Parameter()=None,
+                 **kwargs):
+        super().__init__(locals(), **kwargs)
+
+
 class Purge(Program):
     binary = "purge"
     name = binary
