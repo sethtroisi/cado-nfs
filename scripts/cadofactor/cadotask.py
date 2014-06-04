@@ -2499,7 +2499,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "qmin": 0, "qrange": int, "rels_wanted": 0, "alim": int, 
+            "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
             "import": None, "gzip": True})
     @property
     def stat_conversions(self):
