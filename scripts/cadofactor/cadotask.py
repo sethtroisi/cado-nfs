@@ -5004,7 +5004,8 @@ class CompleteFactorization(HasState, wudb.DbAccess,
         if key is Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
                 self.dup2.request_more_relations(value)
-                self.filtergalois.request_more_relations(value)
+                if self.params["dlp"]:
+                    self.filtergalois.request_more_relations(value)
             elif sender is self.dup2:
                 self.dup1.request_more_relations(value)
             elif sender is self.dup1:
