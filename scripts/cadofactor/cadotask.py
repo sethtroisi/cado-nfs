@@ -4237,10 +4237,10 @@ class ReconstructLogTask(Task):
     @property
     def progparam_override(self):
         return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
-                 "nmaps", "partial", "ker", "ideals", "relsdel", "nrels"]]
+                 "nmaps", "ker", "ideals", "relsdel", "nrels"]]
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"partial": True})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4266,7 +4266,7 @@ class ReconstructLogTask(Task):
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             nrels = nfree+nunique
-            
+
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
             p = cadoprograms.ReconstructLog(poly=polyfilename,
@@ -4275,7 +4275,6 @@ class ReconstructLogTask(Task):
                     dlog=dlogfilename,
                     ell=gorder, smexp=smexp,
                     nmaps=nmaps,
-                    partial=True,
                     ker=kerfilename,
                     ideals=idealfilename,
                     relsdel=relsdelfilename,
