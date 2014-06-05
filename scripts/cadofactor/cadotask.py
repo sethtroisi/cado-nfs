@@ -4240,7 +4240,7 @@ class ReconstructLogTask(Task):
                  "nmaps", "ker", "ideals", "relsdel", "nrels"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"partial": True})
+        return super().paramnames
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4820,7 +4820,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.reconstructlog = ReconstructLogTask(mediator=self,
                                      db=db,
                                      parameters=self.parameters,
-                                     path_prefix=filterpath)
+                                     path_prefix=parampath)
         else:
             ## Tasks specific to factorization
             self.merge = MergeTask(mediator=self,
