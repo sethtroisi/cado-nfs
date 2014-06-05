@@ -91,6 +91,12 @@ class Polynomial(list):
             value = value * x + self[deg - i - 1]
         return value
 
+    def same_lc(self, other):
+        """ Return true if the two polynomials have the same degree
+        and leading coefficient
+        """
+        return self.degree == other.degree and \
+                self[self.degree] == other[other.degree]
 
 class PolynomialParseException(Exception):
     """ Exception class for signaling errors during polynomial parsing """
@@ -230,6 +236,13 @@ class Polynomials(object):
 
     def getN(self):
         return self.params["n"]
+
+    def same_lc(self, other):
+        """ Returns true if both polynomial pairs have same degree and
+        leading coefficient
+        """
+        return self.polyf.same_lc(other.polyf) and \
+               self.polyg.same_lc(other.polyg)
 
 
 class FilePath(object):
@@ -1958,9 +1971,7 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
         # coefficients of both polynomials
         found = None
         for (index, (lognorm, (key, poly))) in enumerate(self.poly_heap):
-            if poly.polyf.degree == df and poly.polyg.degree == dg and \
-                   poly.polyf[df] == search_poly.polyf[df] and \
-                   poly.polyg[dg] == search_poly.polyg[dg]:
+            if search_poly.same_lc(poly):
                if not found is None:
                    self.logger.error("Found more than one match for %s", search_poly)
                else:
