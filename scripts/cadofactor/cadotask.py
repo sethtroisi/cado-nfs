@@ -4240,11 +4240,12 @@ class ReconstructLogTask(Task):
                  "nmaps", "ker", "ideals", "relsdel", "nrels"]]
     @property
     def paramnames(self):
-        return super().paramnames
+        return self.join_params(super().paramnames, {"partial": True})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.progparams[0].setdefault("partial", self.params["partial"])
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
