@@ -2091,10 +2091,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         
         if self.is_done():
             self.logger.info("Already finished - nothing to do")
-            rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
-            if not rank is None:
-                self.logger.info("Best overall polynomial was %d-th in list "
-                                 "after size optimization", rank)
+            self.print_rank()
             # If the poly file got lost somehow, write it again
             filename = self.get_state_filename("polyfilename")
             if filename is None or not filename.isfile():
@@ -2116,13 +2113,10 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
             return False
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.MurphyE)
-        rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
-        if not rank is None:
-            self.logger.info("Best overall polynomial was %d-th in list "
-                             "after size optimization", rank)
+        self.print_rank()
         self.write_poly_file()
         return True
-    
+
     def is_done(self):
         return not self.bestpoly is None and not self.need_more_wus() and \
             self.get_number_outstanding_wus() == 0
@@ -2245,6 +2239,13 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     def get_total_cpu_or_real_time(self, is_cpu):
         """ Return number of seconds of cpu time spent by polyselect2l """
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
+
+    def print_rank(self):
+        if not self.did_import:
+            rank = self.send_request(Request.GET_POLY_RANK, self.bestpoly)
+            if not rank is None:
+                self.logger.info("Best overall polynomial was %d-th in list "
+                                 "after size optimization", rank)
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
