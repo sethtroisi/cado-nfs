@@ -37,7 +37,7 @@ tasks.sieve.rlambda = 1.2
 tasks.sieve.alambda = 1.2
 
 tasks.I = 11
-tasks.sieve.qmin = 200000
+tasks.sieve.qmin = 100000
 tasks.sieve.qrange = 1000
 tasks.sieve.rels_wanted = 222540
 
