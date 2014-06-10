@@ -317,7 +317,7 @@ main (int argc, const char *argv[])
   test_mpz_mul_uint64 (iter);
   test_mpz_mul_int64 (iter);
   test_mpz_addmul_int64 (iter);
-  test_ulong_nextprime (iter / 10);
+  test_ulong_nextprime (iter / 20);
   test_nbits (iter);
   test_mpz_ndiv_q (iter);
   tests_common_clear ();
