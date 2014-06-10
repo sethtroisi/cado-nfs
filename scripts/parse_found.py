@@ -5,8 +5,6 @@ import sys
 import math
 import datetime
 
-# "PID13816 2014-05-27 13:23:24,843 Info:Lattice Sieving: Found 7819 relations in '/localdisk/kruppaal/factoring/rsa220/rsa220.upload/rsa220.sieving.985030000-985040000.rlat6a.gz', total is now 156535983/1500000000"
-
 # Relations counts received within each interval are added up.
 # Define here how long an interval is.
 SECONDS_PER_INTERVAL = 7200
@@ -15,10 +13,16 @@ SECONDS_PER_INTERVAL = 7200
 DATE_FMT = "%Y-%m-%d %H:%M:%S,%f"
 # The time stamp of when we started sieving RSA220
 START_TIME = datetime.datetime.strptime("2014-05-17 22:10:24,702", DATE_FMT)
-# Regex to parse relation counts as printed in the log
+
+# Regex to parse relation counts as printed in the log. Example:
+# "PID13816 2014-05-27 13:23:24,843 Info:Lattice Sieving: Found 7819 relations in '/localdisk/kruppaal/factoring/rsa220/rsa220.upload/rsa220.sieving.985030000-985040000.rlat6a.gz', total is now 156535983/1500000000"
 FOUND_RE = re.compile(r"PID\d+ (\d+-\d+-\d+ \d+:\d+:\d+,\d+) Info:Lattice Sieving: Found (\d+) relations in '\S+', total is now (\d+)/\d+")
 
 sums = {}
+
+cumulative = False
+for arg in sys.argv[1:]:
+    cumulative |= arg == "-cumulative"
 
 for line in sys.stdin:
   # print(line.strip())
@@ -33,8 +37,8 @@ for line in sys.stdin:
             interval = math.floor(sec / SECONDS_PER_INTERVAL)
             sums[interval] = sums.get(interval, 0) + int(new_rels)
 
+value = 0
 for i in range(max(sums)): # don't do +1 to avoid partial interval
-    if i in sums:
-        print("%d %d" % (i, sums[i]))
-    else:
-        print("%d 0" % i)
+    now = sums[i] if i in sums else 0
+    value = value + now if cumulative else now
+    print("%d %d" % (i, value))
