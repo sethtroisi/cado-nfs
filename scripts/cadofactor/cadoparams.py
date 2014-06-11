@@ -245,8 +245,12 @@ class Parameters(object):
             else:
                 dest[segment] = {}
             dest = dest[segment]
-        if key in dest.keys() and isinstance(dest[key], dict):
-            raise KeyError('Key %s already exists as subdictionary' % key)
+        if key in dest.keys():
+            if isinstance(dest[key], dict):
+                raise KeyError('Key %s already exists as subdictionary' % key)
+            elif dest[key][0] != value:
+                logger.warn("Parameter %s, previously set to value %s, overwritten with value %s"
+                            % (joinpath, dest[key][0], value))
         dest[key] = [value, False]
     
     @staticmethod
