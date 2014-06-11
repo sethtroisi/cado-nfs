@@ -31,14 +31,14 @@ if __name__ == '__main__':
     screenlvlname = args.screenlog
     filelvlname = args.filelog
     
+    screenlvl = getattr(cadologger, screenlvlname.upper())
+    logger = logging.getLogger()
+    logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
+
     parameters = cadoparams.Parameters()
     parameters.readfile(paramfile)
     parameters.readparams(args.options)
     tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
-    
-    screenlvl = getattr(cadologger, screenlvlname.upper())
-    logger = logging.getLogger()
-    logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
     
     # Make working directory, if it does not exist
     directory = tasksparams["workdir"]
