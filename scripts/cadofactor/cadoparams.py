@@ -170,10 +170,10 @@ class Parameters(object):
         return result
 
     def __iter__(self):
-        return self._recurse_iter(self.data, [])
+        return self._recurse_iter(self.data)
     
     @staticmethod
-    def _recurse_iter(source, path):
+    def _recurse_iter(source, path=[]):
         # First return all keys on this node
         for key in sorted(source):
             if not isinstance(source[key], dict):
@@ -238,12 +238,11 @@ class Parameters(object):
         key = splitpath.pop()
         dest = self.data
         for segment in splitpath:
-            if segment in dest.keys():
-                if not isinstance(dest[segment], dict):
+            if not segment in dest.keys():
+                dest[segment] = {}
+            elif not isinstance(dest[segment], dict):
                     raise KeyError('Subdirectory %s already exists as key' 
                                    % segment)
-            else:
-                dest[segment] = {}
             dest = dest[segment]
         if key in dest.keys():
             if isinstance(dest[key], dict):
@@ -252,7 +251,7 @@ class Parameters(object):
                 logger.warn("Parameter %s, previously set to value %s, overwritten with value %s"
                             % (joinpath, dest[key][0], value))
         dest[key] = [value, False]
-    
+
     @staticmethod
     def subst_env_var(fqn, value):
         """ Substitute strings like '${HOME}' in value by the corresponding
