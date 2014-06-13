@@ -85,7 +85,9 @@ compute_galois_action (renumber_t tab, cado_poly cpoly)
   for (i = 0; i < tab->size; i++) {
 //    if (i % (1<<16) == 0)
 //      fprintf(stderr, "at %lu\n", (unsigned long)i);
-    if (tab->table[i] != RENUMBER_SPECIAL_VALUE) {
+    if (tab->table[i] == RENUMBER_SPECIAL_VALUE) {
+      Gal[i] = i;
+    } else {
       renumber_get_p_r_from_index(tab, &p, &rr, &side, i, cpoly);
       // Is it a new (p, side) ?
       if (old_p == p && old_side == side) {
