@@ -295,9 +295,9 @@ struct cutoff_finder {
     }
 
     /* This is really limited to karatsuba-like cuttofs. It's ugly */
-    vector<pair<unsigned int, int>> export_best_table()
+    vector<pair<unsigned int, int> > export_best_table()
     {
-        vector<pair<unsigned int, int>> steps;
+        vector<pair<unsigned int, int> > steps;
         steps.push_back(make_pair(1,0));
 
         typedef vector<pair<unsigned int, pair<vector<double>, int> > >::const_iterator it_t;
@@ -310,7 +310,7 @@ struct cutoff_finder {
         }
         return steps;
     }
-    vector<pair<unsigned int, int>> export_kara_cutoff_data(struct polymat_cutoff_info * dst)
+    vector<pair<unsigned int, int> > export_kara_cutoff_data(struct polymat_cutoff_info * dst)
     {
         /* This size will eventually feed the ->subdivide field for the
          * cutoff info */
@@ -321,7 +321,7 @@ struct cutoff_finder {
          * karatsuba. */
         unsigned int first_alwayskara_size = UINT_MAX;
 
-        vector<pair<unsigned int, int>> steps;
+        vector<pair<unsigned int, int> > steps;
         steps.push_back(make_pair(1,0));
 
         typedef vector<pair<unsigned int, pair<vector<double>, int> > >::const_iterator it_t;
@@ -351,18 +351,18 @@ struct cutoff_finder {
         };
         return steps;
     }
-    vector<pair<unsigned int, int>> export_kara_cutoff_data_force_kara_now(struct polymat_cutoff_info * dst, unsigned int size)
+    vector<pair<unsigned int, int> > export_kara_cutoff_data_force_kara_now(struct polymat_cutoff_info * dst, unsigned int size)
     {
         vector<double> allz(ntests);
         all_results.push_back(make_pair(size, make_pair(allz, 1)));
-        vector<pair<unsigned int, int>> x = export_kara_cutoff_data(dst);
+        vector<pair<unsigned int, int> > x = export_kara_cutoff_data(dst);
         all_results.pop_back();
         return x;
     }
-    static string print_result(vector<pair<unsigned int, int>> const& tab) {
+    static string print_result(vector<pair<unsigned int, int> > const& tab) {
         ostringstream s;
         s << "{";
-        typedef vector<pair<unsigned int, int>>::const_iterator it_t;
+        typedef vector<pair<unsigned int, int> >::const_iterator it_t;
         for(it_t y = tab.begin() ; y != tab.end() ; y++) {
             s << " { " << y->first << ", " << y->second << " },";
         }
@@ -558,9 +558,9 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
     }
     hup_caught = 0;
 
-    vector<pair<unsigned int, int>> table = finder.export_best_table();
+    vector<pair<unsigned int, int> > table = finder.export_best_table();
 
-    typedef vector<pair<unsigned int, int>>::iterator it_t;
+    typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
         x.second = nadjs-1-x.second;
 
@@ -729,9 +729,9 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
     }
     hup_caught = 0;
 
-    vector<pair<unsigned int, int>> table = finder.export_best_table();
+    vector<pair<unsigned int, int> > table = finder.export_best_table();
 
-    typedef vector<pair<unsigned int, int>>::iterator it_t;
+    typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
         x.second = nadjs-1-x.second;
 
@@ -973,7 +973,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
     hup_caught = 0;
 
 
-    vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
+    vector<pair<unsigned int, int> > table = finder.export_kara_cutoff_data(improved);
     polymat_set_mul_kara_cutoff(improved, NULL);
 
     cout << "/* Cutoffs (0=basecase, 1=kara) for "
@@ -1224,7 +1224,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
     }
     hup_caught = 0;
 
-    vector<pair<unsigned int, int>> table = finder.export_kara_cutoff_data(improved);
+    vector<pair<unsigned int, int> > table = finder.export_kara_cutoff_data(improved);
     polymat_set_mp_kara_cutoff(improved, NULL);
 
     cout << "/* Cutoffs (0=basecase, 1=kara) for "
