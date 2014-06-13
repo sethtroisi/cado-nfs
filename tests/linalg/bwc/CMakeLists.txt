@@ -31,4 +31,4 @@ endmacro(add_bwc_test)
 # add_dependencies(check plingen_p_1)
 
 add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64)
-add_dependencies(check plingen_p_1)
+add_dependencies(check mf_scan plingen_p_1)
