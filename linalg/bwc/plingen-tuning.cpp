@@ -40,7 +40,7 @@
 /* This is the simple C-type cutoff table which is used down the line by
  * C programs */
 
-typedef struct {
+struct cutoff_list_s {
     unsigned int k;     /* this is the number of coefficients (length) of
                          * pi.  Admittedly,  it is slightly bogus to have
                          * this as a main variable.  Length [k] for pi
@@ -52,7 +52,9 @@ typedef struct {
                                  * this is the depth reduction from the
                                  * flit default.
                                  */
-} * cutoff_list;
+};
+
+typedef cutoff_list_s * cutoff_list;
 
 /* cutoff list *ALWAYS* finish with UINT_MAX, UINT_MAX */
 unsigned int cutoff_list_get(cutoff_list cl, unsigned int k)
