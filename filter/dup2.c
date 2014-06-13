@@ -250,7 +250,7 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
       if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r, side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS] = {0,};
-        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, info);
+        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, side, info);
         
         /* allocate room for (nb) more valuations */
         if (rel->nb + nb - 1 > rel->nb_alloc)

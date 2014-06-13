@@ -8,6 +8,7 @@ ZPH:=PolynomialRing(ZZ,2);
 // the explicitly given polynomial that follows:
 if assigned DEBUG then
     f := 840*x^5-16210*x^4+2610983*x^3-2560484269*x^2-34656366009*x+253976285986533;
+    g := 240*x^4+4327846*x^3-11463289949*x^2-48524924823332*x+99623823815957215;
     ell := 42;
     badfile := "";
     badinfofile := "";
@@ -22,12 +23,14 @@ else
         c := StringToInteger(Split(l, " ")[2]);
         f +:= c*x^e;
     end for;
+    g := ZP!0;
+    for l in lines do
+        if l[1] ne "Y" then continue; end if;
+        e := StringToInteger(l[2]);
+        c := StringToInteger(Split(l, " ")[2]);
+        g +:= c*x^e;
+    end for;
 end if;
-
-SBAD := "";
-SBADINFO := "";
-
-SBAD := Sprintf("%o# badideals for f=%o\n", SBAD, f);
 
 /*
 // p180
@@ -654,8 +657,19 @@ function NormalizeProjectiveElement(uv, pk)
     end if;
 end function;
 
-if not assigned DEBUG then
+polys := [g, f];
 
+
+SBAD := "";
+SBADINFO := "";
+
+SBAD := Sprintf("%o# badideals for pol[0]=%o and pol[1]=%o\n", SBAD,
+   polys[1], polys[2]);
+
+for side := 0 to 1 do
+
+f := polys[side+1];
+if Degree(f) eq 1 then continue; end if;
 K<alpha>:=NumberField(f);
 
 d:=Discriminant(f)*LeadingCoefficient(f);
@@ -715,8 +729,8 @@ for pf in FacBadPrimes do
             else
                 QQ := p;
             end if;
-            SBAD := Sprintf("%o%o,%o:1: %o\n", SBAD, IntegerToString(p, 16),
-            IntegerToString(QQ, 16), #[x : x in vals | x ne 0]);
+            SBAD := Sprintf("%o%o,%o:%o: %o\n", SBAD, IntegerToString(p, 16),
+            IntegerToString(QQ, 16), side, #[x : x in vals | x ne 0]);
         end if;
         text:=Sprintf("### %o %o %o %o", p, Q, w, vals);
         // print [ val(ii, pi) : pi in fac ];
@@ -793,7 +807,7 @@ for pf in FacBadPrimes do
                         totval+:=base[i]*prime_ideal_inertia_degree(G, fac[i][1]);
                     end for;
                     ccQ := NormalizeProjectiveElement(cQ, p^(k-1));
-                    str := Sprintf("%o %o %o", p, k-1, ccQ);
+                    str := Sprintf("%o %o %o %o", p, k-1, ccQ, side);
                     for i in matches do
                         if i in alive_above_this then
                             assert #[a:a in above|i in a[4]] in {0,1,p};
@@ -824,7 +838,7 @@ for pf in FacBadPrimes do
                         uv,ii,nvals,alive:=Explode(a);
                         if #alive gt 0 then continue; end if;
                         ccQ := NormalizeProjectiveElement(uv, p^k);
-                                                str := Sprintf("%o %o %o", p, k, ccQ);
+                        str := Sprintf("%o %o %o %o", p, k, ccQ, side);
                         for i in matches do
                             SBADINFO := Sprintf("%o# (%o : %o) mod %o^%o ; v_%o_%o=%o\n",
                                 SBADINFO,
@@ -844,7 +858,9 @@ for pf in FacBadPrimes do
             SBADINFO := Sprintf("%o%o\n",SBADINFO,l);
         end for;
     end for;
-end for;
+end for; // loop on the potential bad p's 
+
+end for; // loop on the two polynomials
 
 if assigned DEBUG then
     printf SBAD;
@@ -879,4 +895,3 @@ else
     exit;
 end if;
 
-end if;
