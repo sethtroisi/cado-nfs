@@ -368,7 +368,6 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     endif(WITH_MPIR)
 
     add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
-    set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
     if(WITH_MPIR)
         target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)

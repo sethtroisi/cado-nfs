@@ -300,9 +300,10 @@ struct cutoff_finder {
         vector<pair<unsigned int, int>> steps;
         steps.push_back(make_pair(1,0));
 
-        for(auto it : all_results) {
-            unsigned int size = it.first;
-            int best = it.second.second;
+        typedef vector<pair<unsigned int, pair<vector<double>, int> > >::const_iterator it_t;
+        for(it_t it = all_results.begin() ; it != all_results.end() ; ++it) {
+            unsigned int size = it->first;
+            int best = it->second.second;
             if (steps.empty() || best != steps.back().second) {
                 steps.push_back(make_pair(size, best));
             }
@@ -323,10 +324,11 @@ struct cutoff_finder {
         vector<pair<unsigned int, int>> steps;
         steps.push_back(make_pair(1,0));
 
-        for(auto it : all_results) {
-            unsigned int size = it.first;
-            auto const& benches(it.second.first);
-            int best = it.second.second;
+        typedef vector<pair<unsigned int, pair<vector<double>, int> > >::const_iterator it_t;
+        for(it_t it = all_results.begin() ; it != all_results.end() ; ++it) {
+            unsigned int size = it->first;
+            vector<double> const& benches(it->second.first);
+            int best = it->second.second;
             /* In case fft wins, we invent something which will use
              * karatsuba still */
             if (best > 1) best = benches[1] < benches[0];
@@ -360,8 +362,9 @@ struct cutoff_finder {
     static string print_result(vector<pair<unsigned int, int>> const& tab) {
         ostringstream s;
         s << "{";
-        for(auto y : tab) {
-            s << " { " << y.first << ", " << y.second << " },";
+        typedef vector<pair<unsigned int, int>>::const_iterator it_t;
+        for(it_t y = tab.begin() ; y != tab.end() ; y++) {
+            s << " { " << y->first << ", " << y->second << " },";
         }
         s << " }";
         return s.str();
@@ -505,11 +508,11 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
             tB = malloc(fft_alloc_sizes[0]);
             tC = malloc(fft_alloc_sizes[0]);
 
-            for(auto x = finder.micro_bench(index); !x.done(); ++x) {
-                typedef small_bench<timer_t> bt;
+            typedef small_bench<timer_t> bt;
+            for(bt x = finder.micro_bench(index); !x.done(); ++x) {
 
                 double t_dftA=0;
-                for(auto y = bt(t_dftA, mc); !y.done(); ++y) {
+                for(bt y = bt(t_dftA, mc); !y.done(); ++y) {
                     fft_transform_prepare(tA, fti);
                     fft_do_dft_fppol(tA, (mp_limb_t*)A, k, qt, fti, p);
                     y.set_since_last();
@@ -517,7 +520,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
                 x.inject(t_dftA, (m+n)*(m+n));
 
                 double t_dftB=0;
-                for(auto y = bt(t_dftB, mc); !y.done(); ++y) {
+                for(bt y = bt(t_dftB, mc); !y.done(); ++y) {
                     fft_transform_prepare(tB, fti);
                     fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
                     y.set_since_last();
@@ -525,7 +528,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
                 x.inject(t_dftB, (m+n)*(m+n));
 
                 double t_conv=0;
-                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
+                for(bt y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_zero(tC, fti);
                     fft_addmul(tC, tA, tB, tt, qt, fti);
@@ -534,7 +537,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
                 x.inject(t_conv, (m+n)*(m+n)*(m+n));
 
                 double t_iftC=0;
-                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
+                for(bt y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_do_ift_fppol((mp_limb_t*)C, 2*k-1, tC, qt, fti, p);
                     y.set_since_last();
@@ -557,7 +560,9 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
 
     vector<pair<unsigned int, int>> table = finder.export_best_table();
 
-    for(auto& x : table) x.second = nadjs-1-x.second;
+    typedef vector<pair<unsigned int, int>>::iterator it_t;
+    for(it_t x = table.begin() ; x != table.end() ; ++x)
+        x.second = nadjs-1-x.second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)
@@ -674,11 +679,11 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
             tB = malloc(fft_alloc_sizes[0]);
             tC = malloc(fft_alloc_sizes[0]);
 
-            for(auto x = finder.micro_bench(index); !x.done(); ++x) {
-                typedef small_bench<timer_t> bt;
+            typedef small_bench<timer_t> bt;
+            for(bt x = finder.micro_bench(index); !x.done(); ++x) {
 
                 double t_dftA=0;
-                for(auto y = bt(t_dftA, mc); !y.done(); ++y) {
+                for(bt y = bt(t_dftA, mc); !y.done(); ++y) {
                     fft_transform_prepare(tA, fti);
                     fft_do_dft_fppol(tA, (mp_limb_t*)A, E_length, qt, fti, p);
                     y.set_since_last();
@@ -686,7 +691,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
                 x.inject(t_dftA, m*(m+n));
 
                 double t_dftB=0;
-                for(auto y = bt(t_dftB, mc); !y.done(); ++y) {
+                for(bt y = bt(t_dftB, mc); !y.done(); ++y) {
                     fft_transform_prepare(tB, fti);
                     fft_do_dft_fppol(tB, (mp_limb_t*)B, k, qt, fti, p);
                     y.set_since_last();
@@ -694,7 +699,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
                 x.inject(t_dftB, (m+n)*(m+n));
 
                 double t_conv=0;
-                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
+                for(bt y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_zero(tC, fti);
                     fft_addmul(tC, tA, tB, tt, qt, fti);
@@ -703,7 +708,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
                 x.inject(t_conv, m*(m+n)*(m+n));
 
                 double t_iftC=0;
-                for(auto y = bt(t_conv, mc); !y.done(); ++y) {
+                for(bt y = bt(t_conv, mc); !y.done(); ++y) {
                     fft_transform_prepare(tC, fti);
                     fft_do_ift_fppol_mp((mp_limb_t*)C, input_length, tC, qt, fti, p, k-1);
                     y.set_since_last();
@@ -726,7 +731,9 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 
     vector<pair<unsigned int, int>> table = finder.export_best_table();
 
-    for(auto& x : table) x.second = nadjs-1-x.second;
+    typedef vector<pair<unsigned int, int>>::iterator it_t;
+    for(it_t x = table.begin() ; x != table.end() ; ++x)
+        x.second = nadjs-1-x.second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)
@@ -761,6 +768,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
 #define TUNE_MUL_FINDER_NMETHODS 3
 #endif  /* HAVE_MPIR */
 
+    typedef timer_rusage timer_t;
     cutoff_finder<timer_rusage> finder(TUNE_MUL_FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
@@ -822,7 +830,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
         if (finder.still_meaningful_to_test(0)) {
             /* disable kara for a minute */
             polymat_set_mul_kara_cutoff(always_basecase, NULL);
-            for(auto x = finder.micro_bench(0); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(0); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
                 x.set_since_last();
             }
@@ -842,7 +850,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
              */
             finder.export_kara_cutoff_data_force_kara_now(improved, k);
             polymat_set_mul_kara_cutoff(improved, NULL);
-            for(auto x = finder.micro_bench(1); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(1); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
                 x.set_since_last();
             }
@@ -872,7 +880,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
         if (finder.still_meaningful_to_test(2)) {
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
-            for(auto x = finder.micro_bench(2); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
                 matpoly_mul(ab, xpi, xpiL, xpiR);
                 x.set_since_last();
             }
@@ -902,7 +910,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             int s = 0;
             matpoly_clear(ab, xpi);
             matpoly_init(ab, xpi, m+n, m+n, xpiL->size + xpiR->size - 1);
-            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
                 matpoly_ft_init(ab, tpiR, xpiR->m, xpiR->n, fti);
                 matpoly_ft_init(ab, tpi, xpiL->m, xpiR->n, fti);
@@ -920,7 +928,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n, cutoff_lis
             }
             mpz_clear(p);
 #else
-            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_mul_caching_adj(ab, xpi, xpiL, xpiR, adj);
                 x.set_since_last();
             }
@@ -991,6 +999,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
 #define TUNE_MP_FINDER_NMETHODS 3
 #endif  /* HAVE_MPIR */
 
+    typedef timer_rusage timer_t;
     cutoff_finder<timer_rusage> finder(TUNE_MP_FINDER_NMETHODS);
     finder.set_method_name(0, "polymat-basecase");
     finder.set_method_name(1, "polymat-karatsuba");
@@ -1067,7 +1076,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
         if (finder.still_meaningful_to_test(0)) {
             /* disable kara for a minute */
             polymat_set_mp_kara_cutoff(always_basecase, NULL);
-            for(auto x = finder.micro_bench(0); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(0); !x.done(); ++x) {
                 polymat_mp(ab, ER, E, piL);
                 x.set_since_last();
             }
@@ -1087,7 +1096,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
              */
             finder.export_kara_cutoff_data_force_kara_now(improved, k);
             polymat_set_mp_kara_cutoff(improved, NULL);
-            for(auto x = finder.micro_bench(1); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(1); !x.done(); ++x) {
                 polymat_mp(ab, ER, E, piL);
                 x.set_since_last();
             }
@@ -1117,7 +1126,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
         if (finder.still_meaningful_to_test(2)) {
             /* The matpoly layer is just completetly different -- and gets
              * faster quite early on... */
-            for(auto x = finder.micro_bench(2); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(2); !x.done(); ++x) {
                 matpoly_mp(ab, xER, xE, xpiL);
                 x.set_since_last();
             }
@@ -1148,7 +1157,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             int s = 0;
             matpoly_clear(ab, xER);
             matpoly_init(ab, xER, m, m+n, input_length);
-            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_ft_init(ab, tpiL, xpiL->m, xpiL->n, fti);
                 matpoly_ft_init(ab, tE, xE->m, xE->n, fti);
                 matpoly_ft_init(ab, tER, xE->m, xpiL->n, fti);
@@ -1172,7 +1181,7 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n, cutoff_list
             }
             mpz_clear(p);
 #endif
-            for(auto x = finder.micro_bench(3); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench(3); !x.done(); ++x) {
                 matpoly_mp_caching_adj(ab, xER, xE, xpiL, adj);
                 x.set_since_last();
             }
@@ -1267,7 +1276,7 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
 
         double ttloc;
         if (rank == 0) {
-            for(auto x = finder.micro_bench<timer_wct>(ttloc); !x.done(); ++x) {
+            for(small_bench<timer_t> x = finder.micro_bench<timer_wct>(ttloc); !x.done(); ++x) {
                 polymat_mul(ab, pi, piL, piR);
                 x.set_since_last();
             }
