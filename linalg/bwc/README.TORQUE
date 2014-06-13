@@ -25,7 +25,7 @@ It is often convenient (though not necessary) to write a small script
 which can be submitted by the tool "qsub" in Maui.
 
 ---- layout6x8.sh ----
-#!/bin/bash
+#!/usr/bin/env bash
 #PBS -N test_bwc_layout6x8
 #PBS -l nodes=6:ppn=8,walltime=160:00:00
 #PBS -q route

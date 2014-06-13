@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 unset P
 unset ELL

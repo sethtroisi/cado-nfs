@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 notify() {
     LD_LIBRARY_PATH= \

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # daemon to automatically start jobs and clean the relations files
 
 # params

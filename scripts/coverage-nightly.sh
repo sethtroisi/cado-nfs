@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`

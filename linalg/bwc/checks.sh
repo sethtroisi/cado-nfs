@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Usage: ./checks.sh < checks.list ; or ./checks.sh < checks.list.light
 

@@ -16,7 +16,7 @@ fnancy ~/cado $ git rev-list --abbrev-commit master^..descent-new2 | (cd .. ; wh
 where ~/bench-many.sh is the following script:
 
 ----8<----8<----8<----8<----8<----8<----8<----8<----8<----8<----
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ "$1" = client ] ; then
     TMP=$(mktemp -d /tmp/cado-bench.XXXXXXXXXXXX)
