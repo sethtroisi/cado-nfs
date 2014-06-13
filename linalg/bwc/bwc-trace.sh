@@ -3,34 +3,82 @@
 set -e
 set -x
 
-top=`dirname $0`/../..
-export DEBUG=1
-export MPI=1
-make -s -C $top -j 4
-eval `make -s -C $top show`
-bins=$top/$build_tree/linalg/bwc
-mats=$HOME/Local/mats
-if ! [ -d $mats ] ; then
-    mats=/local/rsa768/mats
-fi
+# various configuration variables. environment can be used to override them
 
-wdir=/tmp/bwc
-if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
-mkdir $wdir
+: ${scriptpath=$0}
+: ${m=128}
+: ${n=128}
+: ${wdir=/tmp/bwc}
+: ${mm_impl=bucket}
 
-mn=128
+export m n scriptpath wdir mm_impl prime=2
+exec "`dirname $0`/bwc-ptrace.sh" "$@"
 
-Mh=1; Mv=1;
-Th=2; Tv=2;
+#
+: ${Mh=1}
+: ${Mv=1}
+: ${Th=2}
+: ${Tv=2}
+# Set the "matrix" variable in order to work on a real matrix.
+: ${matrix=}
+# Set the "bindir" variable to use pre-built binaries (must point to the
+# directories with the bwc binaries)
+: ${bindir=}
+
+# This is related to the random matrix which gets automatically created
+# if no matrix was given on the cmdline.
+: ${random_matrix_size=1000}
+# there is no random_matrix_coeffs_per_row ; see random_matrix.c
+: ${random_matrix_maxcoeff=10}
+: ${random_matrix_minkernel=10}
+: ${mats=$HOME/Local/mats}
+: ${matsfallback=/local/rsa768/mats}
+
+
+# XXX note that $wdir is wiped out by this script !
+: ${buildopts="MPI=1 DEBUG=1"}
+: ${shuffle=1}
+: ${nomagma=}
+#
+
+
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
-
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
-# The test matrix may be created by:
-# $bins/random_matrix 1000 1000 15 --kleft 4 > $mats/t1000.txt
-# $bins/mf_scan $mats/t1000.txt ofile=$mats/t1000.bin --binary-out --freq
+
+
+top=`dirname $0`/../..
+
+# build the software. This is optional, really. The only thing is that
+# it's so easy to mess with the location of the binaries that building it
+# by ourselves looks like a reasonable thing to do, for this illustrative
+# script.
+
+if ! [ "$bindir" ] ; then
+    eval "export $buildopts"
+    make -s -C $top -j 4
+    make -s -C $top -j 4 plingen_p_$nwords
+    # make -s -C $top -j 4 plingen_pz
+    eval `make -s -C $top show`
+    bindir=$top/$build_tree/linalg/bwc
+fi
+
+if ! [ -d $mats ] ; then mats=$matsfallback; fi
+if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
+mkdir $wdir
+ 
+# Create the test matrix if needed.
+
+if ! [ "$matrix" ] ; then
+    $bindir/random_matrix  ${random_matrix_size} --kright ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
+    matrix=$mats/t${random_matrix_size}p.txt
+fi
+
+
+# $bindir/random_matrix 1000 1000 15 --kleft 4 > $mats/t1000.txt
+# $bindir/mf_scan $mats/t1000.txt ofile=$mats/t1000.bin --binary-out --freq
 #
 # For the purpose of this complete test, a very tiny matrix is a good
 # choice. Note though that the code may encounter random failures due to
@@ -49,7 +97,7 @@ if [ "$shuffle" = 1 ] ; then
     shuffle_option=--shuffled-product
 fi
 
-$bins/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/
+$bindir/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/
 
 if [ $(ls $wdir/`basename $matrix .bin`.${Nh}x${Nv}.*.bin | wc -l) != 1 ] ; then
     echo "Weird -- should have only one balancing file as output." >&2
@@ -60,9 +108,9 @@ echo "Using balancing file $bfile"
 checksum=${bfile#$wdir/`basename $matrix .bin`.${Nh}x${Nv}.}
 checksum=`basename $checksum .bin`
 
-# $bins/mf_dobal --matrix /local/rsa768/mats/c72.bin mpi=2x3 /local/rsa768/mats/c72.2x3.6e90c700.bin
+# $bindir/mf_dobal --matrix /local/rsa768/mats/c72.bin mpi=2x3 /local/rsa768/mats/c72.2x3.6e90c700.bin
 
-common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=$mn wdir=$wdir"
+common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile m=$m n=$n wdir=$wdir"
 if [ "$nullspace" = left ] ; then
     common="$common nullspace=left"
     transpose_if_left="Transpose"
@@ -75,7 +123,7 @@ set +e
 
 all_splits=0
 j0=0
-while [ $j0 -lt $mn ] ; do
+while [ $j0 -lt $n ] ; do
     let j0=$j0+64
     all_splits=$all_splits,$j0
 done
@@ -83,29 +131,29 @@ done
 
 # ys=0..64 here is really a hack. It merely has to match the version
 # which is used in production.
-$bins/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1 ys=0..64
-[ "$?" = 0 ] && $bins/bwc.pl prep   $common
-[ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=10
-[ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
-[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 end=10 skip_online_checks=1 ys=0..64
+$bindir/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1 ys=0..64
+[ "$?" = 0 ] && $bindir/bwc.pl prep   $common
+[ "$?" = 0 ] && $bindir/bwc.pl secure  $common interval=10
+[ "$?" = 0 ] && $bindir/bwc.pl :ysplit $common splits=$all_splits
+[ "$?" = 0 ] && $bindir/bwc.pl krylov  $common interval=10 end=10 skip_online_checks=1 ys=0..64
 [ "$?" = 0 ] && rm -f $wdir/A*
 j0=0
-while [ $j0 -lt $mn ] ; do
+while [ $j0 -lt $n ] ; do
     let j1=$j0+64
-    [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 ys=$j0..$j1
+    [ "$?" = 0 ] && $bindir/bwc.pl krylov  $common interval=10 ys=$j0..$j1
     j0=$j1
 done
-[ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
-[ "$?" = 0 ] && $bins/bwc.pl lingen      $common lingen_threshold=64
-[ "$?" = 0 ] && $bins/bwc.pl :fsplit     $common splits=$all_splits
+[ "$?" = 0 ] && $bindir/bwc.pl acollect    $common -- --remove-old
+[ "$?" = 0 ] && $bindir/bwc.pl lingen      $common lingen_threshold=64
+[ "$?" = 0 ] && $bindir/bwc.pl :fsplit     $common splits=$all_splits
 j0=0
-while [ $j0 -lt $mn ] ; do
+while [ $j0 -lt $n ] ; do
     let j1=$j0+64
-    [ "$?" = 0 ] && $bins/bwc.pl mksol  $common interval=10 ys=$j0..$j1
+    [ "$?" = 0 ] && $bindir/bwc.pl mksol  $common interval=10 ys=$j0..$j1
     j0=$j1
 done
-[ "$?" = 0 ] && $bins/bwc.pl gather $common interval=10
-[ "$?" = 0 ] && $bins/cleanup --ncols 64 --out $wdir/W $wdir/K.0
+[ "$?" = 0 ] && $bindir/bwc.pl gather $common interval=10
+[ "$?" = 0 ] && $bindir/cleanup --ncols 64 --out $wdir/W $wdir/K.0
 
 failure="$?"
 

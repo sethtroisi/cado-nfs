@@ -23,8 +23,6 @@
 /* splits for the different sites */
 int splits[MAXSPLITS + 1];
 
-int split_y = 0;
-int split_f = 0;
 int force = 0;
 
 void usage()
@@ -43,8 +41,6 @@ int main(int argc, char * argv[])
 
     param_list pl;
     param_list_init(pl);
-    param_list_configure_switch(pl, "--split-y", &split_y);
-    param_list_configure_switch(pl, "--split-f", &split_f);
     param_list_configure_switch(pl, "--force", &force);
     bw_common_init(bw, pl, &argc, &argv);
     int nsplits;
@@ -75,13 +71,10 @@ int main(int argc, char * argv[])
     if ((tmp = param_list_lookup_string(pl, "ofile-fmt")) != NULL)
         ofile_fmt = strdup(tmp);
 
-    ASSERT_ALWAYS(!(!ifile ^ !ofile_fmt));
+    ASSERT_ALWAYS(ifile);
+    ASSERT_ALWAYS(ofile_fmt);
 
     if (param_list_warn_unused(pl)) usage();
-    if (split_f + split_y + (ifile || ofile_fmt) != 1) {
-        fprintf(stderr, "Please select one of --split-y or --split-f\n");
-        usage();
-    }
     if (nsplits <= 0) {
         fprintf(stderr, "Please indicate the splitting points\n");
         usage();
@@ -105,18 +98,6 @@ int main(int argc, char * argv[])
     nsplits--;
 
     int rc;
-
-    /* prepare the file names */
-    if (split_y) {
-        rc = asprintf(&ifile, "%s.%u", Y_FILE_BASE, 0);
-        rc = asprintf(&ofile_fmt, "%s.%u", V_FILE_BASE_PATTERN, 0);
-    } else if (split_f) {
-        ifile = strdup(LINGEN_F_FILE);
-        ofile_fmt = strdup(F_FILE_SLICE_PATTERN);
-    } else {
-        ASSERT_ALWAYS(ifile);
-        ASSERT_ALWAYS(ofile_fmt);
-    }
 
     struct stat sbuf[1];
     if (stat(ifile, sbuf) < 0) {

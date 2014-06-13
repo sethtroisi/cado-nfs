@@ -11,6 +11,6 @@
 
 #include "abase.h"
 
-typedef struct { unsigned int m,n; abfield ab; } dims;
+typedef struct { unsigned int m,n,nsm; abfield ab; } dims;
 
 #endif	/* PLINGEN_H_ */

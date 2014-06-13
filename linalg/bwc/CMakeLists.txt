@@ -381,5 +381,9 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         )
 endforeach(v)
 
-include(CMakeLists-nodist.txt OPTIONAL)
+
+
+add_custom_target(bwc_full)
+add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
+    cleanup prep krylov dispatch mksol gather secure)
 

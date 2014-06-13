@@ -1651,7 +1651,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
         m->transpose = mmt->mm->store_transposed;
-        m->withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+        m->withcoeffs = param_list_lookup_string(pl, "prime") != NULL && strcmp(param_list_lookup_string(pl, "prime"), "2") != 0;
         balancing_get_matrix_u32(mmt->pi, pl, m);
 
         int ssm = 0;

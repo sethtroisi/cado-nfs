@@ -91,6 +91,7 @@ void matrix_read_pass(
         unsigned int rskip,
         unsigned int cskip,
         int progress,
+        /* number of 32-bit words used to store (signed) coefficients */
         int withcoeffs
         )
 {
@@ -148,6 +149,13 @@ void matrix_read_pass(
         ptr = m_in->p;
     }
 
+    mpz_t large_coeff;
+    mpz_init(large_coeff);
+    uint32_t * large_coeff_buffer = NULL;
+    if (withcoeffs > 1) {
+        large_coeff_buffer = malloc(withcoeffs * sizeof(uint32_t));
+    }
+
     for(i = 0 ; ; i++) {
         uint32_t j;
         /* {{{ read row weight w */
@@ -202,12 +210,18 @@ void matrix_read_pass(
                         uint32_t c;
                         rc = fscanf(m_in->f, "%" SCNu32, &c);
                         if (rc == EOF) abort_unexpected_eof();
-                        if (withcoeffs) {
+                        if (withcoeffs == 1) {
                             /* XXX Can probably be more tolerant on how
                              * coeffs are presented */
                             int sp = fgetc(m_in->f);
                             ASSERT_ALWAYS(sp == ' ' || sp == ':');
                             rc = fscanf(m_in->f, "%" SCNd32, (int32_t *) &c);
+                            if (rc == EOF) abort_unexpected_eof();
+                        } else if (withcoeffs > 1) {
+                            int sp = fgetc(m_in->f);
+                            ASSERT_ALWAYS(sp == ' ' || sp == ':');
+                            /* suppressed */
+                            rc = gmp_fscanf(m_in->f, "%*Zd");
                             if (rc == EOF) abort_unexpected_eof();
                         }
                     }
@@ -255,24 +269,40 @@ void matrix_read_pass(
                 if (m_in->ascii) {
                     rc = fscanf(m_in->f, "%" SCNu32, &c);
                     if (rc == EOF) abort_unexpected_eof();
-                    if (withcoeffs) {
+                    if (withcoeffs == 1) {
                         int sp = fgetc(m_in->f);
                         ASSERT_ALWAYS(sp == ' ' || sp == ':');
                         rc = fscanf(m_in->f, "%" SCNd32, (int32_t*) &coeff);
                         if (rc == EOF) abort_unexpected_eof();
+                    } else if (withcoeffs > 1) {
+                        int sp = fgetc(m_in->f);
+                        ASSERT_ALWAYS(sp == ' ' || sp == ':');
+                        rc = gmp_fscanf(m_in->f, "%Zd", large_coeff);
+                        if (rc == EOF) abort_unexpected_eof();
+                        uint32_t * q = large_coeff_buffer;
+                        memset(q, 0, withcoeffs * sizeof(uint32_t));
+                        size_t countp;
+                        mpz_export(q, &countp, -1, sizeof(uint32_t), -1, 0, large_coeff);
+                        ASSERT_ALWAYS(countp <= (size_t) withcoeffs);
                     }
                 } else {
                     rc = fread32_little(&c, 1, m_in->f);
                     if (!rc) abort_unexpected_eof();
-                    if (withcoeffs) {
+                    if (withcoeffs == 1) {
                         rc = fread32_little((uint32_t*) &coeff, 1, m_in->f);
                         if (!rc) abort_unexpected_eof();
+                    } else {
+                        rc = fread(large_coeff_buffer, sizeof(uint32_t), withcoeffs, m_in->f);
+                        if (rc != withcoeffs) abort_unexpected_eof();
                     }
                 }
             } else {
                 c = *ptr++;
-                if (withcoeffs) {
+                if (withcoeffs == 1) {
                     coeff = *ptr++;
+                } else if (withcoeffs > 1) {
+                    memcpy(large_coeff_buffer, ptr, withcoeffs * sizeof(uint32_t));
+                    ptr += withcoeffs;
                 }
             }
             /* }}} */
@@ -283,8 +313,11 @@ void matrix_read_pass(
                     if (m_out) {
                         temp->p[(1 + withcoeffs) * real_weight] = c - cskip;
                     }
-                    if (withcoeffs) {
+                    if (withcoeffs == 1) {
                         temp->p[2 * real_weight + 1] = coeff;
+                    } else if (withcoeffs > 1) {
+                        uint32_t * q = temp->p + (1+withcoeffs)*real_weight + 1; 
+                        memcpy(q, large_coeff_buffer, withcoeffs * sizeof(uint32_t));
                     }
                     real_weight++;
                 }
@@ -297,21 +330,32 @@ void matrix_read_pass(
                     if (!cskip) {
                         if (m_out->ascii) {
                             fprintf(m_out->f, " %" PRIu32, c);
-                            if (withcoeffs) {
+                            if (withcoeffs == 1) {
                                 fprintf(m_out->f, ":%" PRId32, coeff);
+                            } else if (withcoeffs > 1) {
+                                mpz_import(large_coeff, withcoeffs, sizeof(uint32_t), -1, -1, 0, large_coeff_buffer);
+                                gmp_fprintf(m_out->f, ":%Zd", large_coeff);
                             }
                         } else {
                             rc = fwrite32_little(&c, 1, m_out->f);
-                            if (withcoeffs) {
+                            if (withcoeffs == 1) {
                                 rc = fwrite32_little((uint32_t*)&coeff, 1, m_out->f);
+                            } else if (withcoeffs > 1) {
+                                uint32_t * q = large_coeff_buffer;
+                                rc = fwrite(q, sizeof(uint32_t), withcoeffs, m_out->f);
+                                if (rc != withcoeffs) abort_unexpected_eof();
+
                             }
                         }
                     }
                     // otherwise it's too early, size hasn't been written yet.
                 } else {
                     m_out->p[m_out->size++] = c-cskip;
-                    if (withcoeffs) {
+                    if (withcoeffs == 1) {
                         m_out->p[m_out->size++] = coeff;
+                    } else if (withcoeffs > 1) {
+                        memcpy(m_out->p + m_out->size, large_coeff_buffer, withcoeffs * sizeof(uint32_t));
+                        m_out->size += withcoeffs;
                     }
                 }
             }/*}}}*/
@@ -336,10 +380,18 @@ void matrix_read_pass(
             if (m_out->f) {
                 if (m_out->ascii) {
                     fprintf(m_out->f, "%" PRIu32, w);
-                    if (withcoeffs) {
+                    if (withcoeffs == 1) {
                         for(j = 0 ; j < ww ; ) {
                             fprintf(m_out->f, " %" PRIu32, temp->p[j++]);
-                            fprintf(m_out->f, " %" PRId32, temp->p[j++]);
+                            fprintf(m_out->f, ":%" PRId32, temp->p[j++]);
+                        }
+                    } else if (withcoeffs > 1) {
+                        for(j = 0 ; j < ww ; ) {
+                            fprintf(m_out->f, " %" PRIu32, temp->p[j++]);
+                            uint32_t * q = temp->p;
+                            mpz_import(large_coeff, withcoeffs, sizeof(uint32_t), -1, -1, 0, q);
+                            gmp_fprintf(m_out->f, ":%Zd", large_coeff);
+                            j += withcoeffs;
                         }
                     } else {
                         for(j = 0 ; j < w ; j++) {
@@ -391,6 +443,10 @@ row_done:
             }
         }/*}}}*/
     }
+
+    mpz_clear(large_coeff);
+    free(large_coeff_buffer);
+
     if (progress)
         fprintf(stderr, "\n");
 

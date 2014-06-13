@@ -257,12 +257,12 @@ wdir/X.<bchecksum>                  X vector used for Krylov.
     read by krylov and secure
 wdir/Y.0.<bchecksum>                Y vector used for Krylov.
     created by prep
-    read by split --split-y
+    read by split ifile=Y.0 ofile-fmt=V%u-%u.0 splits=[...,]<n1>,<n2>[,...]
 wdir/C.<n>.<bchecksum>              check vector = trsp(M)^n * X  (See note (T))
     created by secure
     read by krylov mksol
 wdir/V<n1>-<n2>.0.<bchecksum>       columns <n1>..<n2> (n2 exclusive) of Y
-    created by split --split-y splits=[...,]<n1>,<n2>[,...]
+    created by split ifile=Y.0 ofile-fmt=V%u-%u.0 splits=[...,]<n1>,<n2>[,...]
     read by krylov mksol
 wdir/A<n1>-<n2>.<j1>-<j2>       krylov sequence data.
     created by krylov
@@ -282,9 +282,9 @@ wdir/pi-<t1>-<t2>               current state for lingen
     is not functional at the moment)
 wdir/F                          linear generator.
     created by lingen
-    read by split --split-f
+    read by split --ifile F --ofile-fmt F.sols0-$n.%u-%u
 wdir/F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
-    created by split --split-f
+    created by split --ifile F --ofile-fmt F.sols0-$n.%u-%u")
     read by mksol
 wdir/S<n1>-<n2>.<j>.<bchecksum>     mksol sequence data.
     created by mksol

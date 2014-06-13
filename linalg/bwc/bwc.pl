@@ -296,11 +296,11 @@ if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
 my $param={};
 
 while (defined($_ = shift @ARGV)) {
-    # -d will never be found as a bw argument, it is 
     if ($_ eq '--') {
         push @extra_args, splice @ARGV;
         last;
     }
+    # -d will never be found as a bw argument, it is only relevant here.
     if (/^(-d|--show|--dry-run)$/) { $show_only=1; next; }
     if (/^(-h|--help)$/) { usage; }
     my ($k,$v);
@@ -417,7 +417,7 @@ while (my ($k,$v) = each %$param) {
         push @main_args, "$k";
     }
 
-    # Yet it does make sense to read some parameters, are we are
+    # Yet it does make sense to read some parameters, as we are
     # interested by their value.
 
     if ($k eq 'wdir') { $wdir=$v; next; }
@@ -526,7 +526,8 @@ sub dosystem
 ##################################################
 # Do we need mpi ??
 
-sub ssh_program() {
+sub ssh_program
+{
     my $ssh;
     if ($ssh = $ENV{'SSH'}) {
         return $ssh;
@@ -541,7 +542,7 @@ sub ssh_program() {
 # Starting daemons for mpich2 1.[012].x and mvapich2 ; we're assuming
 # this works the same for older mpich2's, although this has never been
 # checked.
-sub check_mpd_daemons()
+sub check_mpd_daemons
 {
     return unless $needs_mpd;
 
@@ -856,7 +857,7 @@ sub drive {
                 &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1", "ys=0..64");
                 &drive("prep", @_);
                 &drive("secure", @_) unless $param->{'skip_online_checks'};
-                &drive("./split", @_, "--split-y");
+                &drive(":ysplit", @_);
                 # despicable ugly hack.
                 my @ka=@_;
                 if ($n == 128 && !$interleaving) {
@@ -876,7 +877,7 @@ sub drive {
             }
             &drive("./acollect", @_, "--remove-old");
             &drive("./lingen", @_, "--lingen-threshold", 64);
-            &drive("./split", @_, "--split-f");
+            &drive(":fsplit", @_);
             # same ugly hack already seen above.
             my @ka=@_;
             if ($n == 128 && !$interleaving) {
@@ -902,36 +903,60 @@ sub drive {
         }
         &drive("gather", @_);
         print "Fetching result for $balancing_hash\n";
-        my @my_ks=();
+        my $ks={};
         opendir D, $wdir;
-        for my $f (grep { /^K\.\d+$/ } readdir D) {
-            push @my_ks, "$wdir/$f";
-            print "$f\n";
+        for my $f (readdir D) {
+            next unless $f =~ /^K\.sols(\d+-\d+).\d+$/;
+            push @{$ks->{$1}}, "$wdir/$f";
         }
         closedir D;
-        @my_ks = sort {
-                basename($a)=~/K\.(\d+)/; my $xa=$1;
-                basename($b)=~/K\.(\d+)/; my $xb=$1;
-                $xa <=> $xb;
-            } @my_ks;
-        &drive("./cleanup", "--ncols", $n,
-            "--out", "$wdir/W", @my_ks);
+        my $ns = scalar keys %$ks;
+        die "No solutions found ?" unless $ns;
+        print "Found $ns solutions: ", join(" ", keys(%$ks)), "\n";
+        for my $sol (sort {
+            basename($a)=~/sols(\d+)/; my $xa=$1;
+            basename($b)=~/sols(\d+)/; my $xb=$1;
+            $xa <=> $xb;
+            } keys %$ks)
+        {
+            print "Processing solution block $sol\n";
+            my @my_ks = @{$ks->{$sol}};
+            @my_ks = sort {
+                    basename($a)=~/\.(\d+)$/; my $xa=$1;
+                    basename($b)=~/\.(\d+)$/; my $xb=$1;
+                    $xa <=> $xb;
+                } @my_ks;
+            &drive("./cleanup", "--ncols", $n,
+                "--out", "$wdir/W.sols$sol", @my_ks);
+            if (scalar keys %$ks == 1) {
+                print STDERR "Providing $wdir/W as an alias to $wdir/W.sols$sol\n";
+                symlink "$wdir/W.sols$sol", "$wdir/W";
+            }
+        }
 
         return;
     }
 
     @_ = grep !/^tmpdir=/, @_;
 
-    if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
-    if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
-
     # Some arguments are relevant only to some contexts.
     unless ($program =~ /split$/) {
-        @_ = grep !/^(?:splits?=|--split-[yf])/, @_;
+        @_ = grep !/^splits?=/, @_;
     }
     unless ($program =~ /(?:krylov|mksol|dispatch)$/) {
         @_ = grep !/^ys=/, @_;
     }
+
+    # And some contexts need really specific arguments
+    if ($program eq ':ysplit') {
+        $program="./split";
+        push @_, split(' ', "--binary-ratio 1/8 --ifile Y.0 --ofile-fmt V%u-%u.0");
+    }
+    if ($program eq ':fsplit') {
+        $program="./split";
+        push @_, split(' ', "--binary-ratio 1/8 --ifile F --ofile-fmt F.sols0-$n.%u-%u");
+    }
+
 
     $program="$bindir/$program";
 
