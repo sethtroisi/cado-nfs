@@ -87,8 +87,6 @@ params/rsa704.poly
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
-linalg/bwc/bwc-trace.sh
-linalg/bwc/bwc-trace.m
 scripts/cluster/analyze-bwclogfile.pl
 scripts/cluster/bwc-cluster-oar.sh
 scripts/cluster/bwc-fetchfiles.pl
