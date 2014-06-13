@@ -554,13 +554,15 @@ do_lingen_step_gf2() {
     #
     # TODO: We should get rid of splitting altogether, it's ridiculous.
     # Better do everything within lingen/plingen.
-    for seq in "${sequences[@]}" ; do
-        dseq=$(echo $seq | sed -e 's/\.\./-/g')
-        $bindir/split wdir=$wdir m=$m n=$n              \
-            splits=$all_splits                          \
-            ifile=F.sols0-$n.$dseq ofile-fmt=F.sols%u-%u.$dseq   \
-            --binary-ratio $splitwidth/8
-    done
+    if [ "${#sequences[@]}" -gt 1 ] ; then
+        for seq in "${sequences[@]}" ; do
+            dseq=$(echo $seq | sed -e 's/\.\./-/g')
+            $bindir/split wdir=$wdir m=$m n=$n              \
+                splits=$all_splits                          \
+                ifile=F.sols0-$n.$dseq ofile-fmt=F.sols%u-%u.$dseq   \
+                --binary-ratio $splitwidth/8
+        done
+    fi
 #    for seq in "${sequences[@]}" ; do
 #        dseq=$(echo $seq | sed -e 's/\.\./-/g')
 #        ln -s F$dseq $wdir/F.sols0-$n.$dseq
