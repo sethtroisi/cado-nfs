@@ -27,8 +27,8 @@ macro(add_bwc_test nm script)
         "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
 endmacro(add_bwc_test)
 
-add_bwc_test(modp-with-sm bwc-ptrace.sh prime=65537 random_matrix_size=500 nsm=4 m=8 n=8)
-add_dependencies(check plingen_p_1)
+# add_bwc_test(modp-with-sm bwc-ptrace.sh prime=65537 random_matrix_size=500 nsm=4 m=8 n=8)
+# add_dependencies(check plingen_p_1)
 
 add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64)
 add_dependencies(check plingen_p_1)
