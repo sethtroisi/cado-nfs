@@ -226,7 +226,7 @@ using namespace std;
 #endif
 
 /* This parameter set is successful for 4.6M rows x 2.8 cols, 12x20
- * submatrix of the same snfs247.small, for 4 simultaneous cores of a
+ * submatrix of the same snfs247.sparse, for 4 simultaneous cores of a
  * Xeon X3440. In effect, we're disabling large slices here, and use
  * taller steps for vsc.
  */

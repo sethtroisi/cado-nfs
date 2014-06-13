@@ -133,7 +133,7 @@ checkWithIndex (FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose,
     char *small_row_used, *rel_used;
 
     nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
-    // first read used rows in the small matrix
+    // first read used rows in the sparse matrix
     small_row_used = (char *)malloc(small_nrows * sizeof(char));
     memset(small_row_used, 0, small_nrows * sizeof(char));
     for(i = 0; i < nlimbs; ++i){

@@ -5,7 +5,7 @@
 
 /* Usage string:
  *
-  $bindir/filter/explain -sosp $wdir/$name.sos-purged.bin -sosr $wdir/$name.sos-replay.bin -purged $wdir/$name.purged -index $wdir/$name.index -matrix $wdir/$name.small.bin -skip 32 -start 0 -end 10
+  $bindir/filter/explain -sosp $wdir/$name.sos-purged.bin -sosr $wdir/$name.sos-replay.bin -purged $wdir/$name.purged -index $wdir/$name.index -matrix $wdir/$name.sparse.bin -skip 32 -start 0 -end 10
 
  * Do not forget the skip parameter -- otherwise the output is completely
  * useless.

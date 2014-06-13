@@ -3249,7 +3249,7 @@ class MergeDLPTask(Task):
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
-            mergedfile = self.workdir.make_filename("small.txt")
+            mergedfile = self.workdir.make_filename("sparse.txt")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             idealfile = self.workdir.make_filename("ideal")
             p = cadoprograms.ReplayDLP(purged=purged_filename,
@@ -3271,7 +3271,7 @@ class MergeDLPTask(Task):
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative(),
                       "idealfile": idealfile.get_wdir_relative()}
-            densefilename = self.workdir.make_filename("small.dense.bin")
+            densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
             self.state.update(update)
@@ -3346,7 +3346,7 @@ class MergeTask(Task):
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
-            mergedfile = self.workdir.make_filename("small.bin")
+            mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             p = cadoprograms.Replay(purged=purged_filename,
                                     history=historyfile, index=indexfile,
@@ -3363,7 +3363,7 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % mergedfile)
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative()}
-            densefilename = self.workdir.make_filename("small.dense.bin")
+            densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
             self.state.update(update)

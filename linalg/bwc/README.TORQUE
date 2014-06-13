@@ -30,7 +30,7 @@ which can be submitted by the tool "qsub" in Maui.
 #PBS -l nodes=6:ppn=8,walltime=160:00:00
 #PBS -q route
 #PBS -m ae
-bwc.pl :complete seed=1 thr=2x4 mpi=2x3 matrix=/localdisk/tmp/nfs/c156.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc > /tmp/c156.bwc.stderr 2>&1
+bwc.pl :complete seed=1 thr=2x4 mpi=2x3 matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc > /tmp/c156.bwc.stderr 2>&1
 ----------------------
 
 Please refer to README for the meanings of arguments "matrix", "wdir"

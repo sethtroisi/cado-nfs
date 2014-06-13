@@ -1,4 +1,4 @@
-/* replay --- replaying history of merges to build the small matrix
+/* replay --- replaying history of merges to build the sparse matrix
 
 Copyright 2008, 2009, 2010, 2011, 2012, 2013
           Francois Morain, Emmanuel Thome, Paul Zimmermann,
@@ -105,6 +105,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     {
         smatname = derived_filename(base, suf->smat, zip);
         srwname  = derived_filename(base, suf->srw, zip);
+        scwname = derived_filename(base, suf->scw, zip);
         smatfile = fopen_maybe_compressed(smatname, wmode);
         srwfile  = fopen_maybe_compressed(srwname, wmode);
         if (!bin)
@@ -119,8 +120,14 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     FILE * dcwfile  = NULL;
 
     if (skip) {
+        /* arrange so that we don't get file names like .sparse.dense */
+        char * tmp = strstr(base, ".sparse");
+        if (tmp) {
+            memmove(tmp, tmp + 7, strlen(tmp + 7) + 1);
+        }
         dmatname = derived_filename(base, suf->dmat, zip);
         drwname  = derived_filename(base, suf->drw, zip);
+        dcwname = derived_filename(base, suf->dcw, zip);
         dmatfile = fopen_maybe_compressed(dmatname, wmode);
         drwfile  = fopen_maybe_compressed(drwname, wmode);
         if (!bin)
@@ -221,8 +228,6 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     {
         fclose_maybe_compressed (smatfile, smatname);
         fclose_maybe_compressed (srwfile, srwname);
-        free(smatname);
-        free(srwname);
     }
     if (skip) {
         printf("%lu coeffs (out of %lu total) put into %s (%.1f%%)\n",
@@ -232,12 +237,9 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
         fclose_maybe_compressed (dmatfile, dmatname);
         fclose_maybe_compressed (drwfile, drwname);
-        free(dmatname);
-        free(drwname);
     }
 
     if (skip) {
-        dcwname = derived_filename(base, suf->dcw, zip);
         dcwfile = fopen_maybe_compressed(dcwname, wmode);
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
@@ -248,11 +250,9 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             }
         }
         fclose_maybe_compressed(dcwfile, dcwname);
-        free(dcwname);
     }
 
     {
-        scwname = derived_filename(base, suf->scw, zip);
         scwfile = fopen_maybe_compressed(scwname, wmode);
         for(int j = skip; j < small_ncols; j++){
             uint32_t x = weights[j];
@@ -263,7 +263,17 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             }
         }
         fclose_maybe_compressed(scwfile, scwname);
+    }
+
+    {
+        free(smatname);
+        free(srwname);
         free(scwname);
+    }
+    if (skip) {
+        free(dmatname);
+        free(drwname);
+        free(dcwname);
     }
 
     free(base);

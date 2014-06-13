@@ -136,7 +136,7 @@ unshift @args, "qsub";
 
 print join(" ", @args), "\n";
 
-# matrix=/scratch/morain/CADO/M307/M307.small.bin wdir=/scratch/morain/CADO/M307/M307.bwc
-# qsub -pe openmpi 48 /home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc/bwc.pl :complete seed=1 thr=1x1 mpi=2x2 matrix=/scratch/morain/CADO/M307/M307.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=/scratch/morain/CADO/M307/M307.bwc shuffled_product=1 bwc_bindir=/home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc >> /scratch/morain/CADO/M307/M307.bwc.log 2>&1
-# qsub -N linalg -cwd -e foo.err -o foo.out -sync y -q "batch.q@node001.cm.cluster,batch.q@node002.cm.cluster,batch.q@node003.cm.cluster,batch.q@node004.cm.cluster" -pe openmpi 48 /home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc/bwc.pl :complete seed=1 thr=1x1 mpi=2x2 matrix=/scratch/morain/CADO/M307/M307.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=/scratch/morain/CADO/M307/M307.bwc shuffled_product=1 bwc_bindir=/home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc >> /scratch/morain/CADO/M307/M307.bwc.log 2>&1
+# matrix=/scratch/morain/CADO/M307/M307.sparse.bin wdir=/scratch/morain/CADO/M307/M307.bwc
+# qsub -pe openmpi 48 /home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc/bwc.pl :complete seed=1 thr=1x1 mpi=2x2 matrix=/scratch/morain/CADO/M307/M307.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=/scratch/morain/CADO/M307/M307.bwc shuffled_product=1 bwc_bindir=/home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc >> /scratch/morain/CADO/M307/M307.bwc.log 2>&1
+# qsub -N linalg -cwd -e foo.err -o foo.out -sync y -q "batch.q@node001.cm.cluster,batch.q@node002.cm.cluster,batch.q@node003.cm.cluster,batch.q@node004.cm.cluster" -pe openmpi 48 /home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc/bwc.pl :complete seed=1 thr=1x1 mpi=2x2 matrix=/scratch/morain/CADO/M307/M307.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=/scratch/morain/CADO/M307/M307.bwc shuffled_product=1 bwc_bindir=/home/tanc/morain/cado-nfs/build/tom_pouce/linalg/bwc >> /scratch/morain/CADO/M307/M307.bwc.log 2>&1
 
