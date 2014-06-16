@@ -897,7 +897,12 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.send_notification(Notification.WANT_TO_RUN, None)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
-    
+
+    def run(self):
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        super().run()
+
     def translate_input_filename(self, filename):
         return filename
 
@@ -1503,8 +1508,6 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
                     print("Adding lognorm=%f, key=%s" % (poly.lognorm, oldkey))
 
     def run(self):
-        self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
 
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
@@ -1820,8 +1823,6 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         self.poly_to_submit = None
 
     def run(self):
-        self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
         
         if self.bestpoly is None:
@@ -2027,7 +2028,6 @@ class FactorBaseTask(Task):
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
 
         # Get best polynomial found by polyselect
@@ -2050,7 +2050,6 @@ class FactorBaseTask(Task):
             self.state["poly"] = str(poly)
         
         if not "outputfile" in self.state:
-            self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
@@ -2154,7 +2153,6 @@ class FreeRelTask(Task):
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
 
         # Get best polynomial found by polyselect
@@ -2177,7 +2175,6 @@ class FreeRelTask(Task):
             self.state["poly"] = str(poly)
         
         if not "freerelfilename" in self.state:
-            self.logger.info("Starting")
             # Write polynomial to a file
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
@@ -2336,9 +2333,6 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             pass
     
     def run(self):
-        self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         while self.get_nrels() < self.state["rels_wanted"]:
@@ -2538,9 +2532,6 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self):
-        self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         # Check that previously split files were split into the same number
@@ -2756,9 +2747,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
-        self.logger.info("Starting")
         super().run()
 
         input_nrel = 0
@@ -2910,9 +2898,6 @@ class PurgeTask(Task):
         self.state.setdefault("input_nrels", 0)
     
     def run(self):
-        self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not self.params["galois"]:
@@ -3182,9 +3167,6 @@ class FilterGaloisTask(Task):
         if not self.params["galois"]:
             return True
 
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
-        self.logger.info("Starting")
         super().run()
 
         files = self.send_request(Request.GET_UNIQUE_FILENAMES)
@@ -3251,12 +3233,9 @@ class MergeDLPTask(Task):
         self.progparams[0]["skip"] = 0
 
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "mergedfile" in self.state:
-            self.logger.info("Starting")
             if "idealfile" in self.state:
                 del(self.state["idealfile"])
             if "indexfile" in self.state:
@@ -3353,12 +3332,9 @@ class MergeTask(Task):
         self.progparams[0].setdefault("keep", skip + 128)
 
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "mergedfile" in self.state:
-            self.logger.info("Starting")
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "mergedfile" in self.state:
@@ -3438,9 +3414,6 @@ class NmbrthryTask(Task):
                          path_prefix=path_prefix)
 
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
-        self.logger.info("Starting")
         super().run()
 
         badfile = self.workdir.make_filename("badideals")
@@ -3531,13 +3504,9 @@ class LinAlgDLPTask(Task):
                          path_prefix=path_prefix)
 
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "kerfile" in self.state: 
-            self.logger.info("Starting")
-            
             kerfile = self.workdir.make_filename("ker")
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             smfile = self.send_request(Request.GET_SM_FILENAME)
@@ -3637,12 +3606,9 @@ class LinAlgTask(Task, HasStatistics):
                          path_prefix=path_prefix)
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "dependency" in self.state:
-            self.logger.info("Starting")
             workdir = self.workdir.make_dirname()
             workdir.mkdir(parent=True)
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
@@ -3700,12 +3666,9 @@ class CharactersTask(Task):
                          path_prefix=path_prefix)
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "kernel" in self.state:
-            self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             kernelfilename = self.workdir.make_filename("kernel")
             
@@ -3761,12 +3724,9 @@ class SqrtTask(Task):
         self.add_factor(self.params["N"])
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not self.is_done():
-            self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
@@ -3949,8 +3909,6 @@ class SMTask(Task):
                          path_prefix=path_prefix)
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
         if not "sm" in self.state:
@@ -3958,7 +3916,6 @@ class SMTask(Task):
             if nmaps == 0:
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
-            self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
             badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
@@ -4017,13 +3974,10 @@ class ReconstructLogTask(Task):
         self.progparams[0].setdefault("partial", self.params["partial"])
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
         super().run()
 
 
         if not "dlog" in self.state:
-            self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
