@@ -787,8 +787,46 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         super().print_stats()
 
 
+class Runnable(object):
+    @abc.abstractmethod
+    def run(self):
+        pass
+
+
+class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
+                 metaclass=abc.ABCMeta):
+    @abc.abstractproperty
+    def paramnames(self):
+        return self.join_params(super().paramnames, {"import": None})
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.did_import = False
+
+    def run(self):
+        super().run()
+        if "import" in self.params and not self.did_import:
+            self.import_files(self.params["import"])
+            self.did_import = True
+
+    def import_files(self, input_filename):
+        if input_filename.startswith('@'):
+            self.logger.info("Importing files listed in %s", input_filename[1:])
+            with open(input_filename[1:], "r") as f:
+                filenames = f.read().splitlines()
+        else:
+            self.logger.info("Importing file %s", input_filename)
+            filenames = [input_filename]
+        for filename in filenames:
+            self.import_one_file(filename)
+
+    @abc.abstractmethod
+    def import_one_file(self, filename):
+        pass
+
+
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
-           cadoparams.UseParameters, metaclass=abc.ABCMeta):
+           cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed.
     
     Sub-classes must define class variables:
@@ -1264,7 +1302,7 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         return True
 
 
-class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
+class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observer):
     """ Finds a number of size-optimized polynomial, uses client/server """
     @property
     def name(self):
@@ -1286,7 +1324,7 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "adrange": int, "admin": 0, "admax": int, "import": None,
+            "adrange": int, "admin": 0, "admax": int,
             "I": int, "alim": int, "rlim": int, "nrkeep": 20})
     @staticmethod
     def update_lognorms(old_lognorm, new_lognorm):
@@ -1392,7 +1430,6 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
         assert self.params["nrkeep"] > 0
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), self.params["admin"])
-        self.did_import = False
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
                 * self.params["alim"])
         self.progparams[0].setdefault("Bf", float(self.params["alim"]))
@@ -1468,15 +1505,12 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
     def run(self):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
-        
+        super().run()
+
         worstmsg = ", worst lognorm %f" % -self.poly_heap[0][0] \
                 if self.poly_heap else ""
         self.logger.info("%d polynomials in queue from previous run%s", 
                          len(self.poly_heap), worstmsg)
-        
-        if "import" in self.params and not self.did_import:
-            self.process_polyfile(self.params["import"])
-            self.did_import = True
         
         if self.is_done():
             self.logger.info("Already finished - nothing to do")
@@ -1534,6 +1568,9 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
                 block = []
         if block:
             yield block
+
+    def import_one_file(self, filename):
+        self.process_polyfile(filename)
 
     def process_polyfile(self, filename, commit=True):
         """ Read all size-optimized polynomials in a file and add them to the
@@ -1726,7 +1763,7 @@ class Polysel1Task(ClientServerTask, HasStatistics, patterns.Observer):
         return float(self.state.get("stats_total_time", 0.)) if is_cpu else 0.
 
 
-class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
+class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -1743,7 +1780,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
-            "import": None, "I": int, "alim": int, "rlim": int, "batch": 5})
+            "I": int, "alim": int, "rlim": int, "batch": 5})
     @property
     def stat_conversions(self):
         return (
@@ -1775,7 +1812,6 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         self.bestpoly = None
         if "bestpoly" in self.state:
             self.bestpoly = Polynomials(self.state["bestpoly"].splitlines())
-        self.did_import = False
         self.state.setdefault("nr_poly_submitted", 0)
         self.progparams[0].setdefault("area", 2.**(2*self.params["I"]-1) \
                 * self.params["alim"])
@@ -1786,6 +1822,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
     def run(self):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
+        super().run()
         
         if self.bestpoly is None:
             self.logger.info("No polynomial was previously found")
@@ -1793,12 +1830,6 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g",
                              self.state["bestfile"], self.bestpoly.MurphyE)
-        
-        if "import" in self.params and not self.did_import:
-            self.process_polyfile(self.params["import"])
-            if not self.bestpoly is None:
-                self.write_poly_file()
-            self.did_import = True
         
         # Get the list of polynomials to submit
         self.poly_to_submit = self.send_request(Request.GET_RAW_POLYNOMIALS)
@@ -1854,6 +1885,12 @@ class Polysel2Task(ClientServerTask, HasStatistics, patterns.Observer):
         self.verification(message.get_wu_id(), True, commit=True)
         return True
     
+    def import_one_file(self, filename):
+        old_bestpoly = self.bestpoly
+        self.process_polyfile(filename)
+        if not self.bestpoly is old_bestpoly:
+            self.write_poly_file()
+
     def process_polyfile(self, filename, commit=True):
         poly = self.parse_poly(filename)
         if not poly is None:
@@ -1991,7 +2028,8 @@ class FactorBaseTask(Task):
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
-        
+        super().run()
+
         # Get best polynomial found by polyselect
         poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
@@ -2117,7 +2155,8 @@ class FreeRelTask(Task):
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
-        
+        super().run()
+
         # Get best polynomial found by polyselect
         poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
@@ -2213,7 +2252,7 @@ class FreeRelTask(Task):
         return self.state.get("nprimes", None)
 
 
-class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
+class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                   patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
@@ -2232,7 +2271,7 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
-            "import": None, "gzip": True})
+            "gzip": True})
     @property
     def stat_conversions(self):
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
@@ -2295,17 +2334,13 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
-        self.did_import = False
     
     def run(self):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
-        if "import" in self.params and not self.did_import:
-            self.import_files(self.params["import"])
-            self.did_import = True
-        
+        super().run()
+
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
             q1 = q0 + self.params["qrange"]
@@ -2407,19 +2442,13 @@ class SievingTask(ClientServerTask, FilesCreator, HasStatistics,
                           filename)
         return None
     
-    def import_files(self, input_filename):
-        if input_filename.startswith('@'):
-            with open(input_filename[1:], "r") as f:
-                filenames = f.read().splitlines()
-        else:
-            filenames = [input_filename]
-        for filename in filenames:
-            if filename in self.get_output_filenames():
-                self.logger.info("Re-scanning file %s", filename)
-                nrels = self.get_nrels() - self.get_nrels(filename)
-                self.state.update({"rels_found": nrels}, commit=False)
-                self.forget_output_filenames([filename], commit=True)
-            self.add_file(filename)
+    def import_one_file(self, filename):
+        if filename in self.get_output_filenames():
+            self.logger.info("Re-scanning file %s", filename)
+            nrels = self.get_nrels() - self.get_nrels(filename)
+            self.state.update({"rels_found": nrels}, commit=False)
+            self.forget_output_filenames([filename], commit=True)
+        self.add_file(filename)
 
     def get_statistics_as_strings(self):
         strings = ["Total number of relations: %d" % self.get_nrels()]
@@ -2512,7 +2541,8 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -2728,8 +2758,9 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
         self.logger.info("Starting")
+        super().run()
+
         input_nrel = 0
         for i in range(0, self.nr_slices):
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -2882,7 +2913,8 @@ class PurgeTask(Task):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not self.params["galois"]:
             nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -3153,6 +3185,7 @@ class FilterGaloisTask(Task):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         self.logger.info("Starting")
+        super().run()
 
         files = self.send_request(Request.GET_UNIQUE_FILENAMES)
         nrels = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -3220,7 +3253,8 @@ class MergeDLPTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not "mergedfile" in self.state:
             self.logger.info("Starting")
             if "idealfile" in self.state:
@@ -3321,7 +3355,8 @@ class MergeTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not "mergedfile" in self.state:
             self.logger.info("Starting")
             if "indexfile" in self.state:
@@ -3406,7 +3441,8 @@ class NmbrthryTask(Task):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         self.logger.info("Starting")
-        
+        super().run()
+
         badfile = self.workdir.make_filename("badideals")
         badinfofile = self.workdir.make_filename("badidealinfo")
         polyfile = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -3497,6 +3533,8 @@ class LinAlgDLPTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
+        super().run()
+
         if not "kerfile" in self.state: 
             self.logger.info("Starting")
             
@@ -3601,7 +3639,8 @@ class LinAlgTask(Task, HasStatistics):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not "dependency" in self.state:
             self.logger.info("Starting")
             workdir = self.workdir.make_dirname()
@@ -3663,7 +3702,8 @@ class CharactersTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not "kernel" in self.state:
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -3723,6 +3763,8 @@ class SqrtTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
+        super().run()
+
         if not self.is_done():
             self.logger.info("Starting")
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -3909,7 +3951,8 @@ class SMTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
+        super().run()
+
         if not "sm" in self.state:
             nmaps = self.send_request(Request.GET_NMAPS)
             if nmaps == 0:
@@ -3976,6 +4019,8 @@ class ReconstructLogTask(Task):
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
+        super().run()
+
 
         if not "dlog" in self.state:
             self.logger.info("Starting")
