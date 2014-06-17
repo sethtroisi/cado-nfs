@@ -66,10 +66,11 @@ class Parameters(object):
     # about parameters in the parameter file that are not used by anything,
     # which might indicate a misspelling, etc.
     
-    def __init__(self):
+    def __init__(self, verbose=False):
         self.data = {}
         self._have_read_defaults = False
         self.key_types = {}
+        self.verbose = verbose
     
     def myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
@@ -135,15 +136,28 @@ class Parameters(object):
         # from deeper node. This lets _extract_from_node_by_keys() update 
         # the used flag correctly.
         result = {}
+        found_at_path = {}
         for i in range(len(splitpath), -1, -1): # len, len-1, ..., 1, 0
-            result.update(self._extract_from_node_by_keys(
-                            splitpath[:i], set(keys) - set(result)))
+            # Get those keys which are not in result yet
+            newkeys = self._subdict(keys, result, exists=False)
+            # Extract those parameters from the current node whose keys are
+            # in newkeys
+            update = self._extract_from_node_by_keys(splitpath[:i], newkeys)
+            found_at_path.update({key:splitpath[:i] for key in update})
+            result.update(update)
         # If keys is a dictionary with default values/target types, set
         # defaults and cast types
         if isinstance(keys, dict):
-            self._convert_types(result, keys, splitpath)
+            self._convert_types(result, keys, splitpath, found_at_path)
         return result
     
+    @staticmethod
+    def _subdict(d, s, exists=True):
+        if isinstance(d, dict):
+            return {key:d[key] for key in d if (key in s) == exists}
+        else:
+            return [key for key in d if (key in s) == exists]
+
     def get_unused_parameters(self):
         ''' Returns all entries in the parameters that were never returned
         by myparams() so far
@@ -395,7 +409,7 @@ class Parameters(object):
 
         return value
 
-    def _convert_types(self, data, keytypes, path):
+    def _convert_types(self, data, keytypes, path, found_at_path):
         """ In the dictionary "data", convert types in-place and apply any
         default values specified in the dictionary "keytypes"
         """
@@ -406,12 +420,14 @@ class Parameters(object):
             if keytypes[key] is None:
                 optional = True
                 target_type = None
+                defaultvalue = None
             # If only the type without any default value is specified, then
             # the value must exist in the parameter file, and is converted to
             # the specified type
             elif type(keytypes[key]) is type:
                 optional = False
                 target_type = keytypes[key]
+                defaultvalue = None
             elif type(keytypes[key]) is list:
                 # If a list is given as the default value, its first element
                 # must be a type and we interpret it as an optional parameter:
@@ -419,6 +435,7 @@ class Parameters(object):
                 # that type.
                 optional = True
                 target_type = keytypes[key][0]
+                defaultvalue = None
             else:
                 # If a value is given, it will be used as the default value,
                 # and its type is used as the type to which we cast the
@@ -426,20 +443,39 @@ class Parameters(object):
                 # Optional is set to true here, but that does not matter as
                 # we set the value in data anyway
                 optional = True
-                target_type = type(keytypes[key])
-                data.setdefault(key, keytypes[key])
+                defaultvalue = keytypes[key]
+                target_type = type(defaultvalue)
+                data.setdefault(key, defaultvalue)
             
+            found = key in data
             if not target_type is None and not type(target_type) is type:
                 msg = "Target type %s for key %s is not a type" \
                     % (target_type, key)
                 logger.critical(msg)
                 raise TypeError(msg)
-            if not optional and not key in data:
+            if not optional and not found:
                 msg = "Required parameter %s not found under path %s" \
                     % (key, ".".join(path))
                 logger.critical(msg)
                 raise KeyError(msg)
-            if key in data and not target_type is None:
+
+            if self.verbose:
+                optional_msg = "optional" if optional else "mandatory"
+                found_msg = "not found"
+                if found:
+                    if key in found_at_path:
+                        found_msg = "found at %s = %s" % (".".join(found_at_path[key] + [key]), data[key])
+                    else:
+                        found_msg = "used default value"
+                default_msg = ""
+                if optional and not defaultvalue is None:
+                    default_msg = " with default value %s" % defaultvalue
+                typename = "" if target_type is None \
+                            else " of type %s" % target_type.__name__
+                logger.info("%s.%s, %s parameter%s%s, %s",
+                        ".".join(path), key, optional_msg,
+                        typename, default_msg, found_msg)
+            if found and not target_type is None:
                 data[key] = self._convert_one_type(
                     path, key, data[key], target_type)
 
