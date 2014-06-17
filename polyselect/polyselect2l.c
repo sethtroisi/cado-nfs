@@ -2349,16 +2349,19 @@ print_statistics:
   /* print best keep values of logmu */
   if (collisions_good > 0)
     {
-      printf ("# Stat: best opt logmu:");
+      printf ("# Stat: best logmu after size optimization:");
       for (i = 0; i < keep; i++)
         if (best_opt_logmu[i] < LOGNORM_MAX)
           printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
-      printf ("# Stat: best logmu:");
-      for (i = 0; i < keep; i++)
-        if (best_logmu[i] < LOGNORM_MAX)
-          printf (" %1.2f", best_logmu[i]);
-      printf ("\n");
+      if (raw == 0) /* if only size-optimized, same as above */
+        {
+          printf ("# Stat: best logmu after size+root optimization:");
+          for (i = 0; i < keep; i++)
+            if (best_logmu[i] < LOGNORM_MAX)
+              printf (" %1.2f", best_logmu[i]);
+          printf ("\n");
+        }
     }
 
   /* print total time (this gets parsed by the scripts) */
