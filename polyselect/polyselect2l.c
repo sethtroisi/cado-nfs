@@ -61,12 +61,13 @@ int ros_found = 0; /* number of rootsieved polynomials */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
   aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0,
   var_opt_lognorm = 0.0, var_raw_lognorm = 0.0;
-double min_raw_lognorm = 999.99, max_raw_lognorm = 0.0;
-double min_opt_lognorm = 999.99, max_opt_lognorm = 0.0;
+#define LOGNORM_MAX 999.99
+double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
+double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
-double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP + 1];
+double best_opt_logmu[KEEP], best_logmu[KEEP + 1];
 double rootsieve_time = 0.0;
 int raw = 0;
 
@@ -487,8 +488,8 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
        mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], adz;
-  int cmp;
-  double skew, logmu;
+  int cmp, did_optimize;
+  double skew, logmu, E;
   mpz_poly_t F;
 
   /* the expected rotation space is S^5 for degree 6 */
@@ -639,21 +640,17 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  int did_optimize = 0;
-  double E;
-  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
-  }
+  did_optimize = optimize_raw_poly (&logmu, F, g, d, N, &E);
 
   if (did_optimize && out != NULL)
-    output_msieve(out, d, F->coeff, g);
+    output_msieve (out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
+    output_polynomials (fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly(d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
+    output_skipped_poly (d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
 
   mpz_clear (l);
   mpz_clear (m);
@@ -680,8 +677,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 	   mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz, tmp;
-  int cmp;
-  double skew, logmu;
+  int cmp, did_optimize;
+  double skew, logmu, E;
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
@@ -835,11 +832,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  int did_optimize = 0;
-  double E;
-  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
-  }
+  did_optimize = optimize_raw_poly (&logmu, F, g, d, N, &E);
 
   if (did_optimize && out != NULL)
     output_msieve(out, d, F->coeff, g);
@@ -2066,9 +2059,8 @@ main (int argc, char *argv[])
   /* initialize best norms */
   for (i = 0; i < keep; i++)
     {
-      best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
-      best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
-      best_logmu[i] = 999.99;       /* best logmu after rootsieve */
+      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
+      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
     }
 
   /* These parameters need to be parsed even for -rootsieve */
@@ -2357,17 +2349,15 @@ print_statistics:
   /* print best keep values of logmu */
   if (collisions_good > 0)
     {
-      printf ("# Stat: best raw logmu:");
-      for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_raw_logmu[i]);
-      printf ("\n");
       printf ("# Stat: best opt logmu:");
       for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_opt_logmu[i]);
+        if (best_opt_logmu[i] < LOGNORM_MAX)
+          printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
       printf ("# Stat: best logmu:");
       for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_logmu[i]);
+        if (best_logmu[i] < LOGNORM_MAX)
+          printf (" %1.2f", best_logmu[i]);
       printf ("\n");
     }
 
