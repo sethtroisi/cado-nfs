@@ -2162,13 +2162,13 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
         break;
     }
 
-  if (verbose > 0)
+  if (verbose > 1)
     {
       gmp_fprintf (stderr, "# ad=%Zd: optimized lognorm from %.2f to %.2f\n",
                    f->coeff[d], logmu00, logmu0);
       gmp_fprintf (stderr, "# (rotation %Zd*x^2+%Zd*x+%Zd, translation %Zd)\n",
                    khitot, lamtot, mutot, ktot);
-      if (verbose > 1)
+      if (verbose > 2)
         {
           fprintf (stderr, "# "); mpz_poly_fprintf (stderr, f);
           fprintf (stderr, "# "); mpz_poly_fprintf (stderr, G);
