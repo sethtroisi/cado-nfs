@@ -4003,6 +4003,12 @@ int main (int argc0, char *argv0[])/*{{{*/
         totJ += (double) si->J;
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
+        if (las->verbose >= 2) {
+            fprintf (las->output, "# f_0'(x) = ");
+            mpz_poly_fprintf(las->output, si->sides[0]->fij);
+            fprintf (las->output, "# f_1'(x) = ");
+            mpz_poly_fprintf(las->output, si->sides[1]->fij);
+        }
 
 #ifdef TRACE_K
         init_trace_k(si, pl);
