@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <gmp.h>
 #include "bwc_config.h"
 #include "portability.h"
 #include "macros.h"
@@ -11,12 +12,20 @@
 
 int verbose = 0;
 
+int nrhs = 0;
+mpz_t prime;
+char * rhsname;
+FILE * rhsfile;
+gmp_randstate_t rstate;
+
+int * colweights;
+
 /* Returns something centered on 1. */
 static inline double dist_func()
 {
-    long int y = rand();
+    long int y = gmp_urandomm_ui(rstate, LONG_MAX);
     y += y == 0;
-    double x = (double) y / RAND_MAX;
+    double x = (double) y / LONG_MAX;
     /* With this distribution, bizarrely we tend to get a density which
      * is larger than expected... would be accounted for by our
      */
@@ -93,16 +102,38 @@ void printrows(int nrows, int ncols, double lambda, int maxc)
     int total_coeffs = 0;
     double tot_sq = 0;
     for(int i = 0 ; i < nrows ; i++) {
+        long v = 0;
         int c = gen_row(lambda, ncols, ptr);
         printf("%d", c);
         for(int j = 0 ; j < c ; j++) {
             printf(" %d", ptr[j]);
             if (maxc) {
-                int co = rand() % (2 * maxc + 1) - maxc;
-                printf(" %d", co);
+                int co = gmp_urandomm_ui(rstate, 2 * maxc + 1) - maxc;
+                printf(":%d", co);
+                if (nrhs) v += co * (1+ptr[j]);
             }
         }
         printf("\n");
+        if (nrhs) {
+            mpz_t x,s;
+            mpz_init(x);
+            mpz_init(s);
+            mpz_set_si(s, v);
+
+            for(int j = 0 ; j < nrhs - 1 ; j++) {
+                mpz_urandomm(x, rstate, prime);
+                mpz_addmul_ui(s, x, ncols + j + 1);
+                gmp_fprintf(rhsfile, "%Zd ", x);
+            }
+            mpz_set_si(x, -(ncols + nrhs));
+            mpz_invert(x, x, prime);
+            mpz_mul(s, s, x);
+            mpz_mod(s, s, prime);
+            gmp_fprintf(rhsfile, "%Zd\n", s);
+            mpz_clear(x);
+            mpz_clear(s);
+        }
+
         total_coeffs += c;
         tot_sq += (double) c * (double) c;
     }
@@ -125,7 +156,9 @@ void usage()
             "\t-c <maxc> : add coefficients\n"
             "\t-v : turn verbosity on\n"
             "\t--kleft <d>: ensure at least a left kernel of dimension d\n"
-            "\t--kright <d>: ditto for right kernel\n");
+            "\t--kright <d>: ditto for right kernel\n"
+            "\t--rhs <nrhs>,<prime>,<filename>: rhs output\n"
+            );
     exit(1);
 }
 
@@ -169,7 +202,9 @@ int main(int argc, char * argv[])
     int seed = 0;
     param_list_parse_int(pl, "seed", &seed);
 
-    srand(seed ? seed : time(NULL));
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, seed ? seed : time(NULL));
+
 
     param_list_parse_int(pl, "c", &maxcoeff);
 
@@ -205,8 +240,6 @@ int main(int argc, char * argv[])
         }
     }
 
-    printf("%d %d\n", nrows, ncols);
-
     if (ncols > nrows)
         kernel_right -= ncols - nrows;
     if (kernel_right < 0)
@@ -227,12 +260,41 @@ int main(int argc, char * argv[])
                 " Could trigger misbehaviours\n");
     }
 
+    const char * tmp = param_list_lookup_string(pl, "rhs");
+
+    if (param_list_warn_unused(pl)) usage();
+
+    if (tmp) {
+        /* try to parse the rhs info */
+        ASSERT_ALWAYS(maxcoeff > 0);
+        ASSERT_ALWAYS(kernel_left == 0);
+        kernel_right = 0;
+        char * rhsname = malloc(1 + strlen(tmp));
+        mpz_init(prime);
+        int rc = gmp_sscanf(tmp, "%d,%Zd,%s", &nrhs, prime, rhsname);
+        ASSERT_ALWAYS(rc == 3);
+        if (nrhs == 0) {
+            fprintf(stderr, "--rhs argument requires setting more than 0 vectors !\n");
+            exit(1);
+        }
+        rhsfile = fopen(rhsname, "w");
+        fprintf(rhsfile, "%d %d\n", nrows, nrhs);
+    }
+
+
+    colweights = malloc(ncols * sizeof(int));
+    memset(colweights, 0, ncols * sizeof(int));
+
+    printf("%d %d\n", nrows, ncols);
+
     printrows(nrows - kernel_right, ncols - kernel_left, lambda, maxcoeff);
     for(int i = 0 ; i < kernel_right ; i++) {
         printf("0\n");
     }
 
-    param_list_clear(pl);
+    free(colweights);
+
+    gmp_randclear(rstate);
 
     return 0;
 }
