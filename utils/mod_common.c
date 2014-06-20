@@ -255,3 +255,35 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
   mod_clear (two, m);
 }
 #endif
+
+
+/* Compute modular inverses for n input residues.
+   If any of the residues is not invertible, returns 0 and contents of r are
+   undefined. 
+   a and r must be non-overlapping. */
+int
+mod_batchinv (residue_t *r, const residue_t *a,
+              const size_t n, const modulus_t m)
+{
+  residue_t R;
+  
+  if (n == 0)
+    return 1;
+  
+  mod_set(r[0], a[0], m);
+  for (size_t i = 1; i < n; i++) {
+    mod_mul(r[i], r[i-1], a[i], m);
+  }
+  
+  mod_init_noset0(R, m);
+  if (mod_inv(R, r[n-1], m)== 0)
+    return 0;
+
+  for (size_t i = n-1; i > 0; i--) {
+    mod_mul(r[i], R, r[i-1], m);
+    mod_mul(R, R, a[i], m);
+  }
+  mod_set(r[0], R, m);
+  mod_clear(R, m);
+  return 1;
+}

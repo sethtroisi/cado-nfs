@@ -66,6 +66,7 @@
 #undef mod_isprime
 #undef mod_gcd
 #undef mod_inv
+#undef mod_batchinv
 #undef mod_jacobi
 #undef mod_set0
 #undef mod_set1
@@ -137,6 +138,7 @@
 #define mod_isprime          MOD_RENAME(isprime)
 #define mod_gcd              MOD_RENAME(gcd)
 #define mod_inv              MOD_RENAME(inv)
+#define mod_batchinv         MOD_RENAME(batchinv)
 #define mod_jacobi           MOD_RENAME(jacobi)
 #define mod_set0             MOD_RENAME(set0)
 #define mod_set1             MOD_RENAME(set1)
@@ -218,6 +220,7 @@ mod_test_if_functions_exist()
   p = &mod_isprime;
   p = &mod_gcd;
   p = &mod_inv;
+  p = &mod_batchinv;
   p = &mod_jacobi;
   p = &mod_set0;
   p = &mod_set1;
