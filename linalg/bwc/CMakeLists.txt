@@ -384,5 +384,6 @@ endforeach(v)
 
 add_custom_target(bwc_full)
 add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
-    cleanup prep krylov dispatch mksol gather secure)
+    cleanup prep krylov dispatch mksol gather secure bwc_base
+    all_matmul_libs)
 

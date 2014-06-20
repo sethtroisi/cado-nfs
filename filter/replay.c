@@ -108,8 +108,9 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         scwname = derived_filename(base, suf->scw, zip);
         smatfile = fopen_maybe_compressed(smatname, wmode);
         srwfile  = fopen_maybe_compressed(srwname, wmode);
-        if (!bin)
-            fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
+        /* XXX sm-outside-matrix creates a square matrix here */
+        // if (!bin) fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
+        if (!bin) fprintf(smatfile, "%d %d\n", small_ncols, small_ncols - skip);
     }
 
     char * dmatname = NULL;
@@ -121,20 +122,41 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     if (skip) {
         /* arrange so that we don't get file names like .sparse.dense */
-        char * tmp = strstr(base, ".sparse");
+        char * dbase = strdup(base);
+        char * tmp = strstr(dbase, ".sparse");
         if (tmp) {
             memmove(tmp, tmp + 7, strlen(tmp + 7) + 1);
         }
-        dmatname = derived_filename(base, suf->dmat, zip);
-        drwname  = derived_filename(base, suf->drw, zip);
-        dcwname = derived_filename(base, suf->dcw, zip);
+        dmatname = derived_filename(dbase, suf->dmat, zip);
+        drwname  = derived_filename(dbase, suf->drw, zip);
+        dcwname = derived_filename(dbase, suf->dcw, zip);
         dmatfile = fopen_maybe_compressed(dmatname, wmode);
         drwfile  = fopen_maybe_compressed(drwname, wmode);
         if (!bin)
             fprintf(dmatfile, "%d %d\n", small_nrows, skip);
+        free(dbase);
     }
 
     for(int i = 0; i < small_nrows; i++){
+#ifdef FOR_DL
+        /* this is for sm-outside-matrix */
+        if (i == small_ncols) {
+            printf("Rotating file names\n");
+            char * base2;
+            int rc = asprintf(&base2, "%s.tail", base);
+            ASSERT_ALWAYS(rc >= 0);
+            fclose_maybe_compressed (smatfile, smatname);
+            free(smatname);
+            smatname = derived_filename(base2, suf->smat, zip);
+            smatfile = fopen_maybe_compressed(smatname, wmode);
+            free(base2);
+            if (!bin) {
+                fprintf(smatfile, "%d %d\n", small_nrows - small_ncols, small_ncols - skip);
+            }
+            fclose_maybe_compressed(srwfile, srwname); srwfile = NULL;
+        }
+#endif
+
 	if(sparsemat[i] == NULL) {
           /* this should not happen, unless the corresponding combination of
              relations yields a square, thus we have found a dependency in the
@@ -161,12 +183,12 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             }
             if (bin) {
                 fwrite32_little(&sw, 1, smatfile);
-                fwrite32_little(&sw, 1, srwfile);
+                if (srwfile) fwrite32_little(&sw, 1, srwfile);
                 if (skip) fwrite32_little(&dw, 1, dmatfile);
                 if (skip) fwrite32_little(&dw, 1, drwfile);
             } else {
                 fprintf(smatfile, "%" PRIu32 "", sw);
-                fprintf(srwfile, "%" PRIu32 "\n", sw);
+                if (srwfile) fprintf(srwfile, "%" PRIu32 "\n", sw);
                 if (skip) fprintf(dmatfile, "%" PRIu32 "", dw);
                 if (skip) fprintf(drwfile, "%" PRIu32 "\n", dw);
             }
@@ -194,7 +216,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 		ASSERT(code[rowCell(sparsemat, i, j)] > 0);
 #endif
 		uint32_t x = code[rowCell(sparsemat, i, j)]-1;
-                weights[x]++;
+                if (srwfile) weights[x]++;
                 if ((int) x < skip) {
                     ASSERT_ALWAYS(skip);
                     if (bin) {
@@ -227,7 +249,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     {
         fclose_maybe_compressed (smatfile, smatname);
-        fclose_maybe_compressed (srwfile, srwname);
+        if (srwfile) fclose_maybe_compressed (srwfile, srwname);
     }
     if (skip) {
         printf("%lu coeffs (out of %lu total) put into %s (%.1f%%)\n",

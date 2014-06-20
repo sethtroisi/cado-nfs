@@ -25,19 +25,21 @@ struct bw_params {
     /* m,n blocking factors as in the textbook BW description */
     int m,n;
 
-    /* We have 0<=nsm<=n. This parameter is related to SM handling in the
-     * DL computation, when the SM blocks are part of the block Wiedemann
-     * starting vectors. This influences the number of columns which are
-     * shifted in the generator computation ("considering A(X) div X"),
-     * so that we force the computed relation to have non-zero
-     * coefficients for the SM columns (hence, not shifted in A(X)),
-     * while those corresponding to random vectors _are_ shifted.
+    /* We have 0<=nrhs<=n. This corresponds to solving inhomogeneous
+     * systems, but in reality we consider this parameter only when
+     * related to SM handling in the DL computation, when the SM blocks
+     * are part of the block Wiedemann starting vectors. This influences
+     * the number of columns which are shifted in the generator
+     * computation ("considering A(X) div X"), so that we force the
+     * computed relation to have non-zero coefficients for the SM columns
+     * (hence, not shifted in A(X)), while those corresponding to random
+     * vectors _are_ shifted.
      *
      * mksol and gather are also affected by this parameter.
      *
-     * By default we have nsm=0
+     * By default we have nrhs=0
      */
-    int nsm;
+    int nrhs;
 
     /* modulus */
     mpz_t p;

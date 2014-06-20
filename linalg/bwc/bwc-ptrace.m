@@ -1,26 +1,36 @@
 
+/* This magma script must be run from the directory containing the data files
+ * from a bwc run (converted to magma format by bwc-ptrace.sh */
 
 
-load "/tmp/bwcp/mn.m";
-load "/tmp/bwcp/t.m";
+load "mn.m";
+load "t.m";
 M:=var;
+M_orig:=M;
 
 /* We'll pad the matrix to something which has nice dimensions, multiples of
- * nh*nv. Otherwise I'll get crazy very soon
- */
-load "/tmp/bwcp/placemats.m";
+ * nh*nv. Otherwise I'll get crazy very soon */
+load "placemats.m";
+/* Now M is M_orig zero-padded in rows & cols */
+/* while Mt is the matrix as dispatched on the different threads/jobs */
 
 KP<X>:=PolynomialRing(GF(p));
+
+function group(nlimbs)
+    return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
+end function;
+
+g:=group(Ceiling(Log(2^64,p)));
 
 
 // assert nc le nr;
 // nc:=nr;
 // x:=Matrix(GF(p),nr,nc,[]);InsertBlock(~x,M,1,1);M:=x;
 
-load "/tmp/bwcp/rw.m"; rw:=var;
-load "/tmp/bwcp/cw.m"; cw:=var;
+load "rw.m"; rw:=var;
+load "cw.m"; cw:=var;
 
-load "/tmp/bwcp/b.m"; 
+load "b.m"; 
 nr_orig:=nr;
 nc_orig:=nc;
 nr:=tr;
@@ -128,62 +138,67 @@ assert colweights(Mt*Sc) eq colweights(Mx*Q);
 assert rowweights(Transpose(Pr*Sr)*Mt) eq rowweights(M);
 
 
+assert IsZero((Mx*Q)[nr_orig+1..nr]);
+assert IsZero(Transpose(Mx*Q)[nc_orig+1..nc]);
 
-function group(nlimbs)
-    return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
-end function;
 
-g:=group(Ceiling(Log(2^64,p)));
 
-/* No load in conditionals. Anyway we never use Y.
-if n eq 1 then
-load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,g(var));
-end if;
-*/
+/* The matrix by which we multiply, really */
 
-truncvec:=func<x|Vector(Eltseq(x)[1..Maximum(nr_orig, nc_orig)])>;
-expandvec:=func<x|Vector(xx cat [0:i in [#xx+1..nr]]) where xx is Eltseq(x)>;
+assert Submatrix(Transpose(Mx*Q),1,1,nr_orig,nr_orig) eq Submatrix(Transpose(Q),1,1,nr_orig,nr_orig)*Transpose(Matrix(M_orig));
 
-load "/tmp/bwcp/V0.0.m"; V0:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V0.1.m"; V1:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.2.m"; V2:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.3.m"; V3:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.4.m"; V4:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.5.m"; V5:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.6.m"; V6:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.7.m"; V7:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.8.m"; V8:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.9.m"; V9:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/V0.10.m"; V10:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/C0.m"; C0:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/C1.m"; C1:=expandvec(Vector(GF(p),nr_orig,g(var)));
-load "/tmp/bwcp/C50.m"; C50:=expandvec(Vector(GF(p),nr_orig,g(var)));
+
+Qsmall:=Submatrix(Q,1,1,nr_orig,nr_orig);
+Msmall:=Matrix(GF(p),Matrix(M_orig));
+
+MM:=Transpose(Msmall*Qsmall);
+
+
+load "R.m";
+
+
+// truncvec:=func<x|Vector(Eltseq(x)[1..Maximum(nr_orig, nc_orig)])>;
+// expandvec:=func<x|Vector(xx cat [0:i in [#xx+1..nr]]) where xx is Eltseq(x)>;
+
+load "VV.m";
+
+load "C0.m"; C0:=Vector(GF(p),nr_orig,g(var));
+load "C1.m"; C1:=Vector(GF(p),nr_orig,g(var));
+load "C50.m"; C50:=Vector(GF(p),nr_orig,g(var));
 
 /* Only pick first X, since we only want to verify the check vector */
-load "/tmp/bwcp/x.m";
-Xt:=Matrix(GF(p),nr,1,[]);
+load "x.m";
+Xt:=Matrix(GF(p),nr_orig,1,[]);
 for i in [1..1] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
+
+Xfull:=Matrix(GF(p),nr_orig,#var,[]);
+for i in [1..#var] do for u in var[i] do Xfull[u][i] +:=1; end for; end for;
+
+print "Dimension of the span of the vectors of X";
+x0:=Rows(Transpose(Xfull));
+xi:=x0;
+X:=sub<Universe(x0)|>;
+
+X +:= sub<Universe(x0)|xi>;
+print Dimension(X);
+xi:=[v*(Msmall*Qsmall) : v in xi];
 
 
 interval:=50;
 
-C1 eq Vector(Xt)*Mx*Q;
+C1 eq Vector(Xt)*Transpose(Msmall*Qsmall);
 
 foo:=Vector(Xt);
-for i in [1..50] do print i; foo *:= Mx*Q; end for;
+for i in [1..50] do print i; foo *:= Transpose(Transpose(Msmall*Qsmall)); end for;
 C50 eq foo;
 
 
-V1  eq V0*Transpose(Mx*Q);
-V2  eq V1*Transpose(Mx*Q);
-V3  eq V2*Transpose(Mx*Q);
-V4  eq V3*Transpose(Mx*Q);
-V5  eq V4*Transpose(Mx*Q);
-V6  eq V5*Transpose(Mx*Q);
-V7  eq V6*Transpose(Mx*Q);
-V8  eq V7*Transpose(Mx*Q);
-V9  eq V8*Transpose(Mx*Q);
-V10 eq V9*Transpose(Mx*Q);
+for i in [1..#VV-1] do
+    print Matrix(VV[i])*Transpose(Msmall*Qsmall) eq Matrix(VV[i+1]);
+end for;
+
+
+
 
 function matpol_from_sequence(seq, m, n)
     assert #seq mod m*n eq 0;
@@ -197,19 +212,43 @@ mcoeff:=func<M,k|Matrix(CoefficientRing(CoefficientRing(M)),Nrows(M),Ncols(M),[C
 mdiv:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] div KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
 mmod:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] mod KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
 mval:=func<M|Minimum([Valuation(M[i,j]):i in [1..Nrows(M)], j in [1..Ncols(M)]])>;
+function mycoeff(M,k)
+        s:=KMatrixSpace(CoefficientRing(CoefficientRing(M)),Nrows(M), Ncols(M));
+        return s![Coefficient(P,k):P in Eltseq(M)];
+end function;
+function mpol_eval(y,M,P)
+    /* compute y * P(M) */
+    assert CoefficientRing(P) eq CoefficientRing(M);
+    s:=Parent(y)!0;
+    if Degree(P) lt 0 then return s; end if;
+    i:=Degree(P);
+    s:=Coefficient(P, i) * y;
+    while i gt 0 do
+        s:=s*M;
+        i:=i-1;
+        s+:=Coefficient(P, i) * y;
+    end while;
+    return s;
+end function;
 
 
-load "/tmp/bwcp/A.m";
+
+load "A.m";
 A:=matpol_from_sequence(g(var),m,n);
 
 
-load "/tmp/bwcp/F.m";
+load "F.m";
 F,Fr:=matpol_from_sequence(g(var),n,n);
 F:=Transpose(F);
 Fr:=Transpose(Fr);
 
-load "/tmp/bwcp/rhs.m";
-rhs:=Matrix(GF(p),nsm,n,g(var));
+load "Fchunks.m";
+for i,j in [1..n] do
+    print Polynomial(Fchunks[i][j]) eq F[j,i];
+end for;
+
+load "rhscoeffs.m";
+rhs:=Matrix(GF(p),#RHS,n,g(var));
 
 degF:=Maximum([Degree(F[i,j]):i,j in [1..n]]);
 
@@ -231,22 +270,46 @@ end for;
 // something like this should work.
 // IsZero(mmod(mdiv(A*Fr,degF),159));
 
-load "/tmp/bwcp/V0.0.m"; y0:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V1.0.m"; y1:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V2.0.m"; y2:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V3.0.m"; y3:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V4.0.m"; y4:=expandvec(Vector(GF(p),g(var)));
-load "/tmp/bwcp/V5.0.m"; y5:=expandvec(Vector(GF(p),g(var)));
 
 
-load "/tmp/bwcp/S.m";
+load "S.m";
 nsols:=#vars div n;
 printf "Computed %o solution vectors with mksol\n", nsols;
 assert #vars mod n eq 0;
-SS:=[[expandvec(Vector(GF(p),g(vars[i*n+j+1]))):j in [0..n-1]]:i in [0..nsols-1]];
+SS:=[[(Vector(GF(p),g(vars[i*n+j+1]))):j in [0..n-1]]:i in [0..nsols-1]];
 
-load "/tmp/bwcp/K.sols0-1.0.m";    K0:=expandvec(Vector(GF(p), g(var)));
+nsols:=#SS;
+assert nsols ge #RHS;
 
+for i in [1..nsols] do
+    for j in [1..n] do
+        SS[i,j] eq mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,i]);
+    end for;
+end for;
+
+all_rhs:=Transpose(rhs)*Matrix(RHS);
+ww:=[];
+
+IsZero(all_rhs[1] + &+SS[1]*Transpose(Msmall*Qsmall));
+
+for c in [1..nsols] do
+    // v:=&+[mpol_eval(V_0[j],Transpose(Msmall*Qsmall),F[j,c]): j in [1..n]];
+    v:=&+SS[c];
+    IsZero(all_rhs[c] + v * Transpose(Msmall*Qsmall));
+    w0:=v * Transpose(Qsmall);
+    w1:=Transpose(rhs)[c];
+    IsZero(w0 * Transpose(Msmall) + w1*Matrix(RHS));
+    w:=Vector(Eltseq(w0)[1..nr_orig] cat Eltseq(w1));
+    // IsZero(w * Transpose(Mfull));
+    Append(~ww, w);
+end for;
+
+
+
+
+// load "K.sols0-1.0.m";    K0:=expandvec(Vector(GF(p), g(var)));
+
+/*
 W:=K0;
 for i in [1..10] do
     if IsZero(W*Transpose(Mx*Q)) then break; end if;
@@ -260,6 +323,8 @@ if not IsZero(W*Transpose(Mx*Q)) then
     System("sleep 1");
     notinker:=true;
 end if;
+*/
+    notinker:=true;
 
 assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
 print Mt eq P*S*Mx*Q*S^-1, " (true only for shuffled product)";
@@ -269,14 +334,29 @@ Mx eq M;
 
 // IsZero(W*Transpose(Q)*Cc*Transpose(M)*Transpose(Cr));
 // sol:=Vector(Eltseq(W*Transpose(Q)*Cc)[1..nc]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 if not notinker then
 IsZero(W*Transpose(Q)*Transpose(M));
 sol:=Vector(Eltseq(W*Transpose(Q))[1..nc]);
 IsZero(sol*Transpose(M));
 end if;
+*/
 
 
-// load "/tmp/bwcp/x.m";
+// load "x.m";
 // C0:=Matrix(GF(p),nr,64,[]);
 // Xt:=Matrix(GF(p),nr,n,[]);
 // for i in [1..64] do for u in var[i] do C0[u][i] +:=1; end for; end for;
@@ -293,36 +373,36 @@ end if;
 // end function;
 // 
 // 
-// load "/tmp/bwcp/Y.0.m";      Y0:= vblock(nc, var, n);
-// load "/tmp/bwcp/V0-64.0.m";  V0:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.1.m";  V1:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.2.m";  V2:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.3.m";  V3:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.4.m";  V4:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.5.m";  V5:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.6.m";  V6:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.7.m";  V7:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.8.m";  V8:= vblock(nc, var, 64);
-// // load "/tmp/bwcp/V0-64.9.m";  V9:= vblock(nc, var, 64);
-// load "/tmp/bwcp/V0-64.10.m"; V10:=vblock(nc, var, 64);
-// load "/tmp/bwcp/V0-64.20.m"; V20:=vblock(nc, var, 64);
+// load "Y.0.m";      Y0:= vblock(nc, var, n);
+// load "V0-64.0.m";  V0:= vblock(nc, var, 64);
+// // load "V0-64.1.m";  V1:= vblock(nc, var, 64);
+// // load "V0-64.2.m";  V2:= vblock(nc, var, 64);
+// // load "V0-64.3.m";  V3:= vblock(nc, var, 64);
+// // load "V0-64.4.m";  V4:= vblock(nc, var, 64);
+// // load "V0-64.5.m";  V5:= vblock(nc, var, 64);
+// // load "V0-64.6.m";  V6:= vblock(nc, var, 64);
+// // load "V0-64.7.m";  V7:= vblock(nc, var, 64);
+// // load "V0-64.8.m";  V8:= vblock(nc, var, 64);
+// // load "V0-64.9.m";  V9:= vblock(nc, var, 64);
+// load "V0-64.10.m"; V10:=vblock(nc, var, 64);
+// load "V0-64.20.m"; V20:=vblock(nc, var, 64);
 // 
-// load "/tmp/bwcp/V64-128.0.m";  V0b:= vblock(nc, var, 64);
-// load "/tmp/bwcp/V64-128.10.m"; V10b:=vblock(nc, var, 64);
-// load "/tmp/bwcp/V64-128.20.m"; V20b:=vblock(nc, var, 64);
+// load "V64-128.0.m";  V0b:= vblock(nc, var, 64);
+// load "V64-128.10.m"; V10b:=vblock(nc, var, 64);
+// load "V64-128.20.m"; V20b:=vblock(nc, var, 64);
 // 
 // 
-// // load "/tmp/bwcp/V0-64.12.m"; V12:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.13.m"; V13:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.14.m"; V14:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.15.m"; V15:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.16.m"; V16:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.17.m"; V17:=vblock(nc, var, n);
-// // load "/tmp/bwcp/V0-64.18.m"; V18:=vblock(nc, var, n);
-// load "/tmp/bwcp/C.0.m";    C0:=vblock(nr, var, 64);
-// load "/tmp/bwcp/C.10.m";   C10:=vblock(nr, var, 64);
+// // load "V0-64.12.m"; V12:=vblock(nc, var, n);
+// // load "V0-64.13.m"; V13:=vblock(nc, var, n);
+// // load "V0-64.14.m"; V14:=vblock(nc, var, n);
+// // load "V0-64.15.m"; V15:=vblock(nc, var, n);
+// // load "V0-64.16.m"; V16:=vblock(nc, var, n);
+// // load "V0-64.17.m"; V17:=vblock(nc, var, n);
+// // load "V0-64.18.m"; V18:=vblock(nc, var, n);
+// load "C.0.m";    C0:=vblock(nr, var, 64);
+// load "C.10.m";   C10:=vblock(nr, var, 64);
 // 
-// load "/tmp/bwcp/H1.m";    H1:=vblock(nc, var, 64);
+// load "H1.m";    H1:=vblock(nc, var, 64);
 // var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
 //     where p is PreviousPrime(2^64)
 //     where q is PreviousPrime(2^63);
@@ -404,7 +484,7 @@ end if;
 // 
 // print "Done checking krylov stuff";
 // 
-// load "/tmp/bwcp/A0-128.0-30.m";   // suited for matrix t100b
+// load "A0-128.0-30.m";   // suited for matrix t100b
 // 
 // stride:=m*n div 64;
 // for i in [0..30-1] do
@@ -429,10 +509,7 @@ KRNn:=RMatrixSpace(KR,N,n);
 KRN:=RMatrixSpace(KR,N,N);
 KNn:=KMatrixSpace(K,N,n);
 
-function mycoeff(M,k)
-        s:=KMatrixSpace(CoefficientRing(CoefficientRing(M)),Nrows(M), Ncols(M));
-        return s![Coefficient(P,k):P in Eltseq(M)];
-end function;
+
 // 
 // // beware -- we're using the sequence starting at 1.
 // // A_sequence:=&+[x^(i-1)*KRmn!(Transpose(Xt)*TM^i*V0):i in [1..100]];
@@ -445,7 +522,7 @@ end function;
 // // assert A_sequence eq &+[x^(i-1)*KRmn!(Transpose(Xt)*TM^(i-1)*V0):i in [1..100]];
 // 
 // 
-// load "/tmp/bwcp/F.m";
+// load "F.m";
 // 
 // degf:=#var div stride - 1;
 // 
@@ -482,11 +559,11 @@ end function;
 // 
 // // S:=&+[TM^i*V0*mycoeff(Transpose(F),i):i in [0..2]];
 // 
-// load "/tmp/bwcp/S0-64.10.m"; S10:=vblock(nc, var, n);
-// load "/tmp/bwcp/S0-64.20.m"; S20:=vblock(nc, var, n);
-// load "/tmp/bwcp/S64-128.10.m"; S10b:=vblock(nc, var, n);
-// load "/tmp/bwcp/S64-128.20.m"; S20b:=vblock(nc, var, n);
-// load "/tmp/bwcp/K.0.m";    K0:=vblock(nc, var, 64);
+// load "S0-64.10.m"; S10:=vblock(nc, var, n);
+// load "S0-64.20.m"; S20:=vblock(nc, var, n);
+// load "S64-128.10.m"; S10b:=vblock(nc, var, n);
+// load "S64-128.20.m"; S20b:=vblock(nc, var, n);
+// load "K.0.m";    K0:=vblock(nc, var, 64);
 // 
 // S eq S10+S20;
 // 
@@ -496,7 +573,7 @@ end function;
 // 
 // 
 // 
-// load "/tmp/bwcp/W.m";    W:=vblock(nr, var, 64);    
+// load "W.m";    W:=vblock(nr, var, 64);    
 // 
 // 
 // // For our simple test cases, K0==W. In more subtle situations, things
