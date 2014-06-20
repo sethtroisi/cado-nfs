@@ -1274,7 +1274,8 @@ int modredc15ul_sprp2 (const modulusredc15ul_t);
 int modredc15ul_isprime (const modulusredc15ul_t);
 int modredc15ul_inv (residueredc15ul_t, const residueredc15ul_t, 
 		     const modulusredc15ul_t);
-int modredc15ul_batchinv (residueredc15ul_t *r, const residueredc15ul_t *a,
-                          size_t n, const modulusredc15ul_t m);
+int modredc15ul_batchinv (residueredc15ul_t *, const residueredc15ul_t *,
+                          size_t, const residueredc15ul_t,
+                          const modulusredc15ul_t);
 int modredc15ul_jacobi (const residueredc15ul_t, const modulusredc15ul_t);
 #endif  /* MODREDC_15UL_H */
