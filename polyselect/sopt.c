@@ -1,18 +1,8 @@
-/* polyopt.c:
-
-   re-optimize the raw polynomials in a file. Assume the file
-   already contains raw and optimized polynomial, the code
-   will pick the raw poly and optimize it with current method
-   in optimized.c
-
-   Explicitly, the code will only look at lines with cado format,
-
+/* 
+   Size-optimize the raw polynomials in a file of format:
    "Yi: xxxxxx"
    "ci: xxxxxx"
    "N: xxxxxx"
-
-   Also it will ignore the even number of polynomials found, since
-   we assume this is an optimized result by some old auxiliary.c
 */
 
 /* standard header files */
@@ -23,6 +13,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <gmp.h>
+
 /* CADO-NFS header files */
 #include "portability.h"
 #include "utils.h"
@@ -31,11 +22,26 @@
 
 #define MAX_LINE_LENGTH 1024
 
-int fake = 0; // optimize anyway regardless of the common root condition
+/* Assume the file already contains both raw and optimized polynomial
+   in pairs. SKIP_YES 1 will pick the raw poly and optimize it.
+   So it will ignore the even number of polynomials found, since
+   we assume this is an optimized result. */
+#define SKIP_YES 0
 
-/* Care: poly_print is named in utils.h */
+/* optimize anyway regardless of the common root condition
+   this is only used when you want to try wierd things. */
+int fake = 0;
+
+/* only use translation in optimization */
+int translate = 0;
+
+
+/* 
+   Care: poly_print is named in utils.h
+*/
 static void
-polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) {
+polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) 
+{
   int i;
   gmp_printf ("\nn: %Zd\n", N);
   for (i = deg; i >= 0; i --)
@@ -48,11 +54,14 @@ polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) {
   }
 }
 
-/* optimize all raw polynomial in the file. "skip" denotes position of raw poly */
+
+/*
+  Optimize all raw polynomial in the file.
+*/
 static int
 opt_file (FILE *file, int deg, mpz_t N) {
-  int i, nroots;
-  unsigned flag = 0UL, skip = 0UL, count = 0;
+  int i, nroots, skip = 0;
+  unsigned flag = 0UL, count = 0;
   char str[MAX_LINE_LENGTH];
   mpz_t g[2];
   mpz_t *f;
@@ -64,14 +73,14 @@ opt_file (FILE *file, int deg, mpz_t N) {
   mpz_init (M);
   mpz_init (g[1]);
   mpz_init (g[0]);
-
   mpz_poly_init (F, deg);
   F->deg = deg;
   f = F->coeff;
-  while (1) {
-    if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
-      break; /* wrong line or EOF */
 
+  while (1) {
+    /* wrong line or EOF */
+    if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
+      break;
     if ( str[0] == 'Y' ) {
       if ( str[1] == '1' ) {
         gmp_sscanf (str, "Y1: %Zd\n", g[1]);
@@ -86,7 +95,6 @@ opt_file (FILE *file, int deg, mpz_t N) {
         exit (1);
       }
     }
-    // TODO: add a readline-like function later.
     else if ( str[0] == 'c') {
       if ( str[1] == '0' ) {
         gmp_sscanf (str, "c0: %Zd\n", f[0]);
@@ -125,7 +133,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
     else
       continue;
 
-    // consider raw polynomial only
+    /* consider raw polynomial only */
     if ( (flag == 511UL || flag == 447UL) &&  (skip == 0) ) {
 
       /* M = -Y0/Y1 mod N */
@@ -149,50 +157,53 @@ opt_file (FILE *file, int deg, mpz_t N) {
         }
       }
 
-      // need to output raw, since we may re-optimize this using updated optimize.c
+      /* output raw polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
       skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
       logmu = L2_lognorm (F, skew);
       alpha = get_alpha (F, ALPHA_BOUND);
-      fprintf (stderr, "\n# Raw polynomial (#%6d):", count + 1);
+      fprintf (stdout, "\n# Raw polynomial (#%6d):", count + 1);
       polyprint (f, g, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
-      // optimize
-      //optimize_aux (F, g, 0, 0); // no verbose
-      optimize (F, g, 0, 1); // no verbose
 
-      // optimized polynomial
+      /* optimize */
+      if (translate)
+        optimize_aux (F, g, 0, 0);
+      else
+        optimize (F, g, 0, 1);
+
+      /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
       skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
       logmu = L2_lognorm (F, skew);
       alpha = get_alpha (F, ALPHA_BOUND);
-      fprintf (stderr, "# Optimized polynomial (#%10d): ", count + 1);
+      fprintf (stdout, "# Optimized polynomial (#%10d): ", count + 1);
       polyprint (f, g, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
 
       ave_logmu += logmu;
       ave_alpha += alpha;
-      // ignore next polynomial, which is optimized by some old method.
       count += 1;
       flag = 0UL;
-      skip = 0UL;
+      skip = SKIP_YES;
     }
+
     /* skip optimized (may be by some old opt method) polynomials,
 			 note, we assume "raw" and "optimized" polys appears
 			 in pair and sequential. So it is very fragile if the input file
-			 is broken for some reason (for instance, order of poly is not sequencial
-			 due to some threads problem.) */
+			 is broken for some reason (for instance, order of poly is not
+       sequencial due to some threads problem.) */
     if ( (flag == 511UL || flag == 447UL) && (skip == 1) ) {
       flag = 0UL;
       skip = 0;
     }
   }
 
-  fprintf(stderr, "\n# total num. of polys: %u\n", count);
-  fprintf(stderr, "# ave. l2norm: %3.3f\n", ave_logmu / count);
-  fprintf(stderr, "# ave. alpha: %3.3f\n", ave_alpha / count);
+  fprintf(stdout, "\n# total num. of polys: %u\n", count);
+  fprintf(stdout, "# ave. l2norm: %3.3f\n", ave_logmu / count);
+  fprintf(stdout, "# ave. alpha: %3.3f\n", ave_alpha / count);
 
   mpz_clear (g[0]);
   mpz_clear (g[1]);
@@ -202,31 +213,34 @@ opt_file (FILE *file, int deg, mpz_t N) {
   return 0;
 }
 
-/* print usage and exit */
+
+/*
+   print usage and exit 
+*/
 static void
 usage (void) {
-  fprintf (stderr, "Usage: polyopt [--fake] -f POLYFILE -d DEGREE -n NUMBER\n");
+  fprintf (stdout, "Usage: polyopt [--fake] [--translate] -f POLYFILE -d DEGREE -n NUMBER\n");
   exit(1);
 }
 
-/* PRIME */
-int
-main (int argc, char **argv)
+
+/*
+   main function 
+*/
+int main (int argc, char **argv)
 {
   int degree = 0;
   FILE *file = NULL;
   const char *filename = NULL;
   mpz_t N;
-
   mpz_init (N);
 
-  if (argc == 1) usage();
-
   /* read params */
+  if (argc == 1) usage();
   param_list pl;
   param_list_init (pl);
-
   param_list_configure_switch (pl, "--fake", &fake);
+  param_list_configure_switch (pl, "--translate", &translate);
 
   argv++, argc--;
   for ( ; argc; ) {
