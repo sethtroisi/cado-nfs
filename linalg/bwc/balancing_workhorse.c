@@ -406,6 +406,7 @@ void mf_progress(data_source_ptr s, data_dest_ptr d, time_t dt, const char * nam
 {
     char buf[16];
     char buf2[16];
+    if (!name) return;
     printf("%s: %s, %" PRIu32 " rows in %d s ; %s/s  \r",
             name,
             size_disp(s->pos * sizeof(uint32_t), buf), d->r, (int) dt,
@@ -413,11 +414,28 @@ void mf_progress(data_source_ptr s, data_dest_ptr d, time_t dt, const char * nam
     fflush(stdout);
 }
 
+/* for mf_pipe: tell whether we have any reason to print something */
+struct progress_info {
+    time_t t;   /* last printed time */
+    size_t z;   /* last printed data amount */
+};
+
+int should_print_now(struct progress_info * last_printed, size_t z)
+{
+    if (z >= last_printed->z + (10UL<<20) || time(NULL) >= last_printed->t + 10) {
+        last_printed->z = z;
+        last_printed->t = time(NULL);
+        return 1;
+    }
+    return 0;
+}
+
 void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{{*/
 {
     time_t t0 = time(NULL);
-    time_t t1 = t0 + 1;
-    time_t t = t0;
+    struct progress_info last_printed[1];
+    last_printed->t = t0;
+    last_printed->z = 0;
 
     size_t n = 0;       // values still to flush
     uint32_t * ptr = NULL;  // we are not providing a buffer.
@@ -431,10 +449,8 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
         ASSERT_ALWAYS(r <= (int) n);
         if (r < 0)
             break;
-	t = time(NULL);
-	if (t >= t1) {
-	    t1 = t + 1;
-            mf_progress(input, output, t-t0, name);
+        if (should_print_now(last_printed, input->pos * sizeof(uint32_t))) {
+            mf_progress(input, output, last_printed->t - t0, name);
 	}
         if (r < (int) n) {
             /* We need to refill */
@@ -455,7 +471,7 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
             n = 0;
         }
     }
-    mf_progress(input, output, t-t0, name);
+    mf_progress(input, output, time(NULL)-t0, name);
     printf("\n");
 }/*}}}*/
 
@@ -1112,6 +1128,9 @@ typedef int (*sortfunc_t) (const void*, const void*);
 void slave_loop(slave_data s)
 {
     char name[80];
+
+    int disp = s->pi->m->jrank && s->pi->m->trank;
+
     // parallelizing_info_ptr pi = s->pi;
     // int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
     data_source_ptr input = (data_source_ptr) s->tp->src;
@@ -1119,7 +1138,7 @@ void slave_loop(slave_data s)
     data_dest_ptr output = slave_dest_alloc(s);
     snprintf(name, sizeof(name),
             "[J%uT%u] slave loop 1", s->pi->m->jrank, s->pi->m->trank);
-    mf_pipe(input, output, name);
+    mf_pipe(input, output, disp ? name : NULL);
 
     thread_source_rewind((thread_source_ptr) input);
     slave_dest_stats((slave_dest_ptr) output);
@@ -1132,7 +1151,7 @@ void slave_loop(slave_data s)
             s->pi->m->jrank, s->pi->m->trank);
     snprintf(name, sizeof(name),
             "[J%uT%u] slave loop 2", s->pi->m->jrank, s->pi->m->trank);
-    mf_pipe(input, output, name);
+    mf_pipe(input, output, disp ? name : NULL);
 
     // the thread source should be freed elsewhere.
     // thread_source_free(input);
