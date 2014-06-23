@@ -341,7 +341,13 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
     uint32_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
 
     // They should be no duplicate in already renumbered file
-    ASSERT(!is_dup);
+    if (is_dup)
+      {
+	fprintf (stderr, "Error, duplicate relation (%" PRId64 ",%" PRIu64
+		 ") in already renumbered files\n", rel->a, rel->b);
+
+	exit (1);
+      }
 
     if (i < sanity_size)
         sanity_check(i, rel->a, rel->b);
@@ -536,7 +542,8 @@ main (int argc, char *argv[])
                       "(or nrels = 0)\n");
       usage(pl, argv0);
     }
-    K = 100 + 1.2 * nrels_expected;
+    K = 100 + nrels_expected + (nrels_expected / 5);
+    K = ulong_nextprime (K);
 
     if (basepath && !filelist)
     {
