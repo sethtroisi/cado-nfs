@@ -87,7 +87,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   uint64_t nb_p = 0;
   /* will print report at 2^10, 2^11, ... 2^23 computed primes and every
    * 2^23 primes after that */
-  stats_init (stats, stdout, 23, "Looked into", "primes", "", "p");
+  stats_init (stats, stdout, &nb_p, 23, "Looked into", "primes", "", "p");
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {
     /* first compute the roots */
@@ -124,7 +124,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
     old_table_size = renumber_table->size;
     nb_p++;
-    if (stats_test_progress(stats, nb_p))
+    if (stats_test_progress(stats))
       stats_print_progress (stats, nb_p, 0, 0, 0);
   }
   stats_print_progress (stats, nb_p, 0, 0, 1);

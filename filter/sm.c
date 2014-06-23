@@ -81,9 +81,10 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
 
   fprintf(stdout, "\n# Building %" PRIu64 " relation-sets\n", *small_nrows);
   fflush(stdout);
-  stats_init (stats, stdout, nbits(*small_nrows)-5, "Computed", "relation-sets",
-              "", "relsets");
-  for(uint64_t i = 0 ; i < *small_nrows ; i++)
+  uint64_t i;
+  stats_init (stats, stdout, &i, nbits(*small_nrows)-5, "Computed",
+              "relation-sets", "", "relsets");
+  for(i = 0 ; i < *small_nrows ; i++)
   {
     ret = fscanf(ix, "%" SCNu64 "", &len_relset);
     ASSERT_ALWAYS(ret == 1 && len_relset < MAX_LEN_RELSET);
@@ -97,7 +98,7 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
     sm_relset_init (&rels[i], F->deg);
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
 
-    if (stats_test_progress(stats, i))
+    if (stats_test_progress(stats))
       stats_print_progress (stats, i, 0, 0, 0);
   }
   stats_print_progress (stats, *small_nrows, 0, 0, 1);
@@ -187,7 +188,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   }
 
   // Main loop
-  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "", "SMs");
+  stats_init (stats, stdout, &out_cpt, nbits(sr)-5, "Computed", "SMs", "", "SMs");
   while ((i < sr) || (active_threads > 0)) {
     // Start / restart as many threads as allowed
     if ((active_threads < nt) && (i < sr)) { 
@@ -209,7 +210,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
       print_sm (out, SM[threads_head][k], nsm, F->deg);
 
     // report
-    if (stats_test_progress(stats, out_cpt))
+    if (stats_test_progress(stats))
       stats_print_progress (stats, out_cpt, 0, 0, 0);
 
     // If we are at the end, no job will be restarted, but head still
@@ -250,13 +251,14 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
-  stats_init (stats, stdout, nbits(sr)-5, "Computed", "SMs", "", "SMs");
-  for (uint64_t i=0; i<sr; i++) {
+  uint64_t i;
+  stats_init (stats, stdout, &i, nbits(sr)-5, "Computed", "SMs", "", "SMs");
+  for (i = 0; i < sr; i++) {
     mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
     compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
     print_sm (out, SM, nsm, F->deg);
     // report
-    if (stats_test_progress(stats, i))
+    if (stats_test_progress(stats))
       stats_print_progress (stats, i, 0, 0, 0);
   }
   stats_print_progress (stats, sr, 0, 0, 1);

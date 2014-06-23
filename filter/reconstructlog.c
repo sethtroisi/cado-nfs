@@ -715,7 +715,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
 
   mpz_init (tmp_log);
   i = 0;
-  stats_init (stats, stdout, nbits(ncols)-5, "Read", "logarithms", "", "logs");
+  stats_init (stats, stdout, &i, nbits(ncols)-5, "Read", "logarithms", "", "logs");
   while (fscanf (fid, "%" SCNu64 " %" PRid "\n", &col, &h) == 2)
   {
     FATAL_ERROR_CHECK (col >= ncols, "Too big value of column number");
@@ -727,7 +727,7 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
     ASSERT_ALWAYS (col == i);
     logtab_insert (log, h, tmp_log);
     i++;
-    if (stats_test_progress (stats, i))
+    if (stats_test_progress (stats))
       stats_print_progress (stats, i, 0, 0, 0);
   }
   stats_print_progress (stats, i, 0, 0, 1);
@@ -769,7 +769,7 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   FATAL_ERROR_CHECK(f == NULL, "Cannot open file for reading");
 
   mpz_init (tmp_log);
-  stats_init (stats, stdout, nbits(renumb->size)-5, "Read", "logarithms", "",
+  stats_init (stats, stdout, &nread, nbits(renumb->size)-5, "Read", "logarithms", "",
               "logs");
   if (renumb->add_full_col)
   {
@@ -793,7 +793,7 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   {
     nread++;
     logtab_insert (log, h, tmp_log);
-    if (stats_test_progress (stats, nread))
+    if (stats_test_progress (stats))
       stats_print_progress (stats, nread, 0, 0, 0);
   }
   stats_print_progress (stats, nread, 0, 0, 1);
@@ -835,9 +835,9 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
   f = fopen_maybe_compressed (filename, "w");
   FATAL_ERROR_CHECK(f == NULL, "Cannot open file for writing");
 
-  stats_init (stats, stdout, nbits(tab->size)-5, "Wrote", "known logarithms",
-                                                 "ideals", "logs");
   uint64_t nknown = 0;
+  stats_init (stats, stdout, &nknown, nbits(tab->size)-5, "Wrote",
+              "known logarithms", "ideals", "logs");
   for (i = 0; i < tab->size; i++)
   {
 	  if (mpz_sgn(log->tab[i]) >= 0) // we know the log if this ideal
@@ -864,7 +864,7 @@ write_log (const char *filename, logtab_t log, renumber_t tab, cado_poly poly)
           gmp_fprintf (f, "%" PRid " %" PRpr " %d rat %Zd\n", i, p, side,
                                                                   log->tab[i]);
       }
-      if (stats_test_progress (stats, nknown))
+      if (stats_test_progress (stats))
         stats_print_progress (stats, nknown, i+1, 0, 0);
     }
   }
@@ -1200,11 +1200,6 @@ main(int argc, char *argv[])
     fprintf(stderr, "Error, missing -log command line argument\n");
     usage (pl, argv0);
   }
-  if (idealsfilename == NULL)
-  {
-    fprintf(stderr, "Error, missing -ideals command line argument\n");
-    usage (pl, argv0);
-  }
   if (relspfilename == NULL)
   {
     fprintf(stderr, "Error, missing -purged command line argument\n");
@@ -1244,6 +1239,12 @@ main(int argc, char *argv[])
                       "'reconstruct'\n");
       usage (pl, argv0);
     }
+  }
+  if ((logformat == NULL || strcmp(logformat, "LA") == 0) &&
+      idealsfilename == NULL)
+  {
+    fprintf(stderr, "Error, missing -ideals command line argument\n");
+    usage (pl, argv0);
   }
 
   if (wantedfilename != NULL && !partial)

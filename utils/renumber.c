@@ -418,7 +418,8 @@ renumber_read_table (renumber_t tab, const char * filename)
   }
 
   /* Reading the renumbering table */
-  stats_init (infostats, stdout, 24, "Read", "elements", "", "elts");
+  stats_init (infostats, stdout, &(tab->size), 24, "Read", "elements", "",
+              "elts");
 
   while ((bytes_line = get_one_line(tab->file, s)) > 0)
   {
@@ -446,7 +447,7 @@ renumber_read_table (renumber_t tab, const char * filename)
     }
     tab->size++;
 
-    if (stats_test_progress(infostats, tab->size))
+    if (stats_test_progress(infostats))
       stats_print_progress (infostats, tab->size, 0, bytes_read, 0);
   }
   stats_print_progress (infostats, tab->size, 0, bytes_read, 1);

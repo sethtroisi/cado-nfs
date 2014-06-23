@@ -4,9 +4,11 @@
 #include "utils.h"
 
 void
-stats_init (stats_data_t r, FILE *f, uint8_t max_log_report, const char *verb,
-            const char *name, const char *outofname, const char *abbrv)
+stats_init (stats_data_t r, FILE *f, uint64_t *followed_var,
+            uint8_t max_log_report, const char *verb, const char *name,
+            const char *outofname, const char *abbrv)
 {
+  r->followed_var = followed_var;
   r->last_report = 0;
   r->t0 = wct_seconds();
   r->out = f;
@@ -25,9 +27,9 @@ stats_init (stats_data_t r, FILE *f, uint8_t max_log_report, const char *verb,
    progress report.
    Otherwise return 0 */
 int
-stats_test_progress (stats_data_t r, uint64_t i)
+stats_test_progress (stats_data_t r)
 {
-  if ((i >> r->log_report) != r->last_report)
+  if ((*(r->followed_var) >> r->log_report) != r->last_report)
     return 1;
   else
     return 0;
@@ -64,5 +66,5 @@ stats_print_progress (stats_data_t r, uint64_t i, uint64_t outof, size_t nByte,
   fflush(r->out);
   if (r->log_report < r->max_log_report)
     r->log_report++;
-  r->last_report = (i >> r->log_report);
+  r->last_report = (*(r->followed_var) >> r->log_report);
 }

@@ -945,10 +945,11 @@ uint64_t filter_rels2_inner(char ** input_files,
     /* will print report at 2^10, 2^11, ... 2^23 read rels and every 2^23 rels
      * after that */
     if (!active)
-      stats_init (infostats, stdout, 23, "Read", "relations", "", "rels");
-    else
-      stats_init (infostats, stdout, 23, "Read", "active rels", "read rels",
+      stats_init (infostats, stdout, &nrels, 23, "Read", "relations", "",
                   "rels");
+    else
+      stats_init (infostats, stdout, &nrels, 23, "Read", "active rels",
+                  "read rels", "rels");
 
     inflight->enter(0);
     for(size_t avail_seen = 0 ; ; ) {
@@ -986,7 +987,7 @@ uint64_t filter_rels2_inner(char ** input_files,
             ringbuf_skip_get(rb, nl);
             avail_seen -= nl;
             avail_offset += nl;
-            if (stats_test_progress(infostats, nrels))
+            if (stats_test_progress(infostats))
             {
               if (!active)
                 stats_print_progress (infostats, nrels, 0, nB, 0);
