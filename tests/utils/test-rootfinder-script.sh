@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script eats a testbase on stdin.  Normally it gives nothing on
 # stdout, and gives progress report on stderr. If it prints anything,

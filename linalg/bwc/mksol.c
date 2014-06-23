@@ -36,11 +36,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
-    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
+    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
@@ -76,18 +76,33 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * This could be done, at least in theory, by the split program, as
      * it's really the same operation. However, it's not the case as it
      * is now.
+     *
+     * Anything with nsolvecs < bw->n requires the data files to be
+     * modified ahead of time.
      */
 
+    unsigned int multi = 1;
+    unsigned int nsolvecs_pervec = nsolvecs;
+
     if (mpz_cmp_ui(p,2) != 0 && nsolvecs > 1) {
-        fprintf(stderr,
-                "Current mksol code is limited to nsolvecs==1 in the prime field case. Fixing it is not terribly hard, but not terribly easy either. It requires either implementing a n-at-a-time variant of the mpfq operations.\n");
-        abort();
+        if (tcan_print) {
+            fprintf(stderr,
+"Note: the present code is a quick hack.\n"
+"Some SIMD operations like\n"
+"    w_i += c_i * v (with v a constant vector, c_i scalar)\n"
+"are performed with a simple-minded loop on i, while there is an acknowledged\n"
+"potential for improvement by using mode SIMD-aware code.\n");
+        }
+        multi = nsolvecs;
+        nsolvecs_pervec = 1;
     }
+
+    ASSERT_ALWAYS(multi * nsolvecs_pervec == (unsigned int) nsolvecs);
 
     abase_vbase Ar;
     abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME_MPZ, p,
-            MPFQ_GROUPSIZE, nsolvecs,
+            MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
     mpz_clear(p);
 
@@ -122,8 +137,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     char * v_name;
     rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
-    char * s_name;
-    rc = asprintf(&s_name, S_FILE_BASE_PATTERN, ys[0], ys[1]);
 
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
@@ -180,18 +193,21 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * rhs in the text below.
      */
 
-    ASSERT(A->vec_elt_stride(A,nsolvecs) == Ar->vec_elt_stride(Ar, A->groupsize(A)));
+    ASSERT(A->vec_elt_stride(A,nsolvecs_pervec) == Ar->vec_elt_stride(Ar, A->groupsize(A)));
 
     /* We'll load all the F coefficient matrices before the main loop.
      * It's dual to the treatment of the xy matrices in krylov. Same
      * considerations apply w.r.t the memory footprint.
      */
-    mmt_vec fcoeffs;
+    mmt_vec * fcoeffs;
+    fcoeffs = malloc(multi * sizeof(mmt_vec));
     if (tcan_print) {
         printf("Each thread allocates %zd kb for the F matrices\n",
-                Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval) >> 10);
+                (multi * Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval)) >> 10);
     }
-    vec_init_generic(pi->m, Ar, fcoeffs, 0, A->groupsize(A)*bw->interval);
+    for(unsigned int k = 0 ; k < multi ; k++) {
+        vec_init_generic(pi->m, Ar, fcoeffs[k], 0, A->groupsize(A)*bw->interval);
+    }
     
     /* Our sum vector is only part of the story of course. All jobs, all
      * threads, will participate to the computation of the products by
@@ -210,8 +226,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
         picol->totalsize;
 
-    mmt_vec sum;
-    vec_init_generic(mmt->pi->m, Ar, sum, 0, ii1-ii0);
+    mmt_vec * sum;
+    sum = malloc(multi * sizeof(mmt_vec));
+    for(unsigned int k = 0 ; k < multi ; k++) {
+        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, ii1-ii0);
+    }
 
     if (bw->end == 0) {
         // for mksol we use EOF as an ending indication.
@@ -245,40 +264,42 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         serialize(pi->m);
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            Ar->vec_set_zero(Ar, fcoeffs->v, A->groupsize(A)*bw->interval);
-            char * tmp;
-            rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
+            for(unsigned int k = 0 ; k < multi ; k++) {
+                Ar->vec_set_zero(Ar, fcoeffs[k]->v, A->groupsize(A)*bw->interval);
+                char * tmp;
+                rc = asprintf(&tmp, F_FILE_SLICE_PATTERN2, k, k + nsolvecs_pervec, ys[0], ys[1]);
 
-            FILE * f = fopen(tmp, "rb");
-            DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
-            rc = fseek(f, A->vec_elt_stride(A, s * nsolvecs), SEEK_SET);
-            if (rc < 0) {
-                bw->end = s;
-            }
-
-            for(int i = 0 ; i < bw->interval ; i++) {
-                rc = fread(ahead->v, A->vec_elt_stride(A,1), nsolvecs, f);
-                ASSERT_ALWAYS(rc == 0 || rc == nsolvecs);
-                if (rc == 0) {
-                    printf("Exhausted F data after %d coefficients\n", s+i);
-                    bw->end = s+i;
-                    break;
+                FILE * f = fopen(tmp, "rb");
+                DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
+                rc = fseek(f, A->vec_elt_stride(A, s * nsolvecs_pervec), SEEK_SET);
+                if (rc < 0) {
+                    bw->end = s;
                 }
+
+                for(int i = 0 ; i < bw->interval ; i++) {
+                    rc = fread(ahead->v, A->vec_elt_stride(A,1), nsolvecs_pervec, f);
+                    ASSERT_ALWAYS(rc == 0 || rc == (int) nsolvecs_pervec);
+                    if (rc == 0) {
+                        printf("Exhausted F data after %d coefficients\n", s+i);
+                        bw->end = s+i;
+                        break;
+                    }
 
 #if 0
-                {
-                    void * test;
-                    test = electric_alloc(rstride * abnbits(abase));
-                    abvtranspose(abase_rhs, abase, test, ahead->v);
-                    electric_free(test,rstride * abnbits(abase));
-                }
+                    {
+                        void * test;
+                        test = electric_alloc(rstride * abnbits(abase));
+                        abvtranspose(abase_rhs, abase, test, ahead->v);
+                        electric_free(test,rstride * abnbits(abase));
+                    }
 #endif
-                ArxA->transpose(Ar->obj, A->obj,
-                        SUBVEC(fcoeffs, v, i * A->groupsize(A)),
-                        ahead->v);
+                    ArxA->transpose(Ar->obj, A->obj,
+                            SUBVEC(fcoeffs[k], v, i * A->groupsize(A)),
+                            ahead->v);
+                }
+                fclose(f);
+                free(tmp);
             }
-            fclose(f);
-            free(tmp);
         }
         if (pi->m->trank == 0) {
             /* we're good friends with the global leader. Try to grasp
@@ -291,9 +312,14 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize_threads(pi->m);
 
         /* broadcast f */
-        broadcast_generic(fcoeffs, pi->m, A->groupsize(A) * bw->interval, 0, 0);
+        for(unsigned int k = 0 ; k < multi ; k++) {
+            broadcast_generic(fcoeffs[k], pi->m, A->groupsize(A) * bw->interval, 0, 0);
+        }
 
-        Ar->vec_set_zero(Ar, sum->v, ii1 - ii0);
+        for(unsigned int k = 0 ; k < multi ; k++) {
+            Ar->vec_set_zero(Ar, sum[k]->v, ii1 - ii0);
+        }
+
 
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Our share of the dot product is determined by the
@@ -332,16 +358,19 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          * computations won't be checked.
          */
         for(int i = 0 ; i < bw->interval ; i++) {
-            pi_interleaving_flip(pi);
-            timing_flip_timer(timing);
             /* This segment must be guaranteed to be free of any mpi
              * calls */
 
-            AxAr->addmul_tiny(A->obj, Ar->obj,
-                    sum->v,
-                    SUBVEC(mcol->v, v, ii0 - mcol->i0),
-                    SUBVEC(fcoeffs, v, i * A->groupsize(A)),
-                    ii1 - ii0);
+            pi_interleaving_flip(pi);
+            timing_flip_timer(timing);
+
+            for(unsigned int k = 0 ; k < multi ; k++) {
+                AxAr->addmul_tiny(A->obj, Ar->obj,
+                        sum[k]->v,
+                        SUBVEC(mcol->v, v, ii0 - mcol->i0),
+                        SUBVEC(fcoeffs[k], v, i * A->groupsize(A)),
+                        ii1 - ii0);
+            }
 
             matmul_top_mul_cpu(mmt, bw->dir);
             pi_interleaving_flip(pi);
@@ -384,50 +413,61 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          *
          * We first make sure that an integral number of passes is
          * needed.
+         *
+         * TODO: I've just added the "multi" wrap around existing code. I
+         * don't quite get recall what npasses does, but it's quite
+         * possible that the overlap between the two functionalities is
+         * nontrivial. Well, at least for my q&d adaptation of mksol, I'm
+         * happy with the "multi" thing.
          */
         serialize(pi->m);
         size_t  stride =  A->vec_elt_stride(A, 1);
         size_t rstride =  Ar->vec_elt_stride(Ar, 1);
         ASSERT_ALWAYS(rstride % stride == 0);
         int npasses = rstride / stride;
-        for(int i = 0 ; i < npasses ; i++) {
-            serialize(pi->m);
-            A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
-            serialize(pi->m);
-            /* Each job/thread copies its data share to mcol->v */
-            void * dst;
-            const void * src;
-            src = pointer_arith_const(sum->v, i * stride);
-            dst = pointer_arith(mcol->v->v, (ii0 - mcol->i0) * stride);
-            for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
-                /* XXX If we dereference a function pointer for each such
-                 * iteration here, we're going to pay a lot. And the mpfq
-                 * API does not contain this ``strided copy''. So for the
-                 * moment, since all types considered are flat anyway,
-                 * this looks good enough.
+        for(unsigned int k = 0 ; k < multi ; k++) {
+            for(int i = 0 ; i < npasses ; i++) {
+                serialize(pi->m);
+                A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+                serialize(pi->m);
+                /* Each job/thread copies its data share to mcol->v */
+                void * dst;
+                const void * src;
+                src = pointer_arith_const(sum[k]->v, i * stride);
+                dst = pointer_arith(mcol->v->v, (ii0 - mcol->i0) * stride);
+                for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
+                    /* XXX If we dereference a function pointer for each such
+                     * iteration here, we're going to pay a lot. And the mpfq
+                     * API does not contain this ``strided copy''. So for the
+                     * moment, since all types considered are flat anyway,
+                     * this looks good enough.
+                     */
+                    memcpy(dst, src, stride);
+                    dst = pointer_arith(dst, stride);
+                    src = pointer_arith_const(src, rstride);
+                }
+                /* Now we collect the data in mcol->v. Note that each
+                 * location is non-zero only at one location, so unreduced
+                 * addition is unnecessary.
                  */
-                memcpy(dst, src, stride);
-                dst = pointer_arith(dst, stride);
-                src = pointer_arith_const(src, rstride);
-            }
-            /* Now we collect the data in mcol->v. Note that each
-             * location is non-zero only at one location, so unreduced
-             * addition is unnecessary.
-             */
-            allreduce_across(mmt, bw->dir);
-            /* untwist the result */
-            matmul_top_untwist_vector(mmt, bw->dir);
+                allreduce_across(mmt, bw->dir);
+                /* untwist the result */
+                matmul_top_untwist_vector(mmt, bw->dir);
 
-            serialize_threads(pi->m);
-            dst = pointer_arith(sum->v, i * stride);
-            src = pointer_arith_const(mcol->v->v, (ii0 - mcol->i0) * stride);
-            for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
-                memcpy(dst, src, stride);
-                dst = pointer_arith(dst, rstride);
-                src = pointer_arith_const(src, stride);
+                serialize_threads(pi->m);
+                dst = pointer_arith(sum[k]->v, i * stride);
+                src = pointer_arith_const(mcol->v->v, (ii0 - mcol->i0) * stride);
+                for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
+                    memcpy(dst, src, stride);
+                    dst = pointer_arith(dst, rstride);
+                    src = pointer_arith_const(src, stride);
+                }
             }
+            char * s_name;
+            rc = asprintf(&s_name, S_FILE_BASE_PATTERN, k, k + nsolvecs_pervec, ys[0], ys[1]);
+            pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
+            free(s_name);
         }
-        pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
         serialize(pi->m);
 
         /* recover the vector */
@@ -448,15 +488,18 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     serialize(pi->m);
 
-    matmul_top_vec_clear_generic(mmt, sum, bw->dir);
+    for(unsigned int k = 0 ; k < multi ; k++) {
+        matmul_top_vec_clear_generic(mmt, sum[k], bw->dir);
+    }
     if (!bw->skip_online_checks) {
         matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
         vec_clear_generic(pi->m, ahead, nchecks);
         free(gxvecs);
     }
-    vec_clear_generic(pi->m, fcoeffs, A->groupsize(A)*bw->interval);
+    for(unsigned int k = 0 ; k < multi ; k++) {
+        vec_clear_generic(pi->m, fcoeffs[k], A->groupsize(A)*bw->interval);
+    }
     free(v_name);
-    free(s_name);
 
     matmul_top_clear(mmt);
 

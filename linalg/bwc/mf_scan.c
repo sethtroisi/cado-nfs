@@ -87,7 +87,8 @@ int main(int argc, char * argv[])
     int ascii_freq = 0;
     int binary_freq = 0;
 
-    int withcoeffs = 0;
+    int withlongcoeffs = 0;
+    int withshortcoeffs = 0;
 
     param_list_init(pl);
     argv++,argc--;
@@ -101,7 +102,7 @@ int main(int argc, char * argv[])
     param_list_configure_switch(pl, "--binary-freq", &binary_freq);
     param_list_configure_switch(pl, "--nofreq", &nofreq);
     param_list_configure_switch(pl, "--freq", &freq);
-    param_list_configure_switch(pl, "--withcoeffs", &withcoeffs);
+    param_list_configure_switch(pl, "--withcoeffs", &withshortcoeffs);
 
     for(;argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
@@ -113,6 +114,15 @@ int main(int argc, char * argv[])
         }
         fprintf(stderr, "unknown option %s\n", argv[0]);
         usage(1);
+    }
+
+    param_list_parse_int(pl, "with-long-coeffs", &withlongcoeffs);
+    if (withshortcoeffs) {
+        if (withlongcoeffs) {
+            fprintf(stderr, "Error, with-long-coeffs and --withcoeffs must not be passed together\n");
+            exit(1);
+        }
+        withlongcoeffs=1;
     }
 
     const char * tmp;
@@ -255,7 +265,7 @@ int main(int argc, char * argv[])
             rskip,
             cskip,
             !quiet,
-            withcoeffs);
+            withlongcoeffs);
 
     if (m_out->f && m_out->ascii) {
         fprintf(stderr, "\nWarning: output matrix is headerless\n");

@@ -13,8 +13,9 @@
 #define Y_FILE_BASE "Y"
 #define X_FILE_BASE_PATTERN "X"
 #define V_FILE_BASE_PATTERN "V%u-%u"
-#define S_FILE_BASE_PATTERN "S%u-%u"
-#define K_FILE_BASE_PATTERN "K"
+#define S_FILE_BASE_PATTERN "S.sols%u-%u.%u-%u"
+#define K_FILE_BASE_PATTERN "K.sols%u-%u"
+#define R_FILE_BASE_PATTERN "R.sols%u-%u"       /* short-lived */
 #define CHECK_FILE_BASE "C"
 #define W_FILE "W"
 
@@ -26,5 +27,6 @@
 
 /* mksol */
 #define F_FILE_SLICE_PATTERN "F%u-%u"
+#define F_FILE_SLICE_PATTERN2 "F.sols%u-%u.%u-%u"
 
 #endif	/* FILENAMES_H_ */

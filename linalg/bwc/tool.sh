@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script can be used to run an mpi program with one xterm per job,
 # and wraps the program as a child of some ``controlling application''.

@@ -544,6 +544,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in query:
                         (key, value) = query.split(op, 1)
+                        key = key.strip()
+                        value = value.strip()
                         if not name in conditions:
                             conditions[name] = {}
                         # If value is of the form "now(-123)", convert it to a 
@@ -552,7 +554,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                         if r:
                             minutes_ago = int(r.group(1))
                             td = datetime.timedelta(minutes = minutes_ago)
-                            value = str(datetime.datetime.now() + td)
+                            value = str(datetime.datetime.utcnow() + td)
                         conditions[name][key] = value
                         break
         logging.debug("send_query(): conditions: %s", conditions)

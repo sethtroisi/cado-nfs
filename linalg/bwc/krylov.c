@@ -61,12 +61,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
-    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
-
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
+    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,

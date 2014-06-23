@@ -23,6 +23,9 @@ if __name__ == '__main__':
                         "INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
     parser.add_argument("--filelog", help="Log file logging level, e.g., "
                         "INFO/COMMAND/DEBUG", default="DEBUG", metavar="LEVEL")
+    parser.add_argument("--verboseparam",
+                        help="Enable very verbose parameter parsing",
+                        action='store_true')
     parser.add_argument("parameters", help="A file with the parameters to use")
     parser.add_argument("options", metavar="OPTION", help="An option as in "
                         "parameter file (format: key=value)", nargs="*")
@@ -31,14 +34,14 @@ if __name__ == '__main__':
     screenlvlname = args.screenlog
     filelvlname = args.filelog
     
-    parameters = cadoparams.Parameters()
-    parameters.readfile(paramfile)
-    parameters.readparams(args.options)
-    tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
-    
     screenlvl = getattr(cadologger, screenlvlname.upper())
     logger = logging.getLogger()
     logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
+
+    parameters = cadoparams.Parameters(args.verboseparam)
+    parameters.readfile(paramfile)
+    parameters.readparams(args.options)
+    tasksparams = parameters.myparams({"workdir": str, "name": str}, "tasks")
     
     # Make working directory, if it does not exist
     directory = tasksparams["workdir"]

@@ -833,7 +833,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
       break;
   
   s1param->nbest_sl = size_total_sublattices[i][1] * param->effort;
-  //printf ("s1param->nbest_sl: %u\n", s1param->nbest_sl);
+  //printf ("[Info] s1param->nbest_sl: %u\n", s1param->nbest_sl);
   
   /* Set 3: set "e_sl[]" */
   ropt_s1param_setup_e_sl (poly, s1param, bound, param);

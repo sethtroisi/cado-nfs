@@ -26,6 +26,7 @@ scripts/plot_params.sh
 scripts/plot_sieve_region.py
 scripts/typecast.py
 scripts/check_dup.py
+scripts/parse_found.py
 scripts/cadofactor/parameters
 scripts/cadofactor/parameters.oar
 scripts/cadofactor/parameters.rsa512.oar
@@ -86,8 +87,6 @@ params/rsa704.poly
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
 scripts/polsel_params.sage
-linalg/bwc/bwc-trace.sh
-linalg/bwc/bwc-trace.m
 scripts/cluster/analyze-bwclogfile.pl
 scripts/cluster/bwc-cluster-oar.sh
 scripts/cluster/bwc-fetchfiles.pl
@@ -124,3 +123,5 @@ scripts/cadofactor/README.OAR
 scripts/plot_params.sh
 linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
+linalg/bwc/creating-sm-example.m
+linalg/bwc/sm-outside-matrix.m

@@ -46,7 +46,7 @@ def average_valuation_homogeneous_coprime(f,l):
     aff=average_valuation_affine(S(f), A(l))
     proj=average_valuation_affine(S((S(f).reverse())(l*x)), A(l))
     return aff*nl/(nl+1)+proj/(nl+1)
-    # Lemma: homogenous_val = Prob(b=0)*proj + Prob(b!=0)*affine
+    # Lemma: homogeneous_val = Prob(b=0)*proj + Prob(b!=0)*affine
 
 def alpha_l(f,l):
     """

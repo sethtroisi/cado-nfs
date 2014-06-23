@@ -59,14 +59,15 @@ int tot_found = 0; /* total number of polynomials */
 int opt_found = 0; /* number of size-optimized polynomials */
 int ros_found = 0; /* number of rootsieved polynomials */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-  aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0,
-  var_opt_lognorm = 0.0, var_raw_lognorm = 0.0;
-double min_raw_lognorm = 999.99, max_raw_lognorm = 0.0;
-double min_opt_lognorm = 999.99, max_opt_lognorm = 0.0;
+  aver_raw_lognorm = 0.0, var_opt_lognorm = 0.0,
+  var_raw_lognorm = 0.0;
+#define LOGNORM_MAX 999.99
+double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
+double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
-double best_raw_logmu[KEEP], best_opt_logmu[KEEP], best_logmu[KEEP + 1];
+double best_opt_logmu[KEEP], best_logmu[KEEP + 1];
 double rootsieve_time = 0.0;
 int raw = 0;
 
@@ -323,17 +324,13 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
 
 void
 output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
-    const mpz_t N, const double logmu0c3, const double logmu0c4, mpz_t *f, mpz_t *g,
-    const double E)
+    const mpz_t N, mpz_t *f, mpz_t *g, const double E)
 {
   mutex_lock (&lock);
   if (fold != NULL && gold != NULL) {
     printf ("# Raw polynomial:\n");
     print_poly_info (fold, d, gold, N, 1, phash);
   }
-  if (d == 6 && verbose >= 1)
-    gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
-                logmu0c4, logmu0c3, logmu0c4/logmu0c3);
   if (raw)
     gmp_printf ("# Size-optimized polynomial:\n");
   else
@@ -348,15 +345,15 @@ output_polynomials(mpz_t *fold, const unsigned long d, mpz_t *gold,
 
 void
 output_skipped_poly(const unsigned long d, const double logmu, const uint64_t ad,
-    const mpz_t l, const mpz_t g0, const double logmu0c3, const double logmu0c4)
+    const mpz_t l, const mpz_t g0)
 {
   mpz_t m;
   mpz_init(m);
   mpz_neg(m, g0); 
   mutex_lock (&lock);
   if (d == 6)
-    gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
-                logmu, (unsigned long long) ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+    gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
+                logmu, (unsigned long long) ad, l, m);
   else
     gmp_printf ("# Skip polynomial: %.2f, ad: %llu, l: %Zd, m: %Zd\n",
                 logmu, (unsigned long long) ad, l, m);
@@ -411,7 +408,7 @@ sorted_insert_double(double *array, const size_t len, const double value)
 
 /* return 1 if the polynomial is ok and among the best ones,
    otherwise return 0 */
-int
+static int
 optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
                    const unsigned long d, mpz_t N, double *E)
 {
@@ -430,8 +427,10 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   mpz_clear (t);
 
   /* optimize size */
+  mutex_lock (&lock);
   opt_found ++;
-  optimize (F, g, 0, 1);
+  mutex_unlock (&lock);
+  optimize (F, g, verbose, 1);
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
@@ -485,8 +484,8 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
        mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], adz;
-  int cmp;
-  double skew, logmu;
+  int cmp, did_optimize;
+  double skew, logmu, E;
   mpz_poly_t F;
 
   /* the expected rotation space is S^5 for degree 6 */
@@ -601,21 +600,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
 
-  /* for degree 6 polynomials, find bottleneck coefficient */
-  double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
-  if (d == 6) {
-    mpz_set (adz, f[3]);
-    mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu0c3 = L2_lognorm (F, skewtmp);
-    mpz_set (f[3], adz);
-    mpz_set (adz, f[4]);
-    mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu0c4 = L2_lognorm (F, skewtmp);
-    mpz_set (f[4], adz);
-  }
-
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
@@ -627,9 +611,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   tot_found ++;
   aver_raw_lognorm += logmu;
   var_raw_lognorm += logmu * logmu;
-  if (d == 6) {
-    aver_lognorm_ratio += logmu0c4/logmu0c3;
-  }
   if (logmu < min_raw_lognorm)
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
@@ -637,21 +618,17 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  int did_optimize = 0;
-  double E;
-  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
-  }
+  did_optimize = optimize_raw_poly (&logmu, F, g, d, N, &E);
 
   if (did_optimize && out != NULL)
-    output_msieve(out, d, F->coeff, g);
+    output_msieve (out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
+    output_polynomials (fold, d, gold, N, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly(d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
+    output_skipped_poly (d, logmu, ad, l, g[0]);
 
   mpz_clear (l);
   mpz_clear (m);
@@ -678,8 +655,8 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 	   mpz_t rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz, tmp;
-  int cmp;
-  double skew, logmu;
+  int cmp, did_optimize;
+  double skew, logmu, E;
   mpz_poly_t F;
 
 #ifdef DEBUG_POLYSELECT2L
@@ -797,21 +774,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   logmu = L2_lognorm (F, skew);
 
-  /* for degree 6 polynomials, find bottleneck coefficient */
-  double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
-  if (d == 6) {
-    mpz_set (tmp, f[3]);
-    mpz_set_ui (f[3], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu0c3 = L2_lognorm (F, skewtmp);
-    mpz_set (f[3], tmp);
-    mpz_set (tmp, f[4]);
-    mpz_set_ui (f[4], 0);
-    skewtmp = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
-    logmu0c4 = L2_lognorm (F, skewtmp);
-    mpz_set (f[4], tmp);
-  }
-
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
@@ -823,9 +785,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   tot_found ++;
   aver_raw_lognorm += logmu;
   var_raw_lognorm += logmu * logmu;
-  if (d == 6) {
-    aver_lognorm_ratio += logmu0c4/logmu0c3;
-  }
   if (logmu < min_raw_lognorm)
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
@@ -833,21 +792,17 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   mutex_unlock (&lock);
 
   /* if the polynomial has small norm, we optimize it */
-  int did_optimize = 0;
-  double E;
-  if (sorted_insert_double(best_raw_logmu, keep, logmu)) {
-    did_optimize = optimize_raw_poly(&logmu, F, g, d, N, &E);
-  }
+  did_optimize = optimize_raw_poly (&logmu, F, g, d, N, &E);
 
   if (did_optimize && out != NULL)
     output_msieve(out, d, F->coeff, g);
   
   /* print optimized (maybe size- or size-root- optimized) polynomial */
   if (did_optimize && verbose >= 0)
-    output_polynomials(fold, d, gold, N, logmu0c3, logmu0c4, F->coeff, g, E);
+    output_polynomials(fold, d, gold, N, F->coeff, g, E);
   
   if (!did_optimize && verbose >= 1)
-    output_skipped_poly(d, logmu, ad, l, g[0], logmu0c3, logmu0c4);
+    output_skipped_poly(d, logmu, ad, l, g[0]);
 
   mpz_clear (tmp);
   mpz_clear (l);
@@ -1932,7 +1887,7 @@ read_raw_poly_file(const char *filename)
         double logmu, E;
         /* Optimize and, if good enough, print */
         if (optimize_raw_poly(&logmu, F, g, F->deg, N, &E)) {
-          output_polynomials(NULL, F->deg, NULL, N, 0., 0., F->coeff, g, E);
+          output_polynomials(NULL, F->deg, NULL, N, F->coeff, g, E);
         }
         mpz_set_ui(N, 0);
         for (int i = 0; i < 2; i++)
@@ -1987,7 +1942,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "resume", "resume state from given file");
   param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
-  snprintf (str, 200, "root-sieve effort ranging from 1 to 5 (default %d)",
+  snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
             DEFAULT_RSEFFORT);
   param_list_decl_usage(pl, "rseffort", str);
   snprintf(str, 200, "time interval (seconds) for printing statistics (default %d)", TARGET_TIME / 1000);
@@ -2064,9 +2019,8 @@ main (int argc, char *argv[])
   /* initialize best norms */
   for (i = 0; i < keep; i++)
     {
-      best_raw_logmu[i] = 999.99; /* best logmu before size optimization */
-      best_opt_logmu[i] = 999.99;   /* best logmu after size optimization */
-      best_logmu[i] = 999.99;       /* best logmu after rootsieve */
+      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
+      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
     }
 
   /* These parameters need to be parsed even for -rootsieve */
@@ -2079,9 +2033,9 @@ main (int argc, char *argv[])
 
   /* sieving effort that passed to ropt */
   param_list_parse_int (pl, "rseffort", &rseffort);
-  if (rseffort < 1 || rseffort > 5)
+  if (rseffort < 1 || rseffort > 10)
   {
-    fprintf (stderr, "Error, -rseffort should be in [1,5]\n");
+    fprintf (stderr, "Error, -rseffort should be in [1,10]\n");
     exit (1);
   }
 
@@ -2337,9 +2291,6 @@ main (int argc, char *argv[])
                     sqrt (var_opt_lognorm / collisions_good - mean * mean));
           printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
                   total_adminus2 / (double) collisions);
-          if (d == 6)
-            printf ("# Stat: av. logmu noc4/noc3 ratio: %.3f\n",
-                    aver_lognorm_ratio / (double) collisions);
         }
     }
 
@@ -2355,18 +2306,19 @@ print_statistics:
   /* print best keep values of logmu */
   if (collisions_good > 0)
     {
-      printf ("# Stat: best raw logmu:");
+      printf ("# Stat: best logmu after size optimization:");
       for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_raw_logmu[i]);
+        if (best_opt_logmu[i] < LOGNORM_MAX)
+          printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
-      printf ("# Stat: best opt logmu:");
-      for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_opt_logmu[i]);
-      printf ("\n");
-      printf ("# Stat: best logmu:");
-      for (i = 0; i < keep; i++)
-        printf (" %1.2f", best_logmu[i]);
-      printf ("\n");
+      if (raw == 0) /* if only size-optimized, same as above */
+        {
+          printf ("# Stat: best logmu after size+root optimization:");
+          for (i = 0; i < keep; i++)
+            if (best_logmu[i] < LOGNORM_MAX)
+              printf (" %1.2f", best_logmu[i]);
+          printf ("\n");
+        }
     }
 
   /* print total time (this gets parsed by the scripts) */

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script tries to grab a parameter-file from ~/rsa768/inqueue 
 # and start a sieving job using the parameters derived from the 

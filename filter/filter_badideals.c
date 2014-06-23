@@ -20,10 +20,10 @@
 
 /*
   A line in badidealinfo has the form:
-    p k r v0 v1 ... vs
+    p k r side v0 v1 ... vs
   If means that if (a/b) mod p^k is r (with the usual convention for
-  projective roots, see below), then the s corresponding columns should
-  be filled with the values v0, v1, ... vs.
+  projective roots, see below), then the s corresponding columns for the
+  given side should be filled with the values v0, v1, ... vs.
 
   More precisely, if vi is positive, then this is indeed the value, but if vi
   is negative, then the value (e - |vi|) should be put in the column, where e
@@ -42,9 +42,10 @@
   If we are in the case where (b/a) == 0 mod p, we write "p^k + (1/r)"
   instead of r.
   E.g.
-    2 3 10 -2 2
+    2 3 10 1 -2 2
   means that we are dealing with the case (a:b) = (1:2) mod 2^3, and that in
-  that case, we should write (e-2) and 2 in the two corresponding columns.
+  that case, we should write (e-2) and 2 in the two corresponding columns on
+  the side 1.
 
   For NFS-DL, p and r are read in basis 10.
   For FFS, p and r are read in hexadecimal.
@@ -92,22 +93,25 @@ void read_bad_ideals_info(const char *filename, allbad_info_t info)
         ASSERT_ALWAYS(errno == 0);
         p_r_values_t rk = strtoul(nptr, &ptr, INPUT_BASE);
         ASSERT_ALWAYS(errno == 0);
+        int side = strtoul(ptr, &nptr, 10);
+        ASSERT_ALWAYS(errno == 0);
 
         badid_info_struct_t item;
         item.p = p;
         item.k = k;
         item.rk = rk;
+        item.side = side;
         compute_pk_r_wrapper (&(item.pk), &(item.r), p, rk, k);
         item.ncol = 0;
         do {
             /* here we read exponents, always base 10 */
-            long v = strtol(ptr, &nptr, 10);
+            long v = strtol(nptr, &ptr, 10);
             ASSERT_ALWAYS(errno == 0);
             if (ptr == nptr)
                 break;
             item.val[item.ncol] = v;
             item.ncol++;
-            ptr = nptr;
+            nptr = ptr;
         } while (1);
 
         info->n++;
@@ -143,8 +147,8 @@ compute_r_wrapper (int64_t a, uint64_t b, p_r_values_t p, p_r_values_t pk)
 }
 
 void
-handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
-                   allbad_info_t info)
+handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p,
+        int e, int side, allbad_info_t info)
 {
     p_r_values_t r;
     r = compute_r_wrapper (a, b, p, p);
@@ -152,6 +156,8 @@ handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p, int e,
         if (p != info->badid_info[i].p)
             continue;
         if (r != info->badid_info[i].r)
+            continue;
+        if (side != info->badid_info[i].side)
             continue;
         p_r_values_t pk = info->badid_info[i].pk;
         p_r_values_t rk = compute_r_wrapper (a, b, p, pk);

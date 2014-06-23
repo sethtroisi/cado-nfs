@@ -205,7 +205,8 @@ if sys.version_info[0] == 2:
     class MyHTTPSConnection(httplib.HTTPSConnection):
         """ HTTPS connections with certificate subject identity check """
         ca_file = None
-        
+        check_hostname = True
+
         def connect(self):
             """ Open a connection, then wrap the socket with SSL, verify the
             server certificate, and the the server certificate's subject.
@@ -227,6 +228,9 @@ if sys.version_info[0] == 2:
 
             cert = self.sock.getpeercert()
             host = self.host.split(":")[0]
+
+            if not self.check_hostname:
+                return
 
             had_DNS_name = False
             certhost = ""
@@ -870,7 +874,7 @@ class WorkunitClient(object):
         os.remove(self.wu_filename)
 
     @staticmethod
-    def _urlopen_maybe_https(request, cafile=None):
+    def _urlopen_maybe_https(request, cafile=None, check_hostname=True):
         """ Treat requests for HTTPS differently depending on whether we are
         on Python 2 or Python 3.
         """
@@ -889,6 +893,13 @@ class WorkunitClient(object):
             if sys.version_info[0] == 3:
                 # Python 3 implements HTTPS certificate checks, we can just
                 # let urllib do the work for us
+
+                # To skip the hostname check under Python 3, I'll have to
+                # override # HTTPSConnection.__init__() and register that
+                # with the urlopen director
+                if not check_hostname:
+                    raise Exception("Error, not checking hostname not "
+                                    "implemented for Python 3 yet")
                 return urllib_request.urlopen(request, cafile=cafile)
             else:
                 # For the time being, we just use HTTPS without check.
@@ -900,6 +911,7 @@ class WorkunitClient(object):
                 # to HTTPSConnection, so we modify the class variable
                 # default_cert_file of MyHTTPSConnection. YUCK.
                 MyHTTPSConnection.ca_file = cafile
+                MyHTTPSConnection.check_hostname = check_hostname
                 return urllib_request.urlopen(request)
         else:
             # If we are not using HTTPS, we can just let urllib do it, 
@@ -920,10 +932,12 @@ class WorkunitClient(object):
         # record the number of connection failures
         connfailed = 0
         maxconnfailed = int(self.settings["MAX_CONNECTION_FAILURES"])
-        silent_wait=self.settings["SILENT_WAIT"]
+        silent_wait = self.settings["SILENT_WAIT"]
+        check_hostname = not self.settings["NO_CN_CHECK"]
         while conn is None:
             try:
-                conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile)
+                conn = WorkunitClient._urlopen_maybe_https(request, cafile=cafile,
+                        check_hostname=check_hostname)
             except urllib_error.HTTPError as error:
                 current_error = error.code
                 if error.code == 410:
@@ -1430,6 +1444,9 @@ if __name__ == '__main__':
                           help="Keep and upload old results when client starts")
         parser.add_option("--nosha1check", default=False, action="store_true", 
                           help="Skip checking the SHA1 for input files")
+        parser.add_option("--nocncheck", default=False, action="store_true", 
+                          help="Don't check common name/SAN of certificate. "
+                          "Currently works only under Python 2.")
         parser.add_option("--externdl", default=False, action="store_true", 
                           help="Use wget or curl for HTTPS downloads")
         # Parse command line
@@ -1491,6 +1508,7 @@ if __name__ == '__main__':
     SETTINGS["KEEPOLDRESULT"] = options.keepoldresult
     SETTINGS["NOSHA1CHECK"] = options.nosha1check
     SETTINGS["USE_EXTERNAL_DL"] = options.externdl
+    SETTINGS["NO_CN_CHECK"] = options.nocncheck
 
     # Create download and working directories if they don't exist
     if not os.path.isdir(SETTINGS["DLDIR"]):

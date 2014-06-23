@@ -6,7 +6,6 @@
 #include <string.h>
 #include <errno.h>
 
-#include "cado_poly.h"
 #include "mod_ul.h"
 #include "relation.h"
 #include "gzip.h"
@@ -67,7 +66,8 @@ void relation_copy (relation_t *s, relation_t * r)
 
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
-/* We use the fact that sizeof(p_r_values_t) < sizeof(unsigned long).
+/* We use the fact that sizeof(p_r_values_t) <= sizeof(unsigned long);
+   this is a condition that is checked in typedefs.h.
    So we can use mod_initmod_ul function and mod_get_ul without risk. */
 p_r_values_t
 relation_compute_r (int64_t a, uint64_t b, p_r_values_t p)

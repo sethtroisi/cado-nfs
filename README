@@ -24,13 +24,18 @@ Supported platforms:
 
 Anything else than the primary platform perhaps works, perhaps does not work.
 
- - Mac OS X Leopard and Snow Leopard have been tested to work at least
-   once, provided some additional tools and libraries (see below) have
-   been installed, notably for Leopard. ABI selection is sometimes
-   tricky.
+ - Mac OS X Mavericks and Mountain Lion have been successfully tested with both
+   Apple's gcc and clang. (see local.sh.macosx.x86_64) 
+
+ - Max OS X Leopard and Snow Leopard have been tested to work at
+   least once, provided some additional tools and libraries (see below) have
+   been installed, notably for Leopard. ABI selection is sometimes tricky. (see
+   local.sh.macosx.x86_32)
+ 
+
  - 32-bit linux with gcc-4.4 or later is supposed to work.
- - Windows is only partly supported (see a longer note at the end of this
-   file).
+
+ - Windows is only partly supported (see a longer note at the end of this file).
 
 Required software tools:
 ========================
@@ -130,14 +135,14 @@ the shared library mechanism).
 
 (3) $PREFIX/bin/factor.sh
     This calls binaries from $PREFIX/bin, and loads parameter files from
-    $PREFIX/share/cado-nfs-2.0/examples
+    $PREFIX/share/cado-nfs-2.1/examples
 
 Linux, BSD: All three methods work
 MacOS X:
     For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
     variable must be set up properly. The easiest method is to do make
     install, and include in these environment variables the directory
-    $PREFIX/lib/cado-nfs-2.0.
+    $PREFIX/lib/cado-nfs-2.1.
 
 Run a factorization on current machine:
 =======================================

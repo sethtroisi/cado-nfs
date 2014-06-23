@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # usage: ./filter.sh [OPTIONS]
 # On can switch between NFS-DL or FFS computation with the following option:
 #     nfsdl=[0|1]                   (default 0) FFS (0) or NFS-DL (1) 

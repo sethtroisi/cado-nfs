@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # usage: argv0 <method> <B1> <B2> <sigma>
 

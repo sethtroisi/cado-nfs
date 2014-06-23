@@ -83,7 +83,7 @@ export CURL_INCDIR
 export CURL_LIBDIR
 export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
-export DISABLE_SHARED
+export ENABLE_SHARED
 export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
@@ -112,7 +112,7 @@ if [ "$1" = "show" ] ; then
     echo "GF2X_CONFIGURE_EXTRA=\"$GF2X_CONFIGURE_EXTRA\""
     echo "PTHREADS=\"$PTHREADS\""
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
-    echo "DISABLE_SHARED=\"$DISABLE_SHARED\""
+    echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
     exit 0
 fi
 

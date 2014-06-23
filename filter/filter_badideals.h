@@ -9,6 +9,7 @@ typedef struct {
     p_r_values_t p;
     p_r_values_t r;
     unsigned int k;
+    int side;
     p_r_values_t pk;
     p_r_values_t rk;
     unsigned int ncol;
@@ -24,6 +25,6 @@ typedef allbad_info_struct_t allbad_info_t[1];
 
 void read_bad_ideals_info(const char *filename, allbad_info_t info);
 void handle_bad_ideals (int *exp_above, int64_t a, uint64_t b, p_r_values_t p,
-                        int e, allbad_info_t info);
+                        int e, int side, allbad_info_t info);
 
 #endif   /* __FILTER_BADIDEALS_H__ */

@@ -139,7 +139,7 @@ class MyCursor(sqlite3.Cursor):
         
     # This is used in where queries; it converts from named arguments such as 
     # "eq" to a binary operator such as "="
-    name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
+    name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!=", "like": "like"}
     
     def __init__(self, conn):
         # Enable foreign key support
@@ -867,8 +867,11 @@ class WuAccess(object): # {
             msg = "Workunit %s has status %s (%s), expected %s (%s)" % \
                   (wu["wuid"], wu_status, WuStatus.get_name(wu_status), 
                    status, WuStatus.get_name(status))
-            logger.error ("WuAccess._checkstatus(): %s", msg)
-            raise StatusUpdateError(msg)
+            if status is WuStatus.ASSIGNED and wu_status is WuStatus.CANCELLED:
+                logger.warning ("WuAccess._checkstatus(): %s, presumably timed out", msg)
+            else:
+                logger.error ("WuAccess._checkstatus(): %s", msg)
+                raise StatusUpdateError(msg)
 
     # Which fields should be None for which status
     should_be_unset = {

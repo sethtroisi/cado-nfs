@@ -13,7 +13,7 @@ target_link_libraries (makefb utils)
 set (las_sources las.c fb.c
     las-coordinates.c las-debug.c las-report-stats.c las-duplicate.c
     las-config.c bucket.c las-smallsieve.c las-unsieve.c las-arith.c
-    las-qlattice.c las-descent-helpers.cpp)
+    las-qlattice.c las-descent-helpers.cpp las-cofactor.c)
 set (las_libraries las-norms trialdiv facul utils ${pthread_libs})
 
 add_executable (las ${las_sources})
@@ -41,6 +41,9 @@ add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
+
+add_executable(dupsup dupsup.c las-duplicate.c las-norms.c las-qlattice.c las-coordinates.c las-cofactor.c fb.c)
+target_link_libraries(dupsup utils_with_io facul)
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)
 

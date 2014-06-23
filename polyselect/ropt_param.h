@@ -55,6 +55,8 @@
    seems to be more accurate */
 #define RANK_SUBLATTICE_BY_E 1
 
+/* Increase num in the tunning */
+#define TUNE_NUM_SUBLATTICE 8
 
 /* --- declarations --- */
 

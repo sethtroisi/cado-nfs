@@ -59,35 +59,6 @@ Thus the function to check for duplicates needs the following information:
 */
 
 
-#if 0
-    From relation.h, copy-pasted for easy reference:
-
-    typedef struct {
-      unsigned long p;      /* rational prime */
-      int e;                /* exponent (may want negative exponent in sqrt) */
-    } rat_prime_t;
-
-    typedef struct {
-      unsigned long p;      /* algebraic prime */
-      unsigned long r;      /* corresponding root: r = a/b mod p */
-      int e;                /* exponent (may want negative exponent in sqrt) */
-    } alg_prime_t;
-
-    typedef struct {
-      int64_t a;	/* only a is allowed to be negative */
-      uint64_t b;
-      rat_prime_t *rp;	/* array of rational primes */
-      alg_prime_t *ap;	/* array of algebraic primes */
-      uint8_t nb_rp;	/* number of rational primes */
-      uint8_t nb_ap;	/* number of algebraic primes */
-      uint8_t nb_rp_alloc;	/* allocated space for rp */
-      uint8_t nb_ap_alloc;	/* allocated space for ap */
-    } relation_t;
-#endif
-
-
-
-
 #include "cado.h"
 #include <stdio.h>
 #include <gmp.h>
@@ -98,6 +69,7 @@ Thus the function to check for duplicates needs the following information:
 #include "las-qlattice.h"
 #include "las-coordinates.h"
 #include "las-norms.h"
+#include "las-cofactor.h"
 
 
 static const int verbose = 1;
@@ -111,8 +83,8 @@ compute_a_over_b_mod_p(mpz_t r, const int64_t a, const uint64_t b, const mpz_t p
   mpz_mod(r, r, p);
 }
 
-static sieve_info_ptr
-fill_in_sieve_info(const unsigned long p, const int64_t a, const uint64_t b,
+sieve_info_ptr
+fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const int sq_side, const uint32_t I, const uint32_t J,
                    const unsigned long limits[2], facul_strategy_t *strategy[2],
                    cado_poly_ptr cpoly, siever_config_srcptr conf)
@@ -132,10 +104,8 @@ fill_in_sieve_info(const unsigned long p, const int64_t a, const uint64_t b,
   /* Allocate memory */
   sieve_info_init_norm_data(new_si);
 
-  mpz_init(new_si->doing->p);
-  mpz_init(new_si->doing->r);
-  mpz_set_uint64(new_si->doing->p, p);
-  compute_a_over_b_mod_p(new_si->doing->r, a, b, new_si->doing->p);
+  mpz_init_set(new_si->doing->p, q);
+  mpz_init_set(new_si->doing->r, rho);
   new_si->doing->side = sq_side;
 
   for (int side = 0; side < 2; side++) {
@@ -160,11 +130,17 @@ fill_in_sieve_info_from_si(const unsigned long p, const int64_t a, const uint64_
 {
   const unsigned long lim[2] = {old_si->conf->sides[0]->lim, old_si->conf->sides[1]->lim};
   facul_strategy_t *strategies[2] = {old_si->sides[0]->strategy, old_si->sides[1]->strategy};
-  return fill_in_sieve_info(p, a, b, old_si->doing->side, old_si->I, old_si->J,
+  mpz_t sq, rho;
+  mpz_init_set_ui(sq, p);
+  mpz_init(rho);
+  compute_a_over_b_mod_p(rho, a, b, sq);
+  return fill_in_sieve_info(sq, rho, old_si->doing->side, old_si->I, old_si->J,
                             lim, strategies, old_si->cpoly, old_si->conf);
+  mpz_clear(sq);
+  mpz_clear(rho);
 }
 
-static void
+void
 clear_sieve_info(sieve_info_ptr new_si)
 {
   for (int side = 0; side < 2; side++) {
@@ -198,7 +174,80 @@ compute_cofactor(mpz_t cof, const unsigned long sq,
   ASSERT_ALWAYS(sq == 0 || saw_sq);
 }
 
-#define WRAP(x) x
+/* Here, we assume for now that the log norm estimate is exact, i.e., that
+  it produces the correctly rounded l = log_b(F(a,b)).
+  To make the estimate more precise, we should call the norm calculation
+  function for the correct bucket region and pick the entry corresponding to
+  this i,j-coordinate. */
+static unsigned char
+estimate_lognorm(sieve_info_srcptr si, const int i, const unsigned int j,
+                  const int side)
+{
+  mpz_t norm;
+  mpz_init (norm);
+  mpz_poly_homogeneous_eval_siui(norm, si->sides[side]->fij, i, j);
+  return fb_log(mpz_get_d(norm), si->sides[side]->scale * LOG_SCALE, 0.) + GUARD;
+  mpz_clear (norm);
+}
+
+/* If e == 0, returns 1. Otherwise, if b > lim, returns b.
+   Otherwise returns the largest b^k with k <= e and b^k <= lim. */
+static unsigned long
+bounded_pow(const unsigned long b, const unsigned long e, const unsigned long lim)
+{
+  if (e == 0) {
+    return 1;
+  }
+  if (b > lim) {
+    return b;
+  }
+  unsigned long r = b;
+  /* overflow is the largest ulong that can be multiplied by b without
+     overflowing */
+  unsigned long overflow = ULONG_MAX / b;
+  for (unsigned long i = 1; i < e && r <= overflow; i++) {
+    unsigned long t = r * b;
+    if (t > lim) {
+      break;
+    }
+    r = t;
+  }
+  return r;
+}
+
+/*
+   We subtract the sieve contribution of the factor base primes.
+   I.e., for each p^k || F(a,b) with p <= fbb:
+     if k > 1 then we reduce k if necessary s.t. p^k <= powlim, but never to k < 1
+     set l := l - log_b(p^k)
+*/
+static unsigned char
+subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
+                sieve_info_srcptr si, const int side)
+{
+  const unsigned long fbb = si->conf->sides[side]->lim;
+  const unsigned int nb_p = relation_get_nb_p(relation, side);
+  unsigned char new_lognorm = lognorm;
+
+  for (unsigned int i = 0; i < nb_p; i++) {
+    const unsigned long p = relation_get_p(relation, side, i);
+    const int e = relation_get_e(relation, side, i);
+    ASSERT_ALWAYS(e > 0);
+    if (p <= fbb) {
+      const unsigned long p_pow = bounded_pow(p, e, si->conf->sides[side]->powlim);
+      const unsigned char p_pow_log = fb_log(p_pow, si->sides[side]->scale * LOG_SCALE, 0.);
+      if (p_pow_log > new_lognorm) {
+        if (0)
+          fprintf(stderr, "Warning: lognorm underflow for relation a,b = %" PRId64 ", %" PRIu64 "\n",
+                  relation->a, relation->b);
+        new_lognorm = 0;
+      } else {
+        new_lognorm -= p_pow_log;
+      }
+    }
+  }
+  return new_lognorm;
+}
 
 /* Return 1 if the relation is probably a duplicate of an relation found
    when sieving the sq described by si. Return 0 if it is probably not a
@@ -217,40 +266,25 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   unsigned long large_primes[2][max_large_primes];
   unsigned int nr_lp[2] = {0, 0};
 
-  /* Extract the list of large primes for the rational side */
-  for (unsigned int i = 0; i < relation->nb_rp; i++) {
-    const unsigned long fbb = old_si->conf->sides[RATIONAL_SIDE]->lim;
-    const unsigned long p = relation->rp[i].p;
-    const int e = relation->rp[i].e;
-    ASSERT_ALWAYS(e > 0);
-    if (p > fbb) {
-      for (int i = 0; i < e; i++) {
-        if (nr_lp[RATIONAL_SIDE] < max_large_primes)
-          large_primes[RATIONAL_SIDE][nr_lp[RATIONAL_SIDE]++] = p;
+  /* Extract the list of large primes for each side */
+  for (int side = 0; side < 2; side++) {
+    unsigned int nb_p = relation_get_nb_p(relation, side);
+    for (unsigned int i = 0; i < nb_p; i++) {
+      const unsigned long fbb = old_si->conf->sides[side]->lim;
+      const unsigned long p = relation_get_p(relation, side, i);
+      const int e = relation_get_e(relation, side, i);
+      ASSERT_ALWAYS(e > 0);
+      if (p > fbb) {
+        for (int i = 0; i < e; i++) {
+          if (nr_lp[side] < max_large_primes)
+            large_primes[side][nr_lp[side]++] = p;
+        }
       }
     }
+    mpz_init(cof[side]);
+    /* Compute the cofactor, dividing by sq on the special-q side */
+    compute_cofactor(cof[side], side == sq_side ? sq : 0, large_primes[side], nr_lp[side]);
   }
-
-  /* Extract the list of large primes for the algebraic side */
-  for (unsigned int i = 0; i < relation->nb_ap; i++) {
-    const unsigned long fbb = old_si->conf->sides[ALGEBRAIC_SIDE]->lim;
-    const unsigned long p = relation->ap[i].p;
-    const int e = relation->ap[i].e;
-    ASSERT_ALWAYS(e > 0);
-    if (p > fbb) {
-      for (int i = 0; i < e; i++)
-        if (nr_lp[ALGEBRAIC_SIDE] < max_large_primes)
-          large_primes[ALGEBRAIC_SIDE][nr_lp[ALGEBRAIC_SIDE]++] = p;
-    }
-  }
-
-  mpz_init(cof[0]);
-  mpz_init(cof[1]);
-  /* Compute the cofactor for the special-q side */
-  compute_cofactor(cof[sq_side], sq, large_primes[sq_side], nr_lp[sq_side]);
-
-  /* Compute the cofactor for the non-special-q side */
-  compute_cofactor(cof[1-sq_side], 0, large_primes[1-sq_side], nr_lp[1-sq_side]);
 
   // si = get_sieve_info_from_config(las, sc, pl);
   /* Create a dummy sieve_info struct with just enough info to let us use
@@ -272,7 +306,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   sieve_info_update_norm_data(NULL, si, nb_threads);
 
   if (verbose) {
-    fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q q=%lu; rho=%lu\n", relation->a, relation->b, sq, r);
+    fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
     fprintf(output, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
   }
 
@@ -301,6 +335,22 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     goto clear_and_exit;
   }
 
+  unsigned char remaining_lognorm[2];
+  for (int side = 0; side < 2; side++) {
+    const unsigned char lognorm = estimate_lognorm(si, i, j, side);
+    remaining_lognorm[side] = subtract_fb_log(lognorm, relation, si, side);
+    if (remaining_lognorm[side] > si->sides[side]->bound) {
+      fprintf(output, "# DUPECHECK On side %d, remaining lognorm = %hhu > bound = %hhu\n",
+              side, remaining_lognorm[side], si->sides[side]->bound);
+      is_dupe = 0;
+    }
+  }
+  fprintf (output, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hhu, %hhu\n",
+           i, j, remaining_lognorm[0], remaining_lognorm[1]);
+  if (!is_dupe) {
+    goto clear_and_exit;
+  }
+
   /* Check that the cofactor is within the mfb bound */
   if (!check_leftover_norm (cof[sq_side], si, sq_side)) {
     if (verbose) {
@@ -308,23 +358,6 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     }
     is_dupe = 0;
     goto clear_and_exit;
-  }
-
-  /* Check that log_logbase(cofactor) <= lambda * log_logbase(lp_bound).
-     We can cancel logbase and use log_2().
-     FIXME: What we should check here is that the estimate of the log norm,
-     minus the rounded norms of all the sieved primes is below the sieve
-     report threshold.  */
-  for (int side = 0; side < 2; side++) {
-    const double log_lpb = (double)old_si->conf->sides[side]->lpb * log(2);
-    const double lambda = old_si->conf->sides[side]->lambda;
-    const double log_cof = log(mpz_get_d(cof[side]));
-    if (log_cof > lambda * log_lpb) {
-      gmp_fprintf(output, "# DUPECHECK log of cofactor %Zd is above sieve report threshold on side %d: %f > %f * %f\n",
-                 cof, side, log_cof, lambda, log_lpb);
-      is_dupe = 0;
-      goto clear_and_exit;
-    }
   }
 
   mpz_t BLPrat;

@@ -42,7 +42,8 @@ else(NOT BWC_GFP_ARITHMETIC_BACKENDS)
         # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU
         # CC idioms. As it is not used in production yet, we don't want
         # to expose it on 32-bit platforms.
-        set(BWC_GFP_ARITHMETIC_BACKENDS CACHE FORCE)
+        set(BWC_GFP_ARITHMETIC_BACKENDS CACHE STRING
+                "which GF(p) backends to compile for DLOG mode" FORCE)
         message(STATUS "Warning: DL mode forcibly disabled for linear algebra (amd64-only)")
     endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 endif(NOT BWC_GFP_ARITHMETIC_BACKENDS)
@@ -367,7 +368,6 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
     endif(WITH_MPIR)
 
     add_executable(plingen_${v} EXCLUDE_FROM_ALL ${plingen_${v}_sources})
-    set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
     if(WITH_MPIR)
         target_link_libraries(plingen_${v} flint-fft ${gmp_libname} utils)
@@ -380,5 +380,9 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         )
 endforeach(v)
 
-include(CMakeLists-nodist.txt OPTIONAL)
+
+
+add_custom_target(bwc_full)
+add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
+    cleanup prep krylov dispatch mksol gather secure)
 

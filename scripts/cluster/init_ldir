@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/usr/bin/env bash
 
 # params
 ldir=$1 # 'ldir' directory must contain $name.poly

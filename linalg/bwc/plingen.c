@@ -1459,6 +1459,7 @@ struct bm_io_s {/*{{{*/
     char * iobuf;
     const char * input_file;
     const char * output_file;
+    const char * rhs_output_file;
     int ascii;
     /* This is only a rolling window ! */
     matpoly A, F;
@@ -1516,6 +1517,12 @@ unsigned int bm_io_set_write_behind_size(bm_io_ptr aa, unsigned int * delta)
     unsigned int mindelta = res[0];
     unsigned int maxdelta = res[1];
     unsigned int window = maxdelta - mindelta + aa->t0 + 1;
+    if (d->nsm) {
+        /* in sm-outside-matrix mode for DLP, we form the matrix F
+         * slightly differently, as some *rows* are shifted out before
+         * writing */
+        window++;
+    }
     int rank;
     MPI_Comm_rank(aa->bm->com[0], &rank);
     if (rank) return window;
@@ -1581,6 +1588,13 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     /* This is only temp storage ! */
     matpoly pi;
     matpoly_init(ab, pi, b, b, B);
+
+
+    matpoly rhs;
+    if (d->nsm) {
+        matpoly_init(ab, rhs, d->nsm, n, 1);
+        rhs->size = 1;
+    }
 
     unsigned int window = aa->F->alloc;
 
@@ -1693,6 +1707,8 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
      * coefficients from index maxdelta downwards.
      */
 
+    unsigned int rhscontribs = 0;
+
     unsigned int kpi = maxdelta;
     /* index kpi1 is end fence for window */
     for(unsigned int kpi1 = iceildiv(maxdelta + 1, B) * B ; kpi1 > 0 ; kpi1 -= B) {
@@ -1710,6 +1726,10 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         kpi = kpi1 - 1;
 
         for(unsigned int s = B ; s-- > 0 ; kpi--) {
+            /* Coefficient kpi + window of F has been totally computed,
+             * because of previous runs of this loop (which reads the
+             * coefficients of pi).
+             */
             if (kpi + window == maxdelta) {
                 /* Avoid writing zero coefficients. This can occur !
                  * Example:
@@ -1725,7 +1745,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                     if (z) {
                         /* This is a bit ugly. Given that we're going to
                          * shift one column of F, we'll have a
-                         * potentially deepedr write-back buffer. Columns
+                         * potentially deeper write-back buffer. Columns
                          * which seemed to be ready still are, but they
                          * will now be said so only at the next step.
                          */
@@ -1772,10 +1792,20 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                     unsigned int jpi = sols[jF];
                     unsigned int subtract = maxdelta - delta[jpi];
                     ASSERT(subtract < window);
-                    if ((maxdelta-kpi) < subtract) continue;
+                    if (maxdelta < kpi + subtract) continue;
                     unsigned int kF = (maxdelta - kpi) - subtract;
                     absrc_elt src = matpoly_coeff_const(ab, pi, i, jpi, s);
-                    abdst_elt dst = matpoly_coeff(ab, aa->F, i, jF, kF % window);
+                    unsigned int kF1 = kF - (i < d->nsm);
+                    abdst_elt dst;
+                    if (kF1 == UINT_MAX) {
+                        rhscontribs++;
+                        ASSERT_ALWAYS(d->nsm);
+                        ASSERT_ALWAYS(i < d->nsm);
+                        ASSERT_ALWAYS(jF < n);
+                        dst = matpoly_coeff(ab, rhs, i, jF, 0);
+                    } else {
+                        dst = matpoly_coeff(ab, aa->F, i, jF, kF1 % window);
+                    }
                     ASSERT_ALWAYS(kF <= delta[jpi] || abis_zero(ab, src));
                     abadd(ab, dst, dst, src);
                 }
@@ -1787,9 +1817,19 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                     unsigned int offset = aa->t0 - aa->fdesc[ipi-n][0];
                     unsigned int subtract = maxdelta - delta[jpi] + offset;
                     ASSERT(subtract < window);
-                    if ((maxdelta-kpi) < subtract) continue;
+                    if (maxdelta < kpi + subtract) continue;
                     unsigned int kF = (maxdelta-kpi) - subtract;
-                    abdst_elt dst = matpoly_coeff(ab, aa->F, iF, jF, kF % window);
+                    unsigned int kF1 = kF - (iF < d->nsm);
+                    abdst_elt dst;
+                    if (kF1 == UINT_MAX) {
+                        rhscontribs++;
+                        ASSERT_ALWAYS(d->nsm);
+                        ASSERT_ALWAYS(iF < d->nsm);
+                        ASSERT_ALWAYS(jF < n);
+                        dst = matpoly_coeff(ab, rhs, iF, jF, 0);
+                    } else {
+                        dst = matpoly_coeff(ab, aa->F, iF, jF, kF1 % window);
+                    }
                     absrc_elt src = matpoly_coeff_const(ab, pi, ipi, jpi, s);
                     ASSERT_ALWAYS(kF <= delta[jpi] || abis_zero(ab, src));
                     abadd(ab, dst, dst, src);
@@ -1815,7 +1855,17 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
             bm_io_write_one_F_coeff(aa, maxdelta - kpi - window);
     }
 
+    if (rhscontribs) {
+        printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
+    }
+
     matpoly_clear(ab, pi);
+    if (d->nsm) {
+        FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
+        matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
+        fclose(f);
+        matpoly_clear(ab, rhs);
+    }
 
     free(sols);
 }/*}}}*/
@@ -1893,13 +1943,14 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
     return 1;
 }/*}}}*/
 
-void bm_io_init(bm_io_ptr aa, bmstatus_ptr bm, const char * input_file, const char * output_file, int ascii)/*{{{*/
+void bm_io_init(bm_io_ptr aa, bmstatus_ptr bm, const char * input_file, const char * output_file, const char * rhs_output_file, int ascii)/*{{{*/
 {
     memset(aa, 0, sizeof(*aa));
     aa->bm = bm;
     aa->ascii = ascii;
     aa->input_file = input_file;
     aa->output_file = output_file;
+    aa->rhs_output_file = rhs_output_file;
 }/*}}}*/
 
 void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
@@ -1924,13 +1975,17 @@ void bm_io_begin_read(bm_io_ptr aa)/*{{{*/
     aa->iobuf = malloc(2 * io_block_size);
     setbuffer(aa->f, aa->iobuf, 2 * io_block_size);
 
-    /* read and discard the first coefficient */
+    /* read the first coefficient ahead of time. This is because in most
+     * cases, we'll discard it. Only in the DL case, we will consider the
+     * first coefficient as being part of the series. Which means that
+     * the coefficient reads in the I/O loop will sometimes correspond to
+     * the coefficient needed at that point in time, while we will also
+     * (in the DL case) need data from the previous read.
+     */
     if (!bm_io_read1(aa, 0)) {
         fprintf(stderr, "Read error from %s\n", aa->input_file);
         exit(EXIT_FAILURE);
     }
-    /* discard ! */
-    aa->A->size = aa->k = 0;
 }/*}}}*/
 
 void bm_io_end_read(bm_io_ptr aa)/*{{{*/
@@ -2094,8 +2149,11 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
             bm_io_read1(aa, 0);
 
             for (unsigned int j = 0; r < m && j < n; j++) {
-                /* Extract a full column into M */
-                matpoly_extract_column(ab, M, r, 0, A, j, k);
+                /* Extract a full column into M (column j, degree k in A) */
+                /* adjust the coefficient degree to take into account the
+                 * fact that for SM columns, we might in fact be
+                 * interested by the _previous_ coefficient */
+                matpoly_extract_column(ab, M, r, 0, A, j, k + (j >= bm->d->nsm));
 
                 /* Now reduce it modulo all other columns */
                 for (unsigned int v = 0; v < r; v++) {
@@ -2125,7 +2183,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
                 }
                 if (u == m) {
                     printf("[X^%d] A, col %d does not increase rank (still %d)\n",
-                           k, j, r);
+                           k + (j >= bm->d->nsm), j, r);
 
                     /* we need at least m columns to get as starting matrix
                      * with full rank. Given that we have n columns per
@@ -2165,7 +2223,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
                 // if (r == m)
                     printf
                         ("[X^%d] A, col %d increases rank to %d (head row %d)\n",
-                         aa->k, j, r, u);
+                         k + (j >= bm->d->nsm), j, r, u);
             }
         }
 
@@ -2176,15 +2234,16 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
         }
 
         aa->t0 = exponents[r - 1] + 1;
-        ASSERT_ALWAYS(aa->t0 == aa->k);
+        /* We always have one extra coefficient of back log */
+        ASSERT_ALWAYS(aa->t0 == aa->k - 1);
 
         printf("Found satisfying init data for t0=%d\n", aa->t0);
 
         /* We've also got some adjustments to make: room for one extra
          * coefficient is needed in A. Reading of further coefficients will
-         * pickup where they stopped, and will always leave the last t0+1
+         * pickup where they stopped, and will always leave the last t0+2
          * coefficients readable. */
-        matpoly_realloc(ab, A, aa->t0 + 1);
+        matpoly_realloc(ab, A, aa->t0 + 2);
         A->size++;
 
 
@@ -2245,7 +2304,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
     matpoly E;
     matpoly_init(ab, E, m, b, B);
 
-    unsigned int window = aa->t0 + 1;
+    unsigned int window = aa->t0 + 2;
 
     double tt0 = wct_seconds();
     double next_report_t = tt0 + 10;
@@ -2269,7 +2328,7 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
                      * forcibly discarding the first coefficient in the
                      * sequence. Just don't convey bad information... */
                     printf("EOF met after reading %u coefficients\n",
-                            aa->k + 1);
+                            aa->k);
                     break;
                 }
 
@@ -2279,12 +2338,14 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
 
                 for(unsigned int j = 0 ; j < n ; j++) {
                     unsigned int kA = kE + aa->t0;
+                    kA += (j >= bm->d->nsm);
                     matpoly_extract_column(ab, E, j, s, aa->A, j, kA % window);
                 }
                 for(unsigned int jE = n ; jE < m + n ; jE++) {
                     unsigned int jA = aa->fdesc[jE-n][1];
                     unsigned int offset = aa->fdesc[jE-n][0];
                     unsigned int kA = kE + offset;
+                    kA += (jA >= bm->d->nsm);
                     matpoly_extract_column(ab, E, jE, s, aa->A, jA, kA % window);
                 }
             }
@@ -2296,7 +2357,9 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
         bigmatpoly_scatter_mat_partial(ab, xE, E, kE0, kE - kE0);
 
         if (!rank) {
-            ASSERT_ALWAYS(kE + aa->t0 == aa->k);
+            /* This is because aa->k integrates some backlog because of
+             * the SM / non-SM distinction (for DL) */
+            ASSERT_ALWAYS(kE + aa->t0 + 1 == aa->k);
             if (aa->k > next_report_k) {
                 double tt = wct_seconds();
                 if (tt > next_report_t) {
@@ -2508,6 +2571,15 @@ int main(int argc, char *argv[])
     }
     ASSERT_ALWAYS((afile==NULL) == (ffile == NULL));
 
+    tmp = param_list_lookup_string(pl, "rhsfile");
+    char * rhsfile = NULL;
+    if (tmp) {
+        rhsfile = strdup(tmp);
+    } else if (afile) {
+        int rc = asprintf(&rhsfile, "%s.gen.rhs", afile);
+        ASSERT_ALWAYS(rc >= 0);
+    }
+
 #ifndef HAVE_MPIR
     if (caching) {
         fprintf(stderr, "--caching=1 only supported with MPIR\n");
@@ -2516,6 +2588,8 @@ int main(int argc, char *argv[])
 #endif
 
     bmstatus_init(bm, bw->m, bw->n);
+
+    bm->d->nsm = bw->nsm;
 
     unsigned int m = d->m;
     unsigned int n = d->n;
@@ -2574,14 +2648,15 @@ int main(int argc, char *argv[])
          * of jobs, but close together.
          */
         int mpi[2] = { bm->mpi_dims[0], bm->mpi_dims[1], };
+        int thr[2] = {1,1};
+        param_list_parse_intxint(pl, "thr", thr);
+
 #ifdef  FAKEMPI_H_
-        if (mpi[0]*mpi[1] > 1) {
-            fprintf(stderr, "non-trivial option mpi= can't be used with fakempi. Please do an MPI-enabled build (MPI=1)\n");
+        if (mpi[0]*mpi[1] > 1 || thr[0]*thr[1] > 1) {
+            fprintf(stderr, "non-trivial option mpi= or thr= can't be used with fakempi. Please do an MPI-enabled build (MPI=1)\n");
             exit(EXIT_FAILURE);
         }
 #endif
-        int thr[2] = {1,1};
-        param_list_parse_intxint(pl, "thr", thr);
         /* Asssume numbering in MPI_COMM_WORLD is all mpi jobs from the
          * same node together. So we pick them by bunches of size
          * thr[0]*thr[1].
@@ -2660,7 +2735,7 @@ int main(int argc, char *argv[])
      * that non-root nodes essentially do nothing while the master job
      * does the I/O stuff) */
     bm_io aa;
-    bm_io_init(aa, bm, afile, ffile, ascii);
+    bm_io_init(aa, bm, afile, ffile, rhsfile, ascii);
     bm_io_begin_read(aa);
     bm_io_guess_length(aa);
 

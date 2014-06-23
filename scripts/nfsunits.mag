@@ -1268,7 +1268,7 @@ end procedure;
 // The first line gives number of rows (relation-sets) and columns (ideals)
 // after the merge/replay.
 // 
-// Then, each line of the file corresponds to a line of the small matrix:
+// Then, each line of the file corresponds to a line of the sparse matrix:
 // the first entry is an integer giving the number of relations in the
 // relation-set, and the rest of the line gives the indices of the relations
 // (in hexadecimal). These indices relate to the numbers of the lines in the

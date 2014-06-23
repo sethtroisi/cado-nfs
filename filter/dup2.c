@@ -250,7 +250,7 @@ compute_index_rel (earlyparsed_relation_ptr rel, allbad_info_t info)
       if (renumber_is_bad (&nb, &first_index, renumber_tab, pr[i].p, r, side))
       {
         int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS] = {0,};
-        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, info);
+        handle_bad_ideals (exp_above, rel->a, rel->b, pr[i].p, pr[i].e, side, info);
         
         /* allocate room for (nb) more valuations */
         if (rel->nb + nb - 1 > rel->nb_alloc)
@@ -341,7 +341,13 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
     uint32_t i = insert_relation_in_dup_hashtable (rel, &is_dup);
 
     // They should be no duplicate in already renumbered file
-    ASSERT(!is_dup);
+    if (is_dup)
+      {
+        fprintf (stderr, "Error, duplicate relation (%" PRId64 ",%" PRIu64
+                 ") in already renumbered files\n", rel->a, rel->b);
+
+        exit (1);
+      }
 
     if (i < sanity_size)
         sanity_check(i, rel->a, rel->b);

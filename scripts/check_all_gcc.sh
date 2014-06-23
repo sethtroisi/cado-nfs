@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script downloads, builds, and runs cado-nfs on several machines.
 # The machines from the gcc compile farm are taken as an example. Tests

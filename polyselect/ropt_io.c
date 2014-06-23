@@ -315,7 +315,7 @@ ropt_on_msievepoly ( FILE *file,
 
   /* parse each line */
   while (1) {
-
+    
     /* read ad, l, m */   
     if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
       break;
@@ -330,7 +330,7 @@ ropt_on_msievepoly ( FILE *file,
     Lemma21 (poly->f, poly->n, poly->d, l, m);
     mpz_set (poly->g[1], l);
     mpz_neg (poly->g[0], m);
-    fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+    fprintf (stderr, "\n# Polynomial (# %5d).", count);
 
     mpz_poly_t F;
     F->coeff = poly->f;
@@ -343,9 +343,9 @@ ropt_on_msievepoly ( FILE *file,
     optimize (F, poly->g, 0, 1);
 
     if (param->skip_ropt) {
-      fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
+      fprintf (stderr, "\n# Size-optimize only (# %5d).", count);
       /* also print optimized poly in Msieve format */
-      print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
+      // print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
       /* print size-optimized poly in CADO format */
       print_poly_fg (F, poly->g, poly->n, 1);
     }

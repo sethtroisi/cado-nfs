@@ -85,10 +85,10 @@ contention point. The main cause for this contention is the
 
 Since parsing is limiting, \code{filter\_rels} accepts as arguments a
 bitmask indicating what to parse. This in turn determines which function
-will be called for parsing. Each binary is likely to be interested by
+will be called for parsing. Each binary is likely to be interested in
 different fields in the relations, so this differs from one to another.
 
-One this parsing step is completed, we have well-formed, somewhat-parsed
+Once this parsing step is completed, we have well-formed, somewhat-parsed
 relations, of type \code{earlyparsed\_relation}, ready to start further
 processing.
 

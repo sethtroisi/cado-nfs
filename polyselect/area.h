@@ -6,4 +6,4 @@
 extern double area, bound_f, bound_g;
 
 /* default rootsieve effort */
-#define DEFAULT_RSEFFORT 3
+#define DEFAULT_RSEFFORT 5

@@ -10,7 +10,6 @@
 #include "ropt.h"
 #include "portability.h"
 
-
 /**
  * Tune stage 1 for quadratic rotation.
  */
@@ -21,12 +20,14 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
                         ropt_param_t param,
                         alpha_pq *alpha_pqueue )
 {
-  int i, j, k, r, w, old_i, old_nbest_sl, used, *w_good, w_top[3];
-  const unsigned int size_alpha_pqueue_all_w = s1param->nbest_sl * 4;
+  const int numw = 3;
+  int i, j, k, r, w, old_i, old_nbest_sl, used, *w_good, w_top[numw];
+  const unsigned int size_alpha_pqueue_all_w =
+      s1param->nbest_sl * TUNE_NUM_SUBLATTICE;
   double score;
   mpz_t m, u, v, mod;
   alpha_pq *alpha_pqueue_all_w;
-
+  
   mpz_init (u);
   mpz_init (v);
   mpz_init (mod);
@@ -55,16 +56,11 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   k = 0;
   old_i = 0;
   for (i = bound->global_w_boundl; i <= bound->global_w_boundr; i++) {
-
     if (j >= 2 && k % 10 == 0)
       fprintf (stderr, "# Info: quadratic rotation range %d*x^2\n", i);
-
     old_i = rotate_aux (poly->f, poly->g[1], m, old_i, i, 2);
-
     ropt_poly_setup (poly);
-
     r = ropt_stage1 (poly, bound, s1param, param, alpha_pqueue_all_w, i);
-
     k ++;
   }
 
@@ -96,13 +92,14 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   }
 
   /* Step 2: fetch top three w */
-  for (i = 0; i < 3; i ++) w_top[i] = bound->global_w_boundr + 1;
+  for (i = 0; i < numw; i ++)
+    w_top[i] = bound->global_w_boundr + 1;
   k = 0;
   for (i = used - 1; i > 0; i --) {
     if (k > 2)
       break;    
     r = 0;
-    for (j = 0; j < 3; j ++) {
+    for (j = 0; j < numw; j ++) {
       if (w_top[j] == w_good[i])
         r = 1;
     }
@@ -114,7 +111,7 @@ ropt_quadratic_stage1 ( ropt_poly_t poly,
   s1param->nbest_sl = old_nbest_sl; // recover the larger nbest_sl
   s1param->nbest_sl_tunemode = 0; // Note: used in ropt_stage1()
   old_i = 0;
-  for (i = 0; i < 3; i ++) {
+  for (i = 0; i < numw; i ++) {
     w = w_top[i];
     
     /* w_top[3] is not full? */
@@ -178,11 +175,6 @@ ropt_quadratic_tune ( ropt_poly_t poly,
 
   mpz_init_set (m, poly->g[0]);
   mpz_neg (m, m);
-
-#ifdef ROPT_LINEAR_TUNE_HARDER
-  int k;
-#endif
-
   mpz_init (u);
   mpz_init (tmpu);
   mpz_init (v);
@@ -316,7 +308,6 @@ ropt_quadratic_tune ( ropt_poly_t poly,
   rotate_aux (poly->f, poly->g[1], m, old_i, 0, 2);
   ropt_poly_setup (poly);
   old_i = 0;
-
 
   /* put alpha_pqueue to tmp_alpha_pqueue */
   used = alpha_pqueue->used - 1;
@@ -599,7 +590,7 @@ ropt_quadratic ( ropt_poly_t poly,
   /* nbest_sl is the number of sublattice to be finally root-sieved.
      Here we use some larger value since alpha_pqueue records more 
      sublattices to be tunned */
-  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * 4);
+  new_alpha_pq (&alpha_pqueue, s1param->nbest_sl * TUNE_NUM_SUBLATTICE);
   new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
 
   /* Step 1: find good sublattice */

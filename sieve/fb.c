@@ -104,12 +104,12 @@ static int
 fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
 {
   /* Do we need more memory for fb? */
-  if (fb_buf->alloc < fb_buf->size + addsize)
+  const size_t newsize = fb_buf->size + addsize;
+  if (fb_buf->alloc < newsize)
     {
       factorbase_degn_t *newfb;
       size_t newalloc = fb_buf->alloc + fb_buf->blocksize;
-      ASSERT(addsize <= fb_buf->blocksize); /* Otherwise we still might not have
-					       enough mem after the realloc */
+      ASSERT_ALWAYS(newsize <= newalloc);
       newfb = (factorbase_degn_t *) realloc (fb_buf->fb, newalloc);
       if (newfb == NULL)
 	{
@@ -335,7 +335,7 @@ fb_split_wipe (fb_split_t *split)
 {
   for (size_t i = 0; i < split->nr_buffers; i++)
     fb_buffer_clear (&split->fb_bufs[i]);
-  free (split->fb_bufs);
+  fb_split_clear (split);
 }
 
 #if 0 /* currently unused */

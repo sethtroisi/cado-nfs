@@ -74,14 +74,20 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    gmp_randseed_ui(rstate, bw->seed ? bw->seed : time(NULL));
+    if (!bw->seed)
+        bw->seed = time(NULL);
+    gmp_randseed_ui(rstate, bw->seed);
+    if (tcan_print) {
+        printf("// Random generator seeded with %d\n", bw->seed);
+    }
+
 
 
     for (unsigned ntri = 0;; ntri++) {
         serialize_threads(pi->m);
 
         if (tcan_print) {
-            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) rand());
+            printf("// Generating new x,y vector pair (trial # %u)\n", ntri);
         }
         if (ntri >= my_nx * 10) {
             ++my_nx;

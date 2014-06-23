@@ -50,6 +50,9 @@ nb_curves (const unsigned int lpb)
 #undef LPB_MAX
 }
 
+// ncurves = 100 corresponds to looking for 50-bit factors.
+// ncurves = 200 corresponds to looking for 64-bit factors.
+
 
 /* Make a simple minded strategy for factoring. We start with P-1 and
    P+1 (with x0=2/7), then an ECM curve with low bounds, then a bunch of

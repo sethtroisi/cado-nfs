@@ -142,7 +142,7 @@ which they correspond.
 The first line gives number of rows (relation-sets) and columns (ideals)
 after the merge/replay.
 
-Then, each line of the file corresponds to a line of the small matrix:
+Then, each line of the file corresponds to a line of the sparse matrix:
 the first entry is an integer giving the number of relations in the
 relation-set, and the rest of the line gives the indices of the relations
 (in hexadecimal). These indices relate to the numbers of the lines in the
@@ -152,23 +152,23 @@ For DL, each entry is of the form id:e, where id is the index in the
 purged.gz file, and e is the exponent of the corresponding relation in
 the relation-set.
 
-File XXX.small.*.{txt|bin}
+File XXX.sparse.*.{txt|bin}|bin}
 ==========================
 
-This is the set of files that describe the "small" matrix that is passed
+This is the set of files that describe the "sparse" matrix that is passed
 to the linalg machinery. They are created by replay.
 
 They exist in 2 different formats: txt or bin, the later is more compact.
 We describe only the "txt" format, which is human-readable.
 
-The matrix main file is XXX.small.txt. Its first line contains the number
+The matrix main file is XXX.sparse.txt. Its first line contains the number
 of rows and columns. Then each line gives a row in the following format.
 The first integer is the number of non-zero entries for this row. Then
 the list of entries is given. In the case of factorization, an entry is
 just a column index, and for DL, it is accompanied with its positive or
 negative value.
 
-The files XXX.small.rw.txt and XXX.small.cw.txt contains the row and
+The files XXX.sparse.rw.txt and XXX.sparse.cw.txt contains the row and
 column weights.
 
 If the parameter "skip" is non-zero, then the matrix is separated in a

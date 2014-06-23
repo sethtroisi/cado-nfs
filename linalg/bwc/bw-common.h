@@ -25,8 +25,21 @@ struct bw_params {
     /* m,n blocking factors as in the textbook BW description */
     int m,n;
 
-    /* modulus -- has to be 2 for now. Depending on abase and some stuff here
-     * and there, it could be expanded. */
+    /* We have 0<=nsm<=n. This parameter is related to SM handling in the
+     * DL computation, when the SM blocks are part of the block Wiedemann
+     * starting vectors. This influences the number of columns which are
+     * shifted in the generator computation ("considering A(X) div X"),
+     * so that we force the computed relation to have non-zero
+     * coefficients for the SM columns (hence, not shifted in A(X)),
+     * while those corresponding to random vectors _are_ shifted.
+     *
+     * mksol and gather are also affected by this parameter.
+     *
+     * By default we have nsm=0
+     */
+    int nsm;
+
+    /* modulus */
     mpz_t p;
 
     /* _at the moment_ this corresponds to the checking & checkpointing

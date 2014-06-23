@@ -9,6 +9,7 @@ static const int RELATION_MAX_BYTES = 4096;
 #include <stdio.h>
 
 #include "typedefs.h"
+#include "cado_poly.h"
 
 typedef struct {
   unsigned long p;      /* rational prime */
@@ -63,6 +64,46 @@ extern void relation_copy (relation_t *s, relation_t * r);
 extern void relation_provision_for_primes(relation_t * rel, int nr, int na);
 extern void relation_compress_rat_primes(relation_t * rel);
 extern void relation_compress_alg_primes(relation_t * rel);
+
+/* Getter functions to hide the different data structs for algebraic and
+   rational side. When the structs have been made uniform, this can be
+   replaced with relation->nb[side], relation->p[side][index].p and
+   relation->p[side][index].e */
+static inline unsigned int
+relation_get_nb_p(const relation_t *relation, const int side)
+{
+  if (side == RATIONAL_SIDE) {
+    return relation->nb_rp;
+  } else if (side == ALGEBRAIC_SIDE) {
+    return relation->nb_ap;
+  } else {
+    abort();
+  }
+}
+
+static inline unsigned long
+relation_get_p(const relation_t *relation, const int side, const size_t index)
+{
+  if (side == RATIONAL_SIDE) {
+    return relation->rp[index].p;
+  } else if (side == ALGEBRAIC_SIDE) {
+    return relation->ap[index].p;
+  } else {
+    abort();
+  }
+}
+
+static inline int
+relation_get_e(const relation_t *relation, const int side, const size_t index)
+{
+  if (side == RATIONAL_SIDE) {
+    return relation->rp[index].e;
+  } else if (side == ALGEBRAIC_SIDE) {
+    return relation->ap[index].e;
+  } else {
+    abort();
+  }
+}
 
 #ifdef __cplusplus
 }

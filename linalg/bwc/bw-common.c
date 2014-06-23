@@ -150,6 +150,8 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     bw->nsolvecs = bw->n;
     param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
 
+    param_list_parse_int(pl, "nsm", &bw->nsm);
+
     bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
     int interval_already_in_check_stops = 0;
     for(int i = 0 ; i < bw->number_of_check_stops ; i++) {
@@ -191,6 +193,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "local_cache_copy_dir");
     param_list_lookup_string(pl, "matmul_bucket_methods");
     param_list_lookup_string(pl, "sequence");   // for lingen
+    param_list_lookup_string(pl, "inhomogeneous_rhs");  // for gather
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
