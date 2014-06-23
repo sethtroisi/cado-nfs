@@ -2889,8 +2889,7 @@ class PurgeTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
-            {"dlp": False, "galois": False, "alim": int,
-                "rlim": int, "gzip": True})
+            {"dlp": False, "galois": False, "gzip": True})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2914,9 +2913,8 @@ class PurgeTask(Task):
                 self.logger.critical("No Galois unique relation count received")
                 return False
 
-        minlim = min(self.params["alim"], self.params["rlim"])
-        minindex = int(2. * minlim / (log(minlim) - 1))
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
+        minindex = int(nprimes / 20.0)
         
         if "purgedfile" in self.state and \
                 input_nrels == self.state["input_nrels"]:

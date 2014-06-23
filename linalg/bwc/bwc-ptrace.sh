@@ -36,6 +36,7 @@ if [ "$*" ] ; then eval "$*" ; fi
 : ${mats=$HOME/Local/mats}
 : ${matsfallback=/local/rsa768/mats}
 : ${wipe=}
+: ${seed=}
 
 wordsize=64
 # XXX note that $wdir is wiped out by this script !
@@ -136,6 +137,11 @@ derived_variables() {
     fi
 
     echo "Working on ${#sequences[@]} sequences"
+
+    if ! [ "$seed" ] ; then
+        seed=$RANDOM
+        echo "Setting seed to $seed"
+    fi
 }
 
 optionally_build() {
@@ -164,6 +170,7 @@ prepare_wdir() {
         fi
     fi
     mkdir $wdir
+    echo $seed > $wdir/seed.txt
 }
 
 create_example_dlp_matrix_with_sm() {
@@ -251,10 +258,10 @@ create_test_matrix_if_needed() {
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
     if [ "$prime" = 2 ] ; then
-        $bindir/random_matrix  ${random_matrix_size} --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}.txt
+        $bindir/random_matrix  ${random_matrix_size} -s $seed --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}.txt
         matrix=$mats/t${random_matrix_size}.txt
-    elif ! [ "$nsm" ] ; then
-        $bindir/random_matrix  ${random_matrix_size} -c ${random_matrix_maxcoeff} --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
+    elif ! [ "$nrhs" ] ; then
+        $bindir/random_matrix  ${random_matrix_size} -s $seed -c ${random_matrix_maxcoeff} --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
         matrix=$mats/t${random_matrix_size}p.txt
     else
         # We use specialized magma code to create the example.
@@ -476,7 +483,7 @@ do_prep_step_gfp() {
 
 
 do_prep_step_gf2() {
-    $bindir/bwc.pl prep $common
+    $bindir/bwc.pl prep $common seed=$seed
     $bindir/bwc.pl :ysplit $common splits=$all_splits
 }
 

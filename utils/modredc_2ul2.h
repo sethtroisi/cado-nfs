@@ -1248,5 +1248,7 @@ int modredc2ul2_sprp2 (const modulusredc2ul2_t);
 int modredc2ul2_isprime (const modulusredc2ul2_t);
 int modredc2ul2_inv (residueredc2ul2_t, const residueredc2ul2_t, 
 		     const modulusredc2ul2_t);
+int modredc2ul2_batchinv (residueredc2ul2_t *r, const residueredc2ul2_t *a,
+                          size_t n, const modulusredc2ul2_t m);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
 #endif  /* MODREDC_2UL2_H */

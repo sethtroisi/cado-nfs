@@ -772,4 +772,7 @@ void
 modmpz_V_ul (residuempz_t, const residuempz_t, unsigned long, 
 	     const modulusmpz_t);
 
+int modmpz_batchinv (residuempz_t *r, const residuempz_t *a,
+                     size_t n, const modulusmpz_t m);
+
 #endif  /* MOD_MPZ_H */
