@@ -75,16 +75,16 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
+
     if (!bw->seed) {
-        int ss;
-        int * ps = &ss;
-        if (pi->m->trank == 0 && pi->m->jrank == 0) {
+        /* note that bw is shared between threads.
+         * at pi->m->jrank > 0, we don't care about the seed anyway
+         */
+        if (pi->m->trank == 0) {
             bw->seed = time(NULL);
-            ps = &(bw->seed);
+            MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
         }
-        thread_broadcast(pi->m, (void **) &ps, 0);
-        if (pi->m->trank == 0)
-            bw->seed = *ps;
+        serialize_threads(pi->m);
     }
 
     gmp_randseed_ui(rstate, bw->seed);
@@ -201,7 +201,6 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         /* OK -- now everybody has the same data */
 
         int dimk;
-        int * pdimk;
         
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
@@ -209,10 +208,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                     bw->m, prep_lookahead_iterations * A->groupsize(A),
                     A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
-            pdimk = &dimk;
         }
-        thread_broadcast(pi->m, (void **) &pdimk, 0);
-        dimk = * pdimk;
+        thread_broadcast(pi->m, (void *) &dimk, sizeof(int), 0);
 
         if (tcan_print)
             printf("// Dimension of kernel: %d\n", dimk);

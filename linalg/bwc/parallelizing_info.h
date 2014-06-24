@@ -183,7 +183,16 @@ extern void hello(parallelizing_info_ptr pi);
  *
  * This function uses the wr->utility_ptr field.
  */
-extern void thread_broadcast(pi_wiring_ptr wr, void ** ptr, unsigned int i);
+extern void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int root);
+
+/* shared_malloc is like malloc, except that the pointer returned will be
+ * equal on all threads (proper access will deserve proper locking of
+ * course). shared_malloc_set_zero sets to zero too */
+/* As a side-effect, all shared_* functions serialize threads */
+extern void * shared_malloc(pi_wiring_ptr wr, size_t size);
+extern void * shared_malloc_set_zero(pi_wiring_ptr wr, size_t size);
+extern void shared_free(pi_wiring_ptr wr, void * ptr);
+
 
 /* This one is the higher level thingy on top of MPI_Bcast and the
  * previous one. It broadcast data computed by job j, thread t (e.g. 0,0)

@@ -27,7 +27,7 @@ through.
 Below are a few things you can do with the pi variable. In these protos,
 wr should be one of the wiring inside pi.
   hello(pi)             // a small hello-world that tests the pi
-  thread_broadcast(wr, void** ptr, uint i)
+  thread_broadcast(wr, void* ptr, size_t size, uint root)
                         // Broadcasting function at thread level
   global_broadcast(wr, ...)
                         // Broadcasting function at MPI+thread level

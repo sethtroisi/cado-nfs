@@ -1326,12 +1326,15 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
     for (uint32_t k = 0; k < m->bal->h->nh; k++) {
         ASSERT_ALWAYS(ttab[k] == m->exp_rows[k * m->bal->h->nv]);
     }
+    free(ttab);
     printf("ok\n");
 }/*}}}*/
 
 void clear_master_variables(master_data m)/*{{{*/
 {
     if (m->bal->h->flags & FLAG_REPLICATE) {
+        if (m->bal->h->flags & FLAG_SHUFFLED_MUL)
+            free(m->fw_colperm);
 	free(m->fw_rowperm);
     } else {
 	free(m->fw_rowperm);
@@ -1340,6 +1343,7 @@ void clear_master_variables(master_data m)/*{{{*/
     m->fw_rowperm = m->fw_colperm = NULL;
     free(m->sent_rows); m->sent_rows = NULL;
     free(m->exp_rows); m->exp_rows = NULL;
+    balancing_clear(m->bal);
 }/*}}}*/
 
 struct master_dispatcher_s { /*{{{*/
@@ -1648,18 +1652,12 @@ void * do_loops(struct do_loops_arg * arg)
 void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
 {
     master_data m;
-    slave_data_ptr * slaves;
-
     memset(m, 0, sizeof(master_data));
-
     m->mfile = arg->mfile;
     m->withcoeffs = arg->withcoeffs;
 
-    if (pi->m->trank == 0) {
-        slaves = malloc(pi->m->totalsize * sizeof(slave_data_ptr));
-        memset(slaves, 0, pi->m->totalsize * sizeof(slave_data_ptr));
-    }
-    thread_broadcast(pi->m, (void**) &slaves, 0);
+    slave_data_ptr * slaves;
+    slaves = shared_malloc_set_zero(pi->m, pi->m->totalsize * sizeof(slave_data_ptr));
 
     slave_data_ptr s = malloc(sizeof(slave_data));
     pthread_mutex_lock(pi->m->th->m);
@@ -1750,7 +1748,11 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
     memset(s->mat, 0, sizeof(matrix_u32));
 
     clear_slave_variables(s);
+    free(s);
+
+    /* this also clears m->bal */
     clear_master_variables(m);
+    shared_free(pi->m, slaves);
 
     return arg;
 }

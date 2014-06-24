@@ -500,6 +500,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         vec_clear_generic(pi->m, fcoeffs[k], A->groupsize(A)*bw->interval);
     }
     free(v_name);
+    free(fcoeffs);
+    free(sum);
 
     matmul_top_clear(mmt);
 

@@ -124,7 +124,7 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
 int agree_on_flag(pi_wiring_ptr w, int v)
 {
     int * ptr = &v;
-    thread_broadcast(w, (void**) &ptr, 0);
+    thread_broadcast(w, (void**) &ptr, sizeof(void*), 0);
     for(unsigned int i = 0 ; i < w->ncores ; i++) {
         serialize_threads(w);
         * ptr &= v;
