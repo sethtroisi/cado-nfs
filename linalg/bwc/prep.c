@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <pthread.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -74,8 +75,13 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
+    static pthread_mutex_t seed_init_mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
+    int pt_rc = pthread_mutex_lock(seed_init_mutex);
+    ASSERT_ALWAYS(pt_rc == 0);
     if (!bw->seed)
         bw->seed = time(NULL);
+    pt_rc = pthread_mutex_unlock(seed_init_mutex);
+    ASSERT_ALWAYS(pt_rc == 0);
     gmp_randseed_ui(rstate, bw->seed);
     if (tcan_print) {
         printf("// Random generator seeded with %d\n", bw->seed);
