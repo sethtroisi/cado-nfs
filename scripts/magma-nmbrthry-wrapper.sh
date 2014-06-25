@@ -45,6 +45,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 CMD="magma -b ell:=$ELL mainp:=$P polyfile:=$POLY badfile:=$BAD badinfofile:=$BADINFO $DIR/badideals.mag" 
 
-echo $CMD > /dev/stderr
+echo $CMD >&2
 
 $CMD
