@@ -41,7 +41,7 @@ check_cache_friendliness(const void * const alloc, const size_t size,
   char fn[128];
 
   pid = getpid();
-  sprintf (fn, "/proc/%lu/pagemap", (unsigned long) pid);
+  snprintf (fn, sizeof(fn), "/proc/%lu/pagemap", (unsigned long) pid);
   f = fopen(fn, "r");
   if (f == NULL) {
     /* Cannot check, return ok */

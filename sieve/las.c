@@ -189,7 +189,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         if (pol->deg > 1) {
             tfb = seconds ();
             char fbparamname[4];
-            sprintf(fbparamname, "fb%d", side);
+            snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,

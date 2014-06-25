@@ -393,7 +393,7 @@ static void declare_usage(param_list pl)
             "bits of powers");
     param_list_decl_usage(pl, "out", "(optional) name of the output file");
     char str[1024];
-    sprintf(str, "(optional) create factor base for given side. "
+    snprintf(str, sizeof(str), "(optional) create factor base for given side. "
             "Side must be %d or %d (default is %d, i.e. algebraic).",
             RATIONAL_SIDE, ALGEBRAIC_SIDE, ALGEBRAIC_SIDE);
     param_list_decl_usage(pl, "side", str);
