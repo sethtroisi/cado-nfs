@@ -76,16 +76,15 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
 
-    if (!bw->seed) {
-        /* note that bw is shared between threads.
+    if (pi->m->trank == 0 && !bw->seed) {
+        /* note that bw is shared between threads, thus only thread 0 should
+         * test and update it here.
          * at pi->m->jrank > 0, we don't care about the seed anyway
          */
-        if (pi->m->trank == 0) {
-            bw->seed = time(NULL);
-            MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
-        }
-        serialize_threads(pi->m);
+        bw->seed = time(NULL);
+        MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
     }
+    serialize_threads(pi->m);
 
     gmp_randseed_ui(rstate, bw->seed);
     if (tcan_print) {
