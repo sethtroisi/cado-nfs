@@ -592,6 +592,7 @@ declare_usage (param_list pl)
   param_list_decl_usage (pl, "nratchars", "number of rational characters");
   param_list_decl_usage (pl, "t",      "number of threads");
   param_list_decl_usage (pl, "ker",      "input kernel file");
+  param_list_decl_usage(pl, "force-posix-threads", "(switch)");
 }
 
 int main(int argc, char **argv)
@@ -620,6 +621,8 @@ int main(int argc, char **argv)
 
     argc--,argv++;
     const char *bw_kernel_file = NULL;
+
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
