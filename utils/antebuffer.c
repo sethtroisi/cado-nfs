@@ -66,7 +66,7 @@ void ab_cons () {
   for ( ; ; ) {
     pthread_mutex_lock (&mutex);
     while (!(c = (int) (ab_cptp - cpy_ab_cptc))) {
-      if (UNLIKELY((ab_end)) {
+      if (UNLIKELY(ab_end)) {
 	pthread_mutex_unlock (&mutex);
 	pthread_exit(NULL);
       }
@@ -165,8 +165,7 @@ int main(int argc, char **argv) {
 	  exit (1);
 	}
   }
-  if (p)
-    close(ab_in);
+  if (p) close(ab_in);
   pthread_join(ab_tc, NULL);
   pthread_mutex_destroy (&mutex);
   pthread_cond_destroy (&cond);
