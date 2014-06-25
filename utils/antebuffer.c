@@ -7,15 +7,6 @@
    Limitation: X <= 31; more than 2GB antebuffer has no sense anyway.
 */
 
-/* If you use helgrind or others check tools, it's possible
-   you have false positive warnings for the access (read & write)
-   of the volatiles ab_cptp, ab_cptc, ab_end.
-   Define this *only* to avoid these spurious warnings.
-   This DEFINE protects these three volatile variables by three
-   dedicated pthread spin locks.
-*/
-#define NOT_FALSE_WARNINGS_IN_HELGRIND
-
 /* To avoid the warning: implicit declaration of nanosleep for c99 compliant */
 #include "cado.h"
 #ifdef _POSIX_C_SOURCE
@@ -34,6 +25,9 @@
 #include <time.h>
 #include "portability.h"
 #include "timing.h"
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef HAVE_MINGW
 int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
@@ -56,73 +50,45 @@ int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
 
 /* These variables are used by pthread and main */
 static volatile uint64_t ab_cptp = 0, ab_cptc = 0;   /* Main counters */
+static volatile int ab_end = 0;                      /* 1 if end */
 static char *ab_buf;                                 /* Main buffer */
 static const struct timespec waiting = { 0, 1<<13 }; /* About 5 to 20 microseconds */
-static volatile int ab_end = 0;                      /* 1 if end */
 static int ab_in;                                    /* fd for loading */
 static unsigned int ab_size, ab_sizeio;              /* size for buffer & in */
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND  
-static pthread_spinlock_t spin_tp, spin_tc, spin_end;         
-#endif
 
 static
 void ab_cons () {
-  size_t cpy_ab_cptc;
+  size_t cpy_ab_cptc = 0;
   int w;
-  unsigned int c, t;
+  unsigned int c, t = 0;
   
-  cpy_ab_cptc = 0;
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND  
-  pthread_spin_lock (&spin_tc); ab_cptc = cpy_ab_cptc; pthread_spin_unlock (&spin_tc);
-#else
-  ab_cptc = cpy_ab_cptc;
-#endif
-  t = 0;
   pthread_setcanceltype (PTHREAD_CANCEL_DEFERRED, NULL);
   for ( ; ; ) {
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-    do {
-      uint64_t spin_ab_cptp;
-      pthread_spin_lock (&spin_tp); spin_ab_cptp = ab_cptp; pthread_spin_unlock (&spin_tp);
-      c = (int) (spin_ab_cptp - cpy_ab_cptc);
-      if (!c) {
-	int spin_ab_end;
-	pthread_spin_lock (&spin_end); spin_ab_end = ab_end; pthread_spin_unlock (&spin_end);
-	if (spin_ab_end) {
-	  pthread_spin_lock (&spin_tp); spin_ab_cptp = ab_cptp; pthread_spin_unlock (&spin_tp);
-	  if (cpy_ab_cptc == spin_ab_cptp) pthread_exit(NULL);
-	}
-	nanosleep(&waiting, NULL);
-	continue;
-      }
-    } while (0);
-#else
+    pthread_mutex_lock (&mutex);
     while (!(c = (int) (ab_cptp - cpy_ab_cptc))) {
-      if (ab_end && cpy_ab_cptc == ab_cptp) pthread_exit(NULL);
-      nanosleep(&waiting, NULL);
+      if (UNLIKELY((ab_end)) {
+	pthread_mutex_unlock (&mutex);
+	pthread_exit(NULL);
+      }
+      pthread_cond_wait (&cond, &mutex);
     }
-#endif
+    pthread_mutex_unlock (&mutex);
+
     if (c > ab_sizeio) c = ab_sizeio;
     if (c > ab_size - t) c = ab_size - t;
-    w = (int) write(1, &(ab_buf[t]), (size_t) c);
-    if (w > 0) {
-      cpy_ab_cptc += w;
-      t = (t + w) & (ab_size - 1);
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-      pthread_spin_lock (&spin_tc); ab_cptc = cpy_ab_cptc; pthread_spin_unlock (&spin_tc);
-#else
-      ab_cptc = cpy_ab_cptc;
-#endif
-    }
-    else
-      nanosleep(&waiting, NULL);
+    while ((w = (int) write(1, &(ab_buf[t]), (size_t) c)) <= 0) nanosleep(&waiting, NULL);
+    cpy_ab_cptc += w;
+    t = (t + w) & (ab_size - 1);
+    pthread_mutex_lock (&mutex);
+    ab_cptc = cpy_ab_cptc; pthread_cond_signal(&cond);
+    pthread_mutex_unlock (&mutex);
   }
 }
 
 int main(int argc, char **argv) {
   pthread_t ab_tc;
   pthread_attr_t ab_attr;
-  size_t cpy_ab_cptp;
+  size_t cpy_ab_cptp = 0;
   int r;
   unsigned int t, c, p;
 
@@ -146,21 +112,9 @@ int main(int argc, char **argv) {
     fprintf (stderr, "%s: malloc error: %s\n", argv[0], strerror(errno));
     exit(1);
   }
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND  
-  pthread_spin_init (&spin_tp, PTHREAD_PROCESS_PRIVATE);
-  pthread_spin_init (&spin_tc, PTHREAD_PROCESS_PRIVATE);
-  pthread_spin_init (&spin_end, PTHREAD_PROCESS_PRIVATE);
-#endif
   pthread_attr_init(&ab_attr);
   pthread_attr_setstacksize(&ab_attr, 1<<12);
   pthread_attr_setdetachstate(&ab_attr, PTHREAD_CREATE_JOINABLE);
-  cpy_ab_cptp = 0;
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND  
-  pthread_spin_lock (&spin_tp); ab_cptp = cpy_ab_cptp; pthread_spin_unlock (&spin_tp);
-#else
-  ab_cptp = cpy_ab_cptp;
-#endif
-  
   if (pthread_create(&ab_tc, &ab_attr, (void *) ab_cons, NULL)) {
     fprintf (stderr, "%s: pthread_create error: %s\n", argv[0], strerror(errno));
     exit(1);
@@ -178,40 +132,26 @@ int main(int argc, char **argv) {
   }
   t = 0;
   for ( ; ; ) {
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-    do {
-      uint64_t spin_ab_cptc;
-      pthread_spin_lock (&spin_tc); spin_ab_cptc = ab_cptc; pthread_spin_unlock (&spin_tc);
-      c = (int) ((spin_ab_cptc + ab_size) - cpy_ab_cptp);
-      if (!c) { 
-	nanosleep(&waiting, NULL);
-	continue;
-      }
-    } while (0);
-#else
-    while (!(c = (int) ((ab_cptc + ab_size) - cpy_ab_cptp)))
-      nanosleep(&waiting, NULL);
-#endif
+    pthread_mutex_lock (&mutex);
+    while (!(c = (int) ((ab_cptc + ab_size) - cpy_ab_cptp))) pthread_cond_wait (&cond, &mutex);
+    pthread_mutex_unlock (&mutex);
+    
     if (c > ab_sizeio)   c = ab_sizeio;
     if (c > ab_size - t) c = ab_size - t;
     r = read(ab_in, &(ab_buf[t]), (size_t) c);
     if (r > 0) {
       cpy_ab_cptp += r;
       t = (t + r) & (ab_size - 1);
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-      pthread_spin_lock (&spin_tp); ab_cptp = cpy_ab_cptp; pthread_spin_unlock (&spin_tp);
-#else
-      ab_cptp = cpy_ab_cptp;
-#endif
+      pthread_mutex_lock (&mutex);
+      ab_cptp = cpy_ab_cptp; pthread_cond_signal(&cond);
+      pthread_mutex_unlock (&mutex);
     }
     else 
       if (!r) {
 	if (!p || p == (unsigned int) argc) {
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-	  pthread_spin_lock (&spin_end); ab_end = 1; pthread_spin_unlock (&spin_end);
-#else
-	  ab_end = 1;
-#endif
+	  pthread_mutex_lock (&mutex);
+	  ab_end = 1; pthread_cond_signal(&cond);
+	  pthread_mutex_unlock (&mutex);
 	  break;
 	}
 	close(ab_in);
@@ -228,11 +168,8 @@ int main(int argc, char **argv) {
   if (p)
     close(ab_in);
   pthread_join(ab_tc, NULL);
-#ifdef NOT_FALSE_WARNINGS_IN_HELGRIND
-  pthread_spin_destroy (&spin_tp);
-  pthread_spin_destroy (&spin_tc);
-  pthread_spin_destroy (&spin_end);
-#endif
+  pthread_mutex_destroy (&mutex);
+  pthread_cond_destroy (&cond);
   free (ab_buf);
   ab_buf = NULL;
   double tt[2];
