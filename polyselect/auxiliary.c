@@ -2157,8 +2157,9 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
       else if (mpz_cmp_ui (k1, 1) > 0)
         mpz_div_2exp (k1, k1, 1);       /* k1 <- k1/2 */
 
-      if (count++ > 10000) /* avoid an infinite loop due to the random
-                              choices when logmu=logmu0 */
+      if (count++ > 200) /* abort in cases where the descent procedure
+                            takes too long to converge; 200 iterations seems
+                            largely enough in most cases */
         break;
     }
 
@@ -2734,20 +2735,20 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
     /* We use here an idea suggested by Thorsten Kleinjung, namely
        rotating by l*x^3*g for several values of l, and keeping the
        best value of l.
-       With RSA-768, P=10^5, admax=2500, incr=60, lq=3, nq=1000, seed=1, we
-       get the following min/av/max lognorms (248 hits):
-       LMAX=0: 68.97/71.66/73.12
-       LMAX=1: 68.97/71.26/72.80
-       LMAX=2: 68.97/71.04/72.47
-       LMAX=4: 68.97/70.78/72.44
-       LMAX=8: 68.59/70.46/72.33
-       LMAX=16: 68.15/70.18/71.91
-       LMAX=32: 68.05/69.90/71.28
-       LMAX=64: 67.94/69.66/71.04
-       LMAX=128: 67.94/69.44/70.86
-       LMAX=256: 67.94/69.30/70.51
-       LMAX=512: 67.94/69.23/70.36
-       LMAX=1024: 67.94/69.20/70.10
+       With RSA-768, degree=6, P=10^5, admax=2500, incr=60, nq=1000,
+       we get the following min/av/max optimized lognorms (196 hits):
+       LMAX=0: 68.82/70.78/73.10
+       LMAX=1: 68.82/70.40/72.55
+       LMAX=2: 68.82/70.18/72.12
+       LMAX=4: 68.82/70.04/71.60
+       LMAX=8: 68.24/69.70/70.90
+       LMAX=16: 68.24/69.52/70.90
+       LMAX=32: 68.19/69.33/70.90
+       LMAX=64: 68.17/69.25/70.86
+       LMAX=128: 68.05/69.07/70.74
+       LMAX=256: 68.05/68.95/70.70
+       LMAX=512: 68.05/68.93/70.62
+       LMAX=1024: 68.05/68.89/70.35
     */
 #define LMAX 256
     for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */

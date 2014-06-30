@@ -68,7 +68,7 @@ unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
 double best_opt_logmu[KEEP], best_logmu[KEEP + 1];
-double rootsieve_time = 0.0;
+double rootsieve_time = 0.0, optimize_time = 0.0;
 int raw = 0;
 
 static void
@@ -415,6 +415,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   unsigned long j;
   double skew;
   mpz_t t;
+  double st;
 
   /* check that the algebraic polynomial has content 1, otherwise skip it */
   mpz_init (t);
@@ -427,10 +428,13 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   mpz_clear (t);
 
   /* optimize size */
+  st = seconds_thread ();
+  optimize (F, g, verbose, 1);
+  st = seconds_thread () - st;
   mutex_lock (&lock);
+  optimize_time += st;
   opt_found ++;
   mutex_unlock (&lock);
-  optimize (F, g, verbose, 1);
 
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
@@ -2323,6 +2327,12 @@ print_statistics:
 
   /* print total time (this gets parsed by the scripts) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
+#ifndef HAVE_RUSAGE_THREAD /* optimize_time is correct only if RUSAGE_THREAD
+                              works or in mono-thread mode */
+  if (nthreads == 1)
+#endif
+    printf ("# Stat: size-optimization took %.2fs\n", optimize_time);
+
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */
   if (nthreads == 1)
