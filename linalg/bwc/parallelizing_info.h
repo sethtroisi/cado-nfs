@@ -11,7 +11,7 @@
  * declared as pi.
  *
  * Threads and jobs are arranged in a grid-like manner. Several logical
- * communication group are defined. One for the global grid, as well as
+ * communication groups are defined. One for the global grid, as well as
  * one for each column / row.
  *
  * pi->m denotes the global group. There is only one such group. All
