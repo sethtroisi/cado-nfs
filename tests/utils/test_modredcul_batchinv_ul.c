@@ -23,28 +23,33 @@ print_residues_ul(const char *prefix, const unsigned long *a, size_t len,
 /* Returns 1 if a1[i]*a2[i] == 1, for 0 <= i < len,
    returns 0 otherwise. */
 int
-check_product_1_ul(unsigned long *a1, unsigned long *a2,
-                   const size_t len, const modulusredcul_t m)
+check_product_c_ul(unsigned long *a1, unsigned long *a2,
+                   const unsigned long orig_c, const size_t len,
+                   const modulusredcul_t m)
 {
    int ok = 1;
-   
-   for (size_t i = 0; i < len; i++) {
-     unsigned long hi, lo, q, r;
-     ularith_mul_ul_ul_2ul (&lo, &hi, a1[i], a2[i]);
-     ularith_div_2ul_ul_ul (&q, &r, lo, hi, modredcul_getmod_ul(m));
+   mpz_t prod;
+   const unsigned long c = orig_c % modredcul_getmod_ul(m);
 
-     if(r != 1) {
+   mpz_init(prod);
+   for (size_t i = 0; i < len; i++) {
+     mpz_set_ui(prod, a1[i]);
+     mpz_mul_ui(prod, prod, a2[i]);
+     unsigned long r = mpz_tdiv_ui(prod, modredcul_getmod_ul(m));
+
+     if(r != c) {
        ok = 0;
-       fprintf (stderr, "Inverse is incorrect: %lu * %lu = %lu != 1 (mod %lu)\n",
-                a1[i], a2[i], r, modredcul_getmod_ul(m));
+       fprintf (stderr, "Inverse is incorrect: %lu * %lu = %lu != %lu (mod %lu)\n",
+                a1[i], a2[i], r, c, modredcul_getmod_ul(m));
        break;
      }
    }
+   mpz_clear(prod);
    return ok;
 }
 
 int
-test_modredc_batchinv_ul (const size_t len)
+test_modredc_batchinv_ul (const size_t len, const unsigned long c)
 {
   unsigned long *a, *r;
   modulusredcul_t m;
@@ -52,7 +57,7 @@ test_modredc_batchinv_ul (const size_t len)
   
   /* Random, odd modulus */
   modredcul_initmod_ul(m, random_uint64() | 1);
-  
+
   a = (unsigned long *) malloc(len * sizeof(unsigned long));
   r = (unsigned long *) malloc(len * sizeof(unsigned long));
   
@@ -63,14 +68,14 @@ test_modredc_batchinv_ul (const size_t len)
   }
   
   print_residues_ul("Input numbers", a, len, m);
-  int rc = modredcul_batchinv_ul(r, a, len, m);
+  int rc = modredcul_batchinv_ul(r, a, c, len, m);
   if (rc != 0)
     print_residues_ul("Inverses", r, len, m);
   
   /* Check that product of input and output is 1 */
   if (rc == 1) {
-    if (!check_product_1_ul(r, a, len, m)) {
-      fprintf (stderr, "Product of input and its inverse it not 1\n");
+    if (!check_product_c_ul(r, a, c, len, m)) {
+      fprintf (stderr, "Product of input and its inverse it not %lu\n", c);
       ok = 0;
       goto finish;
     }
@@ -99,7 +104,7 @@ test_modredc_batchinv_ul (const size_t len)
   }
 
   print_residues_ul("Input numbers after dividing by gcd", a, len, m);
-  rc = modredcul_batchinv_ul(r, a, len, m);
+  rc = modredcul_batchinv_ul(r, a, c, len, m);
   if (rc == 0) {
     fprintf (stderr, "After dividing out common factors, modredcul_batchinv()"
              " still returned 0\n");
@@ -109,8 +114,8 @@ test_modredc_batchinv_ul (const size_t len)
   print_residues_ul("Inverses", r, len, m);
   
   /* Check that product of input and output is 1 */
-  if (!check_product_1_ul(r, a, len, m)) {
-    fprintf (stderr, "Product of input and its inverse it not 1\n");
+  if (!check_product_c_ul(r, a, c, len, m)) {
+    fprintf (stderr, "Product of input and its inverse it not %lu\n", c);
     ok = 0;
     goto finish;
   }
@@ -130,8 +135,11 @@ main (int argc, const char *argv[])
   tests_common_get_iter (&iter);
   verbose = tests_common_get_verbose();
   
-  for (unsigned long i = 0; ok && i < iter; i++)
-    ok = test_modredc_batchinv_ul(i);
+  for (unsigned long i = 0; ok && i < iter; i++) {
+    ok &= test_modredc_batchinv_ul(i, 0);
+    ok &= test_modredc_batchinv_ul(i, 1);
+    ok &= test_modredc_batchinv_ul(i, random_uint64());
+  }
   
   tests_common_clear();
   if (ok)

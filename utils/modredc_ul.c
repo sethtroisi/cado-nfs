@@ -245,7 +245,8 @@ modredcul_intinv (residueredcul_t r, const residueredcul_t A,
 
 int
 modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
-                       const size_t n, const modulusredcul_t m)
+                       const unsigned long c, const size_t n,
+                       const modulusredcul_t m)
 {
   residueredcul_t *r = (residueredcul_t *) r_ul;
   const residueredcul_t *a = (const residueredcul_t *) a_ul;
@@ -267,7 +268,7 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
   int rc = modredcul_inv(R, r[n-1], m);
   if (rc == 0)
     return 0;
-  R[0] = modredcul_get_ul(R, m);
+  modredcul_mul(R, R, &c, m);
   R[0] = modredcul_get_ul(R, m);
 
   for (size_t i = n-1; i > 0; i--) {
