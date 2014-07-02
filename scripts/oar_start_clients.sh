@@ -108,13 +108,14 @@ for NODE in $NODES
 do 
     for I in `seq 1 "$NRCLIENTS"`
     do
+    	CLIENTID="${NODE}+${I}"
     	if "$USE_NUMACTL"
     	then
     	  # Fill in the --cpunodebind= parameter
     	  COMMAND[1]="--cpunodebind=$NUMA_NODE"
     	  NUMA_NODE="$(( (NUMA_NODE + 1) % NR_CPUS ))"
     	fi
-        echo "Running command: oarsh $NODE ${COMMAND[@]} $@"
+        echo "Running command: oarsh $NODE ${COMMAND[@]} --clientid="$CLIENTID" $@"
         oarsh "$NODE" "${COMMAND[@]}" "$@" &
     done
 done
