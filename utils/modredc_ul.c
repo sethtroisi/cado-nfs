@@ -259,9 +259,10 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
   if (n == 0)
     return 1;
   
-  modredcul_set(r[0], a[0], m);
+  r[0][0] = a_ul[0] % m[0].m;
   for (size_t i = 1; i < n; i++) {
     modredcul_mul(r[i], r[i-1], a[i], m);
+    ASSERT_ALWAYS(r[i][0] < m[0].m);
   }
   
   modredcul_init_noset0(R, m);
@@ -277,5 +278,68 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
   }
   modredcul_set(r[0], R, m);
   modredcul_clear(R, m);
+  return 1;
+}
+
+/* For each 0 <= i < n, compute r[i] = -num/(den*2^k) mod p[i].
+   den must be odd.
+   Returns 1 if successful. If any modular inverse does not exist,
+   returns 0 and the contents of r are undefined. */
+int
+modredcul_batch_Q_to_Fp (unsigned long *r, const unsigned long num,
+                         const unsigned long den, const unsigned long k,
+                         const unsigned long *p, const size_t n)
+{
+  modulusredcul_t m;
+  const unsigned long ratio = num / den, remainder = num % den;
+
+  ASSERT_ALWAYS(den % 2 == 1);
+  modredcul_initmod_ul (m, den);
+  if (modredcul_batchinv_ul (r, p, num, n, m) == 0)
+    return 0;
+
+  /* Now we have r[i] = num/p[i] (mod den). We want -num/den (mod p[i]).
+     Using Bezout's identity, we have, for some integer t,
+     r[i] * p[i] - t * den = num
+     thus den | (r[i] * p[i] - num), and thus
+     t = (r[i] * p[i] - num) / den is an integer and satisfies
+     t = -num/den (mod p[i]).
+
+     We have 0 <= r[i] < den, and thus
+     t = p[i] * r[i]/den - num/den < p[i] - num/den,
+     t >= -num/den, so
+     -num/den <= t < p[i] - num/den
+     so t fits in unsigned long, and we can compute t modulo 2^LONGBITS;
+     since den is odd, we can multiply by den^{-1} mod 2^LONGBITS. */
+  const unsigned long den_inv = ularith_invmod(den);
+  for (size_t i = 0; i < n; i++) {
+    unsigned long hi, lo, t;
+    ularith_mul_ul_ul_2ul(&lo, &hi, r[i], p[i]);
+    if (ularith_gt_2ul_2ul(remainder, 0, lo, hi)) {
+      ASSERT_ALWAYS((remainder - lo) % den == 0);
+      t = ((remainder - lo) * den_inv);
+      ASSERT_ALWAYS(t < p[i]);
+      t = (t + ratio) % p[i]; /* FIXME */
+      if (t > 0)
+        t = p[i] - t;
+    } else {
+      t = ((lo - remainder) * den_inv);
+      ASSERT_ALWAYS(t < p[i]);
+      if (t >= ratio % p[i])
+        t = t - ratio % p[i]; /* FIXME */
+      else
+        t = p[i] + t - ratio % p[i]; /* FIXME */
+    }
+    /* Now divide by the power of 2 that's supposed to be in the denominator.
+       We assume this is small and do it with a simple loop. */
+    ASSERT_ALWAYS(t < p[i]);
+    ASSERT_ALWAYS(k == 0 || p[i] % 2 == 1);
+    for (unsigned long j = 0; j < k; j++) {
+      t = ularith_div2mod(t, p[i]);
+    }
+    r[i] = t;
+  }
+
+  modredcul_clearmod (m);
   return 1;
 }
