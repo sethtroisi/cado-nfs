@@ -683,6 +683,32 @@ ularith_invmod (const unsigned long n)
   return r;
 }
 
+/* Compute n/2 (mod m), where m must be odd. */
+static inline unsigned long
+ularith_div2mod (const unsigned long n, const unsigned long m)
+{
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  unsigned long s = n, t = m;
+  ASSERT_EXPENSIVE (m % 2UL != 0UL);
+
+  __asm__ __VOLATILE(
+	  "add %1, %0\n\t"
+	  "rcr $1, %0\n\t"
+	  "shr $1, %1\n\t"
+	  "cmovnc %1, %0\n"
+	  : "+&r" (t), "+&r" (s)
+	  : : "cc"
+	  );
+  return t;
+#else
+  ASSERT_EXPENSIVE (m % 2UL != 0UL);
+  if (n % 2UL == 0UL)
+    return n / 2UL;
+  else
+    return n / 2UL + m / 2UL + 1UL;
+#endif
+}
+
 
 /* Integer (truncated) square root of n */
 static inline unsigned long
