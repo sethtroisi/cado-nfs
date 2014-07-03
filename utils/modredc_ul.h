@@ -789,26 +789,7 @@ static inline void
 modredcul_div2 (residueredcul_t r, const residueredcul_t a,
                 const modulusredcul_t m)
 {
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  unsigned long s = a[0], t = m[0].m;
-  ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
-
-  __asm__ __VOLATILE(
-	  "add %1, %0\n\t"
-	  "rcr $1, %0\n\t"
-	  "shr $1, %1\n\t"
-	  "cmovnc %1, %0\n"
-	  : "+&r" (t), "+&r" (s)
-	  : : "cc"
-	  );
-  r[0] = t;
-#else
-  ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
-  if (a[0] % 2UL == 0UL)
-    r[0] = a[0] / 2UL;
-  else
-    r[0] = a[0] / 2UL + m[0].m / 2UL + 1UL;
-#endif
+  r[0] = ularith_div2mod(a[0], m[0].m);
 }
 
 
