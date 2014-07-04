@@ -1018,6 +1018,17 @@ uint64_t filter_rels2(char ** input_files,
     int multi = 0;
     int n;      /* number of levels of the pipe */
     int ncons = 0;      /* total number of consumers (levels >=1) */
+
+    for (unsigned int k = 0; input_files[k]; k++)
+    {
+      if (strcmp (input_files[k], "-") == 0)
+      {
+        fprintf (stderr, "Error, using - to read from standard input does "
+                         "not work.\nPlease use named pipes instead.\n");
+        abort ();
+      }
+    }
+
     for(n = 0 ; desc[n].f ; n++) {
         ncons += desc[n].n;
         multi += desc[n].n > 1;
