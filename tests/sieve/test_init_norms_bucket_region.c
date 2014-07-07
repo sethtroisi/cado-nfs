@@ -1,5 +1,5 @@
 #define NB_TESTS 20      /* NB_TESTS for a given degree & given logi */
-#define MIN_LOGI 10  
+#define MIN_LOGI 10
 #define MAX_LOGI 16      /* MIN_LOGI <= logi <= MAX_LOGI && MAX_LOGI <= LOG_BUCKET_REGION */
 #define MAX_DEGREE 10    /* All degree between 0 and MAX_DEGREE included are tested */
 #define MAX_SMART_ERR 11 /* The error must be < MAX_ERR */
@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "sieve/las-config.h"
+#include "sieve/las-types.h"
 #include "sieve/las-debug.h"
 #include "sieve/las-norms.h"
 #include "utils/utils.h"
@@ -51,17 +52,17 @@ int main() {
     const double didiv2 = (double) (I >> 1);
     for (d = MAX_DEGREE + 1; d--;) {
       poly->deg = d;
-      double coeff[poly->deg + 1] __attribute__((aligned(16))),
-	u[poly->deg + 1], roots[3 * poly->deg + 1];
+      double coeff[poly->deg + 1] __attribute__((aligned(16))), u[poly->deg + 1];
+      struct root_s roots[4 * poly->deg + 1];
       unsigned int nroots;
       poly->coeff = coeff;
       for (k = NB_TESTS; k--;) {
-	J = rand () ^ (rand() << 15); /* 0 <= J < 2^30 at least */
-	J &= (I >> 1) - 1;            /* Original J; 0 <= J < I/2 */
-	for (l = poly->deg + 1; l--;) /* (-2^63)^2 <= coeff <= (2^63-1)^2 */
+	J = rand () ^ (rand() << 15);   /* 0 <= J < 2^30 at least */
+	J &= (I >> 1) - 1;              /* Original J; 0 <= J < I/2 */
+	for (l = poly->deg + 1; l--;) { /* (-2^63)^2 <= coeff <= (2^63-1)^2 */
 	  poly->coeff[l] = (double) rand_int64_t () * (double) rand_int64_t ();
-	if (poly->coeff[poly->deg] == 0.) poly->coeff[poly->deg] = 1.;
-	if (poly->coeff[0] == 0.) poly->coeff[0] = 1.;
+	  if (UNLIKELY(poly->coeff[l] == 0.)) ++l; /* coef must be != 0. */
+	}
 
 	endJ = (LOG_BUCKET_REGION - logI);
 	J >>= endJ;                 /* In order to be able to compute a complete region */
@@ -70,9 +71,9 @@ int main() {
 	
 	/* Phase 1: compute S1 & S2 */
 	memset (S1, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
-	memset (S2, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S1 will be computed */
+	memset (S2, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S2 will be computed */
 	if (poly->deg > 1) {
-	  init_norms_roots_internal (poly->deg, poly->coeff, (double) ((I + 16) >> 1), &nroots, roots);
+	  init_norms_roots_internal (poly->deg, poly->coeff, (double) ((I + 16) >> 1), 1. / (double) (I >> 1), &nroots, roots);
 	  init_smart_degree_X_norms_bucket_region_internal (S1, J, I, scale, poly->deg, poly->coeff, nroots, roots);
 	  init_exact_degree_X_norms_bucket_region_internal (S2, J, I, scale, poly->deg, poly->coeff);
 	} else if (poly->deg == 1) {
@@ -88,11 +89,11 @@ int main() {
 	}
 	
 	/* Phase 2: compute S3 */
+	memset (S3, 0, 1U<<LOG_BUCKET_REGION); /* To be sure S3 will be computed */
 	J <<= endJ;
 	endJ = (1U << endJ) + J;
-	beginJ = J;
 	cS3 = S3;
-	for (; beginJ < endJ; ++beginJ) {
+	for (beginJ = J; beginJ < endJ; ++beginJ) {
 	  my_poly_scale (u, poly->coeff, poly->deg, (double) beginJ);
 	  for (h = -didiv2; h < didiv2; h += 1.) {
 	    for (l = poly->deg, g = u[l]; l--; g = g * h + u[l]);

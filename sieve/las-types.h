@@ -94,6 +94,19 @@ void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side);
 void las_todo_pop(las_todo_ptr * d);
 /* }}} */
 
+struct root_s {
+  unsigned char derivate; /* 0 = root of F; 1 = root of F'; and so on */
+  double value;           /* root of F(i,1) or derivates of F. */
+};
+typedef struct root_s *root_ptr;
+typedef struct root_s root_t[1];
+
+/* These segments ((x, F(x)), (y, F(y))) are used in the smart normalization */
+typedef struct sg_s {
+  int begin, end;
+  double f_begin, f_end;
+} sg_t;
+
 /* {{{ sieve_side_info */
 struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
@@ -144,7 +157,7 @@ struct sieve_side_info_s {
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
-    double *roots;     /* d^2(F(i, const j))/d(i)^2 */
+    root_ptr roots;     /* F, F', F" and maybe F'" - cf las-norms.c,init_norms */
 			    
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
