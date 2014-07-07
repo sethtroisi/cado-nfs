@@ -20,6 +20,7 @@
 #include "gzip.h"
 #include "las-duplicate.h"
 #include "las-coordinates.h"
+#include "las-norms.c"
 
 static void *
 dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)

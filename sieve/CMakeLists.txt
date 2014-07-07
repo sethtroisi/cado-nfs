@@ -47,7 +47,7 @@ target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
 
-add_executable(dupsup dupsup.c las-duplicate.c las-norms.c las-qlattice.c las-coordinates.c las-cofactor.c fb.c)
+add_executable(dupsup dupsup.c las-duplicate.c las-qlattice.c las-coordinates.c las-cofactor.c fb.c)
 target_link_libraries(dupsup utils_with_io facul)
 
 install(TARGETS makefb las freerel RUNTIME DESTINATION ${BINSUFFIX}/sieve)
