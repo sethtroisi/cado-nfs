@@ -2,8 +2,8 @@
 #define MIN_LOGI 10
 #define MAX_LOGI 16      /* MIN_LOGI <= logi <= MAX_LOGI && MAX_LOGI <= LOG_BUCKET_REGION */
 #define MAX_DEGREE 10    /* All degree between 0 and MAX_DEGREE included are tested */
-#define MAX_SMART_ERR 11 /* The error must be < MAX_ERR */
-#define MAX_EXACT_ERR 2  /* The error must be < MAX_ERR */
+#define MAX_SMART_ERR 4  /* The error in smart algo must be <= MAX_SMART_ERR */
+#define MAX_EXACT_ERR 2  /* The error in "exact" algo must be <= MAX_EXACT_ERR */
 
 #include <stdlib.h>
 #include <sys/types.h>

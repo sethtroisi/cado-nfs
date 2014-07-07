@@ -44,7 +44,7 @@
 size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
 size_t min_stos =  0x8000;   /* 32 KB = max size for Intel L0 cache */
   
-MAYBE_UNUSED inline void *las_memset (void *S, int c, size_t n) {
+static inline void *las_memset (void *S, int c, size_t n) {
   int64_t rc = 0x0101010101010101 * (uint8_t) c;
   if (LIKELY (n > 0x20)) {
     register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
@@ -222,20 +222,21 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
 }
 
 /* 2 on 3 pseudo memsets, only for speed tests, do not use. */
-/* This memset is correct only for n >= 0x40 */
+/* This memset is correct only for n >= 0x5f */
 uintptr_t memset_rep_stosq (uintptr_t S, int c, size_t n) {
   __m128 mc;
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
-  n += S;
+  n += S - 0x10;
+  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
   __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc));
+  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
+  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
   n &= -0x10;
-
   _mm_store_ps ((float *) (uintptr_t) (n - 0x40), mc);
   _mm_store_ps ((float *) (uintptr_t) (n - 0x30), mc);
   _mm_store_ps ((float *) (uintptr_t) (n - 0x20), mc);
@@ -261,14 +262,14 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S - 0x10;
-  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
+  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
   /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
+  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
   S |= 0x0f;
   n |= 0x0f;
   n -= S;
@@ -328,11 +329,13 @@ size_t stos_vs_write128 () {
   S = (rS + 0xFFF) & ~0xFFF;
 
   stepn = 0;
-  /* Careful: never less than 0x40 (minima for memset_rep_stosq) */
-  for (n = 0x40; n < endn; ) {
+  /* Careful: never less than 0x80 :
+     1. the minima for memset_rep_stosq is 0x5F;
+     2. n must be a power of 2. */
+  for (n = 0x80; n < endn; ) {
 
-    realn = (n + stepn * (n >> 2));
-    stepn = (stepn + 1 ) & 3;
+    realn = n + stepn * (n >> 2);
+    stepn = (stepn + 1) & 3;
     if (!stepn) n <<= 1;
 
     stos = ~0;
@@ -417,9 +420,7 @@ size_t direct_write_vs_stos () {
     }
     s_stos = (double) realn / stos;
     // fprintf(stderr, "n=%zu(%zx); rep stosl=%.2f, direct128=%.2f\n", realn, realn, s_stos, s_not_cache);
-
-  } while (s_stos < s_not_cache);
-
+  } while (s_stos < s_not_cache && realn > 0x60);
   free((void *)rS);
   return (n == endn) ? (size_t) ~0 : realn;
 }
