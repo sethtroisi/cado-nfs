@@ -90,7 +90,7 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "movaps %[mc],  0x50(%[S])\n"
 			     "movaps %[mc],  0x60(%[S])\n"
 			     "movaps %[mc],  0x70(%[S])\n"
-			     "0: leaq 0x100(%[S]), %[S]\n"
+			     "0: lea 0x100(%[S]), %[S]\n"
 			     "jnz 1b\n"
 			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
       return cS;
@@ -147,7 +147,7 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "movntps %[mc],  0x50(%[S])\n"
 			     "movntps %[mc],  0x60(%[S])\n"
 			     "movntps %[mc],  0x70(%[S])\n"
-			     "0: leaq 0x100(%[S]), %[S]\n"
+			     "0: lea 0x100(%[S]), %[S]\n"
 			     "jnz 1b\n"
 			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
       return cS;
@@ -215,7 +215,7 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
                          "movaps %[mc],  0x50(%[S])\n"
                          "movaps %[mc],  0x60(%[S])\n"
                          "movaps %[mc],  0x70(%[S])\n"
-                         "0: leaq 0x100(%[S]), %[S]\n"
+                         "0: lea 0x100(%[S]), %[S]\n"
                          "jnz 1b\n"
                          : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
   return cS;
@@ -299,7 +299,7 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
                          "movntps %[mc],  0x50(%[S])\n"
                          "movntps %[mc],  0x60(%[S])\n"
                          "movntps %[mc],  0x70(%[S])\n"
-                         "0: leaq 0x100(%[S]), %[S]\n"
+                         "0: lea 0x100(%[S]), %[S]\n"
                          "jnz 1b\n"
                          : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
   return cS;
