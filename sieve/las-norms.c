@@ -571,6 +571,10 @@ inline double compute_f (const unsigned int d, const double *u, const double h) 
    2. p & Roots: the biggest polynome is F", degree = 2 * (degree - 1).
    So, p size is 2 * degree - 1, and Roots size is 2 * degree - 2.
 */
+static int cmp_root (const void *a, const void *b) {
+  return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
+}
+
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
   
@@ -632,9 +636,6 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_clear(d2f);
     
     /* roots must be sort */
-    int cmp_root (const void *a, const void *b) {
-    return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
-    }
     qsort (roots, cumul_nroots, sizeof(root_t), cmp_root);
   }
   *nroots = cumul_nroots;
@@ -935,7 +936,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   beginJ = J;
   endJ = (1U << endJ) + J;
 
-#ifndef HAVE_GCC_STYLE_AMD64_INLINE_ASM /* Light optimization, only log2 */
+#if !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) || !defined(HAVE_SSSE3) /* Light optimization, only log2 */
   
   for (; J < endJ; J++) {
     const unsigned char *endS = S + I;
@@ -949,7 +950,7 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     } while (S < endS);
   }
 
-#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM : optimized part. Stupid but fast code. */
+#else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM && HAVE_SSSE3 : optimized part. Stupid but fast code. */
 
 #define BEGIN ".balign 8\n 0:\n add $0x10,%[S]\n"
 #define FU(A) "movapd %[u" #A "],%[f]\n"
