@@ -73,6 +73,7 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "jmp *%[rc]\n"
 			     
 			     ".p2align 4\n 1:\n"
+			     "addq $0x100, %[S]\n"
 			     "subq $0x01, %[n]\n"
 			     "movaps %[mc], -0x80(%[S])\n"
 			     "movaps %[mc], -0x70(%[S])\n"
@@ -90,7 +91,7 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "movaps %[mc],  0x50(%[S])\n"
 			     "movaps %[mc],  0x60(%[S])\n"
 			     "movaps %[mc],  0x70(%[S])\n"
-			     "0: leaq 0x100(%[S]), %[S]\n"
+			     "0:\n"
 			     "jnz 1b\n"
 			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
       return cS;
@@ -130,7 +131,8 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "jmp *%[rc]\n"
 			     
 			     ".p2align 4\n 1:\n"
-			     "subq $0x01,%[n]\n"
+			     "addq $0x100, %[S]\n"
+			     "subq $0x01, %[n]\n"
 			     "movntps %[mc], -0x80(%[S])\n"
 			     "movntps %[mc], -0x70(%[S])\n"
 			     "movntps %[mc], -0x60(%[S])\n"
@@ -147,7 +149,7 @@ static inline void *las_memset (void *S, int c, size_t n) {
 			     "movntps %[mc],  0x50(%[S])\n"
 			     "movntps %[mc],  0x60(%[S])\n"
 			     "movntps %[mc],  0x70(%[S])\n"
-			     "0: leaq 0x100(%[S]), %[S]\n"
+			     "0:\n"
 			     "jnz 1b\n"
 			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
       return cS;
@@ -198,7 +200,8 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
                          "jmpq *%[rc]\n"
                          
                          ".p2align 4\n 1:\n"
-                         "subq $0x01,%[n]\n"
+			 "addq $0x100, %[S]\n"
+                         "subq $0x01, %[n]\n"
                          "movaps %[mc], -0x80(%[S])\n"
                          "movaps %[mc], -0x70(%[S])\n"
                          "movaps %[mc], -0x60(%[S])\n"
@@ -215,7 +218,7 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
                          "movaps %[mc],  0x50(%[S])\n"
                          "movaps %[mc],  0x60(%[S])\n"
                          "movaps %[mc],  0x70(%[S])\n"
-                         "0: leaq 0x100(%[S]), %[S]\n"
+                         "0:\n"
                          "jnz 1b\n"
                          : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
   return cS;
@@ -282,7 +285,8 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
                          "jmpq *%[rc]\n"
                          
                          ".p2align 4\n 1:\n"
-                         "subq $0x01,%[n]\n"
+			 "addq $0x100, %[S]\n"
+                         "subq $0x01, %[n]\n"
                          "movntps %[mc], -0x80(%[S])\n"
                          "movntps %[mc], -0x70(%[S])\n"
                          "movntps %[mc], -0x60(%[S])\n"
@@ -299,7 +303,7 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
                          "movntps %[mc],  0x50(%[S])\n"
                          "movntps %[mc],  0x60(%[S])\n"
                          "movntps %[mc],  0x70(%[S])\n"
-                         "0: leaq 0x100(%[S]), %[S]\n"
+                         "0:\n"
                          "jnz 1b\n"
                          : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
   return cS;
