@@ -14,7 +14,7 @@
 #include "sieve/las-config.h"
 #include "sieve/las-types.h"
 #include "sieve/las-debug.h"
-#include "sieve/las-norms.h"
+#include "sieve/las-norms.c"
 #include "utils/utils.h"
 #include "portability.h"
 

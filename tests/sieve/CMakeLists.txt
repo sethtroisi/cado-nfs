@@ -52,9 +52,10 @@ macro (add_trialdiv_test MAXLEN)
 endmacro(add_trialdiv_test)
 
 macro (add_init_norms_bucket_region)
-  add_executable(test_init_norms_bucket_region test_init_norms_bucket_region.c)
+  add_executable(test_init_norms_bucket_region test_init_norms_bucket_region.c )
   set_property(TARGET test_init_norms_bucket_region PROPERTY COMPILE_DEFINITIONS)
-  target_link_libraries(test_init_norms_bucket_region las-norms utils tests)
+#  target_link_libraries(test_init_norms_bucket_region las-norms utils tests)
+  target_link_libraries(test_init_norms_bucket_region utils tests)
   run_test(test_init_norms_bucket_region test_init_norms_bucket_region)
 endmacro(add_init_norms_bucket_region)
 
