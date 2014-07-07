@@ -21,6 +21,11 @@
 #include "portability.h"
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
+/* Need if memset is already a define */
+#ifdef memset
+#define save_define_memset memset
+#undef memset
+#endif
 #define memset las_memset
 /*************************** Memset functions pack **********************************
  * Public functions :
@@ -43,13 +48,17 @@ MAYBE_UNUSED inline void *las_memset (void *S, int c, size_t n) {
   int64_t rc = 0x0101010101010101 * (uint8_t) c;
   if (LIKELY (n > 0x20)) {
     register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-    __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc));
+    /* Not possible on few architectures to use movq: gas bug.
+     * So I use movd + pshufd instead of movq + movlhps.
+     * __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
+    __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
     void *cS = S;
     *(int64_t *) ((uintptr_t) S + n - 0x10) = rc;
     *(int64_t *) ((uintptr_t) S + n - 0x08) = rc;
     *(int64_t *) ((uintptr_t) S           ) = rc;
     *(int64_t *) ((uintptr_t) S     + 0x08) = rc;
-    __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc));
+    /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
+    __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
     if (LIKELY (n < min_stos)) {
       n += (uintptr_t) S - 0x10;
       n |= 0x0f;
@@ -169,12 +178,14 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S - 0x10;
-  __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc));
+  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
+  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc));
+  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
+  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
   S |= 0x0f;
   n |= 0x0f;
   n -= S;
@@ -217,7 +228,7 @@ uintptr_t memset_rep_stosq (uintptr_t S, int c, size_t n) {
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S;
-  __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc));
+  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
@@ -250,12 +261,14 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S - 0x10;
-  __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc));
+  __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
+  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc));
+  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
+  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
   S |= 0x0f;
   n |= 0x0f;
   n -= S;
@@ -1872,4 +1885,8 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
 #undef memset
+#ifdef save_define_memset
+#define memset save_define_memset
+#undef save_define_memset
+#endif
 #endif
