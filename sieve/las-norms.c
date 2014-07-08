@@ -1574,9 +1574,9 @@ void sieve_info_init_norm_data(sieve_info_ptr si)
     unsigned int d = si->cpoly->pols[side]->deg;
     sieve_side_info_ptr s = si->sides[side];
     mpz_poly_init (s->fij, d);
-    s->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
+    s->fijd = (double *) malloc_aligned((d + 1) * sizeof(*(s->fijd)), 16);
     FATAL_ERROR_CHECK(s->fijd == NULL, "malloc failed");
-    s->roots = (root_ptr) malloc_aligned((d * 4 + 1) * sizeof(root_ptr *), 16);
+    s->roots = (root_ptr) malloc_aligned((d * 4 + 1) * sizeof(*(s->roots)), 16);
     FATAL_ERROR_CHECK(s->roots == NULL, "malloc failed");
     s->nroots = 0;
   }
