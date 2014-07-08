@@ -747,6 +747,10 @@ L2_skewness (mpz_poly_ptr f, int prec)
   return s;
 }
 
+double L2_skew_lognorm (mpz_poly_ptr f, int prec)
+{
+  return L2_lognorm (f, L2_skewness (f, prec));
+}
 
 #ifdef OPTIMIZE_MP
 
@@ -1950,7 +1954,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
      [f+(khitot*x^2+lamtot*x+mutot)*g](x+k) and g(x+k) */
   mpz_t tmp;
   int changed, changedt, changed2, changed1;
-  double logmu00, logmu0, logmu, skew;
+  double logmu00, logmu0, logmu;
   int prec = SKEWNESS_DEFAULT_PREC;
   int count = 0;
   int d = f->deg;
@@ -1958,8 +1962,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 
   G->coeff = g;
   G->deg = 1;
-  skew = L2_skewness (f, prec);
-  logmu00 = logmu0 = L2_lognorm (f, skew);
+  logmu00 = logmu0 = L2_skew_lognorm (f, prec);
   mpz_init_set_ui (k, 1);
   mpz_init_set_ui (k2, 1);
   mpz_init_set_ui (k1, 1);
@@ -1977,8 +1980,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
       /* first try translation by kt */
       do_translate_z (f, g, kt); /* f(x+kt) */
       mpz_add (ktot, ktot, kt);
-      skew = L2_skewness (f, prec);
-      logmu = L2_lognorm (f, skew);
+      logmu = L2_skew_lognorm (f, prec);
       if (logmu < logmu0)
         {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -1992,8 +1994,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           mpz_mul_si (l, kt, -2); /* l = -2*kt */
           do_translate_z (f, g, l); /* f(x-kt) */
           mpz_add (ktot, ktot, l);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
           {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2018,8 +2019,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           mpz_submul_ui (lamtot, tmp, 2);
           mpz_addmul (mutot, tmp, ktot);
           mpz_add (khitot, khitot, k2);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2036,8 +2036,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               mpz_submul_ui (lamtot, tmp, 2);
               mpz_addmul (mutot, tmp, ktot);
               mpz_add (khitot, khitot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2063,8 +2062,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           rotate_auxg_z (f->coeff, g[1], g[0], k1, 1);
           mpz_submul (mutot, ktot, k1);
           mpz_add (lamtot, lamtot, k1);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2079,8 +2077,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               rotate_auxg_z (f->coeff, g[1], g[0], l, 1); /* f - k1*x*g */
               mpz_submul (mutot, ktot, l);
               mpz_add (lamtot, lamtot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2100,8 +2097,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           /* then do rotation by k*g */
           rotate_auxg_z (f->coeff, g[1], g[0], k, 0);
           mpz_add (mutot, mutot, k);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2115,8 +2111,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               mpz_mul_si (l, k, -2); /* l = -2*k */
               rotate_auxg_z (f->coeff, g[1], g[0], l, 0); /* f - k*g */
               mpz_add (mutot, mutot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2757,7 +2752,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
        LMAX=512: 68.05/68.93/70.62
        LMAX=1024: 68.05/68.89/70.35
     */
-#define LMAX 256
+#define LMAX 8192
     for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
 #undef LMAX
     {
@@ -2787,6 +2782,13 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
         mpz_ndiv_q (k, f->coeff[2], g[0]);
         mpz_neg (k, k);
         rotate_auxg_z (f->coeff, g[1], g[0], k, 2);
+
+        /* skip if the coefficient of degree 2 is not small enough.
+           Since f[2] is reduced modulo g[0] with rounding to nearest,
+           it has (at least) one bit less than g[0], thus with
+           bitsize(f[2]) + k < bitsize(g[0]) it remains 1/2^k of the hits. */
+        if (mpz_sizeinbase (f->coeff[2], 2) + 5 >= mpz_sizeinbase (g[0], 2))
+          continue;
 
 #ifdef OPTIMIZE_MP
         optimize_aux_mp (f, g, verbose, use_rotation);
