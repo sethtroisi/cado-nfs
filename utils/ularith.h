@@ -203,6 +203,37 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   return cy;
 }
 
+
+/* Requires a < m and b <= m, then r == a+b (mod m) and r < m */
+MAYBE_UNUSED
+static inline void
+ularith_addmod_ul_ul (unsigned long *r, const unsigned long a,
+               const unsigned long b, const unsigned long m)
+{
+  ASSERT_EXPENSIVE (a < m && b <= m);
+
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  {
+    unsigned long t = a + b, tr = a - m;
+
+    __asm__ __VOLATILE (
+      "add %2, %0\n\t"   /* tr += b */
+      "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
+      : "+&r" (tr)
+      : "rm" (t), ULARITH_CONSTRAINT_G (b)
+      : "cc"
+    );
+    ASSERT_EXPENSIVE (tr == ((a >= m - b) ? (a - (m - b)) : (a + b)));
+    r[0] = tr;
+  }
+#else
+  r[0] = (b >= m - a) ? (b - (m - a)) : (a + b);
+#endif
+
+  ASSERT_EXPENSIVE (r[0] < m);
+}
+
+
 /* Subtract an unsigned long from two unsigned longs with borrow propagation 
    from low word (r1) to high word (r2). Any borrow out from high word is 
    lost. */
