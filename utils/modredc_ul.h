@@ -673,40 +673,15 @@ static inline void
 modredcul_sub (residueredcul_t r, const residueredcul_t a,
                const residueredcul_t b, const modulusredcul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
 #ifdef MODTRACE
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  {
-    unsigned long tr, t = a[0];
-    __asm__ __VOLATILE (
-      "sub %2, %1\n\t"  /* t -= b ( = a - b) */
-      "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
-      "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
-      : "=&r" (tr), "+&r" (t)
-      : ULARITH_CONSTRAINT_G (b[0]), "r" (m[0].m)
-      : "cc"
-    );
-    r[0] = tr;
-  }
-#elif 1
-  /* Seems to be faster than the one below */
-  {
-    unsigned long t = 0UL, tr;
-    if ((tr = a[0] - b[0]) > a[0])
-      t = m[0].m;
-    r[0] = tr + t;
-  }
-#else
-  r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0].m) : (a[0] - b[0]);
-#endif
+  ularith_submod_ul_ul(r, a[0], b[0], m[0].m);
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
-  ASSERT_EXPENSIVE (r[0] < m[0].m);
 }
 
 
