@@ -2,6 +2,8 @@
 
 OUTPUT_FILE="$1"
 
+if ! [ -d .git ] ; then exit 0 ; fi
+
 function list_modified() {
   echo '#define CADO_MODIFIED_FILES "\'
   git status --porcelain -uno | while read STATUS FILE
