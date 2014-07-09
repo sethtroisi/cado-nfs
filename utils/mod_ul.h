@@ -461,33 +461,15 @@ static inline void
 modul_add (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  {
-    unsigned long t = a[0] - m[0], tr = a[0] + b[0];
-    
-    __asm__ __VOLATILE (
-      "add %2, %1\n\t"   /* t += b */
-      "cmovc %1, %0\n\t"  /* if (cy) tr = t */
-      : "+r" (tr), "+&r" (t)
-      : "g" (b[0])
-      : "cc"
-    );
-    ASSERT_EXPENSIVE (tr == ((a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0])));
-    r[0] = tr;
-  }
-#else
-  r[0] = (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]);
-#endif
+  ularith_addmod_ul_ul(r, a[0], b[0], m[0]);
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
-  ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
 
@@ -507,9 +489,7 @@ static inline void
 modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  unsigned long b2 = b % m[0];
-  ASSERT_EXPENSIVE (a[0] < m[0]);
-  r[0] = (a[0] >= m[0] - b2) ? (a[0] - (m[0] - b2)) : (a[0] + b2);
+  ularith_addmod_ul_ul(r, a[0], b % m[0], m[0]);
 }
 
 MAYBE_UNUSED

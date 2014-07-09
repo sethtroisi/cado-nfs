@@ -614,33 +614,15 @@ static inline void
 modredcul_add (residueredcul_t r, const residueredcul_t a,
                const residueredcul_t b, const modulusredcul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] <= m[0].m);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  {
-    unsigned long t = a[0] + b[0], tr = a[0] - m[0].m;
-
-    __asm__ __VOLATILE (
-      "add %2, %0\n\t"   /* tr += b */
-      "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
-      : "+&r" (tr)
-      : "rm" (t), ULARITH_CONSTRAINT_G (b[0])
-      : "cc"
-    );
-    ASSERT_EXPENSIVE (tr == ((a[0] >= m[0].m - b[0]) ? (a[0] - (m[0].m - b[0])) : (a[0] + b[0])));
-    r[0] = tr;
-  }
-#else
-  r[0] = (b[0] >= m[0].m - a[0]) ? (b[0] - (m[0].m - a[0])) : (a[0] + b[0]);
-#endif
+  ularith_addmod_ul_ul(r, a[0], b[0], m[0].m);
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
-  ASSERT_EXPENSIVE (r[0] < m[0].m);
 }
 
 
