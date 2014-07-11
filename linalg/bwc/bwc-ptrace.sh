@@ -59,6 +59,8 @@ if ! type -p seq >/dev/null ; then
         if [ "$2" ] ; then
             incr="$1"
             shift
+        else
+            incr=1
         fi
         last="$1"
         while [ "$first" -le "$last" ] ; do
