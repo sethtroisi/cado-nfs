@@ -49,16 +49,43 @@ check_product_c_ul(unsigned long *a1, unsigned long *a2,
    return ok;
 }
 
+
+/* Choose one of a few "interesting" moduli for the batch inversion:
+   always odd, some very small, some very large, some random. */
+static unsigned long
+choose_odd_modulus_ul(const unsigned long i)
+{
+  switch (i) {
+     case 0: return 3;
+     case 1: return 5;
+     case 2: return ULONG_MAX; 
+     case 3: return ULONG_MAX - 2; 
+     default: return random_uint64() | 1;
+   }
+}
+
+/* Choose an "interesting" value for an unsigned long depending on i and total,
+   where total is the number of i values over which we iterate.
+   one quarter are chosen small, a quarter large, rest random */
+static unsigned long
+choose_constant(const unsigned long i, const unsigned long total)
+{
+  if (i < total / 4) {
+    return i;
+  } else if (i < total / 2) {
+    return ULONG_MAX - (i - 5);
+  } else {
+    return random_uint64();
+  }
+}
+
 static int
-test_modredc_batchinv_ul (const size_t len, const unsigned long c)
+test_modredc_batchinv_ul (const size_t len, const unsigned long c,
+                          const modulusredcul_t m)
 {
   unsigned long *a, *r;
-  modulusredcul_t m;
   int ok = 1;
   
-  /* Random, odd modulus */
-  modredcul_initmod_ul(m, random_uint64() | 1);
-
   a = (unsigned long *) malloc(len * sizeof(unsigned long));
   r = (unsigned long *) malloc(len * sizeof(unsigned long));
   
@@ -217,16 +244,28 @@ main (int argc, const char *argv[])
   tests_common_get_iter (&iter);
   verbose = tests_common_get_verbose();
   
+  /* With -iter n, try n different values for the modulus: a few small,
+     a few large, rest random. */
   for (unsigned long i = 0; ok && i < iter; i++) {
-    ok &= test_modredc_batchinv_ul(i, 0);
-    ok &= test_modredc_batchinv_ul(i, 1);
-    ok &= test_modredc_batchinv_ul(i, random_uint64());
+    modulusredcul_t m;
+    modredcul_initmod_ul(m, choose_odd_modulus_ul(i));
+
+    /* Always try batch sizes of 0 to 10 */
+    for (size_t len = 0 ; len < 10; len++) {
+      /* For each batch size, try a few "interesting" constants c:
+         a few small, a few large, a few random */
+      const unsigned long nr_c = 20;
+      for (unsigned long k = 0; k < nr_c; k++)
+        ok &= test_modredc_batchinv_ul(len, choose_constant(k, nr_c), m);
+    }
+    modredcul_clearmod(m);
   }
   
   for (unsigned long i = 1; ok && i < iter; i++) {
-    const unsigned long num = (i < 20) ? i : random_uint64();
-    for (unsigned long j = 3; ok && j < 2*iter; j += 2) {
-      const unsigned long den = (j < 20) ? j : (random_uint64() | 1UL);
+    const unsigned long den = choose_odd_modulus_ul(i);
+    const unsigned long nr_c = 20;
+    for (unsigned long j = 0; ok && j < nr_c; j++) {
+      const unsigned long num = choose_constant(i, nr_c);
       ok &= test_modredcul_batch_Q_to_Fp(num, den, 0, iter);
       if (num % 2 == 1) {
         ok &= test_modredcul_batch_Q_to_Fp(num, den, 1, iter);
