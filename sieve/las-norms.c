@@ -549,7 +549,7 @@ static inline __m128i _mm_lg2abs(__m128d *i, const __m128d add, const __m128d sc
 }
 #endif /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
 
-inline double compute_f (const unsigned int d, const double *u, const double h) {
+static inline double compute_f (const unsigned int d, const double *u, const double h) {
   size_t k = (size_t) d;
   double f = u[k];
   switch (k) {
