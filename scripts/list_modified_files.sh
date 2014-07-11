@@ -2,7 +2,12 @@
 
 OUTPUT_FILE="$1"
 
-if ! [ -d .git ] ; then exit 0 ; fi
+if ! [ -d .git ] ; then
+    if ! [ -f "$OUTPUT_FILE" ] ; then
+        touch "$OUTPUT_FILE"
+    fi
+    exit 0
+fi
 
 function list_modified() {
   echo '#define CADO_MODIFIED_FILES "\'
