@@ -4,9 +4,7 @@ OUTPUT_FILE="$1"
 
 if ! [ -d .git ] ; then
     if ! [ -f "$OUTPUT_FILE" ] ; then
-        cat > "$OUTPUT_FILE" <<'EOF'
-#define CADO_MODIFIED_FILES "(tarball extracted)\n"
-EOF
+        touch "$OUTPUT_FILE"
     fi
     exit 0
 fi
