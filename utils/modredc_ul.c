@@ -281,6 +281,28 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
   return 1;
 }
 
+/* Let v = lo + 2^LONG_BIT * hi and
+   subtrahend = subtrahend_lo + subtrahend_hi * 2^LONG_BIT.
+   Return 1 if (v - subtrahend) / divisor is a non-negative integer less than
+   2^LONG_BIT, and 0 otherwise */
+static int
+check_divisible(const unsigned long lo, const unsigned long hi,
+                const unsigned long subtrahend_lo, const unsigned long subtrahend_hi,
+                const unsigned long divisor)
+{
+  /* Test for subtraction underflow */
+  if (ularith_gt_2ul_2ul(subtrahend_lo, subtrahend_hi, lo, hi))
+    return 0;
+  unsigned long diff_lo = lo, diff_hi = hi;
+  ularith_sub_2ul_2ul(&diff_lo, &diff_hi, subtrahend_lo, subtrahend_hi);
+  /* Test for division overflow */
+  if (diff_hi >= divisor)
+    return 0;
+  unsigned long q, r;
+  ularith_div_2ul_ul_ul (&q, &r, diff_lo, diff_hi, divisor);
+  return r == 0;
+}
+
 /* For each 0 <= i < n, compute r[i] = -num/(den*2^k) mod p[i].
    den must be odd.
    Returns 1 if successful. If any modular inverse does not exist,
@@ -299,36 +321,44 @@ modredcul_batch_Q_to_Fp (unsigned long *r, const unsigned long num,
     return 0;
 
   /* Now we have r[i] = num/p[i] (mod den). We want -num/den (mod p[i]).
-     Using Bezout's identity, we have, for some integer t,
+     Using (a variant of) Bezout's identity, we have, for some integer t,
      r[i] * p[i] - t * den = num
      thus den | (r[i] * p[i] - num), and thus
      t = (r[i] * p[i] - num) / den is an integer and satisfies
      t = -num/den (mod p[i]).
 
      We have 0 <= r[i] < den, and thus
-     t = p[i] * r[i]/den - num/den < p[i] - num/den,
+     t = p[i] * r[i]/den - num/den < p[i] - num/den
+     With p[i], den > 0, and r[i] >= 0, we also have
      t >= -num/den, so
      -num/den <= t < p[i] - num/den
-     so t fits in unsigned long, and we can compute t modulo 2^LONGBITS;
+     Thus t fits in unsigned long, and we can compute t modulo 2^LONGBITS;
      since den is odd, we can multiply by den^{-1} mod 2^LONGBITS. */
+
   const unsigned long den_inv = ularith_invmod(den);
   for (size_t i = 0; i < n; i++) {
     unsigned long hi, lo, t;
+    const unsigned long ratio_p = (ratio >= p[i]) ? ratio % p[i] : ratio;
     ularith_mul_ul_ul_2ul(&lo, &hi, r[i], p[i]);
+    t = ((lo - remainder) * den_inv);
+    /* Treat cases t < 0 and t >= 0 separately, so we can negate (mod p[i])
+       in case of negative t. */
     if (ularith_gt_2ul_2ul(remainder, 0, lo, hi)) {
-      ASSERT_ALWAYS((remainder - lo) % den == 0);
-      t = ((remainder - lo) * den_inv);
-      ASSERT_ALWAYS(t < p[i]);
-      t = (t + ratio) % p[i]; /* FIXME */
+      /* Expensive check that den | (remainder - lo + 2^LONGBITS * hi) */
+      ASSERT_ALWAYS(check_divisible(remainder, 0, lo, hi, den));
+      /* Case t < 0. We compute t' = (num - r[i] * p[i]) / den instead, and
+         later set t = -t' mod p[i]. */
+      t = -t;
+      ASSERT_ALWAYS(t < p[i]); /* Cheap and fairly stong check */
+      /* Now we want -(t + ratio_p) mod p[i] */
+      ularith_addmod_ul_ul (&t, t, ratio_p, p[i]);
       if (t > 0)
         t = p[i] - t;
     } else {
-      t = ((lo - remainder) * den_inv);
-      ASSERT_ALWAYS(t < p[i]);
-      if (t >= ratio % p[i])
-        t = t - ratio % p[i]; /* FIXME */
-      else
-        t = p[i] + t - ratio % p[i]; /* FIXME */
+      /* Expensive check that den | (lo + 2^LONGBITS * hi - remainder) */
+      ASSERT_ALWAYS(check_divisible(lo, hi, remainder, 0, den));
+      ASSERT_ALWAYS(t < p[i]); /* Cheap and fairly stong check */
+      ularith_submod_ul_ul(&t, t, ratio_p, p[i]);
     }
     /* Now divide by the power of 2 that's supposed to be in the denominator.
        We assume this is small and do it with a simple loop. */
