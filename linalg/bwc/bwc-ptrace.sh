@@ -52,6 +52,21 @@ wordsize=64
 : ${interval=50}
 : ${mm_impl=basicp}
 
+if ! type -p seq >/dev/null ; then
+    seq() {
+        first="$1"
+        shift
+        if [ "$2" ] ; then
+            incr="$1"
+            shift
+        fi
+        last="$1"
+        while [ "$first" -le "$last" ] ; do
+            echo "$first"
+            let first=first+incr
+        done
+    }
+fi
 
 usage() {
     cat >&2 <<-EOF
