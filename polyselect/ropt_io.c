@@ -406,6 +406,7 @@ print_poly_info_short ( mpz_t *f,
   /* compute skew, logmu, nroots */
   nroots = numberOfRealRoots (cpoly->alg->coeff, d, 0, 0, NULL);
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
+  cpoly->skew = skew;
   logmu = L2_lognorm (F, skew);
   alpha = get_alpha (F, ALPHA_BOUND);
   alpha_proj = get_biased_alpha_projective (F, ALPHA_BOUND);
