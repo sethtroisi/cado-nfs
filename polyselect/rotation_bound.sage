@@ -97,6 +97,16 @@ def l2norm_tk_circular(f,s):
       n = n * pi / 7168
       # return float(1/2 * log(n / (s * s * s * s * s * s)))
       return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s * s)))
+   elif f.degree()==5:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      a5 = f[5] * s^5
+      n = 6 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4) + 14 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5) + 7 * (a4 * a4 + a1 * a1) + 3 * (a3 * a3 + a2 * a2)
+      n = n * pi / 1536
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 

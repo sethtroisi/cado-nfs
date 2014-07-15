@@ -116,7 +116,7 @@ do
     	  NUMA_NODE="$(( (NUMA_NODE + 1) % NR_CPUS ))"
     	fi
         echo "Running command: oarsh $NODE ${COMMAND[@]} --clientid="$CLIENTID" $@"
-        oarsh "$NODE" "${COMMAND[@]}" "$@" &
+        oarsh "$NODE" "${COMMAND[@]}" --clientid="$CLIENTID" "$@" &
     done
 done
 

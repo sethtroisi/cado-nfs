@@ -181,7 +181,7 @@ test_usp ()
   mpz_set_ui (R[0].a, 2);
   mpz_set_ui (R[0].b, 4);
   R[0].ka = R[0].kb = 0;
-  root = rootRefine (R, p, 6); /* root is near 3.00763029864372 */
+  root = rootRefine (R, p, 6, 1e-9); /* root is near 3.00763029864372 */
   ASSERT_ALWAYS(3.00763 <= root && root <= 3.00764);
 
   mpz_init (u);

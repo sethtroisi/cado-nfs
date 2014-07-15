@@ -601,6 +601,7 @@ scripts/cadofactor/wuclient2.py
 scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
+scripts/cadofactor/parameters
 scripts/cadofactor/CMakeLists.txt
 sieve/CMakeLists.txt
 sieve/Makefile
@@ -746,8 +747,6 @@ tests/test_iceildiv.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/test_init_norms_bucket_region.c
-tests/sieve/test_init_alg_norms_bucket_region.c
-tests/sieve/test_init_rat_norms_bucket_region.c
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh

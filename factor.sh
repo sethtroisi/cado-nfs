@@ -65,6 +65,10 @@ function find_timeout() {
 # Set "t" to a temp directory, if not already set.
 # The ":" shell built-in causes variable expansion but nothing else to happen
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
+if ! [ -d "$t" ] ; then
+    echo "No directory $t ???" >&2
+    exit 1
+fi
 # Make temp dir writable by us and readable by everyone
 chmod 755 $t
 

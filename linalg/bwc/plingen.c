@@ -1517,7 +1517,7 @@ unsigned int bm_io_set_write_behind_size(bm_io_ptr aa, unsigned int * delta)
     unsigned int mindelta = res[0];
     unsigned int maxdelta = res[1];
     unsigned int window = maxdelta - mindelta + aa->t0 + 1;
-    if (d->nsm) {
+    if (d->nrhs) {
         /* in sm-outside-matrix mode for DLP, we form the matrix F
          * slightly differently, as some *rows* are shifted out before
          * writing */
@@ -1591,8 +1591,8 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
 
 
     matpoly rhs;
-    if (d->nsm) {
-        matpoly_init(ab, rhs, d->nsm, n, 1);
+    if (d->nrhs) {
+        matpoly_init(ab, rhs, d->nrhs, n, 1);
         rhs->size = 1;
     }
 
@@ -1795,12 +1795,12 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                     if (maxdelta < kpi + subtract) continue;
                     unsigned int kF = (maxdelta - kpi) - subtract;
                     absrc_elt src = matpoly_coeff_const(ab, pi, i, jpi, s);
-                    unsigned int kF1 = kF - (i < d->nsm);
+                    unsigned int kF1 = kF - (i < d->nrhs);
                     abdst_elt dst;
                     if (kF1 == UINT_MAX) {
                         rhscontribs++;
-                        ASSERT_ALWAYS(d->nsm);
-                        ASSERT_ALWAYS(i < d->nsm);
+                        ASSERT_ALWAYS(d->nrhs);
+                        ASSERT_ALWAYS(i < d->nrhs);
                         ASSERT_ALWAYS(jF < n);
                         dst = matpoly_coeff(ab, rhs, i, jF, 0);
                     } else {
@@ -1819,12 +1819,12 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                     ASSERT(subtract < window);
                     if (maxdelta < kpi + subtract) continue;
                     unsigned int kF = (maxdelta-kpi) - subtract;
-                    unsigned int kF1 = kF - (iF < d->nsm);
+                    unsigned int kF1 = kF - (iF < d->nrhs);
                     abdst_elt dst;
                     if (kF1 == UINT_MAX) {
                         rhscontribs++;
-                        ASSERT_ALWAYS(d->nsm);
-                        ASSERT_ALWAYS(iF < d->nsm);
+                        ASSERT_ALWAYS(d->nrhs);
+                        ASSERT_ALWAYS(iF < d->nrhs);
                         ASSERT_ALWAYS(jF < n);
                         dst = matpoly_coeff(ab, rhs, iF, jF, 0);
                     } else {
@@ -1860,7 +1860,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     }
 
     matpoly_clear(ab, pi);
-    if (d->nsm) {
+    if (d->nrhs) {
         FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
         matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
         fclose(f);
@@ -2153,7 +2153,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
                 /* adjust the coefficient degree to take into account the
                  * fact that for SM columns, we might in fact be
                  * interested by the _previous_ coefficient */
-                matpoly_extract_column(ab, M, r, 0, A, j, k + (j >= bm->d->nsm));
+                matpoly_extract_column(ab, M, r, 0, A, j, k + (j >= bm->d->nrhs));
 
                 /* Now reduce it modulo all other columns */
                 for (unsigned int v = 0; v < r; v++) {
@@ -2183,7 +2183,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
                 }
                 if (u == m) {
                     printf("[X^%d] A, col %d does not increase rank (still %d)\n",
-                           k + (j >= bm->d->nsm), j, r);
+                           k + (j >= bm->d->nrhs), j, r);
 
                     /* we need at least m columns to get as starting matrix
                      * with full rank. Given that we have n columns per
@@ -2223,7 +2223,7 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
                 // if (r == m)
                     printf
                         ("[X^%d] A, col %d increases rank to %d (head row %d)\n",
-                         k + (j >= bm->d->nsm), j, r, u);
+                         k + (j >= bm->d->nrhs), j, r, u);
             }
         }
 
@@ -2338,14 +2338,14 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
 
                 for(unsigned int j = 0 ; j < n ; j++) {
                     unsigned int kA = kE + aa->t0;
-                    kA += (j >= bm->d->nsm);
+                    kA += (j >= bm->d->nrhs);
                     matpoly_extract_column(ab, E, j, s, aa->A, j, kA % window);
                 }
                 for(unsigned int jE = n ; jE < m + n ; jE++) {
                     unsigned int jA = aa->fdesc[jE-n][1];
                     unsigned int offset = aa->fdesc[jE-n][0];
                     unsigned int kA = kE + offset;
-                    kA += (jA >= bm->d->nsm);
+                    kA += (jA >= bm->d->nrhs);
                     matpoly_extract_column(ab, E, jE, s, aa->A, jA, kA % window);
                 }
             }
@@ -2589,7 +2589,7 @@ int main(int argc, char *argv[])
 
     bmstatus_init(bm, bw->m, bw->n);
 
-    bm->d->nsm = bw->nsm;
+    bm->d->nrhs = bw->nrhs;
 
     unsigned int m = d->m;
     unsigned int n = d->n;

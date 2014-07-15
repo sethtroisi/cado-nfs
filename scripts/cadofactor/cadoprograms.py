@@ -771,6 +771,7 @@ class Duplicates2(Program):
                  renumber: Parameter(is_input_file=True),
                  filelist: Parameter(is_input_file=True)=None,
                  badidealinfo: Parameter(is_input_file=True)=None,
+                 force_posix_threads: Toggle("force-posix-threads")=None,
                  dlp: Toggle("dl")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -810,6 +811,7 @@ class Purge(Program):
                  inprel: Parameter(is_input_file=True)=None,
                  outrel: Parameter(is_output_file=True)=None,
                  npass: Parameter(checktype=int)=None,
+                 force_posix_threads: Toggle("force-posix-threads")=None,
                  required_excess: Parameter(checktype=float)=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -831,6 +833,7 @@ class Merge(Program):
                  resume: Parameter(is_input_file=True)=None,
                  mkztype: Parameter(checktype=int)=None,
                  wmstmax: Parameter(checktype=int)=None,
+                 force_posix_threads: Toggle("force-posix-threads")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

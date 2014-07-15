@@ -412,9 +412,9 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
    If Roots is not NULL, put the isolating intervals in Roots[0..nroots-1].
 */
 int
-numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
+numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struct *Roots)
 {
-  int i, nroots;
+  int i, nroots, n = orig_n;
   mpz_t a, R, R1, *r;
   double C, pn, x;
   mpf_t aa;
@@ -483,7 +483,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
   mpz_clear (a);
   mpz_clear (R);
   mpz_clear (R1);
-  for (i = 0; i <= n; i++)
+  for (i = 0; i <= orig_n; i++)
     mpz_clear (r[i]);
   free (r);
 
@@ -491,20 +491,29 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
 }
 
 /* refine the root interval r[0] for the polynomial p of degree n,
-   and return a double-precision approximation of the corresponding root */
+   and return a double-precision approximation of the corresponding root,
+   with a maximal error <= precision.
+   CAREFUL1: precision is an absolute value, not a relative.
+   Use it only if you know what you do!
+   CAREFUL2: with precision == 0. + x86 32 bits + gcc mathematical default
+   -mfpmath=387, the computation of c = (a + b) * .5 is done on the
+   top of the i387 stack in 80 bits precision (extended precision).
+   The next comparaison c == a is done in this case between a memory
+   double (64 bits) and this 80 bits value.
+   Solution: in x86 and not in x86-64, (a + b) * .5 is written in memory
+   and loads in c.
+*/
+#define MAX_LOOPS (1024 + 1074) /* difference between the maximal and minimal
+                                   exponents of the double format */
 double
-rootRefine (root_struct *r, mpz_t *p, int n)
+rootRefine (root_struct *r, mpz_t *p, int n, double precision)
 {
-  volatile double a, b, c; /* we need 'volatile' here to force c to be cast
-                              to double precision in c = (a + b) * 0.5 below,
-                              otherwise if c is computed in extended precision,
-                              the comparison c == a || c == b might fail
-                              forever and we might enter an infinite loop */
+  double a, b, c;
   double sa, sb, sc;
   double_poly_t q;
   mpz_poly_t P;
-  unsigned long count = 0;
-
+  unsigned int count = MAX_LOOPS + 1;
+  
   P->coeff = p;
   P->deg = n;
   double_poly_init (q, n);
@@ -514,30 +523,56 @@ rootRefine (root_struct *r, mpz_t *p, int n)
   sa = double_poly_eval (q, a);
   sb = double_poly_eval (q, b);
   ASSERT_ALWAYS (sa * sb < 0.0);
-#define MAX_LOOPS (1024 + 1074) /* difference between the maximal and minimal
-                                   exponents of the double format */
-  while (count++ < MAX_LOOPS)
-    {
-      c = (a + b) * 0.5;
-      if (c == a || c == b)
-        break;
-      sc = double_poly_eval (q, c);
-      if (sa * sc < 0.0)
-        b = c;
-      else
-        a = c;
-    }
-  if (count >= MAX_LOOPS)
-    {
-      mpz_poly_fprintf (stdout, P);
-      printf ("a=%.16e\n", ldexp (mpz_get_d (r[0].a), -r[0].ka));
-      printf ("b=%.16e\n", ldexp (mpz_get_d (r[0].b), -r[0].kb));
-      printf ("sa=%.16e sb=%.16e\n", sa, sb);
-      exit (EXIT_FAILURE);
-    }
+  sc = 0.;
+  if (precision > 0.)
+    if (sa >= 0.)
+      while (--count) {
+	c = (a + b) * .5;
+	if (fabs(a - b) <= precision) break;
+	sc = double_poly_eval (q, c);
+	if (sc < 0.) b = c; else a = c;
+      }
+    else
+      while (--count) {
+	c = (a + b) * .5;
+	if (fabs(a - b) <= precision) break;
+	sc = double_poly_eval (q, c);
+	if (sc < 0.) a = c; else b = c;
+      }
+  else
+    if (sa >= 0.)
+      while (--count) {
+#if defined(__x86) && !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+	c = *(volatile double *) &((a + b) * .5);
+#else
+	c = (a + b) * .5;
+#endif
+	if (c == a || c == b) break;             
+	sc = double_poly_eval (q, c);
+	if (sc < 0.) b = c; else a = c;
+      }
+    else
+      while (--count) {
+#if defined(__x86) && !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+	c = *(volatile double *) &((a + b) * .5);
+#else
+	c = (a + b) * .5;
+#endif
+	if (c == a || c == b) break;
+	sc = double_poly_eval (q, c);
+	if (sc < 0.) a = c; else b = c;
+      }
+  if (UNLIKELY(!count)) {
+    mpz_poly_fprintf (stdout, P);
+    printf ("a=%.16e\n", ldexp (mpz_get_d (r[0].a), -r[0].ka));
+    printf ("b=%.16e\n", ldexp (mpz_get_d (r[0].b), -r[0].kb));
+    printf ("sa=%.16e sb=%.16e\n", sa, sb);
+    exit (EXIT_FAILURE);
+  }
   double_poly_clear (q);
   return c;
 }
+#undef MAX_LOOPS
 
 #ifdef MAIN
 int

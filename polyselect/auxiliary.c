@@ -251,7 +251,7 @@ L2_lognorm (mpz_poly_ptr f, double s)
    1/2 log(int(int(...)))
 */
 void
-L2_lognorm_mp (mpz_poly_ptr f, mpz_t s, int method, mpz_t norm)
+L2_lognorm_mp (mpz_poly_ptr f, mpz_t s, mpz_t norm)
 {
   mpz_t n, tmp, tmp1, tmpsum;
   unsigned long i;
@@ -747,12 +747,16 @@ L2_skewness (mpz_poly_ptr f, int prec)
   return s;
 }
 
+double L2_skew_lognorm (mpz_poly_ptr f, int prec)
+{
+  return L2_lognorm (f, L2_skewness (f, prec));
+}
 
 #ifdef OPTIMIZE_MP
 
 /* Use derivative test, with ellipse regions */
 void
-L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
+L2_skewness_derivative_mp (mpz_poly_ptr F, int prec, mpz_t skewness)
 {
   mpz_t s, s1, s2, s3, s4, s5, s6, a, b, c, nc;
   mpz_init (s);
@@ -767,7 +771,8 @@ L2_skewness_derivative_mp (mpz_poly_ptr f, int prec, int method, mpz_t skewness)
   mpz_init (c);
   mpz_init (nc);
 
-  int i;
+  int i, d = F->deg;
+  mpz_t *f = F->coeff;
 
   if (d == 6) {
     mpz_t df[d+1];
@@ -1949,7 +1954,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
      [f+(khitot*x^2+lamtot*x+mutot)*g](x+k) and g(x+k) */
   mpz_t tmp;
   int changed, changedt, changed2, changed1;
-  double logmu00, logmu0, logmu, skew;
+  double logmu00, logmu0, logmu;
   int prec = SKEWNESS_DEFAULT_PREC;
   int count = 0;
   int d = f->deg;
@@ -1957,8 +1962,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 
   G->coeff = g;
   G->deg = 1;
-  skew = L2_skewness (f, prec);
-  logmu00 = logmu0 = L2_lognorm (f, skew);
+  logmu00 = logmu0 = L2_skew_lognorm (f, prec);
   mpz_init_set_ui (k, 1);
   mpz_init_set_ui (k2, 1);
   mpz_init_set_ui (k1, 1);
@@ -1976,8 +1980,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
       /* first try translation by kt */
       do_translate_z (f, g, kt); /* f(x+kt) */
       mpz_add (ktot, ktot, kt);
-      skew = L2_skewness (f, prec);
-      logmu = L2_lognorm (f, skew);
+      logmu = L2_skew_lognorm (f, prec);
       if (logmu < logmu0)
         {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -1991,8 +1994,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           mpz_mul_si (l, kt, -2); /* l = -2*kt */
           do_translate_z (f, g, l); /* f(x-kt) */
           mpz_add (ktot, ktot, l);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
           {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2017,8 +2019,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           mpz_submul_ui (lamtot, tmp, 2);
           mpz_addmul (mutot, tmp, ktot);
           mpz_add (khitot, khitot, k2);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2035,8 +2036,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               mpz_submul_ui (lamtot, tmp, 2);
               mpz_addmul (mutot, tmp, ktot);
               mpz_add (khitot, khitot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2062,8 +2062,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           rotate_auxg_z (f->coeff, g[1], g[0], k1, 1);
           mpz_submul (mutot, ktot, k1);
           mpz_add (lamtot, lamtot, k1);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2078,8 +2077,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               rotate_auxg_z (f->coeff, g[1], g[0], l, 1); /* f - k1*x*g */
               mpz_submul (mutot, ktot, l);
               mpz_add (lamtot, lamtot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2099,8 +2097,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
           /* then do rotation by k*g */
           rotate_auxg_z (f->coeff, g[1], g[0], k, 0);
           mpz_add (mutot, mutot, k);
-          skew = L2_skewness (f, prec);
-          logmu = L2_lognorm (f, skew);
+          logmu = L2_skew_lognorm (f, prec);
           if (logmu < logmu0)
             {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2114,8 +2111,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
               mpz_mul_si (l, k, -2); /* l = -2*k */
               rotate_auxg_z (f->coeff, g[1], g[0], l, 0); /* f - k*g */
               mpz_add (mutot, mutot, l);
-              skew = L2_skewness (f, prec);
-              logmu = L2_lognorm (f, skew);
+              logmu = L2_skew_lognorm (f, prec);
               if (logmu < logmu0)
                 {
 #ifdef DEBUG_OPTIMIZE_AUX
@@ -2193,8 +2189,7 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
    use mpz
 */
 void
-optimize_aux_mp (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
-                 int method)
+optimize_aux_mp (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 {
   mpz_t kt, k2, k1, k, l; /* current offset */
   mpz_t ktot, khitot, lamtot, mutot; /* compute total translation and rotation,
@@ -2205,7 +2200,11 @@ optimize_aux_mp (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
   int changed, changedt, changed2, changed1;
   int prec = SKEWNESS_DEFAULT_PREC;
   int count = 0;
+  int d = f->deg;
+  mpz_poly_t G;
 
+  G->coeff = g;
+  G->deg = 1;
   mpz_init (tmp);
   mpz_init (tmp0);
   mpz_init (skew);
@@ -2447,8 +2446,10 @@ optimize_aux_mp (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
                  khitot, lamtot, mutot, ktot);
     if (verbose > 1)
     {
-      fprintf (stderr, "# "); fprint_polynomial (stderr, f->coeff, d);
-      fprintf (stderr, "# "); fprint_polynomial (stderr, g, d);
+      fprintf (stderr, "# ");
+      mpz_poly_fprintf (stderr, f);
+      fprintf (stderr, "# ");
+      mpz_poly_fprintf (stderr, G);
     }
   }
   mpz_clear (tmp);
@@ -2703,13 +2704,13 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
      and we want to force f[d-3] to be small. */
   if (d == 6)
   {
-    mpz_t k, r[3], f_copy[MAXDEGREE], g0_copy, best_k;
+    mpz_t k, r[3], g0_copy, best_g0;
     int i, j, n;
-    long l, best_l = LONG_MAX;
-    mpz_poly_t h;
+    long l;
+    mpz_poly_t h, best_f, f_copy;
 
     mpz_init (k);
-    mpz_init (best_k);
+    mpz_init (best_g0);
 
 #ifdef OPTIMIZE_MP
     mpz_t skew, logmu, best_logmu;
@@ -2722,14 +2723,15 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
     double skew, logmu, best_logmu = DBL_MAX;
 #endif
 
+    mpz_poly_init (f_copy, d);
+    mpz_poly_init (best_f, d);
     mpz_poly_init (h, 3);
     h->deg = 3;
     for (i = 0; i < 3; i++)
       mpz_init (r[i]);
 
-    /* f[d] and g[1] are not changed below */
-    for (i = 0; i < d; i++)
-      mpz_init_set (f_copy[i], f->coeff[i]);
+    /* g[1] is not changed below, thus we only save g[0] */
+    mpz_poly_copy (f_copy, f);
     mpz_init_set (g0_copy, g[0]);
 
     /* We use here an idea suggested by Thorsten Kleinjung, namely
@@ -2754,8 +2756,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
     for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
 #undef LMAX
     {
-      for (i = 0; i < d; i++)
-        mpz_set (f->coeff[i], f_copy[i]);
+      mpz_poly_copy (f, f_copy);
       mpz_set (g[0], g0_copy);
 
       rotate_auxg_si (f->coeff, g, l, 3);
@@ -2764,8 +2765,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 
       for (j = 0; j < n; j++)
       {
-        for (i = 0; i < d; i++)
-          mpz_set (f->coeff[i], f_copy[i]);
+        mpz_poly_copy (f, f_copy);
         mpz_set (g[0], g0_copy);
         rotate_auxg_si (f->coeff, g, l, 3);
         mpz_set (k, r[j]);
@@ -2784,13 +2784,12 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
         rotate_auxg_z (f->coeff, g[1], g[0], k, 2);
 
 #ifdef OPTIMIZE_MP
-        optimize_aux_mp (f, g, verbose, use_rotation, 0);
-        L2_skewness_derivative_mp (f, SKEWNESS_DEFAULT_PREC, 0, skew);
-        L2_lognorm_mp (f, skew, 0, logmu);
+        optimize_aux_mp (f, g, verbose, use_rotation);
+        L2_skewness_derivative_mp (f, SKEWNESS_DEFAULT_PREC, skew);
+        L2_lognorm_mp (f, skew, logmu);
 
-        double logmud = 0.0, skewd = 0.0, skewf = 0.0;
+        double logmud = 0.0, skewd = 0.0;
         logmud = mpz_get_d (logmu);
-        skewf = mpz_get_d (skew);
         mpz_pow_ui (skew, skew, d); // s^6
         skewd = mpz_get_d (skew);
         logmud = logmud / skewd * 0.00043828022511018320850; /* Pi/7168 */
@@ -2798,8 +2797,8 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 
         if (logmud < best_logmud) {
           best_logmud = logmud;
-          best_l = l;
-          mpz_set (best_k, r[j]);
+          mpz_poly_copy (best_f, f);
+          mpz_set (best_g0, g[0]);
         }
 #else
         optimize_aux (f, g, verbose, use_rotation);
@@ -2809,42 +2808,25 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
         if (logmu < best_logmu)
           {
             best_logmu = logmu;
-            best_l = l;
-            mpz_set (best_k, r[j]);
+            mpz_poly_copy (best_f, f);
+            mpz_set (best_g0, g[0]);
         }
 #endif
 
       } // #roots
     }  // #translations
 
-    ASSERT(best_l != LONG_MAX);
-
-    /* now consider the best (l,j) */
-    for (i = 0; i < d; i++)
-      mpz_set (f->coeff[i], f_copy[i]);
-    mpz_set (g[0], g0_copy);
-    rotate_auxg_si (f->coeff, g, best_l, 3);
-    mpz_set (k, best_k);
-    do_translate_z (f, g, k);
-
-    /* now reduce coefficients f[0], f[1], f[2] using rotation */
-    mpz_ndiv_q (k, f->coeff[0], g[0]);
-    mpz_neg (k, k);
-    rotate_auxg_z (f->coeff, g[1], g[0], k, 0);
-    mpz_ndiv_q (k, f->coeff[1], g[0]);
-    mpz_neg (k, k);
-    rotate_auxg_z (f->coeff, g[1], g[0], k, 1);
-    mpz_ndiv_q (k, f->coeff[2], g[0]);
-    mpz_neg (k, k);
-    rotate_auxg_z (f->coeff, g[1], g[0], k, 2);
+    /* set f and g to the best polynomials found */
+    mpz_set (g[0], best_g0);
+    mpz_poly_copy (f, best_f);
 
     mpz_clear (k);
-    mpz_clear (best_k);
+    mpz_clear (best_g0);
     mpz_poly_clear (h);
+    mpz_poly_clear (best_f);
+    mpz_poly_clear (f_copy);
     for (i = 0; i < 3; i++)
       mpz_clear (r[i]);
-    for (i = 0; i < d; i++)
-      mpz_clear (f_copy[i]);
     mpz_clear (g0_copy);
 
 #ifdef OPTIMIZE_MP
@@ -2856,7 +2838,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
   }
 
 #ifdef OPTIMIZE_MP
-  optimize_aux_mp (f, g, verbose, use_rotation, 0);
+  optimize_aux_mp (f, g, verbose, use_rotation);
 #else
   optimize_aux (f, g, verbose, use_rotation);
 #endif

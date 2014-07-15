@@ -2,6 +2,15 @@
 
 OUTPUT_FILE="$1"
 
+if ! [ -d .git ] ; then
+    if ! [ -f "$OUTPUT_FILE" ] ; then
+        cat > "$OUTPUT_FILE" <<'EOF'
+#define CADO_MODIFIED_FILES "# (tarball extracted)\n"
+EOF
+    fi
+    exit 0
+fi
+
 function list_modified() {
   echo '#define CADO_MODIFIED_FILES "\'
   git status --porcelain -uno | while read STATUS FILE
