@@ -209,6 +209,11 @@ mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
 
 /************************ Handling of the SMs *******************************/
 unsigned int nbsm = 0; /* number of SM that must be used. Must be 0 for FFS */
+#ifdef GFP3
+unsigned int nbunits = 2; /* gabuzomeu */
+#else
+unsigned int nbunits = 0; /* gabuzomeu */
+#endif
 
 #ifndef FOR_FFS /* Not needed for FFS */
 mpz_t smexp; /* exponent for SM */
@@ -252,6 +257,36 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
   for (i = degF - SMres->deg - 1; i < nbsm; i++)
     mpz_add_log_mod_mpz (l, smlog[i], SMres->coeff[degF-1-i], q);
   mpz_poly_clear(SMres);
+#ifdef GFP3
+  /* begin_gabuzomeu */
+  {
+      /* we need retrieve the exponents of the units in (a-b*x) */
+      FILE *in = fopen("/mnt/data/morain/Cnt/DLP/gfpk/catrel/GFP3/p3dd10g/p3dd10g.units.abunits", "r");
+      int64_t aa;
+      uint64_t bb;
+      int32_t ok = 0, u[10];
+      while(fscanf(in, "%" PRId64 " %" PRIu64 " %d %d", &aa, &bb, u, u+1)
+	    != EOF){
+	  if(aa == a && bb == b){
+	      //	      printf("# GOTCHA: %d %d\n", u[0], u[1]);
+	      ok = 1;
+	      break;
+	  }
+      }
+      fclose(in);
+      if(ok == 0){
+	  fprintf(stderr, "GASP: no eps found\n");
+	  fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
+	  exit(-1);
+      }
+      else{
+	  /* add contrib */
+	  for(i = 0; i < nbunits; i++)
+	      mpz_add_log_mod_si (l, smlog[nbsm+i], u[i], q);
+      }
+  }
+  /* end_gabuzomeu */
+#endif // GFP3
 }
 
 /* Callback function called by filter_rels in compute_log_from_rels */
@@ -379,7 +414,7 @@ log_do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
         mpz_ptr vlog = data->rels[i].log_known_part;
         if (nb == 0 && mpz_cmp_ui (vlog, 0) != 0)
         {
-          gmp_fprintf (stderr, "Error, no unknow log in rel %" PRIu64 " and sum"
+          gmp_fprintf (stderr, "Error, no unknown log in rel %" PRIu64 " and sum"
                        " of log is not zero, sum is:\n%Zd\n", i, vlog);
           exit (EXIT_FAILURE);
         }
@@ -740,7 +775,16 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
     FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
     logtab_insert (log, log->nprimes+nsm, tmp_log);
   }
-
+#ifdef GFP3
+  /* begin_gabuzomeu */
+  for (unsigned int nu = 0; nu < nbunits; nu++)
+  {
+    int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
+    FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
+    logtab_insert (log, log->nprimes+nbsm+nu, tmp_log);
+  }
+  /* end_gabuzomeu */
+#endif
   while (gmp_fscanf (flog, "%Zd\n", tmp_log) == 1)
     printf ("Warning, line %" PRIu64 " is ignored\n", i++);
   ASSERT_ALWAYS (feof(flog));
@@ -1289,7 +1333,7 @@ main(int argc, char *argv[])
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");
   fflush(stdout);
-  logtab_init (log, nprimes, nbsm, q);
+  logtab_init (log, nprimes, nbsm+nbunits, q); /* gabuzomeu */
   if (logformat == NULL || strcmp(logformat, "LA") == 0)
     read_log_format_LA (log, logfilename, idealsfilename);
   else
