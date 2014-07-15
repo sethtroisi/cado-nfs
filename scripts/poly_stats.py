@@ -74,12 +74,12 @@ def make_best_lognorms(P, nq, nrkeep, admin, admax, adstep, adlen,
         lognorms.append(float(line.split()[2].strip(",")))
     lognorms.sort()
     lognorms = lognorms[0:nrkeep]
-    print("Best lognorm was %f, %d-th best was %f" % (lognorms[0], len(lognorms), lognorms[-1]))
     with open(output_filename, "w") as output_file:
         output_file.write("\n".join(map(str, lognorms)))
     if gnuplot_file:
         gnuplot_file.append_plot(output_filename, title="P=%d, ad in [%d, %d]"
                                  % (P, admin, admax))
+    return (lognorms[0], lognorms[-1], sum(lognorms) / len(lognorms))
 
 def run_gnuplot(plot):
     filename = "input.gnuplot"
@@ -97,26 +97,25 @@ def process_one_nq(nq, nrkeep, admin, admax, adstep, adlen, max_nr_poly):
                                          [plot_allruns, plot_only13k]):
             (nr_poly, _) = get_nr_poly(directory, admin, admax_now, adstep, adlen)
             time = get_time(directory, admin, admax_now, adstep, adlen)
-            print("Number of polynomials and time spent in %s up to ad=%d: %d / %g" %
-                  (directory, admax_now, nr_poly, time))
-            make_best_lognorms(P, nq, nrkeep, admin, admax_now, adstep,
-                               adlen, plot_now)
+            (best, worst, avg) = make_best_lognorms(P, nq, nrkeep, admin, admax_now, adstep, adlen, plot_now)
+
+            print("Number of polynomials/time spent/best/avg/%d-best lognorm for nq=%d, P=%d from ad in [%d, %d]: %d/%g/%g/%g/%g" %
+                  (nrkeep, nq, P, admin, admax_now, nr_poly, time, best, avg, worst))
 
     print("Generating plots")
     run_gnuplot(plot_allruns)
     run_gnuplot(plot_only13k)
 
-assert len(sys.argv) == 7
+assert len(sys.argv) == 8
 
-ADMIN = int(sys.argv[1])
-ADMAX = int(sys.argv[2])
-ADSTEP = int(sys.argv[3])
-ADLEN = int(sys.argv[4])
-NRKEEP = int(sys.argv[5])
-MAX_NR_POLY = int(sys.argv[6])
+NQ = int(sys.argv[1])
+ADMIN = int(sys.argv[2])
+ADMAX = int(sys.argv[3])
+ADSTEP = int(sys.argv[4])
+ADLEN = int(sys.argv[5])
+NRKEEP = int(sys.argv[6])
+MAX_NR_POLY = int(sys.argv[7])
 
-NQ_VALUES = [216]
 P_VALUES = [10000, 100000, 1000000, 10000000]
 
-for NQ in NQ_VALUES:
-    process_one_nq(NQ, NRKEEP, ADMIN, ADMAX, ADSTEP, ADLEN, MAX_NR_POLY)
+process_one_nq(NQ, NRKEEP, ADMIN, ADMAX, ADSTEP, ADLEN, MAX_NR_POLY)
