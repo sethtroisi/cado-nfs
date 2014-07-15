@@ -20,7 +20,7 @@
 #include "gzip.h"
 #include "las-duplicate.h"
 #include "las-coordinates.h"
-#include "las-norms.c"
+#include "las-norms.h"
 
 static void *
 dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
@@ -203,6 +203,12 @@ main (int argc, char * argv[])
       fprintf(stderr, "Error, unused parameters are given\n");
       usage(pl, argv0);
     }
+
+#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
+    max_cache = direct_write_vs_stos ();
+    min_stos = stos_vs_write128 ();
+    fprintf (stderr, "# Las normalisation memset: movaps from 33(0x21) to %zu(0x%zx); rep stosq until %zu(0x%zx); movntps after\n", min_stos, min_stos, max_cache, max_cache);
+#endif
 
     for (int side = 0; side < 2; side++)
       strategy[side] = facul_make_strategy(conf->sides[side]->lim,

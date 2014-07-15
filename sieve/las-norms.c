@@ -21,187 +21,34 @@
 #include "portability.h"
 
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
-/* Need if memset is already a define */
-#ifdef memset
-#define save_define_memset memset
-#undef memset
-#endif
-#define memset las_memset
-/*************************** Memset functions pack **********************************
- * Public functions :
- * - 2 static values : max_cache & min_stos,
- * - the best x86 64 SSE2 memset available, las_memset. This memset uses the 2 values.
- * Private functions : need to compute the 2 static values.
- * - 3 internal pseudo memset functions, need to compute max_cache & min_stos :
- *   memset_write128, memset_rep_stosq, memset_direct128;
- * - 2 internal functions to compute max_cache & min_stos : stos_vs_write128 and
- *   direct_write_vs_stos.
- * CAREFUL! This pack is only for las-norms.c, eventually for all others codes which
- * use really memset!
- ***********************************************************************************/
-
-/* Hard to find a "optimal" default values for these... */
-size_t max_cache = 0x800000; /* 8 MB = average max size for biggest cache */
-size_t min_stos =  0x8000;   /* 32 KB = max size for Intel L0 cache */
-  
-static inline void *las_memset (void *S, int c, size_t n) {
-  int64_t rc = 0x0101010101010101 * (uint8_t) c;
-  if (LIKELY (n > 0x20)) {
-    register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-    /* Not possible on few architectures to use movq: gas bug.
-     * So I use movd + pshufd instead of movq + movlhps.
-     * __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
-    __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
-    void *cS = S;
-    *(int64_t *) ((uintptr_t) S + n - 0x10) = rc;
-    *(int64_t *) ((uintptr_t) S + n - 0x08) = rc;
-    *(int64_t *) ((uintptr_t) S           ) = rc;
-    *(int64_t *) ((uintptr_t) S     + 0x08) = rc;
-    /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
-    __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
-    if (LIKELY (n < min_stos)) {
-      n += (uintptr_t) S - 0x10;
-      n |= 0x0f;
-      S = (void *) ((uintptr_t) S | 0x0f);
-      n -= (uintptr_t) S;
-      rc = (uint8_t) n;
-      S = (void *) ((uintptr_t) S + rc - 0x7f);
-      rc = (uint64_t) rc >> 2;
-      rc = -rc;
-      __asm__ __volatile__ ( "addq $0f, %[rc]\n"
-			     "shrq $0x08, %[n]\n"
-			     "jmp *%[rc]\n"
-			     
-			     ".p2align 4\n 1:\n"
-			     "addq $0x100, %[S]\n"
-			     "subq $0x01, %[n]\n"
-			     "movaps %[mc], -0x80(%[S])\n"
-			     "movaps %[mc], -0x70(%[S])\n"
-			     "movaps %[mc], -0x60(%[S])\n"
-			     "movaps %[mc], -0x50(%[S])\n"
-			     "movaps %[mc], -0x40(%[S])\n"
-			     "movaps %[mc], -0x30(%[S])\n"
-			     "movaps %[mc], -0x20(%[S])\n"
-			     "movaps %[mc], -0x10(%[S])\n"
-			     "movdqa %[mc],      (%[S])\n"
-			     "movaps %[mc],  0x10(%[S])\n"
-			     "movaps %[mc],  0x20(%[S])\n"
-			     "movaps %[mc],  0x30(%[S])\n"
-			     "movaps %[mc],  0x40(%[S])\n"
-			     "movaps %[mc],  0x50(%[S])\n"
-			     "movaps %[mc],  0x60(%[S])\n"
-			     "movaps %[mc],  0x70(%[S])\n"
-			     "0:\n"
-			     "jnz 1b\n"
-			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
-      return cS;
-    }
-    else if (LIKELY (n < max_cache)) {
-      n += (uintptr_t) S;
-      n &= -0x10;
-      _mm_store_ps ((float *) (uintptr_t) (n - 0x40), mc);
-      _mm_store_ps ((float *) (uintptr_t) (n - 0x30), mc);
-      _mm_store_ps ((float *) (uintptr_t) (n - 0x20), mc);
-      _mm_store_ps ((float *) (uintptr_t) (n - 0x10), mc);
-      S += 0x40;
-      S = (void *)((uintptr_t) S & -0x10);
-      _mm_store_ps ((float *) (uintptr_t) (S - 0x30), mc);
-      _mm_store_ps ((float *) (uintptr_t) (S - 0x20), mc);
-      _mm_store_ps ((float *) (uintptr_t) (S - 0x10), mc);
-      _mm_store_ps ((float *) (uintptr_t) (S       ), mc);
-      S = (void *)((uintptr_t) S & -0x40);
-      n &= -0x40;
-      
-      n -= (uintptr_t) S;
-      n >>= 3;
-      __asm__ __volatile ( "cld\n rep\n stosq\n" : "+c"(n), [S]"+D"(S) : [rc]"a"(rc) : "cc", "memory");
-      return cS;
-    }
-    else {
-      n += (uintptr_t) S - 0x10;
-      n |= 0x0f;
-      S = (void *) ((uintptr_t) S | 0x0f);
-      n -= (uintptr_t) S;
-      rc = (uint8_t) n;
-      S = (void *) ((uintptr_t) S + rc - 0x7f);
-      rc = (uint64_t) rc >> 2;
-      rc = -rc;
-      __asm__ __volatile__ ( "addq $0f, %[rc]\n"
-			     "shrq $0x08, %[n]\n"
-			     "jmp *%[rc]\n"
-			     
-			     ".p2align 4\n 1:\n"
-			     "addq $0x100, %[S]\n"
-			     "subq $0x01, %[n]\n"
-			     "movntps %[mc], -0x80(%[S])\n"
-			     "movntps %[mc], -0x70(%[S])\n"
-			     "movntps %[mc], -0x60(%[S])\n"
-			     "movntps %[mc], -0x50(%[S])\n"
-			     "movntps %[mc], -0x40(%[S])\n"
-			     "movntps %[mc], -0x30(%[S])\n"
-			     "movntps %[mc], -0x20(%[S])\n"
-			     "movntps %[mc], -0x10(%[S])\n"
-			     "movntdq %[mc],      (%[S])\n"
-			     "movntps %[mc],  0x10(%[S])\n"
-			     "movntps %[mc],  0x20(%[S])\n"
-			     "movntps %[mc],  0x30(%[S])\n"
-			     "movntps %[mc],  0x40(%[S])\n"
-			     "movntps %[mc],  0x50(%[S])\n"
-			     "movntps %[mc],  0x60(%[S])\n"
-			     "movntps %[mc],  0x70(%[S])\n"
-			     "0:\n"
-			     "jnz 1b\n"
-			     : [rc]"+r"(rc), [n]"+r"(n), [S]"+R"(S) : [mc]"x"(mc) : "cc", "memory");
-      return cS;
-    }
-  } else if (UNLIKELY ((uint8_t) n & 0x30)) {
-    *(int64_t *) ((uint8_t *) S     + 0x08) = rc;
-    *(int64_t *) ((uint8_t *) S + n - 0x10) = rc;
-  between_0x08_0x10:
-    *(int64_t *) ((uint8_t *) S           ) = rc;
-    *(int64_t *) ((uint8_t *) S + n - 0x08) = rc;
-  } else if (UNLIKELY ((uint8_t) n & 0x08)) goto between_0x08_0x10;
-  else if (UNLIKELY ((uint8_t) n & 0x04)) {
-    *((uint32_t *) ((uint8_t *) S        )) = (uint32_t) rc;
-    *((uint32_t *) ((uint8_t *) S + n - 0x04)) = (uint32_t) rc;
-  } else if (LIKELY ((uint8_t) n >= 0x01)) {
-    *((uint8_t  *) ((uint8_t *) S        )) = (uint8_t ) rc;
-    if (LIKELY ((uint8_t) n > 0x01)) {
-      *((uint16_t *) ((uint8_t *) S + n - 0x02)) = (uint16_t) rc;
-    }
-  }
-  return S;
-}
 
 /* 1 on 3 pseudo memsets, only for speed tests, do not use. */
 /* This memset is correct only for n >= 0x20 */
 uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
   register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-  int64_t rc = (uint8_t) c * 0x0101010101010101;
+  uint64_t jmp, offset, rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S - 0x10;
-  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
   __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
-  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
+  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
   S |= 0x0f;
   n |= 0x0f;
   n -= S;
-  rc = (uint8_t) n;
-  S += rc - 0x7f;
-  rc = (uint64_t) rc >> 2;
-  rc = -rc;
-  __asm__ __volatile__ ( "addq $0f, %[rc]\n"
+  offset = (uint8_t) n;
+  S += offset - 0x7f;
+  offset = (uint64_t) offset >> 2;
+  __asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
+                         "subq %[offset], %[jmp]\n"
                          "shrq $0x08, %[n]\n"
-                         "jmpq *%[rc]\n"
+                         "jmpq *%[jmp]\n"
                          
                          ".p2align 4\n 1:\n"
-			 "addq $0x100, %[S]\n"
-                         "subq $0x01, %[n]\n"
+                         "addq $0x100, %[S]\n"
+                         "subq $0x01,%[n]\n"
                          "movaps %[mc], -0x80(%[S])\n"
                          "movaps %[mc], -0x70(%[S])\n"
                          "movaps %[mc], -0x60(%[S])\n"
@@ -220,7 +67,7 @@ uintptr_t memset_write128 (uintptr_t S, int c, size_t n) {
                          "movaps %[mc],  0x70(%[S])\n"
                          "0:\n"
                          "jnz 1b\n"
-                         : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
+                         : [jmp]"=&r"(jmp), [n]"+r"(n), [S]"+R"(S) : [offset]"r"(offset), [mc]"x"(mc) : "cc", "memory");
   return cS;
 }
 
@@ -230,15 +77,13 @@ uintptr_t memset_rep_stosq (uintptr_t S, int c, size_t n) {
   __m128 mc;
   int64_t rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
-  n += S - 0x10;
-  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
+  n += S;
   __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
-  *(int64_t *) (uintptr_t) (n       ) = rc;
-  *(int64_t *) (uintptr_t) (n + 0x08) = rc;
+  *(int64_t *) (uintptr_t) (n - 0x10) = rc;
+  *(int64_t *) (uintptr_t) (n - 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
-  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
+  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
   n &= -0x10;
   _mm_store_ps ((float *) (uintptr_t) (n - 0x40), mc);
   _mm_store_ps ((float *) (uintptr_t) (n - 0x30), mc);
@@ -262,31 +107,29 @@ uintptr_t memset_rep_stosq (uintptr_t S, int c, size_t n) {
 /* This memset is correct only for n >= 0x20 */
 uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
   register __m128 mc __asm__ ("xmm7"); /* Way to ask a "legacy" xmm, from xmm0 to xmm7 ? */
-  int64_t rc = (uint8_t) c * 0x0101010101010101;
+  int64_t jmp, offset, rc = (uint8_t) c * 0x0101010101010101;
   uintptr_t cS = S;
   n += S - 0x10;
-  /* __asm__ __volatile__ ( "movq %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"(rc)); */
   __asm__ __volatile__ ( "movd %[rc], %[mc]\n" : [mc]"=x"(mc) : [rc]"r"((uint32_t) rc));
   *(int64_t *) (uintptr_t) (n       ) = rc;
   *(int64_t *) (uintptr_t) (n + 0x08) = rc;
   *(int64_t *) (S        ) = rc;
   *(int64_t *) (S  + 0x08) = rc;
-  /* __asm__ __volatile__ ( "movlhps %[mc], %[mc]\n" : [mc]"+x"(mc)); */
-  __asm__ __volatile__ ( "pshufd $0, %[mc], %[mc]\n" : [mc]"+x"(mc));
+  __asm__ __volatile__ ( "pshufd $0x00, %[mc], %[mc]\n" : [mc]"+x"(mc));
   S |= 0x0f;
   n |= 0x0f;
   n -= S;
-  rc = (uint8_t) n;
-  S += rc - 0x7f;
-  rc = (uint64_t) rc >> 2;
-  rc = -rc;
-  __asm__ __volatile__ ( "addq $0f, %[rc]\n"
+  offset = (uint8_t) n;
+  S += offset - 0x7f;
+  offset = (uint64_t) offset >> 2;
+  __asm__ __volatile__ ( "leaq 0f(%%rip), %[jmp]\n"
+                         "subq %[offset], %[jmp]\n"
                          "shrq $0x08, %[n]\n"
-                         "jmpq *%[rc]\n"
+                         "jmpq *%[jmp]\n"
                          
                          ".p2align 4\n 1:\n"
-			 "addq $0x100, %[S]\n"
-                         "subq $0x01, %[n]\n"
+                         "addq $0x100, %[S]\n"
+                         "subq $0x01,%[n]\n"
                          "movntps %[mc], -0x80(%[S])\n"
                          "movntps %[mc], -0x70(%[S])\n"
                          "movntps %[mc], -0x60(%[S])\n"
@@ -305,8 +148,15 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
                          "movntps %[mc],  0x70(%[S])\n"
                          "0:\n"
                          "jnz 1b\n"
-                         : [n]"+r"(n), [S]"+R"(S), [rc]"+r"(rc) : [mc]"x"(mc) : "cc", "memory");
+                         : [jmp]"=&r"(jmp), [n]"+r"(n), [S]"+R"(S) : [offset]"r"(offset), [mc]"x"(mc) : "cc", "memory");
   return cS;
+}
+
+static inline uint64_t cputicks()
+{
+  uint64_t r;
+  __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
+  return r;
 }
 
 /* Comparison between the speed of rep stosq and movaps. All
@@ -315,13 +165,13 @@ uintptr_t memset_direct128 (uintptr_t S, int c, size_t n) {
  * aligned or not.
  * So, to compute the real speed, I will compute 0x40 memsets
  * for each test, with a L0 aligned cache adress + {0...0x3F}.
-*/
+ */
 size_t stos_vs_write128 () {
-  uint64_t stos, cache, c, r;
+  uint64_t stos, cache, c;
   size_t n, endn, stepn, realn;
   double s_stos, s_cache;
   uintptr_t rS, S;
-
+  
   /* endn must be greater than the biggest cache on all x86 processors:
      128 Mbytes + 4096 + 64 bytes here. */
   endn = 0x8000000;
@@ -331,42 +181,36 @@ size_t stos_vs_write128 () {
   }
   /* S is at the beginning of a 4096 bytes bloc */
   S = (rS + 0xFFF) & ~0xFFF;
-
+  
   stepn = 0;
-  /* Careful: never less than 0x80 :
-     1. the minima for memset_rep_stosq is 0x5F;
-     2. n must be a power of 2. */
+  /* Careful: never less than 0x5f (minima for memset_rep_stosq),
+     and must be a power of 2 */
   for (n = 0x80; n < endn; ) {
-
-    realn = n + stepn * (n >> 2);
-    stepn = (stepn + 1) & 3;
+    
+    realn = (n + stepn * (n >> 2));
+    stepn = (stepn + 1 ) & 3;
     if (!stepn) n <<= 1;
-
+    
     stos = ~0;
     for (unsigned int k = 0; k < 4; k++) {
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c = -r;
+      c = -cputicks();
       for (size_t decal = 0x40; decal--; ) memset_rep_stosq (S + decal, 0, realn);
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c += r;
+      c += cputicks();
       if (c < stos) stos = c;
     }
     s_stos = (double) realn * 0x40 / stos;
-
+    
     cache = ~0;
     for (unsigned int k = 0; k < 3; k++) {
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c = -r;
+      c = -cputicks();
       for (size_t decal = 0x40; decal--; ) memset_write128 (S + decal, 0, realn);
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c += r;
+      c += cputicks();
       if (c < cache) cache = c;
     }
     s_cache = (double) realn * 0x40 / cache;
     // fprintf (stderr, "n=%zu(%zx), write128=%.2f, rep stosq=%.2f\n", realn, realn, s_cache, s_stos);
     if (s_cache < s_stos) break;
   }
-
   free((void *)rS);
   return (n == endn) ? (size_t) ~0 : realn;
 }
@@ -376,13 +220,13 @@ size_t stos_vs_write128 () {
  * slower than rep stosq when the size of the memset is smaller
  * than the biggest cache.
  * So, the memsets are always L0 cache aligned here.
-*/
+ */
 size_t direct_write_vs_stos () {
-  uint64_t stos, not_cache, c, r;
+  uint64_t stos, not_cache, c;
   size_t n, endn, stepn, realn;
   double s_stos, s_not_cache;
   uintptr_t rS, S;
-
+  
   /* endn must be greater than the biggest cache on all x86 processors:
      at least 128 Mbytes + 4096 bytes here. */
   endn = 0x8000000;
@@ -392,44 +236,48 @@ size_t direct_write_vs_stos () {
   }
   /* S is at the beginning of a 4096 bytes bloc */
   S = (rS + 0xFFF) & ~0xFFF;
-
+  
   not_cache = ~0;
   /* I do this 3 times at least and I take the greatest speed */
   for (unsigned int k = 0; k < 3; k++) {
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c = -r;
+    c = -cputicks();
     memset_direct128 (S, 0, endn);
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c += r;
+    c += cputicks();
     if (c < not_cache) not_cache = c;
   }
   s_not_cache = (double) endn / not_cache;
-
+  
   stepn = 0;
   n = endn;
   do {
     realn = n - (n >> 3) * stepn;
     stepn = (stepn + 1 ) & 3;
     if (!stepn) n >>= 1;
-
+    
     stos = ~0;
     /* 2 times seems OK here to have the greatest speed */
     for (unsigned int k = 0; k < 2; k++) {
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c = -r;
+      c = -cputicks();
       memset_rep_stosq (S, 0, realn);
-      __asm__ __volatile__ ("rdtsc\n shlq $0x20, %%rdx\n orq %%rdx, %%rax\n" : "=a"(r) :: "%rdx", "cc");
-      c += r;
+      c += cputicks();
       if (c < stos) stos = c;
     }
     s_stos = (double) realn / stos;
     // fprintf(stderr, "n=%zu(%zx); rep stosl=%.2f, direct128=%.2f\n", realn, realn, s_stos, s_not_cache);
-  } while (s_stos < s_not_cache && realn > 0x60);
+    
+  } while (s_stos < s_not_cache);
+  
   free((void *)rS);
   return (n == endn) ? (size_t) ~0 : realn;
 }
+
 #endif /* End of X86-64 optimized memset pack */
 
+
+/****************************************************************************
+ * Tricky arithmetic functions to compute some values around ~log2.
+ * Log2(n) is computed by the mantissa of n with IEEE 754 representation.
+ ****************************************************************************/
 
 /* Input: i, double. i > 0 needed! If not, the result has no sense at all.
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
@@ -589,6 +437,8 @@ static inline double compute_f (const unsigned int d, const double *u, const dou
    2. p & Roots: the biggest polynome is F", degree = 2 * (degree - 1).
    So, p size is 2 * degree - 1, and Roots size is 2 * degree - 2.
 */
+
+/* Only for qsort. MacOSX doesn't accept a function is declared into another. Odd... */
 static int cmp_root (const void *a, const void *b) {
   return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
 }
@@ -1887,11 +1737,3 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
                                  and this new value is larger */
     }
 }
-
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
-#undef memset
-#ifdef save_define_memset
-#define memset save_define_memset
-#undef save_define_memset
-#endif
-#endif

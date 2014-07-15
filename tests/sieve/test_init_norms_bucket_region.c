@@ -18,7 +18,7 @@
 #include "sieve/las-config.h"
 #include "sieve/las-types.h"
 #include "sieve/las-debug.h"
-#include "sieve/las-norms.c"
+#include "sieve/las-norms.h"
 
 static inline void
 my_poly_scale (double *u, const double *t, unsigned int d, double h)
