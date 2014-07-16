@@ -44,5 +44,6 @@
 #include "mpz_vector.h"
 #include "memory.h"
 #include "stats.h"
+#include "lll.h"
 
 #endif	/* CADO_UTILS_H_ */

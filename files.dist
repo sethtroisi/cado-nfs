@@ -725,6 +725,8 @@ utils/memory.c
 utils/dllist.h
 utils/stats.h
 utils/stats.c
+utils/lll.c
+utils/lll.h
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
