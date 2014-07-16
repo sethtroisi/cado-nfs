@@ -1022,7 +1022,7 @@ static inline void Fill_S (unsigned char *S, int x, double fx, int y, double fy)
 }
 #else
   int next_f = (int) fx;
-  if (UNLIKELY (fy == fx)) {
+if (UNLIKELY ((int) fy == next_f)) {
     memset (S + x, next_f, y - x);
   } else {
     double next_m = (double) (x + 1), m = (double) (y - x) / (fy - fx);
