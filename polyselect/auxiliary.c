@@ -2471,20 +2471,6 @@ optimize_aux_mp (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
 }
 #endif
 
-static void
-eval_poly (mpz_t b, mpz_poly_ptr h, mpz_t k)
-{
-  unsigned int n = h->deg;
-
-  mpz_mul (b, h->coeff[n], k);
-  mpz_add (b, b, h->coeff[--n]);
-  while (n > 0)
-    {
-      mpz_mul (b, b, k);
-      mpz_add (b, b, h->coeff[--n]);
-    }
-}
-
 /* puts in h[3], ..., h[0] the coefficients (in k) of the degree-3 (in x)
    coefficient of f(x+k) */
 static void
@@ -2511,7 +2497,7 @@ root_refine (mpz_t a, mpz_t b, mpz_poly_ptr h)
 
   mpz_init (c);
   mpz_init (v);
-  eval_poly (v, h, a);
+  mpz_poly_eval (v, h, a);
   sa = mpz_sgn (v);
   while (1)
     {
@@ -2519,7 +2505,7 @@ root_refine (mpz_t a, mpz_t b, mpz_poly_ptr h)
       mpz_fdiv_q_2exp (c, c, 1);
       if (mpz_cmp (c, a) == 0)
         break;
-      eval_poly (v, h, c);
+      mpz_poly_eval (v, h, c);
       if (mpz_sgn (v) == sa)
         mpz_swap (a, c);
       else
@@ -2584,7 +2570,7 @@ roots3 (mpz_t *r, mpz_poly_ptr H)
   /* now we have four control points -Inf < r[1] < r[2] < +Inf */
   mpz_init (v);
   mpz_init (k);
-  eval_poly (v, H, r[1]);
+  mpz_poly_eval (v, H, r[1]);
   s1 = mpz_sgn (v);
   if (-mpz_sgn (h[3]) * s1 < 0) /* one root in -Inf..r[1] */
     {
@@ -2593,7 +2579,7 @@ roots3 (mpz_t *r, mpz_poly_ptr H)
         mpz_mul_2exp (k, k, 1);
       while (1)
         {
-          eval_poly (v, H, k);
+          mpz_poly_eval (v, H, k);
           if (mpz_sgn (v) * s1 < 0)
             break;
           mpz_mul_2exp (k, k, 1);
@@ -2601,7 +2587,7 @@ roots3 (mpz_t *r, mpz_poly_ptr H)
       root_refine (k, r[1], H);
       mpz_swap (r[n++], k);
     }
-  eval_poly (v, H, r[2]);
+  mpz_poly_eval (v, H, r[2]);
 
   s2 = mpz_sgn (v);
   if (s1 * s2 < 0) /* one root in r[1]..r[2] */
@@ -2616,7 +2602,7 @@ roots3 (mpz_t *r, mpz_poly_ptr H)
         mpz_mul_2exp (k, k, 1);
       while (1)
         {
-          eval_poly (v, H, k);
+          mpz_poly_eval (v, H, k);
           if (mpz_sgn (v) * s2 < 0)
             break;
           mpz_mul_2exp (k, k, 1);
