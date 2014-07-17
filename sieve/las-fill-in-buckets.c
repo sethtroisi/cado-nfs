@@ -507,10 +507,35 @@ unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
 DECLARE_CACHE_BUFFER(bucket_update_t, 256)
 #endif
 
+struct prime_and_root_s {
+  fbprime_t p;
+  fbroot_t r;
+};
+typedef struct prime_and_root_s prime_and_root_t[1];
+typedef struct prime_and_root_s *prime_and_root_ptr;
+
+static inline size_t
+transform_n_roots(prime_and_root_ptr pr, fb_iterator t, const size_t n,
+                  sieve_info_srcptr si)
+{
+  size_t i;
+  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t))
+  {
+    fbprime_t p = fb_iterator_get_p(t);
+    ASSERT_ALWAYS (p & 1);
+    fbroot_t R = fb_iterator_get_r(t);
+    fbroot_t r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+    pr[i].p = p;
+    pr[i].r = r;
+  }
+  return i;
+}
+
 /* {{{ */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
+  const size_t roots_batchlen = 128;
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
   bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
@@ -523,11 +548,15 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   
   fb_iterator t;
   fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  prime_and_root_t transformed_roots[roots_batchlen];
   unsigned char last_logp = 0;
-  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
-    fbprime_t p = t->fb->p;
+
+  while (!fb_iterator_over(t)) {
+    size_t nr_roots = transform_n_roots(transformed_roots[0], t, roots_batchlen, si);
+    for (size_t i_root = 0; i_root < nr_roots; i_root++) {
+    fbprime_t p = transformed_roots[i_root]->p;
+    fbroot_t r = transformed_roots[i_root]->r;
     unsigned char logp = find_logp(th, side, p);
-    ASSERT_ALWAYS (p & 1);
 
     WHERE_AM_I_UPDATE(w, p, p);
     /* Write new set of pointers if the logp value changed */
@@ -538,7 +567,6 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     /* If we sieve for special-q's smaller than the factor
        base bound, the prime p might equal the special-q prime q. */
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
-    fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
@@ -629,6 +657,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #if MOD2_CLASSES_BS
     }
 #endif
+  }
   }
   th->sides[side]->BA = BA;
 }
