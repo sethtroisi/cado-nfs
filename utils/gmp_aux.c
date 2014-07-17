@@ -224,7 +224,7 @@ int nbits (uintmax_t p)
    Output: -d/2 <= r < d/2
 */
 static void
-mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
+mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, const mpz_t d)
 {
   int s;
 
@@ -244,7 +244,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
    Output satisfies |n-q*d| <= |d|/2
 */
 void
-mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
+mpz_ndiv_q (mpz_t q, mpz_t n, const mpz_t d)
 {
   mpz_t r;
 
