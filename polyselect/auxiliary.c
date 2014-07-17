@@ -1472,7 +1472,7 @@ rotate_auxg_si (mpz_t *f, mpz_t *g, long k, unsigned int t)
 
 /* replace f by f + k * x^t * (b*x + g0) */
 void
-rotate_auxg_z (mpz_t *f, mpz_t b, mpz_t g0, mpz_t k, unsigned int t)
+rotate_auxg_z (mpz_t *f, const mpz_t b, const mpz_t g0, const mpz_t k, unsigned int t)
 {
   mpz_addmul (f[t + 1], b, k);
   mpz_addmul (f[t], g0, k);
@@ -1930,7 +1930,7 @@ print_poly_fg (mpz_poly_ptr f, mpz_t *g, mpz_t N, int mode)
 
 /* f <- f(x+k), g <- g(x+k) */
 void
-do_translate_z (mpz_poly_ptr f, mpz_t *g, mpz_t k)
+do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k)
 {
   int i, j;
   int d = f->deg;
@@ -2694,6 +2694,16 @@ optimize_c3 (mpz_t *f, mpz_t *g, long l)
 }
 #endif
 
+static void
+reduce_f_0_1_2(mpz_poly_ptr f, mpz_t *g, mpz_t temp)
+{
+  for (size_t i = 0; i < 3; i++) {
+    mpz_ndiv_q (temp, f->coeff[i], g[0]);
+    mpz_neg (temp, temp);
+    rotate_auxg_z (f->coeff, g[1], g[0], temp, i);
+  }
+}
+
 /* if use_rotation is non-zero, also use rotation */
 void
 optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
@@ -2705,7 +2715,6 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
   if (d == 6)
   {
     mpz_t k, r[3], g0_copy, best_g0;
-    int i, j, n;
     long l;
     mpz_poly_t h, best_f, f_copy;
 
@@ -2727,7 +2736,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
     mpz_poly_init (best_f, d);
     mpz_poly_init (h, 3);
     h->deg = 3;
-    for (i = 0; i < 3; i++)
+    for (int i = 0; i < 3; i++)
       mpz_init (r[i]);
 
     /* g[1] is not changed below, thus we only save g[0] */
@@ -2759,29 +2768,26 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
       mpz_poly_copy (f, f_copy);
       mpz_set (g[0], g0_copy);
 
+      /* f(x) := f(x) + l*x^3*g(x) */
       rotate_auxg_si (f->coeff, g, l, 3);
+      /* h(k) = coeffiecient of x^3 in  f(x+k), which is a degree-3
+         polynomial in k */
       fdminus3_translated (h, f);
-      n = roots3 (r, h);
+      /* Store in r the integer approximation of the real roots of this
+         cubic h(k), and the number of roots in nr_roots */
+      int nr_roots = roots3 (r, h);
 
-      for (j = 0; j < n; j++)
+      /* For each root R, optimize f(x + R) */
+      for (int j = 0; j < nr_roots; j++)
       {
         mpz_poly_copy (f, f_copy);
         mpz_set (g[0], g0_copy);
         rotate_auxg_si (f->coeff, g, l, 3);
-        mpz_set (k, r[j]);
 
-        do_translate_z (f, g, k);
+        do_translate_z (f, g, r[j]);
 
         /* now reduce coefficients f[0], f[1], f[2] using rotation */
-        mpz_ndiv_q (k, f->coeff[0], g[0]);
-        mpz_neg (k, k);
-        rotate_auxg_z (f->coeff, g[1], g[0], k, 0);
-        mpz_ndiv_q (k, f->coeff[1], g[0]);
-        mpz_neg (k, k);
-        rotate_auxg_z (f->coeff, g[1], g[0], k, 1);
-        mpz_ndiv_q (k, f->coeff[2], g[0]);
-        mpz_neg (k, k);
-        rotate_auxg_z (f->coeff, g[1], g[0], k, 2);
+        reduce_f_0_1_2(f, g, k);
 
 #ifdef OPTIMIZE_MP
         optimize_aux_mp (f, g, verbose, use_rotation);
@@ -2825,7 +2831,7 @@ optimize (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation)
     mpz_poly_clear (h);
     mpz_poly_clear (best_f);
     mpz_poly_clear (f_copy);
-    for (i = 0; i < 3; i++)
+    for (int i = 0; i < 3; i++)
       mpz_clear (r[i]);
     mpz_clear (g0_copy);
 
