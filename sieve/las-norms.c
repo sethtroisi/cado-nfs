@@ -991,58 +991,30 @@ void init_exact_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
    (y - x) / (fy - fx) should be really larger than one for speed.
    CAREFUL : Need y > x. */
 static inline void Fill_S (unsigned char *S, int x, double fx, int y, double fy) {
-#if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(HAS_LAS_MEMSET)
-/* The goal is here to have only ONE call to memset, in order to
-   inline more easily this call. */
-  int begin_x = x, end_x = y;
-  int next_f = (int) fx;
-  double m = 0., next_m = 0.;
-  int step_f = 1;
+  int next_f = (int) fx, step_f = (int) fy - next_f;
 
-  if (UNLIKELY ((int) fy == next_f)) goto mm;
-  next_m = x + 1;
-  if ((fy - fx) < 0.) {
-    m = (double) (x - y) / (fy - fx);
-    step_f = -step_f;
-    next_m += (fx - floor(fx)) * m;
+  if (LIKELY (step_f)) {
+    double m = (double) (y - x) / (fy - fx), next_m = (double) (x + 1);
+    if (step_f < 0.) {
+      m = fabs(m);
+      step_f = -1;
+      next_m += (fx - floor(fx)) * m;
+    }
+    else {
+      step_f = 1;
+      next_m += (ceil(fx) - fx) * m;
+    }
+    for (;;) {
+      int next_x = (int) next_m;
+      if (UNLIKELY (next_x >= y)) break;
+      memset (S + x, next_f, (size_t) (next_x - x));
+      x = next_x;
+      next_f += step_f;
+      next_m += m;
+    }
   }
-  else {
-    m = (double) (y - x) / (fy - fx);
-    next_m += (ceil(fx)  - fx) * m;
-  }
-  for (;;) {
-    end_x = MIN((int) (next_m), y);
-  mm:
-    memset (S + begin_x, next_f, (size_t) (end_x - begin_x));
-    if (end_x == y) return;
-    begin_x = end_x;
-    next_f += step_f;
-    next_m += m;
-  }
+  memset (S + x, next_f, (size_t) (y - x));
 }
-#else
-  int next_f = (int) fx;
-if (UNLIKELY ((int) fy == next_f)) {
-    memset (S + x, next_f, y - x);
-  } else {
-    double next_m = (double) (x + 1), m = (double) (y - x) / (fy - fx);
-    ssize_t begin_x = x, end_x;
-    if (m < 0.)
-      for (next_m += (floor(fx) - fx) * m; (end_x = (int) (next_m)) < y; next_m -= m) {
-	memset (S + begin_x, next_f, (size_t) (end_x - begin_x));
-	begin_x = end_x;
-	--next_f;
-      }
-    else
-      for (next_m += (ceil(fx)  - fx) * m; (end_x = (int) (next_m)) < y; next_m += m) {
-	memset (S + begin_x, next_f, (size_t) (end_x - begin_x));
-	begin_x = end_x;
-	++next_f;
-      }
-    memset (S + begin_x, next_f, (size_t) (y - begin_x));
-  }
-}
-#endif
 
 /* This functions sets all the segments of the contiguous unset values of the line S
    with F(i, const j) by a polygonal approximation on these segments.

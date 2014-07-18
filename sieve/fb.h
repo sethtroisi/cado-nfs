@@ -172,6 +172,11 @@ static inline void fb_iterator_next(fb_iterator_ptr t)
     t->i = 0;
 }
 
+static inline fbprime_t fb_iterator_get_p(fb_iterator_srcptr t)
+{
+    return t->fb->p;
+}
+
 static inline fbprime_t fb_iterator_get_r(fb_iterator_srcptr t)
 {
     return t->fb->roots[t->i];

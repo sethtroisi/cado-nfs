@@ -71,7 +71,7 @@ void print_cadopoly_extra (FILE*, cado_poly, int, char**, double);
 double print_poly_fg (mpz_poly_ptr, mpz_t*, mpz_t, int);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
-void rotate_auxg_z (mpz_t*, mpz_t, mpz_t, mpz_t, unsigned int);
+void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int);
 double rotate (mpz_poly_ptr, unsigned long, mpz_t, mpz_t, long*, long*, int,
                int);
 void optimize (mpz_poly_ptr, mpz_t*, int, int);
@@ -79,7 +79,7 @@ void optimize_lll (mpz_poly_ptr, mpz_t*, int);
 void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation);
 void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose);
 void rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose);
-void do_translate_z (mpz_poly_ptr f, mpz_t *g, mpz_t k);
+void do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k);
 void content_poly (mpz_t g, mpz_poly_ptr);
 void eval_poly_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);
 void eval_poly_diff_ui (mpz_t v, mpz_t *f, unsigned int d, unsigned long r);

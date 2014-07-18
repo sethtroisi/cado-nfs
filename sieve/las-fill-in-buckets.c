@@ -4,6 +4,7 @@
 #include "fb.h"
 #include "utils.h"           /* lots of stuff */
 #include "bucket.h"
+#include "modredc_ul.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -507,10 +508,92 @@ unsigned char find_logp(thread_data_ptr th, const int side, const fbprime_t p)
 DECLARE_CACHE_BUFFER(bucket_update_t, 256)
 #endif
 
+/* Returns -(-1)^neg num/den (mod p). If gcd(den, p) > 1, returns p. */
+static inline unsigned long
+compute_1_root_ul(const unsigned long p, const unsigned long num,
+                  const unsigned long den, const int k, const int neg)
+{
+  modulusredcul_t m;
+  residueredcul_t rn, rd;
+  
+  modredcul_initmod_ul(m, p);
+  modredcul_init(rn, m);
+  modredcul_set_ul(rn, num, m);
+  modredcul_init(rd, m);
+  modredcul_set_ul(rd, den, m);
+  int ok = modredcul_inv(rd, rd, m);
+  if (!ok) {
+    /* FIXME: p could be a prime power */
+    return p;
+  }
+  modredcul_mul(rn, rn, rd, m);
+  if (!neg)
+    modredcul_neg(rn, rn, m);
+  
+  for (int i = 0; i < k; i++)
+    modredcul_div2(rn, rn, m);
+  unsigned long r = modredcul_get_ul(rn, m);
+  
+  modredcul_clear(rn, m);
+  modredcul_clear(rd, m);
+  modredcul_clearmod(m);
+  return r;
+}
+
+
+/* Compute up to n roots of the transformed polynomial, either by tranforming
+   the root stored in the factor base, or, if the polynomial has degree 1 and
+   its coefficients fit into unsigned long, by computing the root from the
+   transformed polynomial.
+   For each root, the modulus (i.e., factor base prime) and
+   the root are stored in p[i] and r[i], resp.
+   Returns the number of transformed roots produced, which may be less than n
+   if we reach the end of the factor base. */
+static inline size_t
+transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
+                  const size_t n, const int side, sieve_info_srcptr si)
+{
+  size_t i;
+  mpz_poly_srcptr f = si->sides[side]->fij;
+
+  if (f->deg == 1 && mpz_fits_ulong_p(f->coeff[0]) && mpz_fits_ulong_p(f->coeff[1])) {
+    for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
+      p[i] = fb_iterator_get_p(t);
+    }
+    const unsigned long num = mpz_get_ui(f->coeff[0]);
+    unsigned long den = mpz_get_ui(f->coeff[1]);
+    /* If exactly one of the two coefficients is negative, we need to flip
+       the sign of the root (mod p). The den and num variables contain
+       absolute values. */
+    const int neg = (mpz_sgn(f->coeff[0]) < 0) != (mpz_sgn(f->coeff[1]) < 0);
+    /* Make den odd, store the exponent of 2 in k */
+    const int k = ularith_ctz(den);
+    den >>= k;
+    int ok = modredcul_batch_Q_to_Fp(r, num, den, k, neg, p, i);
+    if(UNLIKELY(!ok)) {
+      /* Modular inverse did not exists, i.e., at least one of the factor base
+         entries was not coprime to den. Do factor base entries one at a time,
+         handling the non-coprime case properly. */
+      for (size_t j = 0; j < i; j++)
+        r[j] = compute_1_root_ul(p[j], num, den, k, neg);
+    }
+  } else {
+    for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
+      fbprime_t current_p = fb_iterator_get_p(t);
+      ASSERT_ALWAYS (current_p & 1);
+      fbroot_t R = fb_iterator_get_r(t);
+      p[i] = current_p;
+      r[i] = fb_root_in_qlattice(current_p, R, t->fb->invp, si);
+    }
+  }
+  return i;
+}
+
 /* {{{ */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
+  const size_t roots_batchlen = 128;
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
   bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
@@ -523,11 +606,17 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
   
   fb_iterator t;
   fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  unsigned long transformed_p[roots_batchlen],
+                transformed_r[roots_batchlen];
   unsigned char last_logp = 0;
-  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
-    fbprime_t p = t->fb->p;
+
+  while (!fb_iterator_over(t)) {
+    size_t nr_roots = transform_n_roots(transformed_p, transformed_r, t,
+                                        roots_batchlen, side, si);
+    for (size_t i_root = 0; i_root < nr_roots; i_root++) {
+    fbprime_t p = transformed_p[i_root];
+    fbroot_t r = transformed_r[i_root];
     unsigned char logp = find_logp(th, side, p);
-    ASSERT_ALWAYS (p & 1);
 
     WHERE_AM_I_UPDATE(w, p, p);
     /* Write new set of pointers if the logp value changed */
@@ -538,7 +627,6 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     /* If we sieve for special-q's smaller than the factor
        base bound, the prime p might equal the special-q prime q. */
     if (UNLIKELY(!mpz_cmp_ui(si->doing->p, p))) continue;
-    fbprime_t R = fb_iterator_get_r(t), r = fb_root_in_qlattice(p, R, t->fb->invp, si);
     
     const uint32_t I = si->I;
     const unsigned int logI = si->conf->logI;
@@ -629,6 +717,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #if MOD2_CLASSES_BS
     }
 #endif
+  }
   }
   th->sides[side]->BA = BA;
 }
