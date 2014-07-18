@@ -285,7 +285,7 @@ modredcul_batchinv_ul (unsigned long *r_ul, const unsigned long *a_ul,
    subtrahend = subtrahend_lo + subtrahend_hi * 2^LONG_BIT.
    Return 1 if (v - subtrahend) / divisor is a non-negative integer less than
    2^LONG_BIT, and 0 otherwise */
-static int
+static inline int
 check_divisible(const unsigned long lo, const unsigned long hi,
                 const unsigned long subtrahend_lo, const unsigned long subtrahend_hi,
                 const unsigned long divisor)
@@ -303,19 +303,21 @@ check_divisible(const unsigned long lo, const unsigned long hi,
   return r == 0;
 }
 
-/* For each 0 <= i < n, compute r[i] = -num/(den*2^k) mod p[i].
-   den must be odd.
+/* For each 0 <= i < n, compute r[i] = -(-1)^sign num/(den*2^k) mod p[i].
+   den must be odd, sign must be 0 or 1.
    Returns 1 if successful. If any modular inverse does not exist,
    returns 0 and the contents of r are undefined. */
 int
 modredcul_batch_Q_to_Fp (unsigned long *r, const unsigned long num,
                          const unsigned long den, const unsigned long k,
-                         const unsigned long *p, const size_t n)
+                         const int sign, const unsigned long *p,
+                         const size_t n)
 {
   modulusredcul_t m;
   const unsigned long ratio = num / den, remainder = num % den;
 
   ASSERT_ALWAYS(den % 2 == 1);
+  ASSERT_ALWAYS(sign == 0 || sign == 1);
   modredcul_initmod_ul (m, den);
   if (modredcul_batchinv_ul (r, p, num, n, m) == 0)
     return 0;
@@ -344,21 +346,23 @@ modredcul_batch_Q_to_Fp (unsigned long *r, const unsigned long num,
     /* Treat cases t < 0 and t >= 0 separately, so we can negate (mod p[i])
        in case of negative t. */
     if (ularith_gt_2ul_2ul(remainder, 0, lo, hi)) {
-      /* Expensive check that den | (remainder - lo + 2^LONGBITS * hi) */
-      ASSERT_ALWAYS(check_divisible(remainder, 0, lo, hi, den));
-      /* Case t < 0. We compute t' = (num - r[i] * p[i]) / den instead, and
-         later set t = -t' mod p[i]. */
+      /* Expensive check that den | (remainder - (lo + 2^LONGBITS * hi)) */
+      ASSERT_EXPENSIVE(check_divisible(remainder, 0, lo, hi, den));
+      /* Case t < 0. We compute t' = -t = (num - r[i] * p[i]) / den instead,
+         and later set t = -t' mod p[i]. */
       t = -t;
       ASSERT_ALWAYS(t < p[i]); /* Cheap and fairly stong check */
       /* Now we want -(t + ratio_p) mod p[i] */
       ularith_addmod_ul_ul (&t, t, ratio_p, p[i]);
-      if (t > 0)
+      if (!sign && t > 0)
         t = p[i] - t;
     } else {
       /* Expensive check that den | (lo + 2^LONGBITS * hi - remainder) */
-      ASSERT_ALWAYS(check_divisible(lo, hi, remainder, 0, den));
+      ASSERT_EXPENSIVE(check_divisible(lo, hi, remainder, 0, den));
       ASSERT_ALWAYS(t < p[i]); /* Cheap and fairly stong check */
       ularith_submod_ul_ul(&t, t, ratio_p, p[i]);
+      if (sign && t > 0)
+        t = p[i] - t;
     }
     /* Now divide by the power of 2 that's supposed to be in the denominator.
        We assume this is small and do it with a simple loop. */
