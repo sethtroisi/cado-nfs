@@ -19,6 +19,8 @@
    the shortest are the output vectors, but the computation takes longer.
  */
 
+#include "cado.h"
+#include "macros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "lll.h"
@@ -29,7 +31,7 @@
 #define ROW /* each row represents a vector */
 
 static void
-ident ( mat_Z X, long n )
+ident (mat_Z X, long n)
 {
    long i, j;
    X.NumRows = X.NumCols = n;
@@ -37,60 +39,53 @@ ident ( mat_Z X, long n )
    for (i = 1; i <= n; i++)  
       for (j = 1; j <= n; j++)  
          if (i == j)
-	    mpz_set_ui(X.coeff[i][j], 1);
+	    mpz_set_ui (X.coeff[i][j], 1);
          else  
-            mpz_set_ui(X.coeff[i][j], 0);
+            mpz_set_ui (X.coeff[i][j], 0);
 } 
 
-
 static void
-InnerProduct ( mpz_t x, mpz_t *a, mpz_t *b, long n, mpz_t t1 )
+InnerProduct (mpz_t x, mpz_t *a, mpz_t *b, long n)
 {
    long i;
 
-   mpz_set_ui(x, 0);
-   for (i = 1; i <= n; i++) {
-      mpz_mul(t1, a[i], b[i]);
-      mpz_add(x, x, t1);
-   }
+   mpz_mul (x, a[1], b[1]);
+   for (i = 2; i <= n; i++)
+     mpz_addmul (x, a[i], b[i]);
 }
 
-
 static void
-IncrementalGS ( mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k )
+IncrementalGS (mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k)
 {
    long n = B.NumCols;
-   mpz_t u, t1, t2;
+   mpz_t u, t1;
    long i, j, posj;
 
    mpz_init(u);
    mpz_init(t1);
-   mpz_init(t2);
 
    for (j = 1; j <= k-1; j++) {
       posj = P[j];
       if (posj == 0) continue;
 
-      InnerProduct(u, B.coeff[k], B.coeff[j], n, t1);
+      InnerProduct (u, B.coeff[k], B.coeff[j], n);
       for (i = 1; i <= posj-1; i++) {
-         mpz_mul(t1, D[i], u);
-         mpz_mul(t2, lam[k][i], lam[j][i]);
-         mpz_sub(t1, t1, t2);
-         mpz_div(t1, t1, D[i-1]);
-         mpz_set(u, t1);
+         mpz_mul (t1, D[i], u);
+         mpz_submul (t1, lam[k][i], lam[j][i]);
+         mpz_div (t1, t1, D[i-1]);
+         mpz_set (u, t1);
       }
 
       mpz_set(lam[k][posj], u);
    }
 
-   InnerProduct(u, B.coeff[k], B.coeff[k], n, t1);
+   InnerProduct (u, B.coeff[k], B.coeff[k], n);
 
    for (i = 1; i <= *s; i++) {
-      mpz_mul(t1, D[i], u);
-      mpz_mul(t2, lam[k][i], lam[k][i]);
-      mpz_sub(t1, t1, t2);
-      mpz_div(t1, t1, D[i-1]);
-      mpz_set(u, t1);
+      mpz_mul (t1, D[i], u);
+      mpz_submul (t1, lam[k][i], lam[k][i]);
+      mpz_div (t1, t1, D[i-1]);
+      mpz_set (u, t1);
    }
 
    if (mpz_cmp_ui(u, 0) == 0)
@@ -106,33 +101,23 @@ IncrementalGS ( mat_Z B, long *P, mpz_t *D, mpz_t **lam, long *s, long k )
 
    mpz_clear(u);
    mpz_clear(t1);
-   mpz_clear(t2);
 }
 
 
 static void
-BalDiv ( mpz_t q, mpz_t a, mpz_t d, mpz_t r )
+BalDiv (mpz_t q, mpz_t a, mpz_t d, mpz_t r)
 /*  rounds a/d to nearest integer, breaking ties
     by rounding towards zero.  Assumes d > 0. */
 {
    long cmp;
 
-   mpz_fdiv_qr(q, r, a, d);
+   mpz_fdiv_qr (q, r, a, d);
 
-   mpz_mul_2exp(r, r, 1);
+   mpz_mul_2exp (r, r, 1);
 
-   cmp = mpz_cmp(r, d);
+   cmp = mpz_cmp (r, d);
    if (cmp > 0 || (cmp == 0 && mpz_cmp_ui(q, 0) < 0))
-      mpz_add_ui(q, q, 1);
-}
-
-
-static void
-MulSub( mpz_t c, mpz_t c1, mpz_t c2, mpz_t x, mpz_t tmp )
-/* c = c1 - x*c2 */
-{
-   mpz_mul(tmp, x, c2);
-   mpz_sub(c, c1, tmp);
+     mpz_add_ui (q, q, 1);
 }
 
 
@@ -183,16 +168,16 @@ reduce ( long k, long l, mat_Z B, long *P, mpz_t *D,
      return;
 
    BalDiv (r, lam[k][P[l]], D[P[l]], t1);
-   MulSubN (B.coeff[k], B.coeff[l], r, B.NumRows, t1);
+   MulSubN (B.coeff[k], B.coeff[l], r, B.NumCols, t1);
 
    if (U)
-     MulSubN (U->coeff[k], U->coeff[l], r, B.NumRows, t1);
+     MulSubN (U->coeff[k], U->coeff[l], r, B.NumCols, t1);
 
    for (j = 1; j <= l-1; j++)
      if (P[j] != 0)
-       MulSub(lam[k][P[j]], lam[k][P[j]], lam[l][P[j]], r, t1);
+       mpz_submul (lam[k][P[j]], lam[l][P[j]], r);
 
-   MulSub(lam[k][P[l]], lam[k][P[l]], D[P[l]], r, t1);
+   mpz_submul (lam[k][P[l]], D[P[l]], r);
 }
 
 
@@ -349,9 +334,9 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
 
       mpz_set(t3, t2);
       mpz_neg(t2, t2);
-      RowTransformN(B.coeff[k-1], B.coeff[k], t1, t2, y, x, B.NumRows);
+      RowTransformN(B.coeff[k-1], B.coeff[k], t1, t2, y, x, B.NumCols);
       if (U)
-        RowTransformN(U->coeff[k-1], U->coeff[k], t1, t2, y, x, B.NumRows);
+        RowTransformN(U->coeff[k-1], U->coeff[k], t1, t2, y, x, B.NumCols);
       for (j = 1; j <= k-2; j++)
          if (P[j] != 0)
             RowTransform(lam[k-1][P[j]], lam[k][P[j]], t1, t2, y, x);
@@ -395,21 +380,27 @@ swapLLL ( long k, mat_Z B, long *P, mpz_t *D,
    mpz_clear(y);
 }
 
-/* LLL-reduce the matrix B (whose rows represent vectors)
+/* LLL-reduce the matrix B (whose rows represent vectors, with indices
+   starting at 1):
  * det (output) is the determinant
  * U (output) is the transformation matrix (NULL if not needed)
  * a, b are parameters (a/b=3/4 classically, we should have 1/4 < a/b < 1)
- * verbose controls the verbose level (0 = nothing) */
+ * verbose controls the verbose level (0 = nothing)
+ m is the number of vectors (i.e., number of rows)
+ n is the number of columns (i.e., length of each vector)
+ */
 long LLL ( mpz_t det, mat_Z B, mat_Z* U, mpz_t a,
            mpz_t b, long verbose )
 {
-   long m, *P, j, s, k, max_k;
+   long m, n, *P, j, s, k, max_k;
    mpz_t *D, **lam, tmp1, tmp2;
 
    mpz_init (tmp1);
    mpz_init (tmp2);
 
    m = B.NumRows;
+   n = B.NumCols;
+   ASSERT_ALWAYS(n >= m);
 
    P = (long*) malloc((m+1) * sizeof(long));
 

@@ -1540,7 +1540,7 @@ rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1,
   for (i = 1; rotate_area (*K0, -*K0, *J0, *J1) < max_area; i++, *K0 *= 2)
     {
       k0 = rotate_aux (f->coeff, b, m, k0, *K0, 0);
-      lognorm = L2_lognorm (f, L2_skewness (f, SKEWNESS_DEFAULT_PREC));
+      lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
       alpha = exp_alpha[i];
       E = lognorm + alpha;
       if (E < best_E + MARGIN)
@@ -1559,7 +1559,7 @@ rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1,
   for (i++; exp_alpha[i] != DBL_MAX && rotate_area (*K0, *K1, *J0, -*J0) < max_area; i++, *J0 = 2 * *J0 - 1)
     {
       j0 = rotate_aux (f->coeff, b, m, j0, *J0, 1);
-      lognorm = L2_lognorm (f, L2_skewness (f, SKEWNESS_DEFAULT_PREC));
+      lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
       alpha = exp_alpha[i];
       E = lognorm + alpha;
       if (E < best_E + MARGIN)
@@ -1716,7 +1716,7 @@ rotate (mpz_poly_ptr f, unsigned long alim, mpz_t m, mpz_t b,
 
           /* translate from k0 to k */
           k0 = rotate_aux (f->coeff, b, m, k0, k, 0);
-          lognorm = L2_lognorm (f, L2_skewness (f, SKEWNESS_DEFAULT_PREC));
+          lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
           if (multi <= 1) {
               if (lognorm + alpha < best_lognorm + best_alpha) {
                   best_lognorm = lognorm;
@@ -2693,6 +2693,96 @@ optimize_c3 (mpz_t *f, mpz_t *g, long l)
   return vmin;
 }
 #endif
+
+void
+optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
+{
+  double skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
+  double best_lognorm, lognorm;
+  mpz_t s, det, a, b;
+  int d = f->deg, i, j;
+  mat_Z m;
+  mpz_poly_t best_f, copy_f;
+  mpz_t best_g0, copy_g0;
+
+  mpz_init (s);
+  mpz_init (det);
+  mpz_init_set_ui (a, 3);
+  mpz_init_set_ui (b, 4);
+  mpz_poly_init (best_f, d);
+  mpz_poly_init (copy_f, d);
+  mpz_poly_copy (copy_f, f);
+  mpz_init_set (copy_g0, g[0]);
+  mpz_poly_copy (best_f, f);
+  mpz_init_set (best_g0, g[0]);
+  best_lognorm = L2_lognorm (f, skew);
+
+  mpz_set_d (s, skew + 0.5); /* round to nearest */
+  /* m has d-1 (row) vectors of d+1 coefficients each */
+  m.NumRows = d - 1;
+  m.NumCols = d + 1;
+  m.coeff = (mpz_t **) malloc (d * sizeof(mpz_t*));
+  for (j = 0; j <= d-1; j++)
+    {
+      m.coeff[j] = (mpz_t *) malloc ((d + 2) * sizeof(mpz_t));
+      for (i = 0; i <= d + 1; i++)
+        mpz_init (m.coeff[j][i]);
+    }
+  mpz_set_ui (det, 1);
+  for (i = 0; i <= d; i++)
+    {
+      if (i > 0)
+        mpz_mul (det, det, s); /* s^i */
+      if (i <= d - 3)
+        mpz_set (m.coeff[i+2][i+1], det);
+      mpz_mul (m.coeff[1][i+1], det, f->coeff[i]);
+    }
+  for (i = 0; i <= d - 3; i++)
+    {
+      /* m.coeff[i+2][i+1] is already s^i */
+      mpz_mul (m.coeff[i+2][i+2], m.coeff[i+2][i+1], s); /* s^(i+1) */
+      mpz_mul (m.coeff[i+2][i+1], m.coeff[i+2][i+1], g[0]);
+      mpz_mul (m.coeff[i+2][i+2], m.coeff[i+2][i+2], g[1]);
+    }
+  LLL (det, m, NULL, a, b, verbose);
+  for (j = 1; j <= d-1; j++)
+    {
+      if (mpz_sgn (m.coeff[j][d]) != 0)
+        {
+          mpz_set_ui (det, 1);
+          for (i = 0; i <= d; i++)
+            {
+              if (i > 0)
+                mpz_mul (det, det, s); /* det = s^i */
+              ASSERT_ALWAYS(mpz_divisible_p (m.coeff[j][i+1], det));
+              mpz_divexact (f->coeff[i], m.coeff[j][i+1], det);
+            }
+          mpz_set (g[0], copy_g0);
+          optimize_aux (f, g, verbose, 1);
+          lognorm = L2_skew_lognorm (f, SKEWNESS_DEFAULT_PREC);
+          if (lognorm < best_lognorm)
+            {
+              best_lognorm = lognorm;
+              mpz_poly_copy (best_f, f);
+              mpz_set (best_g0, g[0]);
+            }
+        }
+      for (i = 0; i <= d + 1; i++)
+        mpz_clear (m.coeff[j][i]);
+      free (m.coeff[j]);
+    }
+  mpz_poly_copy (f, best_f);
+  mpz_set (g[0], best_g0);
+  free (m.coeff);
+  mpz_clear (s);
+  mpz_clear (det);
+  mpz_clear (a);
+  mpz_clear (b);
+  mpz_poly_clear (best_f);
+  mpz_poly_clear (copy_f);
+  mpz_clear (best_g0);
+  mpz_clear (copy_g0);
+}
 
 /* if use_rotation is non-zero, also use rotation */
 void

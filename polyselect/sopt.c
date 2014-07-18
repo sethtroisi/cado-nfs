@@ -35,6 +35,8 @@ int fake = 0;
 /* only use translation in optimization */
 int translate = 0;
 
+/* use LLL-based algorithm */
+int use_lll = 0;
 
 /* 
    Care: poly_print is named in utils.h
@@ -69,6 +71,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
   mpz_t t, M;
   double skew = 0.0, alpha = 0.0, logmu = 0.0;
   double ave_logmu = 0.0, ave_alpha = 0.0;
+  double min_logmu = DBL_MAX, max_logmu = 0.0;
   mpz_init (t);
   mpz_init (M);
   mpz_init (g[1]);
@@ -170,8 +173,10 @@ opt_file (FILE *file, int deg, mpz_t N) {
       /* optimize */
       if (translate)
         optimize_aux (F, g, 0, 0);
-      else
+      else if (use_lll == 0)
         optimize (F, g, 0, 1);
+      else
+        optimize_lll (F, g, 0);
 
       /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
@@ -184,6 +189,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
               logmu, alpha, logmu + alpha, nroots, skew);
 
       ave_logmu += logmu;
+      min_logmu = (logmu < min_logmu) ? logmu : min_logmu;
+      max_logmu = (logmu > max_logmu) ? logmu : max_logmu;
       ave_alpha += alpha;
       count += 1;
       flag = 0UL;
@@ -203,6 +210,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
   fprintf(stdout, "\n# total num. of polys: %u\n", count);
   fprintf(stdout, "# ave. l2norm: %3.3f\n", ave_logmu / count);
+  fprintf(stdout, "# min. l2norm: %3.3f\n", min_logmu);
+  fprintf(stdout, "# max. l2norm: %3.3f\n", max_logmu);
   fprintf(stdout, "# ave. alpha: %3.3f\n", ave_alpha / count);
 
   mpz_clear (g[0]);
@@ -219,7 +228,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 */
 static void
 usage (void) {
-  fprintf (stdout, "Usage: polyopt [--fake] [--translate] -f POLYFILE -d DEGREE -n NUMBER\n");
+  fprintf (stdout, "Usage: polyopt [--fake] [--translate] [--lll] -f POLYFILE -d DEGREE -n NUMBER\n");
   exit(1);
 }
 
@@ -241,6 +250,7 @@ int main (int argc, char **argv)
   param_list_init (pl);
   param_list_configure_switch (pl, "--fake", &fake);
   param_list_configure_switch (pl, "--translate", &translate);
+  param_list_configure_switch (pl, "--lll", &use_lll);
 
   argv++, argc--;
   for ( ; argc; ) {

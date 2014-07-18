@@ -82,8 +82,6 @@ def l2norm_tk(f,s):
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
-PRECISION=53
-
 def l2norm_tk_circular(f,s):
    if f.degree()==6:
       a0 = f[0]
@@ -608,7 +606,7 @@ def optimize(f,g):
     logmu0 = best_l2norm_tk_circular(f)
     kt = kr0 = kr1 = kr2 = 1
     count = 0
-    while True:
+    while count < 200:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False
         # first try translation
