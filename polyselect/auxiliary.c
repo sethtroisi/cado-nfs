@@ -2843,7 +2843,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
 
     /* f(x) := f(x) + l*x^3*g(x) */
     rotate_auxg_si (f->coeff, g, l, 3);
-    /* h(k) = coeffiecient of x^3 in  f(x+k), which is a degree-3
+    /* h(k) = coefficient of x^3 in  f(x+k), which is a degree-3
        polynomial in k */
     fdminus3_translated (h, f);
     /* Store in r the integer approximation of the real roots of this
