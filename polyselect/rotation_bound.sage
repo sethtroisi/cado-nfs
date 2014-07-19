@@ -668,6 +668,8 @@ def optimize(f,g):
                 logmu0 = logmu
 	    else:
                 f = f + kr0*g
+        if changedt == False and changedr2 == False and changedr1 == False and changedr0 == False and kt == 1 and kr2 == 1 and kr1 == 1 and kr0 == 1:
+            break
         if changedt == True:
             kt = 2*kt
         elif kt > 1:
@@ -684,8 +686,6 @@ def optimize(f,g):
             kr0 = 2*kr0
         elif kr0 > 1:
             kr0 = kr0//2
-        if changedt == False and changedr2 == False and changedr1 == False and changedr0 == False and kt == 1 and kr2 == 1 and kr1 == 1 and kr0 == 1:
-            break
     return f, g
 
 
