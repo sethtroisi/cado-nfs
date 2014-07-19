@@ -72,6 +72,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
   double skew = 0.0, alpha = 0.0, logmu = 0.0;
   double ave_logmu = 0.0, ave_alpha = 0.0;
   double min_logmu = DBL_MAX, max_logmu = 0.0;
+
   mpz_init (t);
   mpz_init (M);
   mpz_init (g[1]);
@@ -145,7 +146,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       mpz_mul (M, M, g[0]);
       mpz_mod (M, M, N);
       /* check M ? a root of the algebraic polynomial mod N */
-      mpz_init_set (t, f[deg]);
+      mpz_set (t, f[deg]);
       for (i = deg - 1; i >= 0; i --) {
         mpz_mul (t, t, M);
         mpz_add (t, t, f[i]);

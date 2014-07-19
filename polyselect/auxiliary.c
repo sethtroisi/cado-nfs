@@ -2708,7 +2708,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   m.NumRows = d - 1;
   m.NumCols = d + 1;
   m.coeff = (mpz_t **) malloc (d * sizeof(mpz_t*));
-  for (j = 0; j <= d-1; j++)
+  for (j = 1; j <= d-1; j++)
     {
       m.coeff[j] = (mpz_t *) malloc ((d + 2) * sizeof(mpz_t));
       for (i = 0; i <= d + 1; i++)
