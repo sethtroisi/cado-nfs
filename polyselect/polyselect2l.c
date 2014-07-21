@@ -69,7 +69,7 @@ unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
 double best_opt_logmu[KEEP], best_logmu[KEEP + 1];
 double rootsieve_time = 0.0, optimize_time = 0.0;
-int raw = 0;
+int raw = 0, dont_use_deg6_small_c3 = 0;
 
 static void
 mutex_lock(pthread_mutex_t *lock)
@@ -429,7 +429,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
 
   /* optimize size */
   st = seconds_thread ();
-  optimize (F, g, verbose, 1);
+  optimize (F, g, verbose, 1, !dont_use_deg6_small_c3);
   st = seconds_thread () - st;
   mutex_lock (&lock);
   optimize_time += st;
@@ -1944,6 +1944,7 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "keep", "number of polynomials kept (default 10)");
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
+  param_list_decl_usage(pl, "noc3", "(switch) don't try to reduce c_3 of degree-6 polynomials");
   param_list_decl_usage(pl, "resume", "resume state from given file");
   param_list_decl_usage(pl, "rootsieve", "root-sieve the size-optimized polynomials in given file");
   snprintf (str, 200, "root-sieve effort ranging from 1 to 10 (default %d)",
@@ -2005,6 +2006,7 @@ main (int argc, char *argv[])
 
   param_list_configure_switch (pl, "-v", &verbose);
   param_list_configure_switch (pl, "-r", &raw);
+  param_list_configure_switch (pl, "-noc3", &dont_use_deg6_small_c3);
   param_list_configure_switch (pl, "-q", &quiet);
   param_list_configure_alias(pl, "degree", "-d");
   param_list_configure_alias(pl, "incr", "-i");

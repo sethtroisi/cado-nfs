@@ -175,7 +175,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       if (translate)
         optimize_aux (F, g, 0, 0);
       else if (use_lll == 0)
-        optimize (F, g, 0, 1);
+        optimize (F, g, 0, 1, 1);
       else
         optimize_lll (F, g, 0);
 
