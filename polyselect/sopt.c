@@ -138,7 +138,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       continue;
 
     /* consider raw polynomial only */
-    if ( (flag == 511UL || flag == 447UL) &&  (skip == 0) ) {
+    if ( (flag == (383UL + (2<<deg))) &&  (skip == 0) ) {
 
       /* M = -Y0/Y1 mod N */
       mpz_invert (M, g[1], N);
