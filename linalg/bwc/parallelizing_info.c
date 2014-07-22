@@ -140,8 +140,6 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     serialize(wr);
     for(unsigned int j = 0 ; j < wr->njobs ; j++) {
         for(unsigned int t = 0 ; t < wr->ncores ; t++) {
-            /* we serialize because of the thread_broadcast bug */
-            // serialize_threads(wr);
             global_broadcast(wr, strings + (j * wr->ncores + t) * siz,
                     siz, j, t);
         }
@@ -857,46 +855,69 @@ void pi_log_print_all(parallelizing_info_ptr pi)
 
 struct thread_broadcast_arg {
     pi_wiring_ptr wr;
-    void ** ptr;
-    unsigned int i;
+    /* this pointer is written from all threads. Its contents are
+     * meaningful only for the root thread */
+    void * ptr;
+    unsigned int root;
+    size_t size;
 };
 
 void thread_broadcast_in(int s MAYBE_UNUSED, struct thread_broadcast_arg * a)
 {
-    if (a->wr->trank == a->i) {
-        a->wr->th->utility_ptr = *a->ptr;
+    /* here we have a mutex locked */
+    if (a->wr->trank == a->root) {
+        a->wr->th->utility_ptr = a->ptr;
     }
 }
 
 void thread_broadcast_out(int s MAYBE_UNUSED, struct thread_broadcast_arg * a)
 {
-    *a->ptr = a->wr->th->utility_ptr;
+    /* here we know that exactly one thread has just filled the
+     * a->wr->th->utility_ptr, so that a memcpy is possible, as long as
+     * the owner of the data area has not touched it again */
+    if (a->ptr != a->wr->th->utility_ptr)       /* placate valgrind */
+        memcpy(a->ptr, a->wr->th->utility_ptr, a->size);
 }
 
-void thread_broadcast(pi_wiring_ptr wr, void ** ptr, unsigned int i)
+/* broadcast the data area pointed to by [ptr, ptr+size[ to all threads.
+ * Pointers at calling threads must differ. */
+void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int i)
 {
     struct thread_broadcast_arg a[1];
     a->wr = wr;
     a->ptr = ptr;
-    a->i = i;
+    a->root = i;
+    a->size = size;
     barrier_wait(wr->th->bh,
             (void(*)(int,void*)) &thread_broadcast_in,
             (void(*)(int,void*)) &thread_broadcast_out,
             a);
-#if 0
-    // FIXME: this design is flawed. Correct reentrancy is not achieved.
-    // All the stuff around the barrier here should be done with the
-    // mutex locked, otherwise disaster may occur.
-    // A fix would incur either basically rewriting barrier code, so as
-    // to place stuff at the right spot. Note that there _is_ some
-    // barrier code in bw/barrier.[ch] which could easily be expanded for
-    // this purpose.
-    if (wr->trank == i) {
-        wr->th->utility_ptr = *ptr;
+    serialize_threads(wr);
+}
+
+void * shared_malloc(pi_wiring_ptr wr, size_t size)
+{
+    void * ptr = NULL;
+    if (wr->trank == 0) ptr = malloc(size);
+    thread_broadcast(wr, &ptr, sizeof(void*), 0);
+    return ptr;
+}
+
+void * shared_malloc_set_zero(pi_wiring_ptr wr, size_t size)
+{
+    void * ptr = NULL;
+    if (wr->trank == 0) {
+        ptr = malloc(size);
+        memset(ptr, 0, size);
     }
-    my_pthread_barrier_wait(wr->th->b);
-    *ptr = wr->th->utility_ptr;
-#endif
+    thread_broadcast(wr, &ptr, sizeof(void*), 0);
+    return ptr;
+}
+
+void shared_free(pi_wiring_ptr wr, void * ptr)
+{
+    serialize_threads(wr);
+    if (wr->trank == 0) free(ptr);
 }
 
 void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t)
@@ -909,10 +930,7 @@ void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j,
         err = MPI_Bcast(ptr, size, MPI_BYTE, j, wr->pals);
         ASSERT_ALWAYS(!err);
     }
-    void * leader_ptr = ptr;
-    thread_broadcast(wr, &leader_ptr, t);
-    if (ptr != leader_ptr)
-        memcpy(ptr, leader_ptr, size);
+    thread_broadcast(wr, ptr, size, t);
 }
 
 
@@ -1048,7 +1066,7 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
     if (w->trank == 0) {
         allcounts_void = malloc(w->totalsize*sizeof(int));
     }
-    thread_broadcast(w, &allcounts_void, 0);
+    thread_broadcast(w, &allcounts_void, sizeof(void*), 0);
     int * allcounts = (int *) allcounts_void;
     for(unsigned int k = 0 ; k < w->njobs ; k++) {
         allcounts[k * w->ncores + w->trank] = counts[k];
@@ -1098,7 +1116,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     if (w->trank == 0) {
         allcounts_void = malloc(w->njobs*w->ncores*sizeof(int));
     }
-    thread_broadcast(w, &allcounts_void, 0);
+    thread_broadcast(w, &allcounts_void, sizeof(int*), 0);
     int * allcounts = (int *) allcounts_void;
 
     // Given an orientation value d, the numbering for the thread (it,jt)
@@ -1280,7 +1298,7 @@ pi_save_file_leader_init_done:
      * thread. It does not make sense on other jobs of course, since for
      * these, recvbuf is unused. */
     if (w->jrank == 0) {
-        thread_broadcast(w, &recvbuf, 0);
+        thread_broadcast(w, &recvbuf, sizeof(void*), 0);
     }
 
     /* Rather unfortunate, but error checking requires some checking. As
@@ -1394,7 +1412,7 @@ pi_save_file_2d_leader_init_done:
      * thread. It does not make sense on other jobs of course, since for
      * these, recvbuf is unused. */
     if (w->jrank == 0) {
-        thread_broadcast(w, &recvbuf, 0);
+        thread_broadcast(w, &recvbuf, sizeof(void*), 0);
     }
 
     /* Rather unfortunate, but error checking requires some checking. As
@@ -1485,7 +1503,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     }
 
     if (w->jrank == 0) {
-        thread_broadcast(w, &sendbuf, 0);
+        thread_broadcast(w, &sendbuf, sizeof(void*), 0);
     }
 
     /* For loading, in contrast to saving, we simply abort if reading
@@ -1615,7 +1633,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     }
 
     if (w->jrank == 0) {
-        thread_broadcast(w, &sendbuf, 0);
+        thread_broadcast(w, &sendbuf, sizeof(void*), 0);
     }
 
     /* For loading, in contrast to saving, we simply abort if reading
@@ -1677,83 +1695,60 @@ void pi_interleaving_leave(parallelizing_info_ptr pi)
     my_pthread_barrier_wait(pi->interleaved->b);
 }
 
+/* Considering a data area with a pointer identical on all calling
+ * threads, tell whether the contents agree on all MPI jobs+threads
+ * (returns 1 if this is the case)
+ *
+ * More exactly, this function only cares about the pointer on thread 0.
+ */
 int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 {
-    int ok = 0;
-    int * pok = &ok;
+    /* TODO: think about allocating less */
+    int cmp = 0;
     if (pi->m->trank == 0) {
         void * b_and = malloc(sz);
         void * b_or = malloc(sz);
         MPI_Allreduce(buffer, b_and, sz, MPI_BYTE, MPI_BAND, pi->m->pals);
         MPI_Allreduce(buffer, b_or, sz, MPI_BYTE, MPI_BOR, pi->m->pals);
-        ok = memcmp(b_and, b_or, sz);
+        cmp = memcmp(b_and, b_or, sz);
         free(b_and);
         free(b_or);
     }
-    thread_broadcast(pi->m, (void**) &pok, 0);
-    return *pok == 0;
+    thread_broadcast(pi->m, &cmp, sizeof(int), 0);
+    return cmp == 0;
 }
 
+/* Here we assume pointers which are different on several calling
+ * threads, and we compare the contents. Results may disagree on the
+ * different MPI nodes */
 int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 {
-    char ** bufs;
-    if (pi->m->trank == 0)
-        bufs = malloc(pi->m->ncores * sizeof(char*));
-    thread_broadcast(pi->m, (void**) &bufs, 0);
+    void ** bufs = shared_malloc(pi->m, pi->m->ncores * sizeof(void*));
+    int * oks = shared_malloc(pi->m, pi->m->ncores * sizeof(int));
+
     bufs[pi->m->trank] = buffer;
-    int ok = 0;
-    int * pok = &ok;
-    if (serialize_threads(pi->m)) {
-        char * b_and = malloc(sz);
-        char * b_or = malloc(sz);
-        memset(b_and, 0, sz);
-        memset(b_or, 0, sz);
-        for(unsigned int i = 0 ; i < pi->m->ncores ; i++) {
-            for(size_t k = 0 ; k < sz ; k++) {
-                b_and[k] &= bufs[i][k];
-                b_or[k]  |= bufs[i][k];
-            }
-        }
-        ok = memcmp(b_and, b_or, sz);
-        free(b_and);
-        free(b_or);
+    oks[pi->m->trank] = 1;
+
+    for(unsigned int stride = 1 ; stride < pi->m->ncores ; stride <<= 1) {
+        unsigned int i = pi->m->trank;
+        serialize_threads(pi->m);
+        if (i + stride > pi->m->ncores) continue;
+        /* many threads are doing nothing here */
+        if (i & stride) continue;
+        oks[i] = oks[i] && oks[i + stride] && memcmp(bufs[i], bufs[i + stride], sz) == 0;
     }
-    thread_broadcast(pi->m, (void**) &pok, 0);
-    return *pok == 0;
+    serialize_threads(pi->m);
+    int ret = oks[0];
+    shared_free(pi->m, oks);
+    shared_free(pi->m, bufs);
+    return ret;
 }
 
 int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 {
-    char ** bufs;
-    if (pi->m->trank == 0)
-        bufs = malloc(pi->m->ncores * sizeof(char*));
-    thread_broadcast(pi->m, (void**) &bufs, 0);
-    bufs[pi->m->trank] = buffer;
-    int ok = 0;
-    int * pok = &ok;
-    if (serialize_threads(pi->m)) {
-        char * b_and = malloc(sz);
-        char * b_or = malloc(sz);
-        memcpy(b_and, buffer, sz);
-        memcpy(b_or, buffer, sz);
-        for(unsigned int i = 0 ; i < pi->m->ncores ; i++) {
-            for(size_t k = 0 ; k < sz ; k++) {
-                b_and[k] &= bufs[i][k];
-                b_or[k]  |= bufs[i][k];
-            }
-        }
-        MPI_Allreduce(MPI_IN_PLACE, b_and, sz, MPI_BYTE, MPI_BAND, pi->m->pals);
-        MPI_Allreduce(MPI_IN_PLACE, b_or,  sz, MPI_BYTE, MPI_BOR,  pi->m->pals);
-        ok = memcmp(b_and, b_or, sz);
-        /* We may use just any non-zero pointer */
-        pok = ok == 0 ? (void*) pi : NULL;
-        free(b_and);
-        free(b_or);
-    }
-    thread_broadcast(pi->m, (void**) &pok, 0);
-    ok = pok != NULL;
-    if (pi->m->trank == 0)
-        free(bufs);
-    return ok;
+    int ok= thread_data_eq(pi, buffer, sz);
+    MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
+    if (!ok) return 0;
+    return mpi_data_eq(pi, buffer, sz);
 }
 

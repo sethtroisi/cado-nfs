@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <pthread.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -74,8 +75,17 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     gmp_randstate_t rstate;
     gmp_randinit_default(rstate);
-    if (!bw->seed)
+
+    if (pi->m->trank == 0 && !bw->seed) {
+        /* note that bw is shared between threads, thus only thread 0 should
+         * test and update it here.
+         * at pi->m->jrank > 0, we don't care about the seed anyway
+         */
         bw->seed = time(NULL);
+        MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
+    }
+    serialize_threads(pi->m);
+
     gmp_randseed_ui(rstate, bw->seed);
     if (tcan_print) {
         printf("// Random generator seeded with %d\n", bw->seed);
@@ -190,7 +200,6 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         /* OK -- now everybody has the same data */
 
         int dimk;
-        int * pdimk;
         
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
@@ -198,10 +207,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                     bw->m, prep_lookahead_iterations * A->groupsize(A),
                     A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
-            pdimk = &dimk;
         }
-        thread_broadcast(pi->m, (void **) &pdimk, 0);
-        dimk = * pdimk;
+        thread_broadcast(pi->m, (void *) &dimk, sizeof(int), 0);
 
         if (tcan_print)
             printf("// Dimension of kernel: %d\n", dimk);

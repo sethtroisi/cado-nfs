@@ -216,8 +216,9 @@ insert_relation_in_dup_hashtable (earlyparsed_relation_srcptr rel, unsigned int 
                      "TRACE: i = %" PRIu32 "\nTRACE: j = %" PRIu32 "\n"
                      "TRACE: initial value of i was %" PRIu32 "\n"
                      "TRACE: h = %" PRIx64 "\nTRACE: is_dup = %u\n",
-                     (rel->a < 0) ? "-" : "", (uint64_t) rel->a, rel->b, i,
-                     j, old_i, h, *is_dup);
+                     (rel->a < 0) ? "-" : "",
+                     (uint64_t) ((rel->a < 0) ? -rel->a : rel->a),
+                     rel->b, i, j, old_i, h, *is_dup);
   }
 #endif
   return i;
@@ -367,10 +368,12 @@ hash_renumbered_rels (void * context_data MAYBE_UNUSED, earlyparsed_relation_ptr
       fprintf (stderr, "Warning, duplicate relation in already renumbered files:"
                        "\na = %s%" PRIx64 "\nb = %" PRIx64 "\ni = %" PRIu32
                        "\nj = %" PRIu32 "\n", (rel->a < 0) ? "-" : "",
-                       (uint64_t) rel->a, rel->b, i, H[i]);
+                       (uint64_t) ((rel->a < 0) ? -rel->a : rel->a),
+                       rel->b, i, H[i]);
       fprintf (stderr, "This warning may be due to a collision on the hash "
-                       "table or to an actual duplicate relation. If it appears"
-                       "often you should check the input set of relations.");
+                       "table or to an actual duplicate\nrelation. If it "
+                       "appears often you should check the input set of "
+                       "relations.\n\n");
     }
 
     if (i < sanity_size)
@@ -566,7 +569,8 @@ main (int argc, char *argv[])
                       "(or nrels = 0)\n");
       usage(pl, argv0);
     }
-    K = 100 + 1.2 * nrels_expected;
+    K = 100 + nrels_expected + (nrels_expected / 5);
+    K = ulong_nextprime (K);
 
     if (basepath && !filelist)
     {

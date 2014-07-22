@@ -68,13 +68,11 @@ void vec_init_generic(pi_wiring_ptr picol, abase_vbase_ptr abase, mmt_vec_ptr v,
      * to zero out the readahead zone only, but it's easier this way.
      */
     if (flags & THREAD_SHARED_VECTOR) {
-        void * r;
         if (picol->trank == 0) {
-            abase->vec_init(abase, &r, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
-            abase->vec_set_zero(abase, r, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            abase->vec_init(abase, &v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
+            abase->vec_set_zero(abase, v->v, n + ABASE_UNIVERSAL_READAHEAD_ITEMS);
         }
-        thread_broadcast(picol, &r, 0);
-        v->v = r;
+        thread_broadcast(picol, &v->v, sizeof(void*), 0);
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             v->all_v[t] = v->v;
         }
@@ -84,10 +82,7 @@ void vec_init_generic(pi_wiring_ptr picol, abase_vbase_ptr abase, mmt_vec_ptr v,
         v->all_v[picol->trank] = v->v;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             serialize_threads(picol);
-            void * r;
-            r = v->v;
-            thread_broadcast(picol, &r, t);
-            v->all_v[t] = r;
+            thread_broadcast(picol, v->all_v + t, sizeof(void*), t);
         }
     }
     for(unsigned int t = 0 ; t < picol->ncores ; t++) {
@@ -1083,10 +1078,7 @@ void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d)
 /* {{{ Application of permutations to indices */
 static void share_u32_table(pi_wiring_ptr wr, uint32_t * g, unsigned int n)
 {
-    uint32_t ** allg = NULL;
-    if (wr->trank == 0)
-        allg = malloc(wr->ncores * sizeof(uint32_t *));
-    thread_broadcast(wr, (void**) &allg, 0);
+    uint32_t ** allg = shared_malloc(wr, wr->ncores * sizeof(uint32_t *));
     allg[wr->trank] = g;
     serialize_threads(wr);
     if (wr->trank == 0) {
@@ -1105,8 +1097,7 @@ static void share_u32_table(pi_wiring_ptr wr, uint32_t * g, unsigned int n)
     if (wr->trank)
         memcpy(g, allg[0], n * sizeof(uint32_t));
     serialize_threads(wr);
-    if (wr->trank == 0)
-        free(allg);
+    shared_free(wr, allg);
 }
 
 #if 0
@@ -1527,7 +1518,7 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
     if (mmt->pi->m->trank == 0) {
         tlines = malloc(mmt->pi->m->ncores * sizeof(const char *));
     }
-    thread_broadcast(mmt->pi->m, (void**) &tlines, 0);
+    thread_broadcast(mmt->pi->m, (void**) &tlines, sizeof(void*), 0);
     tlines[mmt->pi->m->trank] = myline;
     serialize_threads(mmt->pi->m);
     int len = 0;

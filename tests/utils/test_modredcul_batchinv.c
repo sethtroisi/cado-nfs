@@ -47,9 +47,35 @@ check_product_1(residueredcul_t *a1, residueredcul_t *a2,
 }
 
 int
-test_modredc_batchinv (const size_t len)
+check_product_c(residueredcul_t *a1, residueredcul_t *a2,
+                const size_t len, const residueredcul_t c,
+                const modulusredcul_t m)
 {
-  residueredcul_t *a, *r;
+   residueredcul_t p;
+   int ok = 1;
+   
+   modredcul_init(p, m);
+   for (size_t i = 0; i < len; i++) {
+     modredcul_mul(p, a1[i], a2[i], m);
+     if(!modredcul_equal(p, c, m)) {
+       ok = 0;
+       fprintf (stderr, "Inverse is incorrect: %lu * %lu = %lu != %lu (mod %lu)\n",
+                modredcul_get_ul(a1[i], m),
+                modredcul_get_ul(a2[i], m),
+                modredcul_get_ul(p, m),
+                modredcul_get_ul(c, m),
+                modredcul_getmod_ul(m));
+       break;
+     }
+   }
+   modredcul_clear(p, m);
+   return ok;
+}
+
+int
+test_modredc_batchinv (const size_t len, unsigned long uc)
+{
+  residueredcul_t *a, *r, c;
   modulusredcul_t m;
   int ok = 1;
   
@@ -67,18 +93,29 @@ test_modredc_batchinv (const size_t len)
     }
     modredcul_init(r[i], m);
   }
+  modredcul_init(c, m);
+  modredcul_set_ul(c, uc, m);
   
   print_residues("Input numbers", a, len, m);
-  int rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, m);
+  int rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, 
+                              uc == 0 ? NULL : c, m);
   if (rc != 0)
     print_residues("Inverses", r, len, m);
   
   /* Check that product of input and output is 1 */
   if (rc == 1) {
-    if (!check_product_1(r, a, len, m)) {
-      fprintf (stderr, "Product of input and its inverse it not 1\n");
-      ok = 0;
-      goto finish;
+    if (uc == 0) {
+      if (!check_product_1(r, a, len, m)) {
+        fprintf (stderr, "Product of input and its inverse it not 1\n");
+        ok = 0;
+        goto finish;
+      }
+    } else {
+      if (!check_product_c(r, a, len, c, m)) {
+        fprintf (stderr, "Product of input and its inverse it not %lu\n", uc);
+        ok = 0;
+        goto finish;
+      }
     }
   }
   
@@ -111,7 +148,7 @@ test_modredc_batchinv (const size_t len)
   }
 
   print_residues("Input numbers after dividing by gcd", a, len, m);
-  rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, m);
+  rc = modredcul_batchinv(r, (const residueredcul_t *) a, len, NULL, m);
   if (rc == 0) {
     fprintf (stderr, "After dividing out common factors, modredcul_batchinv()"
              " still returned 0\n");
@@ -132,6 +169,7 @@ test_modredc_batchinv (const size_t len)
     modredcul_clear(a[i], m);
     modredcul_clear(r[i], m);
   }
+  modredcul_clear(c, m);
   free(a);
   free(r);
   return ok;
@@ -146,8 +184,11 @@ main (int argc, const char *argv[])
   tests_common_get_iter (&iter);
   verbose = tests_common_get_verbose();
   
-  for (unsigned long i = 0; ok && i < iter; i++)
-    ok = test_modredc_batchinv(i);
+  for (unsigned long i = 0; ok && i < iter; i++) {
+    ok = test_modredc_batchinv(i, 0);
+    ok = test_modredc_batchinv(i, 1);
+    ok = test_modredc_batchinv(i, random_uint64());
+  }
   
   tests_common_clear();
   if (ok)

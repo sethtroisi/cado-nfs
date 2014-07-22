@@ -461,33 +461,15 @@ static inline void
 modul_add (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  {
-    unsigned long t = a[0] - m[0], tr = a[0] + b[0];
-    
-    __asm__ __VOLATILE (
-      "add %2, %1\n\t"   /* t += b */
-      "cmovc %1, %0\n\t"  /* if (cy) tr = t */
-      : "+r" (tr), "+&r" (t)
-      : "g" (b[0])
-      : "cc"
-    );
-    ASSERT_EXPENSIVE (tr == ((a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0])));
-    r[0] = tr;
-  }
-#else
-  r[0] = (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]);
-#endif
+  ularith_addmod_ul_ul(r, a[0], b[0], m[0]);
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
-  ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
 
@@ -507,9 +489,7 @@ static inline void
 modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  unsigned long b2 = b % m[0];
-  ASSERT_EXPENSIVE (a[0] < m[0]);
-  r[0] = (a[0] >= m[0] - b2) ? (a[0] - (m[0] - b2)) : (a[0] + b2);
+  ularith_addmod_ul_ul(r, a[0], b % m[0], m[0]);
 }
 
 MAYBE_UNUSED
@@ -517,41 +497,15 @@ static inline void
 modul_sub (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  {
-    unsigned long tr, t = a[0];
-    __asm__ __VOLATILE (
-      "sub %2, %1\n\t"  /* t -= b ( = a - b) */
-      "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
-      "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
-      : "=&r" (tr), "+&r" (t)
-      : "g" (b[0]), "r" (m[0])
-      : "cc"
-    );
-    r[0] = tr;
-  }
-#elif 1
-  /* Seems to be faster than the one below */
-  {
-    unsigned long t = 0, tr;
-    tr = a[0] - b[0];
-    if (tr > a[0])
-      t = m[0];
-    r[0] = tr + t;
-  }
-#else
-  r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0]) : (a[0] - b[0]);
-#endif
+  ularith_submod_ul_ul(r, a[0], b[0], m[0]);
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
-  ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
 
@@ -560,9 +514,7 @@ static inline void
 modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  unsigned long b2 = b % m[0];
-  ASSERT_EXPENSIVE (a[0] < m[0]);
-  r[0] = (a[0] >= b2) ? (a[0] - b2) : (a[0] + (m[0] - b2));
+  ularith_submod_ul_ul(r, a[0], b % m[0], m[0]);
 }
 
 
@@ -836,25 +788,7 @@ MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-  unsigned long s = a[0], t = m[0];
-  ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
-
-  __asm__ __VOLATILE(
-    "add %1, %0\n\t"
-    "rcr $1, %0\n\t"
-    "shr $1, %1\n\t"
-    "cmovnc %1, %0\n"
-    : "+&r" (t), "+&r" (s)
-    : : "cc");
-  r[0] = t;
-#else
-  ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
-  if (a[0] % 2UL == 0UL)
-    r[0] = a[0] / 2UL;
-  else
-    r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
-#endif
+  r[0] = ularith_div2mod(a[0], m[0]);
 }
 
 
@@ -898,8 +832,8 @@ int modul_isprime (const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
 int modul_inv_odd (residueul_t, const residueul_t, const modulusul_t);
 int modul_inv_powerof2 (residueul_t, const residueul_t, const modulusul_t);
-int modul_batchinv (residueul_t *r, const residueul_t *a, size_t n,
-                    const modulusul_t m);
+int modul_batchinv (residueul_t *, const residueul_t *, size_t,
+                    const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
 
 #endif  /* MOD_UL_H */

@@ -156,12 +156,13 @@ if ($mode =~ /^(permutation|weights|pvector32)$/) {
 if ($mode =~ /^(spvector32)$/) {
     # Dump a list of SIGNED ints
     my $add1 = $mode eq 'permutation';
-    my @p=();
+    my $delim="var:=[";
     while(sysread(STDIN, my $x, 4)) {
         my $v = unpack("l",$x);
-        push @p, $v+$add1;
+        print $delim, $v+$add1;
+        $delim=", ";
     }
-    print "var:=[",join(',',@p),"];\n";
+    print "];\n";
     exit;
 }
 

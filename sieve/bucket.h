@@ -8,7 +8,9 @@
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
 #include <string.h>
+#if defined(HAVE_SSE2)
 #include <emmintrin.h>
+#endif
 #include "cado-endian.h"
 
 // #define SAFE_BUCKETS

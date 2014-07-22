@@ -148,10 +148,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
     }
 
     /* reconcile threads */
-    // serialize_threads(wr);      // bug in thread_broadcast
-    void * ptr = &caught_something;
-    thread_broadcast(wr, &ptr, 0);
-    caught_something = * (unsigned int *) ptr;
+    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 1);
 
     /* ok, got it. Before we possibly leave, make sure everybody has read
      * the data from the pointer. */
@@ -223,20 +220,28 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     grid_print(pi, buf, sizeof(buf), print);
 }
 
-void pi_allreduce_doubles(parallelizing_info pi, double * x, int n)
+/* This adds the contents of x[0..n[ on all threads, and communicates the
+ * result to everyone. This is a thread-level only function !
+ */
+void pi_thread_allreduce_add_double(parallelizing_info pi, double * x, int n)
 {
-    double total[n];
-    memset(total,0,n*sizeof(double));
-    void * ptr = (void*) total;
-    thread_broadcast(pi->m, &ptr, 0);
-    double * main_total = ptr;
-    my_pthread_mutex_lock(pi->m->th->m);
-    for(int i = 0 ; i < n ; i++)
-        main_total[i] += x[i];
-    my_pthread_mutex_unlock(pi->m->th->m);
+    /* Broadcast master's x */
+    double * master_x = (pi->m->trank == 0) ? x : NULL;
+    thread_broadcast(pi->m, (void **) &master_x, sizeof(void*), 0);
+    /* Threads other than master add their x to master's x */
+    if (pi->m->trank != 0) {
+        my_pthread_mutex_lock(pi->m->th->m);
+        for(int i = 0 ; i < n ; i++)
+            master_x[i] += x[i];
+        my_pthread_mutex_unlock(pi->m->th->m);
+    }
     serialize_threads(pi->m);
-    for(int i = 0 ; i < n ; i++)
-        x[i] = main_total[i];
+    /* Master has totals in x, everyone else needs to update their x */
+    if (pi->m->trank != 0)
+        memcpy(x, master_x, n * sizeof(int));
+    /* as long as we have a read intention on master_x, we should not get
+     * past this barrier */
+    serialize_threads(pi->m);
 }
 
 /* stage=0 for krylov, 1 for mksol */
@@ -269,12 +274,12 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
-    pi_allreduce_doubles(pi, &ncoeffs_d, 1);
+    pi_thread_allreduce_add_double(pi, &ncoeffs_d, 1);
 
     /* wct intervals are not aggregated over threads either, so we must
      * do it by hand */
     double aggr_dwct[2] = { since_last_reset[0]->wct, since_last_reset[1]->wct };
-    pi_allreduce_doubles(pi, aggr_dwct, 2);
+    pi_thread_allreduce_add_double(pi, aggr_dwct, 2);
 
     if (print) {
         {
@@ -377,9 +382,9 @@ void timing_final_tally(const char *name, parallelizing_info pi, struct timing_d
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
-    pi_allreduce_doubles(pi, &ncoeffs_d, 1);
+    pi_thread_allreduce_add_double(pi, &ncoeffs_d, 1);
     double aggr_dwct[2] = { since_beginning[0]->wct, since_beginning[1]->wct };
-    pi_allreduce_doubles(pi, aggr_dwct, 2);
+    pi_thread_allreduce_add_double(pi, aggr_dwct, 2);
 
     if (print) {
         {

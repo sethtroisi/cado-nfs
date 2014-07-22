@@ -123,11 +123,15 @@ static void prelude(parallelizing_info_ptr pi, struct sols_list * sl)
 
 int agree_on_flag(pi_wiring_ptr w, int v)
 {
+    static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
     int * ptr = &v;
-    thread_broadcast(w, (void**) &ptr, 0);
+    thread_broadcast(w, (void**) &ptr, sizeof(void*), 0);
     for(unsigned int i = 0 ; i < w->ncores ; i++) {
-        serialize_threads(w);
+        int ptrc = pthread_mutex_lock(mutex);
+        ASSERT_ALWAYS(ptrc == 0);
         * ptr &= v;
+        ptrc = pthread_mutex_unlock(mutex);
+        ASSERT_ALWAYS(ptrc == 0);
     }
     serialize_threads(w);
 
@@ -136,7 +140,9 @@ int agree_on_flag(pi_wiring_ptr w, int v)
         ASSERT_ALWAYS(!err);
     }
     serialize_threads(w);
-    v = *ptr;
+    if (w->trank != 0) {
+        v = *ptr;
+    }
     /* serialize again because the leader must not release its stack
      * before all pals have read it ! */
     serialize_threads(w);
@@ -201,7 +207,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     vec_init_generic(mmt->pi->m, A, svec, 0, ii1-ii0);
     vec_init_generic(mmt->pi->m, A, tvec, 0, ii1-ii0);
 
-    const char * rhs_name = param_list_lookup_string(pl, "inhomogeneous_rhs");
+    const char * rhs_name = param_list_lookup_string(pl, "rhs");
     FILE * rhs = NULL;
     mmt_vec rhsvec;
     if (rhs_name) {
@@ -225,18 +231,18 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
 
-        /* This array receives the bw->nsm coefficients affecting the sm
-         * columns in the identities obtained */
+        /* This array receives the bw->nrhs coefficients affecting the
+         * rhs * columns in the identities obtained */
         void * rhscoeffs;
 
         if (rhs_name) {
-            A->vec_init(A, &rhscoeffs, bw->nsm);
+            A->vec_init(A, &rhscoeffs, bw->nrhs);
 
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
             }
             if (rhs) {      /* main thread */
-                for(int j = 0 ; j < bw->nsm ; j++) {
+                for(int j = 0 ; j < bw->nrhs ; j++) {
                     /* We're implicitly supposing that elements are stored
                      * alone, not grouped à la SIMD (which does happen for
                      * GF(2), of course). */
@@ -244,13 +250,16 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     rc = fseek(rhs, A->vec_elt_stride(A, j * bw->n + sf->s0), SEEK_SET);
                     ASSERT_ALWAYS(rc >= 0);
                     rc = fread(A->vec_coeff_ptr(A, rhscoeffs, j), A->vec_elt_stride(A,1), 1, rhs);
+                    if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
+                        printf("Notice: coefficient for vector " V_FILE_BASE_PATTERN " in solution %d is zero\n", j, j+1, sf->s0);
+                    }
                     ASSERT_ALWAYS(rc == 1);
                 }
             }
-            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,bw->nsm), 0, 0);
+            global_broadcast(pi->m, rhscoeffs, A->vec_elt_stride(A,bw->nrhs), 0, 0);
 
             A->vec_set_zero(A, tvec->v, ii1 - ii0);
-            for(int j = 0 ; j < bw->nsm ; j++) {
+            for(int j = 0 ; j < bw->nrhs ; j++) {
                 /* Add c_j times v_j to tvec */
                 ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
                 char * tmp;
@@ -382,20 +391,20 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             char * tmp;
             int rc = asprintf(&tmp, "%s.%u", kprefix, 0);
             ASSERT_ALWAYS(rc >= 0);
-            printf("Expanding %s so as to include the coefficients for the %d SM columns\n", tmp, bw->nsm);
+            printf("Expanding %s so as to include the coefficients for the %d RHS columns\n", tmp, bw->nrhs);
             FILE * f = fopen(tmp, "ab");
             rc = fseek(f, 0, SEEK_END);
             ASSERT_ALWAYS(rc >= 0);
-            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), bw->nsm, f);
-            ASSERT_ALWAYS(rc == bw->nsm);
+            rc = fwrite(rhscoeffs, A->vec_elt_stride(A, 1), bw->nrhs, f);
+            ASSERT_ALWAYS(rc == bw->nrhs);
             fclose(f);
-            printf("%s is now a right nullspace vector for (M|SM).\n", tmp);
+            printf("%s is now a right nullspace vector for (M|RHS).\n", tmp);
             free(tmp);
         }
 
         serialize(pi->m);
         free(kprefix);
-        if (rhs_name) A->vec_clear(A, &rhscoeffs, bw->nsm);
+        if (rhs_name) A->vec_clear(A, &rhscoeffs, bw->nrhs);
     }
 
     if (rhs) fclose(rhs);

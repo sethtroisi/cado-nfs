@@ -203,6 +203,37 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   return cy;
 }
 
+
+/* Requires a < m and b <= m, then r == a+b (mod m) and r < m */
+MAYBE_UNUSED
+static inline void
+ularith_addmod_ul_ul (unsigned long *r, const unsigned long a,
+               const unsigned long b, const unsigned long m)
+{
+  ASSERT_EXPENSIVE (a < m && b <= m);
+
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  {
+    unsigned long t = a + b, tr = a - m;
+
+    __asm__ __VOLATILE (
+      "add %2, %0\n\t"   /* tr += b */
+      "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
+      : "+&r" (tr)
+      : "rm" (t), ULARITH_CONSTRAINT_G (b)
+      : "cc"
+    );
+    ASSERT_EXPENSIVE (tr == ((a >= m - b) ? (a - (m - b)) : (a + b)));
+    r[0] = tr;
+  }
+#else
+  r[0] = (b >= m - a) ? (b - (m - a)) : (a + b);
+#endif
+
+  ASSERT_EXPENSIVE (r[0] < m);
+}
+
+
 /* Subtract an unsigned long from two unsigned longs with borrow propagation 
    from low word (r1) to high word (r2). Any borrow out from high word is 
    lost. */
@@ -378,6 +409,41 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
       *r2 = t2 - a2 - (a1 > t1);
     }
 #endif
+}
+
+
+MAYBE_UNUSED
+static inline void
+ularith_submod_ul_ul (unsigned long *r, const unsigned long a,
+                      const unsigned long b, const unsigned long m)
+{
+  ASSERT_EXPENSIVE (a < m && b < m);
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  {
+    unsigned long tr, t = a;
+    __asm__ __VOLATILE (
+      "sub %2, %1\n\t"  /* t -= b ( = a - b) */
+      "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
+      "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
+      : "=&r" (tr), "+&r" (t)
+      : ULARITH_CONSTRAINT_G (b), "r" (m)
+      : "cc"
+    );
+    r[0] = tr;
+  }
+#elif 1
+  /* Seems to be faster than the one below */
+  {
+    unsigned long t = 0UL, tr;
+    if ((tr = a - b) > a)
+      t = m;
+    r[0] = tr + t;
+  }
+#else
+  r[0] = (a < b) ? (a - b + m) : (a - b);
+#endif
+
+  ASSERT_EXPENSIVE (r[0] < m);
 }
 
 
@@ -681,6 +747,32 @@ ularith_invmod (const unsigned long n)
 #endif /* LONG_BIT == 32 */
 
   return r;
+}
+
+/* Compute n/2 (mod m), where m must be odd. */
+static inline unsigned long
+ularith_div2mod (const unsigned long n, const unsigned long m)
+{
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
+  unsigned long s = n, t = m;
+  ASSERT_EXPENSIVE (m % 2UL != 0UL);
+
+  __asm__ __VOLATILE(
+	  "add %1, %0\n\t"
+	  "rcr $1, %0\n\t"
+	  "shr $1, %1\n\t"
+	  "cmovnc %1, %0\n"
+	  : "+&r" (t), "+&r" (s)
+	  : : "cc"
+	  );
+  return t;
+#else
+  ASSERT_EXPENSIVE (m % 2UL != 0UL);
+  if (n % 2UL == 0UL)
+    return n / 2UL;
+  else
+    return n / 2UL + m / 2UL + 1UL;
+#endif
 }
 
 

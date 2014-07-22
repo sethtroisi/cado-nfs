@@ -1262,7 +1262,7 @@ mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purg
 	    mpi_rank, mpi_size, host);
     if(mpi_rank != 0){
 	// redirecting stderr; one day, redirect the master?
-	sprintf(mpitmp, "%s%03d.err", outname, mpi_rank);
+	snprintf(mpitmp, sizeof(mpitmp), "%s%03d.err", outname, mpi_rank);
 	freopen(mpitmp, "w", stderr);
     }
     // treat the .gz case
@@ -1272,7 +1272,7 @@ mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purg
 	exit(0);
     }
     else
-	sprintf(str, "%s%03d", outname, mpi_rank);
+	sprintf(str, strlen(outname)+3, "%s%03d", outname, mpi_rank);
     fprintf(stderr, "Outfile for proc=%d will be %s\n", mpi_rank, str);
     mpi_index = 0;
     init_rep(&rep, str, mat, 1);

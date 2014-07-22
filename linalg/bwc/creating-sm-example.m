@@ -49,7 +49,7 @@ Mfull:=HorizontalJoin(Matrix(GF(p),M),Transpose(Matrix(sm)));
 assert IsZero(Vector(GF(p),[1..N+nsm])*Transpose(Mfull));
 
 F:=Open("example.sm.txt", "w");
-fprintf F, "%o\n", N;
+fprintf F, "%o %o\n", N, nsm;
 for i in [1..N] do
     fprintf F, "%o\n", Join([IntegerToString(Integers()!sm[j][i]):j in [1..nsm]]," ");
 end for;
@@ -57,7 +57,7 @@ delete F;
 
 
 F:=Open("example.sm2.txt", "w");
-fprintf F, "%o\n", nsm;
+fprintf F, "%o %o\n", nsm, nsm;
 for i in [N+1..N+nsm] do
     fprintf F, "%o\n", Join([IntegerToString(Integers()!sm[j][i]):j in [1..nsm]]," ");
 end for;

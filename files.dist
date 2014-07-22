@@ -601,6 +601,7 @@ scripts/cadofactor/wuclient2.py
 scripts/cadofactor/wudb.py
 scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
+scripts/cadofactor/parameters
 scripts/cadofactor/CMakeLists.txt
 sieve/CMakeLists.txt
 sieve/Makefile
@@ -669,6 +670,8 @@ sieve/las-unsieve.c
 sieve/las-unsieve.h
 sieve/las-cofactor.c
 sieve/las-cofactor.h
+sieve/las-fill-in-buckets.c
+sieve/las-fill-in-buckets.h
 sieve/las.c
 sieve/makefb.c
 sieve/makefb.sage
@@ -722,6 +725,8 @@ utils/memory.c
 utils/dllist.h
 utils/stats.h
 utils/stats.c
+utils/lll.c
+utils/lll.h
 tests/utils/test_double_poly.c
 tests/utils/test_gmp_aux.c
 tests/utils/test_gcd.c
@@ -746,8 +751,6 @@ tests/test_iceildiv.c
 tests/test_tests_common.c
 tests/sieve/CMakeLists.txt
 tests/sieve/test_init_norms_bucket_region.c
-tests/sieve/test_init_alg_norms_bucket_region.c
-tests/sieve/test_init_rat_norms_bucket_region.c
 tests/sieve/README
 tests/sieve/F9.sievetest.sh
 tests/sieve/F9.tracektest.sh

@@ -1155,6 +1155,7 @@ void declare_usage(param_list pl)
     param_list_decl_usage(pl, "gcd", "(switch) Compute gcd of the two square roots. Requires alg and rat square roots");
     param_list_decl_usage(pl, "dep", "The number of the dependency for which to compute square roots");
     param_list_decl_usage(pl, "v", "More verbose output");
+    param_list_decl_usage(pl, "force-posix-threads", "(switch)");
 }
 
 void usage(param_list pl, const char * argv0, FILE *f)
@@ -1193,6 +1194,7 @@ int main(int argc, char *argv[])
     param_list_configure_switch(pl, "alg", &opt_alg);
     param_list_configure_switch(pl, "gcd", &opt_gcd);
     param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
     argc--,argv++;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;

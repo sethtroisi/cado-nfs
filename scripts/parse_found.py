@@ -20,10 +20,6 @@ FOUND_RE = re.compile(r"PID\d+ (\d+-\d+-\d+ \d+:\d+:\d+,\d+) Info:Lattice Sievin
 
 sums = {}
 
-cumulative = False
-for arg in sys.argv[1:]:
-    cumulative |= arg == "-cumulative"
-
 for line in sys.stdin:
   # print(line.strip())
     match = FOUND_RE.match(line)
@@ -37,8 +33,8 @@ for line in sys.stdin:
             interval = math.floor(sec / SECONDS_PER_INTERVAL)
             sums[interval] = sums.get(interval, 0) + int(new_rels)
 
-value = 0
+cumulative_value = 0
 for i in range(max(sums)): # don't do +1 to avoid partial interval
-    now = sums[i] if i in sums else 0
-    value = value + now if cumulative else now
-    print("%d %d" % (i, value))
+    value = sums[i] if i in sums else 0
+    cumulative_value += value
+    print("%d %d %d" % (i, value, cumulative_value))

@@ -5,6 +5,8 @@
 #include "fb.h"
 #include "trialdiv.h"
 #include "las-config.h"
+#include "las-report-stats.h"
+#include "bucket.h"
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "relation.h"
@@ -94,6 +96,19 @@ void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side);
 void las_todo_pop(las_todo_ptr * d);
 /* }}} */
 
+struct root_s {
+  unsigned char derivate; /* 0 = root of F; 1 = root of F'; and so on */
+  double value;           /* root of F(i,1) or derivates of F. */
+};
+typedef struct root_s *root_ptr;
+typedef struct root_s root_t[1];
+
+/* These segments ((x, F(x)), (y, F(y))) are used in the smart normalization */
+typedef struct sg_s {
+  int begin, end;
+  double f_begin, f_end;
+} sg_t;
+
 /* {{{ sieve_side_info */
 struct sieve_side_info_s {
     unsigned char bound; /* A sieve array entry is a sieve survivor if it is
@@ -144,7 +159,7 @@ struct sieve_side_info_s {
                          q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
     unsigned int nroots; /* Number (+1) and values (+0.0) of the roots of */
-    double *roots;     /* d^2(F(i, const j))/d(i)^2 */
+    root_ptr roots;     /* F, F', F" and maybe F'" - cf las-norms.c,init_norms */
 			    
     /* This updated by applying the special-q lattice transform to the
      * factor base. */
@@ -251,6 +266,48 @@ struct las_info_s {
 
 typedef struct las_info_s las_info[1];
 /* }}} */
+
+/* {{{ thread-related defines */
+/* All of this exists _for each thread_ */
+struct thread_side_data_s {
+  m_bucket_array_t mBA; /* Not used if not fill_in_m_buckets (3 passes sort) */
+  k_bucket_array_t kBA; /* Ditto for fill_in_k_buckets (2 passes sort) */
+  bucket_array_t BA;    /* Always used */
+  factorbase_degn_t *fb_bucket; /* copied from sieve_info. Keep ? XXX */
+  // double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+  const fbprime_t *log_steps;
+  unsigned char log_steps_max;
+  
+  /* For small sieve */
+  int * ssdpos;
+  int * rsdpos;
+
+  unsigned char *bucket_region;
+};
+typedef struct thread_side_data_s thread_side_data[1];
+typedef struct thread_side_data_s * thread_side_data_ptr;
+typedef const struct thread_side_data_s * thread_side_data_srcptr;
+
+struct thread_data_s {
+  int id;
+  thread_side_data sides[2];
+  las_info_ptr las;
+  sieve_info_ptr si;
+  las_report rep;
+  unsigned int checksum_post_sieve[2];
+  unsigned char *SS;
+};
+typedef struct thread_data_s thread_data[1];
+typedef struct thread_data_s * thread_data_ptr;
+typedef const struct thread_data_s * thread_data_srcptr;
+/* }}} */
+
+typedef uint64_t plattice_x_t;
+/* DONT modify this: asm code writes in this with hardcoded deplacement */
+typedef struct {
+  int32_t a0; uint32_t a1;
+  int32_t b0; uint32_t b1;
+} plattice_info_t;
 
 /* FIXME: This does not seem to work well */
 #ifdef  __GNUC__

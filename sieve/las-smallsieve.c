@@ -1,6 +1,8 @@
 #include "cado.h"
 #include <pthread.h>
+#if defined(HAVE_SSE2)
 #include <emmintrin.h>
+#endif
 #include "las-config.h"
 #include "las-smallsieve.h"
 #include "las-types.h"

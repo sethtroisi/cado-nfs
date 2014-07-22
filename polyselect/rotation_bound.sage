@@ -82,8 +82,6 @@ def l2norm_tk(f,s):
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
-PRECISION=53
-
 def l2norm_tk_circular(f,s):
    if f.degree()==6:
       a0 = f[0]
@@ -97,6 +95,16 @@ def l2norm_tk_circular(f,s):
       n = n * pi / 7168
       # return float(1/2 * log(n / (s * s * s * s * s * s)))
       return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s * s)))
+   elif f.degree()==5:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      a5 = f[5] * s^5
+      n = 6 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4) + 14 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5) + 7 * (a4 * a4 + a1 * a1) + 3 * (a3 * a3 + a2 * a2)
+      n = n * pi / 1536
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
@@ -598,7 +606,7 @@ def optimize(f,g):
     logmu0 = best_l2norm_tk_circular(f)
     kt = kr0 = kr1 = kr2 = 1
     count = 0
-    while True:
+    while count < 200:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False
         # first try translation
@@ -660,6 +668,8 @@ def optimize(f,g):
                 logmu0 = logmu
 	    else:
                 f = f + kr0*g
+        if changedt == False and changedr2 == False and changedr1 == False and changedr0 == False and kt == 1 and kr2 == 1 and kr1 == 1 and kr0 == 1:
+            break
         if changedt == True:
             kt = 2*kt
         elif kt > 1:
@@ -676,8 +686,6 @@ def optimize(f,g):
             kr0 = 2*kr0
         elif kr0 > 1:
             kr0 = kr0//2
-        if changedt == False and changedr2 == False and changedr1 == False and changedr0 == False and kt == 1 and kr2 == 1 and kr1 == 1 and kr0 == 1:
-            break
     return f, g
 
 

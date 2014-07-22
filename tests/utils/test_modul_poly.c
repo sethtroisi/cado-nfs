@@ -55,6 +55,15 @@ test_modul_poly_is_irreducible (unsigned long iter)
   modul_set_ul (f->coeff[0], 2, p);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) != 0);
 
+  /* 20*x^2 + 18*x + 19 == (x + 20)^2 (mod 23) */
+  modul_initmod_ul (p, 23);
+  modul_set_ul (f->coeff[2], 20, p);
+  modul_set_ul (f->coeff[1], 18, p);
+  modul_set_ul (f->coeff[0], 19, p);
+  ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) == 0);
+  n = modul_poly_cantor_zassenhaus (r, f, p);
+  ASSERT_ALWAYS(n == 2);
+
   while (iter--)
     {
       d = 1 + lrand48 () % (MAXDEGREE - 1);

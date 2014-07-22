@@ -112,12 +112,6 @@ int main(int argc, char * argv[])
                 splits[nsplits]*scale[0]/scale[1]);
     }
 
-    FILE * f = fopen(ifile, "rb");
-    if (f == NULL) {
-        fprintf(stderr,"%s: %s\n", ifile, strerror(errno));
-        exit(1);
-    }
-
 #ifndef HAVE_MINGW
     /* mingw does not have link() */
     if (nsplits == 1) {
@@ -141,64 +135,73 @@ int main(int argc, char * argv[])
             exit(1);
         }
         free(fname);
-        free(ifile);
-        free(ofile_fmt);
-        return 0;
-    }
+    } else
 #endif
-
-    for(int i = 0 ; i < nsplits ; i++) {
-        char * fname;
-        rc = asprintf(&fname, ofile_fmt, splits[i], splits[i+1]);
-        rc = stat(fname, sbuf);
-        if (rc == 0 && !force) {
-            fprintf(stderr,"%s already exists\n", fname);
+    /* mingw always takes this branch */
+    {
+        FILE * f = fopen(ifile, "rb");
+        if (f == NULL) {
+            fprintf(stderr,"%s: %s\n", ifile, strerror(errno));
             exit(1);
         }
-        if (rc == 0 && force) { unlink(fname); }
-        if (rc < 0 && errno != ENOENT) {
-            fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-            exit(1);
-        }
-        files[i] = fopen(fname, "wb");
-        if (files[i] == NULL) {
-            fprintf(stderr,"%s: %s\n", fname, strerror(errno));
-            exit(1);
-        }
-        free(fname);
-    }
-
-    void * ptr = malloc(splits[nsplits]*scale[0]/scale[1]);
-
-    for(;;) {
-        rc = fread(ptr, 1, splits[nsplits]*scale[0]/scale[1], f);
-        if (rc != splits[nsplits]*scale[0]/scale[1] && rc != 0) {
-            fprintf(stderr, "Unexpected short read\n");
-            exit(1);
-        }
-        if (rc == 0)
-            break;
-
-        char * q = ptr;
 
         for(int i = 0 ; i < nsplits ; i++) {
-            int d = splits[i+1]*scale[0]/scale[1] - splits[i]*scale[0]/scale[1];
-            rc = fwrite(q, 1, d, files[i]);
-            if (rc != d) {
-                fprintf(stderr, "short write\n");
+            char * fname;
+            rc = asprintf(&fname, ofile_fmt, splits[i], splits[i+1]);
+            rc = stat(fname, sbuf);
+            if (rc == 0 && !force) {
+                fprintf(stderr,"%s already exists\n", fname);
                 exit(1);
             }
-            q += d;
+            if (rc == 0 && force) { unlink(fname); }
+            if (rc < 0 && errno != ENOENT) {
+                fprintf(stderr,"%s: %s\n", fname, strerror(errno));
+                exit(1);
+            }
+            files[i] = fopen(fname, "wb");
+            if (files[i] == NULL) {
+                fprintf(stderr,"%s: %s\n", fname, strerror(errno));
+                exit(1);
+            }
+            free(fname);
         }
+
+        void * ptr = malloc(splits[nsplits]*scale[0]/scale[1]);
+
+        for(;;) {
+            rc = fread(ptr, 1, splits[nsplits]*scale[0]/scale[1], f);
+            if (rc != splits[nsplits]*scale[0]/scale[1] && rc != 0) {
+                fprintf(stderr, "Unexpected short read\n");
+                exit(1);
+            }
+            if (rc == 0)
+                break;
+
+            char * q = ptr;
+
+            for(int i = 0 ; i < nsplits ; i++) {
+                int d = splits[i+1]*scale[0]/scale[1] - splits[i]*scale[0]/scale[1];
+                rc = fwrite(q, 1, d, files[i]);
+                if (rc != d) {
+                    fprintf(stderr, "short write\n");
+                    exit(1);
+                }
+                q += d;
+            }
+        }
+        for(int i = 0 ; i < nsplits ; i++) {
+            fclose(files[i]);
+        }
+        fclose(f);
     }
 
     param_list_clear(pl);
-    for(int i = 0 ; i < nsplits ; i++) {
-        fclose(files[i]);
-    }
-    fclose(f);
+    bw_common_clear(bw);
+    free(files);
 
     free(ifile);
     free(ofile_fmt);
+
+    return 0;
 }
 
