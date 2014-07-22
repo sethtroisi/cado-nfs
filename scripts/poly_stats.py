@@ -6,9 +6,9 @@ import re
 import subprocess
 
 class GnuplotFile(object):
-    def __init__(self, outputfile, size=(1024, 768), yrange=(55, 59)):
+    def __init__(self, outputfile, size=(1024, 768), yrange=(55.5, 59.5)):
         self.lines = [
-            "set terminal png size %d,%d enhanced font 'Helvetica,20'\n" % size,
+            "set terminal png size %d,%d enhanced font 'Helvetica,16'\n" % size,
             "set output '%s'\n" % outputfile,
             "set yrange [%d:%d]\n" % yrange
         ]
@@ -77,8 +77,8 @@ def make_best_lognorms(P, nq, nrkeep, admin, admax, adstep, adlen,
     with open(output_filename, "w") as output_file:
         output_file.write("\n".join(map(str, lognorms)))
     if gnuplot_file:
-        gnuplot_file.append_plot(output_filename, title="P=%d, ad in [%d, %d]"
-                                 % (P, admin, admax))
+        gnuplot_file.append_plot(output_filename, title="P=%d, nq=%d, ad in [%d, %d] (len=%d, step=%d)"
+                                 % (P, nq, admin, admax, adlen, adstep))
     return (lognorms[0], lognorms[-1], sum(lognorms) / len(lognorms))
 
 def run_gnuplot(plot):
@@ -87,10 +87,10 @@ def run_gnuplot(plot):
         output_file.write(str(plot))
     subprocess.check_call(["gnuplot", filename])
 
-def process_one_nq(nq, nrkeep, admin, admax, adstep, adlen, max_nr_poly):
-    plot_allruns = GnuplotFile("graph.best_%d.nq_%d.allruns.png" % (nrkeep, nq))
-    plot_only13k = GnuplotFile("graph.best_%d.nq_%d.%d.png" % (nrkeep, nq, max_nr_poly))
-    for P in P_VALUES:
+def process_one_list(parameter_list, nrkeep, max_nr_poly):
+    plot_allruns = GnuplotFile("graph.best_%d.allruns.png" % (nrkeep))
+    plot_only13k = GnuplotFile("graph.best_%d.%d.png" % (nrkeep, max_nr_poly))
+    for (nq, admin, admax, adstep, adlen, P) in parameter_list:
         directory = "P_%d.nq_%d" % (P, nq)
         (nr_poly, admax_13k) = get_nr_poly(directory, admin, admax, adstep, adlen, max_nr_poly=max_nr_poly)
         for (admax_now, plot_now) in zip([admax, admax_13k],
@@ -106,16 +106,13 @@ def process_one_nq(nq, nrkeep, admin, admax, adstep, adlen, max_nr_poly):
     run_gnuplot(plot_allruns)
     run_gnuplot(plot_only13k)
 
-assert len(sys.argv) == 8
+assert len(sys.argv) == 4
+NRKEEP = int(sys.argv[1])
+MAX_NR_POLY = int(sys.argv[2])
 
-NQ = int(sys.argv[1])
-ADMIN = int(sys.argv[2])
-ADMAX = int(sys.argv[3])
-ADSTEP = int(sys.argv[4])
-ADLEN = int(sys.argv[5])
-NRKEEP = int(sys.argv[6])
-MAX_NR_POLY = int(sys.argv[7])
-
-P_VALUES = [10000, 100000, 1000000, 10000000]
-
-process_one_nq(NQ, NRKEEP, ADMIN, ADMAX, ADSTEP, ADLEN, MAX_NR_POLY)
+with open(sys.argv[3], "r") as parameter_file:
+    parameter_list = [];
+    for line in parameter_file:
+        (nq, admin, admax, adstep, adlen, P) = map(int, line.split())
+        parameter_list.append((nq, admin, admax, adstep, adlen, P))
+    process_one_list(parameter_list, NRKEEP, MAX_NR_POLY)
