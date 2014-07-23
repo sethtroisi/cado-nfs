@@ -83,15 +83,59 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-    renumber_debug_print_tab(stdout, renumberfilename, cpoly, lpb);
+  renumber_init_for_reading (tab);
+  renumber_read_table (tab, renumberfilename);
+
+  for (index_t i = 0; i < tab->size; i++)
+  {
+    if (tab->table[i] == RENUMBER_SPECIAL_VALUE)
+    {
+      if (i == 0 && tab->add_full_col)
+        printf ("i=0 tab[i]=#   added column\n");
+      else
+        printf ("i=%" PRid " tab[i]=#   above a bad ideals\n", i);
+    }
+    else
+    {
+      p_r_values_t p, r;
+      int side;
+
+      renumber_get_p_r_from_index (tab, &p, &r, &side, i, cpoly);
+      printf ("i=%" PRid " tab[i]=%" PRpr " p=%" PRpr "", i, tab->table[i], p);
+      if (tab->rat == -1)
+      {
+        if (r == p)
+          printf (" r=%" PRpr " side %d proj\n", r, side);
+        else
+          printf (" r=%" PRpr " side %d\n", r, side);
+      }
+      else
+      {
+        if (side == tab->rat)
+          printf (" rat side\n");
+        else if (r == p)
+          printf (" r=%" PRpr " alg side proj\n", r);
+        else
+          printf (" r=%" PRpr " alg side\n", r);
+      }
+    }
+  }
+
+  if (tab->bad_ideals.n != 0) {
+    printf ("Bad ideals:\n");
+    for (int i = 0; i < tab->bad_ideals.n; ++i) {
+      p_r_values_t p = tab->bad_ideals.p[i];
+      p_r_values_t r = tab->bad_ideals.r[i];
+      int nb = tab->bad_ideals.nb[i];
+      printf("p=%" PRpr " r=%" PRpr " nb=%d\n", p, r, nb);
+    }
+  }
 
   /* Check for all index i if it can retrieved p and r from it and if it can
    * retrieved the same index from this p and r
    */
   if (check)
   {
-    renumber_init (tab, cpoly, lpb);
-    renumber_read_table (tab, renumberfilename);
 
     index_t i, j;
     p_r_values_t p, r;
@@ -110,10 +154,10 @@ main (int argc, char *argv[])
       }
     }
 
-    renumber_free (tab);
   }
 
-    cado_poly_clear (cpoly);
-    param_list_clear(pl);
-    return 0;
+  renumber_clear (tab);
+  cado_poly_clear (cpoly);
+  param_list_clear(pl);
+  return EXIT_SUCCESS;
 }

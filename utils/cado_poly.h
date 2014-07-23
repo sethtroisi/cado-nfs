@@ -53,6 +53,9 @@ extern void cado_poly_clear (cado_poly_ptr);
 // root) or it failed (and then m is a factor of N).
 extern int cado_poly_getm(mpz_ptr, cado_poly_ptr, mpz_ptr);
 
+/* Return the rational side or -1 if two algebraic side */
+extern int cado_poly_get_ratside (cado_poly_ptr);
+
 #ifdef __cplusplus
 }
 #endif

@@ -7,8 +7,8 @@
 #     rels=/path/to/rels
 #     cadobuild=/path/to/cado/bin
 #     param=/path/to/param/file
-# Mandatory options for NFS-DL (for FFS they are not used):
 #     ell=NN                        group size (modulus for linear algebra)
+# Mandatory options for NFS-DL (for FFS they are not used):
 #     smexp=NN                      exponent for the Shirokauer maps
 #     lpba=NN                       large prime bound for algebraic side
 #     lpbr=NN                       large prime bound for rational side
@@ -16,11 +16,11 @@
 #     wdir=path/to/output/directory (default ./<name>.filter.`date`)
 #             if wdir already exists, continue previous computation
 #     tidy=[0|1]                    (default 0)
+#     addfullcol=[0|1]              (default 0)
 #     covernmax=nn.nn               (default 100)
 #     excess=nn                     (default 0 for FFS, deg(poly_alg) for NFS-DL)
 #     req-excess=nn.nn              (default undefined)
 #     maxlevel=nn                   (default 30)
-#     addfullcol=[0|1]              (default 0)
 #     badideals=file                (default "")
 #     badidealinfo=file             (default "", mandatory if badideals is given)
 #     verbose=[0|1]                 (default 0)
@@ -120,7 +120,7 @@ for i in "$@" ; do
         declare VERBOSE="$value"
       elif [ "x${p}" = "xaddfullcol" ] ; then
         if [ "x$value" = "x1" ] ; then
-          declare ADDFULLCOL="-addfullcol"
+          declare ADDFULLCOL="1"
         fi
       elif [ "x${p}" = "xbadideals" ] ; then
         declare BADIDEALS="-badideals $value"
@@ -173,7 +173,7 @@ check_file_exists "${ORIGINAL_PARAMFILE}"
 : ${REQ_EXCESS:="-1"}  # -1.0 means no parameter is passed in purge
 : ${MAXLEVEL:="30"}
 : ${BADIDEALS:=""}
-: ${ADDFULLCOL:=""}
+: ${ADDFULLCOL:="0"}
 : ${VERBOSE:="0"}
 : ${NFSDL:="0"}
 : ${MOD_ELL:="<modulus>"}
@@ -192,6 +192,8 @@ DO_PURGE="1"
 DO_MERGE="1"
 DO_REPLAY="1"
 DO_SM="1"
+DO_LA="1"
+DO_RECONSTRUCT="1"
 
 # Init variables
 
@@ -222,6 +224,8 @@ LOGP="${DIR}/${NAME}.purge.log"
 LOGM="${DIR}/${NAME}.merge.log"
 LOGR="${DIR}/${NAME}.replay.log"
 LOGSM="${DIR}/${NAME}.sm.log"
+LOGLA="${DIR}/${NAME}.la.log"
+LOGRECONSTRUCT="${DIR}/${NAME}.reconstruct.log"
 
 NRELSFILE="${DIR}/${NAME}.nrels"
 
@@ -233,6 +237,8 @@ DELRELSFILE="${DIR}/${NAME}.rels.deleted"
 HISFILE="${DIR}/${NAME}.merge.his"
 INDEXFILE="${DIR}/${NAME}.replay.index"
 SMFILE="${DIR}/${NAME}.sm"
+KERFILE="${DIR}/${NAME}.ker"
+FINALLOGFILE="${DIR}/${NAME}.logarithms.final"
 
 PREFIX_MATRIX="${DIR}/${NAME}.matrix"
 INDEX_ID_MERGE="${DIR}/${NAME}.ideals"
@@ -241,15 +247,18 @@ INDEX_ID_MERGE="${DIR}/${NAME}.ideals"
 if [ "x${NFSDL}" != "x1" ] ; then
 BIN_FREE="${CADO_BUILD}/ffs/f${GF}/freerels";
 BIN_DUP2="${CADO_BUILD}/filter/dup2-ffs-f${GF}";
+BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
 else
 BIN_FREE="${CADO_BUILD}/sieve/freerel";
 BIN_DUP2="${CADO_BUILD}/filter/dup2";
+BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-dl";
 fi
 BIN_DUP1="${CADO_BUILD}/filter/dup1";
 BIN_PURGE="${CADO_BUILD}/filter/purge";
 BIN_MERGE="${CADO_BUILD}/filter/merge-dl";
 BIN_REPLAY="${CADO_BUILD}/filter/replay-dl";
 BIN_SM="${CADO_BUILD}/filter/sm";
+BIN_LA="${CADO_BUILD}/scripts/magma-linalg-wrapper.sh"
 check_file_exists "${BIN_FREE}"
 check_file_exists "${BIN_DUP1}"
 check_file_exists "${BIN_DUP2}"
@@ -259,6 +268,8 @@ check_file_exists "${BIN_REPLAY}"
 if [ "x${NFSDL}" = "x1" ] ; then
 check_file_exists "${BIN_SM}"
 fi
+check_file_exists "${BIN_LA}"
+check_file_exists "${BIN_RECONSTRUCT}"
 
 INITDONE="${DIR}/${NAME}.init_done"
 FREEDONE="${DIR}/${NAME}.freerels_done"
@@ -269,6 +280,8 @@ PURGEDONE="${DIR}/${NAME}.purge_done"
 MERGEDONE="${DIR}/${NAME}.merge_done"
 REPLAYDONE="${DIR}/${NAME}.replay_done"
 SMDONE="${DIR}/${NAME}.sm_done"
+LADONE="${DIR}/${NAME}.LA_done"
+RECONSTRUCTDONE="${DIR}/${NAME}.reconstruct_done"
 
 if [ -e ${INITDONE} ] ; then
   DO_INIT="0"
@@ -288,6 +301,12 @@ if [ -e ${INITDONE} ] ; then
                 DO_REPLAY="0"
                 if [ -e ${SMDONE} ] ; then
                   DO_SM="0"
+                  if [ -e ${LADONE} ] ; then
+                    DO_LA="0"
+                    if [ -e ${RECONSTRUCTDONE} ] ; then
+                      DO_RECONSTRUCT="0"
+                    fi
+                  fi
                 fi
               fi
             fi
@@ -337,7 +356,7 @@ else
   argsf1="-poly ${PARAMFILE} -renumber ${RENUMBERFILE} "
   argsf2="-lpba ${LPBA} -lpbr ${LPBR} "
 fi
-  argsf3="-out ${FREEGZFILE} ${BADIDEALS} ${ADDFULLCOL} "
+  argsf3="-out ${FREEGZFILE} ${BADIDEALS} -addfullcol ${ADDFULLCOL} "
   CMD="${BIN_FREE} $argsf1 $argsf2 $argsf3"
   run_cmd "${CMD}" "${LOGF}" "${LOGF}" "${VERBOSE}" "${FREEDONE}"
 else
@@ -398,7 +417,7 @@ NBREL=`expr ${NB0} + ${NB1}`
 echo ${NBREL} > ${NRELSFILE}
 echo "${NBREL} unique relations remaining."
 
-NBPR=`grep nprimes ${LOGD20} | cut -d "=" -f 2`
+NBPR=`grep nprimes ${LOGF} | cut -d "=" -f 2`
 #MIN=`grep min_index ${LOGD20} | cut -d "=" -f 2`
 MIN="0" # FIXME MIN=ceil(2*minlim/log(minlim)) (in the integers case, not true
 #in the polynomials case (as in FFS))
@@ -471,24 +490,41 @@ if [ "x${NFSDL}" = "x1" ] ; then
 fi
 ####################
 
-
-# Help: output the command line needed to recontruct all logarithms from the
-# ones computed by linear algebra
-
-OUTLOG="${DIR}/${NAME}.logarithms.values"
-if [ "x${NFSDL}" != "x1" ] ; then # For FFS
-  BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-ffs-f${GF}";
-  argsre2="-out ${OUTLOG} -log <file> -gorder ${MOD_ELL}"
-else # for NFS-DL
-  BIN_RECONSTRUCT="${CADO_BUILD}/filter/reconstructlog-dl";
-  argsre2="-out ${OUTLOG} -smexp ${SM_EXP} -log <file> -gorder ${MOD_ELL}"
+######## Linear algrbra ########
+if [ "${DO_LA}" -eq "1" ] ; then
+  if [ "x${NFSDL}" = "x1" ] ; then
+    argsla0="-nmaps 0 -sm ${SMFILE}"
+  else
+    argsla0="-nmaps 0 -sm /dev/null"
+  fi
+  argsla1="-ell ${MOD_ELL} -sparsemat ${PREFIX_MATRIX}.txt -ker ${KERFILE}"
+  CMD="${BIN_LA} $argsla0 $argsla1"
+  run_cmd "${CMD}" "${LOGLA}" "${LOGLA}" "${VERBOSE}" "${LADONE}"
+else
+  echo "Linear algebra already done."
 fi
-
-argsre0="-purged ${RELSFILE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
-argsre1="-ideals ${INDEX_ID_MERGE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
+####################
 
 
-echo "${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2"
+######## Reconstructlog ########
+if [ "${DO_RECONSTRUCT}" -eq "1" ] ; then
+  if [ "x${NFSDL}" != "x1" ] ; then # For FFS
+    argsre3=""
+  else # for NFS-DL
+    argsre3="-smexp ${SM_EXP}"
+  fi
+
+  argsre0="-out ${FINALLOGFILE} -log ${KERFILE} -gorder ${MOD_ELL}"
+  argsre1="-purged ${RELSFILE} -relsdel ${DELRELSFILE} -nrels ${NBREL}"
+  argsre2="-ideals ${INDEX_ID_MERGE} -renumber ${RENUMBERFILE} -poly ${PARAMFILE}"
+  CMD="${BIN_RECONSTRUCT} $argsre0 $argsre1 $argsre2 $argre3"
+  run_cmd "${CMD}" "${LOGRECONSTRUCT}" "${LOGRECONSTRUCT}" "${VERBOSE}" "${RECONSTRUCTDONE}"
+
+else
+  echo "Linear algebra already done."
+fi
+####################
+
 
 ###### If tidy is asked ######
 

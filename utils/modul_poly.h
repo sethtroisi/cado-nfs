@@ -38,9 +38,11 @@ int modul_poly_cantor_zassenhaus (residueul_t*, modul_poly_t, modulusul_t);
 void modul_poly_init (modul_poly_t, int);
 int modul_poly_set_mod (modul_poly_t, mpz_poly_t, modulusul_t);
 int modul_poly_set_mod_raw (modul_poly_t, mpz_poly_t, modulusul_t);
+void modul_poly_set_immediate (modul_poly_t, int, modulusul_t, ...);
 void modul_poly_eval (residueul_t, modul_poly_t, residueul_t, modulusul_t);
 void modul_poly_clear (modul_poly_t);
 int modul_poly_is_irreducible(modul_poly_t, modulusul_t);
+int modul_poly_is_squarefree (modul_poly_t, modulusul_t);
 
 
 #ifdef __cplusplus

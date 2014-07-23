@@ -139,3 +139,15 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
         mpz_poly_clear(f[i]);
     return ret;
 }
+
+/* Return the rational side or -1 if two algebraic sides */
+int
+cado_poly_get_ratside (cado_poly_ptr pol)
+{
+  if (pol->pols[0]->deg != 1 && pol->pols[1]->deg != 1)
+    return -1; /* two algrebraic sides */
+  else if (pol->pols[0]->deg == 1)
+    return 0;
+  else
+    return 1;
+}
