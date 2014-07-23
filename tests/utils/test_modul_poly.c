@@ -21,48 +21,45 @@ test_modul_poly_is_irreducible (unsigned long iter)
   modul_poly_init (f, MAXDEGREE);
 
   modul_initmod_ul (p, 3);
-  modul_set_ul (f->coeff[0], 1, p);
-  f->degree = 0;
+  modul_poly_set_immediate (f, 0, p, 1);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) != 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) == 0);
 
   modul_initmod_ul (p, 3);
-  modul_set_ul (f->coeff[0], 0, p);
-  f->degree = -1;
+  modul_poly_set_immediate (f, -1, p);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) != 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) == 0);
 
   modul_initmod_ul (p, 3);
-  modul_set_ul (f->coeff[2], 2, p);
-  modul_set_ul (f->coeff[1], 1, p);
-  modul_set_ul (f->coeff[0], 2, p);
-  f->degree = 2;
+  modul_poly_set_immediate (f, 2, p, 2, 1, 2);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) == 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) == 0);
 
   modul_initmod_ul (p, 5);
-  modul_set_ul (f->coeff[2], 2, p);
-  modul_set_ul (f->coeff[1], 1, p);
-  modul_set_ul (f->coeff[0], 2, p);
+  modul_poly_set_immediate (f, 2, p, 2, 1, 2);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) == 0);
 
   modul_initmod_ul (p, 7);
-  modul_set_ul (f->coeff[2], 2, p);
-  modul_set_ul (f->coeff[1], 1, p);
-  modul_set_ul (f->coeff[0], 2, p);
+  modul_poly_set_immediate (f, 2, p, 2, 1, 2);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) != 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) != 0);
 
   modul_initmod_ul (p, 11);
-  modul_set_ul (f->coeff[2], 2, p);
-  modul_set_ul (f->coeff[1], 1, p);
-  modul_set_ul (f->coeff[0], 2, p);
+  modul_poly_set_immediate (f, 2, p, 2, 1, 2);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) != 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) != 0);
+
+  /* Has distinct factors: (x + 3) * (x + 6) */
+  modul_initmod_ul (p, 17);
+  modul_poly_set_immediate (f, 2, p, 2, 1, 2);
+  ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) == 0);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) != 0);
 
   /* 20*x^2 + 18*x + 19 == (x + 20)^2 (mod 23) */
   modul_initmod_ul (p, 23);
-  modul_set_ul (f->coeff[2], 20, p);
-  modul_set_ul (f->coeff[1], 18, p);
-  modul_set_ul (f->coeff[0], 19, p);
+  modul_poly_set_immediate (f, 2, p, 19, 18, 20);
   ASSERT_ALWAYS (modul_poly_is_irreducible (f, p) == 0);
-  n = modul_poly_cantor_zassenhaus (r, f, p);
-  ASSERT_ALWAYS(n == 2);
+  ASSERT_ALWAYS (modul_poly_is_squarefree (f, p) == 0);
 
   while (iter--)
     {
@@ -78,9 +75,15 @@ test_modul_poly_is_irreducible (unsigned long iter)
         modul_set_ul (f->coeff[d], lrand48 (), p);
       f->degree = d;
       irred = modul_poly_is_irreducible (f, p);
-      if (d == 1)
+      int squarefree = modul_poly_is_squarefree (f, p);
+      if (d == 1) {
         ASSERT_ALWAYS(irred != 0);
-      if (d == 1 || (d == 2 && irred == 0))
+        ASSERT_ALWAYS(squarefree);
+      }
+      if (irred) {
+        ASSERT_ALWAYS(squarefree);
+      }
+      if (d == 1 || (d == 2 && irred == 0 && squarefree))
         {
           n = modul_poly_cantor_zassenhaus (r, f, p);
           ASSERT_ALWAYS(n == d);
