@@ -4,6 +4,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include "mod_ul.h"
 #include "modul_poly.h"
 #include "gmp_aux.h"
@@ -146,8 +147,29 @@ modul_poly_set_mod_raw (modul_poly_t fp, mpz_poly_t F, modulusul_t p)
   return d;
 }
 
-/* f <- a*x+b, a <> 0 */
+
 void
+modul_poly_set_immediate (modul_poly_t f, const int d, modulusul_t p, ...)
+{
+  va_list ap;
+
+  modul_poly_realloc (f, d + 1);
+  f->degree = d;
+  if (d == -1)
+    modul_set0(f->coeff[0], p);
+
+  va_start(ap, p);
+  for (int i = 0; i <= d; i++) {
+    unsigned long c = va_arg(ap, unsigned long);
+    modul_set_ul(f->coeff[i], c, p);
+  }
+  va_end(ap);
+  modul_poly_normalize(f, p);
+}
+
+
+/* f <- a*x+b, a <> 0 */
+static void
 modul_poly_set_linear (modul_poly_t f, residueul_t a, residueul_t b, modulusul_t p)
 {
   modul_poly_realloc (f, 2);
