@@ -603,7 +603,7 @@ main (int argc, char *argv[])
 
     set_antebuffer_path (argv0, path_antebuffer);
 
-    renumber_init (renumber_tab, cpoly, NULL);
+    renumber_init_for_reading (renumber_tab);
     renumber_read_table (renumber_tab, renumberfilename);
 
   /* sanity check: since we allocate two 64-bit words for each, instead of
@@ -768,7 +768,7 @@ main (int argc, char *argv[])
   filelist_clear(files_new);
 
   param_list_clear(pl);
-  renumber_free (renumber_tab);
+  renumber_clear (renumber_tab);
   cado_poly_clear (cpoly);
   return 0;
 }

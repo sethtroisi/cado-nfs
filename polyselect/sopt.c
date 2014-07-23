@@ -56,6 +56,8 @@ polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N)
   }
 }
 
+static unsigned FLAG_TERMINATION[7] = { 0x181, 0x183, 0x187, 0x18f, 0x19f,
+                                        0x1bf, 0x1ff };
 
 /*
   Optimize all raw polynomial in the file.
@@ -138,8 +140,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       continue;
 
     /* consider raw polynomial only */
-    if ( (flag == (383UL + (2<<deg))) &&  (skip == 0) ) {
-
+    if ( (flag == FLAG_TERMINATION[deg]) &&  (skip == 0) ) {
       /* M = -Y0/Y1 mod N */
       mpz_invert (M, g[1], N);
       mpz_neg (M, M);
@@ -271,6 +272,7 @@ int main (int argc, char **argv)
   /* parse degree */
   param_list_parse_int (pl, "d", &degree);
   if (degree <= 0) usage();
+  ASSERT_ALWAYS (degree <= 6);
   
   /* parse poly filename */
   filename = param_list_lookup_string (pl, "f");

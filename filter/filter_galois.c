@@ -365,7 +365,7 @@ main (int argc, char *argv[])
 
   set_antebuffer_path (argv0, path_antebuffer);
 
-  renumber_init (renumber_tab, cpoly, NULL);
+  renumber_init_for_reading (renumber_tab);
   renumber_read_table (renumber_tab, renumberfilename);
 
   fprintf(stderr, "Computing Galois action on ideals\n");
@@ -417,7 +417,7 @@ main (int argc, char *argv[])
     filelist_clear(files);
 
   param_list_clear(pl);
-  renumber_free (renumber_tab);
+  renumber_clear (renumber_tab);
   cado_poly_clear (cpoly);
   free(H);
   return 0;

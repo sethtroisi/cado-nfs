@@ -15,6 +15,7 @@
 #define RENUMBER_MAXLINE 1024
 #define RENUMBER_MAX_ABOVE_BADIDEALS 8
 #define RENUMBER_SPECIAL_VALUE ((p_r_values_t) -1)
+#define RENUMBER_DEFAULT_SIZE (1 << 22)
 
 
 struct __bad_ideals_t 
@@ -42,26 +43,25 @@ struct __renumber_t
   index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
   index_t first_not_cached;
   int add_full_col; //do we add a col of 1 to all relations
-  unsigned long lpbr;  // The rational side large prime bound
-  unsigned long lpba;  // The algebraic side large prime bound
+  unsigned long lpb0;  // The large prime bound on side 0
+  unsigned long lpb1;  // The large prime bound on side 1
 };
 typedef struct __renumber_t renumber_t[1];
 
-// The last parameter of renumber_init is the array of lpb. If the
-// renumber_t is going to be passed to renumber_read_table, this can be
-// set to NULL. Otherwise, it has to be given, in order to precompute
-// approriate data.
-void renumber_init (renumber_t, cado_poly, unsigned long *);
+void renumber_init_for_writing (renumber_t, int, int, unsigned long *);
+/* Last argument of renumber_write_open can be NULL. It will not print the
+   polynomials on the file */
+void renumber_write_open (renumber_t, const char *, const char *, cado_poly);
+void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
+void renumber_write_close (renumber_t, const char*);
+
+void renumber_init_for_reading (renumber_t);
+void renumber_read_table (renumber_t, const char *);
+
+void renumber_clear (renumber_t);
 
 int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
-void renumber_free (renumber_t);
-void renumber_init_write (renumber_t, const char *, const char *, int);
-void renumber_close_write (renumber_t, const char *);
-void renumber_read_table (renumber_t, const char *);
-void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);
 void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
                                                     int *, index_t, cado_poly);
-//for DEBUG, should be remove later
-void renumber_debug_print_tab (FILE *, const char *, cado_poly, unsigned long *);
 #endif
