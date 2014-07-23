@@ -9,6 +9,8 @@
 #include "gmp_aux.h"
 #include "portability.h"
 
+static void modul_poly_normalize (modul_poly_t, modulusul_t);
+
 /* allocate an array of d coefficients, and initialize it */
 static residueul_t*
 alloc_long_array (int d)
@@ -84,6 +86,32 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
   for (i = 0; i < d; i++)
       modul_mul(f->coeff[i], f->coeff[i], ilc, p);
   modul_set1(f->coeff[d], p);
+}
+
+/* f(x) = g'(x) (mod p) */
+static void
+modul_poly_deriv(modul_poly_t f, const modul_poly_t g, modulusul_t p)
+{
+  const int d = g->degree;
+  residueul_t multiplier;
+  
+  modul_poly_realloc (f, d + 1);
+  f->degree = MAX(d - 1, -1);
+
+  if (d > 0)
+    modul_set(f->coeff[0], g->coeff[1], p);
+
+  modul_init(multiplier, p);
+  modul_set1(multiplier, p);
+  
+  for (int i = 2; i <= d; i++) {
+    modul_add1(multiplier, multiplier, p);
+    modul_mul(f->coeff[i - 1], g->coeff[i], multiplier, p);
+  }
+  modul_clear(multiplier, p);
+  
+  /* Leading coefficient is 0 if p | (d-1)*g[d] */
+  modul_poly_normalize(f, p);
 }
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
@@ -381,6 +409,31 @@ void modul_poly_eval (residueul_t r, modul_poly_t f, residueul_t x, modulusul_t 
       modul_mul(aux, r, x, p);
       modul_add(r, aux, f->coeff[i], p);
   }
+}
+
+/* Returns 0 if there exists any g(x) (mod p) of positive degree
+  such that g(x)^2 | f(x), otherwise returns 1. */
+int
+modul_poly_is_squarefree (modul_poly_t f, modulusul_t p)
+{
+  const int d = f->degree;
+  modul_poly_t f_deriv, t;
+  
+  /* Constant polynomial, any g(x)^2 divides over F_p */
+  if (d <= 0)
+    return 0;
+
+  modul_poly_init(f_deriv, d - 1);
+  modul_poly_deriv(f_deriv, f, p);
+  /* Need a temp polynomial because modul_poly_gcd() clobbers its input :( */
+  modul_poly_init(t, d - 1);
+  modul_poly_set (t, f, p);
+  modul_poly_gcd(f_deriv, t, p);
+  ASSERT_ALWAYS(f_deriv->degree >= 0);
+  int squarefree = (f_deriv->degree == 0);
+  modul_poly_clear(f_deriv);
+  modul_poly_clear(t);
+  return squarefree;
 }
 
 /* Return the number n of roots of f mod p using a naive algorithm.
