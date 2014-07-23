@@ -52,6 +52,7 @@ void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 
 */
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
+#include <emmintrin.h>
 
 /* Only to avoid a possible warning (in MacOSX). */
 #ifdef memset
