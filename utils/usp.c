@@ -66,6 +66,7 @@ B) to use within another program: compile without -DMAIN, the main function
 #include "double_poly.h"
 #include "portability.h"
 #include "macros.h"
+#include "cado_poly.h"
 
 /* #define DEBUG */
 
@@ -490,6 +491,77 @@ numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struc
   return nroots;
 }
 
+/* put in r[0..k-1] the integer part (rounded to nearest) of the
+   k real roots of the polynomial p (of degree d).
+   r must have at least d entries.
+   Return the number k of real roots.
+   Note: to obtain the rounding to nearest, we modify p(x) into 2^d*p(y/2),
+   and round towards -infinity.
+*/
+int
+mpz_poly_mpz_roots (mpz_t *r, mpz_poly_t p)
+{
+  int d = p->deg, k, i, sa, sb, sc;
+  root_struct Roots[MAXDEGREE];
+  mpz_t a, b, c, v;
+
+  mpz_init (a);
+  mpz_init (b);
+  mpz_init (c);
+  mpz_init (v);
+  for (i = 0; i < d; i++)
+    {
+      root_struct_init (Roots + i);
+      mpz_mul_2exp (p->coeff[i], p->coeff[i], d - i);
+    }
+  k = numberOfRealRoots (p->coeff, d, 0.0, 0, Roots);
+  for (i = 0; i < k; i++)
+    {
+      mpz_set (a, Roots[i].a);
+      if (Roots[i].ka <= 0)
+        mpz_mul_2exp (a, a, -Roots[i].ka);
+      else
+        mpz_fdiv_q_2exp (a, a, Roots[i].ka);
+      mpz_poly_eval (v, p, a);
+      sa = mpz_sgn (v);
+      mpz_set (b, Roots[i].b);
+      if (Roots[i].kb <= 0)
+        mpz_mul_2exp (b, b, -Roots[i].kb);
+      else
+        mpz_cdiv_q_2exp (b, b, Roots[i].kb);
+      mpz_poly_eval (v, p, b);
+      sb = mpz_sgn (v);
+      ASSERT_ALWAYS(sa * sb < 0);
+      while (1)
+        {
+          mpz_add (c, a, b);
+          mpz_fdiv_q_2exp (c, c, 1);
+          if (mpz_cmp (a, c) == 0)
+            break;
+          mpz_poly_eval (v, p, c);
+          sc = mpz_sgn (v);
+          if (sa * sc > 0)
+            mpz_set (a, c);
+          else
+            mpz_set (b, c);
+        }
+      if (mpz_tstbit (a, 0) == 0)
+        mpz_fdiv_q_2exp (r[i], a, 1);
+      else
+        mpz_cdiv_q_2exp (r[i], b, 1);
+    }
+  mpz_clear (a);
+  mpz_clear (b);
+  mpz_clear (c);
+  mpz_clear (v);
+  for (i = 0; i < d; i++)
+    {
+      root_struct_clear (Roots + i);
+      mpz_div_2exp (p->coeff[i], p->coeff[i], d - i);
+    }
+  return k;
+}
+
 /* refine the root interval r[0] for the polynomial p of degree n,
    and return a double-precision approximation of the corresponding root,
    with a maximal error <= precision.
@@ -498,7 +570,7 @@ numberOfRealRoots (mpz_t *p, const int orig_n, double T, int verbose, root_struc
    CAREFUL2: with precision == 0. + x86 32 bits + gcc mathematical default
    -mfpmath=387, the computation of c = (a + b) * .5 is done on the
    top of the i387 stack in 80 bits precision (extended precision).
-   The next comparaison c == a is done in this case between a memory
+   The next comparison c == a is done in this case between a memory
    double (64 bits) and this 80 bits value.
    Solution: in x86 and not in x86-64, (a + b) * .5 is written in memory
    and loads in c.
