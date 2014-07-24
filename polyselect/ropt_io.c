@@ -295,6 +295,27 @@ ropt_on_cadopoly ( FILE *file,
 
 
 /**
+ * Regenerate raw polyomial with small c_{d-1}.
+ */
+static void
+ropt_regen_raw (mpz_t *f, int d, mpz_t *g)
+{
+  mpz_t t, d_ad;
+  mpz_init (t);
+  mpz_init (d_ad);
+  
+  mpz_mul_si (d_ad, f[d], d);
+  mpz_neg (t, f[d-1]);
+  mpz_tdiv_q (t, t, d_ad);
+  mpz_mul (t, t, g[1]);
+  mpz_add (g[0], g[0], t);
+
+  mpz_clear (t);
+  mpz_clear (d_ad);
+}
+
+
+/**
  * Ropt on all Msieve-format polynomials in the file.
  */
 void
@@ -315,7 +336,7 @@ ropt_on_msievepoly ( FILE *file,
 
   /* parse each line */
   while (1) {
-    
+
     /* read ad, l, m */   
     if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
       break;
@@ -323,35 +344,53 @@ ropt_on_msievepoly ( FILE *file,
     if (ret != 3)
       continue;
 
-    /* set degree, n, ad, l, m */
+    /* set d, n, ad, l, m */
     poly->d = param->d;
     mpz_set (poly->n, param->n);
     mpz_set (poly->f[poly->d], ad);
-    Lemma21 (poly->f, poly->n, poly->d, l, m);
     mpz_set (poly->g[1], l);
     mpz_neg (poly->g[0], m);
-    fprintf (stderr, "\n# Polynomial (# %5d).", count);
 
+    /* generate polynomial */
+    Lemma21 (poly->f, poly->n, poly->d, l, m);
+
+    /* undo translation and generate again */
+    if (param->skip_ropt2) {
+      ropt_regen_raw (poly->f, poly->d, poly->g);
+      mpz_neg (m, poly->g[0]);
+      Lemma21 (poly->f, poly->n, poly->d, l, m);
+    }
+        
     mpz_poly_t F;
-    F->coeff = poly->f;
+    mpz_poly_init (F, poly->d);
     F->deg = poly->d;
+    for (int j = 0; j <= poly->d; j++)
+      mpz_set (F->coeff[j], poly->f[j]);
 
     /* print before size optimization */
+    fprintf (stderr, "\n# Polynomial (# %5d).", count);
     print_poly_fg (F, poly->g, poly->n, 1);
 
-    /* size optimization */
+    /* optimize size */
     optimize (F, poly->g, 0, 1, 1);
 
-    if (param->skip_ropt) {
+    /* skip or do ropt */
+    if (param->skip_ropt || param->skip_ropt2) {
       fprintf (stderr, "\n# Size-optimize only (# %5d).", count);
-      /* also print optimized poly in Msieve format */
+
+      /* print in Msieve format */
       // print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
-      /* print size-optimized poly in CADO format */
+
+      /* print in CADO format */
       print_poly_fg (F, poly->g, poly->n, 1);
     }
-    else
+    else {
+      for (int j = 0; j <= poly->d; j++)
+        mpz_set (poly->f[j], F->coeff[j]);
       ropt_common (poly, param);
+    }
 
+    mpz_poly_clear (F);
     count ++;
   }
 

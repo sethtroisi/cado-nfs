@@ -1189,6 +1189,7 @@ ropt_param_init ( ropt_param_t param )
   param->verbose = 0;
   param->effort = DEFAULT_RSEFFORT;
   param->skip_ropt = 0;
+  param->skip_ropt2 = 0;
 }
 
 

@@ -313,6 +313,11 @@ ropt_parse_param ( int argc,
           fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
           exit(1);
         }
+        else if (argc >= 3 && strcmp (argv[1], "--skip_ropt2") == 0)
+        {
+          fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
+          exit(1);
+        }
         else {
           usage (argv);
         }
@@ -404,6 +409,12 @@ ropt_parse_param ( int argc,
         else if (argc >= 2 && strcmp (argv[1], "--skip_ropt") == 0)
         {
           param->skip_ropt = 1;
+          argv += 1;
+          argc -= 1;
+        }
+        else if (argc >= 2 && strcmp (argv[1], "--skip_ropt2") == 0)
+        {
+          param->skip_ropt2 = 1;
           argv += 1;
           argc -= 1;
         }

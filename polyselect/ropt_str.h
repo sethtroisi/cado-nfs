@@ -145,8 +145,11 @@ typedef struct {
   /* check between 1 and 5 */
   int effort;
 
-  /* check between 1 and 5 */
+  /* skip ropt */
   int skip_ropt;
+
+  /* skip ropt and output polynomial with short c5 */
+  int skip_ropt2;
 
   /* verbose */
   int verbose;
