@@ -569,13 +569,19 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
     /* Make den odd, store the exponent of 2 in k */
     const int k = ularith_ctz(den);
     den >>= k;
-    int ok = modredcul_batch_Q_to_Fp(r, num, den, k, neg, p, i);
+    int ok = modredcul_batch_Q_to_Fp(r, num, den, k, p, i);
     if(UNLIKELY(!ok)) {
       /* Modular inverse did not exists, i.e., at least one of the factor base
          entries was not coprime to den. Do factor base entries one at a time,
          handling the non-coprime case properly. */
       for (size_t j = 0; j < i; j++)
         r[j] = compute_1_root_ul(p[j], num, den, k, neg);
+    } else if (!neg) {
+      /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
+         then the root is -g_0/g_1, and we need a sign flip. */
+      for (size_t j = 0; j < i; j++)
+        if (r[j] != 0)
+          r[j] =  p[j] - r[j];
     }
   } else {
     for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {

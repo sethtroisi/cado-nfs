@@ -157,7 +157,7 @@ test_modredc_batchinv_ul (const size_t len, const unsigned long c,
 static int
 check_Q_to_Fp(const unsigned long q,
               const unsigned long num, const unsigned long den,
-              const unsigned long k, const int sign, const unsigned long p)
+              const unsigned long k, const unsigned long p)
 {
   mpz_t r, m;
 
@@ -171,8 +171,6 @@ check_Q_to_Fp(const unsigned long q,
 
   mpz_set_ui(m, p);
   mpz_set_ui(r, den);
-  if (!sign)
-    mpz_neg(r, r);
   mpz_mul_2exp(r, r, k);
   mpz_invert(r, r, m);
   mpz_mul_ui(r, r, num);
@@ -192,25 +190,24 @@ check_Q_to_Fp(const unsigned long q,
 static int
 check_modredcul_batch_Q_to_Fp(unsigned long *r, const unsigned long num,
                               const unsigned long den, const unsigned long k,
-                              const int sign, const unsigned long *p, const size_t n)
+                              const unsigned long *p, const size_t n)
 {
   print_residues_ul("Trying modredcul_batch_Q_to_Fp() with p=", p, n, den);
-  int ok = modredcul_batch_Q_to_Fp(r, num, den, k, sign, p, n);
+  int ok = modredcul_batch_Q_to_Fp(r, num, den, k, p, n);
   
   if (!ok) {
     fprintf(stderr, "Error, modredcul_batch_Q_to_Fp() returned error\n");
   }
   
   for (size_t i = 0; i < n; i++) {
-    ok = check_Q_to_Fp(r[i], num, den, k, sign, p[i]);
+    ok = check_Q_to_Fp(r[i], num, den, k, p[i]);
   }
   return ok;
 }
 
 static int
 test_modredcul_batch_Q_to_Fp(const unsigned long num, const unsigned long den,
-                             const unsigned long k, const int sign,
-                             const size_t n)
+                             const unsigned long k, const size_t n)
 {
   unsigned long r[n], p[n];
   
@@ -223,7 +220,7 @@ test_modredcul_batch_Q_to_Fp(const unsigned long num, const unsigned long den,
     } while (gcd_ul(m, den) > 1);
     p[i] = m;
   }
-  int ok = check_modredcul_batch_Q_to_Fp(r, num, den, k, sign, p, n);
+  int ok = check_modredcul_batch_Q_to_Fp(r, num, den, k, p, n);
 
   /* Try random p values */
   for (size_t i = 0; i < n; i++) {
@@ -233,7 +230,7 @@ test_modredcul_batch_Q_to_Fp(const unsigned long num, const unsigned long den,
     } while (m == 0 || (k > 0 && m % 2 == 0) || gcd_ul(m, den) > 1);
     p[i] = m;
   }
-  ok &= check_modredcul_batch_Q_to_Fp(r, num, den, k, sign, p, n);
+  ok &= check_modredcul_batch_Q_to_Fp(r, num, den, k, p, n);
 
   return ok;
 }
@@ -269,11 +266,10 @@ main (int argc, const char *argv[])
     const unsigned long nr_c = 20;
     for (unsigned long j = 0; ok && j < nr_c; j++) {
       const unsigned long num = choose_constant(i, nr_c);
-      const int sign = random_uint64() % 2;
-      ok &= test_modredcul_batch_Q_to_Fp(num, den, 0, sign, iter);
+      ok &= test_modredcul_batch_Q_to_Fp(num, den, 0, iter);
       if (num % 2 == 1) {
-        ok &= test_modredcul_batch_Q_to_Fp(num, den, 1, sign, iter);
-        ok &= test_modredcul_batch_Q_to_Fp(num, den, 2, sign, iter);
+        ok &= test_modredcul_batch_Q_to_Fp(num, den, 1, iter);
+        ok &= test_modredcul_batch_Q_to_Fp(num, den, 2, iter);
       }
     }
   }

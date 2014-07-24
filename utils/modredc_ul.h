@@ -805,7 +805,7 @@ int modredcul_batchinv_ul (unsigned long *, const unsigned long *,
                            unsigned long, const size_t,
                            const modulusredcul_t);
 int modredcul_batch_Q_to_Fp (unsigned long *, unsigned long,
-                             unsigned long, unsigned long, int,
+                             unsigned long, unsigned long,
                              const unsigned long *, size_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);
 
