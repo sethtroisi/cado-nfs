@@ -179,11 +179,11 @@ modredc2ul2_intset_uls (modintredc2ul2_t r, const unsigned long *s,
     abort();
 }
 
+/* Get the least significant unsigned long of r */
 MAYBE_UNUSED
 static inline unsigned long 
-modredc2ul2_intget_ul (modintredc2ul2_t r)
+modredc2ul2_intget_ul (const modintredc2ul2_t r)
 {
-  ASSERT(r[1] == 0);
   return r[0];
 }
 

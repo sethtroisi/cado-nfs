@@ -85,12 +85,12 @@ modmpz_intset_uls (modintmpz_t r, const unsigned long *s, const size_t n)
 }
 
 
+/* Get the least significant unsigned long of r */
 MAYBE_UNUSED
 static inline unsigned long 
 modmpz_intget_ul (const modintmpz_t s)
 {
   ASSERT_MPZ(s);
-  ASSERT (mpz_fits_ulong_p (s));
   return mpz_get_ui(s);
 }
 

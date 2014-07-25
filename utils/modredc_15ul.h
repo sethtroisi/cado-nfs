@@ -186,11 +186,11 @@ modredc15ul_intset_uls (modintredc15ul_t r, const unsigned long *s,
     abort();
 }
 
+/* Get the least significant unsigned long of r */
 MAYBE_UNUSED
 static inline unsigned long 
 modredc15ul_intget_ul (const modintredc15ul_t s)
 {
-  ASSERT(s[1] == 0);
   return s[0];
 }
 
