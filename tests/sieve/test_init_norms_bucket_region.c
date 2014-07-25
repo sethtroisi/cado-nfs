@@ -2,8 +2,12 @@
 #define MIN_LOGI 10
 #define MAX_LOGI 16      /* MIN_LOGI <= logi <= MAX_LOGI && MAX_LOGI <= LOG_BUCKET_REGION */
 #define MAX_DEGREE 10    /* All degree between 0 and MAX_DEGREE included are tested */
-#define MAX_SMART_ERR 5  /* The error in smart algo must be <= MAX_SMART_ERR */
-#define MAX_EXACT_ERR 2  /* The error in "exact" algo must be <= MAX_EXACT_ERR */
+
+#define MAX_SMART_ERR 8            /* The error in smart algo must be <=, always. */
+#define TOLERATE_MAX_SMART_ERR 4   /* The error in smart algo COULD be > ... */
+#define MAX_RELATIVE_ERROR 1000000 /* ... but only for 1 value on MAX_RELATIVE_ERROR values. */
+
+#define MAX_EXACT_ERR 2  /* The error in "exact" algo must be <= */
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -38,6 +42,7 @@ main(int argc, const char *argv[]) {
   double_poly_t poly;
   unsigned long long count, smart_err[(MAX_SMART_ERR<<1)+1], exact_err[(MAX_EXACT_ERR<<1)+1];
   unsigned long iter = NB_TESTS;
+  unsigned long long smart_errors = 0;
   
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER | PARSE_VERBOSE);
   tests_common_get_iter (&iter);
@@ -119,12 +124,15 @@ main(int argc, const char *argv[]) {
 	  exact_err[test_exact_algo + MAX_EXACT_ERR]++;
 
 	  test_smart_algo = S3[l] - S1[l];
-	  if (UNLIKELY(abs(test_smart_algo) > MAX_SMART_ERR)) {
-	    fprintf (stderr, 
-		     "code BUG(): the condition abs(test_smart_algo) <= MAX_SMART_ERR failed!\n"
-		     "test_smart_algo=%d, maximal error accepted in smart algorithm = %u\n",
-		     test_smart_algo, MAX_SMART_ERR);
-	    exit (EXIT_FAILURE);
+	  if (UNLIKELY(abs(test_smart_algo) > TOLERATE_MAX_SMART_ERR)) {
+	    if (UNLIKELY(abs(test_smart_algo) > MAX_SMART_ERR)) {
+	      fprintf (stderr, 
+		       "code BUG(): the condition abs(test_smart_algo) <= MAX_SMART_ERR failed!\n"
+		       "test_smart_algo=%d, maximal error accepted in smart algorithm = %u\n",
+		       test_smart_algo, MAX_SMART_ERR);
+	      exit (EXIT_FAILURE);
+	    }
+	    smart_errors++;
 	  }
 	  smart_err[test_smart_algo + MAX_SMART_ERR]++;
 	}
@@ -132,9 +140,18 @@ main(int argc, const char *argv[]) {
     }
   }
   free(S1); free(S2); free (S3);
+
+  count = (MAX_LOGI - MIN_LOGI + 1) * (MAX_DEGREE + 1) * (unsigned long long) (iter << LOG_BUCKET_REGION);
+  if (smart_errors * MAX_RELATIVE_ERROR > count) {
+    fprintf (stderr, 
+	     "code BUG(): too many tolerate errors (%llu errors for\n"
+	     "%llu values) in the smart initialization algorithm : %llu errors.\n"
+	     "NB: %u < tolerate errors <= %u\n",
+	     count / MAX_RELATIVE_ERROR, count, smart_errors, TOLERATE_MAX_SMART_ERR, MAX_SMART_ERR);
+    exit (EXIT_FAILURE);
+  }
   
   if (tests_common_get_verbose ()) {
-    count = (MAX_LOGI - MIN_LOGI + 1) * (MAX_DEGREE + 1) * (unsigned long long) (iter << LOG_BUCKET_REGION);
     fprintf (stderr, "This test is done with %llu values. All the values are between %u and %u included.\n", count, GUARD, UCHAR_MAX - 1);
 #ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
     fprintf (stderr, "Computations done with SSE (HAVE_GCC_STYLE_AMD64_INLINE_ASM is defined).\n");
