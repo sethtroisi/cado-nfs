@@ -304,51 +304,6 @@ check_divisible(const unsigned long lo, const unsigned long hi,
 }
 
 
-/* We have r = -rem/p (mod den).
-   We want num/den (mod p) == ratio + rem/den (mod p).
-   Using (a variant of) Bezout's identity, we have, for some non-negative
-   integer t,
-   r * p - t * den = -rem, or
-   r * p + rem = t * den,
-   thus den | (r * p + rem), and thus
-   t = (r * p + rem) / den is an integer and satisfies
-   t = rem/den (mod p).
-
-   We have 0 <= r <= den-1 and rem <= den-1, and thus
-   0 <= t = p * r/den + rem/den <=
-   p (1 - 1/den) + 1 - 1/den =
-   p - p/den + 1 - 1/den =
-   p + 1 - (p/den + 1/den) =
-   p + 1 - (p + 1)/den =
-   < p + 1.
-   Thus t is almost a properly reduced residue for rem/den (mod p).
-   Thus t fits in unsigned long, and we can compute t modulo 2^LONGBITS;
-   since den is odd, we can multiply by den^{-1} mod 2^LONGBITS to effect
-   division by den.
-
-   Finally we compute (t + ratio) mod p = num/den mod p.  */
-
-static inline unsigned long
-post_process_inverse(const unsigned long r, const unsigned long p,
-  const unsigned long rem, const unsigned long den_inv,
-  const unsigned long ratio, const unsigned long k)
-{
-  unsigned long t = (r * p + rem) * den_inv;
-  const unsigned long ratio_p = (ratio >= p) ? ratio % p : ratio;
-  ASSERT_ALWAYS(t <= p); /* Cheap and fairly strong test */
-  /* ularith_addmod_ul_ul() accepts third operand == p and still produces
-     a properly reduced sum mod p. */
-  ularith_addmod_ul_ul (&t, ratio_p, t, p);
-
-  ASSERT_ALWAYS(t < p);
-  ASSERT_ALWAYS(k == 0 || p % 2 == 1);
-  for (unsigned long j = 0; j < k; j++) {
-    t = ularith_div2mod(t, p);
-  }
-  return t;
-}
-
-
 /* For each 0 <= i < n, compute r[i] = num/(den*2^k) mod p[i].
    den must be odd. If k > 0, then all p[i] must be odd.
    Returns 1 if successful. If any modular inverse does not exist,
@@ -376,7 +331,7 @@ modredcul_batch_Q_to_Fp (unsigned long *r, const unsigned long num,
   const unsigned long den_inv = ularith_invmod(den);
 
   for (size_t i = 0; i < n; i++)
-    r[i] = post_process_inverse(r[i], p[i], rem, den_inv, ratio, k);
+    r[i] = ularith_post_process_inverse(r[i], p[i], rem, den_inv, ratio, k);
 
   return 1;
 }
