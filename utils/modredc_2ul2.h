@@ -411,6 +411,24 @@ modredc2ul2_intdivexact (modintredc2ul2_t r, const modintredc2ul2_t n,
 #endif
 }
 
+MAYBE_UNUSED
+static inline unsigned long
+modredc2ul2_intmod_ul (const modintredc2ul2_t n, const unsigned long d)
+{
+  unsigned long r;
+  if (n[1] < d)
+    {
+      unsigned long dummy;
+      ularith_div_2ul_ul_ul (&dummy, &r, n[0], n[1], d);
+    }
+  else
+    {
+      unsigned long t, dummy;
+      ularith_div_2ul_ul_ul (&dummy, &t, n[1], 0UL, d);
+      ularith_div_2ul_ul_ul (&dummy, &r, n[0], t, d);
+    }
+  return r;
+}
 
 /* r = n%d */
 MAYBE_UNUSED
@@ -420,19 +438,8 @@ modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
 {
   if (d[1] == 0UL)
     {
-      if (n[1] < d[0])
-        {
-          unsigned long dummy;
-          ularith_div_2ul_ul_ul (&dummy, &(r[0]), n[0], n[1], d[0]);
-          r[1] = 0UL;
-        }
-      else
-        {
-          unsigned long t, dummy;
-          ularith_div_2ul_ul_ul (&dummy, &t, n[1], 0UL, d[0]);
-          ularith_div_2ul_ul_ul (&dummy, &(r[0]), n[0], t, d[0]);
-          r[1] = 0UL;
-        }
+      r[0] = modredc2ul2_intmod_ul (n, d[0]);
+      r[1] = 0;
     }
   else    
     {
