@@ -1258,5 +1258,8 @@ int modredc2ul2_inv (residueredc2ul2_t, const residueredc2ul2_t,
 int modredc2ul2_batchinv (residueredc2ul2_t *, const residueredc2ul2_t *,
                           size_t n, const residueredc2ul2_t,
                           const modulusredc2ul2_t);
+int modredc2ul2_batch_Q_to_Fp (unsigned long *, const modintredc2ul2_t,
+                               const modintredc2ul2_t, unsigned long,
+                               const unsigned long *, size_t);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
 #endif  /* MODREDC_2UL2_H */

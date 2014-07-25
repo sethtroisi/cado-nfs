@@ -221,3 +221,102 @@ modredc2ul2_inv (residueredc2ul2_t r, const residueredc2ul2_t A,
 }
 
 
+/* Currently very slow, converts a[i] to REDC form on every access */
+int
+modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
+                         const residue_t c, const modulus_t m)
+{
+  residue_t R, t;
+
+  if (n == 0)
+    return 1;
+
+  mod_set_ul(r[0], a[0], m);
+
+  mod_init_noset0(t, m);
+  for (size_t i = 1; i < n; i++) {
+    mod_set_ul(t, a[i], m);
+    mod_mul(r[i], r[i-1], t, m);
+  }
+
+  mod_init_noset0(R, m);
+  if (!mod_inv(R, r[n-1], m))
+    return 0;
+
+  if (c != NULL) {
+    mod_mul(R, R, c, m);
+  }
+
+  for (size_t i = n-1; i > 0; i--) {
+    mod_mul(r[i], R, r[i-1], m);
+    mod_set_ul(t, a[i], m);
+    mod_mul(R, R, t, m);
+  }
+  mod_set(r[0], R, m);
+  mod_clear(R, m);
+  mod_clear(t, m);
+  return 1;
+}
+
+
+int
+modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
+                           const modint_t den, const unsigned long k,
+                           const unsigned long *p, const size_t n)
+{
+  modulus_t m;
+  residue_t *tr, num_m;
+  unsigned long rem_ul, ratio_ul;
+  int rc = 1;
+
+  mod_initmod_int(m, den);
+  mod_init_noset0(num_m, m);
+
+  /* Compute ratio = floor(num / den), remainder = num % den. We assume that
+    ratio fits into unsigned long, and abort if it does not. We need only the
+    low word of remainder. */
+  {
+    modint_t ratio, remainder;
+    mod_intinit(remainder);
+    mod_intinit(ratio);
+    mod_intmod(remainder, num, den);
+    mod_intsub(ratio, num, remainder);
+    mod_intdivexact(ratio, ratio, den);
+    ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
+    ratio_ul = modredc2ul2_intget_ul(ratio);
+    rem_ul = modredc2ul2_intget_ul(remainder);
+    mod_set_int_reduced(num_m, remainder, m);
+    mod_neg(num_m, num_m, m);
+    mod_intclear(ratio);
+    mod_intclear(remainder);
+  }
+
+  tr = (residue_t *) malloc(n * sizeof(residue_t));
+  for (size_t i = 0; i < n; i++) {
+    mod_init_noset0(tr[i], m);
+  }
+
+  if (!modredc2ul2_batchinv_ul(tr, p, n, num_m, m)) {
+    rc = 0;
+    goto clear_and_exit;
+  }
+
+  const unsigned long den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
+  modint_t tri;
+  mod_intinit(tri);
+
+  for (size_t i = 0; i < n; i++) {
+    /* Convert residue to smallest non-negative integer representative */
+    mod_get_int(tri, tr[i], m);
+    r[i] = ularith_post_process_inverse(mod_intget_ul(tri), p[i], rem_ul,
+                                        den_inv, ratio_ul, k);
+  }
+  mod_intclear(tri);
+
+clear_and_exit:
+
+  for (size_t i = 0; i < n; i++) {
+    mod_clear(tr[i], m);
+  }
+  return rc;
+}
