@@ -35,9 +35,6 @@ int fake = 0;
 /* only use translation in optimization */
 int translate = 0;
 
-/* use LLL-based algorithm */
-int use_lll = 0;
-
 /* 
    Care: poly_print is named in utils.h
 */
@@ -175,10 +172,8 @@ opt_file (FILE *file, int deg, mpz_t N) {
       /* optimize */
       if (translate)
         optimize_aux (F, g, 0, 0);
-      else if (use_lll == 0)
-        optimize (F, g, 0, 1, 1);
       else
-        optimize_lll (F, g, 0);
+        optimize (F, g, 0, 1, 1);
 
       /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
@@ -252,7 +247,6 @@ int main (int argc, char **argv)
   param_list_init (pl);
   param_list_configure_switch (pl, "--fake", &fake);
   param_list_configure_switch (pl, "--translate", &translate);
-  param_list_configure_switch (pl, "--lll", &use_lll);
 
   argv++, argc--;
   for ( ; argc; ) {
