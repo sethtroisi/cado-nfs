@@ -5,6 +5,7 @@
 #include "utils.h"           /* lots of stuff */
 #include "bucket.h"
 #include "modredc_ul.h"
+#include "modredc_2ul2.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
@@ -541,6 +542,103 @@ compute_1_root_ul(const unsigned long p, const unsigned long num,
 }
 
 
+static inline size_t
+transform_n_roots_ul(unsigned long *p, unsigned long *r, fb_iterator t,
+                     const size_t n, const int side, sieve_info_srcptr si)
+{
+  mpz_poly_srcptr f = si->sides[side]->fij;
+  size_t i;
+  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
+    p[i] = fb_iterator_get_p(t);
+  }
+  const unsigned long num = mpz_get_ui(f->coeff[0]);
+  unsigned long den = mpz_get_ui(f->coeff[1]);
+  /* If exactly one of the two coefficients is negative, we need to flip
+     the sign of the root (mod p). The den and num variables contain
+     absolute values. */
+  const int neg = (mpz_sgn(f->coeff[0]) < 0) != (mpz_sgn(f->coeff[1]) < 0);
+  /* Make den odd, store the exponent of 2 in k */
+  const int k = ularith_ctz(den);
+  den >>= k;
+  int ok = modredcul_batch_Q_to_Fp(r, num, den, k, p, i);
+  if(UNLIKELY(!ok)) {
+    /* Modular inverse did not exists, i.e., at least one of the factor base
+       entries was not coprime to den. Do factor base entries one at a time,
+       handling the non-coprime case properly. */
+    for (size_t j = 0; j < i; j++)
+      r[j] = compute_1_root_ul(p[j], num, den, k, neg);
+  } else if (!neg) {
+    /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
+       then the root is -g_0/g_1, and we need a sign flip. */
+    for (size_t j = 0; j < i; j++)
+      if (r[j] != 0)
+        r[j] =  p[j] - r[j];
+  }
+  return i;
+}
+
+
+static inline void
+modredc2ul2_set_mpz(modintredc2ul2_t r, const mpz_t a)
+{
+  unsigned long t[MODREDC2UL2_SIZE];
+  size_t n;
+  mpz_export (t, &n, -1, sizeof(unsigned long), 0, 0, a);
+  ASSERT_ALWAYS(n <= MODREDC2UL2_SIZE);
+  modredc2ul2_intset_uls(r, t, n);
+}
+
+static inline size_t
+transform_n_roots_2ul2(unsigned long *p, unsigned long *r, fb_iterator t,   
+                       const size_t n, const mpz_t num_mpz, const mpz_t den_mpz,
+                       const unsigned long k)
+{
+  size_t i;
+  modintredc2ul2_t num, den;
+
+  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
+    p[i] = fb_iterator_get_p(t);
+  }
+
+  modredc2ul2_intinit(num);
+  modredc2ul2_intinit(den);
+  /* Set num = |num_mpz|, den = |den_mpz| */
+  modredc2ul2_set_mpz(num, num_mpz);
+  modredc2ul2_set_mpz(den, den_mpz);
+  
+  /* If exactly one of the two coefficients is negative, we need to flip
+     the sign of the root (mod p). The den and num variables contain
+     absolute values. */
+  const int neg = (mpz_sgn(num_mpz) < 0) != (mpz_sgn(den_mpz) < 0);
+  const int ok = modredc2ul2_batch_Q_to_Fp(r, num, den, k, p, i);
+  if(UNLIKELY(!ok)) {
+    /* Modular inverse did not exists, i.e., at least one of the factor base
+       entries was not coprime to den. Do factor base entries one at a time,
+       handling the non-coprime case properly. */
+    for (size_t j = 0; j < i; j++)
+      r[j] = compute_1_root_ul(p[j], modredc2ul2_intmod_ul(num, p[j]),
+                               modredc2ul2_intmod_ul(den, p[j]), k, neg);
+  } else {
+    if (!neg) {
+      /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
+         then the root is -g_0/g_1, and we need a sign flip. */
+      for (size_t j = 0; j < i; j++)
+        if (r[j] != 0)
+          r[j] =  p[j] - r[j];
+    }
+#if 0
+    /* Very expensive but thorough test */
+    for (size_t j = 0; j < i; j++) {
+      unsigned long tr;
+      tr = compute_1_root_ul(p[j], modredc2ul2_intmod_ul(num, p[j]),
+                             modredc2ul2_intmod_ul(den, p[j]), k, neg);
+      ASSERT_ALWAYS(tr == r[j]);
+    }
+#endif
+  }
+  return i;
+}
+
 /* Compute up to n roots of the transformed polynomial, either by tranforming
    the root stored in the factor base, or, if the polynomial has degree 1 and
    its coefficients fit into unsigned long, by computing the root from the
@@ -556,33 +654,19 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
   size_t i;
   mpz_poly_srcptr f = si->sides[side]->fij;
 
-  if (f->deg == 1 && mpz_fits_ulong_p(f->coeff[0]) && mpz_fits_ulong_p(f->coeff[1])) {
-    for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
-      p[i] = fb_iterator_get_p(t);
-    }
-    const unsigned long num = mpz_get_ui(f->coeff[0]);
-    unsigned long den = mpz_get_ui(f->coeff[1]);
-    /* If exactly one of the two coefficients is negative, we need to flip
-       the sign of the root (mod p). The den and num variables contain
-       absolute values. */
-    const int neg = (mpz_sgn(f->coeff[0]) < 0) != (mpz_sgn(f->coeff[1]) < 0);
-    /* Make den odd, store the exponent of 2 in k */
-    const int k = ularith_ctz(den);
-    den >>= k;
-    int ok = modredcul_batch_Q_to_Fp(r, num, den, k, p, i);
-    if(UNLIKELY(!ok)) {
-      /* Modular inverse did not exists, i.e., at least one of the factor base
-         entries was not coprime to den. Do factor base entries one at a time,
-         handling the non-coprime case properly. */
-      for (size_t j = 0; j < i; j++)
-        r[j] = compute_1_root_ul(p[j], num, den, k, neg);
-    } else if (!neg) {
-      /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
-         then the root is -g_0/g_1, and we need a sign flip. */
-      for (size_t j = 0; j < i; j++)
-        if (r[j] != 0)
-          r[j] =  p[j] - r[j];
-    }
+  const unsigned long k = mpz_scan1(f->coeff[1], 0);
+  mpz_t odd_den;
+  mpz_init(odd_den);
+  mpz_tdiv_q_2exp(odd_den, f->coeff[1], k);
+
+  if (f->deg == 1 && mpz_fits_ulong_p(f->coeff[0]) && mpz_fits_ulong_p(odd_den)) {
+    return transform_n_roots_ul(p, r, t, n, side, si);
+  } else if (0 && f->deg == 1 && 
+             mpz_sizeinbase(f->coeff[0], 2) >= MODREDC2UL2_MINBITS &&
+             mpz_sizeinbase(f->coeff[0], 2) <= MODREDC2UL2_MAXBITS &&
+             mpz_sizeinbase(f->coeff[1], 2) >= MODREDC2UL2_MINBITS &&
+             mpz_sizeinbase(f->coeff[1], 2) <= MODREDC2UL2_MAXBITS ) {
+    return transform_n_roots_2ul2(p, r, t, n, f->coeff[0], odd_den, k);
   } else {
     for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
       fbprime_t current_p = fb_iterator_get_p(t);
