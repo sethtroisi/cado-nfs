@@ -231,11 +231,11 @@ modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
   if (n == 0)
     return 1;
 
-  mod_set_ul(r[0], a[0], m);
+  mod_intset_ul(r[0], a[0]);
 
   mod_init_noset0(t, m);
   for (size_t i = 1; i < n; i++) {
-    mod_set_ul(t, a[i], m);
+    mod_intset_ul(t, a[i]);
     mod_mul(r[i], r[i-1], t, m);
   }
 
@@ -245,11 +245,14 @@ modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
 
   if (c != NULL) {
     mod_mul(R, R, c, m);
+  } else {
+    modredc2ul2_frommontgomery(R, R, m);
   }
+  modredc2ul2_frommontgomery(R, R, m);
 
   for (size_t i = n-1; i > 0; i--) {
     mod_mul(r[i], R, r[i-1], m);
-    mod_set_ul(t, a[i], m);
+    mod_intset_ul(t, a[i]);
     mod_mul(R, R, t, m);
   }
   mod_set(r[0], R, m);
