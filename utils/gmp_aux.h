@@ -39,6 +39,7 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 
 /* return the number of bits of p, counting from the least significant end */
 extern int nbits (uintmax_t p);
+extern long double mpz_get_ld (mpz_t z);
 
 
 #ifdef __cplusplus

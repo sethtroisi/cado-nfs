@@ -264,3 +264,19 @@ mpz_coprime_p (mpz_t a, mpz_t b)
   mpz_clear(g);
   return (ret == 0) ? 1 : 0;
 }
+
+long double
+mpz_get_ld (mpz_t z)
+{
+  long double ld;
+  double d;
+  mpz_t t;
+
+  d = mpz_get_d (z);
+  mpz_init (t);
+  mpz_set_d (t, d);
+  mpz_sub (t, z, t);
+  ld = (long double) d + (long double) mpz_get_d (t);
+  mpz_clear (t);
+  return ld;
+}
