@@ -268,12 +268,13 @@ modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
                            const unsigned long *p, const size_t n)
 {
   modulus_t m;
-  residue_t *tr, num_m;
+  residue_t *tr;
+  modint_t c;
   unsigned long rem_ul, ratio_ul;
   int rc = 1;
 
   mod_initmod_int(m, den);
-  mod_init_noset0(num_m, m);
+  mod_intinit(c);
 
   /* Compute ratio = floor(num / den), remainder = num % den. We assume that
     ratio fits into unsigned long, and abort if it does not. We need only the
@@ -288,8 +289,8 @@ modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
     ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
     ratio_ul = modredc2ul2_intget_ul(ratio);
     rem_ul = modredc2ul2_intget_ul(remainder);
-    mod_set_int_reduced(num_m, remainder, m);
-    mod_neg(num_m, num_m, m);
+    if (!mod_intequal_ul(remainder, 0))
+      mod_intsub(c, den, remainder); /* c = -remainder (mod den) */
     mod_intclear(ratio);
     mod_intclear(remainder);
   }
@@ -299,25 +300,20 @@ modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
     mod_init_noset0(tr[i], m);
   }
 
-  if (!modredc2ul2_batchinv_ul(tr, p, n, num_m, m)) {
+  if (!modredc2ul2_batchinv_ul(tr, p, n, c, m)) {
     rc = 0;
     goto clear_and_exit;
   }
 
   const unsigned long den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
-  modint_t tri;
-  mod_intinit(tri);
 
-  for (size_t i = 0; i < n; i++) {
-    /* Convert residue to smallest non-negative integer representative */
-    mod_get_int(tri, tr[i], m);
-    r[i] = ularith_post_process_inverse(mod_intget_ul(tri), p[i], rem_ul,
+  for (size_t i = 0; i < n; i++)
+    r[i] = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i], rem_ul,
                                         den_inv, ratio_ul, k);
-  }
-  mod_intclear(tri);
 
 clear_and_exit:
 
+  mod_intclear(c);
   for (size_t i = 0; i < n; i++) {
     mod_clear(tr[i], m);
   }
