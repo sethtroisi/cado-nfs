@@ -681,6 +681,20 @@ search_survivors_in_line(unsigned char * const restrict SS[2],
         const unsigned int j, const int N, j_div_srcptr j_div,
         const unsigned int td_max, unsieve_aux_data_srcptr us)
 {
+    /* In line j = 0, only the coordinate (i, j) = (-1, 0) may survive */
+    if (j == 0) {
+        const size_t I = (size_t) 1 << log_I;
+        const unsigned char s0 = SS[0][I / 2 - 1], s1 = SS[1][I / 2 - 1];
+        memset(SS[0], 255, I);
+        if (s0 <= bound[0] && s1 <= bound[1]) {
+            SS[0][I / 2 - 1] = s0;
+            SS[1][I / 2 - 1] = s1;
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
     unsieve_not_coprime_line(SS[0], j, td_max + 1, 1U<<log_I, us);
 
 #if defined(HAVE_SSE2) && USE_PATTERN_3
