@@ -153,7 +153,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
          
       if (!fake) {
         if (mpz_cmp_ui (t, 0) != 0) {
-          fprintf (stderr, "This polynomials have no common root mod N\n");
+          fprintf (stderr, "Given polynomials have no common root mod N:\n");
           polyprint (f, g, deg, N);
           exit (1);
         }
