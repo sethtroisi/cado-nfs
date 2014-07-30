@@ -136,11 +136,11 @@ MAYBE_UNUSED double_poly_sum(double_poly_ptr h, double_poly_srcptr f, double_pol
   }
 }
 
-/* Stores the substraction of g to f in h (h = f - g).
+/* Stores the subtraction of g to f in h (h = f - g).
    Assumes h has been initialized with degree at least MAX(f->deg, g->deg).
 */
 void
-double_poly_substract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
+double_poly_subtract(double_poly_ptr h, double_poly_srcptr f, double_poly_srcptr g)
 {
   size_t i;
   if (f->deg <= g->deg) {
