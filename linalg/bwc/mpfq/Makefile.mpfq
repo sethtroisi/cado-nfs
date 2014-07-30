@@ -17,7 +17,7 @@ basic:
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq.h .
 	/bin/cp -f $(MPFQ)/gfp/mpfq_gfp_common.h .
-	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift general_prefix=abase > mpfq_name_ab.h
+	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift > mpfq_name_ab.h
 
 .PHONY: mpfq-buildtree
 
@@ -48,30 +48,16 @@ prime-fields: mpfq-buildtree
 	# $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
 	/bin/cp -f $(MPFQ_TEMP)/include/fixmp*h .
 
+clean-mpfq_%:
+	-rm -f mpfq_$*.c
+	-rm -f mpfq_$*.h
+	-rm -f mpfq_$*_t.c
+	-rm -f mpfq_$*_t.h
 
-clean:
-	-rm -f abase_p16.c
-	-rm -f abase_p16.h
-	-rm -f abase_p16_t.c
-	-rm -f abase_p16_t.h
-	-rm -f abase_p_?.c
-	-rm -f abase_p_?.h
-	-rm -f abase_p_?_t.c
-	-rm -f abase_p_?_t.h
-	-rm -f abase_pz.c
-	-rm -f abase_pz.h
-	-rm -f abase_pz_t.c
-	-rm -f abase_pz_t.h
-	-rm -f abase_u64k1.c
-	-rm -f abase_u64k1.h
-	-rm -f abase_u64k1_t.c
-	-rm -f abase_u64k1_t.h
-	-rm -f abase_u64k2.c
-	-rm -f abase_u64k2.h
-	-rm -f abase_u64k2_t.c
-	-rm -f abase_u64k2_t.h
-	-rm -f abase_vbase.c
-	-rm -f abase_vbase.h
+
+clean:	$(patsubst %,clean-mpfq_%,$(mpfq_tag_list))
+	-rm -f mpfq_vbase.c
+	-rm -f mpfq_vbase.h
 	-rm -f binary-dotprods-backends.h
 	-rm -f mpfq.h
 	-rm -f mpfq_gfp_common.h

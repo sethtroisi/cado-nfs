@@ -22,27 +22,27 @@
 #define CPP_PAD2(A,B) A ## B
 #define MM_IMPL_MY_MAGIC(X) CPP_PAD2(MM_IMPL_MAGIC_,X)
 
-#if !defined(MM_ABASE)
-#error "Please compile this file with the MM_ABASE macro defined"
+#if !defined(MM_MPFQ_LAYER)
+#error "Please compile this file with the MM_MPFQ_LAYER macro defined"
 #endif
 
 /* Now some cpp glue which sets up the different options */
 #define MATMUL_NAME_INNER(abase, impl, func) matmul_ ## abase ## _ ## impl ## _ ## func
 #define MATMUL_NAME_INNER0(abase, impl, func) MATMUL_NAME_INNER(abase, impl, func)
-#define MATMUL_NAME(func) MATMUL_NAME_INNER0(MM_ABASE, MM_IMPL, func)
+#define MATMUL_NAME(func) MATMUL_NAME_INNER0(MM_MPFQ_LAYER, MM_IMPL, func)
 
 #define MATMUL_T(func) matmul_ ## func ## _t
 
 #define REBIND_F(mm, func) \
         mm->bind->func = (MATMUL_T(func)) & MATMUL_NAME(func)
 
-#define SET_IMPL_INNER(mm, abase_, impl_) do {  \
+#define SET_IMPL_INNER(mm, mpfq_, impl_) do {  \
     mm->bind->impl = # impl_ ;                  \
 } while (0)
 
-#define SET_IMPL_INNER0(mm, abase_, impl_) SET_IMPL_INNER(mm, abase_, impl_)
+#define SET_IMPL_INNER0(mm, mpfq_, impl_) SET_IMPL_INNER(mm, mpfq_, impl_)
 
-#define SET_IMPL(mm) SET_IMPL_INNER0(mm, MM_ABASE, MM_IMPL)
+#define SET_IMPL(mm) SET_IMPL_INNER0(mm, MM_MPFQ_LAYER, MM_IMPL)
 
 #define REBIND_ALL(mm) do {				\
         REBIND_F(mm, build_cache);		        \
