@@ -211,7 +211,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
 }
 
 unsigned int
-double_poly_compute_roots(double *roots, double_poly_ptr poly, double s)
+double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
 {
   const unsigned int d = poly->deg;
   double_poly_t *dg; /* derivatives of poly */
