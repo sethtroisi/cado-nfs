@@ -604,70 +604,83 @@ def optimize(f,g):
     R = f.parent()
     x = f.parent().gen()
     logmu0 = best_l2norm_tk_circular(f)
-    kt = kr0 = kr1 = kr2 = 1
     count = 0
+    kt = kr0 = kr1 = kr2 = 1
+    while best_l2norm_tk_circular(R(f+kr0*g)) == logmu0:
+       kr0 *= 2
+    while best_l2norm_tk_circular(R(f+kr1*x*g)) == logmu0:
+       kr1 *= 2
+    while best_l2norm_tk_circular(R(f+kr2*x^2*g)) == logmu0:
+       kr2 *= 2
+    while best_l2norm_tk_circular(R(f(x=x+kt))) == logmu0:
+       kt *= 2
     while count < 200:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False
-        # first try translation
+
+        # try translation by k
         f = f(x+kt)
         g = g(x+kt)
         logmu = best_l2norm_tk_circular(R(f))
-	if logmu < logmu0:
+        if logmu < logmu0:
             changedt = True
             logmu0 = logmu
         else:
             f = f(x-2*kt)
             g = g(x-2*kt)
-	    logmu = best_l2norm_tk_circular(R(f))
-	    if logmu < logmu0:
-	        changedt = True
-                logmu0 = logmu
-	    else:
-                f = f(x+kt)
-                g = g(x+kt)
+            logmu = best_l2norm_tk_circular(R(f))
+            if logmu < logmu0:
+               changedt = True
+               logmu0 = logmu
+            else:
+               f = f(x+kt)
+               g = g(x+kt)
+
         # try rotation by x^2*g
         f = f + kr2*x^2*g
         logmu = best_l2norm_tk_circular(R(f))
-	if logmu < logmu0:
+        if logmu < logmu0:
             changedr2 = True
             logmu0 = logmu
         else:
             f = f - 2*kr2*x^2*g
-	    logmu = best_l2norm_tk_circular(R(f))
-	    if logmu < logmu0:
-	        changedr2 = True
+            logmu = best_l2norm_tk_circular(R(f))
+            if logmu < logmu0:
+                changedr2 = True
                 logmu0 = logmu
-	    else:
+            else:
                 f = f + kr2*x^2*g
+
         # try rotation by x*g
         f = f + kr1*x*g
         logmu = best_l2norm_tk_circular(R(f))
-	if logmu < logmu0:
+        if logmu < logmu0:
             changedr1 = True
             logmu0 = logmu
         else:
             f = f - 2*kr1*x*g
-	    logmu = best_l2norm_tk_circular(R(f))
-	    if logmu < logmu0:
-	        changedr1 = True
+            logmu = best_l2norm_tk_circular(R(f))
+            if logmu < logmu0:
+                changedr1 = True
                 logmu0 = logmu
-	    else:
+            else:
                 f = f + kr1*x*g
+
         # try rotation by g
         f = f + kr0*g
         logmu = best_l2norm_tk_circular(R(f))
-	if logmu < logmu0:
+        if logmu < logmu0:
             changedr0 = True
             logmu0 = logmu
         else:
             f = f - 2*kr0*g
-	    logmu = best_l2norm_tk_circular(R(f))
-	    if logmu < logmu0:
-	        changedr0 = True
+            logmu = best_l2norm_tk_circular(R(f))
+            if logmu < logmu0:
+                changedr0 = True
                 logmu0 = logmu
-	    else:
+            else:
                 f = f + kr0*g
+
         if changedt == False and changedr2 == False and changedr1 == False and changedr0 == False and kt == 1 and kr2 == 1 and kr1 == 1 and kr0 == 1:
             break
         if changedt == True:
