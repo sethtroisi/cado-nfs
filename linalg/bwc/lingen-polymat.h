@@ -1,7 +1,7 @@
 #ifndef POLYMAT_H_
 #define POLYMAT_H_
 
-#include "abase.h"
+#include "mpfq_layer.h"
 
 /* This is used only for plingen. */
 

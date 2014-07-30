@@ -18,7 +18,7 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils.h"
-#include "abase.h"
+#include "mpfq_layer.h"
 #include "lingen-polymat.h"
 #include "lingen-matpoly.h"
 #include "lingen-bigpolymat.h"
