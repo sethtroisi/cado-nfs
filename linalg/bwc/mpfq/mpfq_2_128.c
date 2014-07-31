@@ -56,6 +56,7 @@ void mpfq_2_128_powz(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt y, mpfq_2_128_sr
             mpz_t zr;
             mpz_init(zr);
             mpz_t ppz;
+            mpz_init(ppz);
             mpfq_2_128_field_characteristic(k, ppz);
             mpz_pow_ui(ppz,ppz,mpfq_2_128_field_degree(k));
             mpz_sub_ui(ppz,ppz,1);

@@ -212,6 +212,31 @@ int main(int argc, char * argv[])
                 Kset (r2, a0);
                 });
 
+        DO_ONE_TEST("sub_ui(y) o set_ui(x) == set_mpz(x-y)", {
+                mpz_t z;
+                unsigned long x = gmp_urandomm_ui(rstate, 32);
+                unsigned long y = gmp_urandomm_ui(rstate, 32);
+                mpz_init_set_ui(z, x);
+                mpz_sub_ui(z, z, y);
+                Kset_ui(a1, x);
+                Ksub_ui(r1, a1, y);
+                Kset_mpz(r2, z);
+                mpz_clear(z);
+                });
+
+        DO_ONE_TEST("add_ui(y) o neg o set_ui(x) == set_mpz(y-x)", {
+                mpz_t z;
+                unsigned long x = gmp_urandomm_ui(rstate, 32);
+                unsigned long y = gmp_urandomm_ui(rstate, 32);
+                mpz_init_set_ui(z, y);
+                mpz_sub_ui(z, z, x);
+                Kset_ui(a1, x);
+                Kneg(a1, a1);
+                Kadd_ui(r1, a1, y);
+                Kset_mpz(r2, z);
+                mpz_clear(z);
+                });
+
         DO_ONE_TEST("add_ui o sub_ui = id", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -299,7 +324,7 @@ int main(int argc, char * argv[])
                 Kelt_ur_clear(&tmp);
                 Ksqr(r2, a0);
                 });
-#if 0
+        /* currently mpfq_pz does not have sqrt implemented */
 #ifndef VARIABLE_SIZE_PRIME
         DO_ONE_TEST("sqr o sqrt o sqr = sqr", {
                 Krandom2 (a0, rstate);
@@ -307,7 +332,6 @@ int main(int argc, char * argv[])
                 Ksqrt(r2, r1);
                 Ksqr(r2, r2);
                 });
-#endif
 #endif
         /*-----------------------------------------------------------*/
         /*          Tests specific to prime fields                   */
@@ -337,6 +361,24 @@ int main(int argc, char * argv[])
                 Kpowz(r2, a0, K->p);
                 });
 #endif
+        DO_ONE_TEST("x^(q-1) == 1/x", {
+                do { Krandom2(a0, rstate); } while (Kcmp_ui(a0,0) == 0);
+                mpz_t z;
+                mpz_init_set_si(z, -1);
+                Kpowz(r1, a0, z);
+                Kinv(r2, a0);
+                mpz_clear(z);
+                });
+        DO_ONE_TEST("x^(#K^2) == x", {
+                Krandom2 (a0, rstate);
+                mpz_t z;
+                mpz_init(z);
+                Kfield_characteristic(z);
+                mpz_pow_ui(z, z, Kfield_degree() * 2);
+                Kpowz(r1, a0, z);
+                Kset(r2, a0);
+                mpz_clear(z);
+                });
 #if 0
         DO_ONE_TEST("is_sqr o (mul(sqr,nsqr)) = false", {
                 do {
@@ -482,7 +524,6 @@ int main(int argc, char * argv[])
                 Kinv(r2, a0);
                 });
 
-#ifndef VARIABLE_SIZE_PRIME
         DO_ONE_TEST("sqrt linearity", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -492,7 +533,7 @@ int main(int argc, char * argv[])
                 Kadd (r1, a3, a4);
                 Ksqrt(r2, a2);
         });
-#endif
+
         DO_ONE_TEST("artin-schreier equation", {
                 Krandom2 (r1, rstate);
                 Ksqr(a1, r1);

@@ -432,9 +432,9 @@ MPI_Op mpfq_p_2_mpi_addition_op_ur(mpfq_p_2_dst_field);
 void mpfq_p_2_mpi_ops_clear(mpfq_p_2_dst_field);
 
 /* Object-oriented interface */
-void mpfq_p_2_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_2_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_p_2_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
