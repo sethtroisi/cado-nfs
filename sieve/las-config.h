@@ -47,7 +47,7 @@
    These are two initializations of the algebraics/rationnals.
    These 2 initializations compute F(i, const j)=f(i) for each line.
    f(i)=log2(abs(sum[k=0...d] Ak i^k)+1.)*scale+GUARD = [GUARD...254],
-   where Ak are the coefficients of the polynome.
+   where Ak are the coefficients of the polynomial.
 
    The classical initialization is slow; the only optimization is done
    by the fast computation of the log2. The associated error guarantees
@@ -58,11 +58,11 @@
    This initialization computes first the roots of F, F', F" which each defined
    a line which intercepts (0, 0.).
    For each j, the roots of f, f' and f" are computed : there are F, F', F" roots * j.
-   Because the absolute value, the roots of f have a neighbourhood unstable :
+   Because the absolute value, the roots of f have an unstable neighbourhood :
    f "bounces" on the horizontal axis.
-   The roots of f" have also a neighbourhood unstable (inflexion points of f).
-   The roots of f have a neighbourhood stable.
-   So, the neighbourhood of f(root(f)) and f(root(f")) are computed until
+   The roots of f" have also an unstable neighbourhood (inflexion points of f).
+   The roots of f have a stable neighbourhood.
+   So, the neighbourhoods of f(root(f)) and f(root(f")) are computed until
    on each side of the root there are SMART_NORM_STABILITY identical values,
    so until f has a local horizontal stability on the left and on the right of
    the root.
@@ -73,7 +73,7 @@
    reduced to a point (f(roots(f')); the lenght of the others is between 
    SMART_NORM_STABILITY * 2 + 1 and SMART_NORM_MAX_INFLUENCE * 2 + 1.
 
-   3 artificials roots are insered: -I/2 and (I/2)-1 as two roots of f' (two
+   3 artificials roots are inserted: -I/2 and (I/2)-1 as two roots of f' (two
    one-point segment), and 0.0 as a root of f, because near the neighbourhood of 0.
    f is very unstable.
 
