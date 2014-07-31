@@ -2917,12 +2917,11 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
 
 /* if use_rotation is non-zero, also use rotation */
 void
-optimize (mpz_poly_ptr f, mpz_t *g, const int verbose, const int use_rotation,
-          const int use_deg6_small_c3)
+optimize (mpz_poly_ptr f, mpz_t *g, const int verbose, const int use_rotation)
 {
   const int d = f->deg;
 
-  if (d == 6 && use_deg6_small_c3)
+  if (d == 6)
   {
     optimize_deg6 (f, g, verbose, use_rotation);
   }

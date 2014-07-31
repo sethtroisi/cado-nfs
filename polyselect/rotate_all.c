@@ -59,7 +59,7 @@ main (int argc, char **argv)
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (F, ALPHA_BOUND));
-    optimize (F, poly->rat->coeff, verbose - 1, 1, 1);
+    optimize (F, poly->rat->coeff, verbose - 1, 1);
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     
     printf ("After norm optimization:\n");
@@ -76,7 +76,7 @@ main (int argc, char **argv)
     mpz_neg (poly->rat->coeff[0], m);
     /* optimize again, but only translation */
     mpz_poly_fprintf (stdout, poly->rat);
-    optimize (F, poly->rat->coeff, verbose - 1, 0, 1);
+    optimize (F, poly->rat->coeff, verbose - 1, 0);
     poly->skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
