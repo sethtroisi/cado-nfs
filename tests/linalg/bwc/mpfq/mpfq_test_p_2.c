@@ -31,7 +31,7 @@ Kfield K;
 	do {								\
 	for(int i = 0 ; i < ntests ; i++) {				\
 		do { CODE } while (0);					\
-		if (Kvec_cmp(v1, v2, deg) == 0)				\
+		if (Kvec_cmp(v1, v2, length) == 0)				\
 			continue;					\
 		fprintf(stderr, "Test failed [" name "]/%d\n", i);	\
 		fprintf(stderr, "Seed is %lu, nb_tests is %d\n", seed, ntests);\
@@ -112,7 +112,7 @@ int main(int argc, char * argv[])
             quiet = 1;
             argc--;
             argv++;
-        } else 
+        } else
             usage();
     }
     if (argc > 1)
@@ -350,32 +350,35 @@ int main(int argc, char * argv[])
                 free(str);
                 if (!ret) abort();
                 });
-        /* Now do some I/O tests */
-        char * filename;
-        int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
-        if (rc < 0) abort();
-        FILE * f = fopen(filename, "w");
-        if (f == NULL) abort();
-        DO_ONE_TEST("fprint", {
-                Kset_ui(a0, i);
-                Kinv(a0, a0);
-                Kfprint(f, a0);
-                fprintf(f, "\n");
-                Kset_ui(r1, 1);
-                Kset(r2, r1);
-                });
-        fclose(f);
-        f = fopen(filename, "r");
-        if (f == NULL) abort();
-        DO_ONE_TEST("fscan", {
-                Kset_ui(a0, i);
-                Kfscan(f, a1);
-                Kinv(r1, a1);
-                Kset(r2, a0);
-                });
-        fclose(f);
-        unlink(filename);
-        free(filename);
+
+        {
+            /* Now do some I/O tests */
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            DO_ONE_TEST("fprint", {
+                    Kset_ui(a0, i);
+                    Kinv(a0, a0);
+                    Kfprint(f, a0);
+                    fprintf(f, "\n");
+                    Kset_ui(r1, 1);
+                    Kset(r2, r1);
+                    });
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            DO_ONE_TEST("fscan", {
+                    Kset_ui(a0, i);
+                    Kfscan(f, a1);
+                    Kinv(r1, a1);
+                    Kset(r2, a0);
+                    });
+            fclose(f);
+            unlink(filename);
+            free(filename);
+        }
 
         DO_ONE_TEST("mul by 3 = add o add", {
                 Krandom2 (a0, rstate);
@@ -384,7 +387,7 @@ int main(int argc, char * argv[])
                 Kadd (r2, a0, a0);
                 Kadd (r2, r2, a0);
                 });
-#ifndef EXTENSION_OF_GFP 
+#ifndef EXTENSION_OF_GFP
         DO_ONE_TEST("Fermat by pow", {
                 Krandom2 (a0, rstate);
                 Kset(r1, a0);
@@ -417,9 +420,9 @@ int main(int argc, char * argv[])
                 Ksqr(r1, a0);
                 Kmul(r1, r1, (Ksrc_elt)K->ts_info.z);
                 Kset_ui(r2, Kis_sqr(r1));
-                if (Kcmp_ui(r1, 0) == 0) 
+                if (Kcmp_ui(r1, 0) == 0)
                     Kset_ui(r1, 1);
-                else 
+                else
                     Kset_ui(r1, 0);
                 });
 
@@ -431,7 +434,7 @@ int main(int argc, char * argv[])
                 Ksqr(a0, a0);
                 Kset_ui(r2, Kis_sqr(a0));
                 });
-#endif        
+#endif
         DO_ONE_TEST("ur_add 500 times and reduce", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -452,7 +455,7 @@ int main(int argc, char * argv[])
                 Kmul(r2, a0, a1);
                 Kmul_ui(r2, r2, 500);
                 });
-        
+
         DO_ONE_TEST("ur_sub 500 times and reduce", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -660,62 +663,124 @@ int main(int argc, char * argv[])
         /*-----------------------------------------------------------*/
         /*          Tests related to vectors                         */
         /*-----------------------------------------------------------*/
-        const int deg=7;
-//        int test_deg;
-        Kvec_init(&v1, 2*deg);
-        Kvec_init(&v2, 2*deg);
-        Kvec_init(&w1, 2*deg);
-        Kvec_init(&w2, 2*deg);
-        Kvec_init(&w3, 2*deg);
-        Kvec_init(&w4, 2*deg);
+        const int length=7;
+//        int test_length;
+        Kvec_init(&v1, 2*length);
+        Kvec_init(&v2, 2*length);
+        Kvec_init(&w1, 2*length);
+        Kvec_init(&w2, 2*length);
+        Kvec_init(&w3, 2*length);
+        Kvec_init(&w4, 2*length);
         DO_ONE_TEST_VEC("vec_add commutativity", {
-                Kvec_random(w1, deg, rstate);
-                Kvec_random(w2, deg, rstate);
-                Kvec_add(v1, w1, w2, deg);
-                Kvec_add(v2, w2, w1, deg);
-//                test_deg = deg;
+                Kvec_random(w1, length, rstate);
+                Kvec_random(w2, length, rstate);
+                Kvec_add(v1, w1, w2, length);
+                Kvec_add(v2, w2, w1, length);
+//                test_length = length;
                 });
         DO_ONE_TEST_VEC("vec_add associativity", {
-                Kvec_random(w1, deg, rstate);
-                Kvec_random(w2, deg, rstate);
-                Kvec_random(w3, deg, rstate);
-                Kvec_add(v1, w1, w2, deg);
-                Kvec_add(v1, v1, w3, deg);
-                Kvec_add(v2, w2, w3, deg);
-                Kvec_add(v2, v2, w1, deg);
-//                test_deg = deg;
+                Kvec_random(w1, length, rstate);
+                Kvec_random(w2, length, rstate);
+                Kvec_random(w3, length, rstate);
+                Kvec_add(v1, w1, w2, length);
+                Kvec_add(v1, v1, w3, length);
+                Kvec_add(v2, w2, w3, length);
+                Kvec_add(v2, v2, w1, length);
+//                test_length = length;
                 });
         DO_ONE_TEST_VEC("vec linearity", {
                 Krandom2 (a0, rstate);
-                Kvec_random(w1, deg, rstate);
-                Kvec_random(w2, deg, rstate);
-                Kvec_scal_mul(v1, w1, a0, deg);
-                Kvec_scal_mul(v2, w2, a0, deg);
-                Kvec_add(v1, v1, v2, deg);
-                Kvec_add(w1, w1, w2, deg);
-                Kvec_scal_mul(v2, w1, a0, deg);
-//                test_deg = deg;
+                Kvec_random(w1, length, rstate);
+                Kvec_random(w2, length, rstate);
+                Kvec_scal_mul(v1, w1, a0, length);
+                Kvec_scal_mul(v2, w2, a0, length);
+                Kvec_add(v1, v1, v2, length);
+                Kvec_add(w1, w1, w2, length);
+                Kvec_scal_mul(v2, w1, a0, length);
+//                test_length = length;
                 });
         DO_ONE_TEST_VEC("vec_conv linearity", {
-                Kvec_random(w1, deg, rstate);
-                Kvec_random(w2, deg, rstate);
-                Kvec_random(w3, deg, rstate);
-                Kvec_add(w4, w2, w3, deg);
-                Kvec_conv(v1, w1, deg, w4, deg);
-                Kvec_conv(w4, w1, deg, w2, deg);
-                Kvec_conv(v2, w1, deg, w3, deg);
-                Kvec_add(v2, v2, w4, 2*deg-1);
-//                test_deg = 2*deg-1;
+                Kvec_random(w1, length, rstate);
+                Kvec_random(w2, length, rstate);
+                Kvec_random(w3, length, rstate);
+                Kvec_add(w4, w2, w3, length);
+                Kvec_conv(v1, w1, length, w4, length);
+                Kvec_conv(w4, w1, length, w2, length);
+                Kvec_conv(v2, w1, length, w3, length);
+                Kvec_add(v2, v2, w4, 2*length-1);
+//                test_length = 2*length-1;
                 });
-        Kvec_clear(&v1, 2*deg);
-        Kvec_clear(&v2, 2*deg);
-        Kvec_clear(&w1, 2*deg);
-        Kvec_clear(&w2, 2*deg);
-        Kvec_clear(&w3, 2*deg);
-        Kvec_clear(&w4, 2*deg);
+
+
+        DO_ONE_TEST("vec_sscan o vec_asprint = id", {
+                /* Do this for vectors of length i */
+                unsigned int cap = i < length ? i : length;
+                Kvec_random(w1, cap, rstate);
+                char * str;
+                Kvec_asprint(&str, w1, cap);
+                Kvec tvec;
+                unsigned int tlength = 0;
+                Kvec_init(&tvec, tlength);
+                Kvec_sscan(&tvec, &tlength, str);
+                if (tlength != (unsigned int) cap) abort();
+                Kvec_set(v1, w1, cap);
+                Kvec_set(v2, tvec, cap);
+                Kvec_clear(&tvec, tlength);
+                free(str);
+                });
+
+        {
+            /* Now do some I/O tests */
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-vec-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            DO_ONE_TEST("vec_fprint", {
+                    for(unsigned int j = 0 ; j < (unsigned int) length ; j++) {
+                        Kset_ui(a0, i * length + j);
+                        Kinv(a0, a0);
+                        Kset(Kvec_coeff_ptr(v1, j), a0);
+                    }
+                    Kvec_fprint(f, v1, length);
+                    fprintf(f, "\n");
+                    });
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            DO_ONE_TEST("vec_fscan", {
+                    for(unsigned int j = 0 ; j < (unsigned int) length ; j++) {
+                        Kset_ui(a0, i * length + j);
+                        Kinv(a0, a0);
+                        Kset(Kvec_coeff_ptr(v1, j), a0);
+                    }
+            Kvec tvec;
+                    unsigned int tlength = 0;
+                    Kvec_init(&tvec, tlength);
+                    Kvec_fscan(f, &tvec, &tlength);
+                    if (tlength != (unsigned int) length) abort();
+                    Kvec_set(v2, tvec, length);
+                    Kvec_clear(&tvec, tlength);
+                    });
+            fclose(f);
+            unlink(filename);
+            free(filename);
+        }
+
+        Kvec_clear(&v1, 2*length);
+        Kvec_clear(&v2, 2*length);
+        Kvec_clear(&w1, 2*length);
+        Kvec_clear(&w2, 2*length);
+        Kvec_clear(&w3, 2*length);
+        Kvec_clear(&w4, 2*length);
+
+
         /*-----------------------------------------------------------*/
         /*          Tests related to polynomials                     */
         /*-----------------------------------------------------------*/
+
+        const int deg = length - 1;
+
         Kpoly_init(p1, 2*deg);
         Kpoly_init(p2, 2*deg);
         Kpoly_init(q1, 2*deg);

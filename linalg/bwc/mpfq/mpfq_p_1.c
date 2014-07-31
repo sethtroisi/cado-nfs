@@ -291,7 +291,8 @@ int mpfq_p_1_asprint(mpfq_p_1_dst_field k, char * * pstr, mpfq_p_1_src_elt x)
         y[i]=x[i];
     }
     // allocate enough room for base 2 conversion.
-    *pstr = (char *)mpfq_malloc_check((size_x*64+1)*sizeof(char));
+    // mpn_get_str may produce one extra byte
+    *pstr = (char *)mpfq_malloc_check(size_x * 64 + 2);
     n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) y, size_x);
     for (i = 0; i < n; ++i)
         (*pstr)[i] += '0';
