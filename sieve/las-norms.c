@@ -487,7 +487,7 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_product (df_df, df, df);
     double_poly_derivative (ddf, df);
     double_poly_product (f_ddf, f, ddf);
-    double_poly_substract (d2f, f_ddf, df_df);
+    double_poly_subtract (d2f, f_ddf, df_df);
     
     /* The roots of F" are insered in roots */
     for (k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));

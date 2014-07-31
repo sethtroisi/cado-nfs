@@ -1,7 +1,7 @@
 #ifndef MATMUL_SUB_LARGE_FBI_H_
 #define MATMUL_SUB_LARGE_FBI_H_
 
-#include "abase.h"
+#include "mpfq_layer.h"
 
 #ifdef __cplusplus
 extern "C" {

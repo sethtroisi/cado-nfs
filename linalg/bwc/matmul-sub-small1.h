@@ -1,7 +1,7 @@
 #ifndef MATMUL_SUB_SMALL1_H_
 #define MATMUL_SUB_SMALL1_H_
 
-#include "abase.h"
+#include "mpfq_layer.h"
 
 #ifdef __cplusplus
 extern "C" {

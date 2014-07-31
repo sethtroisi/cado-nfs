@@ -9,7 +9,7 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/abase_vbase.h"
+#include "mpfq/mpfq_vbase.h"
 #include "portability.h"
 
 /*
@@ -20,7 +20,7 @@ static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsig
     mmt_wiring_ptr mcol = mmt->wr[d];
     pi_wiring_ptr picol = mmt->pi->wr[d];
     int shared = mcol->v->flags & THREAD_SHARED_VECTOR;
-    abase_vbase_ptr A = mcol->v->abase;
+    mpfq_vbase_ptr A = mcol->v->abase;
     if (!shared || picol->trank == 0) {
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
         for(int j = 0 ; j < m ; j++) {
@@ -107,8 +107,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     param_list_parse_mpz(pl, "prime", p);
     int withcoeffs = mpz_cmp_ui(p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
-    abase_vbase A;
-    abase_vbase_oo_field_init_byfeatures(A, 
+    mpfq_vbase A;
+    mpfq_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
