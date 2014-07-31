@@ -68,7 +68,7 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 {
   double s;
 
-  for(;;) {
+  for(int n = 0 ; ; n++) {
 #if defined(__i386)
       /* See comment in utils/usp.c on this. We want to avoid comparison
        * involving an extended precision double ! */
@@ -76,13 +76,59 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 #else
       s = (a + b) * 0.5;
 #endif
-      if (s == a || s == b) return s;
+      if (s == a || s == b) { printf("%d\n", n); return s; }
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
   }
   return s;
+}
+
+/* assuming g(a)*g(b) < 0, and g has a single root in [a, b],
+   refines that root by the weighted false position method
+   Assumes sa is of same sign as g(a).
+*/
+double
+double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
+{
+  double pb;
+  int side=0;
+
+  pb = double_poly_eval(p, b);
+
+  for(int n = 0 ; ; n++) {
+      double s, middle;
+#if defined(__i386)
+      /* See above */
+      { volatile double ms = (a*pb-b*pa)/(pb-pa); s = ms; }
+      { volatile double ms = (a + b) * 0.5; middle = ms; }
+#else
+      s = (a*pb-b*pa)/(pb-pa);
+      middle = (a + b) * 0.5;
+#endif
+      /* It may happen that because of overflow, (a*pb-b*pa)/(pb-pa)
+       * reaches s==a or s==b too early. If it so happens that we're
+       * doing this, while the middle cut doesn't behave this way, use
+       * the middle cut instead.
+       *
+       * Note that almost by design, this countermeasure also cancels
+       * some of the benefit of the false position method.
+       */
+      if (s < a || s > b || ((s == a || s == b) && !(middle == a || middle == b)))
+          s = middle;
+      if (s == a || s == b) { printf("%d\n", n); return s; }
+      double ps = double_poly_eval (p, s);
+      if (ps * pa > 0) {
+          a = s; pa = ps;
+          if (side==1) pb /= 2;
+          side=1;
+      } else {
+          b = s; pb = ps;
+          if (side==-1) pa /= 2;
+          side=-1;
+      }
+  }
 }
 
 /* Stores the derivative of f in df. Assumes df different from f.
@@ -206,7 +252,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
           const double b = (l < sign_changes) ? roots[l] : s;
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
-            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
+            roots[new_sign_changes++] = double_poly_falseposition (poly, a, b, va);
           a = b;
           va = vb;
         }
