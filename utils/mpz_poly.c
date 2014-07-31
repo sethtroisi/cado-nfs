@@ -388,13 +388,10 @@ void mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
       gmp_fprintf (fp, "%Zd\n", f->coeff[0]);
       return;
     }
-  gmp_fprintf (fp, "%Zd", f->coeff[0]);
-  for (i = 1; i <= f->deg; ++i)
-    if (mpz_sgn (f->coeff[i]) >= 0)
-      gmp_fprintf (fp, "+%Zd*x^%d", f->coeff[i], i);
-    else
-      gmp_fprintf (fp, "%Zd*x^%d", f->coeff[i], i);
-  printf ("\n");
+  gmp_fprintf (fp, "%Zd + ", f->coeff[0]);
+  for (i = 1; i < f->deg; ++i)
+    gmp_fprintf (fp, "%Zd*x^%d + ", f->coeff[i], i);
+  gmp_fprintf (fp, "%Zd*x^%d\n", f->coeff[f->deg], f->deg);
 }
 
 /* -------------------------------------------------------------------------- */
