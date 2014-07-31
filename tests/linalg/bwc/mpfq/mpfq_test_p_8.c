@@ -214,8 +214,8 @@ int main(int argc, char * argv[])
 
         DO_ONE_TEST("sub_ui(y) o set_ui(x) == set_mpz(x-y)", {
                 mpz_t z;
-                unsigned long x = gmp_urandomm_ui(rstate, 32);
-                unsigned long y = gmp_urandomm_ui(rstate, 32);
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                unsigned long y = gmp_urandomb_ui(rstate, 32);
                 mpz_init_set_ui(z, x);
                 mpz_sub_ui(z, z, y);
                 Kset_ui(a1, x);
@@ -226,8 +226,8 @@ int main(int argc, char * argv[])
 
         DO_ONE_TEST("add_ui(y) o neg o set_ui(x) == set_mpz(y-x)", {
                 mpz_t z;
-                unsigned long x = gmp_urandomm_ui(rstate, 32);
-                unsigned long y = gmp_urandomm_ui(rstate, 32);
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                unsigned long y = gmp_urandomb_ui(rstate, 32);
                 mpz_init_set_ui(z, y);
                 mpz_sub_ui(z, z, x);
                 Kset_ui(a1, x);
@@ -328,6 +328,8 @@ int main(int argc, char * argv[])
 #ifndef VARIABLE_SIZE_PRIME
         DO_ONE_TEST("sqr o sqrt o sqr = sqr", {
                 Krandom2 (a0, rstate);
+                /* force testing x==0 at least once ! */
+                if (i == 0) Kset_ui (a0, 0);
                 Ksqr(r1, a0);
                 Ksqrt(r2, r1);
                 Ksqr(r2, r2);
@@ -339,6 +341,8 @@ int main(int argc, char * argv[])
 #ifndef CHAR2
         DO_ONE_TEST("sscan o asprint = id", {
                 Krandom2 (a0, rstate);
+                /* force testing x==0 at least once ! */
+                if (i == 0) Kset_ui (a0, 0);
                 char *str;
                 Kset(r1, a0);
                 Kasprint(&str, a0);
@@ -346,6 +350,32 @@ int main(int argc, char * argv[])
                 free(str);
                 if (!ret) abort();
                 });
+        /* Now do some I/O tests */
+        char * filename;
+        int rc = asprintf(&filename, "/tmp/mpfq-test.%lu", gmp_urandomb_ui(rstate, 32));
+        if (rc < 0) abort();
+        FILE * f = fopen(filename, "w");
+        if (f == NULL) abort();
+        DO_ONE_TEST("fprint", {
+                Kset_ui(a0, i);
+                Kinv(a0, a0);
+                Kfprint(f, a0);
+                fprintf(f, "\n");
+                Kset_ui(r1, 1);
+                Kset(r2, r1);
+                });
+        fclose(f);
+        f = fopen(filename, "r");
+        if (f == NULL) abort();
+        DO_ONE_TEST("fscan", {
+                Kset_ui(a0, i);
+                Kfscan(f, a1);
+                Kinv(r1, a1);
+                Kset(r2, a0);
+                });
+        fclose(f);
+        unlink(filename);
+        free(filename);
 
         DO_ONE_TEST("mul by 3 = add o add", {
                 Krandom2 (a0, rstate);

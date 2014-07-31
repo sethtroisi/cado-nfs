@@ -8782,8 +8782,8 @@ invmod_1(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) {
   b = *p;
 
   if (a == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_1\n");
-    exit(1);
+    *z=0;
+    return 0;
   }
       
 
@@ -8846,8 +8846,8 @@ invmod_2(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_2(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_2\n");
-    exit(1);
+    memset(res, 0, 2 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_2(fix, b, u);
@@ -8962,8 +8962,8 @@ invmod_3(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_3(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_3\n");
-    exit(1);
+    memset(res, 0, 3 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_3(fix, b, u);
@@ -9078,8 +9078,8 @@ invmod_4(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_4(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_4\n");
-    exit(1);
+    memset(res, 0, 4 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_4(fix, b, u);
@@ -9194,8 +9194,8 @@ invmod_5(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_5(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_5\n");
-    exit(1);
+    memset(res, 0, 5 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_5(fix, b, u);
@@ -9310,8 +9310,8 @@ invmod_6(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_6(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_6\n");
-    exit(1);
+    memset(res, 0, 6 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_6(fix, b, u);
@@ -9426,8 +9426,8 @@ invmod_7(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_7(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_7\n");
-    exit(1);
+    memset(res, 0, 7 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_7(fix, b, u);
@@ -9542,8 +9542,8 @@ invmod_8(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_8(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_8\n");
-    exit(1);
+    memset(res, 0, 8 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_8(fix, b, u);
@@ -9658,8 +9658,8 @@ invmod_9(mp_limb_t *res, const mp_limb_t *x, const mp_limb_t *p) {
   }
   
   if (cmp_9(a, v) == 0) {
-    fprintf(stderr, "Error, division by zero in invmod_9\n");
-    exit(1);
+    memset(res, 0, 9 * sizeof(mp_limb_t));
+    return 0;
   }
 
   add_9(fix, b, u);
