@@ -68,15 +68,14 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 {
   double s;
 
-  do
-    {
+  for(;;) {
       s = (a + b) * 0.5;
+      if (s == a || s == b) return s;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
-    }
-  while (s != a && s != b);
+  }
   return s;
 }
 
