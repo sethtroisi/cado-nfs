@@ -3,11 +3,28 @@
 #define MAX_LOGI 16      /* MIN_LOGI <= logi <= MAX_LOGI && MAX_LOGI <= LOG_BUCKET_REGION */
 #define MAX_DEGREE 10    /* All degree between 0 and MAX_DEGREE included are tested */
 
-#define MAX_SMART_ERR 8            /* The error in smart algo must be <=, always. */
-#define TOLERATE_MAX_SMART_ERR 4   /* The error in smart algo COULD be > ... */
-#define MAX_RELATIVE_ERROR 1000000 /* ... but only for 1 value on MAX_RELATIVE_ERROR values. */
+#define MAX_EXACT_ERR 1  /* The error in "exact" algo must be <= */
 
-#define MAX_EXACT_ERR 2  /* The error in "exact" algo must be <= */
+/* From -MAX_SMART_ERR to MAX_SMART_ERR : maximal relative errors. 
+ * NB: the positive error (the real result is minored) is more acceptable than negative.
+ * With :
+ * #define SMART_NORM_STABILITY 3
+ * #define SMART_NORM_INFLUENCE 10
+ * #define SMART_NORM_LENGTH    8
+ * #define SMART_NORM_DISTANCE  1.
+ * The errors for 400'000 iterations / 2'018'500'880'000 values or errors are :
+ * No difference: 74.969%
+ * Difference  1: Negative (bad):  3.372% (68061439358); Positive (acceptable): 20.146% (406645683871)
+ * Difference  2: Negative (bad):  0.059% ( 1197061462); Positive (acceptable):  1.454% ( 29349868648)
+ * Difference  3: Negative (bad):  0.000% (          0); Positive (acceptable):  0.000% (     2168278)
+ *
+ * The smart_err_max must be adapted if you choose another SMART_NORM_* define values in las-config.h
+ */
+#define MAX_SMART_ERR 5  /* The error in smart algo must be <= */
+static const double smart_err_max[(MAX_SMART_ERR<<1)+1] = {
+  1E-12, 1E-10, 1E-8, .0009, .06,
+  1.,
+  .25, 0.022, 0.000005, 1E-8, 1E-10 };
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -42,7 +59,7 @@ main(int argc, const char *argv[]) {
   double_poly_t poly;
   unsigned long long count, smart_err[(MAX_SMART_ERR<<1)+1], exact_err[(MAX_EXACT_ERR<<1)+1];
   unsigned long iter = NB_TESTS;
-  unsigned long long smart_errors = 0;
+  int smart_err_found = 0;
   
   tests_common_cmdline (&argc, &argv, PARSE_SEED | PARSE_ITER | PARSE_VERBOSE);
   tests_common_get_iter (&iter);
@@ -69,7 +86,6 @@ main(int argc, const char *argv[]) {
 	  poly->coeff[l] = (double) random_int64 () * (double) random_int64 ();
 	  if (UNLIKELY(poly->coeff[l] == 0.)) ++l; /* coef must be != 0. */
 	}
-
 	endJ = (LOG_BUCKET_REGION - logI);
 	J >>= endJ;                 /* In order to be able to compute a complete region */
 	log2max = log2(fabs(get_maxnorm_alg (poly, didiv2, didiv2) + 1.));
@@ -122,17 +138,14 @@ main(int argc, const char *argv[]) {
 	    exit (EXIT_FAILURE);
 	  }
 	  exact_err[test_exact_algo + MAX_EXACT_ERR]++;
-
+	  
 	  test_smart_algo = S3[l] - S1[l];
-	  if (UNLIKELY(abs(test_smart_algo) > TOLERATE_MAX_SMART_ERR)) {
-	    if (UNLIKELY(abs(test_smart_algo) > MAX_SMART_ERR)) {
-	      fprintf (stderr, 
-		       "code BUG(): the condition abs(test_smart_algo) <= MAX_SMART_ERR failed!\n"
-		       "test_smart_algo=%d, maximal error accepted in smart algorithm = %u\n",
-		       test_smart_algo, MAX_SMART_ERR);
-	      exit (EXIT_FAILURE);
-	    }
-	    smart_errors++;
+	  if (UNLIKELY(abs(test_smart_algo) > MAX_SMART_ERR)) {
+	    fprintf (stderr, 
+		     "code BUG(): the condition abs(test_smart_algo) <= MAX_SMART_ERR failed!\n"
+		     "test_smart_algo=%d, maximal error accepted in smart algorithm = %u\n",
+		     test_smart_algo, MAX_SMART_ERR);
+	    exit (EXIT_FAILURE);
 	  }
 	  smart_err[test_smart_algo + MAX_SMART_ERR]++;
 	}
@@ -142,12 +155,16 @@ main(int argc, const char *argv[]) {
   free(S1); free(S2); free (S3);
 
   count = (MAX_LOGI - MIN_LOGI + 1) * (MAX_DEGREE + 1) * (unsigned long long) (iter << LOG_BUCKET_REGION);
-  if (smart_errors * MAX_RELATIVE_ERROR > count) {
-    fprintf (stderr, 
-	     "code BUG(): too many tolerate errors (%llu errors for\n"
-	     "%llu values) in the smart initialization algorithm : %llu errors.\n"
-	     "NB: %u < tolerate errors <= %u\n",
-	     count / MAX_RELATIVE_ERROR, count, smart_errors, TOLERATE_MAX_SMART_ERR, MAX_SMART_ERR);
+
+  for (unsigned int i = 0; i < (MAX_SMART_ERR<<1)+1; i++)
+    smart_err_found |= (smart_err[i] >= smart_err_max[i] * count);
+
+  if (smart_err_found) {
+    fprintf (stderr,  "code BUG(): at least one of the smart relative tolerate errors are too high.\n"
+	     "For %llu values, the differences between the smart and the exact values are :\n", count);
+    for (unsigned int i = 0; i < (MAX_SMART_ERR<<1)+1; i++)
+      fprintf (stderr, "   Difference %2d: found %10llu, max accepted %10llu (%'10llu per billon of values)\n",
+	       i - (int) MAX_SMART_ERR, smart_err[i], (unsigned long long) (count * smart_err_max[i]),(unsigned long long) (smart_err_max[i] * 1E9));
     exit (EXIT_FAILURE);
   }
   
