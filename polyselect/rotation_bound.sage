@@ -606,14 +606,15 @@ def optimize(f,g):
     logmu0 = best_l2norm_tk_circular(f)
     count = 0
     kt = kr0 = kr1 = kr2 = 1
-    while best_l2norm_tk_circular(R(f+kr0*g)) == logmu0:
+    while best_l2norm_tk_circular(R(f+kr0*g)) <= logmu0 + 0.001:
        kr0 *= 2
-    while best_l2norm_tk_circular(R(f+kr1*x*g)) == logmu0:
+    while best_l2norm_tk_circular(R(f+kr1*x*g)) <= logmu0 + 0.001:
        kr1 *= 2
-    while best_l2norm_tk_circular(R(f+kr2*x^2*g)) == logmu0:
+    while best_l2norm_tk_circular(R(f+kr2*x^2*g)) <= logmu0 + 0.001:
        kr2 *= 2
-    while best_l2norm_tk_circular(R(f(x=x+kt))) == logmu0:
+    while best_l2norm_tk_circular(R(f(x=x+kt))) <= logmu0 + 0.001:
        kt *= 2
+    print "kr0=", kr0, "kr1=", kr1, "kr2=", kr2, "kt=", kt
     while count < 200:
         count += 1
         changedt = changedr2 = changedr1 = changedr0 = False
