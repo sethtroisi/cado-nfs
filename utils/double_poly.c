@@ -64,19 +64,18 @@ double_poly_eval (double_poly_srcptr p, const double x)
 */
 double
 double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
-                       unsigned int n MAYBE_UNUSED)
+                       unsigned int n)
 {
   double s;
 
-  for(;;) {
+  do {
       s = (a + b) * 0.5;
-      if (s == a || s == b) return s;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
-  }
-  return s;
+  } while (n-- > 0);
+  return (a + b) * 0.5;
 }
 
 /* Stores the derivative of f in df. Assumes df different from f.
@@ -200,7 +199,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
           const double b = (l < sign_changes) ? roots[l] : s;
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
-            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
+            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 40);
           a = b;
           va = vb;
         }
