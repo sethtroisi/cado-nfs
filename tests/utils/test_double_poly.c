@@ -66,8 +66,6 @@ test_double_poly_compute_roots1(const char *poly_str, const char *roots_str,
   if (nr_roots != (int) roots1->deg + 1) {
     fprintf (stderr, "double_poly_compute_roots() produced wrong number of roots %d, reference has %d\n",
              nr_roots, roots1->deg + 1);
-    double_poly_print (stderr, poly, "Polynomial was: ");
-    fprintf (stderr, "bound is s=%.16e\n", s);
     abort();
   }
   for (i = 0; i < nr_roots; i++) {
@@ -112,8 +110,7 @@ test_double_poly_compute_roots(const int verbose)
   
   /* this is f(x-2). 6 real roots, 0 rational */
   test_double_poly_compute_roots1("1, -21, 70, -84, 45, -11, 1", "0.0581163651478959 0.502978503657798 1.29079022591493 2.24107336051065 3.13612949346231 3.77091205130642", 1e-6, 4., verbose);
-
-  test_double_poly_compute_roots1 ("37718991555021708231785218373859670336563892134301066596876783017325698882362933248 -58290863912589135997939905826055669574526326226812326870330700385351723122688 4974019329969663881845375223408004510305936664806589566321472066027520 0 -2765086156017059372041966183496747450660061680253272064 17192931019341412634837118288585351300728750080 3396573496846254368813196771328", "687391.0 1.1967277e7 4.2033871e7 1.48782523e8", 10.0, 9007199254740992.0, verbose);
+  
 }
 
 void

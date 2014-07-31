@@ -68,13 +68,15 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 {
   double s;
 
-  do {
+  do
+    {
       s = (a + b) * 0.5;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
-  } while (n-- > 0);
+    }
+  while (n-- > 0);
   return (a + b) * 0.5;
 }
 
@@ -199,7 +201,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
           const double b = (l < sign_changes) ? roots[l] : s;
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
-            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 40);
+            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
           a = b;
           va = vb;
         }
@@ -208,39 +210,6 @@ recurse_roots(double_poly_srcptr poly, double *roots,
   return new_sign_changes;
 }
 
-/* Return a bound on the positive roots of p.
-   Assume the leading coefficient of p is positive, then for a positive root
-   r we have
-   p[d]*r^d + ... + p[1]*r + p[0] = 0 thus
-   p[d]*r^d <= -p[d-1]*r^(d-1) - ... - p[1]*r - p[0]
-            <= max(-p[d-1],0)*r^(d-1) + ... + max(-p[1],0)*r + max(-p[0],0)
-   thus q(r) <= 0 where q is the degree-d polynomial formed from p as follows:
-   * q[d] = p[d]
-   * q[i] = p[i] if p[i] < 0, and 0 otherwise for 0 <= i < d.
-   Since q has a unique positive root, say r0, and q(r) < 0 iff r < r0,
-   then positive roots of p are bounded by r0.
-*/
-double
-double_poly_bound_roots (double_poly_srcptr p)
-{
-  unsigned int d = p->deg, i;
-  double_poly_t q;
-  double s;
-
-  s = p->coeff[d] > 0 ? 1.0 : -1.0;
-  double_poly_init (q, d);
-  for (i = 0; i < d; i++)
-    q->coeff[i] = (s * p->coeff[i] < 0) ? s * p->coeff[i] : 0.0;
-  q->coeff[d] = fabs (p->coeff[d]);
-  s = 1.0;
-  while (double_poly_eval (q, s) < 0)
-    s = s + s;
-  double_poly_clear (q);
-  return s;
-}
-
-/* put in roots[0], roots[1], ..., roots[k-1] all k roots of poly in [0, s],
-   and return the number k of roots */
 unsigned int
 double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
 {

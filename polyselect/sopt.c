@@ -173,7 +173,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       if (translate)
         optimize_aux (F, g, 0, 0);
       else
-        optimize (F, g, 0, 1);
+        optimize (F, g, 0, 1, 1);
 
       /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);

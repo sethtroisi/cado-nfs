@@ -372,7 +372,7 @@ ropt_on_msievepoly ( FILE *file,
     print_poly_fg (F, poly->g, poly->n, 1);
 
     /* optimize size */
-    optimize (F, poly->g, 0, 1);
+    optimize (F, poly->g, 0, 1, 1);
 
     /* skip or do ropt */
     if (param->skip_ropt || param->skip_ropt2) {
