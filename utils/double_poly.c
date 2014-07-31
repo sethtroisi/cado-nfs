@@ -93,6 +93,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 
   for(;;) {
       double s = (a*pb-b*pa)/(pb-pa);
+      if (s < a || s > b) s = .5*(a+b);
       if (s == a || s == b) return s;
       double ps = double_poly_eval (p, s);
       if (ps * pa > 0) {
