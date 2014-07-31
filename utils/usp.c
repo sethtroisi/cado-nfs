@@ -600,14 +600,14 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
     if (sa >= 0.)
       while (--count) {
 	c = (a + b) * .5;
-	if (fabs(a - b) <= precision) break;
+	if (fabs(a - b) <= precision || c == a || c == b) break;
 	sc = double_poly_eval (q, c);
 	if (sc < 0.) b = c; else a = c;
       }
     else
       while (--count) {
 	c = (a + b) * .5;
-	if (fabs(a - b) <= precision) break;
+	if (fabs(a - b) <= precision || c == a || c == b) break;
 	sc = double_poly_eval (q, c);
 	if (sc < 0.) a = c; else b = c;
       }
@@ -635,6 +635,7 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
 	if (sc < 0.) a = c; else b = c;
       }
   if (UNLIKELY(!count)) {
+    printf ("Unable to refine root:\n");
     mpz_poly_fprintf (stdout, P);
     printf ("a=%.16e\n", ldexp (mpz_get_d (r[0].a), -r[0].ka));
     printf ("b=%.16e\n", ldexp (mpz_get_d (r[0].b), -r[0].kb));
