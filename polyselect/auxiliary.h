@@ -74,7 +74,7 @@ long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int);
 double rotate (mpz_poly_ptr, unsigned long, mpz_t, mpz_t, long*, long*, int,
                int);
-void optimize (mpz_poly_ptr, mpz_t*, int, int, int);
+void optimize (mpz_poly_ptr, mpz_t*, int, int);
 void optimize_lll (mpz_poly_ptr, mpz_t*, int);
 void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation);
 void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose);
