@@ -1,7 +1,7 @@
 #ifndef BIGPOLYMAT_H_
 #define BIGPOLYMAT_H_
 
-#include "mpfq_layer.h"
+#include "abase.h"
 #include "lingen-polymat.h"
 
 #include "select_mpi.h"

@@ -9,7 +9,7 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 #include "portability.h"
 
 /*
@@ -41,8 +41,8 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     param_list_parse_mpz(pl, "prime", p);
     int withcoeffs = mpz_cmp_ui(p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
-    mpfq_vbase A;
-    mpfq_vbase_oo_field_init_byfeatures(A, 
+    abase_vbase A;
+    abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
@@ -145,7 +145,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     size_t stride = abbytes(mmt->abase, 1);
     ASSERT_ALWAYS((mrow->v->flags & THREAD_SHARED_VECTOR) == 0);
     if (pirow->trank == 0 && pirow->jrank == 0) {
-        mpfq_generic_copy(stride, mmt->wr[!bw->dir]->v->v, oldv[!bw->dir]->v, mmt->wr[!bw->dir]->i1 - mmt->wr[!bw->dir]->i0);
+        abase_generic_copy(stride, mmt->wr[!bw->dir]->v->v, oldv[!bw->dir]->v, mmt->wr[!bw->dir]->i1 - mmt->wr[!bw->dir]->i0);
     }
     serialize_threads(mmt->pi->m);
 

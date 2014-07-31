@@ -11,7 +11,7 @@
 #include "params.h"
 #include "balancing.h"
 #include "misc.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 
 /* Don't touch this. */
 #define CONJUGATED_PERMUTATIONS
@@ -57,7 +57,7 @@
 // vectors, never used as destination), and in some cases not.
 
 struct mmt_vec_s {
-    mpfq_vbase_ptr abase;
+    abase_vbase_ptr abase;
     size_t stride;      // shorcut to this->abase->vec_elt_stride(this->abase,1)
     void * v;
     void * * all_v;
@@ -145,7 +145,7 @@ struct matmul_top_data_s {
 
     matmul_ptr mm;
 
-    mpfq_vbase_ptr abase;
+    abase_vbase_ptr abase;
 
     int io_truncate;
 };
@@ -167,7 +167,7 @@ extern "C" {
 #endif
 
 extern void matmul_top_init(matmul_top_data_ptr mmt,
-        mpfq_vbase_ptr abase,
+        abase_vbase_ptr abase,
         parallelizing_info_ptr pi,
         int const * flags,
         param_list pl,
@@ -220,7 +220,7 @@ extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
  * vector defined in the mmt data for the given direction flag. */
 
 
-extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, mmt_vec_ptr v, int d, int flags);
+extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, abase_vbase_ptr abase, mmt_vec_ptr v, int d, int flags);
 extern void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d);
 #if 0
 extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_vec_ptr v, int d);
@@ -229,7 +229,7 @@ extern void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr 
 extern void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 
 /* These two do not really belong here, but come as a useful complement */
-extern void vec_init_generic(pi_wiring_ptr, mpfq_vbase_ptr, mmt_vec_ptr, int, unsigned int);
+extern void vec_init_generic(pi_wiring_ptr, abase_vbase_ptr, mmt_vec_ptr, int, unsigned int);
 extern void vec_clear_generic(pi_wiring_ptr, mmt_vec_ptr, unsigned int);
 
 /* we should refrain from exposing these. At least for mksol,

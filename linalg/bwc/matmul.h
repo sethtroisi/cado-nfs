@@ -7,7 +7,7 @@
 /* This header is common to the different matrix product implementations
  */
 #include "params.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 #include "raw_matrix_u32.h"
 
 struct matmul_public_s;
@@ -87,9 +87,9 @@ extern "C" {
 #endif
 
 /* This is defined only in the low-level code (e.g. matmul-bucket.cpp) */
-extern const char * matmul_mpfq_name();
+extern const char * matmul_abase_name();
 
-extern matmul_ptr matmul_init(mpfq_vbase_ptr, unsigned int, unsigned int, const char * locfile, const char * impl, param_list pl, int);
+extern matmul_ptr matmul_init(abase_vbase_ptr, unsigned int, unsigned int, const char * locfile, const char * impl, param_list pl, int);
 
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */

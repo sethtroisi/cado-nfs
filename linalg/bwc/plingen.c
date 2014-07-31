@@ -21,7 +21,7 @@
 #include "portability.h"
 #include "macros.h"
 #include "utils.h"
-#include "mpfq_layer.h"
+#include "abase.h"
 #include "memusage.h"
 #include "lingen-matpoly.h"
 

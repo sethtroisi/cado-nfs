@@ -1,7 +1,7 @@
 #ifndef BIGMATPOLY_H_
 #define BIGMATPOLY_H_
 
-#include "mpfq_layer.h"
+#include "abase.h"
 #include "lingen-matpoly.h"
 
 #include "select_mpi.h"

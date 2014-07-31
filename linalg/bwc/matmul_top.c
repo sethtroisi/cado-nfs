@@ -27,7 +27,7 @@
  */
 #define USE_ALTERNATIVE_REDUCE_SCATTER
 
-#define PADD(P, n)      mpfq_generic_ptr_add(P, n)
+#define PADD(P, n)      abase_generic_ptr_add(P, n)
 
 
 ///////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@
 
 
 /* {{{ vector init/clear (generic low-level interface) */
-void vec_init_generic(pi_wiring_ptr picol, mpfq_vbase_ptr abase, mmt_vec_ptr v, int flags, unsigned int n)
+void vec_init_generic(pi_wiring_ptr picol, abase_vbase_ptr abase, mmt_vec_ptr v, int flags, unsigned int n)
 {
     v->abase = abase;
     v->stride = v->abase->vec_elt_stride(v->abase, 1);
@@ -104,7 +104,7 @@ void vec_clear_generic(pi_wiring_ptr picol, mmt_vec_ptr v, unsigned int n MAYBE_
 }
 /*}}}*/
 /* {{{ vector init/clear (still generic, but for usual-size vectors) */
-void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, mpfq_vbase_ptr abase, mmt_vec_ptr v, int d, int flags)
+void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, abase_vbase_ptr abase, mmt_vec_ptr v, int d, int flags)
 {
     if (v == NULL) v = mmt->wr[d]->v;
     if (abase == NULL) abase = mmt->abase;
@@ -456,7 +456,7 @@ void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t strid
     // fill our output vector with garbage, and do broadcast_down
     // afterwards...
     if ((v->flags & THREAD_SHARED_VECTOR) == 0 || mmt->pi->wr[d]->trank == 0)
-        mpfq_generic_random(stride, v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+        abase_generic_random(stride, v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
 
     // reconcile all cells which correspond to the same vertical block.
     broadcast_down_generic(mmt, stride, v, d);
@@ -1424,7 +1424,7 @@ static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list p
 }
 
 void matmul_top_init(matmul_top_data_ptr mmt,
-        mpfq_vbase_ptr abase,
+        abase_vbase_ptr abase,
         /* matmul_ptr mm, */
         parallelizing_info_ptr pi,
         int const * flags,

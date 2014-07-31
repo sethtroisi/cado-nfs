@@ -8,7 +8,7 @@
 #include "portability.h"
 #include "macros.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
 
 void usage()
@@ -18,8 +18,8 @@ void usage()
 }
 int main(int argc, char * argv[])
 {
-    mpfq_vbase xx;
-    mpfq_vbase_oo_field_init_byfeatures(xx,
+    abase_vbase xx;
+    abase_vbase_oo_field_init_byfeatures(xx,
                 /* MPFQ_PRIME_MPZ, (2 as mpz), */ /* this is by default I
                                                  think */
                 MPFQ_GROUPSIZE, 64,

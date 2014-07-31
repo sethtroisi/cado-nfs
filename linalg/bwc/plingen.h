@@ -9,7 +9,7 @@
 
 #include <stdlib.h>
 
-#include "mpfq_layer.h"
+#include "abase.h"
 
 typedef struct { unsigned int m,n,nrhs; abfield ab; } dims;
 

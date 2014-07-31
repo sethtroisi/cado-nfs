@@ -13,7 +13,7 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 #include "portability.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
@@ -38,8 +38,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
-    mpfq_vbase A;
-    mpfq_vbase_oo_field_init_byfeatures(A, 
+    abase_vbase A;
+    abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);

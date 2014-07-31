@@ -79,36 +79,6 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
   return s;
 }
 
-/* assuming g(a)*g(b) < 0, and g has a single root in [a, b],
-   refines that root by the weighted false position method
-   Assumes sa is of same sign as g(a).
-*/
-double
-double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
-{
-  double pb;
-  int side=0;
-
-  pb = double_poly_eval(p, b);
-
-  for(;;) {
-      double s = (a*pb-b*pa)/(pb-pa);
-      if (s < a || s > b) s = .5*(a+b);
-      if (s == a || s == b) return s;
-      double ps = double_poly_eval (p, s);
-      if (ps * pa > 0) {
-          a = s; pa = ps;
-          if (side==1) pb /= 2;
-          side=1;
-      } else {
-          b = s; pb = ps;
-          if (side==-1) pa /= 2;
-          side=-1;
-      }
-  }
-}
-
-
 /* Stores the derivative of f in df. Assumes df different from f.
    Assumes df has been initialized with degree at least f->deg-1. */
 void
@@ -230,7 +200,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
           const double b = (l < sign_changes) ? roots[l] : s;
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
-            roots[new_sign_changes++] = double_poly_falseposition (poly, a, b, va);
+            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
           a = b;
           va = vb;
         }

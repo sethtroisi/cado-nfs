@@ -153,13 +153,13 @@ set_target_properties(bcast-file PROPERTIES
 
 set(bwc_abases u64k1 u64k2)
 
-set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
+set(bwc_mpfq_sources mpfq/abase_vbase.c)
 foreach(v ${bwc_abases})
-    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
 foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
-    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/mpfq_${v}.c mpfq/mpfq_${v}_t.c )
+    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
 add_library(bwc_mpfq ${CADO_SHARED} ${bwc_mpfq_sources})
@@ -245,7 +245,7 @@ macro(CONFIGURE_MATMUL_LIB v i)
     add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
     target_link_libraries(matmul_${v}_${i} matmul_common bwc_mpfq)
     set_target_properties(matmul_${v}_${i} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v} -DMM_IMPL=${i} -DMM_MPFQ_LAYER=${v}"
+        COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i} -DMM_ABASE=${v}"
             LINK_FLAGS "--mpi")
     set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
     if(ENABLE_SHARED)
@@ -358,7 +358,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         lingen-bigmatpoly.c
         lingen-polymat.c
         lingen-bigpolymat.c
-        mpfq/mpfq_${v}.c
+        mpfq/abase_${v}.c
         )
     if(WITH_MPIR)
         set(plingen_${v}_sources
@@ -375,7 +375,7 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
         target_link_libraries(plingen_${v} ${gmp_libname} utils)
     endif(WITH_MPIR)
     set_target_properties(plingen_${v} PROPERTIES
-        COMPILE_FLAGS "--mpi -DSELECT_MPFQ_LAYER_${v}"
+        COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
         LINK_FLAGS "--mpi"
         )
 endforeach(v)

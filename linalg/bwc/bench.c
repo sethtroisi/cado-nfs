@@ -25,7 +25,7 @@
 #include "worker-threads.h"
 #include "utils.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
 
 void usage()
@@ -43,7 +43,7 @@ struct private_args {
 };
 
 struct bench_args {
-    mpfq_vbase xx;
+    abase_vbase xx;
     param_list pl;
     const char * impl;
     int nthreads;
@@ -120,7 +120,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
 void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
     struct private_args * p = ba->p + tnum;
-    mpfq_vbase_ptr A = ba->xx;
+    abase_vbase_ptr A = ba->xx;
 
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
@@ -190,7 +190,7 @@ void mul_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct be
 void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
     struct private_args * p = ba->p + tnum;
-    mpfq_vbase_ptr A = ba->xx;
+    abase_vbase_ptr A = ba->xx;
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
     pthread_mutex_lock(&tg->mu);
@@ -310,7 +310,7 @@ int main(int argc, char * argv[])
 
     unsigned int nbys = 64;
 
-    mpfq_vbase_ptr A = ba->xx;
+    abase_vbase_ptr A = ba->xx;
 
     /* may leave nbys at the default value ! */
     param_list_parse_uint(ba->pl, "nbys", &nbys);
@@ -320,7 +320,7 @@ int main(int argc, char * argv[])
      * the layer in its favorite working context. Most of the time,
      * setting nbys is pointless.
      */
-    mpfq_vbase_oo_field_init_byfeatures(A,
+    abase_vbase_oo_field_init_byfeatures(A,
                 MPFQ_PRIME_MPZ, ba->prime,
                 MPFQ_GROUPSIZE, nbys,
                 MPFQ_DONE);

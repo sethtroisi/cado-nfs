@@ -17,7 +17,7 @@
 #include "xdotprod.h"
 #include "rolling.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -41,8 +41,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     param_list_parse_mpz(pl, "prime", p);
     int withcoeffs = mpz_cmp_ui(p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
-    mpfq_vbase A;
-    mpfq_vbase_oo_field_init_byfeatures(A, 
+    abase_vbase A;
+    abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
@@ -51,8 +51,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * For the binary case, we used to work with 64 as a constant, but
      * for the prime case we want to make this tunable (or maybe 1 ?)
      */
-    mpfq_vbase Ac;
-    mpfq_vbase_oo_field_init_byfeatures(Ac,
+    abase_vbase Ac;
+    abase_vbase_oo_field_init_byfeatures(Ac,
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
@@ -99,8 +99,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     ASSERT_ALWAYS(multi * nsolvecs_pervec == (unsigned int) nsolvecs);
 
-    mpfq_vbase Ar;
-    mpfq_vbase_oo_field_init_byfeatures(Ar,
+    abase_vbase Ar;
+    abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
@@ -148,14 +148,14 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mmt_vec ahead;
     vec_init_generic(pi->m, A, ahead, 0, bw->n);
 
-    mpfq_vbase_tmpl AxAc;
-    mpfq_vbase_oo_init_templates(AxAc, A, Ac);
+    abase_vbase_tmpl AxAc;
+    abase_vbase_oo_init_templates(AxAc, A, Ac);
 
-    mpfq_vbase_tmpl ArxA;
-    mpfq_vbase_oo_init_templates(ArxA, Ar, A);
+    abase_vbase_tmpl ArxA;
+    abase_vbase_oo_init_templates(ArxA, Ar, A);
 
-    mpfq_vbase_tmpl AxAr;
-    mpfq_vbase_oo_init_templates(AxAr, A, Ar);
+    abase_vbase_tmpl AxAr;
+    abase_vbase_oo_init_templates(AxAr, A, Ar);
 
     if (!bw->skip_online_checks) {
         matmul_top_vec_init_generic(mmt, Ac,
@@ -291,7 +291,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     {
                         void * test;
                         test = electric_alloc(rstride * abnbits(abase));
-                        abvtranspose(mpfq_rhs, abase, test, ahead->v);
+                        abvtranspose(abase_rhs, abase, test, ahead->v);
                         electric_free(test,rstride * abnbits(abase));
                     }
 #endif

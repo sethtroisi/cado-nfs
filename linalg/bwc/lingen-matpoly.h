@@ -1,7 +1,7 @@
 #ifndef LINGEN_MATPOLY_H_
 #define LINGEN_MATPOLY_H_
 
-#include "mpfq_layer.h"
+#include "abase.h"
 
 /* This is used only for plingen. */
 

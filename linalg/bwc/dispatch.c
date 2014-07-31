@@ -20,7 +20,7 @@
 #include "filenames.h"
 #include "xymats.h"
 #include "mpfq/mpfq.h"
-#include "mpfq/mpfq_vbase.h"
+#include "mpfq/abase_vbase.h"
 
 void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -47,8 +47,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
-    mpfq_vbase A;
-    mpfq_vbase_oo_field_init_byfeatures(A, 
+    abase_vbase A;
+    abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);

@@ -64,7 +64,7 @@ void (*get_rebinder(const char * impl, const char * dimpl))(matmul_ptr mm)
 }
 #endif
 
-matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
+matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
