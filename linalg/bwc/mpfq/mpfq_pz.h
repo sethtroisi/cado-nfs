@@ -307,6 +307,8 @@ void mpfq_pz_poly_add(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpf
 static inline
 void mpfq_pz_poly_sub(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_poly);
 static inline
+void mpfq_pz_poly_set_ui(mpfq_pz_dst_field, mpfq_pz_dst_poly, unsigned long);
+static inline
 void mpfq_pz_poly_add_ui(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, unsigned long);
 static inline
 void mpfq_pz_poly_sub_ui(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, unsigned long);
@@ -316,7 +318,7 @@ static inline
 void mpfq_pz_poly_scal_mul(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_elt);
 static inline
 void mpfq_pz_poly_mul(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_poly);
-void mpfq_pz_poly_divmod(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_poly);
+int mpfq_pz_poly_divmod(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_poly);
 void mpfq_pz_poly_precomp_mod(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly);
 void mpfq_pz_poly_mod_pre(mpfq_pz_dst_field, mpfq_pz_dst_poly, mpfq_pz_src_poly, mpfq_pz_src_poly, mpfq_pz_src_poly);
 static inline
@@ -631,6 +633,7 @@ void mpfq_pz_poly_setcoeff(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_poly w,
         w->size = i+1;
     }
     mpfq_pz_vec_setcoeff(k, w->c, x, i);
+    w->size = 1 + mpfq_pz_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_setcoeff_ui, pz */
@@ -646,6 +649,7 @@ void mpfq_pz_poly_setcoeff_ui(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_poly
         w->size = i+1;
     }
     mpfq_pz_vec_setcoeff_ui(k, w->c, x, i);
+    w->size = 1 + mpfq_pz_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_getcoeff, pz */
@@ -725,6 +729,23 @@ void mpfq_pz_poly_sub(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_poly w, mpfq
         mpfq_pz_vec_set(k, mpfq_pz_vec_subvec(k, w->c, sv), mpfq_pz_vec_subvec_const(k, u->c, sv), su-sv);
     }
     w->size = 1 + mpfq_pz_poly_deg(k, w);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_set_ui, pz */
+static inline
+void mpfq_pz_poly_set_ui(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_dst_poly w, unsigned long x)
+{
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            mpfq_pz_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        mpfq_pz_vec_setcoeff_ui(k, w->c, x, 0);
+        w->size = 1;
+        w->size = 1 + mpfq_pz_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add_ui, pz */

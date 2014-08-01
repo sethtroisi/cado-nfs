@@ -136,12 +136,13 @@ struct mpfq_vbase_s {
     int (*poly_deg)(mpfq_vbase_ptr, const void *);
     void (*poly_add)(mpfq_vbase_ptr, void *, const void *, const void *);
     void (*poly_sub)(mpfq_vbase_ptr, void *, const void *, const void *);
+    void (*poly_set_ui)(mpfq_vbase_ptr, void *, unsigned long);
     void (*poly_add_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
     void (*poly_sub_ui)(mpfq_vbase_ptr, void *, const void *, unsigned long);
     void (*poly_neg)(mpfq_vbase_ptr, void *, const void *);
     void (*poly_scal_mul)(mpfq_vbase_ptr, void *, const void *, const void *);
     void (*poly_mul)(mpfq_vbase_ptr, void *, const void *, const void *);
-    void (*poly_divmod)(mpfq_vbase_ptr, void *, void *, const void *, const void *);
+    int (*poly_divmod)(mpfq_vbase_ptr, void *, void *, const void *, const void *);
     void (*poly_precomp_mod)(mpfq_vbase_ptr, void *, const void *);
     void (*poly_mod_pre)(mpfq_vbase_ptr, void *, const void *, const void *, const void *);
     void (*poly_gcd)(mpfq_vbase_ptr, void *, const void *, const void *);

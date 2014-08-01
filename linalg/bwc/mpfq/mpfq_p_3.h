@@ -369,6 +369,8 @@ void mpfq_p_3_poly_add(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly,
 static inline
 void mpfq_p_3_poly_sub(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly);
 static inline
+void mpfq_p_3_poly_set_ui(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, unsigned long);
+static inline
 void mpfq_p_3_poly_add_ui(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, unsigned long);
 static inline
 void mpfq_p_3_poly_sub_ui(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, unsigned long);
@@ -378,7 +380,7 @@ static inline
 void mpfq_p_3_poly_scal_mul(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_elt);
 static inline
 void mpfq_p_3_poly_mul(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly);
-void mpfq_p_3_poly_divmod(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly);
+int mpfq_p_3_poly_divmod(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly);
 void mpfq_p_3_poly_precomp_mod(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly);
 void mpfq_p_3_poly_mod_pre(mpfq_p_3_dst_field, mpfq_p_3_dst_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly, mpfq_p_3_src_poly);
 static inline
@@ -667,13 +669,12 @@ void mpfq_p_3_pow(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt res, mpfq_p_3_src_elt r
     long i, j, lead;     /* it is a signed type */
     unsigned long mask;
     
-    assert (n>0);
-    
     /* get the correct (i,j) position of the most significant bit in x */
-    for(i = n-1; i>=0 && x[i]==0; i--)
+    for(i = ((long)n)-1; i>=0 && x[i]==0; i--)
         ;
     if (i < 0) {
-        mpfq_p_3_set_ui(k, res, 0);
+        /* power zero gets 1 */
+        mpfq_p_3_set_ui(k, res, 1);
         return;
     }
     j = 64 - 1;
@@ -1418,6 +1419,7 @@ void mpfq_p_3_poly_setcoeff(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_poly
         w->size = i+1;
     }
     mpfq_p_3_vec_setcoeff(k, w->c, x, i);
+    w->size = 1 + mpfq_p_3_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_setcoeff_ui, Mpfq::gfp */
@@ -1433,6 +1435,7 @@ void mpfq_p_3_poly_setcoeff_ui(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_p
         w->size = i+1;
     }
     mpfq_p_3_vec_setcoeff_ui(k, w->c, x, i);
+    w->size = 1 + mpfq_p_3_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_getcoeff, Mpfq::gfp */
@@ -1512,6 +1515,23 @@ void mpfq_p_3_poly_sub(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_poly w, m
         mpfq_p_3_vec_set(k, mpfq_p_3_vec_subvec(k, w->c, sv), mpfq_p_3_vec_subvec_const(k, u->c, sv), su-sv);
     }
     w->size = 1 + mpfq_p_3_poly_deg(k, w);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_set_ui, Mpfq::gfp */
+static inline
+void mpfq_p_3_poly_set_ui(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_poly w, unsigned long x)
+{
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            mpfq_p_3_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        mpfq_p_3_vec_setcoeff_ui(k, w->c, x, 0);
+        w->size = 1;
+        w->size = 1 + mpfq_p_3_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add_ui, Mpfq::gfp */

@@ -315,24 +315,25 @@ int mpfq_u64k1_vec_print(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_src_vec
 int mpfq_u64k1_vec_sscan(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
+    unsigned int nn;
     mpfq_u64k1_vec_reinit(K, w, *n, 0);
     *n = 0;
+    nn = 0;
     while (isspace((int)(unsigned char)str[0]))
         str++;
     if (str[0] != '[')
         return 0;
     str++;
-    if (str[0] != ' ')
-        return 0;
-    str++;
+    while (isspace((int)(unsigned char)str[0]))
+        str++;
     if (str[0] == ']') {
         return 1;
     }
     unsigned int i = 0;
     for (;;) {
-        if (*n < i+1) {
-            mpfq_u64k1_vec_reinit(K, w, *n, i+1);
-            *n = i+1;
+        if (nn < i+1) {
+            mpfq_u64k1_vec_reinit(K, w, nn, i+1);
+            nn = i+1;
         }
         int ret;
         ret = mpfq_u64k1_sscan(K, (*w)[i], str);
@@ -352,6 +353,7 @@ int mpfq_u64k1_vec_sscan(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_vec * w
         while (isspace((int)(unsigned char)str[0]))
             str++;
     }
+    *n = nn;
     return 1;
 }
 
@@ -365,8 +367,10 @@ int mpfq_u64k1_vec_fscan(mpfq_u64k1_dst_field K MAYBE_UNUSED, FILE * file, mpfq_
     tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
-        if (c==EOF)
+        if (c==EOF) {
+            free(tmp);
             return 0;
+        }
         if (len==allocated) {
             allocated+=100;
             tmp = (char*)realloc(tmp, allocated*sizeof(char));
@@ -435,6 +439,7 @@ void mpfq_u64k1_vec_ur_clear(mpfq_u64k1_dst_field K MAYBE_UNUSED, mpfq_u64k1_vec
 /* missing poly_deg */
 /* missing poly_add */
 /* missing poly_sub */
+/* missing poly_set_ui */
 /* missing poly_add_ui */
 /* missing poly_sub_ui */
 /* missing poly_neg */
@@ -1202,6 +1207,7 @@ void mpfq_u64k1_oo_field_init(mpfq_vbase_ptr vbase)
     /* missing poly_deg */
     /* missing poly_add */
     /* missing poly_sub */
+    /* missing poly_set_ui */
     /* missing poly_add_ui */
     /* missing poly_sub_ui */
     /* missing poly_neg */

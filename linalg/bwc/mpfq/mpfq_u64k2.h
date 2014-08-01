@@ -310,6 +310,7 @@ mpfq_u64k2_src_elt mpfq_u64k2_vec_ur_coeff_ptr_const(mpfq_u64k2_dst_field, mpfq_
 /* missing poly_deg */
 /* missing poly_add */
 /* missing poly_sub */
+/* missing poly_set_ui */
 /* missing poly_add_ui */
 /* missing poly_sub_ui */
 /* missing poly_neg */

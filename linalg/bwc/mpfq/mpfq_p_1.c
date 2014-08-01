@@ -298,6 +298,9 @@ int mpfq_p_1_asprint(mpfq_p_1_dst_field k, char * * pstr, mpfq_p_1_src_elt x)
         (*pstr)[i] += '0';
     (*pstr)[n] = '\0';
     // Remove leading 0s
+    /* Note that gmp source says: There are no leading zeros on the digits
+     * generated at str, but that's not currently a documented feature.
+     * This implies that we won't do much here... */
     int shift = 0;
     while (((*pstr)[shift] == '0') && ((*pstr)[shift+1] != '\0')) 
         shift++;
@@ -358,7 +361,7 @@ int mpfq_p_1_fscan(mpfq_p_1_dst_field k, FILE * file, mpfq_p_1_dst_elt z)
                 break;
         } else {
             if (len==allocated) {
-                allocated+=100;
+                allocated+=100 + allocated / 4;
                 tmp = (char*)realloc(tmp, allocated*sizeof(char));
             }
             tmp[len]=c;
@@ -471,24 +474,25 @@ int mpfq_p_1_vec_print(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_src_vec w, un
 int mpfq_p_1_vec_sscan(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
+    unsigned int nn;
     mpfq_p_1_vec_reinit(K, w, *n, 0);
     *n = 0;
+    nn = 0;
     while (isspace((int)(unsigned char)str[0]))
         str++;
     if (str[0] != '[')
         return 0;
     str++;
-    if (str[0] != ' ')
-        return 0;
-    str++;
+    while (isspace((int)(unsigned char)str[0]))
+        str++;
     if (str[0] == ']') {
         return 1;
     }
     unsigned int i = 0;
     for (;;) {
-        if (*n < i+1) {
-            mpfq_p_1_vec_reinit(K, w, *n, i+1);
-            *n = i+1;
+        if (nn < i+1) {
+            mpfq_p_1_vec_reinit(K, w, nn, i+1);
+            nn = i+1;
         }
         int ret;
         ret = mpfq_p_1_sscan(K, (*w)[i], str);
@@ -508,6 +512,7 @@ int mpfq_p_1_vec_sscan(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_vec * w, unsi
         while (isspace((int)(unsigned char)str[0]))
             str++;
     }
+    *n = nn;
     return 1;
 }
 
@@ -521,8 +526,10 @@ int mpfq_p_1_vec_fscan(mpfq_p_1_dst_field K MAYBE_UNUSED, FILE * file, mpfq_p_1_
     tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
-        if (c==EOF)
+        if (c==EOF) {
+            free(tmp);
             return 0;
+        }
         if (len==allocated) {
             allocated+=100;
             tmp = (char*)realloc(tmp, allocated*sizeof(char));
@@ -670,31 +677,29 @@ void mpfq_p_1_poly_setmonic(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_poly
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_divmod, Mpfq::gfp */
-void mpfq_p_1_poly_divmod(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_poly q, mpfq_p_1_dst_poly r, mpfq_p_1_src_poly a, mpfq_p_1_src_poly b)
+int mpfq_p_1_poly_divmod(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_poly q, mpfq_p_1_dst_poly r, mpfq_p_1_src_poly a, mpfq_p_1_src_poly b)
 {
     if (b->size == 0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (a->size == 0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     int dega = mpfq_p_1_poly_deg(K, a);
     if (dega<0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     // Compute deg b and inverse of leading coef
     int degb = mpfq_p_1_poly_deg(K, b);
     if (degb<0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (degb > dega) {
         q->size=0;
         mpfq_p_1_poly_set(K, r, a);
-        return;
+        return 1;
     }
     int bmonic;
     mpfq_p_1_elt ilb;
@@ -746,10 +751,12 @@ void mpfq_p_1_poly_divmod(mpfq_p_1_dst_field K MAYBE_UNUSED, mpfq_p_1_dst_poly q
     if (r != NULL)
         mpfq_p_1_poly_set(K, r, rr);
     mpfq_p_1_clear(K, &temp);
+    mpfq_p_1_clear(K, &ilb);
     mpfq_p_1_clear(K, &aux);
     mpfq_p_1_clear(K, &aux2);
     mpfq_p_1_poly_clear(K, rr);
     mpfq_p_1_poly_clear(K, qq);
+    return 1;
 }
 
 static void mpfq_p_1_poly_preinv(mpfq_p_1_dst_field, mpfq_p_1_dst_poly, mpfq_p_1_src_poly, unsigned int);
@@ -1652,6 +1659,12 @@ static void mpfq_p_1_wrapper_poly_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_
     mpfq_p_1_poly_sub(vbase->obj, w, u, v);
 }
 
+static void mpfq_p_1_wrapper_poly_set_ui(mpfq_vbase_ptr, mpfq_p_1_dst_poly, unsigned long);
+static void mpfq_p_1_wrapper_poly_set_ui(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_poly w MAYBE_UNUSED, unsigned long x MAYBE_UNUSED)
+{
+    mpfq_p_1_poly_set_ui(vbase->obj, w, x);
+}
+
 static void mpfq_p_1_wrapper_poly_add_ui(mpfq_vbase_ptr, mpfq_p_1_dst_poly, mpfq_p_1_src_poly, unsigned long);
 static void mpfq_p_1_wrapper_poly_add_ui(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_poly w MAYBE_UNUSED, mpfq_p_1_src_poly u MAYBE_UNUSED, unsigned long x MAYBE_UNUSED)
 {
@@ -1682,10 +1695,10 @@ static void mpfq_p_1_wrapper_poly_mul(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_
     mpfq_p_1_poly_mul(vbase->obj, w, u, v);
 }
 
-static void mpfq_p_1_wrapper_poly_divmod(mpfq_vbase_ptr, mpfq_p_1_dst_poly, mpfq_p_1_dst_poly, mpfq_p_1_src_poly, mpfq_p_1_src_poly);
-static void mpfq_p_1_wrapper_poly_divmod(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_poly q MAYBE_UNUSED, mpfq_p_1_dst_poly r MAYBE_UNUSED, mpfq_p_1_src_poly a MAYBE_UNUSED, mpfq_p_1_src_poly b MAYBE_UNUSED)
+static int mpfq_p_1_wrapper_poly_divmod(mpfq_vbase_ptr, mpfq_p_1_dst_poly, mpfq_p_1_dst_poly, mpfq_p_1_src_poly, mpfq_p_1_src_poly);
+static int mpfq_p_1_wrapper_poly_divmod(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_p_1_dst_poly q MAYBE_UNUSED, mpfq_p_1_dst_poly r MAYBE_UNUSED, mpfq_p_1_src_poly a MAYBE_UNUSED, mpfq_p_1_src_poly b MAYBE_UNUSED)
 {
-    mpfq_p_1_poly_divmod(vbase->obj, q, r, a, b);
+    return mpfq_p_1_poly_divmod(vbase->obj, q, r, a, b);
 }
 
 static void mpfq_p_1_wrapper_poly_precomp_mod(mpfq_vbase_ptr, mpfq_p_1_dst_poly, mpfq_p_1_src_poly);
@@ -1986,12 +1999,13 @@ void mpfq_p_1_oo_field_init(mpfq_vbase_ptr vbase)
     vbase->poly_deg = (int (*) (mpfq_vbase_ptr, const void *)) mpfq_p_1_wrapper_poly_deg;
     vbase->poly_add = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_add;
     vbase->poly_sub = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_sub;
+    vbase->poly_set_ui = (void (*) (mpfq_vbase_ptr, void *, unsigned long)) mpfq_p_1_wrapper_poly_set_ui;
     vbase->poly_add_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_p_1_wrapper_poly_add_ui;
     vbase->poly_sub_ui = (void (*) (mpfq_vbase_ptr, void *, const void *, unsigned long)) mpfq_p_1_wrapper_poly_sub_ui;
     vbase->poly_neg = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_wrapper_poly_neg;
     vbase->poly_scal_mul = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_scal_mul;
     vbase->poly_mul = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_mul;
-    vbase->poly_divmod = (void (*) (mpfq_vbase_ptr, void *, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_divmod;
+    vbase->poly_divmod = (int (*) (mpfq_vbase_ptr, void *, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_divmod;
     vbase->poly_precomp_mod = (void (*) (mpfq_vbase_ptr, void *, const void *)) mpfq_p_1_wrapper_poly_precomp_mod;
     vbase->poly_mod_pre = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *, const void *)) mpfq_p_1_wrapper_poly_mod_pre;
     vbase->poly_gcd = (void (*) (mpfq_vbase_ptr, void *, const void *, const void *)) mpfq_p_1_wrapper_poly_gcd;

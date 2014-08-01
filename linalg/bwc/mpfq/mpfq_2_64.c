@@ -340,24 +340,25 @@ int mpfq_2_64_vec_print(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec w,
 int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
+    unsigned int nn;
     mpfq_2_64_vec_reinit(K, w, *n, 0);
     *n = 0;
+    nn = 0;
     while (isspace((int)(unsigned char)str[0]))
         str++;
     if (str[0] != '[')
         return 0;
     str++;
-    if (str[0] != ' ')
-        return 0;
-    str++;
+    while (isspace((int)(unsigned char)str[0]))
+        str++;
     if (str[0] == ']') {
         return 1;
     }
     unsigned int i = 0;
     for (;;) {
-        if (*n < i+1) {
-            mpfq_2_64_vec_reinit(K, w, *n, i+1);
-            *n = i+1;
+        if (nn < i+1) {
+            mpfq_2_64_vec_reinit(K, w, nn, i+1);
+            nn = i+1;
         }
         int ret;
         ret = mpfq_2_64_sscan(K, (*w)[i], str);
@@ -377,6 +378,7 @@ int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, u
         while (isspace((int)(unsigned char)str[0]))
             str++;
     }
+    *n = nn;
     return 1;
 }
 
@@ -390,8 +392,10 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_
     tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
     for(;;) {
         c = fgetc(file);
-        if (c==EOF)
+        if (c==EOF) {
+            free(tmp);
             return 0;
+        }
         if (len==allocated) {
             allocated+=100;
             tmp = (char*)realloc(tmp, allocated*sizeof(char));
@@ -475,31 +479,29 @@ void mpfq_2_64_poly_setmonic(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_p
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_divmod */
-void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_dst_poly r, mpfq_2_64_src_poly a, mpfq_2_64_src_poly b)
+int mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_dst_poly r, mpfq_2_64_src_poly a, mpfq_2_64_src_poly b)
 {
     if (b->size == 0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (a->size == 0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     int dega = mpfq_2_64_poly_deg(K, a);
     if (dega<0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     // Compute deg b and inverse of leading coef
     int degb = mpfq_2_64_poly_deg(K, b);
     if (degb<0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (degb > dega) {
         q->size=0;
         mpfq_2_64_poly_set(K, r, a);
-        return;
+        return 1;
     }
     int bmonic;
     mpfq_2_64_elt ilb;
@@ -551,10 +553,12 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     if (r != NULL)
         mpfq_2_64_poly_set(K, r, rr);
     mpfq_2_64_clear(K, &temp);
+    mpfq_2_64_clear(K, &ilb);
     mpfq_2_64_clear(K, &aux);
     mpfq_2_64_clear(K, &aux2);
     mpfq_2_64_poly_clear(K, rr);
     mpfq_2_64_poly_clear(K, qq);
+    return 1;
 }
 
 static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, unsigned int);

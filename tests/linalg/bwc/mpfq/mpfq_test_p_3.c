@@ -212,6 +212,15 @@ int main(int argc, char * argv[])
                 Kset (r2, a0);
                 });
 
+        DO_ONE_TEST("get_ui o sub_ui(x) o set_ui(x+1) == 1", {
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                Kset_ui(a1, x+1);
+                Ksub_ui(a2, a1, x);
+                unsigned long r = Kget_ui(a2);
+                Kset_ui(r1, r);
+                Kset_ui(r2, 1);
+                });
+
         DO_ONE_TEST("sub_ui(y) o set_ui(x) == set_mpz(x-y)", {
                 mpz_t z;
                 unsigned long x = gmp_urandomb_ui(rstate, 32);
@@ -239,11 +248,9 @@ int main(int argc, char * argv[])
 
         DO_ONE_TEST("add_ui o sub_ui = id", {
                 Krandom2 (a0, rstate);
-                Krandom2 (a1, rstate);
-                unsigned long xx;
-                xx = ((unsigned long *)(void *)(a1))[0];
-                Ksub_ui (r1, a0, xx);
-                Kadd_ui (r1, r1, xx);
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                Ksub_ui (r1, a0, x);
+                Kadd_ui (r1, r1, x);
                 Kset (r2, a0);
                 });
 
@@ -358,6 +365,7 @@ int main(int argc, char * argv[])
             if (rc < 0) abort();
             FILE * f = fopen(filename, "w");
             if (f == NULL) abort();
+            fprintf(f, "\n");   /* ensure we properly ignore leading ws */
             DO_ONE_TEST("fprint", {
                     Kset_ui(a0, i);
                     Kinv(a0, a0);
@@ -402,6 +410,14 @@ int main(int argc, char * argv[])
                 Kinv(r2, a0);
                 mpz_clear(z);
                 });
+        DO_ONE_TEST("x^0 == 1", {
+                Krandom2 (a0, rstate);
+                mpz_t z;
+                mpz_init_set_ui(z, 0);
+                Kpowz(r1, a0, z);
+                Kset_ui(r2, 1);
+                mpz_clear(z);
+                });
         DO_ONE_TEST("x^(#K^2) == x", {
                 Krandom2 (a0, rstate);
                 mpz_t z;
@@ -412,7 +428,8 @@ int main(int argc, char * argv[])
                 Kset(r2, a0);
                 mpz_clear(z);
                 });
-#if 0
+#ifndef VARIABLE_SIZE_PRIME
+        /* pz has no Tonelli Shanks for now */
         DO_ONE_TEST("is_sqr o (mul(sqr,nsqr)) = false", {
                 do {
                     Krandom2 (a0, rstate);
@@ -425,7 +442,7 @@ int main(int argc, char * argv[])
                 else
                     Kset_ui(r1, 0);
                 });
-
+#endif
         DO_ONE_TEST("is_sqr o sqr = true", {
                 do {
                     Krandom2 (a0, rstate);
@@ -434,7 +451,6 @@ int main(int argc, char * argv[])
                 Ksqr(a0, a0);
                 Kset_ui(r2, Kis_sqr(a0));
                 });
-#endif
         DO_ONE_TEST("ur_add 500 times and reduce", {
                 Krandom2 (a0, rstate);
                 Krandom2 (a1, rstate);
@@ -502,6 +518,58 @@ int main(int argc, char * argv[])
                 });
 
 #endif
+
+        /*-----------------------------------------------------------*/
+        /*          Tests specific to some I/O corner cases          */
+        /*-----------------------------------------------------------*/
+
+        {
+            int ntests = 1;
+            DO_ONE_TEST("sscan(garbage) returns 0", {
+                    Kset_ui(r1, 0);
+                    Kset_ui(r2, Ksscan(a0, "garbage"));
+                    });
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            DO_ONE_TEST("fscan(empty file) returns 0", {
+                    Kset_ui(r1, 0);
+                    Kset_ui(r2, Kfscan(f, a1));
+                    });
+            fclose(f);
+            free(filename);
+        }
+        /* This is meant to exert the realloc() feature in fscan */
+        DO_ONE_TEST("fscan(long file)", {
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            mpz_t z;
+            mpz_init(z);
+            Kfield_characteristic(z);
+            gmp_fprintf(f, "%Zd", z);
+            mpz_clear(z);
+            for(int j = 0 ; j < i ; j++) gmp_fprintf(f, "0");
+            gmp_fprintf(f, "1");
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            Kset_ui(r1, 1);
+            Kset_ui(r2, 0);
+            Kfscan(f, r2);
+            fclose(f);
+            free(filename);
+        });
+
+
+
         /*-----------------------------------------------------------*/
         /*          Tests specific to Montgomery representation      */
         /*-----------------------------------------------------------*/
@@ -672,16 +740,16 @@ int main(int argc, char * argv[])
         Kvec_init(&w3, 2*length);
         Kvec_init(&w4, 2*length);
         DO_ONE_TEST_VEC("vec_add commutativity", {
-                Kvec_random(w1, length, rstate);
-                Kvec_random(w2, length, rstate);
+                Kvec_random2(w1, length, rstate);
+                Kvec_random2(w2, length, rstate);
                 Kvec_add(v1, w1, w2, length);
                 Kvec_add(v2, w2, w1, length);
 //                test_length = length;
                 });
         DO_ONE_TEST_VEC("vec_add associativity", {
-                Kvec_random(w1, length, rstate);
-                Kvec_random(w2, length, rstate);
-                Kvec_random(w3, length, rstate);
+                Kvec_random2(w1, length, rstate);
+                Kvec_random2(w2, length, rstate);
+                Kvec_random2(w3, length, rstate);
                 Kvec_add(v1, w1, w2, length);
                 Kvec_add(v1, v1, w3, length);
                 Kvec_add(v2, w2, w3, length);
@@ -690,8 +758,8 @@ int main(int argc, char * argv[])
                 });
         DO_ONE_TEST_VEC("vec linearity", {
                 Krandom2 (a0, rstate);
-                Kvec_random(w1, length, rstate);
-                Kvec_random(w2, length, rstate);
+                Kvec_random2(w1, length, rstate);
+                Kvec_random2(w2, length, rstate);
                 Kvec_scal_mul(v1, w1, a0, length);
                 Kvec_scal_mul(v2, w2, a0, length);
                 Kvec_add(v1, v1, v2, length);
@@ -700,9 +768,9 @@ int main(int argc, char * argv[])
 //                test_length = length;
                 });
         DO_ONE_TEST_VEC("vec_conv linearity", {
-                Kvec_random(w1, length, rstate);
-                Kvec_random(w2, length, rstate);
-                Kvec_random(w3, length, rstate);
+                Kvec_random2(w1, length, rstate);
+                Kvec_random2(w2, length, rstate);
+                Kvec_random2(w3, length, rstate);
                 Kvec_add(w4, w2, w3, length);
                 Kvec_conv(v1, w1, length, w4, length);
                 Kvec_conv(w4, w1, length, w2, length);
@@ -715,7 +783,7 @@ int main(int argc, char * argv[])
         DO_ONE_TEST("vec_sscan o vec_asprint = id", {
                 /* Do this for vectors of length i */
                 unsigned int cap = i < length ? i : length;
-                Kvec_random(w1, cap, rstate);
+                Kvec_random2(w1, cap, rstate);
                 char * str;
                 Kvec_asprint(&str, w1, cap);
                 Kvec tvec;
@@ -754,7 +822,7 @@ int main(int argc, char * argv[])
                         Kinv(a0, a0);
                         Kset(Kvec_coeff_ptr(v1, j), a0);
                     }
-            Kvec tvec;
+                    Kvec tvec;
                     unsigned int tlength = 0;
                     Kvec_init(&tvec, tlength);
                     Kvec_fscan(f, &tvec, &tlength);
@@ -766,6 +834,96 @@ int main(int argc, char * argv[])
             unlink(filename);
             free(filename);
         }
+
+        /* Some I/O corner cases */
+        {
+            int ntests = 1;
+            DO_ONE_TEST("vec_sscan(garbage) returns 0", {
+                    unsigned int tlength = 0;
+                    Kvec tvec;
+                    Kvec_init(&tvec, tlength);
+                    Kvec_random(v1, length, rstate);
+                    Kvec_set(v2, v1, length);
+                    Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
+                    int r = Kvec_sscan(&tvec, &tlength, "garbage");
+                    if (tlength) abort();
+                    Kset_ui(Kvec_coeff_ptr(v2, 0), r);
+                    Kvec_clear(&tvec, tlength);
+                    });
+            DO_ONE_TEST("vec_sscan(\"[garbage]\") returns 0", {
+                    unsigned int tlength = 0;
+                    Kvec tvec;
+                    Kvec_init(&tvec, tlength);
+                    Kvec_random(v1, length, rstate);
+                    Kvec_set(v2, v1, length);
+                    Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
+                    int r = Kvec_sscan(&tvec, &tlength, "[garbage]");
+                    if (tlength) abort();
+                    Kset_ui(Kvec_coeff_ptr(v2, 0), r);
+                    Kvec_clear(&tvec, tlength);
+                    });
+            DO_ONE_TEST("vec_sscan(\"[1 2]\") returns 0", {
+                    unsigned int tlength = 0;
+                    Kvec tvec;
+                    Kvec_init(&tvec, tlength);
+                    Kvec_random(v1, length, rstate);
+                    Kvec_set(v2, v1, length);
+                    Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
+                    int r = Kvec_sscan(&tvec, &tlength, "[1 2]");
+                    if (tlength) abort();
+                    Kset_ui(Kvec_coeff_ptr(v2, 0), r);
+                    Kvec_clear(&tvec, tlength);
+                    });
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-vec_dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            DO_ONE_TEST("vec_fscan(empty file) returns 0", {
+                    unsigned int tlength = 0;
+                    Kvec tvec;
+                    Kvec_init(&tvec, tlength);
+                    Kvec_random(v1, length, rstate);
+                    Kvec_set(v2, v1, length);
+                    Kset_ui(Kvec_coeff_ptr(v1, 0), 0);
+                    int r = Kvec_fscan(f, &tvec, &tlength);
+                    if (tlength) abort();
+                    Kset_ui(Kvec_coeff_ptr(v2, 0), r);
+                    Kvec_clear(&tvec, tlength);
+                    });
+            fclose(f);
+            free(filename);
+        }
+        /* This is meant to exert the realloc() feature in vec_fscan */
+        DO_ONE_TEST("vec_fscan(long file)", {
+            char * filename;
+            int rc = asprintf(&filename, "/tmp/mpfq-dummy-test.%lu", gmp_urandomb_ui(rstate, 32));
+            if (rc < 0) abort();
+            FILE * f = fopen(filename, "w");
+            if (f == NULL) abort();
+            fprintf(f, "[");
+            for(int j = 0 ; j < i ; j++) fprintf(f, " ");
+            fprintf(f, "1]");
+            fclose(f);
+            f = fopen(filename, "r");
+            if (f == NULL) abort();
+            unsigned int tlength = 0;
+            Kvec tvec;
+            Kvec_init(&tvec, tlength);
+            Kvec_random(v1, length, rstate);
+            Kvec_set(v2, v1, length);
+            int r = Kvec_fscan(f, &tvec, &tlength);
+            if (!r) abort();
+            if (tlength != 1) abort();
+            Kset_ui(Kvec_coeff_ptr(v1, 0), 1);
+            Kvec_set(v2, tvec, 1);
+            Kvec_clear(&tvec, tlength);
+            fclose(f);
+            free(filename);
+        });
 
         Kvec_clear(&v1, 2*length);
         Kvec_clear(&v2, 2*length);
@@ -788,10 +946,27 @@ int main(int argc, char * argv[])
         Kpoly_init(q3, 2*deg);
         Kpoly_init(q4, 2*deg);
         DO_ONE_TEST_POLY("poly_add commutativity", {
+                if (!(i & 0xf)) {
+                    /* test realloc every once in a while */
+                    Kpoly_clear(q1);
+                    Kpoly_init(q1, 1);
+                }
                 Kpoly_random(q1, deg, rstate);
                 Kpoly_random(q2, deg, rstate);
                 Kpoly_add(p1, q1, q2);
                 Kpoly_add(p2, q2, q1);
+                });
+        DO_ONE_TEST_POLY("poly_sub = poly_add o poly_neg", {
+                Kpoly_random2 (q1, deg, rstate);
+                Kpoly_random2 (q2, deg, rstate);
+                if (!(i & 0xf)) {
+                    /* test realloc every once in a while */
+                    Kpoly_clear(p1);
+                    Kpoly_init(p1, 1);
+                }
+                Kpoly_sub (p1, q1, q2);
+                Kpoly_neg(q4, q2);
+                Kpoly_add(p2, q4, q1);
                 });
         DO_ONE_TEST_POLY("poly_add associativity", {
                 Kpoly_random(q1, deg, rstate);
@@ -802,8 +977,44 @@ int main(int argc, char * argv[])
                 Kpoly_add(p2, q2, q3);
                 Kpoly_add(p2, p2, q1);
                 });
+        DO_ONE_TEST("poly_add_ui(y) o poly_neg o poly_set_ui(x) == set(y-x)", {
+                mpz_t z;
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                unsigned long y = gmp_urandomb_ui(rstate, 32);
+                mpz_init_set_ui(z, y);
+                mpz_sub_ui(z, z, x);
+                Kset_mpz(a0, z);
+                mpz_clear(z);
+
+                p1->size = 1;
+                Kpoly_setcoeff(p1, a0, 0);
+
+                Kpoly_set_ui(p1, x);
+                Kpoly_neg(p1, p1);
+                Kpoly_add_ui(p1, p1, y);
+                });
+
+        DO_ONE_TEST("add_ui o sub_ui = id", {
+                if (!(i & 0xf)) {
+                    /* test realloc every once in a while */
+                    Kpoly_clear(p1);
+                    Kpoly_init(p1, 1);
+                }
+                Kpoly_random2 (p1, deg, rstate);
+                Kpoly_set(p2, p1);
+                unsigned long x = gmp_urandomb_ui(rstate, 32);
+                Kpoly_sub_ui (p2, p1, x);
+                Kpoly_add_ui (p2, p2, x);
+                });
+
         DO_ONE_TEST_POLY("poly linearity", {
                 Krandom2 (a0, rstate);
+                if (!(i & 0xf)) {
+                    /* test realloc every once in a while */
+                    Kpoly_clear(p2);
+                    Kpoly_init(p2, 1);
+                }
+
                 Kpoly_random(q1, deg, rstate);
                 Kpoly_random(q2, deg, rstate);
                 Kpoly_scal_mul(p1, q1, a0);
@@ -812,6 +1023,8 @@ int main(int argc, char * argv[])
                 Kpoly_add(q1, q1, q2);
                 Kpoly_scal_mul(p2, q1, a0);
                 });
+
+
         DO_ONE_TEST_POLY("poly_mul linearity", {
                 Kpoly_random(q1, deg, rstate);
                 Kpoly_random(q2, deg, rstate);
@@ -821,6 +1034,16 @@ int main(int argc, char * argv[])
                 Kpoly_mul(q4, q1, q2);
                 Kpoly_mul(p2, q1, q3);
                 Kpoly_add(p2, p2, q4);
+                });
+        DO_ONE_TEST_POLY("poly_divmod", {
+                Kpoly_random(p1, deg, rstate);
+                do {
+                    Kpoly_random(q2, deg, rstate);
+                } while (Kpoly_deg(q2) == 0);
+                if (i < 10) Kpoly_setmonic(q2, q2);
+                Kpoly_divmod(q3, q4, p1, q2);
+                Kpoly_mul(q1, q2, q3);
+                Kpoly_add(p2, q1, q4);
                 });
         DO_ONE_TEST_POLY("poly_gcd", {
                 /* make sure leading coefficients are invertible.
@@ -861,6 +1084,168 @@ int main(int argc, char * argv[])
                 Kpoly_mul(q4, q4, q2);
                 Kpoly_add(p1, q3, q4);
                 });
+
+#if 0   /* grrr, internal... */
+        DO_ONE_TEST_POLY("poly_preinv", {
+                do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
+                Kpoly_setcoeff_ui(q2, 0, 1);
+                Kpoly_preinv(q1, q2, deg);
+                Kpoly_mul(q3, q1, q2);
+                /* we expect q3=q1*q2 = 1 + X^deg*something */
+                Kpoly_set_ui(q4, 0);
+                Kpoly_setcoeff_ui(q4, deg, 0);
+                Kpoly_divmod(p1, p2, q3, q4);
+                /* p1 should be 1 */
+                Kpoly_set_ui(p2, 1);
+                });
+#endif
+        DO_ONE_TEST_POLY("poly_mod_pre", {
+                do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
+                Kpoly_random(q1, i==0 ? (deg/2) : (2*Kpoly_deg(q2)-2), rstate);
+
+                Kpoly_setmonic(q2, q2);
+                if (i&1) {
+                    Kpoly_precomp_mod(q3, q2);
+                } else {
+                    /* test realloc feature every once in a while */
+                    Kpoly toosmall;
+                    Kpoly_init(toosmall, 1);
+                    Kpoly_precomp_mod(toosmall, q2);
+                    Kpoly_set(q3, toosmall);
+                    Kpoly_clear(toosmall);
+                }
+
+
+                Kpoly_mod_pre(p1, q1, q2, q3);
+                Kpoly_divmod(q4, p2, q1, q2);
+                });
+
+
+        /* corner cases */
+        {
+            int ntests = 1;
+            DO_ONE_TEST_POLY("poly_setmonic(0) == 0", {
+                    Kpoly_set_ui(p1, 0);
+                    Kpoly_set_ui(q1, 0);
+                    Kpoly_setmonic(p2, q1);
+                    });
+            DO_ONE_TEST_POLY("poly_divmod(x, 0) returns 0", {
+                    Kpoly_random(q1, deg, rstate);
+                    Kpoly_set_ui(p2, 0);
+                    int r = Kpoly_divmod(q2, q3, q1, p2);
+                    Kpoly_set_ui(p1, r);
+                    });
+            DO_ONE_TEST_POLY("poly_divmod(0, x) == 0", {
+                    do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
+                    Kpoly_set_ui(p1, 0);
+                    int r = Kpoly_divmod(p2, q3, p1, q2);
+                    if (!r) abort();
+                    });
+            /* same but with a denormalized polynomial */
+            DO_ONE_TEST_POLY("poly_divmod(x, denormalized 0) returns 0", {
+                    Kpoly_random(q1, deg, rstate);
+                    Kpoly_setcoeff_ui(p2, 0, 1);
+                    int r = Kpoly_divmod(q2, q3, q1, p2);
+                    Kpoly_set_ui(p2, 0);
+                    Kpoly_set_ui(p1, r);
+                    });
+            DO_ONE_TEST_POLY("poly_divmod(denormalized 0, x) == 0", {
+                    do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
+                    Kpoly_setcoeff_ui(p1, 0, 1);
+                    int r = Kpoly_divmod(p2, q3, p1, q2);
+                    if (!r) abort();
+                    Kpoly_set_ui(p1, 0);
+                    });
+            DO_ONE_TEST_POLY("poly_divmod(a, larger than a) returns 0+a", {
+                    Kpoly_random(p1, deg-1, rstate);
+                    do { Kpoly_random(q2, deg, rstate); } while (Kpoly_deg(q2) < 0);
+                    Kpoly_divmod(q3, p2, p1, q2);
+                    });
+
+            DO_ONE_TEST_POLY("poly_gcd(p, 0) == p", {
+                    /* make sure leading coefficients are invertible.
+                     * Normally we're over a field, so we don't have to.
+                     * Unfortunately our testing is so dumb that we don't
+                     * promise that we're over a field...
+                     */
+                    do { Kpoly_random(p1, deg, rstate); } while (Kpoly_deg(p1) < 0);
+                    Kpoly_set_ui(q2, 0);
+                    Kpoly_gcd(p2, p1, q2);
+                    });
+            DO_ONE_TEST_POLY("scal_mul(0)(x) == set_ui(0)", {
+                    Kpoly_random(q1, deg, rstate);
+                    Kset_ui(a0, 0);
+                    Kpoly_scal_mul(p1, q1, a0);
+                    Kpoly_set_ui(p2, 0);
+                    });
+
+            DO_ONE_TEST_POLY("poly_setcoeff_ui(large index)", {
+                    Kpoly toosmall;
+                    Kpoly_init(toosmall, 1);
+                    Kpoly_setcoeff_ui(toosmall, 1, deg);
+                    Kpoly_set(p1, toosmall);
+                    p2->size = 0;
+                    Kpoly_setcoeff_ui(p2, 1, deg);
+                    Kpoly_clear(toosmall);
+                    });
+            DO_ONE_TEST_POLY("poly_setcoeff(large index)", {
+                    Kpoly toosmall;
+                    Krandom2 (a0, rstate);
+                    Kpoly_init(toosmall, 1);
+                    Kpoly_setcoeff(toosmall, a0, deg);
+                    Kpoly_set(p1, toosmall);
+                    Kpoly_setcoeff(p2, a0, deg);
+                    Kpoly_clear(toosmall);
+                    });
+            DO_ONE_TEST_POLY("poly_getcoeff(too large) == 0", {
+                    Kpoly_set_ui(p1, 0);
+                    q1->size = 0;
+                    Kpoly_getcoeff(a0, q1, 1);
+                    p2->size = 1;
+                    Kpoly_setcoeff(p2, a0, 0);
+                    });
+            
+            DO_ONE_TEST_POLY("poly_xgcd(0, 0)", {
+                    Kpoly_set_ui(q1, 0);
+                    Kpoly_set_ui(q2, 0);
+                    Kpoly_xgcd(p1, q3, q4, q1, q2);
+                    Kpoly_mul(q3, q3, q1);
+                    Kpoly_mul(q4, q4, q2);
+                    Kpoly_add(p2, q3, q4);
+                    });
+
+            DO_ONE_TEST_POLY("poly_xgcd(0, 0)", {
+                    do { Kpoly_random(q1, deg, rstate); } while (Kpoly_deg(q1) <= 0);
+                    Kpoly_mul(q2, q1, q1);
+                    int r = Kpoly_cmp(q2, q1); /* should be deg(q1) */
+                    Kpoly_set_ui(p1, r);
+                    Kpoly_set_ui(p2, Kpoly_deg(q1));
+                    });
+
+            ntests = 10;
+
+            DO_ONE_TEST_POLY("poly_xgcd(p, 0)", {
+                    do {
+                        Kpoly_random(q1, deg, rstate);
+                    } while (Kpoly_deg(q1) < 0);
+                    Kpoly_set_ui(q2, 0);
+                    Kpoly_xgcd(p1, q3, q4, q1, q2);
+                    Kpoly_mul(q3, q3, q1);
+                    Kpoly_mul(q4, q4, q2);
+                    Kpoly_add(p2, q3, q4);
+                    });
+            DO_ONE_TEST_POLY("poly_xgcd(0, p)", {
+                    do {
+                        Kpoly_random(q2, deg, rstate);
+                    } while (Kpoly_deg(q2) < 0);
+                    Kpoly_set_ui(q1, 0);
+                    Kpoly_xgcd(p1, q3, q4, q1, q2);
+                    Kpoly_mul(q3, q3, q1);
+                    Kpoly_mul(q4, q4, q2);
+                    Kpoly_add(p2, q3, q4);
+                    });
+        }
+
         Kpoly_clear(p1);
         Kpoly_clear(p2);
         Kpoly_clear(q1);

@@ -202,6 +202,7 @@
 #define abpoly_deg(a0,a1)	abcommon_name_(poly_deg) (a0,a1)
 #define abpoly_add(a0,a1,a2,a3)	abcommon_name_(poly_add) (a0,a1,a2,a3)
 #define abpoly_sub(a0,a1,a2,a3)	abcommon_name_(poly_sub) (a0,a1,a2,a3)
+#define abpoly_set_ui(a0,a1,a2)	abcommon_name_(poly_set_ui) (a0,a1,a2)
 #define abpoly_add_ui(a0,a1,a2,a3)	abcommon_name_(poly_add_ui) (a0,a1,a2,a3)
 #define abpoly_sub_ui(a0,a1,a2,a3)	abcommon_name_(poly_sub_ui) (a0,a1,a2,a3)
 #define abpoly_neg(a0,a1,a2)	abcommon_name_(poly_neg) (a0,a1,a2)

@@ -202,6 +202,7 @@
 #define Kpoly_deg(a0)	Kcommon_name_(poly_deg) (K,a0)
 #define Kpoly_add(a0,a1,a2)	Kcommon_name_(poly_add) (K,a0,a1,a2)
 #define Kpoly_sub(a0,a1,a2)	Kcommon_name_(poly_sub) (K,a0,a1,a2)
+#define Kpoly_set_ui(a0,a1)	Kcommon_name_(poly_set_ui) (K,a0,a1)
 #define Kpoly_add_ui(a0,a1,a2)	Kcommon_name_(poly_add_ui) (K,a0,a1,a2)
 #define Kpoly_sub_ui(a0,a1,a2)	Kcommon_name_(poly_sub_ui) (K,a0,a1,a2)
 #define Kpoly_neg(a0,a1)	Kcommon_name_(poly_neg) (K,a0,a1)
