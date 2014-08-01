@@ -68,7 +68,7 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 {
   double s;
 
-  for(int n = 0 ; ; n++) {
+  for(;;) {
 #if defined(__i386)
       /* See comment in utils/usp.c on this. We want to avoid comparison
        * involving an extended precision double ! */
@@ -76,7 +76,7 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 #else
       s = (a + b) * 0.5;
 #endif
-      if (s == a || s == b) { printf("%d\n", n); return s; }
+      if (s == a || s == b) return s;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
@@ -97,7 +97,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 
   pb = double_poly_eval(p, b);
 
-  for(int n = 0 ; ; n++) {
+  for(;;) {
       double s, middle;
 #if defined(__i386)
       /* See above */
@@ -117,7 +117,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
        */
       if (s < a || s > b || ((s == a || s == b) && !(middle == a || middle == b)))
           s = middle;
-      if (s == a || s == b) { printf("%d\n", n); return s; }
+      if (s == a || s == b) return s;
       double ps = double_poly_eval (p, s);
       if (ps * pa > 0) {
           a = s; pa = ps;
