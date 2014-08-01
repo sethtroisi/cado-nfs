@@ -256,6 +256,7 @@ void mpfq_p_8_powz(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt y, mpfq_p_8_src_elt x,
             mpz_t zr;
             mpz_init(zr);
             mpz_t ppz;
+            mpz_init(ppz);
             mpfq_p_8_field_characteristic(k, ppz);
             mpz_pow_ui(ppz,ppz,mpfq_p_8_field_degree(k));
             mpz_sub_ui(ppz,ppz,1);
@@ -290,7 +291,8 @@ int mpfq_p_8_asprint(mpfq_p_8_dst_field k, char * * pstr, mpfq_p_8_src_elt x)
         y[i]=x[i];
     }
     // allocate enough room for base 2 conversion.
-    *pstr = (char *)mpfq_malloc_check((size_x*64+1)*sizeof(char));
+    // mpn_get_str may produce one extra byte
+    *pstr = (char *)mpfq_malloc_check(size_x * 64 + 2);
     n = mpn_get_str((unsigned char*)(*pstr), k->io_base, (mp_limb_t *) y, size_x);
     for (i = 0; i < n; ++i)
         (*pstr)[i] += '0';

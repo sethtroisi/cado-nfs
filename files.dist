@@ -1084,3 +1084,11 @@ linalg/bwc/logline.h
 tests/linalg/bwc/bwc-tests.sh
 tests/linalg/bwc/CMakeLists.txt
 tests/linalg/CMakeLists.txt
+tests/linalg/bwc/mpfq/CMakeLists.txt
+tests/linalg/bwc/mpfq/mpfq_name_K.h
+tests/linalg/bwc/mpfq/mpfq_test_p_1.c
+tests/linalg/bwc/mpfq/mpfq_test_p_2.c
+tests/linalg/bwc/mpfq/mpfq_test_p_3.c
+tests/linalg/bwc/mpfq/mpfq_test_p_4.c
+tests/linalg/bwc/mpfq/mpfq_test_p_8.c
+tests/linalg/bwc/mpfq/mpfq_test_pz.c
