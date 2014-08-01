@@ -614,8 +614,8 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
   else
     if (sa >= 0.)
       while (--count) {
-#if defined(__x86) && !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-	c = *(volatile double *) &((a + b) * .5);
+#if defined(__i386)
+        { volatile double ms = (a + b) * 0.5; c = ms; }
 #else
 	c = (a + b) * .5;
 #endif
@@ -625,8 +625,8 @@ rootRefine (root_struct *r, mpz_t *p, int n, double precision)
       }
     else
       while (--count) {
-#if defined(__x86) && !defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
-	c = *(volatile double *) &((a + b) * .5);
+#if defined(__i386)
+        { volatile double ms = (a + b) * 0.5; c = ms; }
 #else
 	c = (a + b) * .5;
 #endif

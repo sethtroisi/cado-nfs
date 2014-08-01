@@ -69,7 +69,13 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
   double s;
 
   for(;;) {
+#if defined(__i386)
+      /* See comment in utils/usp.c on this. We want to avoid comparison
+       * involving an extended precision double ! */
+      { volatile double ms = (a + b) * 0.5; s = ms; }
+#else
       s = (a + b) * 0.5;
+#endif
       if (s == a || s == b) return s;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
