@@ -1,4 +1,6 @@
 #include "cado.h"
+#define _GNU_SOURCE     /* asprintf */
+#define _BSD_SOURCE     /* asprintf sometimes (I think) */
 /* test_p_1.c is sed- generated from test.c.meta */
 
 #include <stdio.h>
@@ -542,6 +544,7 @@ int main(int argc, char * argv[])
                     Kset_ui(r2, Kfscan(f, a1));
                     });
             fclose(f);
+            unlink(filename);
             free(filename);
         }
         /* This is meant to exert the realloc() feature in fscan */
@@ -565,6 +568,7 @@ int main(int argc, char * argv[])
             Kset_ui(r2, 0);
             Kfscan(f, r2);
             fclose(f);
+            unlink(filename);
             free(filename);
         });
 
@@ -895,6 +899,7 @@ int main(int argc, char * argv[])
                     Kvec_clear(&tvec, tlength);
                     });
             fclose(f);
+            unlink(filename);
             free(filename);
         }
         /* This is meant to exert the realloc() feature in vec_fscan */
@@ -922,6 +927,7 @@ int main(int argc, char * argv[])
             Kvec_set(v2, tvec, 1);
             Kvec_clear(&tvec, tlength);
             fclose(f);
+            unlink(filename);
             free(filename);
         });
 
