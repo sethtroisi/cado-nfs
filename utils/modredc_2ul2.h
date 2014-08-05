@@ -1042,10 +1042,9 @@ _modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
 #else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
   /* THIS CODE DOES NOT WORK */
 #include <stdlib.h>
-  abort();
-#if 0
   unsigned long pl, ph, t[4], k;
   
+  abort();
   ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc2ul2_intlt (b, m[0].m));
 #if defined(MODTRACE)
@@ -1089,7 +1088,6 @@ _modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
 
   r[0] = t[1];
   r[1] = t[2];
-#endif
 #endif
 #if defined(MODTRACE)
   printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
