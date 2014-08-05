@@ -118,11 +118,9 @@ static inline void
 modredc2ul2_frommontgomery (residueredc2ul2_t r, const residueredc2ul2_t s,
 			    const modulusredc2ul2_t m)
 {
-  residueredc2ul2_t t;
-  
   /* Do two REDC steps */
-  modredc2ul2_redc1 (t, s, m);
-  modredc2ul2_redc1 (r, t, m);
+  modredc2ul2_redc1 (r, s, m);
+  modredc2ul2_redc1 (r, r, m);
 }
 
 
