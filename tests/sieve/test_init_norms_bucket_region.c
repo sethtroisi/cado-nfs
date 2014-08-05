@@ -22,9 +22,9 @@
  */
 #define MAX_SMART_ERR 5  /* The error in smart algo must be <= */
 static const double smart_err_max[(MAX_SMART_ERR<<1)+1] = {
-  1E-12, 1E-10, 1E-8, .0009, .06,
+  1E-12, 1E-10, 1E-8, .0015, .06,
   1.,
-  .25, 0.022, 0.000005, 1E-8, 1E-10 };
+  .25, 0.022, 0.00003, 1E-8, 1E-10 };
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -163,7 +163,7 @@ main(int argc, const char *argv[]) {
     fprintf (stderr,  "code BUG(): at least one of the smart relative tolerate errors are too high.\n"
 	     "For %llu values, the differences between the smart and the exact values are :\n", count);
     for (unsigned int i = 0; i < (MAX_SMART_ERR<<1)+1; i++)
-      fprintf (stderr, "   Difference %2d: found %10llu, max accepted %10llu (%'10llu per billon of values)\n",
+      fprintf (stderr, "   Difference %2d: found %10llu, max accepted %10llu (%'10llu per billion of values)\n",
 	       i - (int) MAX_SMART_ERR, smart_err[i], (unsigned long long) (count * smart_err_max[i]),(unsigned long long) (smart_err_max[i] * 1E9));
     exit (EXIT_FAILURE);
   }
