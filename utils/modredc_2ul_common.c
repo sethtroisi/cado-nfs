@@ -724,9 +724,5 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
   if (m[1] != 0UL || m[0] != 1UL)
     t = 0;
   
-#ifdef MODTRACE
-  printf ("kronecker(%lu, %lu) == %d\n", 
-          mod_get_ul (a_par, m_par), mod_getmod_ul (m_par), t);
-#endif
   return t;
 }

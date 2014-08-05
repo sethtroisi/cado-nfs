@@ -120,7 +120,7 @@ find_minus1 (residue_t r1, const residue_t minusone, const int po2,
         break;
     }
 
-  return (i < po2) ? 1 : 0;
+  return i < po2;
 }
 
 
@@ -277,7 +277,7 @@ mod_batchinv (residue_t *r, const residue_t *a, const size_t n,
   }
   
   mod_init_noset0(R, m);
-  if (mod_inv(R, r[n-1], m)== 0)
+  if (!mod_inv(R, r[n-1], m))
     return 0;
 
   if (c != NULL) {
