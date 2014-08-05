@@ -221,7 +221,6 @@ modredc2ul2_inv (residueredc2ul2_t r, const residueredc2ul2_t A,
 }
 
 
-/* Currently very slow, converts a[i] to REDC form on every access */
 int
 modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
                          const residue_t c, const modulus_t m)
@@ -233,25 +232,35 @@ modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
 
   mod_intset_ul(r[0], a[0]);
 
+  /* beta' = 2^64, beta = 2^128 */
   for (size_t i = 1; i < n; i++) {
     _modredc2ul2_mul_ul(r[i], r[i-1], a[i], m);
   }
+  /* For n = 3, r[0] := a[0], r[1] := a[0]*a[1]/beta', r[2] := a[0]*a[1]*a[2]/beta'^2 */
 
   mod_init_noset0(R, m);
-  if (!mod_inv(R, r[n-1], m))
+  /* Computes R = beta^2/r[n-1] */
+  if (!mod_inv(R, r[n - 1], m))
     return 0;
+  /* R := beta^2 beta'^2 / (a[0]*a[1]*a[2]) */
 
   if (c != NULL) {
-    mod_mul(R, R, c, m);
+    mod_mul(R, R, c, m); /* R := beta beta'^2 c / (a[0]*a[1]*a[2]) */
   } else {
-    modredc2ul2_frommontgomery(R, R, m);
+    modredc2ul2_redc1(R, R, m);
+    modredc2ul2_redc1(R, R, m); /* Assume c=1, so R := beta beta'^2 / (a[0]*a[1]*a[2]) */
   }
-  modredc2ul2_frommontgomery(R, R, m);
+  modredc2ul2_redc1(R, R, m); /* R := beta beta' / (a[0]*a[1]*a[2]) */
 
   for (size_t i = n-1; i > 0; i--) {
     mod_mul(r[i], R, r[i-1], m);
+    /* For i=2: r[2] := R * r[1] / beta = beta beta' / (a[0]*a[1]*a[2]) * a[0]*a[1]/beta' / beta = 1 / a[2] */
+    /* For i=1: r[1] := R * r[0] / beta = beta / (a[0]*a[1]) * a[0] / beta = 1 / a[1] */
     _modredc2ul2_mul_ul(R, R, a[i], m);
+    /* For i=2: R := R * a[2] / beta' = beta beta' / (a[0]*a[1]*a[2]) * a[2] / beta' = beta / (a[0]*a[1]) */
+    /* For i=1: R := R * a[1] / beta' = beta / (a[0]*a[1]) * a[1] / beta' = beta' / a[0] */
   }
+  modredc2ul2_redc1(R, R, m); /* R := R / beta' = 1/a[0] */
   mod_set(r[0], R, m);
   mod_clear(R, m);
   return 1;
