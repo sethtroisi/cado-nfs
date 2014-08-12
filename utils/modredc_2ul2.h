@@ -1336,6 +1336,12 @@ modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a,
   return 1;
 }
 
+struct modredc2ul2_batch_Q_to_Fp_context_s {
+  modintredc2ul2_t c;
+  unsigned long rem_ul, ratio_ul, den_inv;
+  modulusredc2ul2_t m;
+};
+typedef struct modredc2ul2_batch_Q_to_Fp_context_s modredc2ul2_batch_Q_to_Fp_context_t;
 
 /* prototypes of non-inline functions */
 int modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
@@ -1372,8 +1378,12 @@ int modredc2ul2_inv (residueredc2ul2_t, const residueredc2ul2_t,
 int modredc2ul2_batchinv (residueredc2ul2_t *, const residueredc2ul2_t *,
                           size_t n, const residueredc2ul2_t,
                           const modulusredc2ul2_t);
-int modredc2ul2_batch_Q_to_Fp (unsigned long *, const modintredc2ul2_t,
-                               const modintredc2ul2_t, unsigned long,
-                               const unsigned long *, size_t);
+modredc2ul2_batch_Q_to_Fp_context_t *
+modredc2ul2_batch_Q_to_Fp_init (const modintredc2ul2_t, const modintredc2ul2_t);
+void modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t *);
+
+int modredc2ul2_batch_Q_to_Fp (unsigned long *,
+                               const modredc2ul2_batch_Q_to_Fp_context_t *,
+                               unsigned long, const unsigned long *, size_t);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
 #endif  /* MODREDC_2UL2_H */

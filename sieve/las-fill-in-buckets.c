@@ -610,7 +610,10 @@ transform_n_roots_2ul2(unsigned long *p, unsigned long *r, fb_iterator t,
      the sign of the root (mod p). The den and num variables contain
      absolute values. */
   const int neg = (mpz_sgn(num_mpz) < 0) != (mpz_sgn(den_mpz) < 0);
-  const int ok = modredc2ul2_batch_Q_to_Fp(r, num, den, k, p, i);
+  modredc2ul2_batch_Q_to_Fp_context_t *context;
+  context = modredc2ul2_batch_Q_to_Fp_init (num, den);
+  const int ok = modredc2ul2_batch_Q_to_Fp(r, context, k, p, i);
+  modredc2ul2_batch_Q_to_Fp_clear (context);
   if(UNLIKELY(!ok)) {
     /* Modular inverse did not exists, i.e., at least one of the factor base
        entries was not coprime to den. Do factor base entries one at a time,
@@ -653,6 +656,7 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 {
   size_t i;
   mpz_poly_srcptr f = si->sides[side]->fij;
+  int use_Q_to_Fp = 0;
 
   const unsigned long k = mpz_scan1(f->coeff[1], 0);
   mpz_t odd_den;
@@ -661,7 +665,7 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
   if (f->deg == 1 && mpz_fits_ulong_p(f->coeff[0]) && mpz_fits_ulong_p(odd_den)) {
     return transform_n_roots_ul(p, r, t, n, side, si);
-  } else if (0 && f->deg == 1 && 
+  } else if (use_Q_to_Fp && f->deg == 1 && 
              mpz_sizeinbase(f->coeff[0], 2) >= MODREDC2UL2_MINBITS &&
              mpz_sizeinbase(f->coeff[0], 2) <= MODREDC2UL2_MAXBITS &&
              mpz_sizeinbase(f->coeff[1], 2) >= MODREDC2UL2_MINBITS &&

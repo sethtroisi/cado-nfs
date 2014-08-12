@@ -278,61 +278,77 @@ modredc2ul2_batchinv_ul (residue_t *r, const unsigned long *a, const size_t n,
   return 1;
 }
 
-
-int
-modredc2ul2_batch_Q_to_Fp (unsigned long *r, const modint_t num,
-                           const modint_t den, const unsigned long k,
-                           const unsigned long *p, const size_t n)
+modredc2ul2_batch_Q_to_Fp_context_t *
+modredc2ul2_batch_Q_to_Fp_init (const modint_t num, const modint_t den)
 {
-  modulus_t m;
-  residue_t *tr;
-  modint_t c;
-  unsigned long rem_ul, ratio_ul;
-  int rc = 1;
+  modredc2ul2_batch_Q_to_Fp_context_t *context;
+  modint_t ratio, remainder;
 
-  mod_initmod_int(m, den);
-  mod_intinit(c);
+  context = (modredc2ul2_batch_Q_to_Fp_context_t *) malloc(sizeof(modredc2ul2_batch_Q_to_Fp_context_t));
+  if (context == NULL)
+    return NULL;
+
+  mod_initmod_int(context->m, den);
+  mod_intinit(context->c); /* c = 0 */
 
   /* Compute ratio = floor(num / den), remainder = num % den. We assume that
     ratio fits into unsigned long, and abort if it does not. We need only the
     low word of remainder. */
-  {
-    modint_t ratio, remainder;
-    mod_intinit(remainder);
-    mod_intinit(ratio);
-    mod_intmod(remainder, num, den);
-    mod_intsub(ratio, num, remainder);
-    mod_intdivexact(ratio, ratio, den);
-    ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
-    ratio_ul = modredc2ul2_intget_ul(ratio);
-    rem_ul = modredc2ul2_intget_ul(remainder);
-    if (!mod_intequal_ul(remainder, 0))
-      mod_intsub(c, den, remainder); /* c = -remainder (mod den) */
-    mod_intclear(ratio);
-    mod_intclear(remainder);
-  }
+  mod_intinit(remainder);
+  mod_intinit(ratio);
+  mod_intmod(remainder, num, den);
+  mod_intsub(ratio, num, remainder);
+  mod_intdivexact(ratio, ratio, den);
+  ASSERT_ALWAYS(modredc2ul2_intfits_ul(ratio));
+  context->ratio_ul = modredc2ul2_intget_ul(ratio);
+  context->rem_ul = modredc2ul2_intget_ul(remainder);
+  if (!mod_intequal_ul(remainder, 0))
+    mod_intsub(context->c, den, remainder); /* c = -remainder (mod den) */
+  mod_intclear(ratio);
+  mod_intclear(remainder);
+
+  context->den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
+
+  return context;
+}
+
+
+void
+modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t * context)
+{
+  mod_clearmod(context->m);
+  mod_intclear(context->c);
+  free(context);
+}
+
+
+int
+modredc2ul2_batch_Q_to_Fp (unsigned long *r,
+                           const modredc2ul2_batch_Q_to_Fp_context_t *context,
+                           const unsigned long k,
+                           const unsigned long *p, const size_t n)
+{
+  residue_t *tr;
+  int rc = 1;
 
   tr = (residue_t *) malloc(n * sizeof(residue_t));
   for (size_t i = 0; i < n; i++) {
-    mod_init_noset0(tr[i], m);
+    mod_init_noset0(tr[i], context->m);
   }
 
-  if (!modredc2ul2_batchinv_ul(tr, p, n, c, m)) {
+  if (!modredc2ul2_batchinv_ul(tr, p, n, context->c, context->m)) {
     rc = 0;
     goto clear_and_exit;
   }
 
-  const unsigned long den_inv = ularith_invmod(modredc2ul2_intget_ul(den));
-
   for (size_t i = 0; i < n; i++)
-    r[i] = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i], rem_ul,
-                                        den_inv, ratio_ul, k);
+    r[i] = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i],
+                                        context->rem_ul, context->den_inv,
+                                        context->ratio_ul, k);
 
 clear_and_exit:
-
-  mod_intclear(c);
   for (size_t i = 0; i < n; i++) {
-    mod_clear(tr[i], m);
+    mod_clear(tr[i], context->m);
   }
   return rc;
 }
