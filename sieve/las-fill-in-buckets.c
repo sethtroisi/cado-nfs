@@ -542,41 +542,20 @@ compute_1_root_ul(const unsigned long p, const unsigned long num,
 }
 
 
-static inline size_t
-transform_n_roots_ul(unsigned long *p, unsigned long *r, fb_iterator t,
-                     const size_t n, const int side, sieve_info_srcptr si)
+static inline unsigned long
+compute_1_root_mpz(const unsigned long p, const mpz_t f0, const mpz_t f1)
 {
-  mpz_poly_srcptr f = si->sides[side]->fij;
-  size_t i;
-  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
-    p[i] = fb_iterator_get_p(t);
-  }
-  const unsigned long num = mpz_get_ui(f->coeff[0]);
-  unsigned long den = mpz_get_ui(f->coeff[1]);
-  /* If exactly one of the two coefficients is negative, we need to flip
-     the sign of the root (mod p). The den and num variables contain
-     absolute values. */
-  const int neg = (mpz_sgn(f->coeff[0]) < 0) != (mpz_sgn(f->coeff[1]) < 0);
-  /* Make den odd, store the exponent of 2 in k */
-  const int k = ularith_ctz(den);
-  den >>= k;
-  int ok = modredcul_batch_Q_to_Fp(r, num, den, k, p, i);
-  if(UNLIKELY(!ok)) {
-    /* Modular inverse did not exists, i.e., at least one of the factor base
-       entries was not coprime to den. Do factor base entries one at a time,
-       handling the non-coprime case properly. */
-    for (size_t j = 0; j < i; j++)
-      r[j] = compute_1_root_ul(p[j], num, den, k, neg);
-  } else if (!neg) {
-    /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
-       then the root is -g_0/g_1, and we need a sign flip. */
-    for (size_t j = 0; j < i; j++)
-      if (r[j] != 0)
-        r[j] =  p[j] - r[j];
-  }
-  return i;
+  return compute_1_root_ul(p, mpz_fdiv_ui(f0, p), mpz_fdiv_ui(f1, p), 0, 0);
 }
 
+
+struct contexts_s {
+  modredc2ul2_batch_Q_to_Fp_context_t *context_2ul2;
+  unsigned long k;
+  unsigned long num_ul, den_ul;
+  int neg;
+};
+static struct contexts_s contexts;
 
 static inline void
 modredc2ul2_set_mpz(modintredc2ul2_t r, const mpz_t a)
@@ -588,59 +567,54 @@ modredc2ul2_set_mpz(modintredc2ul2_t r, const mpz_t a)
   modredc2ul2_intset_uls(r, t, n);
 }
 
-static inline size_t
-transform_n_roots_2ul2(unsigned long *p, unsigned long *r, fb_iterator t,   
-                       const size_t n, const mpz_t num_mpz, const mpz_t den_mpz,
-                       const unsigned long k)
+void
+init_context(const mpz_t num_mpz, const mpz_t den_mpz)
 {
-  size_t i;
-  modintredc2ul2_t num, den;
+  contexts.k = mpz_scan1(den_mpz, 0);
+  mpz_t odd_den_mpz;
+  mpz_init(odd_den_mpz);
+  mpz_tdiv_q_2exp(odd_den_mpz, den_mpz, contexts.k);
 
-  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
-    p[i] = fb_iterator_get_p(t);
-  }
-
-  modredc2ul2_intinit(num);
-  modredc2ul2_intinit(den);
-  /* Set num = |num_mpz|, den = |den_mpz| */
-  modredc2ul2_set_mpz(num, num_mpz);
-  modredc2ul2_set_mpz(den, den_mpz);
-  
   /* If exactly one of the two coefficients is negative, we need to flip
-     the sign of the root (mod p). The den and num variables contain
+     the sign of the root (mod p). The odd_den and num variables contain
      absolute values. */
-  const int neg = (mpz_sgn(num_mpz) < 0) != (mpz_sgn(den_mpz) < 0);
-  modredc2ul2_batch_Q_to_Fp_context_t *context;
-  context = modredc2ul2_batch_Q_to_Fp_init (num, den);
-  const int ok = modredc2ul2_batch_Q_to_Fp(r, context, k, p, i);
-  modredc2ul2_batch_Q_to_Fp_clear (context);
-  if(UNLIKELY(!ok)) {
-    /* Modular inverse did not exists, i.e., at least one of the factor base
-       entries was not coprime to den. Do factor base entries one at a time,
-       handling the non-coprime case properly. */
-    for (size_t j = 0; j < i; j++)
-      r[j] = compute_1_root_ul(p[j], modredc2ul2_intmod_ul(num, p[j]),
-                               modredc2ul2_intmod_ul(den, p[j]), k, neg);
-  } else {
-    if (!neg) {
-      /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
-         then the root is -g_0/g_1, and we need a sign flip. */
-      for (size_t j = 0; j < i; j++)
-        if (r[j] != 0)
-          r[j] =  p[j] - r[j];
-    }
-#if 0
-    /* Very expensive but thorough test */
-    for (size_t j = 0; j < i; j++) {
-      unsigned long tr;
-      tr = compute_1_root_ul(p[j], modredc2ul2_intmod_ul(num, p[j]),
-                             modredc2ul2_intmod_ul(den, p[j]), k, neg);
-      ASSERT_ALWAYS(tr == r[j]);
-    }
-#endif
+  contexts.neg = (mpz_sgn(num_mpz) < 0) != (mpz_sgn(den_mpz) < 0);
+
+  modintredc2ul2_t num, odd_den;
+  modredc2ul2_intinit(num);
+  modredc2ul2_intinit(odd_den);
+  /* Set num = |num_mpz|, odd_den = |odd_den_mpz| */
+  modredc2ul2_set_mpz(num, num_mpz);
+  modredc2ul2_set_mpz(odd_den, odd_den_mpz);
+
+  contexts.context_2ul2 = NULL;
+  contexts.num_ul = contexts.den_ul = 0;
+
+  if (mpz_fits_ulong_p(num_mpz) && mpz_fits_ulong_p(odd_den_mpz))
+  {
+    contexts.num_ul = mpz_get_ui(num_mpz);
+    contexts.den_ul = mpz_get_ui(odd_den_mpz);
+  } else if (mpz_sizeinbase(num_mpz, 2) >= MODREDC2UL2_MINBITS &&
+             mpz_sizeinbase(num_mpz, 2) <= MODREDC2UL2_MAXBITS &&
+             mpz_sizeinbase(odd_den_mpz, 2) >= MODREDC2UL2_MINBITS &&
+             mpz_sizeinbase(odd_den_mpz, 2) <= MODREDC2UL2_MAXBITS )
+  {
+    contexts.context_2ul2 = modredc2ul2_batch_Q_to_Fp_init (num, odd_den);
   }
-  return i;
+
+  mpz_clear(odd_den_mpz);
+  modredc2ul2_intclear(num);
+  modredc2ul2_intclear(odd_den);
 }
+
+void clear_context()
+{
+  if (contexts.context_2ul2 != NULL)
+    modredc2ul2_batch_Q_to_Fp_clear(contexts.context_2ul2);
+  contexts.context_2ul2 = NULL;
+  contexts.num_ul = contexts.den_ul = 0;
+}
+
 
 /* Compute up to n roots of the transformed polynomial, either by tranforming
    the root stored in the factor base, or, if the polynomial has degree 1 and
@@ -656,22 +630,14 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 {
   size_t i;
   mpz_poly_srcptr f = si->sides[side]->fij;
-  int use_Q_to_Fp = 0;
+  int ok = 0;
+  int use_Q_to_Fp = 0 && (f->deg == 1);
 
-  const unsigned long k = mpz_scan1(f->coeff[1], 0);
-  mpz_t odd_den;
-  mpz_init(odd_den);
-  mpz_tdiv_q_2exp(odd_den, f->coeff[1], k);
+  if (use_Q_to_Fp)
+    init_context (f->coeff[0], f->coeff[1]);
 
-  if (f->deg == 1 && mpz_fits_ulong_p(f->coeff[0]) && mpz_fits_ulong_p(odd_den)) {
-    return transform_n_roots_ul(p, r, t, n, side, si);
-  } else if (use_Q_to_Fp && f->deg == 1 && 
-             mpz_sizeinbase(f->coeff[0], 2) >= MODREDC2UL2_MINBITS &&
-             mpz_sizeinbase(f->coeff[0], 2) <= MODREDC2UL2_MAXBITS &&
-             mpz_sizeinbase(f->coeff[1], 2) >= MODREDC2UL2_MINBITS &&
-             mpz_sizeinbase(f->coeff[1], 2) <= MODREDC2UL2_MAXBITS ) {
-    return transform_n_roots_2ul2(p, r, t, n, f->coeff[0], odd_den, k);
-  } else {
+  if (!use_Q_to_Fp || (contexts.den_ul == 0 && contexts.context_2ul2 == NULL)) {
+    /* Do the old transform with separate inverse modulo each p */
     for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
       fbprime_t current_p = fb_iterator_get_p(t);
       ASSERT_ALWAYS (current_p & 1);
@@ -679,7 +645,44 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
       p[i] = current_p;
       r[i] = fb_root_in_qlattice(current_p, R, t->fb->invp, si);
     }
+    return i;
   }
+
+  /* Collect primes from fb, store up to n namy of them in p, and the actual
+     number of stored primes in i */
+  for (i = 0; !fb_iterator_over(t) && i < n; i++, fb_iterator_next(t)) {
+    p[i] = fb_iterator_get_p(t);
+  }
+
+  if (contexts.den_ul != 0) {
+    ok = modredcul_batch_Q_to_Fp(r, contexts.num_ul, contexts.den_ul, contexts.k, p, i);
+  } else if (contexts.context_2ul2 != NULL) {
+    ok = modredc2ul2_batch_Q_to_Fp(r, contexts.context_2ul2, contexts.k, p, i);
+  }
+
+  if(UNLIKELY(!ok)) {
+    /* Modular inverse did not exists, i.e., at least one of the factor base
+       entries was not coprime to den. Do factor base entries one at a time,
+       handling the non-coprime case properly. */
+    for (size_t j = 0; j < i; j++)
+      r[j] = compute_1_root_mpz(p[j], f->coeff[0], f->coeff[1]);
+  } else if (!contexts.neg) {
+    /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
+       then the root is -g_0/g_1, and we need a sign flip. */
+    for (size_t j = 0; j < i; j++)
+      if (r[j] != 0)
+        r[j] =  p[j] - r[j];
+  }
+
+#if 0
+    /* Very expensive but thorough test */
+    for (size_t j = 0; j < i; j++) {
+      unsigned long tr = compute_1_root_mpz(p[j], f->coeff[0], f->coeff[1]);
+      ASSERT_ALWAYS(tr == r[j]);
+    }
+#endif
+
+  clear_context(contexts.context_2ul2);
   return i;
 }
 
