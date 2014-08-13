@@ -25,18 +25,50 @@
 #include "cado_poly.h"
 
 #define DEG_PY 2
+#if DEG_PY > 2
+#error "the code works only for Py of degree <= 2, sorry."
+#endif
+
+//typedef int coeff_t;
 
 typedef struct {
   int t;     // parameter t
   int PY[DEG_PY + 1]; // no --> use one of the poly stuct of cado-nfs!
   int f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
                          // set to 10 at the moment in cado_poly.h
-}table_f_poly_t;
+}row_f_poly_t;
 
 // tables containing polynomials f
 // how to encode varphi form ?
+typedef struct {
+  unsigned int deg_f;
+  unsigned int deg_Py;
+  unsigned int deg_varphi;
+  row_f_poly_t* table_f;
+  int varphi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
+  //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
+}table_f_poly_t;
 
 #include "table_t_Py_f_deg4_type0_h1_t-200--200.c"
+table_f_poly_t table_f4;
+table_f4.table_f = TAB_f4_CYCLIC; // there are all pointers
+table_f4.deg_f = 4;
+table_f4.deg_varphi = 2;
+table_f4.deg_Py = 2;
+table_f4.varphi = {{-1, 0}, {0, 1}, {1,0}}; // -1 + y*X + X^2
+
+void eval_varphi(table_f_poly_t * table_f, mpz_t u, mpz_t v)
+{
+  int i,j;
+  for (i=0; i <= table_f.deg_varphi; i++){
+    for (j=0; j < table_f.deg_Py; j++){
+      // table_f.varphi[i][0] * v
+      // table_f.varphi[i][1] * u
+    }
+  }
+
+}
+
 
 
 // for MurphyE value
