@@ -350,5 +350,6 @@ clear_and_exit:
   for (size_t i = 0; i < n; i++) {
     mod_clear(tr[i], context->m);
   }
+  free(tr);
   return rc;
 }
