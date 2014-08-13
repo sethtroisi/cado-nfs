@@ -1384,6 +1384,6 @@ void modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t *);
 
 int modredc2ul2_batch_Q_to_Fp (unsigned long *,
                                const modredc2ul2_batch_Q_to_Fp_context_t *,
-                               unsigned long, const unsigned long *, size_t);
+                               unsigned long, int, const unsigned long *, size_t);
 int modredc2ul2_jacobi (const residueredc2ul2_t, const modulusredc2ul2_t);
 #endif  /* MODREDC_2UL2_H */

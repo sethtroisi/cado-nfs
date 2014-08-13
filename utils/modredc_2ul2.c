@@ -325,7 +325,7 @@ modredc2ul2_batch_Q_to_Fp_clear (modredc2ul2_batch_Q_to_Fp_context_t * context)
 int
 modredc2ul2_batch_Q_to_Fp (unsigned long *r,
                            const modredc2ul2_batch_Q_to_Fp_context_t *context,
-                           const unsigned long k,
+                           const unsigned long k, const int neg,
                            const unsigned long *p, const size_t n)
 {
   residue_t *tr;
@@ -341,10 +341,15 @@ modredc2ul2_batch_Q_to_Fp (unsigned long *r,
     goto clear_and_exit;
   }
 
-  for (size_t i = 0; i < n; i++)
-    r[i] = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i],
-                                        context->rem_ul, context->den_inv,
-                                        context->ratio_ul, k);
+  for (size_t i = 0; i < n; i++) {
+    unsigned long t;
+    t = ularith_post_process_inverse(mod_intget_ul(tr[i]), p[i],
+                                     context->rem_ul, context->den_inv,
+                                     context->ratio_ul, k);
+    if (neg && t != 0)
+      t = p[i] - t;
+    r[i] = t;
+  }
 
 clear_and_exit:
   for (size_t i = 0; i < n; i++) {

@@ -655,8 +655,15 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
 
   if (contexts->den_ul != 0) {
     ok = modredcul_batch_Q_to_Fp(r, contexts->num_ul, contexts->den_ul, contexts->k, p, i);
+    if (ok && !contexts->neg) {
+      /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
+         then the root is -g_0/g_1, and we need a sign flip. */
+      for (size_t j = 0; j < i; j++)
+        if (r[j] != 0)
+          r[j] = p[j] - r[j];
+    }
   } else if (contexts->context_2ul2 != NULL) {
-    ok = modredc2ul2_batch_Q_to_Fp(r, contexts->context_2ul2, contexts->k, p, i);
+    ok = modredc2ul2_batch_Q_to_Fp(r, contexts->context_2ul2, contexts->k, !contexts->neg, p, i);
   }
 
   if(UNLIKELY(!ok)) {
@@ -667,12 +674,6 @@ transform_n_roots(unsigned long *p, unsigned long *r, fb_iterator t,
     mpz_poly_srcptr f = si->sides[side]->fij;
     for (size_t j = 0; j < i; j++)
       r[j] = compute_1_root_mpz(p[j], f->coeff[0], f->coeff[1]);
-  } else if (!contexts->neg) {
-    /* We computed r[i] = |g_0| / |g_1| (mod p[i]). If both g0, g1 have the same sign,
-       then the root is -g_0/g_1, and we need a sign flip. */
-    for (size_t j = 0; j < i; j++)
-      if (r[j] != 0)
-        r[j] = p[j] - r[j];
   }
 
 #if 0
