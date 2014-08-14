@@ -149,14 +149,13 @@ _modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
 	  m[0].m[1], LONG_BIT, m[0].m[0]);
 #endif
 
-  unsigned long dummy;
+  unsigned long u = m[0].invm, a0 = a[0];
   __asm__ __VOLATILE (
     /* Product of low words */
-    "movq %[a0], %%rax\n\t"
     "mulq %[b]\n\t"          /* rdx:rax = a0*b <= (2^64-1)^2 */
     "movq %%rdx, %[t0]\n\t"  /* t0:rax = a0*b <= (2^64-1)^2 */
     /* Compute u such that a0*b + u*m == 0 (mod 2^64), compute u*m, add to t0:rax */
-    "imulq %[invm], %%rax\n\t"
+    "imulq %[u], %%rax\n\t"
     "movq %%rax, %[u]\n\t"  /* u <= 2^64-1 */
     "xorl %k[t1], %k[t1]\n\t"
     "mulq %[m0]\n\t"         /* rdx:rax = u*m0 <= (2^64-1)^2 */
@@ -166,12 +165,12 @@ _modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
     "setc %b[t1]\n\t"        /* t1:t0 = (a0*b + u*m0) / 2^64 <= 2*2^64 - 4 */
     "mulq %[m1]\n\t"         /* rdx:rax = u*m1 */
     "addq %%rax, %[t0]\n\t"
-    "movq %[a0], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "movq %[a1], %%rax\n\t"  /* independent, goes in pipe 0 */
     "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b+u*m)/2^64 <= 2^126 - 2^62 */
+    /* Free slot in pipe 2 here */
     ABORT_IF_CY
 
     /* Product of low and high word */
-    "movq %[a1], %%rax\n\t"
     "mulq %[b]\n\t"          /* rdx:rax = a1*b <= (2^63-2^32-1)*(2^64-1) */
     "addq %%rax, %[t0]\n\t"
     "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = ((a1*2^64 + a0)*b + u*m) / 2^64
@@ -187,10 +186,10 @@ _modredc2ul2_mul_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
     "sbbq %[m1], %[t1]\n\t"
     "cmovc %%rax, %[t0]\n\t" /* Carry -> restore old result */
     "cmovc %%rdx, %[t1]\n\t"
-    : [u] "=&r" (dummy), [t0] "=&r" (r[0]), [t1] "=&r" (r[1])
-    : [a0] "g" (a[0]), [a1] "g" (a[1]), [b] "rm" (b),
-      [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
-    : "%rax", "%rdx", "cc"
+    : [u] "+&r" (u), [t0] "=&r" (r[0]), [t1] "=&r" (r[1]), [a0] "+&a" (a0)
+    : [a1] "g" (a[1]), [b] "rm" (b),
+      [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1])
+    : "%rdx", "cc"
   );
 #else /* HAVE_GCC_STYLE_AMD64_INLINE_ASM */
   /* THIS CODE DOES NOT WORK */
