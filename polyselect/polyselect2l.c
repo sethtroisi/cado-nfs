@@ -2039,6 +2039,26 @@ main (int argc, char *argv[])
     exit (1);
   }
 
+  param_list_parse_size_t (pl, "keep", &keep);
+  /* initialize best norms */
+  if (keep > 0) {
+    best_opt_logmu = (double *) malloc(keep * sizeof(double));
+    ASSERT_ALWAYS(best_opt_logmu != NULL);
+    best_logmu = (double *) malloc(keep * sizeof(double));
+    ASSERT_ALWAYS(best_logmu != NULL);
+  } else {
+    /* Allow keep == 0, say, if we want only timings. malloc() may or may not
+       return a NULL pointer for a size argument of zero, so we do it
+       ourselves. */
+    best_opt_logmu = NULL;
+    best_logmu = NULL;
+  }
+  for (size_t i = 0; i < keep; i++)
+    {
+      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
+      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
+    }
+
   /* filename for doing rootsieve only */
   rootsieve_filename = param_list_lookup_string (pl, "rootsieve");
   if (rootsieve_filename != NULL) {
@@ -2067,26 +2087,6 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
-  param_list_parse_size_t (pl, "keep", &keep);
-  /* initialize best norms */
-  if (keep > 0) {
-    best_opt_logmu = (double *) malloc(keep * sizeof(double));
-    ASSERT_ALWAYS(best_opt_logmu != NULL);
-    best_logmu = (double *) malloc(keep * sizeof(double));
-    ASSERT_ALWAYS(best_logmu != NULL);
-  } else {
-    /* Allow keep == 0, say, if we want only timings. malloc() may or may not
-       return a NULL pointer for a size argument of zero, so we do it
-       ourselves. */
-    best_opt_logmu = NULL;
-    best_logmu = NULL;
-  }
-  for (size_t i = 0; i < keep; i++)
-    {
-      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
-      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
-    }
-
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
