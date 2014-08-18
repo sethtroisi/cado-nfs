@@ -43,7 +43,7 @@ char *phash = "";
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
-int keep = KEEP;
+size_t keep = KEEP;
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 int rseffort = DEFAULT_RSEFFORT; /* sieving effort, among 1-5 */
@@ -67,7 +67,7 @@ double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
-double best_opt_logmu[KEEP], best_logmu[KEEP + 1];
+double *best_opt_logmu, *best_logmu;
 double rootsieve_time = 0.0, optimize_time = 0.0;
 int raw = 0;
 
@@ -1941,7 +1941,8 @@ declare_usage(param_list pl)
   snprintf (str, 200, "maximum number of special-q's considered\n"
             "               for each ad (default %d)", INT_MAX);
   param_list_decl_usage(pl, "nq", str);
-  param_list_decl_usage(pl, "keep", "number of polynomials kept (default 10)");
+  snprintf(str, 200, "number of polynomials kept (default %d)", KEEP);
+  param_list_decl_usage(pl, "keep", str);
   param_list_decl_usage(pl, "out", "filename for msieve-format output");
   param_list_decl_usage(pl, "r", "(switch) size-optimize polynomial only (skip root-optimization)");
   param_list_decl_usage(pl, "noc3", "(switch) don't try to reduce c_3 of degree-6 polynomials");
@@ -1972,6 +1973,7 @@ usage (const char *argv, const char * missing, param_list pl)
         missing);
   }
   param_list_print_usage(pl, argv, stderr);
+  param_list_clear (pl);
   exit (EXIT_FAILURE);
 }
 
@@ -1986,7 +1988,7 @@ main (int argc, char *argv[])
   unsigned int d = 0;
   unsigned long P = 0, admin, admax;
   double admin_d, admax_d;
-  int quiet = 0, tries = 0, i, nthreads = 1, st,
+  int quiet = 0, tries = 0, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
   FILE *fp;
@@ -2020,13 +2022,6 @@ main (int argc, char *argv[])
     fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
     usage (argv0[0], NULL, pl);
   }
-
-  /* initialize best norms */
-  for (i = 0; i < keep; i++)
-    {
-      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
-      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
-    }
 
   /* These parameters need to be parsed even for -rootsieve */
   if (param_list_parse_double (pl, "area", &area) == 0) /* no -area */
@@ -2072,12 +2067,26 @@ main (int argc, char *argv[])
 
   param_list_parse_int (pl, "t", &nthreads);
   param_list_parse_int (pl, "nq", &nq);
-  param_list_parse_int (pl, "keep", &keep);
-  if (keep <= 0 || keep > KEEP)
+  param_list_parse_size_t (pl, "keep", &keep);
+  /* initialize best norms */
+  if (keep > 0) {
+    best_opt_logmu = (double *) malloc(keep * sizeof(double));
+    ASSERT_ALWAYS(best_opt_logmu != NULL);
+    best_logmu = (double *) malloc(keep * sizeof(double));
+    ASSERT_ALWAYS(best_logmu != NULL);
+  } else {
+    /* Allow keep == 0, say, if we want only timings. malloc() may or may not
+       return a NULL pointer for a size argument of zero, so we do it
+       ourselves. */
+    best_opt_logmu = NULL;
+    best_logmu = NULL;
+  }
+  for (size_t i = 0; i < keep; i++)
     {
-      fprintf (stderr, "Error, keep should be in [1,%d]\n", KEEP);
-      exit (1);
+      best_opt_logmu[i] = LOGNORM_MAX; /* best logmu after size optimization */
+      best_logmu[i] = LOGNORM_MAX;     /* best logmu after rootsieve */
     }
+
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
@@ -2198,7 +2207,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, cannot allocate memory in main\n");
     exit (1);
   }
-  for (i = 0; i < nthreads ; i++)
+  for (int i = 0; i < nthreads ; i++)
   {
     mpz_init_set (T[i]->N, N);
     T[i]->d = d;
@@ -2218,7 +2227,7 @@ main (int argc, char *argv[])
 
   while (admin <= admax && seconds () - st0 <= maxtime)
   {
-    for (i = 0; i < nthreads ; i++)
+    for (int i = 0; i < nthreads ; i++)
     {
       tries ++;
       if (verbose >= 1)
@@ -2234,7 +2243,7 @@ main (int argc, char *argv[])
       admin += incr;
     }
 #ifdef MAX_THREADS
-    for (i = 0 ; i < nthreads ; i++)
+    for (int i = 0 ; i < nthreads ; i++)
       pthread_join(tid[i], NULL);
 #endif
 
@@ -2302,7 +2311,7 @@ main (int argc, char *argv[])
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d size-optimized, %d rootsieved\n",
           tries, tot_found, opt_found, ros_found);
 
-  for (i = 0; i < nthreads ; i++)
+  for (int i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
   free (T);
   clearPrimes (&Primes);
@@ -2312,14 +2321,14 @@ print_statistics:
   if (collisions_good > 0)
     {
       printf ("# Stat: best logmu after size optimization:");
-      for (i = 0; i < keep; i++)
+      for (size_t i = 0; i < keep; i++)
         if (best_opt_logmu[i] < LOGNORM_MAX)
           printf (" %1.2f", best_opt_logmu[i]);
       printf ("\n");
       if (raw == 0) /* if only size-optimized, same as above */
         {
           printf ("# Stat: best logmu after size+root optimization:");
-          for (i = 0; i < keep; i++)
+          for (size_t i = 0; i < keep; i++)
             if (best_logmu[i] < LOGNORM_MAX)
               printf (" %1.2f", best_logmu[i]);
           printf ("\n");
@@ -2355,6 +2364,8 @@ print_statistics:
   mpz_clear (N);
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
+  free(best_opt_logmu);
+  free(best_logmu);
   param_list_clear (pl);
 
   return 0;
