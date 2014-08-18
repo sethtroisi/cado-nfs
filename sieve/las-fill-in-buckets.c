@@ -570,10 +570,11 @@ modredc2ul2_set_mpz(modintredc2ul2_t r, const mpz_t a)
 static void
 init_Q_to_Fp_context(struct contexts_s *contexts, mpz_poly_srcptr f)
 {
+  const int use_Q_to_Fp = 0;
   contexts->context_2ul2 = NULL;
   contexts->num_ul = contexts->den_ul = 0;
 
-  if (f->deg != 1)
+  if (!use_Q_to_Fp || f->deg != 1)
     return;
 
   contexts->k = mpz_scan1(f->coeff[1], 0);
