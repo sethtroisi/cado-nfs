@@ -28,6 +28,7 @@
 #if DEG_PY > 2
 #error "the code works only for Py of degree <= 2, sorry."
 #endif
+#define VARPHI_COEFF_INT 1
 
 //typedef int coeff_t;
 
@@ -51,24 +52,50 @@ typedef struct {
 
 #include "table_t_Py_f_deg4_type0_h1_t-200--200.c"
 table_f_poly_t table_f4;
-table_f4.table_f = TAB_f4_CYCLIC; // there are all pointers
+table_f4.table_f = TAB_f4_CYCLIC; // both pointers
 table_f4.deg_f = 4;
 table_f4.deg_varphi = 2;
 table_f4.deg_Py = 2;
 table_f4.varphi = {{-1, 0}, {0, 1}, {1,0}}; // -1 + y*X + X^2
 
-void eval_varphi(table_f_poly_t * table_f, mpz_t u, mpz_t v)
+/**
+ * \brief evaluate varphi at (u,v) and outputs a polynomial g, 
+ *        assuming that Py is of degree 2.
+ * 
+ * \param[in] table_f structure that contains varphi and its degree
+ * \param[in] u  mpz_t integer, of size half the size of p
+ * \param[in] v  mpz_t integer, of size half the size of p
+ *               u/v = y mod p with y a root of PY mod p.
+ * \param[out] g polynomial g (already initialized)
+ * 
+ * NOTE: maybe input varphi and deg_varphi directly ? Or a poly structure ?
+ */
+// works only if PY is of degree 2
+void eval_varphi_mpz(mpz_poly_t g, mpz_t** varphi_coeff, int deg_varphi, mpz_t u, mpz_t v)
 {
-  int i,j;
-  for (i=0; i <= table_f.deg_varphi; i++){
-    for (j=0; j < table_f.deg_Py; j++){
-      // table_f.varphi[i][0] * v
-      // table_f.varphi[i][1] * u
-    }
+  int i;
+  for (i=0; i <= deg_varphi; i++){
+    mpz_mul(g->coeff[i], v, varphi_coeff[i][0]);    // gi <- varphi_i0 * v
+    mpz_addmul(g->coeff[i], u, varphi_coeff[i][1]); // gi <- gi + varphi_i1 * u
   }
-
 }
-
+    // t[0] + t[1]*X + ... + t[deg_varphi]*X^deg_varphi
+    // with t[i] = t[i][0] + t[i][1]*Y + ... t[i][deg_Py - 1]*Y^(deg_Py-1)
+    // t[i][j] are int
+    // u, v are mpz_t (multi precision integers)
+    // table_f.varphi[i][0] * v +
+    // table_f.varphi[i][1] * u
+    // varphi_i = varphi_i0 + varphi_i1 * Y
+    // the function does not use modular arithmetic but exact integer arithmetic
+void eval_varphi_si(mpz_poly_t g, long int** varphi_coeff, int deg_varphi, mpz_t u, mpz_t v)
+{
+  int i;
+  for (i=0; i <= deg_varphi; i++){
+    // if varphi has coefficients of type (signed) long int
+    mpz_mul_si(g->coeff[i], v, varphi_coeff[i][0]);    // gi <- varphi_i0 * v
+    mpz_addmul_si(g->coeff[i], u, varphi_coeff[i][1]); // gi <- gi + varphi_i1 * u
+  }
+}
 
 
 // for MurphyE value
@@ -109,7 +136,7 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 
 
 /**
- * \brief test if varphi is a suitable candidate for giving g or not
+ * \brief test wether varphi is a suitable candidate for computing g from it
  * 
  * \param[in] p multiprecision integer, prime
  * \param[in] k integer greater than 1 ( k = 2 or 3 at the moment)
