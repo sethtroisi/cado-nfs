@@ -4,7 +4,8 @@
   varphi := x^2 + y*x - 1;
  */
 
-row_f_poly_t tab_t_Py_f_deg4_type0_h1[26] = {\
+
+const row_f_poly_t tab_t_Py_f_deg4_type0_h1[26] = {\
     { {-103}, {  -4, -103,    1, }, {   1, -103,   -6,  103,    1, }, /* 2.03E-3 */}, \
     { { 103}, {  -4,  103,    1, }, {   1,  103,   -6, -103,    1, }, /* 2.02E-3 */}, \
     { { -22}, {  -4,  -22,    1, }, {   1,  -22,   -6,   22,    1, }, /* 1.88E-3 */}, \
@@ -33,5 +34,20 @@ row_f_poly_t tab_t_Py_f_deg4_type0_h1[26] = {\
     { { -15}, {  -4,  -15,    1, }, {   1,  -15,   -6,   15,    1, }, /* 1.30E-3 */}, \
 };
 
-#define TAB_f4_CYCLIC tab_t_Py_f_deg4_type0_h1
-#define TAB_f4_CYCLIC_SIZE 26
+const unsigned int table_f4_size = 26;
+const table_f_poly_t table_f4 = {
+  4, 
+  2,
+  2,
+  tab_t_Py_f_deg4_type0_h1,
+  {{-1, 0}, {0, 1}, {1,0}}
+};
+
+/* const table_f_poly_t table_f4;
+table_f4.table_f = TAB_f4_CYCLIC; // both pointers
+table_f4.deg_f = 4;
+table_f4.deg_varphi = 2;
+table_f4.deg_Py = 2;
+table_f4.varphi = {{-1, 0}, {0, 1}, {1,0}}; // -1 + y*X + X^2
+*/
+

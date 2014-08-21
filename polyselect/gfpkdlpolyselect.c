@@ -23,40 +23,11 @@
 //#include <time.h> 
 
 #include "cado_poly.h"
+#include "gfpkdlpolyselect.h"
 
-#define DEG_PY 2
-#if DEG_PY > 2
-#error "the code works only for Py of degree <= 2, sorry."
-#endif
-#define VARPHI_COEFF_INT 1
-
-typedef long int coeff_t;
-
-typedef struct {
-  coeff_t t;     // parameter t
-  coeff_t PY[DEG_PY + 1]; // no --> use one of the poly stuct of cado-nfs!
-  coeff_t f[MAXDEGREE + 1];  // polynomial f of degree at most MAXDEGREE 
-                         // set to 10 at the moment in cado_poly.h
-}row_f_poly_t;
-
-// tables containing polynomials f
-// how to encode varphi form ?
-typedef struct {
-  unsigned int deg_f;
-  unsigned int deg_Py;
-  unsigned int deg_varphi;
-  row_f_poly_t* table_f;
-  coeff_t varphi[MAXDEGREE + 1][DEG_PY]; // poly whose coefficients are themselves poly in Y 
-  //(a root of PY) modulo PY so of degree at most DEG_PY-1 --> of DEG_PY coeffs.
-}table_f_poly_t;
-
-#include "table_t_Py_f_deg4_type0_h1_t-200--200.c"
-table_f_poly_t table_f4;
-table_f4.table_f = TAB_f4_CYCLIC; // both pointers
-table_f4.deg_f = 4;
-table_f4.deg_varphi = 2;
-table_f4.deg_Py = 2;
-table_f4.varphi = {{-1, 0}, {0, 1}, {1,0}}; // -1 + y*X + X^2
+extern const row_f_poly_t tab_t_Py_f_deg4_type0_h1[26];
+extern const unsigned int table_f4_size;
+extern const table_f_poly_t table_f4;
 
 /**
  * \brief evaluate varphi at (u,v) and outputs a polynomial g, 
@@ -87,7 +58,7 @@ void eval_varphi_mpz(mpz_poly_t g, mpz_t** varphi_coeff, unsigned int deg_varphi
     // table_f.varphi[i][1] * u
     // varphi_i = varphi_i0 + varphi_i1 * Y
     // the function does not use modular arithmetic but exact integer arithmetic
-void eval_varphi_si(mpz_poly_t g, coeff_t** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v)
+void eval_varphi_si(mpz_poly_t g, long int** varphi_coeff, unsigned int deg_varphi, mpz_t u, mpz_t v)
 {
   unsigned int i;
   for (i=0; i <= deg_varphi; i++){
@@ -114,21 +85,22 @@ double bound_g=BOUND_G;
  * 
  */
 bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
-			    table_f_poly_t* table_f, \
+			    table_f_poly_t** table_f, \
 			    unsigned int* table_f_size)
 {
   switch (deg_f){
   case 4:
-    table_f = TAB_f4_CYCLIC;
-    *table_f_size = TAB_f4_CYCLIC_SIZE;
+    *table_f = &(table_f4);
+    *table_f_size = table_f4_size;
     return true;
+    /*
   case 6:
     table_f = TAB_f6_CYCLIC;
     *table_f_size = TAB_f6_CYCLIC_SIZE;
-    return true;
+    return true;*/
   default:
     table_f = NULL;
-    *table_f_size = O;
+    *table_f_size = 0;
     return false;
   }
 }
@@ -166,7 +138,7 @@ bool is_irreducible_ZZ(mpz_poly_t varphi)
       //compute discriminant, varphi = a*x^2 + b*x + c
       mpz_init(D);
       mpz_init(tmp);
-      mpz_mul(D, varphi->coeff[1]); //   D <- b^2
+      mpz_mul(D, varphi->coeff[1], varphi->coeff[1]); //   D <- b^2
       mpz_mul(tmp, varphi->coeff[0], varphi->coeff[2]); // tmp <- a*c
       mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
       sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
@@ -211,7 +183,7 @@ bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p)
 	    otherwise varphi is irreducible
      if deg >= 3: use MPFQ library ?
   */
-  int degree, sign_D, exact_sqrt;
+  int degree, sign_D, Legendre_D_p;
   bool is_irreducible = false;
   mpz_t D, tmp;
   degree = varphi->deg;
@@ -223,7 +195,7 @@ bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p)
       //compute discriminant, varphi = a*x^2 + b*x + c
       mpz_init(D);
       mpz_init(tmp);
-      mpz_mul(D, varphi->coeff[1]); //   D <- b^2
+      mpz_mul(D, varphi->coeff[1], varphi->coeff[1]); //   D <- b^2
       mpz_mul(tmp, varphi->coeff[0], varphi->coeff[2]); // tmp <- a*c
       mpz_mul_ui(tmp, tmp, 4);      // tmp <- 4*a*c
       sign_D = mpz_cmp(D, tmp);     // sign_D = 1 if b^2 > 4ac, 0 if b^2 = 4ac, -1 if b^2 < 4ac
@@ -294,13 +266,14 @@ void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f )
   table_f_poly_t* table_f;
   unsigned int table_f_size;
   polygen_CONJ_get_tab_f(k, &table_f, &table_f_size);
-  
+  /*
   while ()// nothing found
     // i.e. the i-th polynomial in f is not irreducible mod p,
     // or is but PY has no root.
     {
 
     }
+  */
 }
 
 /**
