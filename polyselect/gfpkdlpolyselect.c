@@ -19,15 +19,33 @@
 #include "murphyE.h"
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 //#include <time.h> 
 
 #include "cado_poly.h"
 #include "gfpkdlpolyselect.h"
 
-extern const row_f_poly_t tab_t_Py_f_deg4_type0_h1[26];
+#include "table_t_Py_f_deg4_type0_h1_t-200--200.c"
+/*extern const row_f_poly_t tab_t_Py_f_deg4_type0_h1[26];
 extern const unsigned int table_f4_size;
-extern const table_f_poly_t table_f4;
+extern const table_f_poly_t table_f4;*/
+
+/**
+ * \brief Return appropriate degrees of polynomials f and g for CONJUGATION
+ * method according to extension degree field k > 1.
+ * 
+ * \param[in] k integer greater than 1 ( k = 2 or 3 at the moment)
+ * \param[out] deg_f degree of polynomial f, this is 2*k
+ * \param[out] deg_g degree of polynomial g, this is k
+ * 
+ * note that deg_f >= deg_g by general convention in all this cado-nfs library.
+ */
+void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_g){
+  *deg_f = 2*k;
+  *deg_g = k;
+}
 
 /**
  * \brief evaluate varphi at (u,v) and outputs a polynomial g, 
@@ -206,13 +224,16 @@ bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p)
 	mpz_sub(D, D, tmp); //   D <- b^2 - 4*a*c and is > 0
 	// is_square mod p ?
 	// compute Legendre symbol
-	  Legendre_D_p = mpz_Legendre(D);
+	Legendre_D_p = mpz_legendre(D, p);
 	  if (Legendre_D_p >= 0){ // indeed, (D/p) can be 0 if D is a multiple of p.
 	    is_irreducible = false;
 	  }else{ // (D/p) = -1
 	    is_irreducible = true;
 	  }
       }// sign_D == 0
+    }else{
+      // degree > 2, use a function that tests irreducibility. But the function does not exists yet.
+      is_irreducible = false;
     }// degree == 2
   }// degree <= 1
   return is_irreducible;
@@ -265,7 +286,13 @@ void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f )
   /*which f table to choose ? */
   table_f_poly_t* table_f;
   unsigned int table_f_size;
+  
   polygen_CONJ_get_tab_f(k, &table_f, &table_f_size);
+  // Now, find an appropriate poly f in that table.
+  // start with the first one, etc because the polynomials are sorted in 
+  // decreasing order of interest (decreasing order of Murphy E value
+  
+ 
   /*
   while ()// nothing found
     // i.e. the i-th polynomial in f is not irreducible mod p,
@@ -285,7 +312,53 @@ void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f )
  * \param[out] g polynomial (the one of lower degree)
  *
  */
-void polygen_CONJ_g ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t g )
-{
+void polygen_CONJ_g ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t g ){
 
 }
+
+
+/**
+ * \brief The main function that computes f and g and print them in the .poly file.
+ * 
+ * \param[in] p multiprecision integer, prime
+ * \param[in] k integer greater than 1 ( k = 2 or 3 at the moment)
+ * \param[in] label tring to label the output .poly file
+ * 
+ */
+
+void gfpkdlpolyselect( mpz_t p, unsigned int k, char* label){
+
+  int dd_p, deg_f = 2*k, deg_g = 2*k;
+  // take the largest possibility as default init for deg_f and deg_g.
+  mpz_poly_t f, g;
+  
+  get_degree_CONJ_f_g(k, &deg_f, &deg_g);
+
+  mpz_poly_init(f, deg_f);
+  mpz_poly_init(g, deg_g);
+
+  // is there a mpz_t function to compute the size in decimal digits of a number ?
+  // look at Miscellanous Functions on Integers in GMP doc
+  dd_p = mpz_sizeinbase(p, 10);
+
+  char* filename = (char*)malloc(strlen(label) + 16);
+
+  sprintf(filename, "p%ddd%d%s.poly", k, dd_p, label);
+  FILE* outputpoly = fopen(filename, "w");
+  if (outputpoly != NULL){
+    // do stuff
+
+    // is there a printing function for f and g ?
+    // dlpolyselect.c: NO, there is 
+    // print_nonlinear_poly_info(f, g, deg_f, deg_g, 1);
+    // but that does NOT do what I want.
+    fclose(outputpoly);
+  }else{
+    fprintf(stderr, "Error output file: %s .\n", filename);
+  }
+
+  mpz_poly_clear(f);
+  mpz_poly_clear(g);
+
+}
+
