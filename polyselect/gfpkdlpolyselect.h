@@ -50,10 +50,14 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
 			    unsigned int* table_f_size);
 bool is_irreducible_ZZ(mpz_poly_t varphi);
 bool is_irreducible_mod_p(mpz_poly_t varphi, mpz_t p);
+bool is_irreducible_mod_p_si(mpz_poly_t varphi, mpz_t p); //???
+// I need a function that works also for polynomials of small coafficients (signed long int)
 bool is_good_varphi(mpz_poly_t varphi, unsigned int k, mpz_t p);
-bool is_good_f_PY();
+bool is_good_f_PY(row_f_poly_t* row_t_Py_f, mpz_poly_t** varphi);
 void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f );
 void polygen_CONJ_g ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t g );
+
+unsigned int get_index_next_poly_in_tab_f(table_f_poly_t * table_f, unsigned int table_f_size);
 
 void gfpkdlpolyselect( mpz_t p, unsigned int k, char* label);
 

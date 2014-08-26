@@ -51,11 +51,13 @@ void get_degree_CONJ_f_g(unsigned int k, unsigned int *deg_f, unsigned int *deg_
  * \brief evaluate varphi at (u,v) and outputs a polynomial g, 
  *        assuming that Py is of degree 2.
  * 
- * \param[in] table_f structure that contains varphi and its degree
+ * \param[in] varphi_coeff double entry array. The poly varphi is expressed as (ZZ[y])[X]
+ *                         i.e. sum_{i=0}^{deg varphi} ((a_{i0} + a_{i1}*y)*X^i)
+ * \param[in] deg_varphi degree of polynomial varphi, for the moment this must be less than 2.
  * \param[in] u  mpz_t integer, of size half the size of p
  * \param[in] v  mpz_t integer, of size half the size of p
  *               u/v = y mod p with y a root of PY mod p.
- * \param[out] g polynomial g (already initialized)
+ * \param[out] g polynomial g of same degree as varphi (already initialized)
  * 
  * NOTE: maybe input varphi and deg_varphi directly ? Or a poly structure ?
  */
@@ -85,12 +87,6 @@ void eval_varphi_si(mpz_poly_t g, long int** varphi_coeff, unsigned int deg_varp
     mpz_addmul_si(g->coeff[i], u, varphi_coeff[i][1]); // gi <- gi + varphi_i1 * u
   }
 }
-
-
-// for MurphyE value
-double area=AREA;
-double bound_f=BOUND_F;
-double bound_g=BOUND_G;
 
 /**
  * \brief return a pointer to a table [{t, PY, f}] with f of degree k.
@@ -122,6 +118,30 @@ bool polygen_CONJ_get_tab_f(unsigned int deg_f, \
     return false;
   }
 }
+
+/**
+ * \brief 
+ * 
+ * \param[in] table_f a table of suitable polynomials f
+ * \param[in] table_f_size the size of the table, so ::index should be strictly less than that
+ *
+ * \return index the index of the next suitable f in the table, if not found, then 
+ *               index = ::table_f_size
+ * 
+ * This function returns the index of the first suitable f, starting at index = table_f_size
+ * A suitable f is such that
+ * f is irreducible over the integers ZZ
+ * f has an irreducible degree n factor modulo p
+ * By design, the table is made of polynomials coming in pairs (f, Py), so that
+ * if Py (of degree 2) has a root mod p, then f factors and has a degree n factor varphi.
+ *
+ */
+unsigned int get_index_next_poly_in_tab_f(table_f_poly_t * table_f, unsigned int table_f_size){
+
+
+
+}
+
 
 /**
  * \brief test irreducibility over integers of polynomial varphi
@@ -277,30 +297,48 @@ bool is_good_f_PY()
  * \param[in] p multiprecision integer, prime
  * \param[in] k integer greater than 1 ( k = 2 or 3 at the moment)
  * \param[out] f polynomial (the one of higher degree)
+ * \param[out] varphi_list a list of possible varphi
  * 
+ * varphi is a degree n factor of f, with coefficients in y with y a root of Py.
+ * \return true if a suitable polynomial f was found
+ * \return false otherwise 
  */
 // note: mpz_poly_t is a 1-dim 1-element array. So this is a pointer to 
 // an initialized thing.
-void polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f )
+bool polygen_CONJ_f ( mpz_t p, unsigned int k, mpz_poly_t f, mpz_poly_t varphi_list[DEG_PY] )
 {
-  /*which f table to choose ? */
-  table_f_poly_t* table_f;
-  unsigned int table_f_size;
-  
-  polygen_CONJ_get_tab_f(k, &table_f, &table_f_size);
-  // Now, find an appropriate poly f in that table.
-  // start with the first one, etc because the polynomials are sorted in 
-  // decreasing order of interest (decreasing order of Murphy E value
-  
- 
-  /*
-  while ()// nothing found
-    // i.e. the i-th polynomial in f is not irreducible mod p,
-    // or is but PY has no root.
-    {
+  table_f_poly_t* table_f = NULL;
+  unsigned int table_f_size = 0;
+  unsigned int index = 0;
+  bool found_good_f = false;
+  bool Py_ok = false;
+  bool varphi_ok = false;
+  mpz_poly_t f0;
+  mpz_poly_init(f0);
 
+  /* pointer to an appropriate table of polynomials f */
+  polygen_CONJ_get_tab_f(k, &table_f, &table_f_size);
+  if(table_f != NULL){
+    // Now, find an appropriate poly f in that table.
+    // start with the first one, etc because the polynomials are sorted in 
+    // decreasing order of interest (decreasing order of Murphy E value
+    while ((found_good_f != true) && (index < table_f_size)){// nothing found
+      // i.e. the i-th polynomial in f is not irreducible mod p,
+      // or is but PY has no root.
+      fi = (table_f->table_f[index]).f;
+      Pyi = (table_f->table_f[index]).PY;
+      // check that Pyi has a root mod p.
+
+      Py_ok = is_irreducible_mod_p(Pyi, p);
+
+
+      index = get_index_next_poly_in_tab_f(table_f, table_f_size);
+
+      if (found_good_f != true){
+	index ++;
+      }
     }
-  */
+  }
 }
 
 /**
