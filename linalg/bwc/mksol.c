@@ -36,14 +36,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
     /* Hmmm. This would deserve better thought. Surely we don't need 64
@@ -53,7 +50,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
     mpfq_vbase Ac;
     mpfq_vbase_oo_field_init_byfeatures(Ac,
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
@@ -84,7 +81,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     unsigned int multi = 1;
     unsigned int nsolvecs_pervec = nsolvecs;
 
-    if (mpz_cmp_ui(p,2) != 0 && nsolvecs > 1) {
+    if (mpz_cmp_ui(bw->p,2) != 0 && nsolvecs > 1) {
         if (tcan_print) {
             fprintf(stderr,
 "Note: the present code is a quick hack.\n"
@@ -101,10 +98,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     mpfq_vbase Ar;
     mpfq_vbase_oo_field_init_byfeatures(Ar,
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nsolvecs_pervec,
             MPFQ_DONE);
-    mpz_clear(p);
 
     if (pi->m->trank == 0) Ar->mpi_ops_init(Ar);
 

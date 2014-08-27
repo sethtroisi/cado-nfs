@@ -117,7 +117,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
 
 
     mpz_init_set_ui(bw->p, 2);
-    param_list_parse_mpz(pl, "p", bw->p);
+    param_list_parse_mpz(pl, "prime", bw->p);
     int nullspace_forced = 0;
 
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
@@ -230,7 +230,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
 
-    param_list_lookup_string(pl, "prime");
     return 0;
 }
 
