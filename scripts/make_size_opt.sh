@@ -80,14 +80,15 @@ do
 
   # Like before, but takes the average of the 20-th best lognorm from each P value,
   # which is even less jittery
-  AVGLOGNORMFILE="c120${IDX}.avg_lognorm"
+  NR_AVERAGE=20
+  AVGLOGNORMFILE="c120${IDX}.avg_${NR_AVERAGE}_lognorm"
   if test_if_needed "${AVGLOGNORMFILE}"
   then
     for KEEPFILE in "${KEEPFILENAMES[@]}"
     do
       echo -n "( "
-      grep "# lognorm" "$KEEPFILE" | head -n 20 | sed "s/# lognorm //" | tr "\n" "+"
-      echo "0 ) / 10"
+      grep "# lognorm" "$KEEPFILE" | head -n "${NR_AVERAGE}" | sed "s/# lognorm //" | tr "\n" "+"
+      echo "0 ) / ${NR_AVERAGE}"
     done | bc -l > "${AVGLOGNORMFILE}"
   fi
 
@@ -118,5 +119,7 @@ do
   then
     echo "Root-optimizing new polynomials from ${NEWFILE} and appending to ${ROPTFILE}"
     "${POLYSELECT2L}" -rootsieve "${NEWFILE}" -t 2 -keep 10000 -area 67108864000000.0 -Bf 8000000.0 -Bg 4000000.0 >> "${ROPTFILE}"
+  else
+    echo "No new polynomials found, nothing to do for root-sieve"
   fi
 done
