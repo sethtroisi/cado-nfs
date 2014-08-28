@@ -50,7 +50,7 @@ typedef poly_base_struct_t poly_base_t[1];
 
 
 /* Management of the structure, set and print coefficients. */
-void mpz_poly_init(mpz_poly_t, int d);
+void mpz_poly_init(mpz_poly_ptr, int d);
 void mpz_poly_realloc (mpz_poly_ptr f, int nc);
 void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f);
 void mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g);
@@ -69,7 +69,7 @@ void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f);
 void mpz_poly_fprintf(FILE *fp, mpz_poly_srcptr f);
 
 /* Tests and comparison functions */
-int mpz_poly_cmp (mpz_poly_t, mpz_poly_t);
+int mpz_poly_cmp (mpz_poly_srcptr, mpz_poly_srcptr);
 int mpz_poly_normalized_p (mpz_poly_srcptr f);
 
 /* Polynomial arithmetic */
@@ -90,8 +90,9 @@ void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_src
                             mpz_srcptr invm);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
                                          mpz_poly_srcptr F, mpz_srcptr m);
-void mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
-void mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p);
+int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
+int mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p);
+int mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m);
 void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i);
   
@@ -106,7 +107,6 @@ void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * res, mpz_poly_srcptr * f, i
 
 void polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
                   mpz_poly_srcptr F);
-void mpz_poly_reduce_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m);
 void mpz_poly_sqr_mod_f_mod_mpz(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                             mpz_srcptr m, mpz_srcptr invm);
 void mpz_poly_power_mod_f_mod_ui(mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
@@ -115,7 +115,7 @@ void mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_s
                                mpz_srcptr a, mpz_srcptr p);
 void mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                                unsigned long a, mpz_srcptr p);
-void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t, mpz_poly_srcptr,
+void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_ptr, mpz_poly_srcptr,
                                            mpz_poly_srcptr, mpz_srcptr,
                                            mpz_srcptr, mpz_srcptr);
 void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f);
@@ -124,7 +124,7 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m,
                   mpz_srcptr invm);
 mpz_poly_t* mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly_t *P);
-void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_t pk);
+void mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk);
 size_t mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int base);
 void mpz_poly_gcd_mpz (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
@@ -135,6 +135,32 @@ void mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4]);
 void mpz_poly_homogeneous_eval_siui (mpz_t v, mpz_poly_srcptr f, const int64_t i, const uint64_t j);
 void mpz_poly_content (mpz_t c, mpz_poly_srcptr F);
 
+struct mpz_poly_with_m_s {
+    mpz_poly_t f;
+    int m;
+};
+typedef struct mpz_poly_with_m_s mpz_poly_with_m[1];
+typedef struct mpz_poly_with_m_s * mpz_poly_with_m_ptr;
+typedef const struct mpz_poly_with_m_s * mpz_poly_with_m_srcptr;
+
+struct mpz_poly_factor_list_s {
+    mpz_poly_with_m * factors;
+    int alloc;
+    int size;
+};
+typedef struct mpz_poly_factor_list_s mpz_poly_factor_list[1];
+typedef struct mpz_poly_factor_list_s * mpz_poly_factor_list_ptr;
+typedef const struct mpz_poly_factor_list_s * mpz_poly_factor_list_srcptr;
+
+void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l);
+void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l);
+void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l);
+void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m);
+int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, mpz_srcptr p);
+int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p);
+int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate);
+int mpz_poly_factor(mpz_poly_factor_list lf, mpz_poly_srcptr f, mpz_srcptr p, gmp_randstate_t rstate);
+int mpz_poly_is_irreducible(mpz_poly_srcptr f, mpz_srcptr p);
 
 #ifdef __cplusplus
 }

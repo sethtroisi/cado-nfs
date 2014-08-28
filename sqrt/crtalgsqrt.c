@@ -1451,7 +1451,7 @@ alg_ptree_t * alg_ptree_build(struct prime_data * p, int i0, int i1)
     res->t1 = alg_ptree_build(p, i0+d, i1);
     mpz_poly_mul(res->s, res->t0->s, res->t1->s);
     mpz_poly_reducemodF_monic(res->s, res->s, glob.F);
-    mpz_poly_reduce_mod_mpz (res->s, res->s, px);
+    mpz_poly_mod_mpz (res->s, res->s, px);
     return res;
 }
 #endif

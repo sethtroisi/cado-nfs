@@ -42,12 +42,32 @@ static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
 static int
 mpz_poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s) {
   int i, j;
+  assert(f != g && f != h);
   for (i = 0; i <= r + s; i++)
     mpz_set_ui (f[i], 0);
   for (i = 0; i <= r; ++i)
     for (j = 0; j <= s; ++j)
       mpz_addmul(f[i+j], g[i], h[j]);
   return r + s;
+}
+
+static int
+mpz_poly_sqr_basecase (mpz_t *f, mpz_t *g, int r) {
+  int i, j;
+  assert(f != g);
+  for (i = 0; i <= 2 * r; i++)
+    mpz_set_ui (f[i], 0);
+  for (i = 0; i <= r; ++i)
+    for (j = 0; j < i; ++j)
+      mpz_addmul(f[i+j], g[i], g[j]);
+  for (i = 0; i < 2*r ; i++)
+      mpz_mul_2exp(f[i], f[i], 1);
+  for (i = 0; i < r ; i++) {
+      mpz_mul(f[2*r], g[i], g[i]);
+      mpz_add(f[2*i], f[2*i], f[2*r]);
+  }
+  mpz_mul(f[2*r], g[r], g[r]);
+  return 2 * r;
 }
 
 /* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
@@ -117,6 +137,14 @@ mpz_poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
   if ((r == -1) || (s == -1)) /* g or h is 0 */
     return -1;
 
+  if (t > MAX_T) {
+    /* naive product */
+    /* currently we have to resort to this for larger degree, because
+     * the generic toom implementation is bounded in degree.
+     */
+    return mpz_poly_mul_basecase (f, g, r, h, s);
+  }
+
   ASSERT_ALWAYS (t <= MAX_T);
 
   mpz_init (tmp);
@@ -163,6 +191,14 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
 
   if (r == -1) /* g is 0 */
     return -1;
+
+  if (t > MAX_T) {
+    /* naive product */
+    /* currently we have to resort to this for larger degree, because
+     * the generic toom implementation is bounded in degree.
+     */
+    return mpz_poly_sqr_basecase (f, g, r);
+  }
 
   ASSERT_ALWAYS (t <= MAX_T);
 
@@ -409,11 +445,12 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
         memcpy(temp, g->coeff, i * sizeof(mpz_t));
         memmove(g->coeff, g->coeff + i, (g->deg + 1 - i) * sizeof(mpz_t));
         memcpy(g->coeff + (g->deg + 1 - i), temp, i * sizeof(mpz_t));
+        g->deg -= i;
         free(temp);
         return;
     }
 
-    mpz_realloc(g, 1 + f->deg - i);
+    mpz_poly_realloc(g, 1 + f->deg - i);
     for(int j = i ; j <= f->deg ; j++) {
         mpz_set(g->coeff[j - i], f->coeff[j]);
     }
@@ -484,51 +521,44 @@ int mpz_poly_normalized_p (mpz_poly_srcptr f)
    Note: f can be the same as g or h;
          g can be the same as h. */
 void mpz_poly_add(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
-
-  if(f==h || f==g) {
-    mpz_poly_t aux;
-    mpz_poly_init(aux, -1);
-    mpz_poly_add(aux, g, h);
-    mpz_poly_set(f, aux);
-    mpz_poly_clear(aux);
-    return;
-  }
   int i, maxdeg;
   mpz_t z;
   mpz_init(z);
-
   maxdeg = max(g->deg, h->deg);
-  f->deg = maxdeg;
-  for (i = maxdeg; i >= 0; --i) {
+  mpz_poly_realloc(f, maxdeg + 1);
+  for (i = 0 ; i <= maxdeg ; i++) {
     if (i <= g->deg)
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
     if (i <= h->deg)
-      mpz_add (z, z, h->coeff[i]);
-    mpz_poly_setcoeff(f, i, z);
+      mpz_add(z, z, h->coeff[i]);
+    mpz_set(f->coeff[i], z);
   }
+  f->deg = maxdeg;
   mpz_clear(z);
   mpz_poly_cleandeg(f, maxdeg);
 }
 
 /* Set f=g-h.
-   Note: f can be the same as g */
+   Note: f can be the same as g or h;
+         g can be the same as h. */
 void mpz_poly_sub(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
   int i, maxdeg;
   mpz_t z;
   mpz_init(z);
   maxdeg = max(g->deg, h->deg);
-  f->deg = maxdeg;
-  for (i = maxdeg; i >= 0; --i) {
+  mpz_poly_realloc(f, maxdeg + 1);
+  for (i = 0 ; i <= maxdeg ; i++) {
     if (i <= g->deg)
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
     if (i <= h->deg)
       mpz_sub(z, z, h->coeff[i]);
-    mpz_poly_setcoeff(f, i, z);
+    mpz_set(f->coeff[i], z);
   }
+  f->deg = maxdeg;
   mpz_clear(z);
   mpz_poly_cleandeg(f, maxdeg);
 }
@@ -572,28 +602,8 @@ mpz_poly_sub_ui (mpz_poly_ptr g, mpz_poly_srcptr f, unsigned long a)
 void
 mpz_poly_sub_mod_mpz (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h, mpz_srcptr m)
 {
-  int i, maxdeg;
-  int gdeg = g->deg; /* save in case f=g */
-  int hdeg = h->deg; /* save in case f=h */
-  mpz_t z;
-  mpz_init(z);
-  maxdeg = max(gdeg, hdeg);
-  f->deg = maxdeg;
-  for (i = maxdeg; i >= 0; --i) {
-    if (i <= gdeg)
-      mpz_set(z, g->coeff[i]);
-    else
-      mpz_set_ui(z, 0);
-    if (i <= hdeg)
-      mpz_sub(z, z, h->coeff[i]);
-    mpz_poly_setcoeff(f, i, z);
-  }
-  mpz_clear(z);
-  mpz_poly_cleandeg(f, maxdeg);
-  for (i = 0; i <= f->deg; ++i) {
-    mpz_mod(f->coeff[i], f->coeff[i], m);
-  }
-  mpz_poly_cleandeg(f, f->deg);
+    mpz_poly_sub(f, g, h);
+    mpz_poly_mod_mpz(f, f, m, NULL);
 }
 
 /* Set f=g*h. Note: f might equal g or h. */
@@ -636,15 +646,7 @@ mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
   mpz_poly_init(prd, maxdeg);
 
 #if 1
-  if (g->deg + h->deg <= MAX_T) {
-    prd->deg = mpz_poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
-  } else {
-    /* naive product */
-    /* currently we have to resort to this for larger degree, because
-     * the generic toom implementation is bounded in degree.
-     */
-    prd->deg = mpz_poly_mul_basecase (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
-  }
+  prd->deg = mpz_poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
 #else /* segmentation, this code has problem with huge runs, for example
          degree 5 with lifting to 631516975 bits */
   {
@@ -747,6 +749,8 @@ mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_t fac
     if (!mpz_invert (inv, tmp, N)) {
       if (factor != NULL)
         mpz_gcd(factor, tmp, N);
+      mpz_clear(inv);
+      mpz_clear(tmp);
       return 0;
     }
   }
@@ -780,38 +784,45 @@ mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_t fac
 }
 
 /* h=rem(h, f) mod p, f not necessarily monic. */
-static void
+/* returns 0 if an inverse of the leading coeff could not be found. */
+int
 mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p)
 {
-  mpz_poly_pseudodiv_r (h, f, p, NULL);
+  return mpz_poly_pseudodiv_r (h, f, p, NULL);
 }
 
 /*
    computes q, r such that f = q*g + r mod p, with deg(r) < deg(g)
    and p in mpz_t
    q and r must be allocated!
+   the only aliasing allowed is f==r.
 */
-void mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p)
+int mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p)
 {
   int k, j, df = f->deg, dg = g->deg, dq = df - dg;
   mpz_t tmp, lg, invlg;
 
   ASSERT_ALWAYS(df >= dg);
-  ASSERT_ALWAYS(q->alloc >= dq+1);
+  mpz_poly_realloc(q, dq + 1);
 
-  mpz_init(tmp);
   mpz_init(lg);
   mpz_init_set_ui(invlg, 1);
 
-  mpz_poly_set(r, f);
+  if (f != r) mpz_poly_set(r, f);
   q->deg = dq;
 
   mpz_set (lg, g->coeff[dg]);
   mpz_mod (lg, lg, p);
   /* invlg = 1/g[dg] mod p */
   if (mpz_cmp_ui(lg, 1) != 0)
-    mpz_invert(invlg, lg, p);
+    if (!mpz_invert(invlg, lg, p)) {
+        mpz_clear(lg);
+        mpz_clear(invlg);
+        return 0;
+    }
 
+
+  mpz_init(tmp);
   for (k = df-dg ; k >=0 ; k--) {
     mpz_mul(q->coeff[k], r->coeff[k+dg], invlg);
     mpz_mod(q->coeff[k], q->coeff[k], p);
@@ -826,12 +837,13 @@ void mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_pol
   mpz_clear(invlg);
   mpz_clear(lg);
   mpz_clear(tmp);
+  return 1;
 }
 
 /* q=divexact(h, f) mod p, f not necessarily monic.
    Assumes lc(h) <> 0 mod p.
    Clobbers h. */
-static void
+static int
 mpz_poly_divexact_clobber (mpz_poly_ptr q, mpz_poly_ptr h, mpz_poly_srcptr f,
                    mpz_srcptr p) {
   int i, d = f->deg, dh = h->deg;
@@ -849,8 +861,12 @@ mpz_poly_divexact_clobber (mpz_poly_ptr q, mpz_poly_ptr h, mpz_poly_srcptr f,
   /* t is 1/f[d] mod p */
   mpz_set (aux, f->coeff[d]);
   mpz_fdiv_r (aux, aux, p);
-  if (mpz_cmp_ui(aux, 1) != 0)
-    mpz_invert (t, aux, p);
+  if (!mpz_invert (t, aux, p)) {
+      mpz_clear(t);
+      mpz_clear(aux);
+      return 0;
+  }
+
 
   while (dh >= d) {
 
@@ -875,17 +891,19 @@ mpz_poly_divexact_clobber (mpz_poly_ptr q, mpz_poly_ptr h, mpz_poly_srcptr f,
 
   mpz_clear (t);
   mpz_clear (aux);
+  return 1;
 }
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. */
-void
+int
 mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p)
 {
     mpz_poly_t hh;
     mpz_poly_init(hh, h->deg);
     mpz_poly_set(hh, h);
-    mpz_poly_divexact_clobber(q, hh, f, p);
+    int r = mpz_poly_divexact_clobber(q, hh, f, p);
     mpz_poly_clear(hh);
+    return r;
 }
 
 /* Set f=g/2 (mod m), where f might equal g.
@@ -1027,22 +1045,6 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
   mpz_poly_clear (prd);
 }
 
-/* Set Q = P (mod m) */
-void mpz_poly_reduce_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
-{
-  int i;
-  mpz_t aux;
-
-  mpz_init(aux);
-  Q->deg = P->deg;
-  for (i = 0; i <= P->deg; ++i) {
-    mpz_mod(aux, P->coeff[i], m);
-    mpz_poly_setcoeff(Q, i, aux);
-  }
-  mpz_clear(aux);
-  mpz_poly_cleandeg(Q, Q->deg);
-}
-
 /* Set Q = P/lc(P) (mod m). Q and P might be identical. */
 void
 mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
@@ -1149,7 +1151,7 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
     mpz_poly_getcoeff (inv, 0, denom); /* inv <- denom[0] */
     mpz_invert (inv, inv, m);          /* inv <- denom[0]^-1 */
     mpz_poly_mul_mpz (num, num, inv);  /* num <- num * inv */
-    mpz_poly_reduce_mod_mpz (num, num, m); /* num <- num * inv mod m */
+    mpz_poly_mod_mpz (num, num, m, NULL); /* num <- num * inv mod m */
     mpz_clear (inv);
   } else {
     mpz_poly_t g, U, V;
@@ -1581,11 +1583,11 @@ mpz_poly_xgcd_mpz (mpz_poly_ptr d, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_pol
       mpz_init(inv);
       mpz_invert(inv, d->coeff[0], p);
       mpz_poly_mul_mpz(d, d, inv);
-      mpz_poly_reduce_mod_mpz(d, d, p);
+      mpz_poly_mod_mpz(d, d, p, NULL);
       mpz_poly_mul_mpz(u, u, inv);
-      mpz_poly_reduce_mod_mpz(u, u, p);
+      mpz_poly_mod_mpz(u, u, p, NULL);
       mpz_poly_mul_mpz(v, v, inv);
-      mpz_poly_reduce_mod_mpz(v, v, p);
+      mpz_poly_mod_mpz(v, v, p, NULL);
       mpz_clear(inv);
     }
 
@@ -1712,3 +1714,449 @@ mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
   mpz_abs (c, c);
 }
 
+/* factoring polynomials */
+
+void mpz_poly_factor_list_init(mpz_poly_factor_list_ptr l)
+{
+    memset(l, 0, sizeof(*l));
+}
+
+void mpz_poly_factor_list_clear(mpz_poly_factor_list_ptr l)
+{
+    for(int i = 0 ; i < l->alloc ; i++)
+        mpz_poly_clear(l->factors[i]->f);
+    free(l->factors);
+    memset(l, 0, sizeof(*l));
+}
+
+void mpz_poly_factor_list_flush(mpz_poly_factor_list_ptr l)
+{
+    /* There's a design choice here. We may elect to free everything.
+     * Instead, we'll simply mark everything as zero, but keep all
+     * allocated space.
+     */
+    for(int i = 0 ; i < l->alloc ; i++)
+        l->factors[i]->f->deg = -1;
+    l->size = 0;
+}
+
+
+void mpz_poly_factor_list_prepare_write(mpz_poly_factor_list_ptr l, int index)
+{
+    if (index >= l->alloc) {
+        l->alloc = index + 4 + l->alloc / 4;
+        l->factors = realloc(l->factors, l->alloc * sizeof(mpz_poly_with_m));
+        /* We need to set something. A zero polynomial has NULL storage
+         * area, so that will do (realloc behaves as needed).  */
+        for(int i = l->size ; i < l->alloc ; i++) {
+            mpz_poly_init(l->factors[i]->f, -1);
+            l->factors[i]->m = 0;
+        }
+    }
+    if (l->size <= index)
+        l->size = index + 1;
+}
+
+void mpz_poly_factor_list_push(mpz_poly_factor_list_ptr l, mpz_poly_srcptr f, int m)
+{
+    mpz_poly_factor_list_prepare_write(l, l->size);
+    mpz_poly_set(l->factors[l->size - 1]->f, f);
+    l->factors[l->size - 1]->m = m;
+}
+
+
+/* Squarefree factorization */
+
+/* This auxiliary function almost does the sqf. It fills
+ * lf->factors[stride*i] (i from 1 to deg(f)) with the factors with
+ * multiplicity i in f.  lf->factors[0] is filled with the product whose
+ * multiplicity is a multiple of the field characteristic.  returns max
+ * multiplicity stored (multiplied by the stride value).
+ *
+ * (stride has an importance for the recursive call, for p small. E.g. on
+ * f=g^p, we get called with g=f^(1/p) and stride=p).
+ *
+ * We make no effort to check that lf is clean on input, which is to be
+ * guaranteed by the caller (e.g. sufficiently many polynomials, all
+ * equal to 1 -- or 0, which can easily be identified as something
+ * unset).
+ */
+static int mpz_poly_factor_sqf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int stride, mpz_srcptr p)
+{
+    int r = 0;
+
+    mpz_poly_t g, mi, mi1;
+    mpz_poly_t t0,t1, T, tmp;
+    mpz_poly_init(g, f->deg);
+    mpz_poly_init(mi, f->deg);
+    mpz_poly_init(mi1, f->deg);
+    mpz_poly_init(t0, f->deg);
+    mpz_poly_init(t1, f->deg);
+    mpz_poly_init(T, f->deg);
+    mpz_poly_init(tmp, f->deg);
+
+    mpz_poly_derivative(t0, f);
+    mpz_poly_gcd_mpz(g, f, t0, p);
+    mpz_poly_divexact(mi, f, g, p);
+    /* mi is f/gcd(f,f') == all repeated prime factors of f whose
+     * multiplicity isn't a multiple of the field characteristic.
+     */
+
+    mpz_poly_set_xi(T, 0);
+    for(int i = 1 ; mi->deg > 0 ; i++) {
+        /* note the weird argument ordering */
+        mpz_poly_power_ui_mod_f_mod_mpz(t0, mi, NULL, i, p);
+        mpz_poly_divexact(t1, f, t0, p);
+        /* t1 = all polynomials in mi taken out from f with multiplicity i */
+        mpz_poly_gcd_mpz(mi1, t1, mi, p);
+        /* mi1 = almost like mi, but since factors with multiplicity i
+         * are no longer in t1, there's absent from mi1 too. Whence
+         * mi/mi1 is exactly the product of factors of multiplicity 1.
+         */
+        mpz_poly_factor_list_prepare_write(lf, i * stride);
+        /* Use tmp so that we don't absurdly keep storage within
+         * lf->factors */
+        mpz_poly_divexact(tmp, mi, mi1, p);
+        mpz_poly_set(lf->factors[i * stride]->f, tmp);
+        /* multiplicity field still unused at this point */
+        mpz_poly_power_ui_mod_f_mod_mpz(t0, lf->factors[i * stride]->f, NULL, i, p);
+        mpz_poly_mul(T, T, t0);
+        mpz_poly_mod_mpz(T, T, p, NULL);
+        mpz_poly_swap(mi, mi1);
+        r = i * stride;
+    }
+
+    mpz_poly_divexact(lf->factors[0]->f, f, T, p);
+
+    mpz_poly_clear(g);
+    mpz_poly_clear(tmp);
+    mpz_poly_clear(mi);
+    mpz_poly_clear(mi1);
+    mpz_poly_clear(t0);
+    mpz_poly_clear(t1);
+    mpz_poly_clear(T);
+    return r;
+}
+
+/* return the largest multiplicity */
+int mpz_poly_factor_sqf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p)
+{
+    /* factoring 0 doesn't make sense, really */
+    assert(f0->deg >= 0);
+
+    /* We'll call mpz_poly_factor_sqf_inner, possibly several times if
+     * we are in small characteristic.
+     */
+    mpz_poly_t f;
+    mpz_poly_init(f, f0->deg);
+    mpz_poly_reduce_makemonic_mod_mpz(f, f0, p);
+    assert(mpz_cmp_ui(mpz_poly_lc_const(f), 1) == 0);
+
+    int m = 0;
+    int pu = mpz_get_ui(p);  // see below
+    /* reset the factor list completely */
+    mpz_poly_factor_list_flush(lf);
+
+    for(int stride = 1 ; ; stride *= pu) {
+        int r = mpz_poly_factor_sqf_inner(lf, f, stride, p);
+        if (r > m) m = r;
+        if (lf->factors[0]->f->deg == 0) {
+            // if p is LAAAARGE, then of course we'll never have a linear
+            // polynomial out of sqf_inner, thus we'll break early here.
+            break;
+        }
+        /* divide coefficients */
+        for(int i = 0 ; i <= lf->factors[0]->f->deg ; i++) {
+            if (i % pu == 0) {
+                mpz_set(f->coeff[i / pu], lf->factors[0]->f->coeff[i]);
+            } else {
+                assert (mpz_cmp_ui(lf->factors[0]->f->coeff[i], 0) == 0);
+            }
+        }
+        f->deg = lf->factors[0]->f->deg / pu;
+        mpz_poly_set_xi(lf->factors[0]->f, 0);
+    }
+    /* Now make sure that all factors in the factor list are non-zero */
+    for(int i = 0 ; i < lf->size ; i++) {
+        if (lf->factors[i]->f->deg < 0) {
+            mpz_poly_set_xi(lf->factors[i]->f, 0);
+        }
+    }
+    mpz_poly_clear(f);
+    return m;
+}
+
+
+
+
+/* This performs distinct degree factorization */
+/* Input polynomial must be squarefree -- otherwise repeated factors
+ * probably won't show up in the factor list, or maybe at the wrong place
+ * as parasites. */
+/* Returns max degree of factors found (i.e. if the largest factors we
+ * have are two factors of degree 7, we return 7, not 14). */
+static int mpz_poly_factor_ddf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p, int only_check_irreducible)
+{
+    mpz_poly_t g, gmx, x, tmp;
+    mpz_poly_t f;
+    mpz_poly_init(f, f0->deg);
+    int i;
+
+    /* factoring 0 doesn't make sense, really */
+    assert(f0->deg >= 0);
+
+    mpz_poly_reduce_makemonic_mod_mpz(f, f0, p);
+    assert(mpz_cmp_ui(mpz_poly_lc_const(f), 1) == 0);
+
+    /* reset the factor list completely */
+    mpz_poly_factor_list_flush(lf);
+
+    mpz_poly_init (g, 2 * f->deg - 1);
+    mpz_poly_init (gmx, 2 * f->deg - 1);
+    mpz_poly_init (x, 1);
+    mpz_poly_init (tmp, f->deg);
+
+    mpz_poly_set_xi(x, 1);
+    mpz_poly_set_xi(g, 1);
+
+    for (i = 1; i <= f->deg ; ++i) {
+        if (2 * i > f->deg) {
+            /* Then we know that the remaining f is irreducible.  */
+            mpz_poly_factor_list_prepare_write(lf, f->deg);
+            for( ; i < f->deg ; i++) {
+                /* multiplicity field still unused at this point */
+                mpz_poly_set_xi(lf->factors[i]->f, 0);
+            }
+            /* multiplicity field still unused at this point */
+            mpz_poly_swap(lf->factors[f->deg]->f, f);
+            break;
+        }
+
+        /* g <- g^p mod fp */
+        mpz_poly_power_mod_f_mod_mpz (g, g, f, p, p);
+
+        /* subtract x */
+        mpz_poly_sub (gmx, g, x);
+        mpz_poly_mod_mpz(gmx, gmx, p, NULL);
+
+        /* lf[i] <- gcd (f, x^(p^i)-x) */
+        mpz_poly_factor_list_prepare_write(lf, i);
+        /* multiplicity field still unused at this point */
+
+        /* see remark in _sqf regarding the relevance of tmp for storage */
+        mpz_poly_gcd_mpz(tmp, f, gmx, p);
+        mpz_poly_divexact(f, f, tmp, p);
+        mpz_poly_set(lf->factors[i]->f, tmp);
+
+        /* Note for a mere irreducibility test: the length of the loop in
+         * the irreducible case would still be deg(f)/2, and the penalty
+         * caused by storing factors can be neglected.
+         */
+        if (only_check_irreducible && lf->factors[i]->f->deg > 0)
+            break;
+
+        if (f->deg == 0)
+            break;
+    }
+
+    mpz_poly_clear (g);
+    mpz_poly_clear (x);
+    mpz_poly_clear (gmx);
+    mpz_poly_clear (tmp);
+    mpz_poly_clear (f);
+
+    return i;
+}
+
+int mpz_poly_factor_ddf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f0, mpz_srcptr p)
+{
+    return mpz_poly_factor_ddf_inner(lf, f0, p, 0);
+}
+
+/* Note that this also works for non squarefree polynomials -- the factor
+ * list returned by mpz_poly_factor_ddf will be rubbish, but the m ==
+ * f->deg test will tell the truth. */
+int mpz_poly_is_irreducible(mpz_poly_srcptr f, mpz_srcptr p)
+{
+    mpz_poly_factor_list lf;
+    mpz_poly_factor_list_init(lf);
+    int m = mpz_poly_factor_ddf_inner(lf, f, p, 1);
+    mpz_poly_factor_list_clear(lf);
+    return m == f->deg;
+}
+
+
+/*
+ * this tries to split between squares and non-squares -- it's the most
+ * basic split of course, and the other splits merely randomize on top of
+ * this. Note that this building block must be changed for characteristic
+ * two
+ *
+ * returns non-zero if a non-trivial or split is obtained.
+ *
+ * k is the degree of factors we are looking for.
+ *
+ * We split in two parts:
+ * 
+ *  - factors whose roots are squares in GF(p^k).
+ *  - factors whose roots are non squares in GF(p^k).
+ *
+ * Note that we do not find the factor X this way; this is to be done by
+ * the caller.
+ */
+static int mpz_poly_factor_edf_pre(mpz_poly_t g[2], mpz_poly_srcptr f0, mpz_srcptr a, int k, mpz_srcptr p)
+{
+    int nontrivial = 0;
+    mpz_poly_set_xi(g[0], 0);
+    mpz_poly_set_xi(g[1], 0);
+
+    ASSERT_ALWAYS (f0->deg > k);
+    mpz_poly_t f;
+    mpz_poly_init(f, f0->deg);
+    mpz_poly_set(f, f0);
+
+    mpz_t half_pk;
+    mpz_init(half_pk);
+    mpz_pow_ui(half_pk, p, k);
+    mpz_fdiv_q_ui(half_pk, half_pk, 2); /* (p^k-1)/2 */
+
+    /* take the polynomial x+a */
+    mpz_poly_set_xi(g[0], 1);
+    mpz_set(g[0]->coeff[0], a);
+
+    mpz_poly_power_mod_f_mod_mpz(g[0], g[0], f, half_pk, p);
+
+    mpz_poly_add_ui(g[1], g[0], 1);     /* (x+a)^((p^k-1)/2) + 1 */
+    mpz_poly_sub_ui(g[0], g[0], 1);     /* (x+a)^((p^k-1)/2) - 1 */
+
+    mpz_poly_mod_mpz(g[0], g[0], p, NULL);
+    mpz_poly_mod_mpz(g[1], g[1], p, NULL);
+
+    mpz_poly_gcd_mpz(g[0], g[0], f, p);
+    mpz_poly_gcd_mpz(g[1], g[1], f, p);
+
+    assert(g[0]->deg + g[1]->deg == f->deg);
+    assert(g[0]->deg % k == 0);
+    assert(g[1]->deg % k == 0);
+
+    mpz_clear(half_pk);
+
+    mpz_poly_clear(f);
+
+    nontrivial += g[0]->deg != 0 && g[0]->deg != f->deg;
+    nontrivial += g[1]->deg != 0 && g[0]->deg != f->deg;
+
+    return nontrivial;
+}
+
+/* This factors f, and for each factor q found, store q in lf.
+ * Return the number of distinct factors found. */
+static int mpz_poly_factor_edf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate)
+{
+    if (f->deg == k) {
+        mpz_poly_factor_list_push(lf, f, 1);
+        return 1;
+    }
+    if (f->deg == 0) {
+        return 0;
+    }
+
+    mpz_poly_t h[2];
+
+    mpz_poly_init(h[0], f->deg);
+    mpz_poly_init(h[1], f->deg);
+
+    mpz_t a;
+    mpz_init(a);
+    mpz_urandomm(a, rstate, p);
+    mpz_poly_factor_edf_pre(h, f, a, k, p);
+    mpz_clear(a);
+
+    int n = 0;
+
+    n += mpz_poly_factor_edf_inner(lf, h[0], k, p, rstate);
+    mpz_poly_clear(h[0]);
+
+    n += mpz_poly_factor_edf_inner(lf, h[1], k, p, rstate);
+    mpz_poly_clear(h[1]);
+
+    return n;
+}
+
+// returns f0->deg / d
+int mpz_poly_factor_edf(mpz_poly_factor_list_ptr lf, mpz_poly_srcptr f, int k, mpz_srcptr p, gmp_randstate_t rstate)
+{
+    /* otherwise we need some other code for edf */
+    ASSERT_ALWAYS(mpz_cmp_ui(p, 2) > 0);
+
+    mpz_poly_factor_list_flush(lf);
+    int v = mpz_poly_valuation(f);
+    if (v) {
+        /* Since our input is square-free, then we expect v==1.
+         * Furthermore, k prescribes the extension field where the
+         * expected roots live, thus for 0 it should really be 1. */
+        ASSERT_ALWAYS(v == 1 && k == 1);
+        mpz_poly_factor_list_prepare_write(lf, lf->size);
+        mpz_poly_set_xi(lf->factors[lf->size-1]->f, 1);
+
+        mpz_poly_t f1;
+        mpz_poly_init(f1, f->deg - 1);
+        mpz_poly_div_xi(f1, f, v);
+        int n = 1 + mpz_poly_factor_edf_inner(lf, f1, k, p, rstate);
+        mpz_poly_clear(f1);
+        return n;
+    }
+
+    return mpz_poly_factor_edf_inner(lf, f, k, p, rstate);
+}
+
+typedef int (*sortfunc_t) (const void *, const void *);
+
+static int mpz_poly_with_m_cmp(
+        const mpz_poly_with_m * a,
+        const mpz_poly_with_m * b)
+{
+    int r = mpz_poly_cmp((*a)->f, (*b)->f);
+    if (r) return r;
+    return ((*a)->m > (*b)->m) - ((*b)->m > (*a)->m);
+}
+
+
+/* putting it all together */
+int mpz_poly_factor(mpz_poly_factor_list lf, mpz_poly_srcptr f, mpz_srcptr p, gmp_randstate_t rstate)
+{
+    mpz_poly_factor_list sqfs, ddfs, edfs;
+    mpz_poly_factor_list_init(sqfs);
+    mpz_poly_factor_list_init(ddfs);
+    mpz_poly_factor_list_init(edfs);
+
+    mpz_poly_factor_list_flush(lf);
+
+    int maxmult = mpz_poly_factor_sqf(sqfs, f, p);
+    for(int m = 1 ; m <= maxmult ; m++) {
+        ASSERT_ALWAYS(sqfs->factors[m]->f->deg >= 0);
+        if (sqfs->factors[m]->f->deg == 0) continue;
+        int maxdeg = mpz_poly_factor_ddf(ddfs, sqfs->factors[m]->f, p);
+        for(int k = 1 ; k <= maxdeg ; k++) {
+            ASSERT_ALWAYS(ddfs->factors[k]->f->deg >= 0);
+            if(ddfs->factors[k]->f->deg == 0) continue;
+            mpz_poly_factor_edf(edfs, ddfs->factors[k]->f, k, p, rstate);
+            for(int j = 0 ; j < edfs->size ; j++) {
+                /* register this factor, with multiplicity m */
+                /* cheat a bit... */
+                mpz_poly_factor_list_prepare_write(lf, lf->size);
+                mpz_poly_swap(lf->factors[lf->size-1]->f, edfs->factors[j]->f);
+                mpz_poly_reduce_makemonic_mod_mpz(lf->factors[lf->size-1]->f, lf->factors[lf->size-1]->f, p);
+                lf->factors[lf->size-1]->m = m;
+            }
+        }
+    }
+    mpz_poly_factor_list_clear(edfs);
+    mpz_poly_factor_list_clear(ddfs);
+    mpz_poly_factor_list_clear(sqfs);
+
+    /* sort factors by degree */
+    qsort(lf->factors, lf->size, sizeof(mpz_poly_with_m), (sortfunc_t) &mpz_poly_with_m_cmp);
+
+    return lf->size;
+}

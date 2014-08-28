@@ -507,7 +507,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
       mpz_mul_ui (pk, pk, p);
       target_k ++;
     }
-  mpz_poly_reduce_mod_mpz (A, A, pk);
+  mpz_poly_mod_mpz (A, A, pk, NULL);
   for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
     K[logk] = k;
   K[logk] = 1;
