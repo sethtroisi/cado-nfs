@@ -225,6 +225,19 @@ double_poly_revert (double_poly_ptr f)
     }
 }
 
+/* Change sign of variable: x -> -x */
+static void
+double_poly_neg_x (double_poly_ptr r, double_poly_srcptr s)
+{
+  unsigned int i;
+  r->deg = s->deg;
+  for (i = 0; i < s->deg; i += 2) {
+    r->coeff[i]     = s->coeff[i]; /* Even power coeff */
+    r->coeff[i + 1] = -s->coeff[i + 1]; /* Odd power */
+  }
+  if (i == s->deg) /* iff deg is even */
+    r->coeff[i] = s->coeff[i];
+}
 
 static unsigned int
 recurse_roots(double_poly_srcptr poly, double *roots,
@@ -329,6 +342,26 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   free (dg);
 
   return sign_changes;
+}
+
+unsigned int
+double_poly_compute_all_roots(double *roots, double_poly_srcptr poly)
+{
+  /* Positive roots */
+  double bound = double_poly_bound_roots (poly);
+  unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
+  /* Negative roots */
+  double_poly_t t; /* Copy of poly which gets sign-flipped */
+  double_poly_init (t, poly->deg);
+  double_poly_neg_x (t, poly);
+  bound = double_poly_bound_roots (t);
+  unsigned int nr_roots_neg =
+    double_poly_compute_roots (roots + nr_roots_pos, t, bound);
+  double_poly_clear(t);
+  /* Flip sign of negative roots */
+  for (unsigned int i = 0; i < nr_roots_neg; i++)
+    roots[nr_roots_pos + i] *= -1.;
+  return nr_roots_pos + nr_roots_neg;
 }
 
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
