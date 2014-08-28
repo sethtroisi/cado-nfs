@@ -22,13 +22,13 @@
 #endif
 
 
-static inline mpz_ptr mpz_poly_lc(mpz_poly_t f)
+static inline mpz_ptr mpz_poly_lc(mpz_poly_ptr f)
 {
     assert(f->deg >= 0);
     return f->coeff[f->deg];
 }
 
-static inline mpz_srcptr mpz_poly_lc_const(const mpz_poly_t f)
+static inline mpz_srcptr mpz_poly_lc_const(mpz_poly_srcptr f)
 {
     assert(f->deg >= 0);
     return f->coeff[f->deg];
@@ -189,7 +189,7 @@ mpz_poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
    P->p = lc(F)^P->v * p mod F.
    WARNING: this function destroys its input p !!! */
 static void
-mpz_poly_reducemodF(polymodF_t P, mpz_poly_t p, const mpz_poly_t F) {
+mpz_poly_reducemodF(polymodF_t P, mpz_poly_ptr p, mpz_poly_srcptr F) {
   int v = 0;
 
   if (p->deg < F->deg) {
@@ -242,7 +242,7 @@ mpz_poly_reducemodF(polymodF_t P, mpz_poly_t p, const mpz_poly_t F) {
 /* Allocate a polynomial that can contain 'd+1' coefficients and set to zero.
    We allow d < 0, which is equivalent to d = -1.
  */
-void mpz_poly_init(mpz_poly_t f, int d)
+void mpz_poly_init(mpz_poly_ptr f, int d)
 {
   f->deg = -1;
   if (d < 0)
@@ -263,7 +263,7 @@ void mpz_poly_init(mpz_poly_t f, int d)
 
 
 /* realloc f to (at least) nc coefficients */
-void mpz_poly_realloc (mpz_poly_t f, int nc)
+void mpz_poly_realloc (mpz_poly_ptr f, int nc)
 {
   int i;
   if (f->alloc < nc)
@@ -279,7 +279,7 @@ void mpz_poly_realloc (mpz_poly_t f, int nc)
 /* Copy f to g, where g must be initialized (but there is no need it has
    enough allocated coefficients, since mpz_poly_setcoeff reallocates if
    needed). */
-void mpz_poly_set(mpz_poly_t g, const mpz_poly_t f) 
+void mpz_poly_set(mpz_poly_ptr g, mpz_poly_srcptr f) 
 {
   int i;
   g->deg = f->deg;
@@ -289,7 +289,7 @@ void mpz_poly_set(mpz_poly_t g, const mpz_poly_t f)
 
 /* swap f and g */
 void
-mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
+mpz_poly_swap (mpz_poly_ptr f, mpz_poly_ptr g)
 {
   int i;
   mpz_t *t;
@@ -306,7 +306,7 @@ mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
 }
 
 /* Free polynomial f in mpz_poly_t. */
-void mpz_poly_clear(mpz_poly_t f) 
+void mpz_poly_clear(mpz_poly_ptr f) 
 {
   int i;
   for (i = 0; i < f->alloc; ++i)
@@ -321,7 +321,7 @@ void mpz_poly_clear(mpz_poly_t f)
  * not use the more robust mpz_poly_cleandeg */
 
 /* Find polynomial degree. */
-void mpz_poly_cleandeg(mpz_poly_t f, int deg)
+void mpz_poly_cleandeg(mpz_poly_ptr f, int deg)
 {
   ASSERT(deg >= -1);
   while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
@@ -331,7 +331,7 @@ void mpz_poly_cleandeg(mpz_poly_t f, int deg)
 
 /* Sets f to the polynomial of degree d, of coefficients
    given by coeffs. */
-void mpz_poly_setcoeffs (mpz_poly_t f, mpz_t * coeffs, int d)
+void mpz_poly_setcoeffs (mpz_poly_ptr f, mpz_t * coeffs, int d)
 {
   int i;
   for (i=d; i>=0; --i)
@@ -340,13 +340,13 @@ void mpz_poly_setcoeffs (mpz_poly_t f, mpz_t * coeffs, int d)
 }
 
 /* Set a zero polynomial. */
-void mpz_poly_set_zero(mpz_poly_t f) 
+void mpz_poly_set_zero(mpz_poly_ptr f) 
 {
   f->deg = -1;
 }
 
 /* Set mpz_t coefficient for the i-th term. */
-void mpz_poly_setcoeff (mpz_poly_t f, int i, const mpz_t z)
+void mpz_poly_setcoeff (mpz_poly_ptr f, int i, mpz_srcptr z)
 {
   mpz_poly_realloc (f, i + 1);
   mpz_set (f->coeff[i], z);
@@ -355,7 +355,7 @@ void mpz_poly_setcoeff (mpz_poly_t f, int i, const mpz_t z)
 }
 
 /* Set signed int coefficient for the i-th term. */
-void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z)
+void mpz_poly_setcoeff_si(mpz_poly_ptr f, int i, int z)
 {
   mpz_poly_realloc (f, i + 1);
   mpz_set_si (f->coeff[i], z);
@@ -364,7 +364,7 @@ void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z)
 }
 
 /* Set int64 coefficient for the i-th term. */
-void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z)
+void mpz_poly_setcoeff_int64(mpz_poly_ptr f, int i, int64_t z)
 {
   mpz_poly_realloc (f, i + 1);
   mpz_set_int64 (f->coeff[i], z);
@@ -373,7 +373,7 @@ void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z)
 }
 
 /* Get coefficient for the i-th term. */
-void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f)
+void mpz_poly_getcoeff(mpz_t res, int i, mpz_poly_srcptr f)
 {
   // The code below will work anyway,
   // this assert is better called a warning.
@@ -385,7 +385,7 @@ void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f)
 }
 
 /* x^i is often useful */
-void mpz_poly_set_xi(mpz_poly_t f, int i)
+void mpz_poly_set_xi(mpz_poly_ptr f, int i)
 {
     mpz_poly_realloc (f, i + 1);
     for(int j = 0 ; j <= i ; j++) {
@@ -394,7 +394,7 @@ void mpz_poly_set_xi(mpz_poly_t f, int i)
     f->deg = i;
 }
 
-void mpz_poly_div_xi(mpz_poly_t g, const mpz_poly_t f, int i)
+void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
 {
     if (f->deg < i) {
         mpz_poly_set_zero(g);
@@ -420,7 +420,7 @@ void mpz_poly_div_xi(mpz_poly_t g, const mpz_poly_t f, int i)
     g->deg = f->deg - i;
 }
 
-int mpz_poly_valuation(const mpz_poly_t f)
+int mpz_poly_valuation(mpz_poly_srcptr f)
 {
     int n = 0;
     assert(f->deg >= 0);
@@ -430,7 +430,7 @@ int mpz_poly_valuation(const mpz_poly_t f)
 
 
 /* Print coefficients of f. */
-void mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
+void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
 {
   int i;
 
@@ -460,7 +460,7 @@ void mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
 
 /* return 0 if f and g are equal, non-zero otherwise
    Assumes f and g are normalized */
-int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
+int mpz_poly_cmp (mpz_poly_ptr f, mpz_poly_ptr g)
 {
   int i;
 
@@ -478,7 +478,7 @@ int mpz_poly_cmp (mpz_poly_t f, mpz_poly_t g)
 }
 
 /* return 1 if f is normalized, i.e. f[deg] != 0, or the null polynomial.  */
-int mpz_poly_normalized_p (const mpz_poly_t f)
+int mpz_poly_normalized_p (mpz_poly_srcptr f)
 {
   return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
 }
@@ -489,7 +489,7 @@ int mpz_poly_normalized_p (const mpz_poly_t f)
 /* Set f=g+h.
    Note: f can be the same as g or h;
          g can be the same as h. */
-void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
+void mpz_poly_add(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
 
   if(f==h || f==g) {
     mpz_poly_t aux;
@@ -520,7 +520,7 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
 
 /* Set f=g-h.
    Note: f can be the same as g */
-void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
+void mpz_poly_sub(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
   int i, maxdeg;
   mpz_t z;
   mpz_init(z);
@@ -541,7 +541,7 @@ void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
 
 /* Set f=f+a where a is unsigned long. */
 void
-mpz_poly_add_ui (mpz_poly_t f, unsigned long a)
+mpz_poly_add_ui (mpz_poly_ptr f, unsigned long a)
 {
     mpz_poly_realloc(f, 1);
     mpz_add_ui(f->coeff[0], f->coeff[0], a);
@@ -554,7 +554,7 @@ mpz_poly_add_ui (mpz_poly_t f, unsigned long a)
 
 /* Set f=f-a where a is unsigned long. */
 void
-mpz_poly_sub_ui (mpz_poly_t f, unsigned long a)
+mpz_poly_sub_ui (mpz_poly_ptr f, unsigned long a)
 {
     mpz_poly_realloc(f, 1);
     mpz_sub_ui(f->coeff[0], f->coeff[0], a);
@@ -567,7 +567,7 @@ mpz_poly_sub_ui (mpz_poly_t f, unsigned long a)
 
 /* Set f=g-h (mod m). */
 void
-mpz_poly_sub_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h, const mpz_t m)
+mpz_poly_sub_mod_mpz (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h, mpz_srcptr m)
 {
   int i, maxdeg;
   int gdeg = g->deg; /* save in case f=g */
@@ -595,7 +595,7 @@ mpz_poly_sub_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h, cons
 
 /* Set f=g*h. Note: f might equal g or h. */
 void
-mpz_poly_mul (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
+mpz_poly_mul (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
   int i, maxdeg;
   mpz_poly_t prd;
 
@@ -713,7 +713,7 @@ mpz_poly_mul (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
 
 /* Set Q=a*P, where a is an mpz_t */
 void
-mpz_poly_mul_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t a)
+mpz_poly_mul_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr a)
 {
   int i;
   mpz_t aux;
@@ -730,7 +730,7 @@ mpz_poly_mul_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t a)
 
 /* h=rem(h, f) mod N, f not necessarily monic, N not necessarily prime */
 static int
-mpz_poly_pseudodiv_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t N, mpz_t factor)
+mpz_poly_pseudodiv_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr N, mpz_t factor)
 {
   int i, d = f->deg, dh = h->deg;
   mpz_t tmp, inv;
@@ -778,7 +778,7 @@ mpz_poly_pseudodiv_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t N, mpz_t fac
 
 /* h=rem(h, f) mod p, f not necessarily monic. */
 static void
-mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
+mpz_poly_div_r (mpz_poly_ptr h, mpz_poly_srcptr f, mpz_srcptr p)
 {
   mpz_poly_pseudodiv_r (h, f, p, NULL);
 }
@@ -788,7 +788,7 @@ mpz_poly_div_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
    and p in mpz_t
    q and r must be allocated!
 */
-void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p)
+void mpz_poly_div_qr (mpz_poly_ptr q, mpz_poly_ptr r, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_srcptr p)
 {
   int k, j, df = f->deg, dg = g->deg, dq = df - dg;
   mpz_t tmp, lg, invlg;
@@ -829,8 +829,8 @@ void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_
    Assumes lc(h) <> 0 mod p.
    Clobbers h. */
 static void
-mpz_poly_divexact_clobber (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f,
-                   const mpz_t p) {
+mpz_poly_divexact_clobber (mpz_poly_ptr q, mpz_poly_ptr h, mpz_poly_srcptr f,
+                   mpz_srcptr p) {
   int i, d = f->deg, dh = h->deg;
   mpz_t t, aux;
 
@@ -876,7 +876,7 @@ mpz_poly_divexact_clobber (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f,
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. */
 void
-mpz_poly_divexact (mpz_poly_t q, const mpz_poly_t h, const mpz_poly_t f, const mpz_t p)
+mpz_poly_divexact (mpz_poly_ptr q, mpz_poly_srcptr h, mpz_poly_srcptr f, mpz_srcptr p)
 {
     mpz_poly_t hh;
     mpz_poly_init(hh, h->deg);
@@ -887,7 +887,7 @@ mpz_poly_divexact (mpz_poly_t q, const mpz_poly_t h, const mpz_poly_t f, const m
 
 /* Set f=g/2 (mod m), where f might equal g.
    Assumes m is odd. */
-void mpz_poly_div_2_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_t m)
+void mpz_poly_div_2_mod_mpz (mpz_poly_ptr f, mpz_poly_srcptr g, mpz_srcptr m)
 {
   int i;
 
@@ -908,7 +908,7 @@ void mpz_poly_div_2_mod_mpz (mpz_poly_t f, const mpz_poly_t g, const mpz_t m)
 }
 
 /* Set res=f(x). Assumes res and x are different variables. */
-void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
+void mpz_poly_eval(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x) {
   int i, d;
   d = f->deg;
   if (d == -1) {
@@ -923,14 +923,14 @@ void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x) {
 }
 
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
-void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
-                       const mpz_t m)
+void mpz_poly_eval_mod_mpz(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
+                       mpz_srcptr m)
 {
     mpz_poly_eval_mod_mpz_barrett(res, f, x, m, NULL);
 }
 
 /* Return 1 if poly(root) % modulus == 0, return 0 otherwise */
-int mpz_poly_is_root(const mpz_poly_t poly, mpz_t root, mpz_t modulus)
+int mpz_poly_is_root(mpz_poly_srcptr poly, mpz_t root, mpz_t modulus)
 {
     mpz_t x;
     mpz_init(x);
@@ -941,8 +941,8 @@ int mpz_poly_is_root(const mpz_poly_t poly, mpz_t root, mpz_t modulus)
 }
 
 /* Set res=f(x) (mod m).  Assume res and x are different variables. */
-void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
-                       const mpz_t m, const mpz_t mx) {
+void mpz_poly_eval_mod_mpz_barrett(mpz_t res, mpz_poly_srcptr f, mpz_srcptr x,
+                       mpz_srcptr m, mpz_srcptr mx) {
   int i, d;
 
   d = f->deg;
@@ -964,8 +964,8 @@ void mpz_poly_eval_mod_mpz_barrett(mpz_t res, const mpz_poly_t f, const mpz_t x,
  * When k==1, we use mpz_poly_eval_mod_mpz instead, since it's faster
  * then.
  */
-void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int k, const mpz_t x,
-                       const mpz_t m, const mpz_t mx)
+void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int k, mpz_srcptr x,
+                       mpz_srcptr m, mpz_srcptr mx)
 {
     int i;
 
@@ -1006,7 +1006,7 @@ void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int
 
 /* Set Q=P1*P2 (mod F). Warning: Q might equal P1 (or P2). */
 void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
-                   const mpz_poly_t F) {
+                   mpz_poly_srcptr F) {
   mpz_poly_t prd;
   int v;
 
@@ -1025,7 +1025,7 @@ void polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
 }
 
 /* Set Q = P (mod m) */
-void mpz_poly_reduce_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
+void mpz_poly_reduce_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
 {
   int i;
   mpz_t aux;
@@ -1042,7 +1042,7 @@ void mpz_poly_reduce_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
 
 /* Set Q = P/lc(P) (mod m). Q and P might be identical. */
 void
-mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
+mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
 {
   int i;
   mpz_t aux, aux2;
@@ -1073,7 +1073,7 @@ mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t
 }
 
 int
-mpz_poly_mod_mpz (mpz_poly_t R, const mpz_poly_t A, const mpz_t m, const mpz_t invm)
+mpz_poly_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr A, mpz_srcptr m, mpz_srcptr invm)
 {
   /* reduce lower coefficients */
   mpz_poly_realloc(R, A->deg + 1);
@@ -1087,8 +1087,8 @@ mpz_poly_mod_mpz (mpz_poly_t R, const mpz_poly_t A, const mpz_t m, const mpz_t i
    Return the degree of the remainder.
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 int
-mpz_poly_mod_f_mod_mpz (mpz_poly_t R, const mpz_poly_t f, const mpz_t m,
-                    const mpz_t invm)
+mpz_poly_mod_f_mod_mpz (mpz_poly_ptr R, mpz_poly_srcptr f, mpz_srcptr m,
+                    mpz_srcptr invm)
 {
   mpz_t aux, c;
 
@@ -1136,8 +1136,8 @@ mpz_poly_mod_f_mod_mpz (mpz_poly_t R, const mpz_poly_t f, const mpz_t m,
     The return value is in num, denom is set to constant polynomial 1
     */
 void
-mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
-                                    const mpz_poly_t F, const mpz_t m)
+mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_ptr num, mpz_poly_ptr denom,
+                                    mpz_poly_srcptr F, mpz_srcptr m)
 {
   if (denom->deg == 0)
   {
@@ -1169,8 +1169,8 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
    f is the original algebraic polynomial (non monic but small coefficients)
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 void
-mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
-                        const mpz_poly_t f, const mpz_t m, const mpz_t invm)
+mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr P2,
+                        mpz_poly_srcptr f, mpz_srcptr m, mpz_srcptr invm)
 {
   int d1 = P1->deg;
   int d2 = P2->deg;
@@ -1193,8 +1193,8 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
    f is the original algebraic polynomial (non monic but small coefficients)
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 void
-mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                        const mpz_t m, const mpz_t invm)
+mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                        mpz_srcptr m, mpz_srcptr invm)
 {
   int d1 = P->deg;
   int d = d1 + d1;
@@ -1216,7 +1216,7 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
 
 /* Affects the derivative of f to df. Assumes df different from f.
    Assumes df has been initialized with degree at least f->deg-1. */
-void mpz_poly_derivative(mpz_poly_t df, const mpz_poly_t f) {
+void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f) {
   int n;
 
   df->deg = (f->deg <= 0) ? -1 : f->deg - 1;
@@ -1226,8 +1226,8 @@ void mpz_poly_derivative(mpz_poly_t df, const mpz_poly_t f) {
 
 /* Q = P^a mod f, mod p (f is the algebraic polynomial, non monic) */
 void
-mpz_poly_power_mod_f_mod_ui (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                         const mpz_t a, unsigned long p)
+mpz_poly_power_mod_f_mod_ui (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                         mpz_srcptr a, unsigned long p)
 {
     mpz_t m;
     mpz_init_set_ui(m, p);
@@ -1237,15 +1237,15 @@ mpz_poly_power_mod_f_mod_ui (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t 
 
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 void
-mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                          const mpz_t a, const mpz_t p)
+mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                          mpz_srcptr a, mpz_srcptr p)
 {
     mpz_poly_power_mod_f_mod_mpz_Barrett(Q, P, f, a, p, NULL);
 }
 
 void
-mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
-                          unsigned long a, const mpz_t p)
+mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
+                          unsigned long a, mpz_srcptr p)
 {
     mpz_t az;
     mpz_init_set_ui(az, a);
@@ -1310,9 +1310,9 @@ void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 /* Same as mpz_poly_power_mod_f_mod_mpz but use barrett for reduction mod p */
 void
-mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
-                                      const mpz_poly_t f, const mpz_t a,
-                                      const mpz_t p, const mpz_t invp)
+mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_ptr Q, mpz_poly_srcptr P,
+                                      mpz_poly_srcptr f, mpz_srcptr a,
+                                      mpz_srcptr p, mpz_srcptr invp)
 {
   int k = mpz_sizeinbase(a, 2);
   mpz_poly_t R;
@@ -1355,7 +1355,7 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
    Assume l > 0.
 */
 mpz_poly_t*
-mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
+mpz_poly_base_modp_init (mpz_poly_srcptr P0, int p, int *K, int l)
 {
   mpz_poly_t *P;
   int k, i, j;
@@ -1415,7 +1415,7 @@ mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l)
 
 /* a <- a + pk*P[k] */
 void
-mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk)
+mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_t pk)
 {
   int i;
 
@@ -1451,7 +1451,7 @@ mpz_poly_base_modp_clear (mpz_poly_t *P)
 
 /* return the maximal size of the coefficients of f in base b */
 size_t
-mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
+mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int b)
 {
   size_t S = 0, s;
   int i;
@@ -1469,7 +1469,7 @@ mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
 /* f=gcd(f, g) mod p, with p in mpz_t */
 /* clobbers g */
 static void
-mpz_poly_gcd_mpz_clobber (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
+mpz_poly_gcd_mpz_clobber (mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr p)
 {
   while (g->deg >= 0)
     {
@@ -1480,7 +1480,7 @@ mpz_poly_gcd_mpz_clobber (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
 }
 
 /* f <- gcd(a, b) mod p. */
-void mpz_poly_gcd_mpz(mpz_poly_t f, const mpz_poly_t a, const mpz_poly_t b, const mpz_t p)
+void mpz_poly_gcd_mpz(mpz_poly_ptr f, mpz_poly_srcptr a, mpz_poly_srcptr b, mpz_srcptr p)
 {
     mpz_poly_t hh;
     if (f == b) {
@@ -1506,7 +1506,7 @@ void mpz_poly_gcd_mpz(mpz_poly_t f, const mpz_poly_t a, const mpz_poly_t b, cons
  * WARNING: this function destroys its input.
  */
 int
-mpz_poly_pseudogcd_mpz(mpz_poly_t f, mpz_poly_t g, const mpz_t N, mpz_t factor)
+mpz_poly_pseudogcd_mpz(mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr N, mpz_t factor)
 {
   for (int k = 0; k <= f->deg; ++k)
     mpz_mod(f->coeff[k], f->coeff[k], N);
@@ -1527,7 +1527,7 @@ mpz_poly_pseudogcd_mpz(mpz_poly_t f, mpz_poly_t g, const mpz_t N, mpz_t factor)
 
 /* computes d = gcd(f, g) = u*f + v*g mod p, with p in mpz_t */
 void
-mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p)
+mpz_poly_xgcd_mpz (mpz_poly_ptr d, mpz_poly_srcptr f, mpz_poly_srcptr g, mpz_poly_ptr u, mpz_poly_ptr v, mpz_srcptr p)
 {
   mpz_poly_t q, tmp;
   mpz_poly_t gg;
@@ -1602,7 +1602,7 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
    Assumes the coefficients of fij[] are initialized.
 */
 void
-mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
+mpz_poly_homography (mpz_poly_ptr Fij, mpz_poly_ptr F, int64_t H[4])
 {
   int k, l;
   mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
