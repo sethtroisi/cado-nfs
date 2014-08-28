@@ -28,6 +28,12 @@ static inline mpz_ptr mpz_poly_lc(mpz_poly_t f)
     return f->coeff[f->deg];
 }
 
+static inline mpz_srcptr mpz_poly_lc_const(const mpz_poly_t f)
+{
+    assert(f->deg >= 0);
+    return f->coeff[f->deg];
+}
+
 /* --------------------------------------------------------------------------
    Static functions
    -------------------------------------------------------------------------- */
@@ -378,6 +384,51 @@ void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f)
     mpz_set (res, f->coeff[i]);
 }
 
+/* x^i is often useful */
+void mpz_poly_set_xi(mpz_poly_t f, int i)
+{
+    mpz_poly_realloc (f, i + 1);
+    for(int j = 0 ; j <= i ; j++) {
+        mpz_set_ui(f->coeff[j], j == i);
+    }
+    f->deg = i;
+}
+
+void mpz_poly_div_xi(mpz_poly_t g, const mpz_poly_t f, int i)
+{
+    if (f->deg < i) {
+        mpz_poly_set_zero(g);
+        return;
+    }
+    if (i == 0) {
+        mpz_poly_set(g, f);
+        return;
+    }
+    if (g == f) {
+        mpz_t * temp = malloc(i * sizeof(mpz_t));
+        memcpy(temp, g->coeff, i * sizeof(mpz_t));
+        memmove(g->coeff, g->coeff + i, (g->deg + 1 - i) * sizeof(mpz_t));
+        memcpy(g->coeff + (g->deg + 1 - i), temp, i * sizeof(mpz_t));
+        free(temp);
+        return;
+    }
+
+    mpz_realloc(g, 1 + f->deg - i);
+    for(int j = i ; j <= f->deg ; j++) {
+        mpz_set(g->coeff[j - i], f->coeff[j]);
+    }
+    g->deg = f->deg - i;
+}
+
+int mpz_poly_valuation(const mpz_poly_t f)
+{
+    int n = 0;
+    assert(f->deg >= 0);
+    for( ; n < f->deg  && mpz_cmp_ui(f->coeff[n], 0) == 0 ; n++) ;
+    return n;
+}
+
+
 /* Print coefficients of f. */
 void mpz_poly_fprintf (FILE *fp, const mpz_poly_t f)
 {
@@ -488,15 +539,30 @@ void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
   mpz_poly_cleandeg(f, maxdeg);
 }
 
+/* Set f=f+a where a is unsigned long. */
+void
+mpz_poly_add_ui (mpz_poly_t f, unsigned long a)
+{
+    mpz_poly_realloc(f, 1);
+    mpz_add_ui(f->coeff[0], f->coeff[0], a);
+    if (f->deg < 0) {
+        f->deg = 1;
+    } else if (f->deg == 0) {
+        mpz_poly_cleandeg(f, f->deg);
+    }
+}
+
 /* Set f=f-a where a is unsigned long. */
 void
 mpz_poly_sub_ui (mpz_poly_t f, unsigned long a)
 {
-  mpz_t aux;
-  mpz_init(aux);
-  mpz_sub_ui(aux, f->coeff[0], a);
-  mpz_poly_setcoeff(f, 0, aux);
-  mpz_clear(aux);
+    mpz_poly_realloc(f, 1);
+    mpz_sub_ui(f->coeff[0], f->coeff[0], a);
+    if (f->deg < 0) {
+        f->deg = 1;
+    } else if (f->deg == 0) {
+        mpz_poly_cleandeg(f, f->deg);
+    }
 }
 
 /* Set f=g-h (mod m). */
@@ -1252,8 +1318,7 @@ mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t Q, const mpz_poly_t P,
   mpz_poly_t R;
 
   if (mpz_cmp_ui(a, 0) == 0) {
-    Q->deg = 0;
-    mpz_poly_setcoeff_si (Q, 0, 1);
+    mpz_poly_set_xi (Q, 0);
     return;
   }
 
@@ -1475,12 +1540,10 @@ mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_pol
   mpz_poly_init (uu, 0);
   mpz_poly_init (vv, 0);
 
-  u->deg = 0;
-  mpz_poly_setcoeff_si(u, 0, 1);
+  mpz_poly_set_xi(u, 0);
   mpz_poly_set_zero(uu);
 
-  vv->deg = 0;
-  mpz_poly_setcoeff_si(vv, 0, 1);
+  mpz_poly_set_xi(vv, 0);
   mpz_poly_set_zero(v);
 
   mpz_poly_init(q, d->deg);
@@ -1643,3 +1706,4 @@ mpz_poly_content (mpz_t c, mpz_poly_srcptr F)
     mpz_gcd (c, c, f[i]);
   mpz_abs (c, c);
 }
+

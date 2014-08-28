@@ -59,6 +59,8 @@ void mpz_poly_clear(mpz_poly_t f);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_setcoeffs(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_t f);
+void mpz_poly_set_xi(mpz_poly_t f, int i);
+
 void mpz_poly_setcoeff(mpz_poly_t f, int i, const mpz_t z);
 void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z);
 void mpz_poly_setcoeff_int64(mpz_poly_t f, int i, int64_t z);
@@ -73,6 +75,7 @@ int mpz_poly_normalized_p (const mpz_poly_t f);
 /* Polynomial arithmetic */
 void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
 void mpz_poly_sub(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
+void mpz_poly_add_ui(mpz_poly_t f, unsigned long a);
 void mpz_poly_sub_ui(mpz_poly_t f, unsigned long a);
 void mpz_poly_sub_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h,
                       const mpz_t m);
@@ -90,6 +93,7 @@ void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
 void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p);
 void mpz_poly_divexact (mpz_poly_t q, const mpz_poly_t h, const mpz_poly_t f, const mpz_t p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_t m);
+void mpz_poly_div_xi(mpz_poly_t g, const mpz_poly_t f, int i);
   
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x);
 void mpz_poly_eval_mod_mpz(mpz_t res, const mpz_poly_t f, const mpz_t x,
