@@ -1311,7 +1311,7 @@ void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, 
 static double
 get_maxnorm_aux (double_poly_srcptr poly, double s)
 {
-  double_poly_t deriv;
+  double_poly_t derivative;
   const int d = poly->deg;
 
   ASSERT_ALWAYS(d >= 0);
@@ -1323,11 +1323,11 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
 
   /* Compute the derivative of polynomial */
-  double_poly_init (deriv, d - 1);
-  double_poly_derivative (deriv, poly);
+  double_poly_init (derivative, d - 1);
+  double_poly_derivative (derivative, poly);
 
   /* Look for extrema of the polynomial, i.e., for roots of the derivative */
-  const unsigned int nr_roots = double_poly_compute_roots(roots, deriv, s);
+  const unsigned int nr_roots = double_poly_compute_roots(roots, derivative, s);
 
   /* now abscissae of all extrema of poly are 0, roots[0], ..., 
      roots[nr_roots-1], s */
@@ -1340,7 +1340,7 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
         gmax = va;
     }
   free (roots);
-  double_poly_clear(deriv);
+  double_poly_clear(derivative);
   return gmax;
 }
 
