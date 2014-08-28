@@ -189,7 +189,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
     mpz_sub_ui (aux, p, 1);
     mpz_divexact_ui (aux, aux, 2);
     mpz_poly_power_mod_f_mod_mpz (h, q, f, aux, p);
-    mpz_poly_sub_ui (h, 1);
+    mpz_poly_sub_ui (h, h, 1);
 
     /* q = gcd(f,h) */
     mpz_poly_gcd_mpz (q, f, h, p);

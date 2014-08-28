@@ -606,7 +606,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
 #ifdef VERBOSE
     fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-    mpz_poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
+    mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);

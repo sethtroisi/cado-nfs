@@ -539,29 +539,36 @@ void mpz_poly_sub(mpz_poly_ptr f, mpz_poly_srcptr g, mpz_poly_srcptr h) {
   mpz_poly_cleandeg(f, maxdeg);
 }
 
-/* Set f=f+a where a is unsigned long. */
+/* Set g=f+a where a is unsigned long. */
 void
-mpz_poly_add_ui (mpz_poly_ptr f, unsigned long a)
+mpz_poly_add_ui (mpz_poly_ptr g, mpz_poly_srcptr f, unsigned long a)
 {
-    mpz_poly_realloc(f, 1);
-    mpz_add_ui(f->coeff[0], f->coeff[0], a);
-    if (f->deg < 0) {
-        f->deg = 1;
-    } else if (f->deg == 0) {
-        mpz_poly_cleandeg(f, f->deg);
+    mpz_poly_realloc(g, 1);
+    if (f->deg >= 0) {
+        mpz_add_ui(g->coeff[0], f->coeff[0], a);
+        g->deg = f->deg;
+        if (g->deg == 0)
+            mpz_poly_cleandeg(g, g->deg);
+    } else {
+        mpz_set_ui(g->coeff[0], a);
+        g->deg = 0;
     }
 }
 
-/* Set f=f-a where a is unsigned long. */
+/* Set g=f-a where a is unsigned long. */
 void
-mpz_poly_sub_ui (mpz_poly_ptr f, unsigned long a)
+mpz_poly_sub_ui (mpz_poly_ptr g, mpz_poly_srcptr f, unsigned long a)
 {
-    mpz_poly_realloc(f, 1);
-    mpz_sub_ui(f->coeff[0], f->coeff[0], a);
-    if (f->deg < 0) {
-        f->deg = 1;
-    } else if (f->deg == 0) {
-        mpz_poly_cleandeg(f, f->deg);
+    mpz_poly_realloc(g, 1);
+    if (f->deg >= 0) {
+        mpz_sub_ui(g->coeff[0], f->coeff[0], a);
+        g->deg = f->deg;
+        if (g->deg == 0)
+            mpz_poly_cleandeg(g, g->deg);
+    } else {
+        mpz_set_ui(g->coeff[0], a);
+        mpz_neg(g->coeff[0], g->coeff[0]);
+        g->deg = 0;
     }
 }
 
