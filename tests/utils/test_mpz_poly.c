@@ -68,7 +68,7 @@ test_polymodF_mul ()
           mpz_poly_init (P1->p, d1);
           mpz_poly_init (P1_saved->p, d1);
           mpz_poly_random (P1->p, d1, k);
-          mpz_poly_copy (P1_saved->p, P1->p);
+          mpz_poly_set (P1_saved->p, P1->p);
           P1->v = 0;
           for (d2 = 1; d2 <= 10; d2++)
             {
@@ -80,17 +80,17 @@ test_polymodF_mul ()
               else if ((count % 3) == 1)
                 {
                   polymodF_mul (P1, P1, P2, F);
-                  mpz_poly_copy (Q->p, P1->p);
+                  mpz_poly_set (Q->p, P1->p);
                   Q->v = P1->v;
-                  mpz_poly_copy (P1->p, P1_saved->p);
+                  mpz_poly_set (P1->p, P1_saved->p);
                   P1->v = 0;
                 }
               else
                 {
                   polymodF_mul (P1, P2, P1, F);
-                  mpz_poly_copy (Q->p, P1->p);
+                  mpz_poly_set (Q->p, P1->p);
                   Q->v = P1->v;
-                  mpz_poly_copy (P1->p, P1_saved->p);
+                  mpz_poly_set (P1->p, P1_saved->p);
                   P1->v = 0;
                 }
               /* check that Q->p = lc(F)^Q->v * P1 * P1 mod F */
@@ -305,7 +305,7 @@ test_mpz_poly_fprintf (void)
   mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2+42*x+17 */
   mpz_poly_fprintf (stdout, f);
 
-  mpz_poly_copy (g, f);
+  mpz_poly_set (g, f);
   res = mpz_poly_cmp (f, g);
   ASSERT_ALWAYS (res == 0);
   mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1); /* g = -2*x^2+42*x+17 */
@@ -626,7 +626,7 @@ void test_mpz_poly_is_root(unsigned long iter)
         mpz_poly_setcoeff_si(ell, 1, 1);
         mpz_neg(ell->coeff[0], r);
         mpz_poly_mul(f, f, ell);
-        mpz_poly_mod_mpz(f, p, NULL);
+        mpz_poly_mod_mpz(f, f, p, NULL);
         mpz_mod(r, r, p);
     }
 

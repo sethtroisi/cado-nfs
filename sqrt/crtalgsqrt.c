@@ -1077,7 +1077,7 @@ mpz_poly_from_ab_monic(mpz_poly_t tmp, long a, unsigned long b) {
 mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
 {
     if (p->deg < F->deg) {
-        mpz_poly_copy(P, p);
+        mpz_poly_set(P, p);
         return;
     }
     const int d = F->deg;
@@ -1089,7 +1089,7 @@ mpz_poly_reducemodF_monic(mpz_poly_t P, mpz_poly_t p, const mpz_poly_t F)
         mpz_poly_cleandeg (p, k-1);
     }
 
-    mpz_poly_copy(P, p);
+    mpz_poly_set(P, p);
 }
 
     void
@@ -3831,7 +3831,7 @@ int main(int argc, char **argv)
 
 // Init F to be the algebraic polynomial
 mpz_poly_init(F, degree);
-mpz_poly_copy (F, pol->alg);
+mpz_poly_set (F, pol->alg);
 
 // Init prd to 1.
 mpz_poly_init(prd->p, pol->alg->deg);
@@ -3886,7 +3886,7 @@ int nab = 0, nfree = 0;
     accumulate_fast_end(prd_tab, F, lprd);
     fclose(depfile);
 
-    mpz_poly_copy(prd->p, prd_tab[0]->p);
+    mpz_poly_set(prd->p, prd_tab[0]->p);
     prd->v = prd_tab[0]->v;
     for (i = 0; i < (long) lprd; ++i)
         mpz_poly_clear(prd_tab[i]->p);

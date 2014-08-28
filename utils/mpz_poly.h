@@ -52,12 +52,12 @@ typedef poly_base_struct_t poly_base_t[1];
 /* Management of the structure, set and print coefficients. */
 void mpz_poly_init(mpz_poly_t, int d);
 void mpz_poly_realloc (mpz_poly_t f, int nc);
-void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
+void mpz_poly_set(mpz_poly_t g, const mpz_poly_t f);
 void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
 void mpz_poly_clear(mpz_poly_t f);
 
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
-void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
+void mpz_poly_setcoeffs(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_t f);
 void mpz_poly_setcoeff(mpz_poly_t f, int i, const mpz_t z);
 void mpz_poly_setcoeff_si(mpz_poly_t f, int i, int z);
@@ -81,14 +81,14 @@ void mpz_poly_mul_mpz(mpz_poly_t Q, const mpz_poly_t P, const mpz_t a);
 void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m);
 int mpz_poly_mod_f_mod_mpz (mpz_poly_t R, const mpz_poly_t f, const mpz_t m,
                         const mpz_t invm);
-int mpz_poly_mod_mpz (mpz_poly_t R, const mpz_t m, const mpz_t invm);
+int mpz_poly_mod_mpz (mpz_poly_t R, const mpz_poly_t A, const mpz_t m, const mpz_t invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
                             const mpz_poly_t f, const mpz_t m,
                             const mpz_t invm);
 void mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
                                          const mpz_poly_t F, const mpz_t m);
 void mpz_poly_div_qr (mpz_poly_t q, mpz_poly_t r, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p);
-void mpz_poly_divexact (mpz_poly_t q, mpz_poly_t h, const mpz_poly_t f, const mpz_t p);
+void mpz_poly_divexact (mpz_poly_t q, const mpz_poly_t h, const mpz_poly_t f, const mpz_t p);
 void mpz_poly_div_2_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_t m);
   
 void mpz_poly_eval(mpz_t res, const mpz_poly_t f, const mpz_t x);
@@ -109,6 +109,8 @@ void mpz_poly_power_mod_f_mod_ui(mpz_poly_t Q, const mpz_poly_t P, const mpz_pol
                              const mpz_t a, unsigned long p);
 void mpz_poly_power_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
                                const mpz_t a, const mpz_t p);
+void mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f,
+                               unsigned long a, const mpz_t p);
 void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_t, const mpz_poly_t,
                                            const mpz_poly_t, const mpz_t,
                                            const mpz_t, const mpz_t);
@@ -120,7 +122,7 @@ mpz_poly_t* mpz_poly_base_modp_init (const mpz_poly_t P0, int p, int *K, int l);
 void mpz_poly_base_modp_clear (mpz_poly_t *P);
 void mpz_poly_base_modp_lift (mpz_poly_t a, mpz_poly_t *P, int k, mpz_t pk);
 size_t mpz_poly_sizeinbase (mpz_poly_t f, int d, int base);
-void mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p);
+void mpz_poly_gcd_mpz (mpz_poly_t h, const mpz_poly_t f, const mpz_poly_t g, const mpz_t p);
 // compute f = GCD(f,g) mod N. If this fails, put the factor in the last
 // given argument.
 int mpz_poly_pseudogcd_mpz(mpz_poly_t , mpz_poly_t , const mpz_t , mpz_t );

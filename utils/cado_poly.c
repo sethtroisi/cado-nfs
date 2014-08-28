@@ -41,7 +41,7 @@ cado_poly_set (cado_poly p, cado_poly q)
     mpz_set (p->n, q->n);
     p->skew = q->skew;
     for(int side = 0 ; side < 2 ; side++)
-      mpz_poly_copy (p->pols[side], q->pols[side]);
+      mpz_poly_set (p->pols[side], q->pols[side]);
 }
 
 // This function is no longer exported
@@ -116,7 +116,7 @@ int cado_poly_getm(mpz_ptr m, cado_poly_ptr cpoly, mpz_ptr N)
     mpz_poly_t f[2];
     for (int i = 0; i < 2; ++i) {
         mpz_poly_init(f[i], cpoly->pols[i]->alloc);
-        mpz_poly_copy(f[i], cpoly->pols[i]);
+        mpz_poly_set(f[i], cpoly->pols[i]);
     }
     int ret;
     ret = mpz_poly_pseudogcd_mpz(f[0], f[1], N, m); 
