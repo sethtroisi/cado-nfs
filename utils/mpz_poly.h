@@ -56,7 +56,6 @@ void mpz_poly_copy(mpz_poly_t g, const mpz_poly_t f);
 void mpz_poly_swap (mpz_poly_t f, mpz_poly_t g);
 void mpz_poly_clear(mpz_poly_t f);
 
-void mpz_poly_set_deg(mpz_poly_t f, int deg);
 void mpz_poly_cleandeg(mpz_poly_t f, int deg);
 void mpz_poly_set(mpz_poly_t f, mpz_t * coeffs, int d);
 void mpz_poly_set_zero(mpz_poly_t f);
@@ -80,8 +79,9 @@ void mpz_poly_sub_mod_mpz(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h,
 void mpz_poly_mul(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h);
 void mpz_poly_mul_mpz(mpz_poly_t Q, const mpz_poly_t P, const mpz_t a);
 void mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m);
-int mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
+int mpz_poly_mod_f_mod_mpz (mpz_poly_t R, const mpz_poly_t f, const mpz_t m,
                         const mpz_t invm);
+int mpz_poly_mod_mpz (mpz_poly_t R, const mpz_t m, const mpz_t invm);
 void mpz_poly_mul_mod_f_mod_mpz(mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t P2,
                             const mpz_poly_t f, const mpz_t m,
                             const mpz_t invm);

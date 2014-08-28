@@ -1,6 +1,7 @@
 /*
    These files (mpz_poly.*) implement arithmetics of polynomials whose
    coefficients are in multiprecision integers (using mpz_t from GNU MP).
+
    We use them in sqrt/algsqrt.c to represent rings of integers.
 
    Please see the file README_POLYNOMIALS for more details and
@@ -20,6 +21,12 @@
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
+
+static inline mpz_ptr mpz_poly_lc(mpz_poly_t f)
+{
+    assert(f->deg >= 0);
+    return f->coeff[f->deg];
+}
 
 /* --------------------------------------------------------------------------
    Static functions
@@ -302,12 +309,8 @@ void mpz_poly_clear(mpz_poly_t f)
 }
 
 
-/* Set polynomial degree */
-void mpz_poly_set_deg(mpz_poly_t f, int deg)
-{
-  f->deg = deg;
-}
-
+/* removed mpz_poly_set_deg, as for all purposes there is no reason to
+ * not use the more robust mpz_poly_cleandeg */
 
 /* Find polynomial degree. */
 void mpz_poly_cleandeg(mpz_poly_t f, int deg)
@@ -324,8 +327,8 @@ void mpz_poly_set (mpz_poly_t f, mpz_t * coeffs, int d)
 {
   int i;
   for (i=d; i>=0; --i)
-    mpz_poly_setcoeff(f,i,coeffs[i]);
-  mpz_poly_cleandeg(f,d);
+    mpz_poly_setcoeff(f, i, coeffs[i]);
+  mpz_poly_cleandeg(f, d);
 }
 
 /* Set a zero polynomial. */
@@ -368,9 +371,9 @@ void mpz_poly_getcoeff(mpz_t res, int i, const mpz_poly_t f)
   // this assert is better called a warning.
   ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i );
   if (i > f->deg)
-    mpz_set_ui (res,0);
+    mpz_set_ui (res, 0);
   else
-    mpz_set (res,f->coeff[i]);
+    mpz_set (res, f->coeff[i]);
 }
 
 /* Print coefficients of f. */
@@ -437,9 +440,9 @@ void mpz_poly_add(mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
 
   if(f==h || f==g) {
     mpz_poly_t aux;
-    mpz_poly_init(aux,-1);
-    mpz_poly_add(aux,g,h);
-    mpz_poly_copy(f,aux);
+    mpz_poly_init(aux, -1);
+    mpz_poly_add(aux, g, h);
+    mpz_poly_copy(f, aux);
     mpz_poly_clear(aux);
     return;
   }
@@ -533,7 +536,7 @@ mpz_poly_mul (mpz_poly_t f, const mpz_poly_t g, const mpz_poly_t h) {
       mpz_poly_t aux;
       mpz_poly_init (aux, -1);
       mpz_poly_mul (aux, g, h);
-      mpz_poly_copy (f,aux);
+      mpz_poly_copy (f, aux);
       mpz_poly_clear (aux);
       return;
     }
@@ -695,7 +698,7 @@ mpz_poly_pseudodiv_r (mpz_poly_t h, const mpz_poly_t f, const mpz_t N, mpz_t fac
     do {
       dh --;
     }
-    while (dh >= 0 && mpz_divisible_p (h->coeff[dh],N));
+    while (dh >= 0 && mpz_divisible_p (h->coeff[dh], N));
 
     h->deg = dh;
   }
@@ -897,7 +900,7 @@ void mpz_poly_eval_several_mod_mpz_barrett(mpz_ptr * r, mpz_poly_srcptr * f, int
     int maxdeg = -1;
     for(int j = 0 ; j < k ; j++) {
         if (f[j]->deg >= 0)
-            mpz_set(r[j],f[j]->coeff[0]);
+            mpz_set(r[j], f[j]->coeff[0]);
         else
             mpz_set_ui(r[j], 0);
         if (f[j]->deg > maxdeg)
@@ -955,7 +958,7 @@ void mpz_poly_reduce_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t m)
     mpz_poly_setcoeff(Q, i, aux);
   }
   mpz_clear(aux);
-  mpz_poly_cleandeg(Q,Q->deg);
+  mpz_poly_cleandeg(Q, Q->deg);
 }
 
 /* Set Q = P/lc(P) (mod m). Q and P might be identical. */
@@ -990,53 +993,63 @@ mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_t
   mpz_clear(aux2);
 }
 
+int
+mpz_poly_mod_mpz (mpz_poly_t R, const mpz_t m,
+                    const mpz_t invm)
+{
+  /* reduce lower coefficients */
+  for (int i = 0; i <= R->deg; ++i)
+    barrett_mod (R->coeff[i], R->coeff[i], m, invm);
+
+  mpz_poly_cleandeg(R, R->deg);
+  return R->deg;
+}
 /* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
    Return the degree of the remainder.
    Assume invm = floor(B^(2k)/m), m having k limbs, and B is the limb base */
 int
-mpz_poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
+mpz_poly_mod_f_mod_mpz (mpz_poly_t R, const mpz_poly_t f, const mpz_t m,
                     const mpz_t invm)
 {
-  int i;
   mpz_t aux, c;
 
   mpz_init (aux);
   mpz_init (c);
-  mpz_invert (aux, m, f[df]); /* aux = 1/m mod lc(f). We could precompute it
-                                 but it should not cost much. */
+  /* aux = 1/m mod lc(f). We could precompute it but it should not cost
+   * much anyway. */
+  mpz_invert (aux, m, f->coeff[f->deg]);
   // FIXME: write a subquadratic variant
-  while (d >= df)
+  while (R->deg >= f->deg)
   {
     /* First reduce the leading coefficient of R mod m. However this is
        quite expensive, since it costs O(D(n)) where m has size n, whereas
-       if we leave R[d] to size 2n, we have an overhead of O(n) only. */
-    // barrett_mod (R[d], R[d], m, invm);
+       if we leave lc(R) to size 2n, we have an overhead of O(n) only. */
+    // barrett_mod (lc(R), lc(R), m, invm);
     /* Here m is large (typically several million bits) and lc(f) is small
-       (typically one word). We first add to R lambda * m * x^(d-df)
+       (typically one word). We first add to R lambda * m * x^(dR-df)
        --- which is zero mod m ---
-       such that the new coefficient of degree d
-       is divisible by lc(f), i.e., lambda = -R[d]/m mod lc(f).
-       Then if c = (R[d] + lambda * m) / lc(f), we simply subtract
-       c * x^(d-df) * f.
+       such that the new coefficient of degree dR
+       is divisible by lc(f), i.e., lambda = -lc(R)/m mod lc(f).
+       Then if c = (lc(R) + lambda * m) / lc(f), we simply subtract
+       c * x^(dR-df) * f.
     */
-    mpz_mod (c, R[d], f[df]); /* R[d] mod lc(f) */
+    mpz_mod (c, R->coeff[R->deg], f->coeff[f->deg]); /* lc(R) mod lc(f) */
     mpz_mul (c, c, aux);
-    mpz_mod (c, c, f[df]);    /* R[d]/m mod lc(f) */
-    mpz_submul (R[d], m, c);  /* R[d] - m * (R[d] / m mod lc(f)) */
-    ASSERT (mpz_divisible_p (R[d], f[df]));
-    mpz_divexact (c, R[d], f[df]);
-    for (i = d - 1; i >= d - df; --i)
-      mpz_submul (R[i], c, f[df-d+i]);
-    d--;
+    mpz_mod (c, c, f->coeff[f->deg]);    /* lc(R)/m mod lc(f) */
+    mpz_submul (R->coeff[R->deg], m, c);  /* lc(R) - m * (lc(R) / m mod lc(f)) */
+    ASSERT (mpz_divisible_p (R->coeff[R->deg], f->coeff[f->deg]));
+    mpz_divexact (c, R->coeff[R->deg], f->coeff[f->deg]);
+    for (int i = R->deg - 1; i >= R->deg - f->deg; --i)
+      mpz_submul (R->coeff[i], c, f->coeff[f->deg-R->deg+i]);
+    R->deg--;
   }
 
-  /* reduce lower coefficients */
-  for (i = 0; i <= d; ++i)
-    barrett_mod (R[i], R[i], m, invm);
+  mpz_poly_mod_mpz(R, m, invm);
+  mpz_poly_cleandeg(R, R->deg);
   mpz_clear (aux);
   mpz_clear (c);
 
-  return d;
+  return R->deg;
 }
 
 /*  Reduce frac (= num / denom) mod F mod m ,
@@ -1056,18 +1069,14 @@ mpz_poly_reduce_frac_mod_f_mod_mpz (mpz_poly_t num, mpz_poly_t denom,
     mpz_poly_mul_mpz (num, num, inv);  /* num <- num * inv */
     mpz_poly_reduce_mod_mpz (num, num, m); /* num <- num * inv mod m */
     mpz_clear (inv);
-  }
-  else
-  {
-    int d;
+  } else {
     mpz_poly_t g, U, V;
     mpz_poly_init (g, 0);
     mpz_poly_init (U, 0);
     mpz_poly_init (V, 0);
     mpz_poly_xgcd_mpz (g, F, denom, U, V, m);
     mpz_poly_mul (num, num, V);
-    d=mpz_poly_mod_f_mod_mpz (num->coeff, num->deg, F->coeff, F->deg, m, NULL);
-    mpz_poly_cleandeg(num, d);
+    mpz_poly_mod_f_mod_mpz (num, F, m, NULL);
     mpz_poly_clear (g);
     mpz_poly_clear (U);
     mpz_poly_clear (V);
@@ -1087,17 +1096,16 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P1, const mpz_poly_t 
   int d1 = P1->deg;
   int d2 = P2->deg;
   int d = d1+d2;
-  int df = f->deg;
   mpz_poly_t R;
 
   mpz_poly_init(R, d);
 
   d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+  mpz_poly_cleandeg(R, d);
 
   // reduce mod f
-  d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
+  mpz_poly_mod_f_mod_mpz (R, f, m, invm);
 
-  mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
   mpz_poly_clear(R);
 }
@@ -1111,7 +1119,6 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
 {
   int d1 = P->deg;
   int d = d1 + d1;
-  int df = f->deg;
   mpz_poly_t R;
 
   mpz_poly_init(R, d);
@@ -1119,11 +1126,11 @@ mpz_poly_sqr_mod_f_mod_mpz (mpz_poly_t Q, const mpz_poly_t P, const mpz_poly_t f
   /* Fast squaring in 2d1+1 squares, i.e., 2d-1 squares.
      For d=5, this gives 9 squares. */
   d = mpz_poly_sqr_tc (R->coeff, P->coeff, d1);
+  mpz_poly_cleandeg(R, d);
 
   // reduce mod f
-  d = mpz_poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
+  mpz_poly_mod_f_mod_mpz (R, f, m, invm);
 
-  mpz_poly_cleandeg(R, d);
   mpz_poly_copy(Q, R);
   mpz_poly_clear(R);
 }
@@ -1417,7 +1424,7 @@ mpz_poly_sizeinbase (mpz_poly_t f, int d, int b)
   return S;
 }
 
-/* f=gcd(f,g) mod p, with p in mpz_t */
+/* f=gcd(f, g) mod p, with p in mpz_t */
 void
 mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
 {
@@ -1429,7 +1436,7 @@ mpz_poly_gcd_mpz (mpz_poly_t f, mpz_poly_t g, const mpz_t p)
     }
 }
 
-/* Attempt to compute the f=gcd(f,g) mod N, where N is not necessarily a
+/* Attempt to compute the f=gcd(f, g) mod N, where N is not necessarily a
  * prime. If at some point a division fails, this gives a proper factor
  * of N that is put in the corresponding argument.
  * The return value tells whether the process was successful (1 means
@@ -1456,7 +1463,7 @@ mpz_poly_pseudogcd_mpz(mpz_poly_t f, mpz_poly_t g, const mpz_t N, mpz_t factor)
 }
 
 
-/* computes d = gcd(f,g) = u*f + v*g mod p, with p in mpz_t */
+/* computes d = gcd(f, g) = u*f + v*g mod p, with p in mpz_t */
 void
 mpz_poly_xgcd_mpz (mpz_poly_t d, const mpz_poly_t f, const mpz_poly_t g, mpz_poly_t u, mpz_poly_t v, const mpz_t p)
 {
@@ -1549,7 +1556,7 @@ mpz_poly_homography (mpz_poly_t Fij, mpz_poly_t F, int64_t H[4])
   for (k = 0; k <= d; k++)
     mpz_set (fij[k], f[k]);
 
-  mpz_poly_set_deg(Fij, d);
+  Fij->deg = d;
 
   g = malloc ((d + 1) * sizeof (mpz_t));
   FATAL_ERROR_CHECK (g == NULL, "not enough memory");

@@ -610,6 +610,33 @@ test_mpz_poly_base_modp_init (unsigned long iter)
   mpz_clear (pk);
 }
 
+void test_mpz_poly_is_root(unsigned long iter)
+{
+    mpz_t p, r;
+    mpz_poly_t f, ell;
+    mpz_init(p);
+    mpz_init(r);
+    mpz_poly_init(f, 10);
+    mpz_poly_init(ell, 1);
+
+    for( ; iter--; ) {
+        mpz_poly_random(f, 10, 100);
+        mpz_urandomb(p, state, 100);
+        mpz_rrandomb(r, state, 100);
+        mpz_poly_setcoeff_si(ell, 1, 1);
+        mpz_neg(ell->coeff[0], r);
+        mpz_poly_mul(f, f, ell);
+        mpz_poly_mod_mpz(f, p, NULL);
+        mpz_mod(r, r, p);
+    }
+
+    ASSERT_ALWAYS(mpz_poly_is_root(f, r, p));
+    mpz_poly_clear(f);
+    mpz_poly_clear(ell);
+    mpz_clear(r);
+    mpz_clear(p);
+}
+
 int
 main (int argc, const char *argv[])
 {
@@ -625,6 +652,7 @@ main (int argc, const char *argv[])
   test_mpz_poly_power_mod_f_mod_ui ();
   test_barrett_mod (iter);
   test_mpz_poly_base_modp_init (iter);
+  test_mpz_poly_is_root(iter);
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
