@@ -131,22 +131,21 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
   }
 }
 
-/* Stores the derivative of f in df. Assumes df different from f.
+/* Stores the derivative of f in df. f and df may be identical.
    Assumes df has been initialized with degree at least f->deg-1. */
 void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
   unsigned int n;
-  double d_n;
   if (f->deg == 0) {
     df->deg = 0; /* How do we store deg -\infty polynomials? */
     df->coeff[0] = 0.;
     return;
   }
   // at this point, f->deg >=1
+  for (n = 1; n <= f->deg; n++)
+    df->coeff[n - 1] = f->coeff[n] * (double) n;
   df->deg = f->deg - 1;
-  for(n = 0, d_n = 1.; n < f->deg; n++, d_n += 1.)
-    df->coeff[n] = f->coeff[n + 1] * d_n;
 }
 
 /* Stores the product of f and g in h (h = f * g).
