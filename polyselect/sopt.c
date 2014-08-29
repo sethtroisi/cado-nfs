@@ -184,6 +184,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       polyprint (f, g, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
+      fflush (stdout);
 
       ave_logmu += logmu;
       min_logmu = (logmu < min_logmu) ? logmu : min_logmu;
