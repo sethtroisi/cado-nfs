@@ -1005,7 +1005,7 @@ special_val0 (mpz_poly_ptr f, unsigned long p)
         mpz_divexact (g->coeff[i], f->coeff[i], c);
     }
   else
-    mpz_poly_copy (g, f);
+    mpz_poly_set (g, f);
 
   mpz_poly_init (H, d);
   H->deg = d;
@@ -2697,9 +2697,9 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   mpz_init_set_ui (b, 4);
   mpz_poly_init (best_f, d);
   mpz_poly_init (copy_f, d);
-  mpz_poly_copy (copy_f, f);
+  mpz_poly_set (copy_f, f);
   mpz_init_set (copy_g0, g[0]);
-  mpz_poly_copy (best_f, f);
+  mpz_poly_set (best_f, f);
   mpz_init_set (best_g0, g[0]);
   best_lognorm = L2_lognorm (f, skew);
 
@@ -2749,7 +2749,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
           if (lognorm < best_lognorm)
             {
               best_lognorm = lognorm;
-              mpz_poly_copy (best_f, f);
+              mpz_poly_set (best_f, f);
               mpz_set (best_g0, g[0]);
             }
         }
@@ -2757,7 +2757,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
         mpz_clear (m.coeff[j][i]);
       free (m.coeff[j]);
     }
-  mpz_poly_copy (f, best_f);
+  mpz_poly_set (f, best_f);
   mpz_set (g[0], best_g0);
   free (m.coeff);
   mpz_clear (s);
@@ -2813,7 +2813,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
     mpz_init (r[i]);
 
   /* g[1] is not changed below, thus we only save g[0] */
-  mpz_poly_copy (f_copy, f);
+  mpz_poly_set (f_copy, f);
   mpz_init_set (g0_copy, g[0]);
 
   /* We use here an idea suggested by Thorsten Kleinjung, namely
@@ -2838,7 +2838,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
   for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
 #undef LMAX
   {
-    mpz_poly_copy (f, f_copy);
+    mpz_poly_set (f, f_copy);
     mpz_set (g[0], g0_copy);
 
     /* f(x) := f(x) + l*x^3*g(x) */
@@ -2853,7 +2853,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
     /* For each root R, rounded to an integer, optimize f(x + R) */
     for (int j = 0; j < nr_roots; j++)
     {
-      mpz_poly_copy (f, f_copy);
+      mpz_poly_set (f, f_copy);
       mpz_set (g[0], g0_copy);
       rotate_auxg_si (f->coeff, g, l, 3);
 
@@ -2876,7 +2876,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
 
       if (logmud < best_logmud) {
         best_logmud = logmud;
-        mpz_poly_copy (best_f, f);
+        mpz_poly_set (best_f, f);
         mpz_set (best_g0, g[0]);
       }
 #else
@@ -2887,7 +2887,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
       if (logmu < best_logmu)
         {
           best_logmu = logmu;
-          mpz_poly_copy (best_f, f);
+          mpz_poly_set (best_f, f);
           mpz_set (best_g0, g[0]);
       }
 #endif
@@ -2897,7 +2897,7 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
 
   /* set f and g to the best polynomials found */
   mpz_set (g[0], best_g0);
-  mpz_poly_copy (f, best_f);
+  mpz_poly_set (f, best_f);
 
   mpz_clear (k);
   mpz_clear (best_g0);

@@ -164,15 +164,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, bw->nsolvecs,
             MPFQ_DONE);
-    mpz_clear(p);
 
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);

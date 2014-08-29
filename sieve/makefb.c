@@ -28,7 +28,7 @@ void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
         mpz_poly_setcoeff(aXpb, 0, aux);
         mpz_clear(aux);
     }
-    mpz_poly_copy(aXpbi, aXpb);
+    mpz_poly_set(aXpbi, aXpb);
     mpz_poly_setcoeff(G, 0, f[0]);
     for (int i = 1; i <= d; ++i) {
         mpz_poly_mul_mpz(Aux, aXpbi, f[i]);

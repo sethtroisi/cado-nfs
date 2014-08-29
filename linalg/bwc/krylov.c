@@ -61,14 +61,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
     /* Hmmm. This would deserve better thought. Surely we don't need 64
@@ -78,12 +75,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
      */
     mpfq_vbase Ac;
     mpfq_vbase_oo_field_init_byfeatures(Ac,
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
-    mpz_clear(p);
-
-
 
     block_control_signals();
 

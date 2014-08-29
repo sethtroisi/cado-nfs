@@ -44,15 +44,11 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     }
     */
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
-    mpz_clear(p);
 
     block_control_signals();
 
@@ -63,8 +59,9 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     int only_export = param_list_lookup_string(pl, "export_cachelist") != NULL;
 
     // in no situation shall we try to do our sanity check if we've just
-    // been told to export our cache list
-    if (tmp != NULL && !only_export && !param_list_lookup_string(pl, "prime")) {
+    // been told to export our cache list. Note also that this sanity
+    // check is currently only valid for GF(2).
+    if (tmp != NULL && !only_export && mpz_cmp_ui(bw->p, 2) == 0) {
         /* We have computed a sanity check vector, which is H=M*K, with K
          * constant and easily given. Note that we have not computed K*M,
          * but really M*K. Thus independently of which side we prefer, we

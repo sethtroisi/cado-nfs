@@ -1,5 +1,6 @@
 #include "cado.h"
 #include "macros.h"
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -46,6 +47,18 @@ mpz_poly_mul_xk (mpz_poly_t f, int k)
   f->deg += k;
 }
 
+static void mpz_poly_setcoeffs_ui_var(mpz_poly_t f, int d, ...)
+{
+    va_list ap;
+    va_start(ap, d);
+    mpz_poly_realloc(f, d + 1);
+    for(int i = 0 ; i <= d ; i++) {
+        mpz_set_ui(f->coeff[i], va_arg(ap, int));
+    }
+    mpz_poly_cleandeg(f, d);
+    va_end(ap);
+}
+
 void
 test_polymodF_mul ()
 {
@@ -68,7 +81,7 @@ test_polymodF_mul ()
           mpz_poly_init (P1->p, d1);
           mpz_poly_init (P1_saved->p, d1);
           mpz_poly_random (P1->p, d1, k);
-          mpz_poly_copy (P1_saved->p, P1->p);
+          mpz_poly_set (P1_saved->p, P1->p);
           P1->v = 0;
           for (d2 = 1; d2 <= 10; d2++)
             {
@@ -80,17 +93,17 @@ test_polymodF_mul ()
               else if ((count % 3) == 1)
                 {
                   polymodF_mul (P1, P1, P2, F);
-                  mpz_poly_copy (Q->p, P1->p);
+                  mpz_poly_set (Q->p, P1->p);
                   Q->v = P1->v;
-                  mpz_poly_copy (P1->p, P1_saved->p);
+                  mpz_poly_set (P1->p, P1_saved->p);
                   P1->v = 0;
                 }
               else
                 {
                   polymodF_mul (P1, P2, P1, F);
-                  mpz_poly_copy (Q->p, P1->p);
+                  mpz_poly_set (Q->p, P1->p);
                   Q->v = P1->v;
-                  mpz_poly_copy (P1->p, P1_saved->p);
+                  mpz_poly_set (P1->p, P1_saved->p);
                   P1->v = 0;
                 }
               /* check that Q->p = lc(F)^Q->v * P1 * P1 mod F */
@@ -127,6 +140,7 @@ test_polymodF_mul ()
               mpz_poly_clear (P2->p);
             }
           mpz_poly_clear (P1->p);
+          mpz_poly_clear (P1_saved->p);
         }
       mpz_poly_clear (F);
       mpz_poly_clear (Q->p);
@@ -305,7 +319,7 @@ test_mpz_poly_fprintf (void)
   mpz_poly_setcoeff_si (f, 2, -3); /* f = -3*x^2+42*x+17 */
   mpz_poly_fprintf (stdout, f);
 
-  mpz_poly_copy (g, f);
+  mpz_poly_set (g, f);
   res = mpz_poly_cmp (f, g);
   ASSERT_ALWAYS (res == 0);
   mpz_add_ui (g->coeff[g->deg], g->coeff[g->deg], 1); /* g = -2*x^2+42*x+17 */
@@ -610,12 +624,247 @@ test_mpz_poly_base_modp_init (unsigned long iter)
   mpz_clear (pk);
 }
 
+void test_mpz_poly_is_root(unsigned long iter)
+{
+    mpz_t p, r;
+    mpz_poly_t f, ell;
+    mpz_init(p);
+    mpz_init(r);
+    mpz_poly_init(f, 10);
+    mpz_poly_init(ell, 1);
+
+    for( ; iter--; ) {
+        mpz_poly_random(f, 10, 100);
+        mpz_urandomb(p, state, 100);
+        mpz_rrandomb(r, state, 100);
+        mpz_poly_setcoeff_si(ell, 1, 1);
+        mpz_neg(ell->coeff[0], r);
+        mpz_poly_mul(f, f, ell);
+        mpz_poly_mod_mpz(f, f, p, NULL);
+        mpz_mod(r, r, p);
+    }
+
+    ASSERT_ALWAYS(mpz_poly_is_root(f, r, p));
+    mpz_poly_clear(f);
+    mpz_poly_clear(ell);
+    mpz_clear(r);
+    mpz_clear(p);
+}
+
+void test_mpz_poly_factor(unsigned long iter)
+{
+    mpz_t p;
+    mpz_poly_factor_list lf;
+    mpz_poly_t f;
+
+    mpz_init(p);
+    mpz_poly_init(f, -1);
+    mpz_poly_factor_list_init(lf);
+
+    mpz_set_ui(p, 13);
+    mpz_poly_setcoeffs_ui_var(f, 21, 3, 8, 5, 5, 6, 1, 9, 4, 3, 3, 8, 7, 7, 7, 0, 12, 5, 11, 11, 1, 7, 10);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 2);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 20);
+
+    ASSERT_ALWAYS(mpz_poly_is_irreducible(lf->factors[1]->f, p));
+
+    mpz_set_ui(p, 13);
+    mpz_poly_setcoeffs_ui_var(f, 25, 0, 0, 0, 0, 5, 1, 1, 3, 7, 9, 7, 4, 11, 8, 2, 10, 8, 11, 0, 5, 12, 12, 1, 11, 2, 3);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 6);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[0]->m == 4);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 2);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 3);
+    ASSERT_ALWAYS(lf->factors[4]->f->deg == 6);
+    ASSERT_ALWAYS(lf->factors[5]->f->deg == 9);
+
+    mpz_set_ui(p, 13);
+    mpz_poly_setcoeffs_ui_var(f, 21, 0, 7, 4, 3, 6, 11, 3, 6, 12, 2, 5, 4, 7, 6, 4, 6, 12, 8, 0, 3, 3, 6);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 5);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 3);
+    ASSERT_ALWAYS(lf->factors[2]->m == 2);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 5);
+    ASSERT_ALWAYS(lf->factors[4]->f->deg == 8);
+
+    mpz_set_ui(p, 3);
+    mpz_poly_setcoeffs_ui_var(f, 20, 1, 1, 1, 2, 1, 0, 0, 1, 0, 0, 0, 1, 2, 0, 2, 0, 2, 0, 1, 1, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 4);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[1]->m == 3);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 6);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 10);
+
+    mpz_set_ui(p, 3);
+    mpz_poly_setcoeffs_ui_var(f, 20, 2, 0, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 0, 2, 2, 1, 1, 2, 0, 2, 2);
+    mpz_poly_factor(lf, f, p, state);
+    ASSERT_ALWAYS(lf->size == 5);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 1);
+    ASSERT_ALWAYS(lf->factors[0]->m == 6);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 3);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 3);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 4);
+    ASSERT_ALWAYS(lf->factors[4]->f->deg == 4);
+
+    for( ; iter-- ; ) {
+        // fprintf(stderr, "%lu ", iter);
+        mpz_rrandomb(p, state, 20);
+        mpz_nextprime(p, p);
+        mpz_poly_random(f, 10, 10);
+        mpz_poly_mod_mpz(f, f, p, NULL);
+        // mpz_poly_fprintf(stderr, f);
+        mpz_poly_factor(lf, f, p, state);
+        mpz_poly_t g;
+        mpz_poly_init(g, f->deg);
+        mpz_poly_set_xi(g, 0);
+        for(int i = 0 ; i < lf->size ; i++) {
+            mpz_poly_with_m_ptr fx = lf->factors[i];
+            mpz_poly_power_ui_mod_f_mod_mpz(fx->f, fx->f, NULL, fx->m, p); 
+            mpz_poly_mul(g, g, fx->f);
+            mpz_poly_mod_mpz(g, g, p, NULL);
+        }
+        mpz_poly_reduce_makemonic_mod_mpz(f, f, p);
+        ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
+        mpz_poly_clear(g);
+    }
+
+    mpz_poly_factor_list_clear(lf);
+    mpz_clear(p);
+    mpz_poly_clear(f);
+}
+
+void test_mpz_poly_trivialities()
+{
+    mpz_t a[5], p;
+    mpz_poly_t f, g, q, r;
+    mpz_poly_factor_list lf;
+    int rc;
+
+    mpz_init_set_ui(a[0], 1);
+    mpz_init_set_ui(a[1], 4);
+    mpz_init_set_ui(a[2], 6);
+    mpz_init_set_ui(a[3], 4);
+    mpz_init_set_ui(a[4], 1);
+    mpz_init_set_ui(p, 13);
+    mpz_poly_init(f, -1);
+    mpz_poly_init(g, -1);
+    mpz_poly_init(q, -1);
+    mpz_poly_init(r, -1);
+    mpz_poly_setcoeffs(f, a, 4);
+    {
+        mpz_poly_factor_list_init(lf);
+        mpz_poly_factor(lf, f, p, state);
+        ASSERT_ALWAYS(lf->factors[0]->m == 4);
+        mpz_poly_swap(f, lf->factors[0]->f);
+        mpz_poly_factor_list_clear(lf);
+    }
+    /* we expect to have f == x + 1 */
+    mpz_poly_setcoeffs_ui_var(g, 1, 1, 1);
+    mpz_poly_getcoeff(a[0], 0, f);
+    ASSERT_ALWAYS(mpz_cmp_ui(a[0], 1) == 0);
+    mpz_poly_getcoeff(a[1], 1, f);
+    ASSERT_ALWAYS(mpz_cmp_ui(a[1], 1) == 0);
+    mpz_poly_sub_mod_mpz(f, f, g, p);
+    mpz_poly_set_zero(g);
+    ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
+
+    /* check that (x+1)^5 div x is irreducible mod 13 */
+    mpz_poly_setcoeffs_ui_var(g, 1, 1, 1);
+    mpz_poly_power_ui_mod_f_mod_mpz(g, g, NULL, 5, p);
+    mpz_poly_div_xi(f, g, 6);
+    ASSERT_ALWAYS(f->deg == -1);
+    mpz_poly_div_xi(f, g, 0);
+    ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
+    mpz_poly_div_xi(g, g, 1);
+    ASSERT_ALWAYS(mpz_poly_is_irreducible(g, p));
+
+    /* check that x+1 - (x+1)^2 = -x^2-x */
+    mpz_poly_set_zero(f);
+    mpz_poly_add_ui(f, f, 1);
+    mpz_poly_set_xi(g, 1);
+    mpz_poly_add(f, f, g);
+    mpz_poly_mul(g, f, f);
+    mpz_poly_sub(f, f, g);
+    mpz_poly_set_zero(g);
+    mpz_poly_sub_ui(g, g, 1);
+    mpz_poly_mul(f, f, g);
+    mpz_poly_set_zero(g);
+    mpz_set_ui(a[0], 1);
+    mpz_poly_set_xi(g, 2);
+    mpz_poly_setcoeff(g, 1, a[0]);
+    ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
+
+    /* multiply by zero */
+    mpz_poly_random(f, 10, 10);
+    mpz_poly_set_zero(g);
+    mpz_poly_mul(f, f, g);
+    ASSERT_ALWAYS(mpz_poly_cmp(f, g) == 0);
+
+    /* div modulo non-prime N should get factor */
+    mpz_set_ui(p, 143);
+    mpz_poly_setcoeffs_ui_var(f, 2, 1, 1, 3);
+    mpz_poly_setcoeffs_ui_var(g, 1, 1, 11);
+    rc = mpz_poly_div_r(f, g, p);
+    ASSERT_ALWAYS(rc == 0);
+    mpz_poly_setcoeffs_ui_var(f, 2, 1, 1, 3);
+    mpz_poly_setcoeffs_ui_var(g, 1, 1, 11);
+    /* same test. Of course it doesn't exactly divide, but we do expect
+     * failure nonetheless */
+    rc = mpz_poly_divexact(f, f, g, p);
+    ASSERT_ALWAYS(rc == 0);
+
+    /* test div_qr */
+    mpz_poly_setcoeffs_ui_var(f, 4, 1, 1, 1, 1, 3);
+    mpz_poly_setcoeffs_ui_var(g, 2, 1, 2, 11);
+    rc = mpz_poly_div_qr(q, r, f, g, p);
+    ASSERT_ALWAYS(rc == 0);
+    mpz_set_ui(p, 13);
+    rc = mpz_poly_div_qr(q, r, f, g, p);
+    mpz_poly_setcoeffs_ui_var(f, 2, 0, 11, 5);
+    mpz_poly_setcoeffs_ui_var(g, 1, 1, 3);
+    ASSERT_ALWAYS(rc);
+    ASSERT_ALWAYS(mpz_poly_cmp(f, q) == 0);
+    ASSERT_ALWAYS(mpz_poly_cmp(g, r) == 0);
+
+    /* multiply by p, then reduce mod p */
+    mpz_poly_random(f, 10, 10);
+    mpz_poly_mul_mpz (f, f, p);
+    mpz_poly_reduce_makemonic_mod_mpz(f, f, p);
+    ASSERT_ALWAYS(f->deg < 0);
+
+    /* a non-irreducible polynomial */
+    mpz_poly_setcoeffs_ui_var(g, 2, 1, 2, 1);
+    rc = mpz_poly_is_irreducible(g, p);
+    ASSERT_ALWAYS(rc == 0);
+
+
+    mpz_poly_clear(f);
+    mpz_poly_clear(g);
+    mpz_poly_clear(q);
+    mpz_poly_clear(r);
+    mpz_clear(a[4]);
+    mpz_clear(a[3]);
+    mpz_clear(a[2]);
+    mpz_clear(a[1]);
+    mpz_clear(a[0]);
+    mpz_clear(p);
+}
+
 int
 main (int argc, const char *argv[])
 {
   unsigned long iter = 500;
   tests_common_cmdline(&argc, &argv, PARSE_SEED | PARSE_ITER);
   tests_common_get_iter(&iter);
+
   test_polymodF_mul ();
   /* test_mpz_poly_roots_mpz (iter); */
   test_mpz_poly_sqr_mod_f_mod_mpz (iter);
@@ -625,6 +874,9 @@ main (int argc, const char *argv[])
   test_mpz_poly_power_mod_f_mod_ui ();
   test_barrett_mod (iter);
   test_mpz_poly_base_modp_init (iter);
+  test_mpz_poly_is_root(iter);
+  test_mpz_poly_factor(iter / 5);
+  test_mpz_poly_trivialities ();
   tests_common_clear ();
   exit (EXIT_SUCCESS);
 }
