@@ -1442,17 +1442,10 @@ mpz_poly_base_modp_lift (mpz_poly_ptr a, mpz_poly_t *P, int k, mpz_srcptr pk)
 }
 
 void
-mpz_poly_base_modp_clear (mpz_poly_t *P)
+mpz_poly_base_modp_clear (mpz_poly_t *P, int l)
 {
-  mpz_poly_t *t = P;
-
-  while (1)
-  {
-    mpz_poly_clear (t[0]);
-    if (t[0]->deg == -1)
-      break;
-    t ++;
-  }
+  for (int i = 0; i < l + 2; i++)
+    mpz_poly_clear (P[i]);
   free (P);
 }
 
