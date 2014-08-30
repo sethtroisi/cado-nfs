@@ -660,7 +660,7 @@ mp_limb_t mpfq_fixmp_1_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
-    : );
+    );
     return carry;
 }
 
@@ -678,7 +678,7 @@ mp_limb_t mpfq_fixmp_1_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
-    : );
+    );
     return carry;
 }
 
@@ -763,7 +763,7 @@ void mpfq_fixmp_1_mul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
         "mulq %[y0]\n"
               : "=a" (z[0]), "=d" (z[1])
               : "0" (x[0]), [y0] "rm1" (y[0])
-              : "cc");
+              );
 }
 
 /* x has 1 words, z has 4. Put x*y in z. */
@@ -775,7 +775,7 @@ void mpfq_fixmp_1_sqr(mp_limb_t * z, const mp_limb_t * x)
         "mulq %%rax\n"
     : "=a" (z[0]), "=d" (z[1])
     : "0" (x[0])
-    : "cc");
+    );
 }
 
 /* x has 1 words, z has 3. Put x*y in z. */
@@ -835,7 +835,7 @@ mp_limb_t mpfq_fixmp_2_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
-    : );
+    );
     return carry;
 }
 
@@ -856,7 +856,7 @@ mp_limb_t mpfq_fixmp_2_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
-    : );
+    );
     return carry;
 }
 
@@ -1087,7 +1087,7 @@ mp_limb_t mpfq_fixmp_3_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
-    : );
+    );
     return carry;
 }
 
@@ -1111,7 +1111,7 @@ mp_limb_t mpfq_fixmp_3_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
-    : );
+    );
     return carry;
 }
 
@@ -1436,7 +1436,7 @@ mp_limb_t mpfq_fixmp_4_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
-    : );
+    );
     return carry;
 }
 
@@ -1463,7 +1463,7 @@ mp_limb_t mpfq_fixmp_4_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
-    : );
+    );
     return carry;
 }
 
@@ -5732,7 +5732,7 @@ mp_limb_t mpfq_fixmp_0_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
-    : );
+    );
     return carry;
 }
 
@@ -5750,7 +5750,7 @@ mp_limb_t mpfq_fixmp_0_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
-    : );
+    );
     return carry;
 }
 
@@ -5835,7 +5835,7 @@ void mpfq_fixmp_0_5_mul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
         "imulq %[y0], %%rax\n"
               : "=a" (z[0])
               : "0" (x[0]), [y0] "rm" (y[0])
-              : "cc");
+              );
 }
 
 /* x has 0.5 words, z has 1. Put x*y in z. */
@@ -5847,7 +5847,7 @@ void mpfq_fixmp_0_5_sqr(mp_limb_t * z, const mp_limb_t * x)
         "imulq %%rax, %%rax\n"
     : "=a" (z[0])
     : "0" (x[0])
-    : "cc");
+    );
 }
 
 /* x has 0.5 words, z has 2. Put x*y in z. */
@@ -5928,7 +5928,7 @@ mp_limb_t mpfq_fixmp_1_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
-    : );
+    );
     return carry;
 }
 
@@ -5949,7 +5949,7 @@ mp_limb_t mpfq_fixmp_1_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
-    : );
+    );
     return carry;
 }
 
@@ -6241,7 +6241,7 @@ mp_limb_t mpfq_fixmp_2_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
-    : );
+    );
     return carry;
 }
 
@@ -6265,7 +6265,7 @@ mp_limb_t mpfq_fixmp_2_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
-    : );
+    );
     return carry;
 }
 
@@ -6672,7 +6672,7 @@ mp_limb_t mpfq_fixmp_3_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
-    : );
+    );
     return carry;
 }
 
@@ -6699,7 +6699,7 @@ mp_limb_t mpfq_fixmp_3_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "adcq $0, %%rax\n"
     : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
-    : );
+    );
     return carry;
 }
 
