@@ -793,7 +793,7 @@ void mpfq_fixmp_1_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "mulq    %[mult]\n"
     : [z0]"=a"(z[0]), [z1]"=d"(z[1])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x, y, z and p have 1 words.
@@ -5865,7 +5865,7 @@ void mpfq_fixmp_0_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "mulq    %[mult]\n"
     : [z0]"=a"(z[0]), [z1]"=d"(z[1])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x has 0.5 words, z has 1. c is 0.5 word.
@@ -5914,7 +5914,7 @@ void mpfq_fixmp_0_5_mul05(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "movq    %%rax, %[z0]\n"
     : [z0]"=a"(z[0])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x, y, and z have 1.5 words. Result in z. Return carry bit */
