@@ -617,7 +617,7 @@ test_mpz_poly_base_modp_init (unsigned long iter)
           mpz_poly_base_modp_lift (P[0], P, i, pk);
         }
       ASSERT_ALWAYS(mpz_poly_cmp (f, P[0]) == 0);
-      mpz_poly_base_modp_clear (P);
+      mpz_poly_base_modp_clear (P, l);
     }
   mpz_poly_clear (f);
   mpz_poly_clear (g);

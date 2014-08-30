@@ -179,12 +179,21 @@ test_double_poly_derivative (void)
   double_poly_init (f, 1);
   double_poly_init (df, 0);
 
+  f->deg = 1;
   f->coeff[0] = 17.0;
   f->coeff[1] = 42.0;
   double_poly_derivative (df, f);
   ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 42.0);
 
+  /* Test in-place operation */
+  f->deg = 1;
+  f->coeff[0] = 17.0;
+  f->coeff[1] = 42.0;
+  double_poly_derivative (f, f);
+  ASSERT_ALWAYS (f->deg == 0 && f->coeff[0] == 42.0);
+
   f->deg = 0;
+  f->coeff[0] = 17.0;
   double_poly_derivative (df, f);
   ASSERT_ALWAYS (df->deg == 0 && df->coeff[0] == 0.0);
 

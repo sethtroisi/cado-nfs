@@ -77,11 +77,8 @@ static int mpfq_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() pa
    w=64,
    } */
 
-/* missing impl_max_characteristic_bits */
-/* missing impl_max_degree */
 
 /* Functions operating on the field structure */
-/* missing field_characteristic_bits */
 /* *simd_u64k::code_for_field_specify */
 void mpfq_u64k2_field_specify(mpfq_u64k2_dst_field K MAYBE_UNUSED, unsigned long tag, void * x MAYBE_UNUSED)
 {
@@ -98,37 +95,14 @@ void mpfq_u64k2_field_specify(mpfq_u64k2_dst_field K MAYBE_UNUSED, unsigned long
 /* Element allocation functions */
 
 /* Elementary assignment functions */
-/* missing set_ui */
-/* missing get_ui */
-/* missing set_mpn */
-/* missing set_mpz */
-/* missing get_mpn */
-/* missing get_mpz */
 
 /* Assignment of random values */
-/* missing random2 */
 
 /* Arithmetic operations on elements */
-/* missing mul */
-/* missing sqr */
-/* missing is_sqr */
-/* missing sqrt */
-/* missing pow */
-/* missing powz */
-/* missing frobenius */
-/* missing add_ui */
-/* missing sub_ui */
-/* missing mul_ui */
-/* missing inv */
 
 /* Operations involving unreduced elements */
-/* missing elt_ur_set_ui */
-/* missing mul_ur */
-/* missing sqr_ur */
-/* missing reduce */
 
 /* Comparison functions */
-/* missing cmp_ui */
 
 /* Input/output functions */
 /* *io::code_for_asprint */
@@ -213,7 +187,7 @@ int mpfq_u64k2_fscan(mpfq_u64k2_dst_field k, FILE * file, mpfq_u64k2_dst_elt z)
     tmp[len]='\0';
     int ret=mpfq_u64k2_sscan(k,z,tmp);
     free(tmp);
-    return ret;
+    return ret ? len : 0;
 }
 
 
@@ -254,7 +228,6 @@ void mpfq_u64k2_vec_clear(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_vec * 
 
 /* missing vec_setcoeff_ui */
 /* missing vec_scal_mul */
-/* missing vec_conv */
 /* missing vec_random2 */
 /* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec */
 int mpfq_u64k2_vec_asprint(mpfq_u64k2_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_u64k2_src_vec w, unsigned int n)
@@ -281,7 +254,7 @@ int mpfq_u64k2_vec_asprint(mpfq_u64k2_dst_field K MAYBE_UNUSED, char * * pstr, m
         mpfq_u64k2_asprint(K, &tmp, w[i]);
         int ltmp = strlen(tmp);
         if (len+ltmp+4 > alloc) {
-            alloc = len+ltmp+100;
+            alloc = len+ltmp+100 + alloc / 4;
             *pstr = (char *)realloc(*pstr, alloc*sizeof(char));
         }
         strncpy(*pstr+len, tmp, ltmp+4);
@@ -316,45 +289,48 @@ int mpfq_u64k2_vec_sscan(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_vec * w
 {
     // start with a clean vector
     unsigned int nn;
+    int len = 0;
     mpfq_u64k2_vec_reinit(K, w, *n, 0);
-    *n = 0;
-    nn = 0;
-    while (isspace((int)(unsigned char)str[0]))
-        str++;
-    if (str[0] != '[')
+    *n = nn = 0;
+    while (isspace((int)(unsigned char)str[len]))
+        len++;
+    if (str[len] != '[')
         return 0;
-    str++;
-    while (isspace((int)(unsigned char)str[0]))
-        str++;
-    if (str[0] == ']') {
-        return 1;
+    len++;
+    while (isspace((int)(unsigned char)str[len]))
+        len++;
+    if (str[len] == ']') {
+        len++;
+        return len;
     }
     unsigned int i = 0;
     for (;;) {
         if (nn < i+1) {
             mpfq_u64k2_vec_reinit(K, w, nn, i+1);
-            nn = i+1;
+            *n = nn = i+1;
         }
-        int ret;
-        ret = mpfq_u64k2_sscan(K, (*w)[i], str);
+        int ret = mpfq_u64k2_sscan(K, mpfq_u64k2_vec_coeff_ptr(K, *w, i), str + len);
         if (!ret) {
+            *n = 0; /* invalidate data ! */
             return 0;
         }
         i++;
-        while (isdigit((int)(unsigned char)str[0]))
-            str++;
-        while (isspace((int)(unsigned char)str[0]))
-            str++;
-        if (str[0] == ']')
+        len += ret;
+        while (isspace((int)(unsigned char)str[len]))
+            len++;
+        if (str[len] == ']') {
+            len++;
             break;
-        if (str[0] != ',')
+        }
+        if (str[len] != ',') {
+            *n = 0; /* invalidate data ! */
             return 0;
-        str++;
-        while (isspace((int)(unsigned char)str[0]))
-            str++;
+        }
+        len++;
+        while (isspace((int)(unsigned char)str[len]))
+            len++;
     }
-    *n = nn;
-    return 1;
+    return len;
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec */
@@ -365,19 +341,26 @@ int mpfq_u64k2_vec_fscan(mpfq_u64k2_dst_field K MAYBE_UNUSED, FILE * file, mpfq_
     int allocated, len=0;
     allocated=100;
     tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
+    int nest = 0, mnest = 0;
     for(;;) {
         c = fgetc(file);
         if (c==EOF) {
             free(tmp);
             return 0;
         }
+        if (c == '[') {
+            nest++, mnest++;
+        }
         if (len==allocated) {
-            allocated+=100;
+            allocated = len + 10 + allocated / 4;
             tmp = (char*)realloc(tmp, allocated*sizeof(char));
         }
         tmp[len]=c;
         len++;
-        if (c==']')
+        if (c == ']') {
+            nest--, mnest++;
+        }
+        if (mnest && nest == 0)
             break;
     }
     if (len==allocated) {
@@ -425,40 +408,9 @@ void mpfq_u64k2_vec_ur_clear(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_vec
 }
 
 /* missing vec_scal_mul_ur */
-/* missing vec_conv_ur */
 /* missing vec_reduce */
 
 /* Polynomial functions */
-/* missing poly_init */
-/* missing poly_clear */
-/* missing poly_set */
-/* missing poly_setmonic */
-/* missing poly_setcoeff */
-/* missing poly_setcoeff_ui */
-/* missing poly_getcoeff */
-/* missing poly_deg */
-/* missing poly_add */
-/* missing poly_sub */
-/* missing poly_set_ui */
-/* missing poly_add_ui */
-/* missing poly_sub_ui */
-/* missing poly_neg */
-/* missing poly_scal_mul */
-/* missing poly_mul */
-/* missing poly_divmod */
-/* missing poly_precomp_mod */
-/* missing poly_mod_pre */
-/* missing poly_gcd */
-/* missing poly_xgcd */
-/* missing poly_random */
-/* missing poly_random2 */
-/* missing poly_cmp */
-/* missing poly_asprint */
-/* missing poly_fprint */
-/* missing poly_print */
-/* missing poly_sscan */
-/* missing poly_fscan */
-/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_dotprod::code_for_dotprod */
@@ -474,26 +426,28 @@ void mpfq_u64k2_dotprod(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_vec 
 /* Member templates related to SIMD operation */
 
 /* MPI interface */
-static void mpfq_u64k2_mpi_op_inner(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
-void mpfq_u64k2_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
-{
-    int got_it;
-    mpfq_u64k2_dst_field K;
-    MPI_Type_get_attr(*datatype, mpfq_u64k2_impl_mpi_attr, (void*) &K, &got_it);
-    assert(got_it);
-    mpfq_u64k2_vec_add(K, inoutvec, inoutvec, invec, *len);
-}
-
 static void mpfq_u64k2_mpi_op_inner_ur(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
-void mpfq_u64k2_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
+/* Triggered by: mpi_ops_init */
+static void mpfq_u64k2_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
 {
     int got_it;
     mpfq_u64k2_dst_field K;
     MPI_Type_get_attr(*datatype, mpfq_u64k2_impl_mpi_attr, (void*) &K, &got_it);
     assert(got_it);
     mpfq_u64k2_vec_ur_add(K, inoutvec, inoutvec, invec, *len);
+}
+
+static void mpfq_u64k2_mpi_op_inner(void *, void *, int *, MPI_Datatype *);
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
+/* Triggered by: mpi_ops_init */
+static void mpfq_u64k2_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
+{
+    int got_it;
+    mpfq_u64k2_dst_field K;
+    MPI_Type_get_attr(*datatype, mpfq_u64k2_impl_mpi_attr, (void*) &K, &got_it);
+    assert(got_it);
+    mpfq_u64k2_vec_add(K, inoutvec, inoutvec, invec, *len);
 }
 
 /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
@@ -552,526 +506,10 @@ void mpfq_u64k2_mpi_ops_clear(mpfq_u64k2_dst_field K MAYBE_UNUSED)
 
 
 /* Object-oriented interface */
-static const char * mpfq_u64k2_wrapper_impl_name();
-static const char * mpfq_u64k2_wrapper_impl_name()
+static void mpfq_u64k2_wrapper_oo_field_clear(mpfq_vbase_ptr);
+static void mpfq_u64k2_wrapper_oo_field_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
 {
-    return mpfq_u64k2_impl_name();
-}
-
-static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr, mpz_t);
-static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
-{
-    mpfq_u64k2_field_characteristic(vbase->obj, z);
-}
-
-static int mpfq_u64k2_wrapper_field_degree(mpfq_vbase_ptr);
-static int mpfq_u64k2_wrapper_field_degree(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_field_degree(vbase->obj);
-}
-
-static void mpfq_u64k2_wrapper_field_init(mpfq_vbase_ptr);
-static void mpfq_u64k2_wrapper_field_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_u64k2_field_init(vbase->obj);
-}
-
-static void mpfq_u64k2_wrapper_field_clear(mpfq_vbase_ptr);
-static void mpfq_u64k2_wrapper_field_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_u64k2_field_clear(vbase->obj);
-}
-
-static void mpfq_u64k2_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, void *);
-static void mpfq_u64k2_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long tag MAYBE_UNUSED, void * x MAYBE_UNUSED)
-{
-    mpfq_u64k2_field_specify(vbase->obj, tag, x);
-}
-
-static void mpfq_u64k2_wrapper_field_setopt(mpfq_vbase_ptr, unsigned long, void *);
-static void mpfq_u64k2_wrapper_field_setopt(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, void * y MAYBE_UNUSED)
-{
-    mpfq_u64k2_field_setopt(vbase->obj, x, y);
-}
-
-static void mpfq_u64k2_wrapper_init(mpfq_vbase_ptr, mpfq_u64k2_elt *);
-static void mpfq_u64k2_wrapper_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt * px MAYBE_UNUSED)
-{
-    mpfq_u64k2_init(vbase->obj, px);
-}
-
-static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr, mpfq_u64k2_elt *);
-static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt * px MAYBE_UNUSED)
-{
-    mpfq_u64k2_clear(vbase->obj, px);
-}
-
-static void mpfq_u64k2_wrapper_set(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt);
-static void mpfq_u64k2_wrapper_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
-{
-    mpfq_u64k2_set(vbase->obj, r, s);
-}
-
-static void mpfq_u64k2_wrapper_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_elt);
-static void mpfq_u64k2_wrapper_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED)
-{
-    mpfq_u64k2_set_zero(vbase->obj, r);
-}
-
-static void mpfq_u64k2_wrapper_random(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, gmp_randstate_t);
-static void mpfq_u64k2_wrapper_random(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
-{
-    mpfq_u64k2_random(vbase->obj, r, state);
-}
-
-static void mpfq_u64k2_wrapper_add(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
-static void mpfq_u64k2_wrapper_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s1 MAYBE_UNUSED, mpfq_u64k2_src_elt s2 MAYBE_UNUSED)
-{
-    mpfq_u64k2_add(vbase->obj, r, s1, s2);
-}
-
-static void mpfq_u64k2_wrapper_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
-static void mpfq_u64k2_wrapper_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s1 MAYBE_UNUSED, mpfq_u64k2_src_elt s2 MAYBE_UNUSED)
-{
-    mpfq_u64k2_sub(vbase->obj, r, s1, s2);
-}
-
-static void mpfq_u64k2_wrapper_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt);
-static void mpfq_u64k2_wrapper_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
-{
-    mpfq_u64k2_neg(vbase->obj, r, s);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_init(mpfq_vbase_ptr, mpfq_u64k2_elt_ur *);
-static void mpfq_u64k2_wrapper_elt_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt_ur * px MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_init(vbase->obj, px);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr, mpfq_u64k2_elt_ur *);
-static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt_ur * px MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_clear(vbase->obj, px);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_set(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur);
-static void mpfq_u64k2_wrapper_elt_ur_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_set(vbase->obj, r, s);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_set_elt(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt);
-static void mpfq_u64k2_wrapper_elt_ur_set_elt(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_set_elt(vbase->obj, r, s);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur);
-static void mpfq_u64k2_wrapper_elt_ur_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_set_zero(vbase->obj, r);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_add(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur, mpfq_u64k2_src_elt_ur);
-static void mpfq_u64k2_wrapper_elt_ur_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s1 MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s2 MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_add(vbase->obj, r, s1, s2);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur);
-static void mpfq_u64k2_wrapper_elt_ur_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_neg(vbase->obj, r, s);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur, mpfq_u64k2_src_elt_ur);
-static void mpfq_u64k2_wrapper_elt_ur_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s1 MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s2 MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_sub(vbase->obj, r, s1, s2);
-}
-
-static int mpfq_u64k2_wrapper_cmp(mpfq_vbase_ptr, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
-static int mpfq_u64k2_wrapper_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
-{
-    return mpfq_u64k2_cmp(vbase->obj, r, s);
-}
-
-static int mpfq_u64k2_wrapper_is_zero(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
-static int mpfq_u64k2_wrapper_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt r MAYBE_UNUSED)
-{
-    return mpfq_u64k2_is_zero(vbase->obj, r);
-}
-
-static int mpfq_u64k2_wrapper_asprint(mpfq_vbase_ptr, char * *, mpfq_u64k2_src_elt);
-static int mpfq_u64k2_wrapper_asprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, char * * ps MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
-{
-    return mpfq_u64k2_asprint(vbase->obj, ps, x);
-}
-
-static int mpfq_u64k2_wrapper_fprint(mpfq_vbase_ptr, FILE *, mpfq_u64k2_src_elt);
-static int mpfq_u64k2_wrapper_fprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
-{
-    return mpfq_u64k2_fprint(vbase->obj, file, x);
-}
-
-static int mpfq_u64k2_wrapper_print(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
-static int mpfq_u64k2_wrapper_print(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
-{
-    return mpfq_u64k2_print(vbase->obj, x);
-}
-
-static int mpfq_u64k2_wrapper_sscan(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, const char *);
-static int mpfq_u64k2_wrapper_sscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt z MAYBE_UNUSED, const char * str MAYBE_UNUSED)
-{
-    return mpfq_u64k2_sscan(vbase->obj, z, str);
-}
-
-static int mpfq_u64k2_wrapper_fscan(mpfq_vbase_ptr, FILE *, mpfq_u64k2_dst_elt);
-static int mpfq_u64k2_wrapper_fscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_dst_elt z MAYBE_UNUSED)
-{
-    return mpfq_u64k2_fscan(vbase->obj, file, z);
-}
-
-static int mpfq_u64k2_wrapper_scan(mpfq_vbase_ptr, mpfq_u64k2_dst_elt);
-static int mpfq_u64k2_wrapper_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt x MAYBE_UNUSED)
-{
-    return mpfq_u64k2_scan(vbase->obj, x);
-}
-
-static void mpfq_u64k2_wrapper_vec_init(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int);
-static void mpfq_u64k2_wrapper_vec_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_init(vbase->obj, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_reinit(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int, unsigned int);
-static void mpfq_u64k2_wrapper_vec_reinit(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_reinit(vbase->obj, v, n, m);
-}
-
-static void mpfq_u64k2_wrapper_vec_clear(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int);
-static void mpfq_u64k2_wrapper_vec_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_clear(vbase->obj, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_set(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec r MAYBE_UNUSED, mpfq_u64k2_src_vec s MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_set(vbase->obj, r, s, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_set_zero(vbase->obj, r, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_setcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_elt, unsigned int);
-static void mpfq_u64k2_wrapper_vec_setcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_setcoeff(vbase->obj, w, x, i);
-}
-
-static void mpfq_u64k2_wrapper_vec_getcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_getcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt x MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_getcoeff(vbase->obj, x, w, i);
-}
-
-static void mpfq_u64k2_wrapper_vec_add(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_add(vbase->obj, w, u, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_neg(vbase->obj, w, u, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_rev(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_rev(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_rev(vbase->obj, w, u, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_sub(vbase->obj, w, u, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_random(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, unsigned int, gmp_randstate_t);
-static void mpfq_u64k2_wrapper_vec_random(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_random(vbase->obj, w, n, state);
-}
-
-static int mpfq_u64k2_wrapper_vec_cmp(mpfq_vbase_ptr, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
-static int mpfq_u64k2_wrapper_vec_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_cmp(vbase->obj, u, v, n);
-}
-
-static int mpfq_u64k2_wrapper_vec_is_zero(mpfq_vbase_ptr, mpfq_u64k2_src_vec, unsigned int);
-static int mpfq_u64k2_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_is_zero(vbase->obj, r, n);
-}
-
-static mpfq_u64k2_dst_vec mpfq_u64k2_wrapper_vec_subvec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, int);
-static mpfq_u64k2_dst_vec mpfq_u64k2_wrapper_vec_subvec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_subvec(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_src_vec mpfq_u64k2_wrapper_vec_subvec_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec, int);
-static mpfq_u64k2_src_vec mpfq_u64k2_wrapper_vec_subvec_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_subvec_const(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_coeff_ptr(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, int);
-static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_coeff_ptr(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_coeff_ptr(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_coeff_ptr_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec, int);
-static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_coeff_ptr_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_coeff_ptr_const(vbase->obj, v, i);
-}
-
-static int mpfq_u64k2_wrapper_vec_asprint(mpfq_vbase_ptr, char * *, mpfq_u64k2_src_vec, unsigned int);
-static int mpfq_u64k2_wrapper_vec_asprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_asprint(vbase->obj, pstr, w, n);
-}
-
-static int mpfq_u64k2_wrapper_vec_fprint(mpfq_vbase_ptr, FILE *, mpfq_u64k2_src_vec, unsigned int);
-static int mpfq_u64k2_wrapper_vec_fprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_fprint(vbase->obj, file, w, n);
-}
-
-static int mpfq_u64k2_wrapper_vec_print(mpfq_vbase_ptr, mpfq_u64k2_src_vec, unsigned int);
-static int mpfq_u64k2_wrapper_vec_print(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_print(vbase->obj, w, n);
-}
-
-static int mpfq_u64k2_wrapper_vec_sscan(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int *, const char *);
-static int mpfq_u64k2_wrapper_vec_sscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED, const char * str MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_sscan(vbase->obj, w, n, str);
-}
-
-static int mpfq_u64k2_wrapper_vec_fscan(mpfq_vbase_ptr, FILE *, mpfq_u64k2_vec *, unsigned int *);
-static int mpfq_u64k2_wrapper_vec_fscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_fscan(vbase->obj, file, w, n);
-}
-
-static int mpfq_u64k2_wrapper_vec_scan(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int *);
-static int mpfq_u64k2_wrapper_vec_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_scan(vbase->obj, w, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_init(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_init(vbase->obj, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_set_zero(vbase->obj, r, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_set_vec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_set_vec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_set_vec(vbase->obj, w, u, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_reinit(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_reinit(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_reinit(vbase->obj, v, n, m);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_clear(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_clear(vbase->obj, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_set(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur r MAYBE_UNUSED, mpfq_u64k2_src_vec_ur s MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_set(vbase->obj, r, s, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_setcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_elt_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_setcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_setcoeff(vbase->obj, w, x, i);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_getcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_getcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur x MAYBE_UNUSED, mpfq_u64k2_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_getcoeff(vbase->obj, x, w, i);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_add(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_add(vbase->obj, w, u, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_sub(vbase->obj, w, u, v, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_neg(vbase->obj, w, u, n);
-}
-
-static void mpfq_u64k2_wrapper_vec_ur_rev(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
-static void mpfq_u64k2_wrapper_vec_ur_rev(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_vec_ur_rev(vbase->obj, w, u, n);
-}
-
-static mpfq_u64k2_dst_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, int);
-static mpfq_u64k2_dst_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_ur_subvec(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_src_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec_ur, int);
-static mpfq_u64k2_src_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_ur_subvec_const(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, int);
-static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_ur_coeff_ptr(vbase->obj, v, i);
-}
-
-static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec_ur, int);
-static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_ur_coeff_ptr_const(vbase->obj, v, i);
-}
-
-static ptrdiff_t mpfq_u64k2_wrapper_vec_elt_stride(mpfq_vbase_ptr, int);
-static ptrdiff_t mpfq_u64k2_wrapper_vec_elt_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_elt_stride(vbase->obj, n);
-}
-
-static ptrdiff_t mpfq_u64k2_wrapper_vec_ur_elt_stride(mpfq_vbase_ptr, int);
-static ptrdiff_t mpfq_u64k2_wrapper_vec_ur_elt_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_vec_ur_elt_stride(vbase->obj, n);
-}
-
-static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr);
-static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_groupsize(vbase->obj);
-}
-
-static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr, int);
-static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
-{
-    return mpfq_u64k2_offset(vbase->obj, n);
-}
-
-static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr);
-static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_stride(vbase->obj);
-}
-
-static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
-static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
-{
-    mpfq_u64k2_set_ui_at(vbase->obj, p, k, v);
-}
-
-static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
-static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
-{
-    mpfq_u64k2_set_ui_all(vbase->obj, r, v);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_set_ui_at(vbase->obj, p, k, v);
-}
-
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
-static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
-{
-    mpfq_u64k2_elt_ur_set_ui_all(vbase->obj, r, v);
-}
-
-static void mpfq_u64k2_wrapper_dotprod(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
-static void mpfq_u64k2_wrapper_dotprod(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec xw MAYBE_UNUSED, mpfq_u64k2_src_vec xu1 MAYBE_UNUSED, mpfq_u64k2_src_vec xu0 MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
-{
-    mpfq_u64k2_dotprod(vbase->obj, xw, xu1, xu0, n);
-}
-
-static void mpfq_u64k2_wrapper_mpi_ops_init(mpfq_vbase_ptr);
-static void mpfq_u64k2_wrapper_mpi_ops_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_u64k2_mpi_ops_init(vbase->obj);
-}
-
-static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype(mpfq_vbase_ptr);
-static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_mpi_datatype(vbase->obj);
-}
-
-static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype_ur(mpfq_vbase_ptr);
-static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_mpi_datatype_ur(vbase->obj);
-}
-
-static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op(mpfq_vbase_ptr);
-static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_mpi_addition_op(vbase->obj);
-}
-
-static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr);
-static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    return mpfq_u64k2_mpi_addition_op_ur(vbase->obj);
-}
-
-static void mpfq_u64k2_wrapper_mpi_ops_clear(mpfq_vbase_ptr);
-static void mpfq_u64k2_wrapper_mpi_ops_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
-{
-    mpfq_u64k2_mpi_ops_clear(vbase->obj);
+    mpfq_u64k2_oo_field_clear(vbase);
 }
 
 static void mpfq_u64k2_wrapper_oo_field_init(mpfq_vbase_ptr);
@@ -1080,20 +518,550 @@ static void mpfq_u64k2_wrapper_oo_field_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
     mpfq_u64k2_oo_field_init(vbase);
 }
 
-static void mpfq_u64k2_wrapper_oo_field_clear(mpfq_vbase_ptr);
-static void mpfq_u64k2_wrapper_oo_field_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+static void mpfq_u64k2_wrapper_mpi_ops_clear(mpfq_vbase_ptr);
+static void mpfq_u64k2_wrapper_mpi_ops_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
 {
-    mpfq_u64k2_oo_field_clear(vbase);
+    mpfq_u64k2_mpi_ops_clear(vbase->obj);
 }
 
+static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr);
+static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_mpi_addition_op_ur(vbase->obj);
+}
+
+static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op(mpfq_vbase_ptr);
+static MPI_Op mpfq_u64k2_wrapper_mpi_addition_op(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_mpi_addition_op(vbase->obj);
+}
+
+static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype_ur(mpfq_vbase_ptr);
+static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype_ur(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_mpi_datatype_ur(vbase->obj);
+}
+
+static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype(mpfq_vbase_ptr);
+static MPI_Datatype mpfq_u64k2_wrapper_mpi_datatype(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_mpi_datatype(vbase->obj);
+}
+
+static void mpfq_u64k2_wrapper_mpi_ops_init(mpfq_vbase_ptr);
+static void mpfq_u64k2_wrapper_mpi_ops_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    mpfq_u64k2_mpi_ops_init(vbase->obj);
+}
+
+static void mpfq_u64k2_wrapper_dotprod(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_dotprod(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec xw MAYBE_UNUSED, mpfq_u64k2_src_vec xu1 MAYBE_UNUSED, mpfq_u64k2_src_vec xu0 MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_dotprod(vbase->obj, xw, xu1, xu0, n);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
+static void mpfq_u64k2_wrapper_elt_ur_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_set_ui_all(vbase->obj, r, v);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
+static void mpfq_u64k2_wrapper_elt_ur_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_set_ui_at(vbase->obj, p, k, v);
+}
+
+static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, unsigned long);
+static void mpfq_u64k2_wrapper_set_ui_all(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+{
+    mpfq_u64k2_set_ui_all(vbase->obj, r, v);
+}
+
+static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, int, unsigned long);
+static void mpfq_u64k2_wrapper_set_ui_at(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt p MAYBE_UNUSED, int k MAYBE_UNUSED, unsigned long v MAYBE_UNUSED)
+{
+    mpfq_u64k2_set_ui_at(vbase->obj, p, k, v);
+}
+
+static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr);
+static int mpfq_u64k2_wrapper_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_stride(vbase->obj);
+}
+
+static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr, int);
+static int mpfq_u64k2_wrapper_offset(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_offset(vbase->obj, n);
+}
+
+static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr);
+static int mpfq_u64k2_wrapper_groupsize(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_groupsize(vbase->obj);
+}
+
+static ptrdiff_t mpfq_u64k2_wrapper_vec_ur_elt_stride(mpfq_vbase_ptr, int);
+static ptrdiff_t mpfq_u64k2_wrapper_vec_ur_elt_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_ur_elt_stride(vbase->obj, n);
+}
+
+static ptrdiff_t mpfq_u64k2_wrapper_vec_elt_stride(mpfq_vbase_ptr, int);
+static ptrdiff_t mpfq_u64k2_wrapper_vec_elt_stride(mpfq_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_elt_stride(vbase->obj, n);
+}
+
+static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec_ur, int);
+static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_ur_coeff_ptr_const(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, int);
+static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_ur_coeff_ptr(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_ur_coeff_ptr(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_src_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec_ur, int);
+static mpfq_u64k2_src_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_ur_subvec_const(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_dst_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, int);
+static mpfq_u64k2_dst_vec_ur mpfq_u64k2_wrapper_vec_ur_subvec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_ur_subvec(vbase->obj, v, i);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_rev(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_rev(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_rev(vbase->obj, w, u, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_neg(vbase->obj, w, u, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_sub(vbase->obj, w, u, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_add(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec_ur u MAYBE_UNUSED, mpfq_u64k2_src_vec_ur v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_add(vbase->obj, w, u, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_getcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_getcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur x MAYBE_UNUSED, mpfq_u64k2_src_vec_ur w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_getcoeff(vbase->obj, x, w, i);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_setcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_elt_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_setcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_elt_ur x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_setcoeff(vbase->obj, w, x, i);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_set(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur r MAYBE_UNUSED, mpfq_u64k2_src_vec_ur s MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_set(vbase->obj, r, s, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_clear(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_clear(vbase->obj, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_reinit(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_reinit(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_reinit(vbase->obj, v, n, m);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_set_vec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_set_vec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_set_vec(vbase->obj, w, u, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_vec_ur, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec_ur r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_set_zero(vbase->obj, r, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_ur_init(mpfq_vbase_ptr, mpfq_u64k2_vec_ur *, unsigned int);
+static void mpfq_u64k2_wrapper_vec_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_ur_init(vbase->obj, v, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_scan(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int *);
+static int mpfq_u64k2_wrapper_vec_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_scan(vbase->obj, w, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_fscan(mpfq_vbase_ptr, FILE *, mpfq_u64k2_vec *, unsigned int *);
+static int mpfq_u64k2_wrapper_vec_fscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_fscan(vbase->obj, file, w, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_sscan(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int *, const char *);
+static int mpfq_u64k2_wrapper_vec_sscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * w MAYBE_UNUSED, unsigned int * n MAYBE_UNUSED, const char * str MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_sscan(vbase->obj, w, n, str);
+}
+
+static int mpfq_u64k2_wrapper_vec_print(mpfq_vbase_ptr, mpfq_u64k2_src_vec, unsigned int);
+static int mpfq_u64k2_wrapper_vec_print(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_print(vbase->obj, w, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_fprint(mpfq_vbase_ptr, FILE *, mpfq_u64k2_src_vec, unsigned int);
+static int mpfq_u64k2_wrapper_vec_fprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_fprint(vbase->obj, file, w, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_asprint(mpfq_vbase_ptr, char * *, mpfq_u64k2_src_vec, unsigned int);
+static int mpfq_u64k2_wrapper_vec_asprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, char * * pstr MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_asprint(vbase->obj, pstr, w, n);
+}
+
+static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_coeff_ptr_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec, int);
+static mpfq_u64k2_src_elt mpfq_u64k2_wrapper_vec_coeff_ptr_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_coeff_ptr_const(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_coeff_ptr(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, int);
+static mpfq_u64k2_dst_elt mpfq_u64k2_wrapper_vec_coeff_ptr(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_coeff_ptr(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_src_vec mpfq_u64k2_wrapper_vec_subvec_const(mpfq_vbase_ptr, mpfq_u64k2_src_vec, int);
+static mpfq_u64k2_src_vec mpfq_u64k2_wrapper_vec_subvec_const(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_subvec_const(vbase->obj, v, i);
+}
+
+static mpfq_u64k2_dst_vec mpfq_u64k2_wrapper_vec_subvec(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, int);
+static mpfq_u64k2_dst_vec mpfq_u64k2_wrapper_vec_subvec(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec v MAYBE_UNUSED, int i MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_subvec(vbase->obj, v, i);
+}
+
+static int mpfq_u64k2_wrapper_vec_is_zero(mpfq_vbase_ptr, mpfq_u64k2_src_vec, unsigned int);
+static int mpfq_u64k2_wrapper_vec_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_is_zero(vbase->obj, r, n);
+}
+
+static int mpfq_u64k2_wrapper_vec_cmp(mpfq_vbase_ptr, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
+static int mpfq_u64k2_wrapper_vec_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    return mpfq_u64k2_vec_cmp(vbase->obj, u, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_random(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, unsigned int, gmp_randstate_t);
+static void mpfq_u64k2_wrapper_vec_random(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_random(vbase->obj, w, n, state);
+}
+
+static void mpfq_u64k2_wrapper_vec_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_sub(vbase->obj, w, u, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_rev(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_rev(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_rev(vbase->obj, w, u, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_neg(vbase->obj, w, u, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_add(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_vec u MAYBE_UNUSED, mpfq_u64k2_src_vec v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_add(vbase->obj, w, u, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_getcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_getcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt x MAYBE_UNUSED, mpfq_u64k2_src_vec w MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_getcoeff(vbase->obj, x, w, i);
+}
+
+static void mpfq_u64k2_wrapper_vec_setcoeff(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_elt, unsigned int);
+static void mpfq_u64k2_wrapper_vec_setcoeff(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec w MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED, unsigned int i MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_setcoeff(vbase->obj, w, x, i);
+}
+
+static void mpfq_u64k2_wrapper_vec_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_set_zero(vbase->obj, r, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_set(mpfq_vbase_ptr, mpfq_u64k2_dst_vec, mpfq_u64k2_src_vec, unsigned int);
+static void mpfq_u64k2_wrapper_vec_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_vec r MAYBE_UNUSED, mpfq_u64k2_src_vec s MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_set(vbase->obj, r, s, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_clear(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int);
+static void mpfq_u64k2_wrapper_vec_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_clear(vbase->obj, v, n);
+}
+
+static void mpfq_u64k2_wrapper_vec_reinit(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int, unsigned int);
+static void mpfq_u64k2_wrapper_vec_reinit(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_reinit(vbase->obj, v, n, m);
+}
+
+static void mpfq_u64k2_wrapper_vec_init(mpfq_vbase_ptr, mpfq_u64k2_vec *, unsigned int);
+static void mpfq_u64k2_wrapper_vec_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_vec * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    mpfq_u64k2_vec_init(vbase->obj, v, n);
+}
+
+static int mpfq_u64k2_wrapper_scan(mpfq_vbase_ptr, mpfq_u64k2_dst_elt);
+static int mpfq_u64k2_wrapper_scan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt x MAYBE_UNUSED)
+{
+    return mpfq_u64k2_scan(vbase->obj, x);
+}
+
+static int mpfq_u64k2_wrapper_fscan(mpfq_vbase_ptr, FILE *, mpfq_u64k2_dst_elt);
+static int mpfq_u64k2_wrapper_fscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_dst_elt z MAYBE_UNUSED)
+{
+    return mpfq_u64k2_fscan(vbase->obj, file, z);
+}
+
+static int mpfq_u64k2_wrapper_sscan(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, const char *);
+static int mpfq_u64k2_wrapper_sscan(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt z MAYBE_UNUSED, const char * str MAYBE_UNUSED)
+{
+    return mpfq_u64k2_sscan(vbase->obj, z, str);
+}
+
+static int mpfq_u64k2_wrapper_print(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_print(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
+{
+    return mpfq_u64k2_print(vbase->obj, x);
+}
+
+static int mpfq_u64k2_wrapper_fprint(mpfq_vbase_ptr, FILE *, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_fprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, FILE * file MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
+{
+    return mpfq_u64k2_fprint(vbase->obj, file, x);
+}
+
+static int mpfq_u64k2_wrapper_asprint(mpfq_vbase_ptr, char * *, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_asprint(mpfq_vbase_ptr vbase MAYBE_UNUSED, char * * ps MAYBE_UNUSED, mpfq_u64k2_src_elt x MAYBE_UNUSED)
+{
+    return mpfq_u64k2_asprint(vbase->obj, ps, x);
+}
+
+static int mpfq_u64k2_wrapper_is_zero(mpfq_vbase_ptr, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_is_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt r MAYBE_UNUSED)
+{
+    return mpfq_u64k2_is_zero(vbase->obj, r);
+}
+
+static int mpfq_u64k2_wrapper_cmp(mpfq_vbase_ptr, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
+static int mpfq_u64k2_wrapper_cmp(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_src_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
+{
+    return mpfq_u64k2_cmp(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur, mpfq_u64k2_src_elt_ur);
+static void mpfq_u64k2_wrapper_elt_ur_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s1 MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s2 MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_sub(vbase->obj, r, s1, s2);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur);
+static void mpfq_u64k2_wrapper_elt_ur_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_neg(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_add(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur, mpfq_u64k2_src_elt_ur);
+static void mpfq_u64k2_wrapper_elt_ur_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s1 MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s2 MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_add(vbase->obj, r, s1, s2);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur);
+static void mpfq_u64k2_wrapper_elt_ur_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_set_zero(vbase->obj, r);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_set_elt(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt);
+static void mpfq_u64k2_wrapper_elt_ur_set_elt(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_set_elt(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_set(mpfq_vbase_ptr, mpfq_u64k2_dst_elt_ur, mpfq_u64k2_src_elt_ur);
+static void mpfq_u64k2_wrapper_elt_ur_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt_ur r MAYBE_UNUSED, mpfq_u64k2_src_elt_ur s MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_set(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr, mpfq_u64k2_elt_ur *);
+static void mpfq_u64k2_wrapper_elt_ur_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt_ur * px MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_clear(vbase->obj, px);
+}
+
+static void mpfq_u64k2_wrapper_elt_ur_init(mpfq_vbase_ptr, mpfq_u64k2_elt_ur *);
+static void mpfq_u64k2_wrapper_elt_ur_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt_ur * px MAYBE_UNUSED)
+{
+    mpfq_u64k2_elt_ur_init(vbase->obj, px);
+}
+
+static void mpfq_u64k2_wrapper_neg(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt);
+static void mpfq_u64k2_wrapper_neg(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
+{
+    mpfq_u64k2_neg(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_sub(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
+static void mpfq_u64k2_wrapper_sub(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s1 MAYBE_UNUSED, mpfq_u64k2_src_elt s2 MAYBE_UNUSED)
+{
+    mpfq_u64k2_sub(vbase->obj, r, s1, s2);
+}
+
+static void mpfq_u64k2_wrapper_add(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt, mpfq_u64k2_src_elt);
+static void mpfq_u64k2_wrapper_add(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s1 MAYBE_UNUSED, mpfq_u64k2_src_elt s2 MAYBE_UNUSED)
+{
+    mpfq_u64k2_add(vbase->obj, r, s1, s2);
+}
+
+static void mpfq_u64k2_wrapper_random(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, gmp_randstate_t);
+static void mpfq_u64k2_wrapper_random(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
+{
+    mpfq_u64k2_random(vbase->obj, r, state);
+}
+
+static void mpfq_u64k2_wrapper_set_zero(mpfq_vbase_ptr, mpfq_u64k2_dst_elt);
+static void mpfq_u64k2_wrapper_set_zero(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED)
+{
+    mpfq_u64k2_set_zero(vbase->obj, r);
+}
+
+static void mpfq_u64k2_wrapper_set(mpfq_vbase_ptr, mpfq_u64k2_dst_elt, mpfq_u64k2_src_elt);
+static void mpfq_u64k2_wrapper_set(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_dst_elt r MAYBE_UNUSED, mpfq_u64k2_src_elt s MAYBE_UNUSED)
+{
+    mpfq_u64k2_set(vbase->obj, r, s);
+}
+
+static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr, mpfq_u64k2_elt *);
+static void mpfq_u64k2_wrapper_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt * px MAYBE_UNUSED)
+{
+    mpfq_u64k2_clear(vbase->obj, px);
+}
+
+static void mpfq_u64k2_wrapper_init(mpfq_vbase_ptr, mpfq_u64k2_elt *);
+static void mpfq_u64k2_wrapper_init(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpfq_u64k2_elt * px MAYBE_UNUSED)
+{
+    mpfq_u64k2_init(vbase->obj, px);
+}
+
+static void mpfq_u64k2_wrapper_field_setopt(mpfq_vbase_ptr, unsigned long, void *);
+static void mpfq_u64k2_wrapper_field_setopt(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long x MAYBE_UNUSED, void * y MAYBE_UNUSED)
+{
+    mpfq_u64k2_field_setopt(vbase->obj, x, y);
+}
+
+static void mpfq_u64k2_wrapper_field_specify(mpfq_vbase_ptr, unsigned long, void *);
+static void mpfq_u64k2_wrapper_field_specify(mpfq_vbase_ptr vbase MAYBE_UNUSED, unsigned long tag MAYBE_UNUSED, void * x MAYBE_UNUSED)
+{
+    mpfq_u64k2_field_specify(vbase->obj, tag, x);
+}
+
+static void mpfq_u64k2_wrapper_field_clear(mpfq_vbase_ptr);
+static void mpfq_u64k2_wrapper_field_clear(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    mpfq_u64k2_field_clear(vbase->obj);
+}
+
+static void mpfq_u64k2_wrapper_field_init(mpfq_vbase_ptr);
+static void mpfq_u64k2_wrapper_field_init(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    mpfq_u64k2_field_init(vbase->obj);
+}
+
+static int mpfq_u64k2_wrapper_field_degree(mpfq_vbase_ptr);
+static int mpfq_u64k2_wrapper_field_degree(mpfq_vbase_ptr vbase MAYBE_UNUSED)
+{
+    return mpfq_u64k2_field_degree(vbase->obj);
+}
+
+static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr, mpz_t);
+static void mpfq_u64k2_wrapper_field_characteristic(mpfq_vbase_ptr vbase MAYBE_UNUSED, mpz_t z MAYBE_UNUSED)
+{
+    mpfq_u64k2_field_characteristic(vbase->obj, z);
+}
+
+static unsigned long mpfq_u64k2_wrapper_impl_max_degree();
+static unsigned long mpfq_u64k2_wrapper_impl_max_degree()
+{
+    return mpfq_u64k2_impl_max_degree();
+}
+
+static unsigned long mpfq_u64k2_wrapper_impl_max_characteristic_bits();
+static unsigned long mpfq_u64k2_wrapper_impl_max_characteristic_bits()
+{
+    return mpfq_u64k2_impl_max_characteristic_bits();
+}
+
+static const char * mpfq_u64k2_wrapper_impl_name();
+static const char * mpfq_u64k2_wrapper_impl_name()
+{
+    return mpfq_u64k2_impl_name();
+}
+
+/* Mpfq::engine::oo::oo_field_init */
+/* Triggered by: oo */
 void mpfq_u64k2_oo_field_init(mpfq_vbase_ptr vbase)
 {
     memset(vbase, 0, sizeof(struct mpfq_vbase_s));
     vbase->obj = malloc(sizeof(mpfq_u64k2_field));
     mpfq_u64k2_field_init((mpfq_u64k2_dst_field) vbase->obj);
     vbase->impl_name = (const char * (*) ()) mpfq_u64k2_wrapper_impl_name;
-    /* missing impl_max_characteristic_bits */
-    /* missing impl_max_degree */
+    vbase->impl_max_characteristic_bits = (unsigned long (*) ()) mpfq_u64k2_wrapper_impl_max_characteristic_bits;
+    vbase->impl_max_degree = (unsigned long (*) ()) mpfq_u64k2_wrapper_impl_max_degree;
     vbase->field_characteristic = (void (*) (mpfq_vbase_ptr, mpz_t)) mpfq_u64k2_wrapper_field_characteristic;
     /* missing field_characteristic_bits */
     vbase->field_degree = (int (*) (mpfq_vbase_ptr)) mpfq_u64k2_wrapper_field_degree;
