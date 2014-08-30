@@ -622,7 +622,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
   mpz_poly_mod_center (tmp, pk);
 
-  mpz_poly_base_modp_clear (P);
+  mpz_poly_base_modp_clear (P, logk);
 
   mpz_poly_set(res->p, tmp);
   res->v = v;
