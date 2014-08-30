@@ -182,9 +182,9 @@ void mpfq_2_64_add_uipoly(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, mpfq_2_64_src_
 static inline
 void mpfq_2_64_mul_uipoly(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, mpfq_2_64_src_elt, unsigned long);
 static inline
-void mpfq_2_64_longaddshift_left(unsigned long *, const unsigned long *, int, int);
-static inline
 void mpfq_2_64_longshift_left(unsigned long *, const unsigned long *, int, int);
+static inline
+void mpfq_2_64_longaddshift_left(unsigned long *, const unsigned long *, int, int);
 static inline
 int mpfq_2_64_inv(mpfq_2_64_dst_field, mpfq_2_64_dst_elt, mpfq_2_64_src_elt);
 static inline
@@ -694,26 +694,7 @@ void mpfq_2_64_mul_uipoly(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt r, mpfq_2_64_
 }
 
 /* *Mpfq::gf2n::inversion::code_for_inv */
-static inline
-void mpfq_2_64_longaddshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
-{
-    int m = s / 64;
-    int i;
-    s %= 64;
-    if (s>0) {
-        for(i = n-m-1 ; i > 0 ; i--) {
-            dst[m+i] ^= src[i] << s ^ src[i-1] >> (64-s);
-        }
-        dst[m] ^= src[0] << s;
-    } else {
-        for(i = n-m-1 ; i > 0 ; i--) {
-            dst[m+i] ^= src[i];
-        }
-        dst[m] ^= src[0];
-    }
-}
-
-/* *Mpfq::gf2n::inversion::code_for_inv */
+/* Triggered by: inv */
 static inline
 void mpfq_2_64_longshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
 {
@@ -735,6 +716,27 @@ void mpfq_2_64_longshift_left(unsigned long * dst, const unsigned long * src, in
         dst[i] = 0UL;
     }
     
+}
+
+/* *Mpfq::gf2n::inversion::code_for_inv */
+/* Triggered by: inv */
+static inline
+void mpfq_2_64_longaddshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
+{
+    int m = s / 64;
+    int i;
+    s %= 64;
+    if (s>0) {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i] << s ^ src[i-1] >> (64-s);
+        }
+        dst[m] ^= src[0] << s;
+    } else {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i];
+        }
+        dst[m] ^= src[0];
+    }
 }
 
 /* *Mpfq::gf2n::inversion::code_for_inv */
@@ -1388,6 +1390,7 @@ void mpfq_2_64_vec_scal_mul_ur(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst
 }
 
 /* *Mpfq::defaults::vec::conv::code_for_vec_conv_ur */
+/* Triggered by: vec_conv_ur */
 static inline
 void mpfq_2_64_vec_conv_ur_n(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur w, mpfq_2_64_src_vec u, mpfq_2_64_src_vec v, unsigned int n)
 {

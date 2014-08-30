@@ -356,10 +356,10 @@ linalg/bwc/mpfq/mpfq_u64k2_t.h
 linalg/bwc/mpfq/mpfq_vbase.c
 linalg/bwc/mpfq/mpfq_vbase.h
 linalg/bwc/mpfq/binary-dotprods-backends.h
-linalg/bwc/mpfq/fixmp.h
-linalg/bwc/mpfq/fixmp_longlong.h
-linalg/bwc/mpfq/fixmp_x86_32.h
-linalg/bwc/mpfq/fixmp_x86_64.h
+linalg/bwc/mpfq/mpfq_fixmp.h
+linalg/bwc/mpfq/mpfq_fixmp_longlong.h
+linalg/bwc/mpfq/mpfq_fixmp_i386.h
+linalg/bwc/mpfq/mpfq_fixmp_x86_64.h
 linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_2_128.c
 linalg/bwc/mpfq/mpfq_2_128.h

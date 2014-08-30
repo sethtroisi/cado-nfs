@@ -119,15 +119,13 @@ void mpfq_u64k2_u64k2_dotprod(mpfq_u64k2_dst_field K0 MAYBE_UNUSED, mpfq_u64k2_d
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
 void mpfq_u64k2_u64k1_addmul_tiny(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k1_dst_field L MAYBE_UNUSED, mpfq_u64k1_dst_vec w, mpfq_u64k2_src_vec u, mpfq_u64k1_dst_vec v, unsigned int n)
 {
-    vaddmul_tiny_64K_64L((uint64_t*)w[0],(const
-        uint64_t*)u[0],(const uint64_t*)v[0],n,2,1);
+    vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,2,1);
 }
 
 /* *simd_dotprod::code_for_member_template_addmul_tiny */
 void mpfq_u64k2_u64k2_addmul_tiny(mpfq_u64k2_dst_field K MAYBE_UNUSED, mpfq_u64k2_dst_field L MAYBE_UNUSED, mpfq_u64k2_dst_vec w, mpfq_u64k2_src_vec u, mpfq_u64k2_dst_vec v, unsigned int n)
 {
-    vaddmul_tiny_64K_64L((uint64_t*)w[0],(const
-        uint64_t*)u[0],(const uint64_t*)v[0],n,2,2);
+    vaddmul_tiny_64K_64L((uint64_t*)w[0],(const uint64_t*)u[0],(const uint64_t*)v[0],n,2,2);
 }
 
 /* *simd_dotprod::code_for_member_template_transpose */
