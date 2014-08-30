@@ -11,6 +11,9 @@
 #endif
 #define DEBUG 0
 
+/* to use in the GF(p^n) computations, uncomment the following */
+//#define FOR_GFPN
+
 stats_data_t stats; /* struct for printing progress */
 
 /*********************** mutex for multi threaded version ********************/
@@ -208,15 +211,18 @@ mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
 }
 
 /************************ Handling of the SMs *******************************/
-unsigned int nbsm = 0; /* number of SM that must be used. Must be 0 for FFS */
-#ifdef GFP3
-unsigned int nbunits = 2; /* gabuzomeu */
-#else
-unsigned int nbunits = 0; /* gabuzomeu */
+/* number of SM that must be used for side 1. Must be 0 for FFS */
+unsigned int nbsm1 = 0;
+/* for side 0 */
+#ifdef FOR_GFPN
+unsigned int nbsm0 = 0;
 #endif
 
 #ifndef FOR_FFS /* Not needed for FFS */
 mpz_t smexp; /* exponent for SM */
+# ifdef FOR_GFPN
+mpz_t smexp0; /* expondent for SM on the 0 side */
+# endif
 mpz_poly_ptr F;
 mpz_t q2;    /* q^2 */
 mpz_t invq2;
@@ -254,12 +260,13 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
   mpz_poly_setcoeff_si(SMres, 0, 1);
   sm_single_rel(SMres, a, b, F, smexp, q, q2, invq2);
   unsigned int i;
-  for (i = degF - SMres->deg - 1; i < nbsm; i++)
+  for (i = degF - SMres->deg - 1; i < nbsm1; i++)
     mpz_add_log_mod_mpz (l, smlog[i], SMres->coeff[degF-1-i], q);
   mpz_poly_clear(SMres);
-#ifdef GFP3
+#ifdef FOR_GFPN
+  // TODO: same business as above for smexp0 if needed
   /* begin_gabuzomeu */
-  {
+  if(mpz_sgn(smexp0) == 0){
       /* we need retrieve the exponents of the units in (a-b*x) */
       FILE *in = fopen("/mnt/data/morain/Cnt/DLP/gfpk/catrel/GFP3/p3dd10g/p3dd10g.units.abunits", "r");
       int64_t aa;
@@ -268,7 +275,7 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
       while(fscanf(in, "%" PRId64 " %" PRIu64 " %d %d", &aa, &bb, u, u+1)
 	    != EOF){
 	  if(aa == a && bb == b){
-	      //	      printf("# GOTCHA: %d %d\n", u[0], u[1]);
+	      printf("# GOTCHA: %d %d\n", u[0], u[1]);
 	      ok = 1;
 	      break;
 	  }
@@ -281,12 +288,12 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
       }
       else{
 	  /* add contrib */
-	  for(i = 0; i < nbunits; i++)
-	      mpz_add_log_mod_si (l, smlog[nbsm+i], u[i], q);
+	  for(i = 0; i < nbsm0; i++)
+	      mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
       }
   }
   /* end_gabuzomeu */
-#endif // GFP3
+#endif // FOR_GFPN
 }
 
 /* Callback function called by filter_rels in compute_log_from_rels */
@@ -296,7 +303,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   read_data_t *data = (read_data_t *) context_data;
   log_rel_t *lrel = &(data->rels[rel->num]);
 
-  if (nbsm > 0)
+  if (nbsm1 > 0)
     add_sm_contribution (lrel->log_known_part, rel->a, rel->b, data->log->q);
 
   return NULL;
@@ -769,19 +776,19 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
   ASSERT_ALWAYS (feof(fid));
   ASSERT_ALWAYS (i == ncols);
 
-  for (unsigned int nsm = 0; nsm < nbsm; nsm++)
+  for (unsigned int nsm = 0; nsm < nbsm1; nsm++)
   {
     int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
     FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
     logtab_insert (log, log->nprimes+nsm, tmp_log);
   }
-#ifdef GFP3
+#ifdef FOR_GFPN
   /* begin_gabuzomeu */
-  for (unsigned int nu = 0; nu < nbunits; nu++)
+  for (unsigned int nu = 0; nu < nbsm0; nu++)
   {
     int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
     FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
-    logtab_insert (log, log->nprimes+nbsm+nu, tmp_log);
+    logtab_insert (log, log->nprimes+nbsm1+nu, tmp_log);
   }
   /* end_gabuzomeu */
 #endif
@@ -789,8 +796,12 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
     printf ("Warning, line %" PRIu64 " is ignored\n", i++);
   ASSERT_ALWAYS (feof(flog));
 
-  if (nbsm)
-    printf ("# Logarithms for %u SM columns were also read\n", nbsm);
+  if (nbsm1)
+    printf ("# Logarithms for %u SM1 columns were also read\n", nbsm1);
+#ifdef FOR_GFPN
+  if (nbsm0)
+    printf ("# Logarithms for %u SM0 columns were also read\n", nbsm0);
+#endif
   mpz_clear (tmp_log);
   fclose_maybe_compressed (flog, logfile);
   fclose_maybe_compressed (fid, idealsfile);
@@ -861,8 +872,8 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   }
   ASSERT_ALWAYS (feof(f));
 
-  if (nbsm)
-    printf ("# Logarithms for %u SM columns were also read\n", nbsm);
+  if (nbsm1)
+    printf ("# Logarithms for %u SM columns were also read\n", nbsm1);
   mpz_clear (tmp_log);
   fclose_maybe_compressed (f, filename);
 }
@@ -1138,6 +1149,10 @@ static void declare_usage(param_list pl)
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "sm", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp parameter)");
+# ifdef FOR_GFPN
+  param_list_decl_usage(pl, "sm0", "number of SM to add to relations");
+  param_list_decl_usage(pl, "smexp0", "sm0 exponent (see sm -smexp parameter)");
+# endif
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
@@ -1205,9 +1220,14 @@ main(int argc, char *argv[])
   param_list_parse_uint64(pl, "nrels", &nrels_tot);
   param_list_parse_mpz(pl, "gorder", q);
 #ifndef FOR_FFS
-  param_list_parse_uint(pl, "sm", &nbsm);
+  param_list_parse_uint(pl, "sm", &nbsm1);
   mpz_init (smexp);
   param_list_parse_mpz(pl, "smexp", smexp);
+# ifdef FOR_GFPN
+  param_list_parse_uint(pl, "sm0", &nbsm0);
+  mpz_init (smexp0);
+  param_list_parse_mpz(pl, "smexp0", smexp0);
+# endif
 #endif
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
@@ -1226,7 +1246,7 @@ main(int argc, char *argv[])
     usage (pl, argv0);
   }
 #ifndef FOR_FFS
-  if (nbsm != 0 && mpz_cmp_ui (smexp, 0) <= 0)
+  if (nbsm1 != 0 && mpz_cmp_ui (smexp, 0) <= 0)
   {
     fprintf(stderr, "Error, missing -smexp command line argument "
                     "(or smexp <= 0)\n");
@@ -1311,9 +1331,11 @@ main(int argc, char *argv[])
 #ifndef FOR_FFS
   /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
   F = poly->pols[ALGEBRAIC_SIDE];
-  FATAL_ERROR_CHECK(nbsm > (unsigned int) poly->alg->deg, "Too many SM");
+# ifndef FOR_GFPN // humf, this is quite temporary...!
+  FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
+# endif
 #else
-  FATAL_ERROR_CHECK(nbsm != 0, "sm should be 0 for FFS");
+  FATAL_ERROR_CHECK(nbsm1 != 0, "sm should be 0 for FFS");
 #endif
 
   set_antebuffer_path (argv0, path_antebuffer);
@@ -1331,7 +1353,11 @@ main(int argc, char *argv[])
   /* Malloc'ing log tab and reading values of log */
   printf ("\n###### Reading known logarithms ######\n");
   fflush(stdout);
-  logtab_init (log, nprimes, nbsm+nbunits, q); /* gabuzomeu */
+#ifndef FOR_GFPN
+  logtab_init (log, nprimes, nbsm1, q);
+#else
+  logtab_init (log, nprimes, nbsm1+nbsm0, q);
+#endif
   if (logformat == NULL || strcmp(logformat, "LA") == 0)
     read_log_format_LA (log, logfilename, idealsfilename);
   else
