@@ -369,6 +369,7 @@ linalg/bwc/mpfq/mpfq_gf2n_common.h
 linalg/bwc/mpfq/mpfq_gfp_common.h
 linalg/bwc/mpfq/mpfq_name_ab.h
 linalg/bwc/mpfq/pclmul.patch
+linalg/bwc/mpfq/asm-constraints.patch
 linalg/bwc/mpich2.spec
 linalg/bwc/pad.h
 linalg/bwc/parallelizing_info.c

@@ -762,7 +762,13 @@ void mpfq_fixmp_1_mul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
     __asm__ __volatile__(
         "mulq %[y0]\n"
               : "=a" (z[0]), "=d" (z[1])
+#if GNUC_VERSION_ATMOST(4, 2, 1)
+              /* gcc-4.2.1 on openbsd-5.3 says constraints are impossible
+               * here (??) */
+              : "0" (x[0]), [y0] "rm" (y[0])
+#else
               : "0" (x[0]), [y0] "rm1" (y[0])
+#endif
               );
 }
 

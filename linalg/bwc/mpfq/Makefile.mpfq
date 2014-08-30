@@ -52,6 +52,8 @@ prime-fields: mpfq-buildtree
 	# $(MPFQ)/fixmp/gen_fixmp.pl output_path=.
 	$(MAKE) -C $(MPFQ_TEMP) fixmp_files
 	/bin/cp -f $(MPFQ_TEMP)/include/mpfq_fixmp*h .
+	patch -p1 -d. < asm-constraints.patch
+	-rm -f *.orig
 
 clean-mpfq_%:
 	-rm -f mpfq_$*.c
