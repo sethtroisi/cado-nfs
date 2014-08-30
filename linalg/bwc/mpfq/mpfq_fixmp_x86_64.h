@@ -658,7 +658,7 @@ mp_limb_t mpfq_fixmp_1_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z0]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), "=a"(carry)
+    : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
     : );
     return carry;
@@ -676,7 +676,7 @@ mp_limb_t mpfq_fixmp_1_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z0]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), "=a"(carry)
+    : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
     : );
     return carry;
@@ -833,7 +833,7 @@ mp_limb_t mpfq_fixmp_2_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z1]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
     : );
     return carry;
@@ -854,7 +854,7 @@ mp_limb_t mpfq_fixmp_2_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z1]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
     : );
     return carry;
@@ -1085,7 +1085,7 @@ mp_limb_t mpfq_fixmp_3_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z2]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
     : );
     return carry;
@@ -1109,7 +1109,7 @@ mp_limb_t mpfq_fixmp_3_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z2]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
     : );
     return carry;
@@ -1434,7 +1434,7 @@ mp_limb_t mpfq_fixmp_4_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z3]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
     : );
     return carry;
@@ -1461,7 +1461,7 @@ mp_limb_t mpfq_fixmp_4_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, %[z3]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
     : );
     return carry;
@@ -1900,7 +1900,7 @@ mp_limb_t mpfq_fixmp_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 32(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -1933,7 +1933,7 @@ mp_limb_t mpfq_fixmp_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 32(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -2412,7 +2412,7 @@ mp_limb_t mpfq_fixmp_6_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 40(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -2448,7 +2448,7 @@ mp_limb_t mpfq_fixmp_6_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 40(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -3040,7 +3040,7 @@ mp_limb_t mpfq_fixmp_7_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 48(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -3079,7 +3079,7 @@ mp_limb_t mpfq_fixmp_7_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 48(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -3798,7 +3798,7 @@ mp_limb_t mpfq_fixmp_8_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 56(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -3840,7 +3840,7 @@ mp_limb_t mpfq_fixmp_8_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 56(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -4700,7 +4700,7 @@ mp_limb_t mpfq_fixmp_9_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 64(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -4745,7 +4745,7 @@ mp_limb_t mpfq_fixmp_9_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t *
         "movq    %%rax, 64(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -5730,7 +5730,7 @@ mp_limb_t mpfq_fixmp_0_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z0]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), "=a"(carry)
+    : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
     : );
     return carry;
@@ -5748,7 +5748,7 @@ mp_limb_t mpfq_fixmp_0_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z0]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), "=a"(carry)
+    : [z0]"=m"(z[0]), "=&a"(carry)
     : [x0]"m"(x[0]), [y0]"m"(y[0])
     : );
     return carry;
@@ -5926,7 +5926,7 @@ mp_limb_t mpfq_fixmp_1_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z1]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
     : );
     return carry;
@@ -5947,7 +5947,7 @@ mp_limb_t mpfq_fixmp_1_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z1]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [y0]"m"(y[0]), [y1]"m"(y[1])
     : );
     return carry;
@@ -6239,7 +6239,7 @@ mp_limb_t mpfq_fixmp_2_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z2]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
     : );
     return carry;
@@ -6263,7 +6263,7 @@ mp_limb_t mpfq_fixmp_2_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z2]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2])
     : );
     return carry;
@@ -6670,7 +6670,7 @@ mp_limb_t mpfq_fixmp_3_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z3]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
     : );
     return carry;
@@ -6697,7 +6697,7 @@ mp_limb_t mpfq_fixmp_3_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, %[z3]\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=a"(carry)
+    : [z0]"=m"(z[0]), [z1]"=m"(z[1]), [z2]"=m"(z[2]), [z3]"=m"(z[3]), "=&a"(carry)
     : [x0]"m"(x[0]), [x1]"m"(x[1]), [x2]"m"(x[2]), [x3]"m"(x[3]), [y0]"m"(y[0]), [y1]"m"(y[1]), [y2]"m"(y[2]), [y3]"m"(y[3])
     : );
     return carry;
@@ -7238,7 +7238,7 @@ mp_limb_t mpfq_fixmp_4_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 32(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -7271,7 +7271,7 @@ mp_limb_t mpfq_fixmp_4_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 32(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -7881,7 +7881,7 @@ mp_limb_t mpfq_fixmp_5_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 40(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -7917,7 +7917,7 @@ mp_limb_t mpfq_fixmp_5_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 40(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -8660,7 +8660,7 @@ mp_limb_t mpfq_fixmp_6_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 48(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -8699,7 +8699,7 @@ mp_limb_t mpfq_fixmp_6_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 48(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -9589,7 +9589,7 @@ mp_limb_t mpfq_fixmp_7_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 56(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -9631,7 +9631,7 @@ mp_limb_t mpfq_fixmp_7_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 56(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -10682,7 +10682,7 @@ mp_limb_t mpfq_fixmp_8_5_add(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 64(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
@@ -10727,7 +10727,7 @@ mp_limb_t mpfq_fixmp_8_5_sub(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t
         "movq    %%rax, 64(%%rdi)\n"
         "movq $0, %%rax\n"
         "adcq $0, %%rax\n"
-    : "=a"(carry)
+    : "=&a"(carry)
     : [z]"m"(z), [x]"m"(x), [y]"m"(y)
     : "%rdx", "%rsi", "%rdi", "memory");
     return carry;
