@@ -12,7 +12,7 @@
 #define DEBUG 0
 
 /* to use in the GF(p^n) computations, uncomment the following */
-//#define FOR_GFPN
+#define FOR_GFPN
 
 stats_data_t stats; /* struct for printing progress */
 
@@ -168,15 +168,18 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
+  char * abunitsfilename;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
-read_data_init (read_data_t *data, logtab_t log, uint64_t nrels)
+read_data_init (read_data_t *data, logtab_t log, uint64_t nrels, 
+		const char * abunitsfilename)
 {
   data->rels = log_rel_init(nrels);
   data->log = log;
+  data->abunitsfilename = abunitsfilename;
 }
 
 static void
@@ -219,11 +222,11 @@ unsigned int nbsm0 = 0;
 #endif
 
 #ifndef FOR_FFS /* Not needed for FFS */
-mpz_t smexp; /* exponent for SM */
+mpz_t smexp1; /* exponent for SM */
 # ifdef FOR_GFPN
-mpz_t smexp0; /* expondent for SM on the 0 side */
+mpz_t smexp0; /* exponent for SM on the 0 side */
 # endif
-mpz_poly_ptr F;
+mpz_poly_ptr F1;
 mpz_t q2;    /* q^2 */
 mpz_t invq2;
 mpz_t *smlog;
@@ -249,50 +252,73 @@ sm_data_free ()
   mpz_clear(invq2);
 }
 
+/* Very naive code for finding the valuations of the units. */
+static int
+get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
+{
+    FILE *in = fopen(abunitsfilename, "r");
+    int64_t aa;
+    uint64_t bb;
+    int32_t ok = 0;
+    while(fscanf(in, "%" PRId64 " %" PRIu64, &aa, &bb) != EOF){
+	for(int i = 0; i < (int)nbsm0; i++)
+	    fscanf(in, "%d", u+i);
+	if(aa == a && bb == b){
+	    printf("# GOTCHA a and b\n");
+	    ok = 1;
+	    break;
+	}
+    }
+    fclose(in);
+    if(ok == 0){
+	fprintf(stderr, "GASP: no eps found ");
+	fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
+	exit(-1);
+    }
+    return ok;
+}
+
+/* we need retrieve the exponents of the units in a-b*x. */
+static inline void
+add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
+		       const char * abunitsfilename)
+{
+    int u[10];
+    if(get_units_for_ab(u, a, b, abunitsfilename)){
+	/* add contrib */
+	for(int i = 0; i < (int)nbsm0; i++)
+	    mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
+    }
+}
+
 /* Given a and b, compute the SM and add the contribution to l */
 static inline void
 add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
 {
   mpz_poly_t SMres;
-  int degF = F->deg;
+  int degF = F1->deg;
   mpz_poly_init(SMres, degF);
   SMres->deg = 0;
   mpz_poly_setcoeff_si(SMres, 0, 1);
-  sm_single_rel(SMres, a, b, F, smexp, q, q2, invq2);
+  sm_single_rel(SMres, a, b, F1, smexp1, q, q2, invq2);
   unsigned int i;
   for (i = degF - SMres->deg - 1; i < nbsm1; i++)
     mpz_add_log_mod_mpz (l, smlog[i], SMres->coeff[degF-1-i], q);
   mpz_poly_clear(SMres);
+}
+
+/* TODO: everything is easily adaptable for sm/sm or sm/unit or unit/unit.
+   We need just throw away global variables smexp, F, etc. At least replacing
+   them by smexp1 and F1, so as to function-ify the above function.
+*/
+static inline void
+add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
+		      const char * abunitsfilename)
+{
+  add_sm_contribution(l, a, b, q);
 #ifdef FOR_GFPN
-  // TODO: same business as above for smexp0 if needed
-  /* begin_gabuzomeu */
-  if(mpz_sgn(smexp0) == 0){
-      /* we need retrieve the exponents of the units in (a-b*x) */
-      FILE *in = fopen("/mnt/data/morain/Cnt/DLP/gfpk/catrel/GFP3/p3dd10g/p3dd10g.units.abunits", "r");
-      int64_t aa;
-      uint64_t bb;
-      int32_t ok = 0, u[10];
-      while(fscanf(in, "%" PRId64 " %" PRIu64 " %d %d", &aa, &bb, u, u+1)
-	    != EOF){
-	  if(aa == a && bb == b){
-	      printf("# GOTCHA: %d %d\n", u[0], u[1]);
-	      ok = 1;
-	      break;
-	  }
-      }
-      fclose(in);
-      if(ok == 0){
-	  fprintf(stderr, "GASP: no eps found\n");
-	  fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
-	  exit(-1);
-      }
-      else{
-	  /* add contrib */
-	  for(i = 0; i < nbsm0; i++)
-	      mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
-      }
-  }
-  /* end_gabuzomeu */
+  if(mpz_sgn(smexp0) == 0)
+      add_unit_contribution(l, a, b, q, abunitsfilename);
 #endif // FOR_GFPN
 }
 
@@ -304,7 +330,8 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   log_rel_t *lrel = &(data->rels[rel->num]);
 
   if (nbsm1 > 0)
-    add_sm_contribution (lrel->log_known_part, rel->a, rel->b, data->log->q);
+      add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
+			    data->abunitsfilename);
 
   return NULL;
 }
@@ -783,14 +810,12 @@ read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
     logtab_insert (log, log->nprimes+nsm, tmp_log);
   }
 #ifdef FOR_GFPN
-  /* begin_gabuzomeu */
   for (unsigned int nu = 0; nu < nbsm0; nu++)
   {
     int ret = gmp_fscanf (flog, "%Zd\n", tmp_log);
     FATAL_ERROR_CHECK (ret != 1, "Error in file containing logarithms values");
     logtab_insert (log, log->nprimes+nbsm1+nu, tmp_log);
   }
-  /* end_gabuzomeu */
 #endif
   while (gmp_fscanf (flog, "%Zd\n", tmp_log) == 1)
     printf ("Warning, line %" PRIu64 " is ignored\n", i++);
@@ -948,14 +973,15 @@ static uint64_t
 compute_log_from_rels (bit_vector needed_rels,
                        const char *relspfilename, uint64_t nrels_purged,
                        const char *relsdfilename, uint64_t nrels_del,
-                       uint64_t nrels_needed, logtab_t log, int nt)
+                       uint64_t nrels_needed, logtab_t log, int nt,
+		       const char *abunitsfilename)
 {
   double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
   read_data_t data;
-  read_data_init(&data, log, nrels);
+  read_data_init(&data, log, nrels, abunitsfilename);
 
   /* Reading all relations */
   printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
@@ -1132,7 +1158,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "log", "input file containing known logarithms");
   param_list_decl_usage(pl, "logformat", "format of input log file: 'LA' or "
                                          "'reconstruct' (default is 'LA')");
-  param_list_decl_usage(pl, "gorder", "group order (see sm -gorder parameter");
+  param_list_decl_usage(pl, "gorder", "group order (see sm -gorder parameter)");
   param_list_decl_usage(pl, "out", "output file for logarithms");
   param_list_decl_usage(pl, "renumber", "input file for renumbering table");
   param_list_decl_usage(pl, "poly", "input polynomial file");
@@ -1148,10 +1174,11 @@ static void declare_usage(param_list pl)
                                        "that can be reconstructed");
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "sm", "number of SM to add to relations");
-  param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp parameter)");
+  param_list_decl_usage(pl, "smexp1", "sm exponent (see sm -smexp1 parameter)");
 # ifdef FOR_GFPN
   param_list_decl_usage(pl, "sm0", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp0", "sm0 exponent (see sm -smexp parameter)");
+  param_list_decl_usage(pl, "abunits", "units for all (a, b) pairs from purged and relsdels");
 # endif
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
@@ -1221,12 +1248,13 @@ main(int argc, char *argv[])
   param_list_parse_mpz(pl, "gorder", q);
 #ifndef FOR_FFS
   param_list_parse_uint(pl, "sm", &nbsm1);
-  mpz_init (smexp);
-  param_list_parse_mpz(pl, "smexp", smexp);
+  mpz_init (smexp1);
+  param_list_parse_mpz(pl, "smexp1", smexp1);
 # ifdef FOR_GFPN
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
+  const char * abunitsfilename = param_list_lookup_string(pl, "abunits");
 # endif
 #endif
   param_list_parse_int(pl, "mt", &mt);
@@ -1246,10 +1274,10 @@ main(int argc, char *argv[])
     usage (pl, argv0);
   }
 #ifndef FOR_FFS
-  if (nbsm1 != 0 && mpz_cmp_ui (smexp, 0) <= 0)
+  if (nbsm1 != 0 && mpz_cmp_ui (smexp1, 0) <= 0)
   {
-    fprintf(stderr, "Error, missing -smexp command line argument "
-                    "(or smexp <= 0)\n");
+    fprintf(stderr, "Error, missing -smexp1 command line argument "
+                    "(or smexp1 <= 0)\n");
     usage (pl, argv0);
   }
 #endif
@@ -1330,10 +1358,16 @@ main(int argc, char *argv[])
 
 #ifndef FOR_FFS
   /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
-  F = poly->pols[ALGEBRAIC_SIDE];
+  F1 = poly->pols[ALGEBRAIC_SIDE];
 # ifndef FOR_GFPN // humf, this is quite temporary...!
   FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
-# endif
+# else
+  if (abunitsfilename == NULL)
+  {
+    fprintf(stderr, "Error, missing -abunits command line argument\n");
+    usage (pl, argv0);
+  }
+# endif // FOR_GFPN
 #else
   FATAL_ERROR_CHECK(nbsm1 != 0, "sm should be 0 for FFS");
 #endif
@@ -1398,7 +1432,8 @@ main(int argc, char *argv[])
   {
     log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
                                           nrels_purged, relsdfilename,
-                                          nrels_del, nrels_needed, log, mt);
+                                          nrels_del, nrels_needed, log, mt,
+					  abunitsfilename);
     printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
   }
   else
@@ -1412,7 +1447,10 @@ main(int argc, char *argv[])
   /* freeing and closing */
 #ifndef FOR_FFS
   sm_data_free();
-  mpz_clear(smexp);
+  mpz_clear(smexp1);
+# ifdef FOR_GFPM
+  mpz_clear(smexp0);
+# endif
 #endif
   logtab_free (log);
   mpz_clear(q);
