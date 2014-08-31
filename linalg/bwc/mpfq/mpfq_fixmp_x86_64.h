@@ -749,7 +749,7 @@ mp_limb_t mpfq_fixmp_1_addmul1_shortz(mp_limb_t * z, const mp_limb_t * x, mp_lim
         "adcq    $0, %%rdx\n"
     : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
     return carry;
 }
 
@@ -5826,7 +5826,7 @@ mp_limb_t mpfq_fixmp_0_5_addmul1_shortz(mp_limb_t * z, const mp_limb_t * x, mp_l
         "adcq    $0, %%rdx\n"
     : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
     return carry;
 }
 
@@ -5881,7 +5881,7 @@ mp_limb_t mpfq_fixmp_0_5_addmul05(mp_limb_t * z, const mp_limb_t * x, mp_limb_t 
         "adcq    $0, %%rdx\n"
     : "=a"(junk), [z0]"+m"(z[0]), "=d"(carry)
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
     return carry;
 }
 
@@ -5897,7 +5897,7 @@ void mpfq_fixmp_0_5_addmul05_nc(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "addq    %[x0], %[z0]\n"
     : "=a"(junk), [z0]"+m"(z[0])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x has 0.5 words, z has 1. c is 0.5 word.
