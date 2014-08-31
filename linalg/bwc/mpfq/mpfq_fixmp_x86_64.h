@@ -706,15 +706,14 @@ mp_limb_t mpfq_fixmp_1_addmul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
     mp_limb_t carry;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
         "xorq    %%rax, %%rax\n"
         "addq    %%rdx, %[z1]\n"
         "adcq    $0, %%rax\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=a"(carry)
-    : [x0]"m"(x[0]), [mult]"m"(c)
+    : "=a"(carry), [z0]"+m"(z[0]), [z1]"+m"(z[1])
+    : [x0]"0"(x[0]), [mult]"m"(c)
     : "%rdx");
     return carry;
 }
@@ -725,15 +724,15 @@ mp_limb_t mpfq_fixmp_1_addmul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_1_addmul1_nc(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
         "addq    %%rdx, %[z1]\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1])
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax", "%rdx");
+    : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1])
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    : "%rdx");
 }
 
 /* x has 1 words, z has 2.
@@ -743,14 +742,14 @@ static inline
 mp_limb_t mpfq_fixmp_1_addmul1_shortz(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
     mp_limb_t carry;
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax");
+    : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    );
     return carry;
 }
 
@@ -793,7 +792,7 @@ void mpfq_fixmp_1_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "mulq    %[mult]\n"
     : [z0]"=a"(z[0]), [z1]"=d"(z[1])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x, y, z and p have 1 words.
@@ -5784,15 +5783,14 @@ mp_limb_t mpfq_fixmp_0_5_addmul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c
 {
     mp_limb_t carry;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
         "xorq    %%rax, %%rax\n"
         "addq    %%rdx, %[z1]\n"
         "adcq    $0, %%rax\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=a"(carry)
-    : [x0]"m"(x[0]), [mult]"m"(c)
+    : "=a"(carry), [z0]"+m"(z[0]), [z1]"+m"(z[1])
+    : [x0]"0"(x[0]), [mult]"m"(c)
     : "%rdx");
     return carry;
 }
@@ -5803,15 +5801,15 @@ mp_limb_t mpfq_fixmp_0_5_addmul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c
 static inline
 void mpfq_fixmp_0_5_addmul1_nc(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
         "addq    %%rdx, %[z1]\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1])
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax", "%rdx");
+    : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1])
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    : "%rdx");
 }
 
 /* x has 0.5 words, z has 1.
@@ -5821,14 +5819,14 @@ static inline
 mp_limb_t mpfq_fixmp_0_5_addmul1_shortz(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
     mp_limb_t carry;
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "mulq    %[mult]\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
-    : [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax");
+    : "=a"(junk), [z0]"+m"(z[0]), [z1]"+m"(z[1]), "=d"(carry)
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    );
     return carry;
 }
 
@@ -5865,7 +5863,7 @@ void mpfq_fixmp_0_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
         "mulq    %[mult]\n"
     : [z0]"=a"(z[0]), [z1]"=d"(z[1])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x has 0.5 words, z has 1. c is 0.5 word.
@@ -5875,15 +5873,15 @@ static inline
 mp_limb_t mpfq_fixmp_0_5_addmul05(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
     mp_limb_t carry;
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
-        "imulq    %[mult], %%rax\n"
+        "imulq    %[mult], %[x0]\n"
         "xorq    %%rdx, %%rdx\n"
         "addq    %%rax, %[z0]\n"
         "adcq    $0, %%rdx\n"
-    : [z0]"+m"(z[0]), "=d"(carry)
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax");
+    : "=a"(junk), [z0]"+m"(z[0]), "=d"(carry)
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    );
     return carry;
 }
 
@@ -5893,13 +5891,13 @@ mp_limb_t mpfq_fixmp_0_5_addmul05(mp_limb_t * z, const mp_limb_t * x, mp_limb_t 
 static inline
 void mpfq_fixmp_0_5_addmul05_nc(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
+    mp_limb_t junk;
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
-        "imulq    %[mult], %%rax\n"
-        "addq    %%rax, %[z0]\n"
-    : [z0]"+m"(z[0])
-    : [x0]"m"(x[0]), [mult]"m"(c)
-    : "%rax");
+        "imulq    %[mult], %[x0]\n"
+        "addq    %[x0], %[z0]\n"
+    : "=a"(junk), [z0]"+m"(z[0])
+    : [x0]"0"(x[0]), [mult]"m"(c)
+    );
 }
 
 /* x has 0.5 words, z has 1. c is 0.5 word.
@@ -5909,12 +5907,10 @@ static inline
 void mpfq_fixmp_0_5_mul05(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 {
     __asm__ __volatile__(
-        "movq    %[x0], %%rax\n"
         "imulq    %[mult], %%rax\n"
-        "movq    %%rax, %[z0]\n"
     : [z0]"=a"(z[0])
     : [x0]"0"(x[0]), [mult]"m"(c)
-    : );
+    );
 }
 
 /* x, y, and z have 1.5 words. Result in z. Return carry bit */
