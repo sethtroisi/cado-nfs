@@ -50,6 +50,7 @@ binary-fields: mpfq-buildtree
 prime-fields: mpfq-buildtree
 	# This would almost suffice, except for the mpfq_fixmp.h file.
 	# $(MPFQ)/fixmp/gen_fixmp.pl output_path=.
+	$(MPFQ)/fixmp/gen_test_fixmp.pl > ../../../tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 	$(MAKE) -C $(MPFQ_TEMP) fixmp_files
 	/bin/cp -f $(MPFQ_TEMP)/include/mpfq_fixmp*h .
 	patch -p1 -d. < asm-constraints.patch
