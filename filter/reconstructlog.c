@@ -253,6 +253,7 @@ sm_data_free ()
   mpz_clear(invq2);
 }
 
+#ifdef FOR_GFPN
 /* Very naive code for finding the valuations of the units. */
 static int
 get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
@@ -291,6 +292,7 @@ add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 	    mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
     }
 }
+#endif // FOR_GFPN
 
 /* Given a and b, compute the SM and add the contribution to l */
 static inline void
@@ -1261,6 +1263,8 @@ main(int argc, char *argv[])
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
   const char * abunitsfilename = param_list_lookup_string(pl, "abunits");
+# else
+  const char * abunitsfilename = NULL;
 # endif
 #endif
   param_list_parse_int(pl, "mt", &mt);
