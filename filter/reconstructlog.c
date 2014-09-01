@@ -12,7 +12,7 @@
 #define DEBUG 0
 
 /* to use in the GF(p^n) computations, uncomment the following */
-#define FOR_GFPN
+//#define FOR_GFPN
 
 stats_data_t stats; /* struct for printing progress */
 
