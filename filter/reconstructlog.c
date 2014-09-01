@@ -225,6 +225,7 @@ unsigned int nbsm0 = 0;
 mpz_t smexp1; /* exponent for SM */
 # ifdef FOR_GFPN
 mpz_t smexp0; /* exponent for SM on the 0 side */
+mpz_poly_ptr F0;
 # endif
 mpz_poly_ptr F1;
 mpz_t q2;    /* q^2 */
@@ -293,17 +294,19 @@ add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 
 /* Given a and b, compute the SM and add the contribution to l */
 static inline void
-add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q)
+add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
+		     mpz_poly_ptr F, mpz_t smexp, unsigned int nbsm,
+		     mpz_t *smlg)
 {
   mpz_poly_t SMres;
-  int degF = F1->deg;
+  int degF = F->deg;
   mpz_poly_init(SMres, degF);
   SMres->deg = 0;
   mpz_poly_setcoeff_si(SMres, 0, 1);
-  sm_single_rel(SMres, a, b, F1, smexp1, q, q2, invq2);
+  sm_single_rel(SMres, a, b, F, smexp, q, q2, invq2);
   unsigned int i;
-  for (i = degF - SMres->deg - 1; i < nbsm1; i++)
-    mpz_add_log_mod_mpz (l, smlog[i], SMres->coeff[degF-1-i], q);
+  for (i = degF - SMres->deg - 1; i < nbsm; i++)
+    mpz_add_log_mod_mpz (l, smlg[i], SMres->coeff[degF-1-i], q);
   mpz_poly_clear(SMres);
 }
 
@@ -315,10 +318,12 @@ static inline void
 add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 		      const char * abunitsfilename)
 {
-  add_sm_contribution(l, a, b, q);
+  add_sm_contribution(l, a, b, q, F1, smexp1, nbsm1, smlog);
 #ifdef FOR_GFPN
   if(mpz_sgn(smexp0) == 0)
-      add_unit_contribution(l, a, b, q, abunitsfilename);
+    add_unit_contribution(l, a, b, q, abunitsfilename);
+  else
+    add_sm_contribution(l, a, b, q, F0, smexp0, nbsm0, smlog+nbsm1);
 #endif // FOR_GFPN
 }
 
@@ -1174,7 +1179,8 @@ static void declare_usage(param_list pl)
                                        "that can be reconstructed");
 #ifndef FOR_FFS
   param_list_decl_usage(pl, "sm", "number of SM to add to relations");
-  param_list_decl_usage(pl, "smexp1", "sm exponent (see sm -smexp1 parameter)");
+  // TODO: replace smexp by smexp1
+  param_list_decl_usage(pl, "smexp", "sm exponent (see sm -smexp1 parameter)");
 # ifdef FOR_GFPN
   param_list_decl_usage(pl, "sm0", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp0", "sm0 exponent (see sm -smexp parameter)");
@@ -1249,7 +1255,7 @@ main(int argc, char *argv[])
 #ifndef FOR_FFS
   param_list_parse_uint(pl, "sm", &nbsm1);
   mpz_init (smexp1);
-  param_list_parse_mpz(pl, "smexp1", smexp1);
+  param_list_parse_mpz(pl, "smexp", smexp1);
 # ifdef FOR_GFPN
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
@@ -1362,6 +1368,7 @@ main(int argc, char *argv[])
 # ifndef FOR_GFPN // humf, this is quite temporary...!
   FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
 # else
+  F0 = poly->pols[RATIONAL_SIDE];
   if (abunitsfilename == NULL)
   {
     fprintf(stderr, "Error, missing -abunits command line argument\n");
