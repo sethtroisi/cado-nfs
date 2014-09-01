@@ -168,7 +168,7 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
-  char * abunitsfilename;
+  const char * abunitsfilename;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
@@ -318,7 +318,7 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 */
 static inline void
 add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		      const char * abunitsfilename)
+		      const char * abunitsfilename MAYBE_UNUSED)
 {
   add_sm_contribution(l, a, b, q, F1, smexp1, nbsm1, smlog);
 #ifdef FOR_GFPN
