@@ -752,7 +752,7 @@ int main(int argc, char * argv[])
           * assembly, it is likely to trigger register allocation
           * problems in some instances */
          Khadamard(a0,a1,a2,a3);
-#endif
+#endif  /* HAVE_mpfq_p_4_hadamard */
         /*-----------------------------------------------------------*/
         /*          Tests related to vectors                         */
         /*-----------------------------------------------------------*/

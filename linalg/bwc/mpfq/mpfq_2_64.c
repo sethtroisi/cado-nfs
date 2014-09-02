@@ -206,8 +206,8 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
             free(zz);
             return 0;
         }
-        mpn_copyi(z, zz, ret);
-        mpn_zero(z + ret, 1 - ret);
+        mpfq_copy(z, zz, ret);
+        mpfq_zero(z + ret, 1 - ret);
         free(zz);
         return len;
     } else {
