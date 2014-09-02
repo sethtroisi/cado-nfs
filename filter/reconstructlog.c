@@ -12,7 +12,7 @@
 #define DEBUG 0
 
 /* to use in the GF(p^n) computations, uncomment the following */
-//#define FOR_GFPN
+#define FOR_GFPN
 
 stats_data_t stats; /* struct for printing progress */
 
@@ -1186,7 +1186,7 @@ static void declare_usage(param_list pl)
 # ifdef FOR_GFPN
   param_list_decl_usage(pl, "sm0", "number of SM to add to relations");
   param_list_decl_usage(pl, "smexp0", "sm0 exponent (see sm -smexp parameter)");
-  param_list_decl_usage(pl, "abunits", "units for all (a, b) pairs from purged and relsdels");
+  param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels for side 0");
 # endif
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
@@ -1262,7 +1262,7 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
-  const char * abunitsfilename = param_list_lookup_string(pl, "abunits");
+  const char * abunitsfilename = param_list_lookup_string(pl, "abunits0");
 # else
   const char * abunitsfilename = NULL;
 # endif
@@ -1375,7 +1375,7 @@ main(int argc, char *argv[])
   F0 = poly->pols[RATIONAL_SIDE];
   if (abunitsfilename == NULL)
   {
-    fprintf(stderr, "Error, missing -abunits command line argument\n");
+    fprintf(stderr, "Error, missing -abunits0 command line argument\n");
     usage (pl, argv0);
   }
 # endif // FOR_GFPN
