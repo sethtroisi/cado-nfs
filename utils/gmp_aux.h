@@ -41,7 +41,6 @@ extern int mpz_coprime_p (mpz_t a, mpz_t b);
 extern int nbits (uintmax_t p);
 extern long double mpz_get_ld (mpz_t z);
 
-
 #ifdef __cplusplus
 }
 #endif

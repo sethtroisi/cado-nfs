@@ -1094,3 +1094,4 @@ tests/linalg/bwc/mpfq/mpfq_test_p_3.c
 tests/linalg/bwc/mpfq/mpfq_test_p_4.c
 tests/linalg/bwc/mpfq/mpfq_test_p_8.c
 tests/linalg/bwc/mpfq/mpfq_test_pz.c
+tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
