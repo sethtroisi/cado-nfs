@@ -434,9 +434,9 @@ MPI_Op mpfq_p_8_mpi_addition_op_ur(mpfq_p_8_dst_field);
 void mpfq_p_8_mpi_ops_clear(mpfq_p_8_dst_field);
 
 /* Object-oriented interface */
+void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_8_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -496,7 +496,7 @@ void mpfq_p_8_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt r, unsi
 {
     assert (r);
     r[0] = x;
-    mpn_zero(r + 1, 8 - 1);
+    mpfq_zero(r + 1, 8 - 1);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
@@ -518,8 +518,8 @@ static inline
 void mpfq_p_8_set_mpn(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt r, mp_limb_t * x, size_t n)
 {
     if (n < 8) {
-        mpn_copyi(r, x, n);
-        mpn_zero(r + n, 8 - n);
+        mpfq_copy(r, x, n);
+        mpfq_zero(r + n, 8 - n);
     } else {
         mp_limb_t tmp[n-8+1];
         mpn_tdiv_qr(tmp, r, 0, x, n, k->p->_mp_d, 8);
@@ -542,7 +542,7 @@ void mpfq_p_8_set_mpz(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt r, mpz_t z)
 static inline
 void mpfq_p_8_get_mpn(mpfq_p_8_dst_field k MAYBE_UNUSED, mp_limb_t * r, mpfq_p_8_src_elt x)
 {
-    mpn_copyi(r, x, 8);
+    mpfq_copy(r, x, 8);
 }
 
 /* *Mpfq::gfp::elt::code_for_get_mpz, Mpfq::gfp */
@@ -566,7 +566,7 @@ void mpfq_p_8_random(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt x, gmp_randstate_t s
       mpz_t z;
       mpz_init(z);
       mpz_urandomb(z, state, 8 * GMP_LIMB_BITS);
-      mpn_copyi(x, z->_mp_d, 8);
+      mpfq_copy(x, z->_mp_d, 8);
       mpz_clear(z);
     mpfq_p_8_normalize(k, x);
 }
@@ -578,7 +578,7 @@ void mpfq_p_8_random2(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt x, gmp_randstate_t 
       mpz_t z;
       mpz_init(z);
       mpz_rrandomb(z, state, 8 * GMP_LIMB_BITS);
-      mpn_copyi(x, z->_mp_d, 8);
+      mpfq_copy(x, z->_mp_d, 8);
       mpz_clear(z);
     mpfq_p_8_normalize(k, x);
 }
@@ -776,7 +776,7 @@ void mpfq_p_8_elt_ur_clear(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_elt_ur * 
 static inline
 void mpfq_p_8_elt_ur_set(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt_ur x)
 {
-    mpn_copyi(z, x, 17);
+    mpfq_copy(z, x, 17);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
@@ -799,7 +799,7 @@ void mpfq_p_8_elt_ur_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_
 {
     assert (r); 
     r[0] = x;
-    mpn_zero(r + 1, 17 - 1);
+    mpfq_zero(r + 1, 17 - 1);
 }
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_add, Mpfq::gfp */
@@ -815,7 +815,7 @@ void mpfq_p_8_elt_ur_neg(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt_ur z, mpfq_p_8_s
 {
     mpfq_p_8_elt_ur tmp;
     mpfq_p_8_elt_ur_init(k, &tmp);
-    mpn_zero(tmp, 17);
+    mpfq_zero(tmp, 17);
     mpn_sub_n(z, tmp, x, 17);
     mpfq_p_8_elt_ur_clear(k, &tmp);
 }
@@ -832,7 +832,7 @@ static inline
 void mpfq_p_8_mul_ur(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
     mpfq_fixmp_8_mul(z, x, y);
-    mpn_zero(z + 16, 17 - 16);
+    mpfq_zero(z + 16, 17 - 16);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqr_ur, Mpfq::gfp */
@@ -840,7 +840,7 @@ static inline
 void mpfq_p_8_sqr_ur(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt x)
 {
     mpfq_fixmp_8_sqr(z, x);
-    mpn_zero(z + 16, 17 - 16);
+    mpfq_zero(z + 16, 17 - 16);
 }
 
 /* *Mpfq::gfp::elt::code_for_reduce, Mpfq::gfp */

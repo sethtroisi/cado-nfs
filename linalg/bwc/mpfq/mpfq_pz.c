@@ -140,8 +140,8 @@ void mpfq_pz_clear(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_elt * x)
 void mpfq_pz_set_mpn(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, mp_limb_t * x, size_t n)
 {
     if (n < mpz_size(k->p)) {
-        mpn_copyi(z, x, n);
-        mpn_zero(z + n, (mpz_size(k->p) - n));
+        mpfq_copy(z, x, n);
+        mpfq_zero(z + n, (mpz_size(k->p) - n));
     } else {
         mp_limb_t *tmp;
         tmp = (mp_limb_t *) mpfq_malloc_check((n + 1 - mpz_size(k->p)) * sizeof(mp_limb_t));
@@ -527,7 +527,7 @@ void mpfq_pz_vec_set(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, mpfq_pz_src_vec v, 
 /* *pz::code_for_vec_set_zero */
 void mpfq_pz_vec_set_zero(mpfq_pz_dst_field k, mpfq_pz_dst_vec w, unsigned int n)
 {
-        if (n) mpn_zero(w, n * mpz_size(k->p));
+        if (n) mpfq_zero(w, n * mpz_size(k->p));
 }
 
 /* *pz::code_for_vec_setcoeff */
@@ -790,7 +790,7 @@ void mpfq_pz_vec_ur_init(mpfq_pz_dst_field k, mpfq_pz_vec_ur * v, unsigned int n
 /* *pz::code_for_vec_ur_set_zero */
 void mpfq_pz_vec_ur_set_zero(mpfq_pz_dst_field k, mpfq_pz_dst_vec_ur w, unsigned int n)
 {
-        mpn_zero(w, n * mpz_size(k->bigmul_p));
+        mpfq_zero(w, n * mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_vec_ur_set_vec */
@@ -902,10 +902,10 @@ static void mpfq_pz_vec_conv_ur_ks(mpfq_pz_field k, mpfq_pz_dst_vec_ur w, mpfq_p
         mp_limb_t *U, *V;
         U = (mp_limb_t *) mpfq_malloc_check(n * nwords * sizeof(mp_limb_t));
         V = (mp_limb_t *) mpfq_malloc_check(m * nwords * sizeof(mp_limb_t));
-        mpn_zero(U, n * nwords);
+        mpfq_zero(U, n * nwords);
         for (unsigned int i = 0; i < n; ++i)
         mpfq_pz_get_mpn(k, U + i * nwords, u + i * mpz_size(k->p));
-        mpn_zero(V, m * nwords);
+        mpfq_zero(V, m * nwords);
         for (unsigned int i = 0; i < m; ++i)
         mpfq_pz_get_mpn(k, V + i * nwords, v + i * mpz_size(k->p));
         // Mul !
@@ -916,9 +916,9 @@ static void mpfq_pz_vec_conv_ur_ks(mpfq_pz_field k, mpfq_pz_dst_vec_ur w, mpfq_p
         else
             mpn_mul(W, V, m * nwords, U, n * nwords);
         // Put coeffs in w
-        mpn_zero(w, (n + m - 1) * mpz_size(k->bigmul_p));
+        mpfq_zero(w, (n + m - 1) * mpz_size(k->bigmul_p));
         for (unsigned int i = 0; i < n + m - 1; ++i)
-        mpn_copyi(w + i * mpz_size(k->bigmul_p), W + i * nwords, nwords);
+        mpfq_copy(w + i * mpz_size(k->bigmul_p), W + i * nwords, nwords);
         mpfq_free(U, n * nwords * sizeof(mp_limb_t));
         mpfq_free(V, m * nwords * sizeof(mp_limb_t));
         mpfq_free(W, (m+n) * nwords * sizeof(mp_limb_t));

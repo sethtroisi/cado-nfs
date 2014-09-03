@@ -371,9 +371,9 @@ MPI_Op mpfq_pz_mpi_addition_op_ur(mpfq_pz_dst_field);
 void mpfq_pz_mpi_ops_clear(mpfq_pz_dst_field);
 
 /* Object-oriented interface */
-void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_pz_oo_field_clear(mpfq_vbase_ptr);
+void mpfq_pz_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -408,7 +408,7 @@ void mpfq_pz_field_init(mpfq_pz_dst_field k)
 static inline
 void mpfq_pz_set(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, mpfq_pz_src_elt x)
 {
-        if (z != x) mpn_copyi(z, x, mpz_size(k->p));
+        mpfq_copy(z, x, mpz_size(k->p));
 }
 
 /* *pz::code_for_set_ui */
@@ -416,14 +416,14 @@ static inline
 void mpfq_pz_set_ui(mpfq_pz_dst_field k, mpfq_pz_dst_elt z, unsigned long x0)
 {
         z[0] = mpz_size(k->p) == 1 ? x0 % mpz_getlimbn(k->p, 0) : x0;
-        mpn_zero(z + 1, (mpz_size(k->p) - 1));
+        mpfq_zero(z + 1, (mpz_size(k->p) - 1));
 }
 
 /* *pz::code_for_set_zero */
 static inline
 void mpfq_pz_set_zero(mpfq_pz_dst_field k, mpfq_pz_dst_elt z)
 {
-        mpn_zero(z, (mpz_size(k->p)));
+        mpfq_zero(z, (mpz_size(k->p)));
 }
 
 /* *pz::code_for_get_ui */
@@ -437,7 +437,7 @@ unsigned long mpfq_pz_get_ui(mpfq_pz_dst_field k MAYBE_UNUSED, mpfq_pz_src_elt x
 static inline
 void mpfq_pz_get_mpn(mpfq_pz_dst_field k, mp_limb_t * z, mpfq_pz_src_elt x)
 {
-        mpn_copyi(z, x, mpz_size(k->p));
+        mpfq_copy(z, x, mpz_size(k->p));
 }
 
 /* *pz::code_for_get_mpz */
@@ -456,22 +456,22 @@ void mpfq_pz_get_mpz(mpfq_pz_dst_field k, mpz_t z, mpfq_pz_src_elt x)
 static inline
 void mpfq_pz_elt_ur_set(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z, mpfq_pz_src_elt_ur x)
 {
-        mpn_copyi(z, x, mpz_size(k->bigmul_p));
+        mpfq_copy(z, x, mpz_size(k->bigmul_p));
 }
 
 /* *pz::code_for_elt_ur_set_elt */
 static inline
 void mpfq_pz_elt_ur_set_elt(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z, mpfq_pz_src_elt x)
 {
-        mpn_copyi(z, x, mpz_size(k->p));
-        mpn_zero(z + mpz_size(k->p), (mpz_size(k->bigmul_p) - mpz_size(k->p)));
+        mpfq_copy(z, x, mpz_size(k->p));
+        mpfq_zero(z + mpz_size(k->p), (mpz_size(k->bigmul_p) - mpz_size(k->p)));
 }
 
 /* *pz::code_for_elt_ur_set_zero */
 static inline
 void mpfq_pz_elt_ur_set_zero(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z)
 {
-        mpn_zero(z, (mpz_size(k->bigmul_p)));
+        mpfq_zero(z, (mpz_size(k->bigmul_p)));
 }
 
 /* *pz::code_for_elt_ur_set_ui */
@@ -479,7 +479,7 @@ static inline
 void mpfq_pz_elt_ur_set_ui(mpfq_pz_dst_field k, mpfq_pz_dst_elt_ur z, unsigned long x0)
 {
         z[0] = x0;
-        mpn_zero(z + 1, (mpz_size(k->bigmul_p) - 1));
+        mpfq_zero(z + 1, (mpz_size(k->bigmul_p) - 1));
 }
 
 /* *simd_pz::code_for_addmul_si_ur */

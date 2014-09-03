@@ -71,8 +71,8 @@ void test_fixmp_1() {
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 1);
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c2 = mpfq_fixmp_1_add(v, v, y);
     mpfq_fixmp_1_add_nc(u, u, y);
     assert (c1 == c2);
@@ -88,8 +88,8 @@ void test_fixmp_1() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c1 = mpn_add_1(s, x, 1, wx);
     c2 = mpfq_fixmp_1_add_ui(u, u, wx);
     mpfq_fixmp_1_add_ui_nc(v, v, wx);
@@ -116,8 +116,8 @@ void test_fixmp_1() {
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 1);
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c2 = mpfq_fixmp_1_sub(v, v, y);
     mpfq_fixmp_1_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -133,8 +133,8 @@ void test_fixmp_1() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c1 = mpn_sub_1(s, x, 1, wx);
     c2 = mpfq_fixmp_1_sub_ui(u, u, wx);
     mpfq_fixmp_1_sub_ui_nc(v, v, wx);
@@ -142,10 +142,10 @@ void test_fixmp_1() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     // addmul1
-    mpn_copyi(s, z, 2);
-    mpn_copyi(u, z, 2);
-    mpn_copyi(v, z, 2);
-    mpn_copyi(w, z, 2);
+    mpfq_copy(s, z, 2);
+    mpfq_copy(u, z, 2);
+    mpfq_copy(v, z, 2);
+    mpfq_copy(w, z, 2);
     c1 = mpn_addmul_1(s, x, 1, wx);
     s[1] += c1;
     c3 = s[1] < c1;
@@ -164,8 +164,8 @@ void test_fixmp_1() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+    mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     c1 = mpn_addmul_1(s, s, 1, wx);
     c2 = mpfq_fixmp_1_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 1) == 0);
@@ -177,8 +177,8 @@ void test_fixmp_1() {
     assert (u[2] == 0xdeadbeef);
     assert (mpn_cmp(s,u,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(t, x, 1);
+    mpfq_copy(v, x, 1);
     t[1] = mpn_mul_1(t, t, 1, wx);
     mpfq_fixmp_1_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 1 + 1) == 0);
@@ -204,16 +204,16 @@ void test_fixmp_1() {
     j = mpn_cmp(x, y, 1);
     k = mpfq_fixmp_1_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 1);
+    mpfq_copy(u, x, 1);
     j = mpfq_fixmp_1_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 0);
+    mpfq_zero(u+1, 0);
     j = mpfq_fixmp_1_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_1_cmp_ui(u, ~x[0]);
     assert (j!=0);
     // mod
-    mpn_copyi(v, y, 1);
+    mpfq_copy(v, y, 1);
     v[1-1] += !v[1-1];
     mpn_tdiv_qr(s+2, s, 0, z, 2, v, 1);
     mpfq_fixmp_1_mod(u, z, v);
@@ -225,8 +225,8 @@ void test_fixmp_1() {
     mpfq_fixmp_1_invmod(v, v, P);
     assert(mpn_cmp(v, u, 1) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 1);
-    mpn_zero(v, 1);
+    mpfq_zero(u, 1);
+    mpfq_zero(v, 1);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_1_invmod(v, u, P);
     assert(c1 == 0);
@@ -236,9 +236,9 @@ void test_fixmp_1() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 1);
+    mpfq_zero(u, 1);
     memset(u, ~0, 1 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 1);
+    mpfq_copy(v, x, 1);
     /* This creates an n-limb multiple of 257.  */
     v[1] = mpn_lshift(v, x, 1, 8);
     v[1] += mpfq_fixmp_1_add(v, v, x);
@@ -259,7 +259,7 @@ void test_fixmp_1() {
       
       // x[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 1);
+      mpfq_zero(mip, 1);
       mpn_random2(p, 1);
       p[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[1-1] > p[1-1])
@@ -268,7 +268,7 @@ void test_fixmp_1() {
         p[1-1] = y[1-1];
       p[0] |= 1UL;
       p[1-1] += !p[1-1];
-      mpn_zero(w, 2*1);
+      mpfq_zero(w, 2*1);
       w[1]=1;
       mpfq_fixmp_1_mod(w, w, p);
       mpfq_fixmp_1_invmod(invR, w, p);
@@ -276,7 +276,7 @@ void test_fixmp_1() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 1);
+        mpfq_copy(v, mip, 1);
         mpfq_fixmp_1_shortmul(t, mip, p);
 	mpn_add_1(t, t, 1, 1);
 	mpfq_fixmp_1_shortmul(u, t, mip);
@@ -301,7 +301,7 @@ void test_fixmp_1() {
        * is simulated. */
       mpfq_fixmp_1_mul(t, xe, ye);
       s[2] = mpn_mul_1(s, t, 2, wx);
-      mpn_zero(t, 2*1+1);
+      mpfq_zero(t, 2*1+1);
       mpfq_fixmp_1_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_1_mod(s, t, p);
       mpfq_fixmp_1_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -323,7 +323,7 @@ void test_fixmp_1() {
       mpfq_fixmp_1_redc(s, u, mip, p);
       mpfq_fixmp_1_mul1(w, s, sat);
       mpn_tdiv_qr(s+1, s, 0, w, 1+1, p, 1);
-      mpn_zero(w, 2*1+1);
+      mpfq_zero(w, 2*1+1);
       mpfq_fixmp_1_redc(w, v, mip, p);
       mpn_tdiv_qr(t+1, t, 0, w, 1+1, p, 1);
       assert(mpn_cmp(s, t, 1) == 0);
@@ -333,7 +333,7 @@ void test_fixmp_1() {
       mpfq_fixmp_1_redc_ur(s, u, mip, p);
       mpfq_fixmp_1_mul1(w, s, sat);
       mpn_tdiv_qr(s+1, s, 0, w, 1+1, p, 1);
-      mpn_zero(w, 2*1+1);
+      mpfq_zero(w, 2*1+1);
       mpfq_fixmp_1_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+1, t, 0, w, 1+1, p, 1);
       assert(mpn_cmp(s, t, 1) == 0);
@@ -349,8 +349,8 @@ void test_fixmp_1() {
     if (j) 
         mpn_lshift(s, x, 1, j);
     else
-        mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_1_lshift(u, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // lshift
@@ -358,32 +358,32 @@ void test_fixmp_1() {
     if (j)
         mpn_rshift(s, x, 1, j);
     else
-        mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_1_rshift(u, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // long_lshift
     j = wx % (1 * GMP_LIMB_BITS);
-    mpn_zero(s, 1);
+    mpfq_zero(s, 1);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 1 - k, j);
     else
-        mpn_copyi(s + k, x, 1 - k);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s + k, x, 1 - k);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_1_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // long_rshift
     j = wx % (1 * GMP_LIMB_BITS);
-    mpn_zero(s, 1);
+    mpfq_zero(s, 1);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 1 - k, j);
     else
-        mpn_copyi(s, x + k, 1 - k);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x + k, 1 - k);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_1_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 1) == 0);
 }
@@ -422,8 +422,8 @@ void test_fixmp_2() {
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 2);
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c2 = mpfq_fixmp_2_add(v, v, y);
     mpfq_fixmp_2_add_nc(u, u, y);
     assert (c1 == c2);
@@ -439,8 +439,8 @@ void test_fixmp_2() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c1 = mpn_add_1(s, x, 2, wx);
     c2 = mpfq_fixmp_2_add_ui(u, u, wx);
     mpfq_fixmp_2_add_ui_nc(v, v, wx);
@@ -467,8 +467,8 @@ void test_fixmp_2() {
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 2);
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c2 = mpfq_fixmp_2_sub(v, v, y);
     mpfq_fixmp_2_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -484,8 +484,8 @@ void test_fixmp_2() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c1 = mpn_sub_1(s, x, 2, wx);
     c2 = mpfq_fixmp_2_sub_ui(u, u, wx);
     mpfq_fixmp_2_sub_ui_nc(v, v, wx);
@@ -493,10 +493,10 @@ void test_fixmp_2() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     // addmul1
-    mpn_copyi(s, z, 3);
-    mpn_copyi(u, z, 3);
-    mpn_copyi(v, z, 3);
-    mpn_copyi(w, z, 3);
+    mpfq_copy(s, z, 3);
+    mpfq_copy(u, z, 3);
+    mpfq_copy(v, z, 3);
+    mpfq_copy(w, z, 3);
     c1 = mpn_addmul_1(s, x, 2, wx);
     s[2] += c1;
     c3 = s[2] < c1;
@@ -515,8 +515,8 @@ void test_fixmp_2() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+    mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     c1 = mpn_addmul_1(s, s, 2, wx);
     c2 = mpfq_fixmp_2_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 2) == 0);
@@ -528,8 +528,8 @@ void test_fixmp_2() {
     assert (u[3] == 0xdeadbeef);
     assert (mpn_cmp(s,u,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(t, x, 2);
+    mpfq_copy(v, x, 2);
     t[2] = mpn_mul_1(t, t, 2, wx);
     mpfq_fixmp_2_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 2 + 1) == 0);
@@ -555,10 +555,10 @@ void test_fixmp_2() {
     j = mpn_cmp(x, y, 2);
     k = mpfq_fixmp_2_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 2);
+    mpfq_copy(u, x, 2);
     j = mpfq_fixmp_2_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 1);
+    mpfq_zero(u+1, 1);
     j = mpfq_fixmp_2_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_2_cmp_ui(u, ~x[0]);
@@ -567,7 +567,7 @@ void test_fixmp_2() {
     j = mpfq_fixmp_2_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 2);
+    mpfq_copy(v, y, 2);
     v[2-1] += !v[2-1];
     mpn_tdiv_qr(s+3, s, 0, z, 4, v, 2);
     mpfq_fixmp_2_mod(u, z, v);
@@ -579,8 +579,8 @@ void test_fixmp_2() {
     mpfq_fixmp_2_invmod(v, v, P);
     assert(mpn_cmp(v, u, 2) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 2);
-    mpn_zero(v, 2);
+    mpfq_zero(u, 2);
+    mpfq_zero(v, 2);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_2_invmod(v, u, P);
     assert(c1 == 0);
@@ -590,9 +590,9 @@ void test_fixmp_2() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 2);
+    mpfq_zero(u, 2);
     memset(u, ~0, 2 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 2);
+    mpfq_copy(v, x, 2);
     /* This creates an n-limb multiple of 257.  */
     v[2] = mpn_lshift(v, x, 2, 8);
     v[2] += mpfq_fixmp_2_add(v, v, x);
@@ -613,7 +613,7 @@ void test_fixmp_2() {
       
       // x[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 2);
+      mpfq_zero(mip, 2);
       mpn_random2(p, 2);
       p[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[2-1] > p[2-1])
@@ -622,7 +622,7 @@ void test_fixmp_2() {
         p[2-1] = y[2-1];
       p[0] |= 1UL;
       p[2-1] += !p[2-1];
-      mpn_zero(w, 2*2);
+      mpfq_zero(w, 2*2);
       w[2]=1;
       mpfq_fixmp_2_mod(w, w, p);
       mpfq_fixmp_2_invmod(invR, w, p);
@@ -630,7 +630,7 @@ void test_fixmp_2() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 2);
+        mpfq_copy(v, mip, 2);
         mpfq_fixmp_2_shortmul(t, mip, p);
 	mpn_add_1(t, t, 2, 1);
 	mpfq_fixmp_2_shortmul(u, t, mip);
@@ -655,7 +655,7 @@ void test_fixmp_2() {
        * is simulated. */
       mpfq_fixmp_2_mul(t, xe, ye);
       s[4] = mpn_mul_1(s, t, 4, wx);
-      mpn_zero(t, 2*2+1);
+      mpfq_zero(t, 2*2+1);
       mpfq_fixmp_2_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_2_mod(s, t, p);
       mpfq_fixmp_2_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -677,7 +677,7 @@ void test_fixmp_2() {
       mpfq_fixmp_2_redc(s, u, mip, p);
       mpfq_fixmp_2_mul1(w, s, sat);
       mpn_tdiv_qr(s+2, s, 0, w, 2+1, p, 2);
-      mpn_zero(w, 2*2+1);
+      mpfq_zero(w, 2*2+1);
       mpfq_fixmp_2_redc(w, v, mip, p);
       mpn_tdiv_qr(t+2, t, 0, w, 2+1, p, 2);
       assert(mpn_cmp(s, t, 2) == 0);
@@ -687,7 +687,7 @@ void test_fixmp_2() {
       mpfq_fixmp_2_redc_ur(s, u, mip, p);
       mpfq_fixmp_2_mul1(w, s, sat);
       mpn_tdiv_qr(s+2, s, 0, w, 2+1, p, 2);
-      mpn_zero(w, 2*2+1);
+      mpfq_zero(w, 2*2+1);
       mpfq_fixmp_2_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+2, t, 0, w, 2+1, p, 2);
       assert(mpn_cmp(s, t, 2) == 0);
@@ -703,8 +703,8 @@ void test_fixmp_2() {
     if (j) 
         mpn_lshift(s, x, 2, j);
     else
-        mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_2_lshift(u, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // lshift
@@ -712,32 +712,32 @@ void test_fixmp_2() {
     if (j)
         mpn_rshift(s, x, 2, j);
     else
-        mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_2_rshift(u, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // long_lshift
     j = wx % (2 * GMP_LIMB_BITS);
-    mpn_zero(s, 2);
+    mpfq_zero(s, 2);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 2 - k, j);
     else
-        mpn_copyi(s + k, x, 2 - k);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s + k, x, 2 - k);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_2_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // long_rshift
     j = wx % (2 * GMP_LIMB_BITS);
-    mpn_zero(s, 2);
+    mpfq_zero(s, 2);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 2 - k, j);
     else
-        mpn_copyi(s, x + k, 2 - k);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x + k, 2 - k);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_2_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 2) == 0);
 }
@@ -776,8 +776,8 @@ void test_fixmp_3() {
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 3);
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c2 = mpfq_fixmp_3_add(v, v, y);
     mpfq_fixmp_3_add_nc(u, u, y);
     assert (c1 == c2);
@@ -793,8 +793,8 @@ void test_fixmp_3() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c1 = mpn_add_1(s, x, 3, wx);
     c2 = mpfq_fixmp_3_add_ui(u, u, wx);
     mpfq_fixmp_3_add_ui_nc(v, v, wx);
@@ -821,8 +821,8 @@ void test_fixmp_3() {
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 3);
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c2 = mpfq_fixmp_3_sub(v, v, y);
     mpfq_fixmp_3_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -838,8 +838,8 @@ void test_fixmp_3() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c1 = mpn_sub_1(s, x, 3, wx);
     c2 = mpfq_fixmp_3_sub_ui(u, u, wx);
     mpfq_fixmp_3_sub_ui_nc(v, v, wx);
@@ -847,10 +847,10 @@ void test_fixmp_3() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     // addmul1
-    mpn_copyi(s, z, 4);
-    mpn_copyi(u, z, 4);
-    mpn_copyi(v, z, 4);
-    mpn_copyi(w, z, 4);
+    mpfq_copy(s, z, 4);
+    mpfq_copy(u, z, 4);
+    mpfq_copy(v, z, 4);
+    mpfq_copy(w, z, 4);
     c1 = mpn_addmul_1(s, x, 3, wx);
     s[3] += c1;
     c3 = s[3] < c1;
@@ -869,8 +869,8 @@ void test_fixmp_3() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+    mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     c1 = mpn_addmul_1(s, s, 3, wx);
     c2 = mpfq_fixmp_3_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 3) == 0);
@@ -882,8 +882,8 @@ void test_fixmp_3() {
     assert (u[4] == 0xdeadbeef);
     assert (mpn_cmp(s,u,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(t, x, 3);
+    mpfq_copy(v, x, 3);
     t[3] = mpn_mul_1(t, t, 3, wx);
     mpfq_fixmp_3_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 3 + 1) == 0);
@@ -909,10 +909,10 @@ void test_fixmp_3() {
     j = mpn_cmp(x, y, 3);
     k = mpfq_fixmp_3_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 3);
+    mpfq_copy(u, x, 3);
     j = mpfq_fixmp_3_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 2);
+    mpfq_zero(u+1, 2);
     j = mpfq_fixmp_3_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_3_cmp_ui(u, ~x[0]);
@@ -921,7 +921,7 @@ void test_fixmp_3() {
     j = mpfq_fixmp_3_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 3);
+    mpfq_copy(v, y, 3);
     v[3-1] += !v[3-1];
     mpn_tdiv_qr(s+4, s, 0, z, 6, v, 3);
     mpfq_fixmp_3_mod(u, z, v);
@@ -933,8 +933,8 @@ void test_fixmp_3() {
     mpfq_fixmp_3_invmod(v, v, P);
     assert(mpn_cmp(v, u, 3) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 3);
-    mpn_zero(v, 3);
+    mpfq_zero(u, 3);
+    mpfq_zero(v, 3);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_3_invmod(v, u, P);
     assert(c1 == 0);
@@ -944,9 +944,9 @@ void test_fixmp_3() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 3);
+    mpfq_zero(u, 3);
     memset(u, ~0, 3 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 3);
+    mpfq_copy(v, x, 3);
     /* This creates an n-limb multiple of 257.  */
     v[3] = mpn_lshift(v, x, 3, 8);
     v[3] += mpfq_fixmp_3_add(v, v, x);
@@ -967,7 +967,7 @@ void test_fixmp_3() {
       
       // x[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 3);
+      mpfq_zero(mip, 3);
       mpn_random2(p, 3);
       p[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[3-1] > p[3-1])
@@ -976,7 +976,7 @@ void test_fixmp_3() {
         p[3-1] = y[3-1];
       p[0] |= 1UL;
       p[3-1] += !p[3-1];
-      mpn_zero(w, 2*3);
+      mpfq_zero(w, 2*3);
       w[3]=1;
       mpfq_fixmp_3_mod(w, w, p);
       mpfq_fixmp_3_invmod(invR, w, p);
@@ -984,7 +984,7 @@ void test_fixmp_3() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 3);
+        mpfq_copy(v, mip, 3);
         mpfq_fixmp_3_shortmul(t, mip, p);
 	mpn_add_1(t, t, 3, 1);
 	mpfq_fixmp_3_shortmul(u, t, mip);
@@ -1009,7 +1009,7 @@ void test_fixmp_3() {
        * is simulated. */
       mpfq_fixmp_3_mul(t, xe, ye);
       s[6] = mpn_mul_1(s, t, 6, wx);
-      mpn_zero(t, 2*3+1);
+      mpfq_zero(t, 2*3+1);
       mpfq_fixmp_3_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_3_mod(s, t, p);
       mpfq_fixmp_3_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -1031,7 +1031,7 @@ void test_fixmp_3() {
       mpfq_fixmp_3_redc(s, u, mip, p);
       mpfq_fixmp_3_mul1(w, s, sat);
       mpn_tdiv_qr(s+3, s, 0, w, 3+1, p, 3);
-      mpn_zero(w, 2*3+1);
+      mpfq_zero(w, 2*3+1);
       mpfq_fixmp_3_redc(w, v, mip, p);
       mpn_tdiv_qr(t+3, t, 0, w, 3+1, p, 3);
       assert(mpn_cmp(s, t, 3) == 0);
@@ -1041,7 +1041,7 @@ void test_fixmp_3() {
       mpfq_fixmp_3_redc_ur(s, u, mip, p);
       mpfq_fixmp_3_mul1(w, s, sat);
       mpn_tdiv_qr(s+3, s, 0, w, 3+1, p, 3);
-      mpn_zero(w, 2*3+1);
+      mpfq_zero(w, 2*3+1);
       mpfq_fixmp_3_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+3, t, 0, w, 3+1, p, 3);
       assert(mpn_cmp(s, t, 3) == 0);
@@ -1057,8 +1057,8 @@ void test_fixmp_3() {
     if (j) 
         mpn_lshift(s, x, 3, j);
     else
-        mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_3_lshift(u, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // lshift
@@ -1066,32 +1066,32 @@ void test_fixmp_3() {
     if (j)
         mpn_rshift(s, x, 3, j);
     else
-        mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_3_rshift(u, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // long_lshift
     j = wx % (3 * GMP_LIMB_BITS);
-    mpn_zero(s, 3);
+    mpfq_zero(s, 3);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 3 - k, j);
     else
-        mpn_copyi(s + k, x, 3 - k);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s + k, x, 3 - k);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_3_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // long_rshift
     j = wx % (3 * GMP_LIMB_BITS);
-    mpn_zero(s, 3);
+    mpfq_zero(s, 3);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 3 - k, j);
     else
-        mpn_copyi(s, x + k, 3 - k);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x + k, 3 - k);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_3_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 3) == 0);
 }
@@ -1130,8 +1130,8 @@ void test_fixmp_4() {
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 4);
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c2 = mpfq_fixmp_4_add(v, v, y);
     mpfq_fixmp_4_add_nc(u, u, y);
     assert (c1 == c2);
@@ -1147,8 +1147,8 @@ void test_fixmp_4() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c1 = mpn_add_1(s, x, 4, wx);
     c2 = mpfq_fixmp_4_add_ui(u, u, wx);
     mpfq_fixmp_4_add_ui_nc(v, v, wx);
@@ -1175,8 +1175,8 @@ void test_fixmp_4() {
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 4);
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c2 = mpfq_fixmp_4_sub(v, v, y);
     mpfq_fixmp_4_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -1192,8 +1192,8 @@ void test_fixmp_4() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c1 = mpn_sub_1(s, x, 4, wx);
     c2 = mpfq_fixmp_4_sub_ui(u, u, wx);
     mpfq_fixmp_4_sub_ui_nc(v, v, wx);
@@ -1201,10 +1201,10 @@ void test_fixmp_4() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     // addmul1
-    mpn_copyi(s, z, 5);
-    mpn_copyi(u, z, 5);
-    mpn_copyi(v, z, 5);
-    mpn_copyi(w, z, 5);
+    mpfq_copy(s, z, 5);
+    mpfq_copy(u, z, 5);
+    mpfq_copy(v, z, 5);
+    mpfq_copy(w, z, 5);
     c1 = mpn_addmul_1(s, x, 4, wx);
     s[4] += c1;
     c3 = s[4] < c1;
@@ -1223,8 +1223,8 @@ void test_fixmp_4() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+    mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     c1 = mpn_addmul_1(s, s, 4, wx);
     c2 = mpfq_fixmp_4_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 4) == 0);
@@ -1236,8 +1236,8 @@ void test_fixmp_4() {
     assert (u[5] == 0xdeadbeef);
     assert (mpn_cmp(s,u,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(t, x, 4);
+    mpfq_copy(v, x, 4);
     t[4] = mpn_mul_1(t, t, 4, wx);
     mpfq_fixmp_4_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 4 + 1) == 0);
@@ -1263,10 +1263,10 @@ void test_fixmp_4() {
     j = mpn_cmp(x, y, 4);
     k = mpfq_fixmp_4_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 4);
+    mpfq_copy(u, x, 4);
     j = mpfq_fixmp_4_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 3);
+    mpfq_zero(u+1, 3);
     j = mpfq_fixmp_4_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_4_cmp_ui(u, ~x[0]);
@@ -1275,7 +1275,7 @@ void test_fixmp_4() {
     j = mpfq_fixmp_4_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 4);
+    mpfq_copy(v, y, 4);
     v[4-1] += !v[4-1];
     mpn_tdiv_qr(s+5, s, 0, z, 8, v, 4);
     mpfq_fixmp_4_mod(u, z, v);
@@ -1287,8 +1287,8 @@ void test_fixmp_4() {
     mpfq_fixmp_4_invmod(v, v, P);
     assert(mpn_cmp(v, u, 4) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 4);
-    mpn_zero(v, 4);
+    mpfq_zero(u, 4);
+    mpfq_zero(v, 4);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_4_invmod(v, u, P);
     assert(c1 == 0);
@@ -1298,9 +1298,9 @@ void test_fixmp_4() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 4);
+    mpfq_zero(u, 4);
     memset(u, ~0, 4 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 4);
+    mpfq_copy(v, x, 4);
     /* This creates an n-limb multiple of 257.  */
     v[4] = mpn_lshift(v, x, 4, 8);
     v[4] += mpfq_fixmp_4_add(v, v, x);
@@ -1321,7 +1321,7 @@ void test_fixmp_4() {
       
       // x[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 4);
+      mpfq_zero(mip, 4);
       mpn_random2(p, 4);
       p[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[4-1] > p[4-1])
@@ -1330,7 +1330,7 @@ void test_fixmp_4() {
         p[4-1] = y[4-1];
       p[0] |= 1UL;
       p[4-1] += !p[4-1];
-      mpn_zero(w, 2*4);
+      mpfq_zero(w, 2*4);
       w[4]=1;
       mpfq_fixmp_4_mod(w, w, p);
       mpfq_fixmp_4_invmod(invR, w, p);
@@ -1338,7 +1338,7 @@ void test_fixmp_4() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 4);
+        mpfq_copy(v, mip, 4);
         mpfq_fixmp_4_shortmul(t, mip, p);
 	mpn_add_1(t, t, 4, 1);
 	mpfq_fixmp_4_shortmul(u, t, mip);
@@ -1363,7 +1363,7 @@ void test_fixmp_4() {
        * is simulated. */
       mpfq_fixmp_4_mul(t, xe, ye);
       s[8] = mpn_mul_1(s, t, 8, wx);
-      mpn_zero(t, 2*4+1);
+      mpfq_zero(t, 2*4+1);
       mpfq_fixmp_4_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_4_mod(s, t, p);
       mpfq_fixmp_4_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -1385,7 +1385,7 @@ void test_fixmp_4() {
       mpfq_fixmp_4_redc(s, u, mip, p);
       mpfq_fixmp_4_mul1(w, s, sat);
       mpn_tdiv_qr(s+4, s, 0, w, 4+1, p, 4);
-      mpn_zero(w, 2*4+1);
+      mpfq_zero(w, 2*4+1);
       mpfq_fixmp_4_redc(w, v, mip, p);
       mpn_tdiv_qr(t+4, t, 0, w, 4+1, p, 4);
       assert(mpn_cmp(s, t, 4) == 0);
@@ -1395,7 +1395,7 @@ void test_fixmp_4() {
       mpfq_fixmp_4_redc_ur(s, u, mip, p);
       mpfq_fixmp_4_mul1(w, s, sat);
       mpn_tdiv_qr(s+4, s, 0, w, 4+1, p, 4);
-      mpn_zero(w, 2*4+1);
+      mpfq_zero(w, 2*4+1);
       mpfq_fixmp_4_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+4, t, 0, w, 4+1, p, 4);
       assert(mpn_cmp(s, t, 4) == 0);
@@ -1411,8 +1411,8 @@ void test_fixmp_4() {
     if (j) 
         mpn_lshift(s, x, 4, j);
     else
-        mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_4_lshift(u, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // lshift
@@ -1420,32 +1420,32 @@ void test_fixmp_4() {
     if (j)
         mpn_rshift(s, x, 4, j);
     else
-        mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_4_rshift(u, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // long_lshift
     j = wx % (4 * GMP_LIMB_BITS);
-    mpn_zero(s, 4);
+    mpfq_zero(s, 4);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 4 - k, j);
     else
-        mpn_copyi(s + k, x, 4 - k);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s + k, x, 4 - k);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_4_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // long_rshift
     j = wx % (4 * GMP_LIMB_BITS);
-    mpn_zero(s, 4);
+    mpfq_zero(s, 4);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 4 - k, j);
     else
-        mpn_copyi(s, x + k, 4 - k);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x + k, 4 - k);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_4_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 4) == 0);
 }
@@ -1484,8 +1484,8 @@ void test_fixmp_5() {
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 5);
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c2 = mpfq_fixmp_5_add(v, v, y);
     mpfq_fixmp_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -1501,8 +1501,8 @@ void test_fixmp_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c1 = mpn_add_1(s, x, 5, wx);
     c2 = mpfq_fixmp_5_add_ui(u, u, wx);
     mpfq_fixmp_5_add_ui_nc(v, v, wx);
@@ -1529,8 +1529,8 @@ void test_fixmp_5() {
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 5);
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c2 = mpfq_fixmp_5_sub(v, v, y);
     mpfq_fixmp_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -1546,8 +1546,8 @@ void test_fixmp_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c1 = mpn_sub_1(s, x, 5, wx);
     c2 = mpfq_fixmp_5_sub_ui(u, u, wx);
     mpfq_fixmp_5_sub_ui_nc(v, v, wx);
@@ -1555,10 +1555,10 @@ void test_fixmp_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     // addmul1
-    mpn_copyi(s, z, 6);
-    mpn_copyi(u, z, 6);
-    mpn_copyi(v, z, 6);
-    mpn_copyi(w, z, 6);
+    mpfq_copy(s, z, 6);
+    mpfq_copy(u, z, 6);
+    mpfq_copy(v, z, 6);
+    mpfq_copy(w, z, 6);
     c1 = mpn_addmul_1(s, x, 5, wx);
     s[5] += c1;
     c3 = s[5] < c1;
@@ -1577,8 +1577,8 @@ void test_fixmp_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+    mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     c1 = mpn_addmul_1(s, s, 5, wx);
     c2 = mpfq_fixmp_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 5) == 0);
@@ -1590,8 +1590,8 @@ void test_fixmp_5() {
     assert (u[6] == 0xdeadbeef);
     assert (mpn_cmp(s,u,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(t, x, 5);
+    mpfq_copy(v, x, 5);
     t[5] = mpn_mul_1(t, t, 5, wx);
     mpfq_fixmp_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 5 + 1) == 0);
@@ -1617,10 +1617,10 @@ void test_fixmp_5() {
     j = mpn_cmp(x, y, 5);
     k = mpfq_fixmp_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 5);
+    mpfq_copy(u, x, 5);
     j = mpfq_fixmp_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 4);
+    mpfq_zero(u+1, 4);
     j = mpfq_fixmp_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_5_cmp_ui(u, ~x[0]);
@@ -1629,7 +1629,7 @@ void test_fixmp_5() {
     j = mpfq_fixmp_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 5);
+    mpfq_copy(v, y, 5);
     v[5-1] += !v[5-1];
     mpn_tdiv_qr(s+6, s, 0, z, 10, v, 5);
     mpfq_fixmp_5_mod(u, z, v);
@@ -1641,8 +1641,8 @@ void test_fixmp_5() {
     mpfq_fixmp_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 5) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 5);
-    mpn_zero(v, 5);
+    mpfq_zero(u, 5);
+    mpfq_zero(v, 5);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -1652,9 +1652,9 @@ void test_fixmp_5() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 5);
+    mpfq_zero(u, 5);
     memset(u, ~0, 5 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 5);
+    mpfq_copy(v, x, 5);
     /* This creates an n-limb multiple of 257.  */
     v[5] = mpn_lshift(v, x, 5, 8);
     v[5] += mpfq_fixmp_5_add(v, v, x);
@@ -1675,7 +1675,7 @@ void test_fixmp_5() {
       
       // x[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 5);
+      mpfq_zero(mip, 5);
       mpn_random2(p, 5);
       p[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[5-1] > p[5-1])
@@ -1684,7 +1684,7 @@ void test_fixmp_5() {
         p[5-1] = y[5-1];
       p[0] |= 1UL;
       p[5-1] += !p[5-1];
-      mpn_zero(w, 2*5);
+      mpfq_zero(w, 2*5);
       w[5]=1;
       mpfq_fixmp_5_mod(w, w, p);
       mpfq_fixmp_5_invmod(invR, w, p);
@@ -1692,7 +1692,7 @@ void test_fixmp_5() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 5);
+        mpfq_copy(v, mip, 5);
         mpfq_fixmp_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 5, 1);
 	mpfq_fixmp_5_shortmul(u, t, mip);
@@ -1717,7 +1717,7 @@ void test_fixmp_5() {
        * is simulated. */
       mpfq_fixmp_5_mul(t, xe, ye);
       s[10] = mpn_mul_1(s, t, 10, wx);
-      mpn_zero(t, 2*5+1);
+      mpfq_zero(t, 2*5+1);
       mpfq_fixmp_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_5_mod(s, t, p);
       mpfq_fixmp_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -1739,7 +1739,7 @@ void test_fixmp_5() {
       mpfq_fixmp_5_redc(s, u, mip, p);
       mpfq_fixmp_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+5, s, 0, w, 5+1, p, 5);
-      mpn_zero(w, 2*5+1);
+      mpfq_zero(w, 2*5+1);
       mpfq_fixmp_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+5, t, 0, w, 5+1, p, 5);
       assert(mpn_cmp(s, t, 5) == 0);
@@ -1749,7 +1749,7 @@ void test_fixmp_5() {
       mpfq_fixmp_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+5, s, 0, w, 5+1, p, 5);
-      mpn_zero(w, 2*5+1);
+      mpfq_zero(w, 2*5+1);
       mpfq_fixmp_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+5, t, 0, w, 5+1, p, 5);
       assert(mpn_cmp(s, t, 5) == 0);
@@ -1765,8 +1765,8 @@ void test_fixmp_5() {
     if (j) 
         mpn_lshift(s, x, 5, j);
     else
-        mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_5_lshift(u, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // lshift
@@ -1774,32 +1774,32 @@ void test_fixmp_5() {
     if (j)
         mpn_rshift(s, x, 5, j);
     else
-        mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_5_rshift(u, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // long_lshift
     j = wx % (5 * GMP_LIMB_BITS);
-    mpn_zero(s, 5);
+    mpfq_zero(s, 5);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 5 - k, j);
     else
-        mpn_copyi(s + k, x, 5 - k);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s + k, x, 5 - k);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // long_rshift
     j = wx % (5 * GMP_LIMB_BITS);
-    mpn_zero(s, 5);
+    mpfq_zero(s, 5);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 5 - k, j);
     else
-        mpn_copyi(s, x + k, 5 - k);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x + k, 5 - k);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 5) == 0);
 }
@@ -1838,8 +1838,8 @@ void test_fixmp_6() {
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 6);
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c2 = mpfq_fixmp_6_add(v, v, y);
     mpfq_fixmp_6_add_nc(u, u, y);
     assert (c1 == c2);
@@ -1855,8 +1855,8 @@ void test_fixmp_6() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c1 = mpn_add_1(s, x, 6, wx);
     c2 = mpfq_fixmp_6_add_ui(u, u, wx);
     mpfq_fixmp_6_add_ui_nc(v, v, wx);
@@ -1883,8 +1883,8 @@ void test_fixmp_6() {
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 6);
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c2 = mpfq_fixmp_6_sub(v, v, y);
     mpfq_fixmp_6_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -1900,8 +1900,8 @@ void test_fixmp_6() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c1 = mpn_sub_1(s, x, 6, wx);
     c2 = mpfq_fixmp_6_sub_ui(u, u, wx);
     mpfq_fixmp_6_sub_ui_nc(v, v, wx);
@@ -1909,10 +1909,10 @@ void test_fixmp_6() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     // addmul1
-    mpn_copyi(s, z, 7);
-    mpn_copyi(u, z, 7);
-    mpn_copyi(v, z, 7);
-    mpn_copyi(w, z, 7);
+    mpfq_copy(s, z, 7);
+    mpfq_copy(u, z, 7);
+    mpfq_copy(v, z, 7);
+    mpfq_copy(w, z, 7);
     c1 = mpn_addmul_1(s, x, 6, wx);
     s[6] += c1;
     c3 = s[6] < c1;
@@ -1931,8 +1931,8 @@ void test_fixmp_6() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+    mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     c1 = mpn_addmul_1(s, s, 6, wx);
     c2 = mpfq_fixmp_6_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 6) == 0);
@@ -1944,8 +1944,8 @@ void test_fixmp_6() {
     assert (u[7] == 0xdeadbeef);
     assert (mpn_cmp(s,u,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(t, x, 6);
+    mpfq_copy(v, x, 6);
     t[6] = mpn_mul_1(t, t, 6, wx);
     mpfq_fixmp_6_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 6 + 1) == 0);
@@ -1971,10 +1971,10 @@ void test_fixmp_6() {
     j = mpn_cmp(x, y, 6);
     k = mpfq_fixmp_6_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 6);
+    mpfq_copy(u, x, 6);
     j = mpfq_fixmp_6_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 5);
+    mpfq_zero(u+1, 5);
     j = mpfq_fixmp_6_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_6_cmp_ui(u, ~x[0]);
@@ -1983,7 +1983,7 @@ void test_fixmp_6() {
     j = mpfq_fixmp_6_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 6);
+    mpfq_copy(v, y, 6);
     v[6-1] += !v[6-1];
     mpn_tdiv_qr(s+7, s, 0, z, 12, v, 6);
     mpfq_fixmp_6_mod(u, z, v);
@@ -1995,8 +1995,8 @@ void test_fixmp_6() {
     mpfq_fixmp_6_invmod(v, v, P);
     assert(mpn_cmp(v, u, 6) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 6);
-    mpn_zero(v, 6);
+    mpfq_zero(u, 6);
+    mpfq_zero(v, 6);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_6_invmod(v, u, P);
     assert(c1 == 0);
@@ -2006,9 +2006,9 @@ void test_fixmp_6() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 6);
+    mpfq_zero(u, 6);
     memset(u, ~0, 6 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 6);
+    mpfq_copy(v, x, 6);
     /* This creates an n-limb multiple of 257.  */
     v[6] = mpn_lshift(v, x, 6, 8);
     v[6] += mpfq_fixmp_6_add(v, v, x);
@@ -2029,7 +2029,7 @@ void test_fixmp_6() {
       
       // x[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 6);
+      mpfq_zero(mip, 6);
       mpn_random2(p, 6);
       p[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[6-1] > p[6-1])
@@ -2038,7 +2038,7 @@ void test_fixmp_6() {
         p[6-1] = y[6-1];
       p[0] |= 1UL;
       p[6-1] += !p[6-1];
-      mpn_zero(w, 2*6);
+      mpfq_zero(w, 2*6);
       w[6]=1;
       mpfq_fixmp_6_mod(w, w, p);
       mpfq_fixmp_6_invmod(invR, w, p);
@@ -2046,7 +2046,7 @@ void test_fixmp_6() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 6);
+        mpfq_copy(v, mip, 6);
         mpfq_fixmp_6_shortmul(t, mip, p);
 	mpn_add_1(t, t, 6, 1);
 	mpfq_fixmp_6_shortmul(u, t, mip);
@@ -2071,7 +2071,7 @@ void test_fixmp_6() {
        * is simulated. */
       mpfq_fixmp_6_mul(t, xe, ye);
       s[12] = mpn_mul_1(s, t, 12, wx);
-      mpn_zero(t, 2*6+1);
+      mpfq_zero(t, 2*6+1);
       mpfq_fixmp_6_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_6_mod(s, t, p);
       mpfq_fixmp_6_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -2093,7 +2093,7 @@ void test_fixmp_6() {
       mpfq_fixmp_6_redc(s, u, mip, p);
       mpfq_fixmp_6_mul1(w, s, sat);
       mpn_tdiv_qr(s+6, s, 0, w, 6+1, p, 6);
-      mpn_zero(w, 2*6+1);
+      mpfq_zero(w, 2*6+1);
       mpfq_fixmp_6_redc(w, v, mip, p);
       mpn_tdiv_qr(t+6, t, 0, w, 6+1, p, 6);
       assert(mpn_cmp(s, t, 6) == 0);
@@ -2103,7 +2103,7 @@ void test_fixmp_6() {
       mpfq_fixmp_6_redc_ur(s, u, mip, p);
       mpfq_fixmp_6_mul1(w, s, sat);
       mpn_tdiv_qr(s+6, s, 0, w, 6+1, p, 6);
-      mpn_zero(w, 2*6+1);
+      mpfq_zero(w, 2*6+1);
       mpfq_fixmp_6_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+6, t, 0, w, 6+1, p, 6);
       assert(mpn_cmp(s, t, 6) == 0);
@@ -2119,8 +2119,8 @@ void test_fixmp_6() {
     if (j) 
         mpn_lshift(s, x, 6, j);
     else
-        mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_6_lshift(u, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // lshift
@@ -2128,32 +2128,32 @@ void test_fixmp_6() {
     if (j)
         mpn_rshift(s, x, 6, j);
     else
-        mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_6_rshift(u, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // long_lshift
     j = wx % (6 * GMP_LIMB_BITS);
-    mpn_zero(s, 6);
+    mpfq_zero(s, 6);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 6 - k, j);
     else
-        mpn_copyi(s + k, x, 6 - k);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s + k, x, 6 - k);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_6_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // long_rshift
     j = wx % (6 * GMP_LIMB_BITS);
-    mpn_zero(s, 6);
+    mpfq_zero(s, 6);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 6 - k, j);
     else
-        mpn_copyi(s, x + k, 6 - k);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x + k, 6 - k);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_6_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 6) == 0);
 }
@@ -2192,8 +2192,8 @@ void test_fixmp_7() {
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 7);
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c2 = mpfq_fixmp_7_add(v, v, y);
     mpfq_fixmp_7_add_nc(u, u, y);
     assert (c1 == c2);
@@ -2209,8 +2209,8 @@ void test_fixmp_7() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c1 = mpn_add_1(s, x, 7, wx);
     c2 = mpfq_fixmp_7_add_ui(u, u, wx);
     mpfq_fixmp_7_add_ui_nc(v, v, wx);
@@ -2237,8 +2237,8 @@ void test_fixmp_7() {
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 7);
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c2 = mpfq_fixmp_7_sub(v, v, y);
     mpfq_fixmp_7_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -2254,8 +2254,8 @@ void test_fixmp_7() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c1 = mpn_sub_1(s, x, 7, wx);
     c2 = mpfq_fixmp_7_sub_ui(u, u, wx);
     mpfq_fixmp_7_sub_ui_nc(v, v, wx);
@@ -2263,10 +2263,10 @@ void test_fixmp_7() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     // addmul1
-    mpn_copyi(s, z, 8);
-    mpn_copyi(u, z, 8);
-    mpn_copyi(v, z, 8);
-    mpn_copyi(w, z, 8);
+    mpfq_copy(s, z, 8);
+    mpfq_copy(u, z, 8);
+    mpfq_copy(v, z, 8);
+    mpfq_copy(w, z, 8);
     c1 = mpn_addmul_1(s, x, 7, wx);
     s[7] += c1;
     c3 = s[7] < c1;
@@ -2285,8 +2285,8 @@ void test_fixmp_7() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+    mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     c1 = mpn_addmul_1(s, s, 7, wx);
     c2 = mpfq_fixmp_7_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 7) == 0);
@@ -2298,8 +2298,8 @@ void test_fixmp_7() {
     assert (u[8] == 0xdeadbeef);
     assert (mpn_cmp(s,u,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(t, x, 7);
+    mpfq_copy(v, x, 7);
     t[7] = mpn_mul_1(t, t, 7, wx);
     mpfq_fixmp_7_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 7 + 1) == 0);
@@ -2325,10 +2325,10 @@ void test_fixmp_7() {
     j = mpn_cmp(x, y, 7);
     k = mpfq_fixmp_7_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 7);
+    mpfq_copy(u, x, 7);
     j = mpfq_fixmp_7_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 6);
+    mpfq_zero(u+1, 6);
     j = mpfq_fixmp_7_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_7_cmp_ui(u, ~x[0]);
@@ -2337,7 +2337,7 @@ void test_fixmp_7() {
     j = mpfq_fixmp_7_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 7);
+    mpfq_copy(v, y, 7);
     v[7-1] += !v[7-1];
     mpn_tdiv_qr(s+8, s, 0, z, 14, v, 7);
     mpfq_fixmp_7_mod(u, z, v);
@@ -2349,8 +2349,8 @@ void test_fixmp_7() {
     mpfq_fixmp_7_invmod(v, v, P);
     assert(mpn_cmp(v, u, 7) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 7);
-    mpn_zero(v, 7);
+    mpfq_zero(u, 7);
+    mpfq_zero(v, 7);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_7_invmod(v, u, P);
     assert(c1 == 0);
@@ -2360,9 +2360,9 @@ void test_fixmp_7() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 7);
+    mpfq_zero(u, 7);
     memset(u, ~0, 7 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 7);
+    mpfq_copy(v, x, 7);
     /* This creates an n-limb multiple of 257.  */
     v[7] = mpn_lshift(v, x, 7, 8);
     v[7] += mpfq_fixmp_7_add(v, v, x);
@@ -2383,7 +2383,7 @@ void test_fixmp_7() {
       
       // x[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 7);
+      mpfq_zero(mip, 7);
       mpn_random2(p, 7);
       p[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[7-1] > p[7-1])
@@ -2392,7 +2392,7 @@ void test_fixmp_7() {
         p[7-1] = y[7-1];
       p[0] |= 1UL;
       p[7-1] += !p[7-1];
-      mpn_zero(w, 2*7);
+      mpfq_zero(w, 2*7);
       w[7]=1;
       mpfq_fixmp_7_mod(w, w, p);
       mpfq_fixmp_7_invmod(invR, w, p);
@@ -2400,7 +2400,7 @@ void test_fixmp_7() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 7);
+        mpfq_copy(v, mip, 7);
         mpfq_fixmp_7_shortmul(t, mip, p);
 	mpn_add_1(t, t, 7, 1);
 	mpfq_fixmp_7_shortmul(u, t, mip);
@@ -2425,7 +2425,7 @@ void test_fixmp_7() {
        * is simulated. */
       mpfq_fixmp_7_mul(t, xe, ye);
       s[14] = mpn_mul_1(s, t, 14, wx);
-      mpn_zero(t, 2*7+1);
+      mpfq_zero(t, 2*7+1);
       mpfq_fixmp_7_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_7_mod(s, t, p);
       mpfq_fixmp_7_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -2447,7 +2447,7 @@ void test_fixmp_7() {
       mpfq_fixmp_7_redc(s, u, mip, p);
       mpfq_fixmp_7_mul1(w, s, sat);
       mpn_tdiv_qr(s+7, s, 0, w, 7+1, p, 7);
-      mpn_zero(w, 2*7+1);
+      mpfq_zero(w, 2*7+1);
       mpfq_fixmp_7_redc(w, v, mip, p);
       mpn_tdiv_qr(t+7, t, 0, w, 7+1, p, 7);
       assert(mpn_cmp(s, t, 7) == 0);
@@ -2457,7 +2457,7 @@ void test_fixmp_7() {
       mpfq_fixmp_7_redc_ur(s, u, mip, p);
       mpfq_fixmp_7_mul1(w, s, sat);
       mpn_tdiv_qr(s+7, s, 0, w, 7+1, p, 7);
-      mpn_zero(w, 2*7+1);
+      mpfq_zero(w, 2*7+1);
       mpfq_fixmp_7_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+7, t, 0, w, 7+1, p, 7);
       assert(mpn_cmp(s, t, 7) == 0);
@@ -2473,8 +2473,8 @@ void test_fixmp_7() {
     if (j) 
         mpn_lshift(s, x, 7, j);
     else
-        mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_7_lshift(u, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // lshift
@@ -2482,32 +2482,32 @@ void test_fixmp_7() {
     if (j)
         mpn_rshift(s, x, 7, j);
     else
-        mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_7_rshift(u, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // long_lshift
     j = wx % (7 * GMP_LIMB_BITS);
-    mpn_zero(s, 7);
+    mpfq_zero(s, 7);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 7 - k, j);
     else
-        mpn_copyi(s + k, x, 7 - k);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s + k, x, 7 - k);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_7_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // long_rshift
     j = wx % (7 * GMP_LIMB_BITS);
-    mpn_zero(s, 7);
+    mpfq_zero(s, 7);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 7 - k, j);
     else
-        mpn_copyi(s, x + k, 7 - k);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x + k, 7 - k);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_7_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 7) == 0);
 }
@@ -2546,8 +2546,8 @@ void test_fixmp_8() {
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 8);
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c2 = mpfq_fixmp_8_add(v, v, y);
     mpfq_fixmp_8_add_nc(u, u, y);
     assert (c1 == c2);
@@ -2563,8 +2563,8 @@ void test_fixmp_8() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c1 = mpn_add_1(s, x, 8, wx);
     c2 = mpfq_fixmp_8_add_ui(u, u, wx);
     mpfq_fixmp_8_add_ui_nc(v, v, wx);
@@ -2591,8 +2591,8 @@ void test_fixmp_8() {
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 8);
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c2 = mpfq_fixmp_8_sub(v, v, y);
     mpfq_fixmp_8_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -2608,8 +2608,8 @@ void test_fixmp_8() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c1 = mpn_sub_1(s, x, 8, wx);
     c2 = mpfq_fixmp_8_sub_ui(u, u, wx);
     mpfq_fixmp_8_sub_ui_nc(v, v, wx);
@@ -2617,10 +2617,10 @@ void test_fixmp_8() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     // addmul1
-    mpn_copyi(s, z, 9);
-    mpn_copyi(u, z, 9);
-    mpn_copyi(v, z, 9);
-    mpn_copyi(w, z, 9);
+    mpfq_copy(s, z, 9);
+    mpfq_copy(u, z, 9);
+    mpfq_copy(v, z, 9);
+    mpfq_copy(w, z, 9);
     c1 = mpn_addmul_1(s, x, 8, wx);
     s[8] += c1;
     c3 = s[8] < c1;
@@ -2639,8 +2639,8 @@ void test_fixmp_8() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+    mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     c1 = mpn_addmul_1(s, s, 8, wx);
     c2 = mpfq_fixmp_8_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 8) == 0);
@@ -2652,8 +2652,8 @@ void test_fixmp_8() {
     assert (u[9] == 0xdeadbeef);
     assert (mpn_cmp(s,u,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(t, x, 8);
+    mpfq_copy(v, x, 8);
     t[8] = mpn_mul_1(t, t, 8, wx);
     mpfq_fixmp_8_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 8 + 1) == 0);
@@ -2679,10 +2679,10 @@ void test_fixmp_8() {
     j = mpn_cmp(x, y, 8);
     k = mpfq_fixmp_8_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 8);
+    mpfq_copy(u, x, 8);
     j = mpfq_fixmp_8_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 7);
+    mpfq_zero(u+1, 7);
     j = mpfq_fixmp_8_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_8_cmp_ui(u, ~x[0]);
@@ -2691,7 +2691,7 @@ void test_fixmp_8() {
     j = mpfq_fixmp_8_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 8);
+    mpfq_copy(v, y, 8);
     v[8-1] += !v[8-1];
     mpn_tdiv_qr(s+9, s, 0, z, 16, v, 8);
     mpfq_fixmp_8_mod(u, z, v);
@@ -2703,8 +2703,8 @@ void test_fixmp_8() {
     mpfq_fixmp_8_invmod(v, v, P);
     assert(mpn_cmp(v, u, 8) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 8);
-    mpn_zero(v, 8);
+    mpfq_zero(u, 8);
+    mpfq_zero(v, 8);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_8_invmod(v, u, P);
     assert(c1 == 0);
@@ -2714,9 +2714,9 @@ void test_fixmp_8() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 8);
+    mpfq_zero(u, 8);
     memset(u, ~0, 8 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 8);
+    mpfq_copy(v, x, 8);
     /* This creates an n-limb multiple of 257.  */
     v[8] = mpn_lshift(v, x, 8, 8);
     v[8] += mpfq_fixmp_8_add(v, v, x);
@@ -2737,7 +2737,7 @@ void test_fixmp_8() {
       
       // x[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 8);
+      mpfq_zero(mip, 8);
       mpn_random2(p, 8);
       p[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[8-1] > p[8-1])
@@ -2746,7 +2746,7 @@ void test_fixmp_8() {
         p[8-1] = y[8-1];
       p[0] |= 1UL;
       p[8-1] += !p[8-1];
-      mpn_zero(w, 2*8);
+      mpfq_zero(w, 2*8);
       w[8]=1;
       mpfq_fixmp_8_mod(w, w, p);
       mpfq_fixmp_8_invmod(invR, w, p);
@@ -2754,7 +2754,7 @@ void test_fixmp_8() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 8);
+        mpfq_copy(v, mip, 8);
         mpfq_fixmp_8_shortmul(t, mip, p);
 	mpn_add_1(t, t, 8, 1);
 	mpfq_fixmp_8_shortmul(u, t, mip);
@@ -2779,7 +2779,7 @@ void test_fixmp_8() {
        * is simulated. */
       mpfq_fixmp_8_mul(t, xe, ye);
       s[16] = mpn_mul_1(s, t, 16, wx);
-      mpn_zero(t, 2*8+1);
+      mpfq_zero(t, 2*8+1);
       mpfq_fixmp_8_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_8_mod(s, t, p);
       mpfq_fixmp_8_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -2801,7 +2801,7 @@ void test_fixmp_8() {
       mpfq_fixmp_8_redc(s, u, mip, p);
       mpfq_fixmp_8_mul1(w, s, sat);
       mpn_tdiv_qr(s+8, s, 0, w, 8+1, p, 8);
-      mpn_zero(w, 2*8+1);
+      mpfq_zero(w, 2*8+1);
       mpfq_fixmp_8_redc(w, v, mip, p);
       mpn_tdiv_qr(t+8, t, 0, w, 8+1, p, 8);
       assert(mpn_cmp(s, t, 8) == 0);
@@ -2811,7 +2811,7 @@ void test_fixmp_8() {
       mpfq_fixmp_8_redc_ur(s, u, mip, p);
       mpfq_fixmp_8_mul1(w, s, sat);
       mpn_tdiv_qr(s+8, s, 0, w, 8+1, p, 8);
-      mpn_zero(w, 2*8+1);
+      mpfq_zero(w, 2*8+1);
       mpfq_fixmp_8_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+8, t, 0, w, 8+1, p, 8);
       assert(mpn_cmp(s, t, 8) == 0);
@@ -2827,8 +2827,8 @@ void test_fixmp_8() {
     if (j) 
         mpn_lshift(s, x, 8, j);
     else
-        mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_8_lshift(u, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // lshift
@@ -2836,32 +2836,32 @@ void test_fixmp_8() {
     if (j)
         mpn_rshift(s, x, 8, j);
     else
-        mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_8_rshift(u, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // long_lshift
     j = wx % (8 * GMP_LIMB_BITS);
-    mpn_zero(s, 8);
+    mpfq_zero(s, 8);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 8 - k, j);
     else
-        mpn_copyi(s + k, x, 8 - k);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s + k, x, 8 - k);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_8_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // long_rshift
     j = wx % (8 * GMP_LIMB_BITS);
-    mpn_zero(s, 8);
+    mpfq_zero(s, 8);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 8 - k, j);
     else
-        mpn_copyi(s, x + k, 8 - k);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x + k, 8 - k);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_8_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 8) == 0);
 }
@@ -2900,8 +2900,8 @@ void test_fixmp_9() {
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 9);
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c2 = mpfq_fixmp_9_add(v, v, y);
     mpfq_fixmp_9_add_nc(u, u, y);
     assert (c1 == c2);
@@ -2917,8 +2917,8 @@ void test_fixmp_9() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c1 = mpn_add_1(s, x, 9, wx);
     c2 = mpfq_fixmp_9_add_ui(u, u, wx);
     mpfq_fixmp_9_add_ui_nc(v, v, wx);
@@ -2945,8 +2945,8 @@ void test_fixmp_9() {
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 9);
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c2 = mpfq_fixmp_9_sub(v, v, y);
     mpfq_fixmp_9_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -2962,8 +2962,8 @@ void test_fixmp_9() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c1 = mpn_sub_1(s, x, 9, wx);
     c2 = mpfq_fixmp_9_sub_ui(u, u, wx);
     mpfq_fixmp_9_sub_ui_nc(v, v, wx);
@@ -2971,10 +2971,10 @@ void test_fixmp_9() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     // addmul1
-    mpn_copyi(s, z, 10);
-    mpn_copyi(u, z, 10);
-    mpn_copyi(v, z, 10);
-    mpn_copyi(w, z, 10);
+    mpfq_copy(s, z, 10);
+    mpfq_copy(u, z, 10);
+    mpfq_copy(v, z, 10);
+    mpfq_copy(w, z, 10);
     c1 = mpn_addmul_1(s, x, 9, wx);
     s[9] += c1;
     c3 = s[9] < c1;
@@ -2993,8 +2993,8 @@ void test_fixmp_9() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+    mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     c1 = mpn_addmul_1(s, s, 9, wx);
     c2 = mpfq_fixmp_9_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 9) == 0);
@@ -3006,8 +3006,8 @@ void test_fixmp_9() {
     assert (u[10] == 0xdeadbeef);
     assert (mpn_cmp(s,u,10) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(t, x, 9);
+    mpfq_copy(v, x, 9);
     t[9] = mpn_mul_1(t, t, 9, wx);
     mpfq_fixmp_9_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 9 + 1) == 0);
@@ -3033,10 +3033,10 @@ void test_fixmp_9() {
     j = mpn_cmp(x, y, 9);
     k = mpfq_fixmp_9_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 9);
+    mpfq_copy(u, x, 9);
     j = mpfq_fixmp_9_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 8);
+    mpfq_zero(u+1, 8);
     j = mpfq_fixmp_9_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_9_cmp_ui(u, ~x[0]);
@@ -3045,7 +3045,7 @@ void test_fixmp_9() {
     j = mpfq_fixmp_9_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 9);
+    mpfq_copy(v, y, 9);
     v[9-1] += !v[9-1];
     mpn_tdiv_qr(s+10, s, 0, z, 18, v, 9);
     mpfq_fixmp_9_mod(u, z, v);
@@ -3057,8 +3057,8 @@ void test_fixmp_9() {
     mpfq_fixmp_9_invmod(v, v, P);
     assert(mpn_cmp(v, u, 9) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 9);
-    mpn_zero(v, 9);
+    mpfq_zero(u, 9);
+    mpfq_zero(v, 9);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_9_invmod(v, u, P);
     assert(c1 == 0);
@@ -3068,9 +3068,9 @@ void test_fixmp_9() {
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 9);
+    mpfq_zero(u, 9);
     memset(u, ~0, 9 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 9);
+    mpfq_copy(v, x, 9);
     /* This creates an n-limb multiple of 257.  */
     v[9] = mpn_lshift(v, x, 9, 8);
     v[9] += mpfq_fixmp_9_add(v, v, x);
@@ -3091,7 +3091,7 @@ void test_fixmp_9() {
       
       // x[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 9);
+      mpfq_zero(mip, 9);
       mpn_random2(p, 9);
       p[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[9-1] > p[9-1])
@@ -3100,7 +3100,7 @@ void test_fixmp_9() {
         p[9-1] = y[9-1];
       p[0] |= 1UL;
       p[9-1] += !p[9-1];
-      mpn_zero(w, 2*9);
+      mpfq_zero(w, 2*9);
       w[9]=1;
       mpfq_fixmp_9_mod(w, w, p);
       mpfq_fixmp_9_invmod(invR, w, p);
@@ -3108,7 +3108,7 @@ void test_fixmp_9() {
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 9);
+        mpfq_copy(v, mip, 9);
         mpfq_fixmp_9_shortmul(t, mip, p);
 	mpn_add_1(t, t, 9, 1);
 	mpfq_fixmp_9_shortmul(u, t, mip);
@@ -3133,7 +3133,7 @@ void test_fixmp_9() {
        * is simulated. */
       mpfq_fixmp_9_mul(t, xe, ye);
       s[18] = mpn_mul_1(s, t, 18, wx);
-      mpn_zero(t, 2*9+1);
+      mpfq_zero(t, 2*9+1);
       mpfq_fixmp_9_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_9_mod(s, t, p);
       mpfq_fixmp_9_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -3155,7 +3155,7 @@ void test_fixmp_9() {
       mpfq_fixmp_9_redc(s, u, mip, p);
       mpfq_fixmp_9_mul1(w, s, sat);
       mpn_tdiv_qr(s+9, s, 0, w, 9+1, p, 9);
-      mpn_zero(w, 2*9+1);
+      mpfq_zero(w, 2*9+1);
       mpfq_fixmp_9_redc(w, v, mip, p);
       mpn_tdiv_qr(t+9, t, 0, w, 9+1, p, 9);
       assert(mpn_cmp(s, t, 9) == 0);
@@ -3165,7 +3165,7 @@ void test_fixmp_9() {
       mpfq_fixmp_9_redc_ur(s, u, mip, p);
       mpfq_fixmp_9_mul1(w, s, sat);
       mpn_tdiv_qr(s+9, s, 0, w, 9+1, p, 9);
-      mpn_zero(w, 2*9+1);
+      mpfq_zero(w, 2*9+1);
       mpfq_fixmp_9_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+9, t, 0, w, 9+1, p, 9);
       assert(mpn_cmp(s, t, 9) == 0);
@@ -3181,8 +3181,8 @@ void test_fixmp_9() {
     if (j) 
         mpn_lshift(s, x, 9, j);
     else
-        mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_9_lshift(u, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // lshift
@@ -3190,32 +3190,32 @@ void test_fixmp_9() {
     if (j)
         mpn_rshift(s, x, 9, j);
     else
-        mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_9_rshift(u, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // long_lshift
     j = wx % (9 * GMP_LIMB_BITS);
-    mpn_zero(s, 9);
+    mpfq_zero(s, 9);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 9 - k, j);
     else
-        mpn_copyi(s + k, x, 9 - k);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s + k, x, 9 - k);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_9_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // long_rshift
     j = wx % (9 * GMP_LIMB_BITS);
-    mpn_zero(s, 9);
+    mpfq_zero(s, 9);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 9 - k, j);
     else
-        mpn_copyi(s, x + k, 9 - k);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x + k, 9 - k);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_9_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 9) == 0);
 }
@@ -3254,8 +3254,8 @@ void test_fixmp_0_5() {
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 1);
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c2 = mpfq_fixmp_0_5_add(v, v, y);
     mpfq_fixmp_0_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -3271,8 +3271,8 @@ void test_fixmp_0_5() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c1 = mpn_add_1(s, x, 1, wx);
     c2 = mpfq_fixmp_0_5_add_ui(u, u, wx);
     mpfq_fixmp_0_5_add_ui_nc(v, v, wx);
@@ -3299,8 +3299,8 @@ void test_fixmp_0_5() {
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 1);
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c2 = mpfq_fixmp_0_5_sub(v, v, y);
     mpfq_fixmp_0_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -3316,8 +3316,8 @@ void test_fixmp_0_5() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(u, x, 1);
+    mpfq_copy(v, x, 1);
     c1 = mpn_sub_1(s, x, 1, wx);
     c2 = mpfq_fixmp_0_5_sub_ui(u, u, wx);
     mpfq_fixmp_0_5_sub_ui_nc(v, v, wx);
@@ -3325,10 +3325,10 @@ void test_fixmp_0_5() {
     assert (mpn_cmp(s,u,1) == 0);
     assert (mpn_cmp(s,v,1) == 0);
     // addmul1
-    mpn_copyi(s, z, 2);
-    mpn_copyi(u, z, 2);
-    mpn_copyi(v, z, 2);
-    mpn_copyi(w, z, 2);
+    mpfq_copy(s, z, 2);
+    mpfq_copy(u, z, 2);
+    mpfq_copy(v, z, 2);
+    mpfq_copy(w, z, 2);
     c1 = mpn_addmul_1(s, x, 1, wx);
     s[1] += c1;
     c3 = s[1] < c1;
@@ -3347,16 +3347,16 @@ void test_fixmp_0_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+    mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     c1 = mpn_addmul_1(s, s, 1, wx);
     c2 = mpfq_fixmp_0_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 1) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 1);
-        mpn_copyi(u, z, 1);
-        mpn_copyi(w, z, 1);
+        mpfq_copy(s, z, 1);
+        mpfq_copy(u, z, 1);
+        mpfq_copy(w, z, 1);
         c1 = mpn_addmul_1(s, x, 1, y[0]);
         u[1]=0xdeadbeef;
         w[1]=0xdeadbeef;
@@ -3368,8 +3368,8 @@ void test_fixmp_0_5() {
         assert (mpn_cmp(s, w, 1) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 1);
-        mpn_copyi(u, x, 1);
+        mpfq_copy(s, x, 1);
+        mpfq_copy(u, x, 1);
         c1 = mpn_addmul_1(s, s, 1, y[0]);
         c2 = mpfq_fixmp_0_5_addmul05(u, u, y[0]);
         assert (mpn_cmp(s, u, 1) == 0);
@@ -3381,8 +3381,8 @@ void test_fixmp_0_5() {
     assert (u[2] == 0xdeadbeef);
     assert (mpn_cmp(s,u,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 1);
-    mpn_copyi(v, x, 1);
+    mpfq_copy(t, x, 1);
+    mpfq_copy(v, x, 1);
     t[1] = mpn_mul_1(t, t, 1, wx);
     mpfq_fixmp_0_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 1 + 1) == 0);
@@ -3394,8 +3394,8 @@ void test_fixmp_0_5() {
         assert (mpn_cmp(s,u,1) == 0);
         assert (s[1] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 1);
-        mpn_copyi(v, x, 1);
+        mpfq_copy(t, x, 1);
+        mpfq_copy(v, x, 1);
         t[1] = mpn_mul_1(t, t, 1, y[0]);
         mpfq_fixmp_0_5_mul05(v, v, y[0]);
         assert (mpn_cmp(t, v, 1) == 0);
@@ -3423,16 +3423,16 @@ assert (s[1] == 0);
     j = mpn_cmp(x, y, 1);
     k = mpfq_fixmp_0_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 1);
+    mpfq_copy(u, x, 1);
     j = mpfq_fixmp_0_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 0);
+    mpfq_zero(u+1, 0);
     j = mpfq_fixmp_0_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_0_5_cmp_ui(u, ~x[0]);
     assert (j!=0);
     // mod
-    mpn_copyi(v, y, 1);
+    mpfq_copy(v, y, 1);
     v[1-1] += !v[1-1];
     mpn_tdiv_qr(s+2, s, 0, z, 1, v, 1);
     mpfq_fixmp_0_5_mod(u, z, v);
@@ -3444,8 +3444,8 @@ assert (s[1] == 0);
     mpfq_fixmp_0_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 1) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 1);
-    mpn_zero(v, 1);
+    mpfq_zero(u, 1);
+    mpfq_zero(v, 1);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_0_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -3455,9 +3455,9 @@ assert (s[1] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 1);
+    mpfq_zero(u, 1);
     memset(u, ~0, 1 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 1);
+    mpfq_copy(v, x, 1);
     /* This creates an n-limb multiple of 257.  */
     v[1] = mpn_lshift(v, x, 1, 8);
     v[1] += mpfq_fixmp_0_5_add(v, v, x);
@@ -3478,7 +3478,7 @@ assert (s[1] == 0);
       
       // x[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 1);
+      mpfq_zero(mip, 1);
       mpn_random2(p, 1);
       p[1-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[1-1] > p[1-1])
@@ -3488,7 +3488,7 @@ assert (s[1] == 0);
       p[0] |= 1UL;
 p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[1-1] += !p[1-1];
-        mpn_zero(w, 2*1);
+        mpfq_zero(w, 2*1);
         w[0] = 1UL << (GMP_LIMB_BITS>>1);
         mpfq_fixmp_0_5_mod(w, w, p);
         mpfq_fixmp_0_5_mul(v, w, w);
@@ -3498,7 +3498,7 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 1);
+        mpfq_copy(v, mip, 1);
         mpfq_fixmp_0_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 1, 1);
 	mpfq_fixmp_0_5_shortmul(u, t, mip);
@@ -3523,7 +3523,7 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_0_5_mul(t, xe, ye);
       s[1] = mpn_mul_1(s, t, 1, wx);
-      mpn_zero(t, 2*1+1);
+      mpfq_zero(t, 2*1+1);
       mpfq_fixmp_0_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_0_5_mod(s, t, p);
       mpfq_fixmp_0_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -3545,7 +3545,7 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_0_5_redc(s, u, mip, p);
       mpfq_fixmp_0_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+1, s, 0, w, 1+1, p, 1);
-      mpn_zero(w, 2*1+1);
+      mpfq_zero(w, 2*1+1);
       mpfq_fixmp_0_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+1, t, 0, w, 1+1, p, 1);
       assert(mpn_cmp(s, t, 1) == 0);
@@ -3555,7 +3555,7 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_0_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_0_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+1, s, 0, w, 1+1, p, 1);
-      mpn_zero(w, 2*1+1);
+      mpfq_zero(w, 2*1+1);
       mpfq_fixmp_0_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+1, t, 0, w, 1+1, p, 1);
       assert(mpn_cmp(s, t, 1) == 0);
@@ -3571,8 +3571,8 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 1, j);
     else
-        mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_0_5_lshift(u, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // lshift
@@ -3580,32 +3580,32 @@ p[1-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 1, j);
     else
-        mpn_copyi(s, x, 1);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x, 1);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_0_5_rshift(u, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // long_lshift
     j = wx % (1 * GMP_LIMB_BITS);
-    mpn_zero(s, 1);
+    mpfq_zero(s, 1);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 1 - k, j);
     else
-        mpn_copyi(s + k, x, 1 - k);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s + k, x, 1 - k);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_0_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 1) == 0);
     // long_rshift
     j = wx % (1 * GMP_LIMB_BITS);
-    mpn_zero(s, 1);
+    mpfq_zero(s, 1);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 1 - k, j);
     else
-        mpn_copyi(s, x + k, 1 - k);
-    mpn_copyi(u, x, 1);
+        mpfq_copy(s, x + k, 1 - k);
+    mpfq_copy(u, x, 1);
     mpfq_fixmp_0_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 1) == 0);
 }
@@ -3644,8 +3644,8 @@ void test_fixmp_1_5() {
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 2);
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c2 = mpfq_fixmp_1_5_add(v, v, y);
     mpfq_fixmp_1_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -3661,8 +3661,8 @@ void test_fixmp_1_5() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c1 = mpn_add_1(s, x, 2, wx);
     c2 = mpfq_fixmp_1_5_add_ui(u, u, wx);
     mpfq_fixmp_1_5_add_ui_nc(v, v, wx);
@@ -3689,8 +3689,8 @@ void test_fixmp_1_5() {
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 2);
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c2 = mpfq_fixmp_1_5_sub(v, v, y);
     mpfq_fixmp_1_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -3706,8 +3706,8 @@ void test_fixmp_1_5() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(u, x, 2);
+    mpfq_copy(v, x, 2);
     c1 = mpn_sub_1(s, x, 2, wx);
     c2 = mpfq_fixmp_1_5_sub_ui(u, u, wx);
     mpfq_fixmp_1_5_sub_ui_nc(v, v, wx);
@@ -3715,10 +3715,10 @@ void test_fixmp_1_5() {
     assert (mpn_cmp(s,u,2) == 0);
     assert (mpn_cmp(s,v,2) == 0);
     // addmul1
-    mpn_copyi(s, z, 3);
-    mpn_copyi(u, z, 3);
-    mpn_copyi(v, z, 3);
-    mpn_copyi(w, z, 3);
+    mpfq_copy(s, z, 3);
+    mpfq_copy(u, z, 3);
+    mpfq_copy(v, z, 3);
+    mpfq_copy(w, z, 3);
     c1 = mpn_addmul_1(s, x, 2, wx);
     s[2] += c1;
     c3 = s[2] < c1;
@@ -3737,16 +3737,16 @@ void test_fixmp_1_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+    mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     c1 = mpn_addmul_1(s, s, 2, wx);
     c2 = mpfq_fixmp_1_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 2) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 2);
-        mpn_copyi(u, z, 2);
-        mpn_copyi(w, z, 2);
+        mpfq_copy(s, z, 2);
+        mpfq_copy(u, z, 2);
+        mpfq_copy(w, z, 2);
         c1 = mpn_addmul_1(s, x, 2, y[1]);
         u[2]=0xdeadbeef;
         w[2]=0xdeadbeef;
@@ -3758,8 +3758,8 @@ void test_fixmp_1_5() {
         assert (mpn_cmp(s, w, 2) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 2);
-        mpn_copyi(u, x, 2);
+        mpfq_copy(s, x, 2);
+        mpfq_copy(u, x, 2);
         c1 = mpn_addmul_1(s, s, 2, y[1]);
         c2 = mpfq_fixmp_1_5_addmul05(u, u, y[1]);
         assert (mpn_cmp(s, u, 2) == 0);
@@ -3771,8 +3771,8 @@ void test_fixmp_1_5() {
     assert (u[3] == 0xdeadbeef);
     assert (mpn_cmp(s,u,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 2);
-    mpn_copyi(v, x, 2);
+    mpfq_copy(t, x, 2);
+    mpfq_copy(v, x, 2);
     t[2] = mpn_mul_1(t, t, 2, wx);
     mpfq_fixmp_1_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 2 + 1) == 0);
@@ -3784,8 +3784,8 @@ void test_fixmp_1_5() {
         assert (mpn_cmp(s,u,2) == 0);
         assert (s[2] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 2);
-        mpn_copyi(v, x, 2);
+        mpfq_copy(t, x, 2);
+        mpfq_copy(v, x, 2);
         t[2] = mpn_mul_1(t, t, 2, y[1]);
         mpfq_fixmp_1_5_mul05(v, v, y[1]);
         assert (mpn_cmp(t, v, 2) == 0);
@@ -3813,10 +3813,10 @@ assert (s[3] == 0);
     j = mpn_cmp(x, y, 2);
     k = mpfq_fixmp_1_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 2);
+    mpfq_copy(u, x, 2);
     j = mpfq_fixmp_1_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 1);
+    mpfq_zero(u+1, 1);
     j = mpfq_fixmp_1_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_1_5_cmp_ui(u, ~x[0]);
@@ -3825,7 +3825,7 @@ assert (s[3] == 0);
     j = mpfq_fixmp_1_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 2);
+    mpfq_copy(v, y, 2);
     v[2-1] += !v[2-1];
     mpn_tdiv_qr(s+3, s, 0, z, 3, v, 2);
     mpfq_fixmp_1_5_mod(u, z, v);
@@ -3837,8 +3837,8 @@ assert (s[3] == 0);
     mpfq_fixmp_1_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 2) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 2);
-    mpn_zero(v, 2);
+    mpfq_zero(u, 2);
+    mpfq_zero(v, 2);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_1_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -3848,9 +3848,9 @@ assert (s[3] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 2);
+    mpfq_zero(u, 2);
     memset(u, ~0, 2 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 2);
+    mpfq_copy(v, x, 2);
     /* This creates an n-limb multiple of 257.  */
     v[2] = mpn_lshift(v, x, 2, 8);
     v[2] += mpfq_fixmp_1_5_add(v, v, x);
@@ -3871,7 +3871,7 @@ assert (s[3] == 0);
       
       // x[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 2);
+      mpfq_zero(mip, 2);
       mpn_random2(p, 2);
       p[2-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[2-1] > p[2-1])
@@ -3881,7 +3881,7 @@ assert (s[3] == 0);
       p[0] |= 1UL;
 p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[2-1] += !p[2-1];
-      mpn_zero(w, 2*2);
+      mpfq_zero(w, 2*2);
       w[2]=1;
       mpfq_fixmp_1_5_mod(w, w, p);
       mpfq_fixmp_1_5_invmod(invR, w, p);
@@ -3889,7 +3889,7 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 2);
+        mpfq_copy(v, mip, 2);
         mpfq_fixmp_1_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 2, 1);
 	mpfq_fixmp_1_5_shortmul(u, t, mip);
@@ -3914,7 +3914,7 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_1_5_mul(t, xe, ye);
       s[3] = mpn_mul_1(s, t, 3, wx);
-      mpn_zero(t, 2*2+1);
+      mpfq_zero(t, 2*2+1);
       mpfq_fixmp_1_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_1_5_mod(s, t, p);
       mpfq_fixmp_1_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -3936,7 +3936,7 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_1_5_redc(s, u, mip, p);
       mpfq_fixmp_1_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+2, s, 0, w, 2+1, p, 2);
-      mpn_zero(w, 2*2+1);
+      mpfq_zero(w, 2*2+1);
       mpfq_fixmp_1_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+2, t, 0, w, 2+1, p, 2);
       assert(mpn_cmp(s, t, 2) == 0);
@@ -3946,7 +3946,7 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_1_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_1_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+2, s, 0, w, 2+1, p, 2);
-      mpn_zero(w, 2*2+1);
+      mpfq_zero(w, 2*2+1);
       mpfq_fixmp_1_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+2, t, 0, w, 2+1, p, 2);
       assert(mpn_cmp(s, t, 2) == 0);
@@ -3962,8 +3962,8 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 2, j);
     else
-        mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_1_5_lshift(u, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // lshift
@@ -3971,32 +3971,32 @@ p[2-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 2, j);
     else
-        mpn_copyi(s, x, 2);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x, 2);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_1_5_rshift(u, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // long_lshift
     j = wx % (2 * GMP_LIMB_BITS);
-    mpn_zero(s, 2);
+    mpfq_zero(s, 2);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 2 - k, j);
     else
-        mpn_copyi(s + k, x, 2 - k);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s + k, x, 2 - k);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_1_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 2) == 0);
     // long_rshift
     j = wx % (2 * GMP_LIMB_BITS);
-    mpn_zero(s, 2);
+    mpfq_zero(s, 2);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 2 - k, j);
     else
-        mpn_copyi(s, x + k, 2 - k);
-    mpn_copyi(u, x, 2);
+        mpfq_copy(s, x + k, 2 - k);
+    mpfq_copy(u, x, 2);
     mpfq_fixmp_1_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 2) == 0);
 }
@@ -4035,8 +4035,8 @@ void test_fixmp_2_5() {
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 3);
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c2 = mpfq_fixmp_2_5_add(v, v, y);
     mpfq_fixmp_2_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -4052,8 +4052,8 @@ void test_fixmp_2_5() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c1 = mpn_add_1(s, x, 3, wx);
     c2 = mpfq_fixmp_2_5_add_ui(u, u, wx);
     mpfq_fixmp_2_5_add_ui_nc(v, v, wx);
@@ -4080,8 +4080,8 @@ void test_fixmp_2_5() {
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 3);
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c2 = mpfq_fixmp_2_5_sub(v, v, y);
     mpfq_fixmp_2_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -4097,8 +4097,8 @@ void test_fixmp_2_5() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(u, x, 3);
+    mpfq_copy(v, x, 3);
     c1 = mpn_sub_1(s, x, 3, wx);
     c2 = mpfq_fixmp_2_5_sub_ui(u, u, wx);
     mpfq_fixmp_2_5_sub_ui_nc(v, v, wx);
@@ -4106,10 +4106,10 @@ void test_fixmp_2_5() {
     assert (mpn_cmp(s,u,3) == 0);
     assert (mpn_cmp(s,v,3) == 0);
     // addmul1
-    mpn_copyi(s, z, 4);
-    mpn_copyi(u, z, 4);
-    mpn_copyi(v, z, 4);
-    mpn_copyi(w, z, 4);
+    mpfq_copy(s, z, 4);
+    mpfq_copy(u, z, 4);
+    mpfq_copy(v, z, 4);
+    mpfq_copy(w, z, 4);
     c1 = mpn_addmul_1(s, x, 3, wx);
     s[3] += c1;
     c3 = s[3] < c1;
@@ -4128,16 +4128,16 @@ void test_fixmp_2_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+    mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     c1 = mpn_addmul_1(s, s, 3, wx);
     c2 = mpfq_fixmp_2_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 3) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 3);
-        mpn_copyi(u, z, 3);
-        mpn_copyi(w, z, 3);
+        mpfq_copy(s, z, 3);
+        mpfq_copy(u, z, 3);
+        mpfq_copy(w, z, 3);
         c1 = mpn_addmul_1(s, x, 3, y[2]);
         u[3]=0xdeadbeef;
         w[3]=0xdeadbeef;
@@ -4149,8 +4149,8 @@ void test_fixmp_2_5() {
         assert (mpn_cmp(s, w, 3) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 3);
-        mpn_copyi(u, x, 3);
+        mpfq_copy(s, x, 3);
+        mpfq_copy(u, x, 3);
         c1 = mpn_addmul_1(s, s, 3, y[2]);
         c2 = mpfq_fixmp_2_5_addmul05(u, u, y[2]);
         assert (mpn_cmp(s, u, 3) == 0);
@@ -4162,8 +4162,8 @@ void test_fixmp_2_5() {
     assert (u[4] == 0xdeadbeef);
     assert (mpn_cmp(s,u,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 3);
-    mpn_copyi(v, x, 3);
+    mpfq_copy(t, x, 3);
+    mpfq_copy(v, x, 3);
     t[3] = mpn_mul_1(t, t, 3, wx);
     mpfq_fixmp_2_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 3 + 1) == 0);
@@ -4175,8 +4175,8 @@ void test_fixmp_2_5() {
         assert (mpn_cmp(s,u,3) == 0);
         assert (s[3] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 3);
-        mpn_copyi(v, x, 3);
+        mpfq_copy(t, x, 3);
+        mpfq_copy(v, x, 3);
         t[3] = mpn_mul_1(t, t, 3, y[2]);
         mpfq_fixmp_2_5_mul05(v, v, y[2]);
         assert (mpn_cmp(t, v, 3) == 0);
@@ -4204,10 +4204,10 @@ assert (s[5] == 0);
     j = mpn_cmp(x, y, 3);
     k = mpfq_fixmp_2_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 3);
+    mpfq_copy(u, x, 3);
     j = mpfq_fixmp_2_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 2);
+    mpfq_zero(u+1, 2);
     j = mpfq_fixmp_2_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_2_5_cmp_ui(u, ~x[0]);
@@ -4216,7 +4216,7 @@ assert (s[5] == 0);
     j = mpfq_fixmp_2_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 3);
+    mpfq_copy(v, y, 3);
     v[3-1] += !v[3-1];
     mpn_tdiv_qr(s+4, s, 0, z, 5, v, 3);
     mpfq_fixmp_2_5_mod(u, z, v);
@@ -4228,8 +4228,8 @@ assert (s[5] == 0);
     mpfq_fixmp_2_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 3) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 3);
-    mpn_zero(v, 3);
+    mpfq_zero(u, 3);
+    mpfq_zero(v, 3);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_2_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -4239,9 +4239,9 @@ assert (s[5] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 3);
+    mpfq_zero(u, 3);
     memset(u, ~0, 3 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 3);
+    mpfq_copy(v, x, 3);
     /* This creates an n-limb multiple of 257.  */
     v[3] = mpn_lshift(v, x, 3, 8);
     v[3] += mpfq_fixmp_2_5_add(v, v, x);
@@ -4262,7 +4262,7 @@ assert (s[5] == 0);
       
       // x[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 3);
+      mpfq_zero(mip, 3);
       mpn_random2(p, 3);
       p[3-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[3-1] > p[3-1])
@@ -4272,7 +4272,7 @@ assert (s[5] == 0);
       p[0] |= 1UL;
 p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[3-1] += !p[3-1];
-      mpn_zero(w, 2*3);
+      mpfq_zero(w, 2*3);
       w[3]=1;
       mpfq_fixmp_2_5_mod(w, w, p);
       mpfq_fixmp_2_5_invmod(invR, w, p);
@@ -4280,7 +4280,7 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 3);
+        mpfq_copy(v, mip, 3);
         mpfq_fixmp_2_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 3, 1);
 	mpfq_fixmp_2_5_shortmul(u, t, mip);
@@ -4305,7 +4305,7 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_2_5_mul(t, xe, ye);
       s[5] = mpn_mul_1(s, t, 5, wx);
-      mpn_zero(t, 2*3+1);
+      mpfq_zero(t, 2*3+1);
       mpfq_fixmp_2_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_2_5_mod(s, t, p);
       mpfq_fixmp_2_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -4327,7 +4327,7 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_2_5_redc(s, u, mip, p);
       mpfq_fixmp_2_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+3, s, 0, w, 3+1, p, 3);
-      mpn_zero(w, 2*3+1);
+      mpfq_zero(w, 2*3+1);
       mpfq_fixmp_2_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+3, t, 0, w, 3+1, p, 3);
       assert(mpn_cmp(s, t, 3) == 0);
@@ -4337,7 +4337,7 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_2_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_2_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+3, s, 0, w, 3+1, p, 3);
-      mpn_zero(w, 2*3+1);
+      mpfq_zero(w, 2*3+1);
       mpfq_fixmp_2_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+3, t, 0, w, 3+1, p, 3);
       assert(mpn_cmp(s, t, 3) == 0);
@@ -4353,8 +4353,8 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 3, j);
     else
-        mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_2_5_lshift(u, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // lshift
@@ -4362,32 +4362,32 @@ p[3-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 3, j);
     else
-        mpn_copyi(s, x, 3);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x, 3);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_2_5_rshift(u, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // long_lshift
     j = wx % (3 * GMP_LIMB_BITS);
-    mpn_zero(s, 3);
+    mpfq_zero(s, 3);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 3 - k, j);
     else
-        mpn_copyi(s + k, x, 3 - k);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s + k, x, 3 - k);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_2_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 3) == 0);
     // long_rshift
     j = wx % (3 * GMP_LIMB_BITS);
-    mpn_zero(s, 3);
+    mpfq_zero(s, 3);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 3 - k, j);
     else
-        mpn_copyi(s, x + k, 3 - k);
-    mpn_copyi(u, x, 3);
+        mpfq_copy(s, x + k, 3 - k);
+    mpfq_copy(u, x, 3);
     mpfq_fixmp_2_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 3) == 0);
 }
@@ -4426,8 +4426,8 @@ void test_fixmp_3_5() {
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 4);
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c2 = mpfq_fixmp_3_5_add(v, v, y);
     mpfq_fixmp_3_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -4443,8 +4443,8 @@ void test_fixmp_3_5() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c1 = mpn_add_1(s, x, 4, wx);
     c2 = mpfq_fixmp_3_5_add_ui(u, u, wx);
     mpfq_fixmp_3_5_add_ui_nc(v, v, wx);
@@ -4471,8 +4471,8 @@ void test_fixmp_3_5() {
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 4);
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c2 = mpfq_fixmp_3_5_sub(v, v, y);
     mpfq_fixmp_3_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -4488,8 +4488,8 @@ void test_fixmp_3_5() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(u, x, 4);
+    mpfq_copy(v, x, 4);
     c1 = mpn_sub_1(s, x, 4, wx);
     c2 = mpfq_fixmp_3_5_sub_ui(u, u, wx);
     mpfq_fixmp_3_5_sub_ui_nc(v, v, wx);
@@ -4497,10 +4497,10 @@ void test_fixmp_3_5() {
     assert (mpn_cmp(s,u,4) == 0);
     assert (mpn_cmp(s,v,4) == 0);
     // addmul1
-    mpn_copyi(s, z, 5);
-    mpn_copyi(u, z, 5);
-    mpn_copyi(v, z, 5);
-    mpn_copyi(w, z, 5);
+    mpfq_copy(s, z, 5);
+    mpfq_copy(u, z, 5);
+    mpfq_copy(v, z, 5);
+    mpfq_copy(w, z, 5);
     c1 = mpn_addmul_1(s, x, 4, wx);
     s[4] += c1;
     c3 = s[4] < c1;
@@ -4519,16 +4519,16 @@ void test_fixmp_3_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+    mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     c1 = mpn_addmul_1(s, s, 4, wx);
     c2 = mpfq_fixmp_3_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 4) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 4);
-        mpn_copyi(u, z, 4);
-        mpn_copyi(w, z, 4);
+        mpfq_copy(s, z, 4);
+        mpfq_copy(u, z, 4);
+        mpfq_copy(w, z, 4);
         c1 = mpn_addmul_1(s, x, 4, y[3]);
         u[4]=0xdeadbeef;
         w[4]=0xdeadbeef;
@@ -4540,8 +4540,8 @@ void test_fixmp_3_5() {
         assert (mpn_cmp(s, w, 4) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 4);
-        mpn_copyi(u, x, 4);
+        mpfq_copy(s, x, 4);
+        mpfq_copy(u, x, 4);
         c1 = mpn_addmul_1(s, s, 4, y[3]);
         c2 = mpfq_fixmp_3_5_addmul05(u, u, y[3]);
         assert (mpn_cmp(s, u, 4) == 0);
@@ -4553,8 +4553,8 @@ void test_fixmp_3_5() {
     assert (u[5] == 0xdeadbeef);
     assert (mpn_cmp(s,u,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 4);
-    mpn_copyi(v, x, 4);
+    mpfq_copy(t, x, 4);
+    mpfq_copy(v, x, 4);
     t[4] = mpn_mul_1(t, t, 4, wx);
     mpfq_fixmp_3_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 4 + 1) == 0);
@@ -4566,8 +4566,8 @@ void test_fixmp_3_5() {
         assert (mpn_cmp(s,u,4) == 0);
         assert (s[4] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 4);
-        mpn_copyi(v, x, 4);
+        mpfq_copy(t, x, 4);
+        mpfq_copy(v, x, 4);
         t[4] = mpn_mul_1(t, t, 4, y[3]);
         mpfq_fixmp_3_5_mul05(v, v, y[3]);
         assert (mpn_cmp(t, v, 4) == 0);
@@ -4595,10 +4595,10 @@ assert (s[7] == 0);
     j = mpn_cmp(x, y, 4);
     k = mpfq_fixmp_3_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 4);
+    mpfq_copy(u, x, 4);
     j = mpfq_fixmp_3_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 3);
+    mpfq_zero(u+1, 3);
     j = mpfq_fixmp_3_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_3_5_cmp_ui(u, ~x[0]);
@@ -4607,7 +4607,7 @@ assert (s[7] == 0);
     j = mpfq_fixmp_3_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 4);
+    mpfq_copy(v, y, 4);
     v[4-1] += !v[4-1];
     mpn_tdiv_qr(s+5, s, 0, z, 7, v, 4);
     mpfq_fixmp_3_5_mod(u, z, v);
@@ -4619,8 +4619,8 @@ assert (s[7] == 0);
     mpfq_fixmp_3_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 4) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 4);
-    mpn_zero(v, 4);
+    mpfq_zero(u, 4);
+    mpfq_zero(v, 4);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_3_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -4630,9 +4630,9 @@ assert (s[7] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 4);
+    mpfq_zero(u, 4);
     memset(u, ~0, 4 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 4);
+    mpfq_copy(v, x, 4);
     /* This creates an n-limb multiple of 257.  */
     v[4] = mpn_lshift(v, x, 4, 8);
     v[4] += mpfq_fixmp_3_5_add(v, v, x);
@@ -4653,7 +4653,7 @@ assert (s[7] == 0);
       
       // x[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 4);
+      mpfq_zero(mip, 4);
       mpn_random2(p, 4);
       p[4-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[4-1] > p[4-1])
@@ -4663,7 +4663,7 @@ assert (s[7] == 0);
       p[0] |= 1UL;
 p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[4-1] += !p[4-1];
-      mpn_zero(w, 2*4);
+      mpfq_zero(w, 2*4);
       w[4]=1;
       mpfq_fixmp_3_5_mod(w, w, p);
       mpfq_fixmp_3_5_invmod(invR, w, p);
@@ -4671,7 +4671,7 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 4);
+        mpfq_copy(v, mip, 4);
         mpfq_fixmp_3_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 4, 1);
 	mpfq_fixmp_3_5_shortmul(u, t, mip);
@@ -4696,7 +4696,7 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_3_5_mul(t, xe, ye);
       s[7] = mpn_mul_1(s, t, 7, wx);
-      mpn_zero(t, 2*4+1);
+      mpfq_zero(t, 2*4+1);
       mpfq_fixmp_3_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_3_5_mod(s, t, p);
       mpfq_fixmp_3_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -4718,7 +4718,7 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_3_5_redc(s, u, mip, p);
       mpfq_fixmp_3_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+4, s, 0, w, 4+1, p, 4);
-      mpn_zero(w, 2*4+1);
+      mpfq_zero(w, 2*4+1);
       mpfq_fixmp_3_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+4, t, 0, w, 4+1, p, 4);
       assert(mpn_cmp(s, t, 4) == 0);
@@ -4728,7 +4728,7 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_3_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_3_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+4, s, 0, w, 4+1, p, 4);
-      mpn_zero(w, 2*4+1);
+      mpfq_zero(w, 2*4+1);
       mpfq_fixmp_3_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+4, t, 0, w, 4+1, p, 4);
       assert(mpn_cmp(s, t, 4) == 0);
@@ -4744,8 +4744,8 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 4, j);
     else
-        mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_3_5_lshift(u, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // lshift
@@ -4753,32 +4753,32 @@ p[4-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 4, j);
     else
-        mpn_copyi(s, x, 4);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x, 4);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_3_5_rshift(u, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // long_lshift
     j = wx % (4 * GMP_LIMB_BITS);
-    mpn_zero(s, 4);
+    mpfq_zero(s, 4);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 4 - k, j);
     else
-        mpn_copyi(s + k, x, 4 - k);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s + k, x, 4 - k);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_3_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 4) == 0);
     // long_rshift
     j = wx % (4 * GMP_LIMB_BITS);
-    mpn_zero(s, 4);
+    mpfq_zero(s, 4);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 4 - k, j);
     else
-        mpn_copyi(s, x + k, 4 - k);
-    mpn_copyi(u, x, 4);
+        mpfq_copy(s, x + k, 4 - k);
+    mpfq_copy(u, x, 4);
     mpfq_fixmp_3_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 4) == 0);
 }
@@ -4817,8 +4817,8 @@ void test_fixmp_4_5() {
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 5);
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c2 = mpfq_fixmp_4_5_add(v, v, y);
     mpfq_fixmp_4_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -4834,8 +4834,8 @@ void test_fixmp_4_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c1 = mpn_add_1(s, x, 5, wx);
     c2 = mpfq_fixmp_4_5_add_ui(u, u, wx);
     mpfq_fixmp_4_5_add_ui_nc(v, v, wx);
@@ -4862,8 +4862,8 @@ void test_fixmp_4_5() {
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 5);
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c2 = mpfq_fixmp_4_5_sub(v, v, y);
     mpfq_fixmp_4_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -4879,8 +4879,8 @@ void test_fixmp_4_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(u, x, 5);
+    mpfq_copy(v, x, 5);
     c1 = mpn_sub_1(s, x, 5, wx);
     c2 = mpfq_fixmp_4_5_sub_ui(u, u, wx);
     mpfq_fixmp_4_5_sub_ui_nc(v, v, wx);
@@ -4888,10 +4888,10 @@ void test_fixmp_4_5() {
     assert (mpn_cmp(s,u,5) == 0);
     assert (mpn_cmp(s,v,5) == 0);
     // addmul1
-    mpn_copyi(s, z, 6);
-    mpn_copyi(u, z, 6);
-    mpn_copyi(v, z, 6);
-    mpn_copyi(w, z, 6);
+    mpfq_copy(s, z, 6);
+    mpfq_copy(u, z, 6);
+    mpfq_copy(v, z, 6);
+    mpfq_copy(w, z, 6);
     c1 = mpn_addmul_1(s, x, 5, wx);
     s[5] += c1;
     c3 = s[5] < c1;
@@ -4910,16 +4910,16 @@ void test_fixmp_4_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+    mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     c1 = mpn_addmul_1(s, s, 5, wx);
     c2 = mpfq_fixmp_4_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 5) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 5);
-        mpn_copyi(u, z, 5);
-        mpn_copyi(w, z, 5);
+        mpfq_copy(s, z, 5);
+        mpfq_copy(u, z, 5);
+        mpfq_copy(w, z, 5);
         c1 = mpn_addmul_1(s, x, 5, y[4]);
         u[5]=0xdeadbeef;
         w[5]=0xdeadbeef;
@@ -4931,8 +4931,8 @@ void test_fixmp_4_5() {
         assert (mpn_cmp(s, w, 5) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 5);
-        mpn_copyi(u, x, 5);
+        mpfq_copy(s, x, 5);
+        mpfq_copy(u, x, 5);
         c1 = mpn_addmul_1(s, s, 5, y[4]);
         c2 = mpfq_fixmp_4_5_addmul05(u, u, y[4]);
         assert (mpn_cmp(s, u, 5) == 0);
@@ -4944,8 +4944,8 @@ void test_fixmp_4_5() {
     assert (u[6] == 0xdeadbeef);
     assert (mpn_cmp(s,u,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 5);
-    mpn_copyi(v, x, 5);
+    mpfq_copy(t, x, 5);
+    mpfq_copy(v, x, 5);
     t[5] = mpn_mul_1(t, t, 5, wx);
     mpfq_fixmp_4_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 5 + 1) == 0);
@@ -4957,8 +4957,8 @@ void test_fixmp_4_5() {
         assert (mpn_cmp(s,u,5) == 0);
         assert (s[5] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 5);
-        mpn_copyi(v, x, 5);
+        mpfq_copy(t, x, 5);
+        mpfq_copy(v, x, 5);
         t[5] = mpn_mul_1(t, t, 5, y[4]);
         mpfq_fixmp_4_5_mul05(v, v, y[4]);
         assert (mpn_cmp(t, v, 5) == 0);
@@ -4986,10 +4986,10 @@ assert (s[9] == 0);
     j = mpn_cmp(x, y, 5);
     k = mpfq_fixmp_4_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 5);
+    mpfq_copy(u, x, 5);
     j = mpfq_fixmp_4_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 4);
+    mpfq_zero(u+1, 4);
     j = mpfq_fixmp_4_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_4_5_cmp_ui(u, ~x[0]);
@@ -4998,7 +4998,7 @@ assert (s[9] == 0);
     j = mpfq_fixmp_4_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 5);
+    mpfq_copy(v, y, 5);
     v[5-1] += !v[5-1];
     mpn_tdiv_qr(s+6, s, 0, z, 9, v, 5);
     mpfq_fixmp_4_5_mod(u, z, v);
@@ -5010,8 +5010,8 @@ assert (s[9] == 0);
     mpfq_fixmp_4_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 5) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 5);
-    mpn_zero(v, 5);
+    mpfq_zero(u, 5);
+    mpfq_zero(v, 5);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_4_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -5021,9 +5021,9 @@ assert (s[9] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 5);
+    mpfq_zero(u, 5);
     memset(u, ~0, 5 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 5);
+    mpfq_copy(v, x, 5);
     /* This creates an n-limb multiple of 257.  */
     v[5] = mpn_lshift(v, x, 5, 8);
     v[5] += mpfq_fixmp_4_5_add(v, v, x);
@@ -5044,7 +5044,7 @@ assert (s[9] == 0);
       
       // x[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 5);
+      mpfq_zero(mip, 5);
       mpn_random2(p, 5);
       p[5-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[5-1] > p[5-1])
@@ -5054,7 +5054,7 @@ assert (s[9] == 0);
       p[0] |= 1UL;
 p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[5-1] += !p[5-1];
-      mpn_zero(w, 2*5);
+      mpfq_zero(w, 2*5);
       w[5]=1;
       mpfq_fixmp_4_5_mod(w, w, p);
       mpfq_fixmp_4_5_invmod(invR, w, p);
@@ -5062,7 +5062,7 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 5);
+        mpfq_copy(v, mip, 5);
         mpfq_fixmp_4_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 5, 1);
 	mpfq_fixmp_4_5_shortmul(u, t, mip);
@@ -5087,7 +5087,7 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_4_5_mul(t, xe, ye);
       s[9] = mpn_mul_1(s, t, 9, wx);
-      mpn_zero(t, 2*5+1);
+      mpfq_zero(t, 2*5+1);
       mpfq_fixmp_4_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_4_5_mod(s, t, p);
       mpfq_fixmp_4_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -5109,7 +5109,7 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_4_5_redc(s, u, mip, p);
       mpfq_fixmp_4_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+5, s, 0, w, 5+1, p, 5);
-      mpn_zero(w, 2*5+1);
+      mpfq_zero(w, 2*5+1);
       mpfq_fixmp_4_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+5, t, 0, w, 5+1, p, 5);
       assert(mpn_cmp(s, t, 5) == 0);
@@ -5119,7 +5119,7 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_4_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_4_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+5, s, 0, w, 5+1, p, 5);
-      mpn_zero(w, 2*5+1);
+      mpfq_zero(w, 2*5+1);
       mpfq_fixmp_4_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+5, t, 0, w, 5+1, p, 5);
       assert(mpn_cmp(s, t, 5) == 0);
@@ -5135,8 +5135,8 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 5, j);
     else
-        mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_4_5_lshift(u, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // lshift
@@ -5144,32 +5144,32 @@ p[5-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 5, j);
     else
-        mpn_copyi(s, x, 5);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x, 5);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_4_5_rshift(u, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // long_lshift
     j = wx % (5 * GMP_LIMB_BITS);
-    mpn_zero(s, 5);
+    mpfq_zero(s, 5);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 5 - k, j);
     else
-        mpn_copyi(s + k, x, 5 - k);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s + k, x, 5 - k);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_4_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 5) == 0);
     // long_rshift
     j = wx % (5 * GMP_LIMB_BITS);
-    mpn_zero(s, 5);
+    mpfq_zero(s, 5);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 5 - k, j);
     else
-        mpn_copyi(s, x + k, 5 - k);
-    mpn_copyi(u, x, 5);
+        mpfq_copy(s, x + k, 5 - k);
+    mpfq_copy(u, x, 5);
     mpfq_fixmp_4_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 5) == 0);
 }
@@ -5208,8 +5208,8 @@ void test_fixmp_5_5() {
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 6);
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c2 = mpfq_fixmp_5_5_add(v, v, y);
     mpfq_fixmp_5_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -5225,8 +5225,8 @@ void test_fixmp_5_5() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c1 = mpn_add_1(s, x, 6, wx);
     c2 = mpfq_fixmp_5_5_add_ui(u, u, wx);
     mpfq_fixmp_5_5_add_ui_nc(v, v, wx);
@@ -5253,8 +5253,8 @@ void test_fixmp_5_5() {
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 6);
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c2 = mpfq_fixmp_5_5_sub(v, v, y);
     mpfq_fixmp_5_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -5270,8 +5270,8 @@ void test_fixmp_5_5() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(u, x, 6);
+    mpfq_copy(v, x, 6);
     c1 = mpn_sub_1(s, x, 6, wx);
     c2 = mpfq_fixmp_5_5_sub_ui(u, u, wx);
     mpfq_fixmp_5_5_sub_ui_nc(v, v, wx);
@@ -5279,10 +5279,10 @@ void test_fixmp_5_5() {
     assert (mpn_cmp(s,u,6) == 0);
     assert (mpn_cmp(s,v,6) == 0);
     // addmul1
-    mpn_copyi(s, z, 7);
-    mpn_copyi(u, z, 7);
-    mpn_copyi(v, z, 7);
-    mpn_copyi(w, z, 7);
+    mpfq_copy(s, z, 7);
+    mpfq_copy(u, z, 7);
+    mpfq_copy(v, z, 7);
+    mpfq_copy(w, z, 7);
     c1 = mpn_addmul_1(s, x, 6, wx);
     s[6] += c1;
     c3 = s[6] < c1;
@@ -5301,16 +5301,16 @@ void test_fixmp_5_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+    mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     c1 = mpn_addmul_1(s, s, 6, wx);
     c2 = mpfq_fixmp_5_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 6) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 6);
-        mpn_copyi(u, z, 6);
-        mpn_copyi(w, z, 6);
+        mpfq_copy(s, z, 6);
+        mpfq_copy(u, z, 6);
+        mpfq_copy(w, z, 6);
         c1 = mpn_addmul_1(s, x, 6, y[5]);
         u[6]=0xdeadbeef;
         w[6]=0xdeadbeef;
@@ -5322,8 +5322,8 @@ void test_fixmp_5_5() {
         assert (mpn_cmp(s, w, 6) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 6);
-        mpn_copyi(u, x, 6);
+        mpfq_copy(s, x, 6);
+        mpfq_copy(u, x, 6);
         c1 = mpn_addmul_1(s, s, 6, y[5]);
         c2 = mpfq_fixmp_5_5_addmul05(u, u, y[5]);
         assert (mpn_cmp(s, u, 6) == 0);
@@ -5335,8 +5335,8 @@ void test_fixmp_5_5() {
     assert (u[7] == 0xdeadbeef);
     assert (mpn_cmp(s,u,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 6);
-    mpn_copyi(v, x, 6);
+    mpfq_copy(t, x, 6);
+    mpfq_copy(v, x, 6);
     t[6] = mpn_mul_1(t, t, 6, wx);
     mpfq_fixmp_5_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 6 + 1) == 0);
@@ -5348,8 +5348,8 @@ void test_fixmp_5_5() {
         assert (mpn_cmp(s,u,6) == 0);
         assert (s[6] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 6);
-        mpn_copyi(v, x, 6);
+        mpfq_copy(t, x, 6);
+        mpfq_copy(v, x, 6);
         t[6] = mpn_mul_1(t, t, 6, y[5]);
         mpfq_fixmp_5_5_mul05(v, v, y[5]);
         assert (mpn_cmp(t, v, 6) == 0);
@@ -5377,10 +5377,10 @@ assert (s[11] == 0);
     j = mpn_cmp(x, y, 6);
     k = mpfq_fixmp_5_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 6);
+    mpfq_copy(u, x, 6);
     j = mpfq_fixmp_5_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 5);
+    mpfq_zero(u+1, 5);
     j = mpfq_fixmp_5_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_5_5_cmp_ui(u, ~x[0]);
@@ -5389,7 +5389,7 @@ assert (s[11] == 0);
     j = mpfq_fixmp_5_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 6);
+    mpfq_copy(v, y, 6);
     v[6-1] += !v[6-1];
     mpn_tdiv_qr(s+7, s, 0, z, 11, v, 6);
     mpfq_fixmp_5_5_mod(u, z, v);
@@ -5401,8 +5401,8 @@ assert (s[11] == 0);
     mpfq_fixmp_5_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 6) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 6);
-    mpn_zero(v, 6);
+    mpfq_zero(u, 6);
+    mpfq_zero(v, 6);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_5_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -5412,9 +5412,9 @@ assert (s[11] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 6);
+    mpfq_zero(u, 6);
     memset(u, ~0, 6 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 6);
+    mpfq_copy(v, x, 6);
     /* This creates an n-limb multiple of 257.  */
     v[6] = mpn_lshift(v, x, 6, 8);
     v[6] += mpfq_fixmp_5_5_add(v, v, x);
@@ -5435,7 +5435,7 @@ assert (s[11] == 0);
       
       // x[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 6);
+      mpfq_zero(mip, 6);
       mpn_random2(p, 6);
       p[6-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[6-1] > p[6-1])
@@ -5445,7 +5445,7 @@ assert (s[11] == 0);
       p[0] |= 1UL;
 p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[6-1] += !p[6-1];
-      mpn_zero(w, 2*6);
+      mpfq_zero(w, 2*6);
       w[6]=1;
       mpfq_fixmp_5_5_mod(w, w, p);
       mpfq_fixmp_5_5_invmod(invR, w, p);
@@ -5453,7 +5453,7 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 6);
+        mpfq_copy(v, mip, 6);
         mpfq_fixmp_5_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 6, 1);
 	mpfq_fixmp_5_5_shortmul(u, t, mip);
@@ -5478,7 +5478,7 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_5_5_mul(t, xe, ye);
       s[11] = mpn_mul_1(s, t, 11, wx);
-      mpn_zero(t, 2*6+1);
+      mpfq_zero(t, 2*6+1);
       mpfq_fixmp_5_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_5_5_mod(s, t, p);
       mpfq_fixmp_5_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -5500,7 +5500,7 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_5_5_redc(s, u, mip, p);
       mpfq_fixmp_5_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+6, s, 0, w, 6+1, p, 6);
-      mpn_zero(w, 2*6+1);
+      mpfq_zero(w, 2*6+1);
       mpfq_fixmp_5_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+6, t, 0, w, 6+1, p, 6);
       assert(mpn_cmp(s, t, 6) == 0);
@@ -5510,7 +5510,7 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_5_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_5_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+6, s, 0, w, 6+1, p, 6);
-      mpn_zero(w, 2*6+1);
+      mpfq_zero(w, 2*6+1);
       mpfq_fixmp_5_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+6, t, 0, w, 6+1, p, 6);
       assert(mpn_cmp(s, t, 6) == 0);
@@ -5526,8 +5526,8 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 6, j);
     else
-        mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_5_5_lshift(u, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // lshift
@@ -5535,32 +5535,32 @@ p[6-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 6, j);
     else
-        mpn_copyi(s, x, 6);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x, 6);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_5_5_rshift(u, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // long_lshift
     j = wx % (6 * GMP_LIMB_BITS);
-    mpn_zero(s, 6);
+    mpfq_zero(s, 6);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 6 - k, j);
     else
-        mpn_copyi(s + k, x, 6 - k);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s + k, x, 6 - k);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_5_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 6) == 0);
     // long_rshift
     j = wx % (6 * GMP_LIMB_BITS);
-    mpn_zero(s, 6);
+    mpfq_zero(s, 6);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 6 - k, j);
     else
-        mpn_copyi(s, x + k, 6 - k);
-    mpn_copyi(u, x, 6);
+        mpfq_copy(s, x + k, 6 - k);
+    mpfq_copy(u, x, 6);
     mpfq_fixmp_5_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 6) == 0);
 }
@@ -5599,8 +5599,8 @@ void test_fixmp_6_5() {
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 7);
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c2 = mpfq_fixmp_6_5_add(v, v, y);
     mpfq_fixmp_6_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -5616,8 +5616,8 @@ void test_fixmp_6_5() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c1 = mpn_add_1(s, x, 7, wx);
     c2 = mpfq_fixmp_6_5_add_ui(u, u, wx);
     mpfq_fixmp_6_5_add_ui_nc(v, v, wx);
@@ -5644,8 +5644,8 @@ void test_fixmp_6_5() {
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 7);
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c2 = mpfq_fixmp_6_5_sub(v, v, y);
     mpfq_fixmp_6_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -5661,8 +5661,8 @@ void test_fixmp_6_5() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(u, x, 7);
+    mpfq_copy(v, x, 7);
     c1 = mpn_sub_1(s, x, 7, wx);
     c2 = mpfq_fixmp_6_5_sub_ui(u, u, wx);
     mpfq_fixmp_6_5_sub_ui_nc(v, v, wx);
@@ -5670,10 +5670,10 @@ void test_fixmp_6_5() {
     assert (mpn_cmp(s,u,7) == 0);
     assert (mpn_cmp(s,v,7) == 0);
     // addmul1
-    mpn_copyi(s, z, 8);
-    mpn_copyi(u, z, 8);
-    mpn_copyi(v, z, 8);
-    mpn_copyi(w, z, 8);
+    mpfq_copy(s, z, 8);
+    mpfq_copy(u, z, 8);
+    mpfq_copy(v, z, 8);
+    mpfq_copy(w, z, 8);
     c1 = mpn_addmul_1(s, x, 7, wx);
     s[7] += c1;
     c3 = s[7] < c1;
@@ -5692,16 +5692,16 @@ void test_fixmp_6_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+    mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     c1 = mpn_addmul_1(s, s, 7, wx);
     c2 = mpfq_fixmp_6_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 7) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 7);
-        mpn_copyi(u, z, 7);
-        mpn_copyi(w, z, 7);
+        mpfq_copy(s, z, 7);
+        mpfq_copy(u, z, 7);
+        mpfq_copy(w, z, 7);
         c1 = mpn_addmul_1(s, x, 7, y[6]);
         u[7]=0xdeadbeef;
         w[7]=0xdeadbeef;
@@ -5713,8 +5713,8 @@ void test_fixmp_6_5() {
         assert (mpn_cmp(s, w, 7) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 7);
-        mpn_copyi(u, x, 7);
+        mpfq_copy(s, x, 7);
+        mpfq_copy(u, x, 7);
         c1 = mpn_addmul_1(s, s, 7, y[6]);
         c2 = mpfq_fixmp_6_5_addmul05(u, u, y[6]);
         assert (mpn_cmp(s, u, 7) == 0);
@@ -5726,8 +5726,8 @@ void test_fixmp_6_5() {
     assert (u[8] == 0xdeadbeef);
     assert (mpn_cmp(s,u,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 7);
-    mpn_copyi(v, x, 7);
+    mpfq_copy(t, x, 7);
+    mpfq_copy(v, x, 7);
     t[7] = mpn_mul_1(t, t, 7, wx);
     mpfq_fixmp_6_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 7 + 1) == 0);
@@ -5739,8 +5739,8 @@ void test_fixmp_6_5() {
         assert (mpn_cmp(s,u,7) == 0);
         assert (s[7] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 7);
-        mpn_copyi(v, x, 7);
+        mpfq_copy(t, x, 7);
+        mpfq_copy(v, x, 7);
         t[7] = mpn_mul_1(t, t, 7, y[6]);
         mpfq_fixmp_6_5_mul05(v, v, y[6]);
         assert (mpn_cmp(t, v, 7) == 0);
@@ -5768,10 +5768,10 @@ assert (s[13] == 0);
     j = mpn_cmp(x, y, 7);
     k = mpfq_fixmp_6_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 7);
+    mpfq_copy(u, x, 7);
     j = mpfq_fixmp_6_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 6);
+    mpfq_zero(u+1, 6);
     j = mpfq_fixmp_6_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_6_5_cmp_ui(u, ~x[0]);
@@ -5780,7 +5780,7 @@ assert (s[13] == 0);
     j = mpfq_fixmp_6_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 7);
+    mpfq_copy(v, y, 7);
     v[7-1] += !v[7-1];
     mpn_tdiv_qr(s+8, s, 0, z, 13, v, 7);
     mpfq_fixmp_6_5_mod(u, z, v);
@@ -5792,8 +5792,8 @@ assert (s[13] == 0);
     mpfq_fixmp_6_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 7) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 7);
-    mpn_zero(v, 7);
+    mpfq_zero(u, 7);
+    mpfq_zero(v, 7);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_6_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -5803,9 +5803,9 @@ assert (s[13] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 7);
+    mpfq_zero(u, 7);
     memset(u, ~0, 7 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 7);
+    mpfq_copy(v, x, 7);
     /* This creates an n-limb multiple of 257.  */
     v[7] = mpn_lshift(v, x, 7, 8);
     v[7] += mpfq_fixmp_6_5_add(v, v, x);
@@ -5826,7 +5826,7 @@ assert (s[13] == 0);
       
       // x[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 7);
+      mpfq_zero(mip, 7);
       mpn_random2(p, 7);
       p[7-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[7-1] > p[7-1])
@@ -5836,7 +5836,7 @@ assert (s[13] == 0);
       p[0] |= 1UL;
 p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[7-1] += !p[7-1];
-      mpn_zero(w, 2*7);
+      mpfq_zero(w, 2*7);
       w[7]=1;
       mpfq_fixmp_6_5_mod(w, w, p);
       mpfq_fixmp_6_5_invmod(invR, w, p);
@@ -5844,7 +5844,7 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 7);
+        mpfq_copy(v, mip, 7);
         mpfq_fixmp_6_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 7, 1);
 	mpfq_fixmp_6_5_shortmul(u, t, mip);
@@ -5869,7 +5869,7 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_6_5_mul(t, xe, ye);
       s[13] = mpn_mul_1(s, t, 13, wx);
-      mpn_zero(t, 2*7+1);
+      mpfq_zero(t, 2*7+1);
       mpfq_fixmp_6_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_6_5_mod(s, t, p);
       mpfq_fixmp_6_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -5891,7 +5891,7 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_6_5_redc(s, u, mip, p);
       mpfq_fixmp_6_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+7, s, 0, w, 7+1, p, 7);
-      mpn_zero(w, 2*7+1);
+      mpfq_zero(w, 2*7+1);
       mpfq_fixmp_6_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+7, t, 0, w, 7+1, p, 7);
       assert(mpn_cmp(s, t, 7) == 0);
@@ -5901,7 +5901,7 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_6_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_6_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+7, s, 0, w, 7+1, p, 7);
-      mpn_zero(w, 2*7+1);
+      mpfq_zero(w, 2*7+1);
       mpfq_fixmp_6_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+7, t, 0, w, 7+1, p, 7);
       assert(mpn_cmp(s, t, 7) == 0);
@@ -5917,8 +5917,8 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 7, j);
     else
-        mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_6_5_lshift(u, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // lshift
@@ -5926,32 +5926,32 @@ p[7-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 7, j);
     else
-        mpn_copyi(s, x, 7);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x, 7);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_6_5_rshift(u, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // long_lshift
     j = wx % (7 * GMP_LIMB_BITS);
-    mpn_zero(s, 7);
+    mpfq_zero(s, 7);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 7 - k, j);
     else
-        mpn_copyi(s + k, x, 7 - k);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s + k, x, 7 - k);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_6_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 7) == 0);
     // long_rshift
     j = wx % (7 * GMP_LIMB_BITS);
-    mpn_zero(s, 7);
+    mpfq_zero(s, 7);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 7 - k, j);
     else
-        mpn_copyi(s, x + k, 7 - k);
-    mpn_copyi(u, x, 7);
+        mpfq_copy(s, x + k, 7 - k);
+    mpfq_copy(u, x, 7);
     mpfq_fixmp_6_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 7) == 0);
 }
@@ -5990,8 +5990,8 @@ void test_fixmp_7_5() {
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 8);
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c2 = mpfq_fixmp_7_5_add(v, v, y);
     mpfq_fixmp_7_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -6007,8 +6007,8 @@ void test_fixmp_7_5() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c1 = mpn_add_1(s, x, 8, wx);
     c2 = mpfq_fixmp_7_5_add_ui(u, u, wx);
     mpfq_fixmp_7_5_add_ui_nc(v, v, wx);
@@ -6035,8 +6035,8 @@ void test_fixmp_7_5() {
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 8);
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c2 = mpfq_fixmp_7_5_sub(v, v, y);
     mpfq_fixmp_7_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -6052,8 +6052,8 @@ void test_fixmp_7_5() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(u, x, 8);
+    mpfq_copy(v, x, 8);
     c1 = mpn_sub_1(s, x, 8, wx);
     c2 = mpfq_fixmp_7_5_sub_ui(u, u, wx);
     mpfq_fixmp_7_5_sub_ui_nc(v, v, wx);
@@ -6061,10 +6061,10 @@ void test_fixmp_7_5() {
     assert (mpn_cmp(s,u,8) == 0);
     assert (mpn_cmp(s,v,8) == 0);
     // addmul1
-    mpn_copyi(s, z, 9);
-    mpn_copyi(u, z, 9);
-    mpn_copyi(v, z, 9);
-    mpn_copyi(w, z, 9);
+    mpfq_copy(s, z, 9);
+    mpfq_copy(u, z, 9);
+    mpfq_copy(v, z, 9);
+    mpfq_copy(w, z, 9);
     c1 = mpn_addmul_1(s, x, 8, wx);
     s[8] += c1;
     c3 = s[8] < c1;
@@ -6083,16 +6083,16 @@ void test_fixmp_7_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+    mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     c1 = mpn_addmul_1(s, s, 8, wx);
     c2 = mpfq_fixmp_7_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 8) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 8);
-        mpn_copyi(u, z, 8);
-        mpn_copyi(w, z, 8);
+        mpfq_copy(s, z, 8);
+        mpfq_copy(u, z, 8);
+        mpfq_copy(w, z, 8);
         c1 = mpn_addmul_1(s, x, 8, y[7]);
         u[8]=0xdeadbeef;
         w[8]=0xdeadbeef;
@@ -6104,8 +6104,8 @@ void test_fixmp_7_5() {
         assert (mpn_cmp(s, w, 8) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 8);
-        mpn_copyi(u, x, 8);
+        mpfq_copy(s, x, 8);
+        mpfq_copy(u, x, 8);
         c1 = mpn_addmul_1(s, s, 8, y[7]);
         c2 = mpfq_fixmp_7_5_addmul05(u, u, y[7]);
         assert (mpn_cmp(s, u, 8) == 0);
@@ -6117,8 +6117,8 @@ void test_fixmp_7_5() {
     assert (u[9] == 0xdeadbeef);
     assert (mpn_cmp(s,u,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 8);
-    mpn_copyi(v, x, 8);
+    mpfq_copy(t, x, 8);
+    mpfq_copy(v, x, 8);
     t[8] = mpn_mul_1(t, t, 8, wx);
     mpfq_fixmp_7_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 8 + 1) == 0);
@@ -6130,8 +6130,8 @@ void test_fixmp_7_5() {
         assert (mpn_cmp(s,u,8) == 0);
         assert (s[8] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 8);
-        mpn_copyi(v, x, 8);
+        mpfq_copy(t, x, 8);
+        mpfq_copy(v, x, 8);
         t[8] = mpn_mul_1(t, t, 8, y[7]);
         mpfq_fixmp_7_5_mul05(v, v, y[7]);
         assert (mpn_cmp(t, v, 8) == 0);
@@ -6159,10 +6159,10 @@ assert (s[15] == 0);
     j = mpn_cmp(x, y, 8);
     k = mpfq_fixmp_7_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 8);
+    mpfq_copy(u, x, 8);
     j = mpfq_fixmp_7_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 7);
+    mpfq_zero(u+1, 7);
     j = mpfq_fixmp_7_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_7_5_cmp_ui(u, ~x[0]);
@@ -6171,7 +6171,7 @@ assert (s[15] == 0);
     j = mpfq_fixmp_7_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 8);
+    mpfq_copy(v, y, 8);
     v[8-1] += !v[8-1];
     mpn_tdiv_qr(s+9, s, 0, z, 15, v, 8);
     mpfq_fixmp_7_5_mod(u, z, v);
@@ -6183,8 +6183,8 @@ assert (s[15] == 0);
     mpfq_fixmp_7_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 8) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 8);
-    mpn_zero(v, 8);
+    mpfq_zero(u, 8);
+    mpfq_zero(v, 8);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_7_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -6194,9 +6194,9 @@ assert (s[15] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 8);
+    mpfq_zero(u, 8);
     memset(u, ~0, 8 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 8);
+    mpfq_copy(v, x, 8);
     /* This creates an n-limb multiple of 257.  */
     v[8] = mpn_lshift(v, x, 8, 8);
     v[8] += mpfq_fixmp_7_5_add(v, v, x);
@@ -6217,7 +6217,7 @@ assert (s[15] == 0);
       
       // x[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 8);
+      mpfq_zero(mip, 8);
       mpn_random2(p, 8);
       p[8-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[8-1] > p[8-1])
@@ -6227,7 +6227,7 @@ assert (s[15] == 0);
       p[0] |= 1UL;
 p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[8-1] += !p[8-1];
-      mpn_zero(w, 2*8);
+      mpfq_zero(w, 2*8);
       w[8]=1;
       mpfq_fixmp_7_5_mod(w, w, p);
       mpfq_fixmp_7_5_invmod(invR, w, p);
@@ -6235,7 +6235,7 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 8);
+        mpfq_copy(v, mip, 8);
         mpfq_fixmp_7_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 8, 1);
 	mpfq_fixmp_7_5_shortmul(u, t, mip);
@@ -6260,7 +6260,7 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_7_5_mul(t, xe, ye);
       s[15] = mpn_mul_1(s, t, 15, wx);
-      mpn_zero(t, 2*8+1);
+      mpfq_zero(t, 2*8+1);
       mpfq_fixmp_7_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_7_5_mod(s, t, p);
       mpfq_fixmp_7_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -6282,7 +6282,7 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_7_5_redc(s, u, mip, p);
       mpfq_fixmp_7_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+8, s, 0, w, 8+1, p, 8);
-      mpn_zero(w, 2*8+1);
+      mpfq_zero(w, 2*8+1);
       mpfq_fixmp_7_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+8, t, 0, w, 8+1, p, 8);
       assert(mpn_cmp(s, t, 8) == 0);
@@ -6292,7 +6292,7 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_7_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_7_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+8, s, 0, w, 8+1, p, 8);
-      mpn_zero(w, 2*8+1);
+      mpfq_zero(w, 2*8+1);
       mpfq_fixmp_7_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+8, t, 0, w, 8+1, p, 8);
       assert(mpn_cmp(s, t, 8) == 0);
@@ -6308,8 +6308,8 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 8, j);
     else
-        mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_7_5_lshift(u, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // lshift
@@ -6317,32 +6317,32 @@ p[8-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 8, j);
     else
-        mpn_copyi(s, x, 8);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x, 8);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_7_5_rshift(u, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // long_lshift
     j = wx % (8 * GMP_LIMB_BITS);
-    mpn_zero(s, 8);
+    mpfq_zero(s, 8);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 8 - k, j);
     else
-        mpn_copyi(s + k, x, 8 - k);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s + k, x, 8 - k);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_7_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 8) == 0);
     // long_rshift
     j = wx % (8 * GMP_LIMB_BITS);
-    mpn_zero(s, 8);
+    mpfq_zero(s, 8);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 8 - k, j);
     else
-        mpn_copyi(s, x + k, 8 - k);
-    mpn_copyi(u, x, 8);
+        mpfq_copy(s, x + k, 8 - k);
+    mpfq_copy(u, x, 8);
     mpfq_fixmp_7_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 8) == 0);
 }
@@ -6381,8 +6381,8 @@ void test_fixmp_8_5() {
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
     c1 = mpn_add_n(s, x, y, 9);
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c2 = mpfq_fixmp_8_5_add(v, v, y);
     mpfq_fixmp_8_5_add_nc(u, u, y);
     assert (c1 == c2);
@@ -6398,8 +6398,8 @@ void test_fixmp_8_5() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c1 = mpn_add_1(s, x, 9, wx);
     c2 = mpfq_fixmp_8_5_add_ui(u, u, wx);
     mpfq_fixmp_8_5_add_ui_nc(v, v, wx);
@@ -6426,8 +6426,8 @@ void test_fixmp_8_5() {
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
     c1 = mpn_sub_n(s, x, y, 9);
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c2 = mpfq_fixmp_8_5_sub(v, v, y);
     mpfq_fixmp_8_5_sub_nc(u, u, y);
     assert (c1 == c2);
@@ -6443,8 +6443,8 @@ void test_fixmp_8_5() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     /* check aliasing z==x */
-    mpn_copyi(u, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(u, x, 9);
+    mpfq_copy(v, x, 9);
     c1 = mpn_sub_1(s, x, 9, wx);
     c2 = mpfq_fixmp_8_5_sub_ui(u, u, wx);
     mpfq_fixmp_8_5_sub_ui_nc(v, v, wx);
@@ -6452,10 +6452,10 @@ void test_fixmp_8_5() {
     assert (mpn_cmp(s,u,9) == 0);
     assert (mpn_cmp(s,v,9) == 0);
     // addmul1
-    mpn_copyi(s, z, 10);
-    mpn_copyi(u, z, 10);
-    mpn_copyi(v, z, 10);
-    mpn_copyi(w, z, 10);
+    mpfq_copy(s, z, 10);
+    mpfq_copy(u, z, 10);
+    mpfq_copy(v, z, 10);
+    mpfq_copy(w, z, 10);
     c1 = mpn_addmul_1(s, x, 9, wx);
     s[9] += c1;
     c3 = s[9] < c1;
@@ -6474,16 +6474,16 @@ void test_fixmp_8_5() {
     assert (c1 == c2);
     assert (c3 == c4);
     /* check aliasing z==x */
-    mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+    mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     c1 = mpn_addmul_1(s, s, 9, wx);
     c2 = mpfq_fixmp_8_5_addmul1_shortz(u, u, wx);
     assert (mpn_cmp(s, u, 9) == 0);
     assert (c1 == c2);
         // addmul05
-        mpn_copyi(s, z, 9);
-        mpn_copyi(u, z, 9);
-        mpn_copyi(w, z, 9);
+        mpfq_copy(s, z, 9);
+        mpfq_copy(u, z, 9);
+        mpfq_copy(w, z, 9);
         c1 = mpn_addmul_1(s, x, 9, y[8]);
         u[9]=0xdeadbeef;
         w[9]=0xdeadbeef;
@@ -6495,8 +6495,8 @@ void test_fixmp_8_5() {
         assert (mpn_cmp(s, w, 9) == 0);
         assert (c1 == c2);
         /* check aliasing z==x */
-        mpn_copyi(s, x, 9);
-        mpn_copyi(u, x, 9);
+        mpfq_copy(s, x, 9);
+        mpfq_copy(u, x, 9);
         c1 = mpn_addmul_1(s, s, 9, y[8]);
         c2 = mpfq_fixmp_8_5_addmul05(u, u, y[8]);
         assert (mpn_cmp(s, u, 9) == 0);
@@ -6508,8 +6508,8 @@ void test_fixmp_8_5() {
     assert (u[10] == 0xdeadbeef);
     assert (mpn_cmp(s,u,10) == 0);
     /* check aliasing z==x */
-    mpn_copyi(t, x, 9);
-    mpn_copyi(v, x, 9);
+    mpfq_copy(t, x, 9);
+    mpfq_copy(v, x, 9);
     t[9] = mpn_mul_1(t, t, 9, wx);
     mpfq_fixmp_8_5_mul1(v, v, wx);
     assert (mpn_cmp(t, v, 9 + 1) == 0);
@@ -6521,8 +6521,8 @@ void test_fixmp_8_5() {
         assert (mpn_cmp(s,u,9) == 0);
         assert (s[9] == 0);
         /* check aliasing z==x */
-        mpn_copyi(t, x, 9);
-        mpn_copyi(v, x, 9);
+        mpfq_copy(t, x, 9);
+        mpfq_copy(v, x, 9);
         t[9] = mpn_mul_1(t, t, 9, y[8]);
         mpfq_fixmp_8_5_mul05(v, v, y[8]);
         assert (mpn_cmp(t, v, 9) == 0);
@@ -6550,10 +6550,10 @@ assert (s[17] == 0);
     j = mpn_cmp(x, y, 9);
     k = mpfq_fixmp_8_5_cmp(x, y);
     assert (j==k);
-    mpn_copyi(u, x, 9);
+    mpfq_copy(u, x, 9);
     j = mpfq_fixmp_8_5_cmp(x, u);
     assert (j==0);
-    mpn_zero(u+1, 8);
+    mpfq_zero(u+1, 8);
     j = mpfq_fixmp_8_5_cmp_ui(u, x[0]);
     assert (j==0);
     j = mpfq_fixmp_8_5_cmp_ui(u, ~x[0]);
@@ -6562,7 +6562,7 @@ assert (s[17] == 0);
     j = mpfq_fixmp_8_5_cmp_ui(u, x[0]);
     assert (j>0);
     // mod
-    mpn_copyi(v, y, 9);
+    mpfq_copy(v, y, 9);
     v[9-1] += !v[9-1];
     mpn_tdiv_qr(s+10, s, 0, z, 17, v, 9);
     mpfq_fixmp_8_5_mod(u, z, v);
@@ -6574,8 +6574,8 @@ assert (s[17] == 0);
     mpfq_fixmp_8_5_invmod(v, v, P);
     assert(mpn_cmp(v, u, 9) == 0);
     /* also test the degenerate case invmod(0) or invmod(non invertible) */
-    mpn_zero(u, 9);
-    mpn_zero(v, 9);
+    mpfq_zero(u, 9);
+    mpfq_zero(v, 9);
     v[0] = ~0UL;
     c1 = mpfq_fixmp_8_5_invmod(v, u, P);
     assert(c1 == 0);
@@ -6585,9 +6585,9 @@ assert (s[17] == 0);
     assert(c1 == 0);
     assert(v[0] == 0);
     /* non invertible ; We'll make it slightly artificial */
-    mpn_zero(u, 9);
+    mpfq_zero(u, 9);
     memset(u, ~0, 9 * sizeof(mp_limb_t)); /* multiple of 257 */
-    mpn_copyi(v, x, 9);
+    mpfq_copy(v, x, 9);
     /* This creates an n-limb multiple of 257.  */
     v[9] = mpn_lshift(v, x, 9, 8);
     v[9] += mpfq_fixmp_8_5_add(v, v, x);
@@ -6608,7 +6608,7 @@ assert (s[17] == 0);
       
       // x[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       // y[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
-      mpn_zero(mip, 9);
+      mpfq_zero(mip, 9);
       mpn_random2(p, 9);
       p[9-1] &= (1UL<<(GMP_LIMB_BITS-1)) -1;
       if (x[9-1] > p[9-1])
@@ -6618,7 +6618,7 @@ assert (s[17] == 0);
       p[0] |= 1UL;
 p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       p[9-1] += !p[9-1];
-      mpn_zero(w, 2*9);
+      mpfq_zero(w, 2*9);
       w[9]=1;
       mpfq_fixmp_8_5_mod(w, w, p);
       mpfq_fixmp_8_5_invmod(invR, w, p);
@@ -6626,7 +6626,7 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       // with iterated  x <- x + x*(p*x+1) mod R
       mip[0] = 1UL;
       do{ 
-        mpn_copyi(v, mip, 9);
+        mpfq_copy(v, mip, 9);
         mpfq_fixmp_8_5_shortmul(t, mip, p);
 	mpn_add_1(t, t, 9, 1);
 	mpfq_fixmp_8_5_shortmul(u, t, mip);
@@ -6651,7 +6651,7 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
        * is simulated. */
       mpfq_fixmp_8_5_mul(t, xe, ye);
       s[17] = mpn_mul_1(s, t, 17, wx);
-      mpn_zero(t, 2*9+1);
+      mpfq_zero(t, 2*9+1);
       mpfq_fixmp_8_5_redc_ur(t, s, mip, p); /* input is 2n+1-hw words */
       mpfq_fixmp_8_5_mod(s, t, p);
       mpfq_fixmp_8_5_mul1(w, ze, wx);       /* output is n+1-hw/2 words == n+1 */
@@ -6673,7 +6673,7 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_8_5_redc(s, u, mip, p);
       mpfq_fixmp_8_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+9, s, 0, w, 9+1, p, 9);
-      mpn_zero(w, 2*9+1);
+      mpfq_zero(w, 2*9+1);
       mpfq_fixmp_8_5_redc(w, v, mip, p);
       mpn_tdiv_qr(t+9, t, 0, w, 9+1, p, 9);
       assert(mpn_cmp(s, t, 9) == 0);
@@ -6683,7 +6683,7 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
       mpfq_fixmp_8_5_redc_ur(s, u, mip, p);
       mpfq_fixmp_8_5_mul1(w, s, sat);
       mpn_tdiv_qr(s+9, s, 0, w, 9+1, p, 9);
-      mpn_zero(w, 2*9+1);
+      mpfq_zero(w, 2*9+1);
       mpfq_fixmp_8_5_redc_ur(w, v, mip, p);
       mpn_tdiv_qr(t+9, t, 0, w, 9+1, p, 9);
       assert(mpn_cmp(s, t, 9) == 0);
@@ -6699,8 +6699,8 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j) 
         mpn_lshift(s, x, 9, j);
     else
-        mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_8_5_lshift(u, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // lshift
@@ -6708,32 +6708,32 @@ p[9-1] &= (1UL<<(GMP_LIMB_BITS>>1))-1;
     if (j)
         mpn_rshift(s, x, 9, j);
     else
-        mpn_copyi(s, x, 9);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x, 9);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_8_5_rshift(u, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // long_lshift
     j = wx % (9 * GMP_LIMB_BITS);
-    mpn_zero(s, 9);
+    mpfq_zero(s, 9);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_lshift(s + k, x, 9 - k, j);
     else
-        mpn_copyi(s + k, x, 9 - k);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s + k, x, 9 - k);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_8_5_long_lshift(u, k, j);
     assert (mpn_cmp(s, u, 9) == 0);
     // long_rshift
     j = wx % (9 * GMP_LIMB_BITS);
-    mpn_zero(s, 9);
+    mpfq_zero(s, 9);
     k = j / GMP_LIMB_BITS;
     j = j % GMP_LIMB_BITS;
     if (j)
         mpn_rshift(s, x + k, 9 - k, j);
     else
-        mpn_copyi(s, x + k, 9 - k);
-    mpn_copyi(u, x, 9);
+        mpfq_copy(s, x + k, 9 - k);
+    mpfq_copy(u, x, 9);
     mpfq_fixmp_8_5_long_rshift(u, k, j);
     assert (mpn_cmp(s, u, 9) == 0);
 }

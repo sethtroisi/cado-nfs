@@ -1334,7 +1334,7 @@ void mpfq_fixmp_1_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_1_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 1);
+    mpfq_zero(z, 1);
     z[1-1] += x[0]*y[1-1];
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_shortmul) */
@@ -1350,7 +1350,7 @@ void mpfq_fixmp_1_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[1+1], r[1];
     assert (p[1-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 2, p, 1);
-    mpn_copyi(z, r, 1);
+    mpfq_copy(z, r, 1);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_mod) */
 
@@ -1927,7 +1927,7 @@ void mpfq_fixmp_2_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_2_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 2);
+    mpfq_zero(z, 2);
     mpfq_fixmp_1_addmul1_nc (z+0, x, y[0]);
     z[2-1] += x[1]*y[0];
     z[2-1] += x[0]*y[2-1];
@@ -1945,7 +1945,7 @@ void mpfq_fixmp_2_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[2+1], r[2];
     assert (p[2-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 4, p, 2);
-    mpn_copyi(z, r, 2);
+    mpfq_copy(z, r, 2);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_mod) */
 
@@ -1984,9 +1984,9 @@ void mpfq_fixmp_2_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[2-off-1] = a[2-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 2 - off);
+        mpfq_copyi(a, a + off, 2 - off);
     }
-    mpn_zero(a + 2 - off, off);
+    mpfq_zero(a + 2 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_long_rshift) */
 
@@ -2006,9 +2006,9 @@ void mpfq_fixmp_2_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 2 - off);
+        mpfq_copyd(a + off, a, 2 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_long_lshift) */
 
@@ -2024,14 +2024,14 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[2], v[2], a[2], b[2], fix[2];
       int i, t, lsh;
     
-      mpn_zero(u, 2);
-      mpn_zero(v, 2);
-      mpn_copyi(a, x, 2);
-      mpn_copyi(b, p, 2);
+      mpfq_zero(u, 2);
+      mpfq_zero(v, 2);
+      mpfq_copy(a, x, 2);
+      mpfq_copy(b, p, 2);
       u[0] = 1UL;
       
       if (mpfq_fixmp_2_cmp(a, v) == 0 || mpfq_fixmp_2_cmp(a, b) == 0) {
-        mpn_zero(res, 2);
+        mpfq_zero(res, 2);
         return 0;
       }
     
@@ -2075,7 +2075,7 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_2_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_2_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 2);
+          mpfq_copy(res, a, 2);
           return 0;
         }
       }
@@ -2086,7 +2086,7 @@ int mpfq_fixmp_2_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_2_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 2);
+      mpfq_copy(res, u, 2);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_invmod) */
@@ -2119,7 +2119,7 @@ void mpfq_fixmp_2_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_2_cmp(x, p) >= 0) {
         mpfq_fixmp_2_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 2);
+        mpfq_copy(z, x, 2);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_redc) */
@@ -2639,7 +2639,7 @@ void mpfq_fixmp_3_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_3_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 3);
+    mpfq_zero(z, 3);
     mpfq_fixmp_2_addmul1_nc (z+0, x, y[0]);
     z[3-1] += x[2]*y[0];
     mpfq_fixmp_1_addmul1_nc (z+1, x, y[1]);
@@ -2659,7 +2659,7 @@ void mpfq_fixmp_3_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[3+1], r[3];
     assert (p[3-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 6, p, 3);
-    mpn_copyi(z, r, 3);
+    mpfq_copy(z, r, 3);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_mod) */
 
@@ -2698,9 +2698,9 @@ void mpfq_fixmp_3_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[3-off-1] = a[3-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 3 - off);
+        mpfq_copyi(a, a + off, 3 - off);
     }
-    mpn_zero(a + 3 - off, off);
+    mpfq_zero(a + 3 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_long_rshift) */
 
@@ -2720,9 +2720,9 @@ void mpfq_fixmp_3_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 3 - off);
+        mpfq_copyd(a + off, a, 3 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_long_lshift) */
 
@@ -2738,14 +2738,14 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[3], v[3], a[3], b[3], fix[3];
       int i, t, lsh;
     
-      mpn_zero(u, 3);
-      mpn_zero(v, 3);
-      mpn_copyi(a, x, 3);
-      mpn_copyi(b, p, 3);
+      mpfq_zero(u, 3);
+      mpfq_zero(v, 3);
+      mpfq_copy(a, x, 3);
+      mpfq_copy(b, p, 3);
       u[0] = 1UL;
       
       if (mpfq_fixmp_3_cmp(a, v) == 0 || mpfq_fixmp_3_cmp(a, b) == 0) {
-        mpn_zero(res, 3);
+        mpfq_zero(res, 3);
         return 0;
       }
     
@@ -2789,7 +2789,7 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_3_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_3_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 3);
+          mpfq_copy(res, a, 3);
           return 0;
         }
       }
@@ -2800,7 +2800,7 @@ int mpfq_fixmp_3_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_3_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 3);
+      mpfq_copy(res, u, 3);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_invmod) */
@@ -2833,7 +2833,7 @@ void mpfq_fixmp_3_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_3_cmp(x, p) >= 0) {
         mpfq_fixmp_3_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 3);
+        mpfq_copy(z, x, 3);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_redc) */
@@ -3425,7 +3425,7 @@ void mpfq_fixmp_4_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_4_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 4);
+    mpfq_zero(z, 4);
     mpfq_fixmp_3_addmul1_nc (z+0, x, y[0]);
     z[4-1] += x[3]*y[0];
     mpfq_fixmp_2_addmul1_nc (z+1, x, y[1]);
@@ -3447,7 +3447,7 @@ void mpfq_fixmp_4_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[4+1], r[4];
     assert (p[4-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 8, p, 4);
-    mpn_copyi(z, r, 4);
+    mpfq_copy(z, r, 4);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_mod) */
 
@@ -3486,9 +3486,9 @@ void mpfq_fixmp_4_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[4-off-1] = a[4-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 4 - off);
+        mpfq_copyi(a, a + off, 4 - off);
     }
-    mpn_zero(a + 4 - off, off);
+    mpfq_zero(a + 4 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_long_rshift) */
 
@@ -3508,9 +3508,9 @@ void mpfq_fixmp_4_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 4 - off);
+        mpfq_copyd(a + off, a, 4 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_long_lshift) */
 
@@ -3526,14 +3526,14 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[4], v[4], a[4], b[4], fix[4];
       int i, t, lsh;
     
-      mpn_zero(u, 4);
-      mpn_zero(v, 4);
-      mpn_copyi(a, x, 4);
-      mpn_copyi(b, p, 4);
+      mpfq_zero(u, 4);
+      mpfq_zero(v, 4);
+      mpfq_copy(a, x, 4);
+      mpfq_copy(b, p, 4);
       u[0] = 1UL;
       
       if (mpfq_fixmp_4_cmp(a, v) == 0 || mpfq_fixmp_4_cmp(a, b) == 0) {
-        mpn_zero(res, 4);
+        mpfq_zero(res, 4);
         return 0;
       }
     
@@ -3577,7 +3577,7 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_4_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_4_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 4);
+          mpfq_copy(res, a, 4);
           return 0;
         }
       }
@@ -3588,7 +3588,7 @@ int mpfq_fixmp_4_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_4_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 4);
+      mpfq_copy(res, u, 4);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_invmod) */
@@ -3621,7 +3621,7 @@ void mpfq_fixmp_4_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_4_cmp(x, p) >= 0) {
         mpfq_fixmp_4_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 4);
+        mpfq_copy(z, x, 4);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_redc) */
@@ -4285,7 +4285,7 @@ void mpfq_fixmp_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 5);
+    mpfq_zero(z, 5);
     mpfq_fixmp_4_addmul1_nc (z+0, x, y[0]);
     z[5-1] += x[4]*y[0];
     mpfq_fixmp_3_addmul1_nc (z+1, x, y[1]);
@@ -4309,7 +4309,7 @@ void mpfq_fixmp_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[5+1], r[5];
     assert (p[5-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 10, p, 5);
-    mpn_copyi(z, r, 5);
+    mpfq_copy(z, r, 5);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_mod) */
 
@@ -4348,9 +4348,9 @@ void mpfq_fixmp_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[5-off-1] = a[5-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 5 - off);
+        mpfq_copyi(a, a + off, 5 - off);
     }
-    mpn_zero(a + 5 - off, off);
+    mpfq_zero(a + 5 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_long_rshift) */
 
@@ -4370,9 +4370,9 @@ void mpfq_fixmp_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 5 - off);
+        mpfq_copyd(a + off, a, 5 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_long_lshift) */
 
@@ -4388,14 +4388,14 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[5], v[5], a[5], b[5], fix[5];
       int i, t, lsh;
     
-      mpn_zero(u, 5);
-      mpn_zero(v, 5);
-      mpn_copyi(a, x, 5);
-      mpn_copyi(b, p, 5);
+      mpfq_zero(u, 5);
+      mpfq_zero(v, 5);
+      mpfq_copy(a, x, 5);
+      mpfq_copy(b, p, 5);
       u[0] = 1UL;
       
       if (mpfq_fixmp_5_cmp(a, v) == 0 || mpfq_fixmp_5_cmp(a, b) == 0) {
-        mpn_zero(res, 5);
+        mpfq_zero(res, 5);
         return 0;
       }
     
@@ -4439,7 +4439,7 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 5);
+          mpfq_copy(res, a, 5);
           return 0;
         }
       }
@@ -4450,7 +4450,7 @@ int mpfq_fixmp_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 5);
+      mpfq_copy(res, u, 5);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_invmod) */
@@ -4483,7 +4483,7 @@ void mpfq_fixmp_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_5_cmp(x, p) >= 0) {
         mpfq_fixmp_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 5);
+        mpfq_copy(z, x, 5);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_redc) */
@@ -5219,7 +5219,7 @@ void mpfq_fixmp_6_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_6_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 6);
+    mpfq_zero(z, 6);
     mpfq_fixmp_5_addmul1_nc (z+0, x, y[0]);
     z[6-1] += x[5]*y[0];
     mpfq_fixmp_4_addmul1_nc (z+1, x, y[1]);
@@ -5245,7 +5245,7 @@ void mpfq_fixmp_6_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[6+1], r[6];
     assert (p[6-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 12, p, 6);
-    mpn_copyi(z, r, 6);
+    mpfq_copy(z, r, 6);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_mod) */
 
@@ -5284,9 +5284,9 @@ void mpfq_fixmp_6_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[6-off-1] = a[6-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 6 - off);
+        mpfq_copyi(a, a + off, 6 - off);
     }
-    mpn_zero(a + 6 - off, off);
+    mpfq_zero(a + 6 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_long_rshift) */
 
@@ -5306,9 +5306,9 @@ void mpfq_fixmp_6_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 6 - off);
+        mpfq_copyd(a + off, a, 6 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_long_lshift) */
 
@@ -5324,14 +5324,14 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[6], v[6], a[6], b[6], fix[6];
       int i, t, lsh;
     
-      mpn_zero(u, 6);
-      mpn_zero(v, 6);
-      mpn_copyi(a, x, 6);
-      mpn_copyi(b, p, 6);
+      mpfq_zero(u, 6);
+      mpfq_zero(v, 6);
+      mpfq_copy(a, x, 6);
+      mpfq_copy(b, p, 6);
       u[0] = 1UL;
       
       if (mpfq_fixmp_6_cmp(a, v) == 0 || mpfq_fixmp_6_cmp(a, b) == 0) {
-        mpn_zero(res, 6);
+        mpfq_zero(res, 6);
         return 0;
       }
     
@@ -5375,7 +5375,7 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_6_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_6_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 6);
+          mpfq_copy(res, a, 6);
           return 0;
         }
       }
@@ -5386,7 +5386,7 @@ int mpfq_fixmp_6_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_6_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 6);
+      mpfq_copy(res, u, 6);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_invmod) */
@@ -5419,7 +5419,7 @@ void mpfq_fixmp_6_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_6_cmp(x, p) >= 0) {
         mpfq_fixmp_6_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 6);
+        mpfq_copy(z, x, 6);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_redc) */
@@ -6227,7 +6227,7 @@ void mpfq_fixmp_7_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_7_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 7);
+    mpfq_zero(z, 7);
     mpfq_fixmp_6_addmul1_nc (z+0, x, y[0]);
     z[7-1] += x[6]*y[0];
     mpfq_fixmp_5_addmul1_nc (z+1, x, y[1]);
@@ -6255,7 +6255,7 @@ void mpfq_fixmp_7_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[7+1], r[7];
     assert (p[7-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 14, p, 7);
-    mpn_copyi(z, r, 7);
+    mpfq_copy(z, r, 7);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_mod) */
 
@@ -6294,9 +6294,9 @@ void mpfq_fixmp_7_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[7-off-1] = a[7-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 7 - off);
+        mpfq_copyi(a, a + off, 7 - off);
     }
-    mpn_zero(a + 7 - off, off);
+    mpfq_zero(a + 7 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_long_rshift) */
 
@@ -6316,9 +6316,9 @@ void mpfq_fixmp_7_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 7 - off);
+        mpfq_copyd(a + off, a, 7 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_long_lshift) */
 
@@ -6334,14 +6334,14 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[7], v[7], a[7], b[7], fix[7];
       int i, t, lsh;
     
-      mpn_zero(u, 7);
-      mpn_zero(v, 7);
-      mpn_copyi(a, x, 7);
-      mpn_copyi(b, p, 7);
+      mpfq_zero(u, 7);
+      mpfq_zero(v, 7);
+      mpfq_copy(a, x, 7);
+      mpfq_copy(b, p, 7);
       u[0] = 1UL;
       
       if (mpfq_fixmp_7_cmp(a, v) == 0 || mpfq_fixmp_7_cmp(a, b) == 0) {
-        mpn_zero(res, 7);
+        mpfq_zero(res, 7);
         return 0;
       }
     
@@ -6385,7 +6385,7 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_7_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_7_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 7);
+          mpfq_copy(res, a, 7);
           return 0;
         }
       }
@@ -6396,7 +6396,7 @@ int mpfq_fixmp_7_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_7_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 7);
+      mpfq_copy(res, u, 7);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_invmod) */
@@ -6429,7 +6429,7 @@ void mpfq_fixmp_7_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_7_cmp(x, p) >= 0) {
         mpfq_fixmp_7_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 7);
+        mpfq_copy(z, x, 7);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_redc) */
@@ -7309,7 +7309,7 @@ void mpfq_fixmp_8_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_8_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 8);
+    mpfq_zero(z, 8);
     mpfq_fixmp_7_addmul1_nc (z+0, x, y[0]);
     z[8-1] += x[7]*y[0];
     mpfq_fixmp_6_addmul1_nc (z+1, x, y[1]);
@@ -7339,7 +7339,7 @@ void mpfq_fixmp_8_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[8+1], r[8];
     assert (p[8-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 16, p, 8);
-    mpn_copyi(z, r, 8);
+    mpfq_copy(z, r, 8);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_mod) */
 
@@ -7378,9 +7378,9 @@ void mpfq_fixmp_8_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[8-off-1] = a[8-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 8 - off);
+        mpfq_copyi(a, a + off, 8 - off);
     }
-    mpn_zero(a + 8 - off, off);
+    mpfq_zero(a + 8 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_long_rshift) */
 
@@ -7400,9 +7400,9 @@ void mpfq_fixmp_8_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 8 - off);
+        mpfq_copyd(a + off, a, 8 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_long_lshift) */
 
@@ -7418,14 +7418,14 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[8], v[8], a[8], b[8], fix[8];
       int i, t, lsh;
     
-      mpn_zero(u, 8);
-      mpn_zero(v, 8);
-      mpn_copyi(a, x, 8);
-      mpn_copyi(b, p, 8);
+      mpfq_zero(u, 8);
+      mpfq_zero(v, 8);
+      mpfq_copy(a, x, 8);
+      mpfq_copy(b, p, 8);
       u[0] = 1UL;
       
       if (mpfq_fixmp_8_cmp(a, v) == 0 || mpfq_fixmp_8_cmp(a, b) == 0) {
-        mpn_zero(res, 8);
+        mpfq_zero(res, 8);
         return 0;
       }
     
@@ -7469,7 +7469,7 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_8_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_8_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 8);
+          mpfq_copy(res, a, 8);
           return 0;
         }
       }
@@ -7480,7 +7480,7 @@ int mpfq_fixmp_8_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_8_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 8);
+      mpfq_copy(res, u, 8);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_invmod) */
@@ -7513,7 +7513,7 @@ void mpfq_fixmp_8_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_8_cmp(x, p) >= 0) {
         mpfq_fixmp_8_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 8);
+        mpfq_copy(z, x, 8);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_redc) */
@@ -8465,7 +8465,7 @@ void mpfq_fixmp_9_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_9_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 9);
+    mpfq_zero(z, 9);
     mpfq_fixmp_8_addmul1_nc (z+0, x, y[0]);
     z[9-1] += x[8]*y[0];
     mpfq_fixmp_7_addmul1_nc (z+1, x, y[1]);
@@ -8497,7 +8497,7 @@ void mpfq_fixmp_9_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[9+1], r[9];
     assert (p[9-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 18, p, 9);
-    mpn_copyi(z, r, 9);
+    mpfq_copy(z, r, 9);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_9_mod) */
 
@@ -8536,9 +8536,9 @@ void mpfq_fixmp_9_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[9-off-1] = a[9-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 9 - off);
+        mpfq_copyi(a, a + off, 9 - off);
     }
-    mpn_zero(a + 9 - off, off);
+    mpfq_zero(a + 9 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_9_long_rshift) */
 
@@ -8558,9 +8558,9 @@ void mpfq_fixmp_9_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 9 - off);
+        mpfq_copyd(a + off, a, 9 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_9_long_lshift) */
 
@@ -8576,14 +8576,14 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       mp_limb_t u[9], v[9], a[9], b[9], fix[9];
       int i, t, lsh;
     
-      mpn_zero(u, 9);
-      mpn_zero(v, 9);
-      mpn_copyi(a, x, 9);
-      mpn_copyi(b, p, 9);
+      mpfq_zero(u, 9);
+      mpfq_zero(v, 9);
+      mpfq_copy(a, x, 9);
+      mpfq_copy(b, p, 9);
       u[0] = 1UL;
       
       if (mpfq_fixmp_9_cmp(a, v) == 0 || mpfq_fixmp_9_cmp(a, b) == 0) {
-        mpn_zero(res, 9);
+        mpfq_zero(res, 9);
         return 0;
       }
     
@@ -8627,7 +8627,7 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
       } while (mpfq_fixmp_9_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_9_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 9);
+          mpfq_copy(res, a, 9);
           return 0;
         }
       }
@@ -8638,7 +8638,7 @@ int mpfq_fixmp_9_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t * 
           mpfq_fixmp_9_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 9);
+      mpfq_copy(res, u, 9);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_9_invmod) */
@@ -8671,7 +8671,7 @@ void mpfq_fixmp_9_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, cons
     if (cy || mpfq_fixmp_9_cmp(x, p) >= 0) {
         mpfq_fixmp_9_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 9);
+        mpfq_copy(z, x, 9);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_9_redc) */
@@ -9057,7 +9057,7 @@ void mpfq_fixmp_0_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_0_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 1);
+    mpfq_zero(z, 1);
     z[1-1] += x[0]*y[1-1];
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_0_5_shortmul) */
@@ -9104,7 +9104,7 @@ void mpfq_fixmp_0_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[0+1], r[1];
     assert (p[1-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 1, p, 1);
-    mpn_copyi(z, r, 1);
+    mpfq_copy(z, r, 1);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_0_5_mod) */
 
@@ -9704,7 +9704,7 @@ void mpfq_fixmp_1_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_1_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 2);
+    mpfq_zero(z, 2);
     mpfq_fixmp_1_addmul1_nc (z+0, x, y[0]);
     z[2-1] += x[1]*y[0];
     z[2-1] += x[0]*y[2-1];
@@ -9764,7 +9764,7 @@ void mpfq_fixmp_1_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[1+1], r[2];
     assert (p[2-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 3, p, 2);
-    mpn_copyi(z, r, 2);
+    mpfq_copy(z, r, 2);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_5_mod) */
 
@@ -9803,9 +9803,9 @@ void mpfq_fixmp_1_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[2-off-1] = a[2-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 2 - off);
+        mpfq_copyi(a, a + off, 2 - off);
     }
-    mpn_zero(a + 2 - off, off);
+    mpfq_zero(a + 2 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_5_long_rshift) */
 
@@ -9825,9 +9825,9 @@ void mpfq_fixmp_1_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 2 - off);
+        mpfq_copyd(a + off, a, 2 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_5_long_lshift) */
 
@@ -9843,14 +9843,14 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[2], v[2], a[2], b[2], fix[2];
       int i, t, lsh;
     
-      mpn_zero(u, 2);
-      mpn_zero(v, 2);
-      mpn_copyi(a, x, 2);
-      mpn_copyi(b, p, 2);
+      mpfq_zero(u, 2);
+      mpfq_zero(v, 2);
+      mpfq_copy(a, x, 2);
+      mpfq_copy(b, p, 2);
       u[0] = 1UL;
       
       if (mpfq_fixmp_1_5_cmp(a, v) == 0 || mpfq_fixmp_1_5_cmp(a, b) == 0) {
-        mpn_zero(res, 2);
+        mpfq_zero(res, 2);
         return 0;
       }
     
@@ -9894,7 +9894,7 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_1_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_1_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 2);
+          mpfq_copy(res, a, 2);
           return 0;
         }
       }
@@ -9905,7 +9905,7 @@ int mpfq_fixmp_1_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_1_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 2);
+      mpfq_copy(res, u, 2);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_5_invmod) */
@@ -9941,7 +9941,7 @@ void mpfq_fixmp_1_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_1_5_cmp(x, p) >= 0) {
         mpfq_fixmp_1_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 2);
+        mpfq_copy(z, x, 2);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_1_5_redc) */
@@ -10491,7 +10491,7 @@ void mpfq_fixmp_2_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_2_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 3);
+    mpfq_zero(z, 3);
     mpfq_fixmp_2_addmul1_nc (z+0, x, y[0]);
     z[3-1] += x[2]*y[0];
     mpfq_fixmp_1_addmul1_nc (z+1, x, y[1]);
@@ -10564,7 +10564,7 @@ void mpfq_fixmp_2_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[2+1], r[3];
     assert (p[3-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 5, p, 3);
-    mpn_copyi(z, r, 3);
+    mpfq_copy(z, r, 3);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_5_mod) */
 
@@ -10603,9 +10603,9 @@ void mpfq_fixmp_2_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[3-off-1] = a[3-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 3 - off);
+        mpfq_copyi(a, a + off, 3 - off);
     }
-    mpn_zero(a + 3 - off, off);
+    mpfq_zero(a + 3 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_5_long_rshift) */
 
@@ -10625,9 +10625,9 @@ void mpfq_fixmp_2_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 3 - off);
+        mpfq_copyd(a + off, a, 3 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_5_long_lshift) */
 
@@ -10643,14 +10643,14 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[3], v[3], a[3], b[3], fix[3];
       int i, t, lsh;
     
-      mpn_zero(u, 3);
-      mpn_zero(v, 3);
-      mpn_copyi(a, x, 3);
-      mpn_copyi(b, p, 3);
+      mpfq_zero(u, 3);
+      mpfq_zero(v, 3);
+      mpfq_copy(a, x, 3);
+      mpfq_copy(b, p, 3);
       u[0] = 1UL;
       
       if (mpfq_fixmp_2_5_cmp(a, v) == 0 || mpfq_fixmp_2_5_cmp(a, b) == 0) {
-        mpn_zero(res, 3);
+        mpfq_zero(res, 3);
         return 0;
       }
     
@@ -10694,7 +10694,7 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_2_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_2_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 3);
+          mpfq_copy(res, a, 3);
           return 0;
         }
       }
@@ -10705,7 +10705,7 @@ int mpfq_fixmp_2_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_2_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 3);
+      mpfq_copy(res, u, 3);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_5_invmod) */
@@ -10741,7 +10741,7 @@ void mpfq_fixmp_2_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_2_5_cmp(x, p) >= 0) {
         mpfq_fixmp_2_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 3);
+        mpfq_copy(z, x, 3);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_2_5_redc) */
@@ -11370,7 +11370,7 @@ void mpfq_fixmp_3_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_3_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 4);
+    mpfq_zero(z, 4);
     mpfq_fixmp_3_addmul1_nc (z+0, x, y[0]);
     z[4-1] += x[3]*y[0];
     mpfq_fixmp_2_addmul1_nc (z+1, x, y[1]);
@@ -11456,7 +11456,7 @@ void mpfq_fixmp_3_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[3+1], r[4];
     assert (p[4-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 7, p, 4);
-    mpn_copyi(z, r, 4);
+    mpfq_copy(z, r, 4);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_5_mod) */
 
@@ -11495,9 +11495,9 @@ void mpfq_fixmp_3_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[4-off-1] = a[4-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 4 - off);
+        mpfq_copyi(a, a + off, 4 - off);
     }
-    mpn_zero(a + 4 - off, off);
+    mpfq_zero(a + 4 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_5_long_rshift) */
 
@@ -11517,9 +11517,9 @@ void mpfq_fixmp_3_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 4 - off);
+        mpfq_copyd(a + off, a, 4 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_5_long_lshift) */
 
@@ -11535,14 +11535,14 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[4], v[4], a[4], b[4], fix[4];
       int i, t, lsh;
     
-      mpn_zero(u, 4);
-      mpn_zero(v, 4);
-      mpn_copyi(a, x, 4);
-      mpn_copyi(b, p, 4);
+      mpfq_zero(u, 4);
+      mpfq_zero(v, 4);
+      mpfq_copy(a, x, 4);
+      mpfq_copy(b, p, 4);
       u[0] = 1UL;
       
       if (mpfq_fixmp_3_5_cmp(a, v) == 0 || mpfq_fixmp_3_5_cmp(a, b) == 0) {
-        mpn_zero(res, 4);
+        mpfq_zero(res, 4);
         return 0;
       }
     
@@ -11586,7 +11586,7 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_3_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_3_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 4);
+          mpfq_copy(res, a, 4);
           return 0;
         }
       }
@@ -11597,7 +11597,7 @@ int mpfq_fixmp_3_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_3_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 4);
+      mpfq_copy(res, u, 4);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_5_invmod) */
@@ -11633,7 +11633,7 @@ void mpfq_fixmp_3_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_3_5_cmp(x, p) >= 0) {
         mpfq_fixmp_3_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 4);
+        mpfq_copy(z, x, 4);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_3_5_redc) */
@@ -12341,7 +12341,7 @@ void mpfq_fixmp_4_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_4_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 5);
+    mpfq_zero(z, 5);
     mpfq_fixmp_4_addmul1_nc (z+0, x, y[0]);
     z[5-1] += x[4]*y[0];
     mpfq_fixmp_3_addmul1_nc (z+1, x, y[1]);
@@ -12440,7 +12440,7 @@ void mpfq_fixmp_4_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[4+1], r[5];
     assert (p[5-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 9, p, 5);
-    mpn_copyi(z, r, 5);
+    mpfq_copy(z, r, 5);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_5_mod) */
 
@@ -12479,9 +12479,9 @@ void mpfq_fixmp_4_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[5-off-1] = a[5-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 5 - off);
+        mpfq_copyi(a, a + off, 5 - off);
     }
-    mpn_zero(a + 5 - off, off);
+    mpfq_zero(a + 5 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_5_long_rshift) */
 
@@ -12501,9 +12501,9 @@ void mpfq_fixmp_4_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 5 - off);
+        mpfq_copyd(a + off, a, 5 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_5_long_lshift) */
 
@@ -12519,14 +12519,14 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[5], v[5], a[5], b[5], fix[5];
       int i, t, lsh;
     
-      mpn_zero(u, 5);
-      mpn_zero(v, 5);
-      mpn_copyi(a, x, 5);
-      mpn_copyi(b, p, 5);
+      mpfq_zero(u, 5);
+      mpfq_zero(v, 5);
+      mpfq_copy(a, x, 5);
+      mpfq_copy(b, p, 5);
       u[0] = 1UL;
       
       if (mpfq_fixmp_4_5_cmp(a, v) == 0 || mpfq_fixmp_4_5_cmp(a, b) == 0) {
-        mpn_zero(res, 5);
+        mpfq_zero(res, 5);
         return 0;
       }
     
@@ -12570,7 +12570,7 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_4_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_4_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 5);
+          mpfq_copy(res, a, 5);
           return 0;
         }
       }
@@ -12581,7 +12581,7 @@ int mpfq_fixmp_4_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_4_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 5);
+      mpfq_copy(res, u, 5);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_5_invmod) */
@@ -12617,7 +12617,7 @@ void mpfq_fixmp_4_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_4_5_cmp(x, p) >= 0) {
         mpfq_fixmp_4_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 5);
+        mpfq_copy(z, x, 5);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_4_5_redc) */
@@ -13404,7 +13404,7 @@ void mpfq_fixmp_5_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_5_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 6);
+    mpfq_zero(z, 6);
     mpfq_fixmp_5_addmul1_nc (z+0, x, y[0]);
     z[6-1] += x[5]*y[0];
     mpfq_fixmp_4_addmul1_nc (z+1, x, y[1]);
@@ -13516,7 +13516,7 @@ void mpfq_fixmp_5_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[5+1], r[6];
     assert (p[6-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 11, p, 6);
-    mpn_copyi(z, r, 6);
+    mpfq_copy(z, r, 6);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_5_mod) */
 
@@ -13555,9 +13555,9 @@ void mpfq_fixmp_5_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[6-off-1] = a[6-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 6 - off);
+        mpfq_copyi(a, a + off, 6 - off);
     }
-    mpn_zero(a + 6 - off, off);
+    mpfq_zero(a + 6 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_5_long_rshift) */
 
@@ -13577,9 +13577,9 @@ void mpfq_fixmp_5_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 6 - off);
+        mpfq_copyd(a + off, a, 6 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_5_long_lshift) */
 
@@ -13595,14 +13595,14 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[6], v[6], a[6], b[6], fix[6];
       int i, t, lsh;
     
-      mpn_zero(u, 6);
-      mpn_zero(v, 6);
-      mpn_copyi(a, x, 6);
-      mpn_copyi(b, p, 6);
+      mpfq_zero(u, 6);
+      mpfq_zero(v, 6);
+      mpfq_copy(a, x, 6);
+      mpfq_copy(b, p, 6);
       u[0] = 1UL;
       
       if (mpfq_fixmp_5_5_cmp(a, v) == 0 || mpfq_fixmp_5_5_cmp(a, b) == 0) {
-        mpn_zero(res, 6);
+        mpfq_zero(res, 6);
         return 0;
       }
     
@@ -13646,7 +13646,7 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_5_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_5_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 6);
+          mpfq_copy(res, a, 6);
           return 0;
         }
       }
@@ -13657,7 +13657,7 @@ int mpfq_fixmp_5_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_5_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 6);
+      mpfq_copy(res, u, 6);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_5_invmod) */
@@ -13693,7 +13693,7 @@ void mpfq_fixmp_5_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_5_5_cmp(x, p) >= 0) {
         mpfq_fixmp_5_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 6);
+        mpfq_copy(z, x, 6);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_5_5_redc) */
@@ -14559,7 +14559,7 @@ void mpfq_fixmp_6_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_6_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 7);
+    mpfq_zero(z, 7);
     mpfq_fixmp_6_addmul1_nc (z+0, x, y[0]);
     z[7-1] += x[6]*y[0];
     mpfq_fixmp_5_addmul1_nc (z+1, x, y[1]);
@@ -14684,7 +14684,7 @@ void mpfq_fixmp_6_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[6+1], r[7];
     assert (p[7-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 13, p, 7);
-    mpn_copyi(z, r, 7);
+    mpfq_copy(z, r, 7);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_5_mod) */
 
@@ -14723,9 +14723,9 @@ void mpfq_fixmp_6_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[7-off-1] = a[7-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 7 - off);
+        mpfq_copyi(a, a + off, 7 - off);
     }
-    mpn_zero(a + 7 - off, off);
+    mpfq_zero(a + 7 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_5_long_rshift) */
 
@@ -14745,9 +14745,9 @@ void mpfq_fixmp_6_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 7 - off);
+        mpfq_copyd(a + off, a, 7 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_5_long_lshift) */
 
@@ -14763,14 +14763,14 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[7], v[7], a[7], b[7], fix[7];
       int i, t, lsh;
     
-      mpn_zero(u, 7);
-      mpn_zero(v, 7);
-      mpn_copyi(a, x, 7);
-      mpn_copyi(b, p, 7);
+      mpfq_zero(u, 7);
+      mpfq_zero(v, 7);
+      mpfq_copy(a, x, 7);
+      mpfq_copy(b, p, 7);
       u[0] = 1UL;
       
       if (mpfq_fixmp_6_5_cmp(a, v) == 0 || mpfq_fixmp_6_5_cmp(a, b) == 0) {
-        mpn_zero(res, 7);
+        mpfq_zero(res, 7);
         return 0;
       }
     
@@ -14814,7 +14814,7 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_6_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_6_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 7);
+          mpfq_copy(res, a, 7);
           return 0;
         }
       }
@@ -14825,7 +14825,7 @@ int mpfq_fixmp_6_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_6_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 7);
+      mpfq_copy(res, u, 7);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_5_invmod) */
@@ -14861,7 +14861,7 @@ void mpfq_fixmp_6_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_6_5_cmp(x, p) >= 0) {
         mpfq_fixmp_6_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 7);
+        mpfq_copy(z, x, 7);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_6_5_redc) */
@@ -15806,7 +15806,7 @@ void mpfq_fixmp_7_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_7_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 8);
+    mpfq_zero(z, 8);
     mpfq_fixmp_7_addmul1_nc (z+0, x, y[0]);
     z[8-1] += x[7]*y[0];
     mpfq_fixmp_6_addmul1_nc (z+1, x, y[1]);
@@ -15944,7 +15944,7 @@ void mpfq_fixmp_7_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[7+1], r[8];
     assert (p[8-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 15, p, 8);
-    mpn_copyi(z, r, 8);
+    mpfq_copy(z, r, 8);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_5_mod) */
 
@@ -15983,9 +15983,9 @@ void mpfq_fixmp_7_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[8-off-1] = a[8-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 8 - off);
+        mpfq_copyi(a, a + off, 8 - off);
     }
-    mpn_zero(a + 8 - off, off);
+    mpfq_zero(a + 8 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_5_long_rshift) */
 
@@ -16005,9 +16005,9 @@ void mpfq_fixmp_7_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 8 - off);
+        mpfq_copyd(a + off, a, 8 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_5_long_lshift) */
 
@@ -16023,14 +16023,14 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[8], v[8], a[8], b[8], fix[8];
       int i, t, lsh;
     
-      mpn_zero(u, 8);
-      mpn_zero(v, 8);
-      mpn_copyi(a, x, 8);
-      mpn_copyi(b, p, 8);
+      mpfq_zero(u, 8);
+      mpfq_zero(v, 8);
+      mpfq_copy(a, x, 8);
+      mpfq_copy(b, p, 8);
       u[0] = 1UL;
       
       if (mpfq_fixmp_7_5_cmp(a, v) == 0 || mpfq_fixmp_7_5_cmp(a, b) == 0) {
-        mpn_zero(res, 8);
+        mpfq_zero(res, 8);
         return 0;
       }
     
@@ -16074,7 +16074,7 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_7_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_7_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 8);
+          mpfq_copy(res, a, 8);
           return 0;
         }
       }
@@ -16085,7 +16085,7 @@ int mpfq_fixmp_7_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_7_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 8);
+      mpfq_copy(res, u, 8);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_5_invmod) */
@@ -16121,7 +16121,7 @@ void mpfq_fixmp_7_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_7_5_cmp(x, p) >= 0) {
         mpfq_fixmp_7_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 8);
+        mpfq_copy(z, x, 8);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_7_5_redc) */
@@ -17145,7 +17145,7 @@ void mpfq_fixmp_8_5_mul1(mp_limb_t * z, const mp_limb_t * x, mp_limb_t c)
 static inline
 void mpfq_fixmp_8_5_shortmul(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * y)
 {
-    mpn_zero(z, 9);
+    mpfq_zero(z, 9);
     mpfq_fixmp_8_addmul1_nc (z+0, x, y[0]);
     z[9-1] += x[8]*y[0];
     mpfq_fixmp_7_addmul1_nc (z+1, x, y[1]);
@@ -17296,7 +17296,7 @@ void mpfq_fixmp_8_5_mod(mp_limb_t * z, const mp_limb_t * x, const mp_limb_t * p)
     mp_limb_t q[8+1], r[9];
     assert (p[9-1] != 0);
     mpn_tdiv_qr(q, r, 0, x, 17, p, 9);
-    mpn_copyi(z, r, 9);
+    mpfq_copy(z, r, 9);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_5_mod) */
 
@@ -17335,9 +17335,9 @@ void mpfq_fixmp_8_5_long_rshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[9-off-1] = a[9-1]>>cnt;
     } else {
-        mpn_copyi(a, a + off, 9 - off);
+        mpfq_copyi(a, a + off, 9 - off);
     }
-    mpn_zero(a + 9 - off, off);
+    mpfq_zero(a + 9 - off, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_5_long_rshift) */
 
@@ -17357,9 +17357,9 @@ void mpfq_fixmp_8_5_long_lshift(mp_limb_t * a, int off MAYBE_UNUSED, int cnt)
         }
         a[off] = a[0]<<cnt;
     } else {
-        mpn_copyd(a + off, a, 9 - off);
+        mpfq_copyd(a + off, a, 9 - off);
     }
-    mpn_zero(a, off);
+    mpfq_zero(a, off);
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_5_long_lshift) */
 
@@ -17375,14 +17375,14 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       mp_limb_t u[9], v[9], a[9], b[9], fix[9];
       int i, t, lsh;
     
-      mpn_zero(u, 9);
-      mpn_zero(v, 9);
-      mpn_copyi(a, x, 9);
-      mpn_copyi(b, p, 9);
+      mpfq_zero(u, 9);
+      mpfq_zero(v, 9);
+      mpfq_copy(a, x, 9);
+      mpfq_copy(b, p, 9);
       u[0] = 1UL;
       
       if (mpfq_fixmp_8_5_cmp(a, v) == 0 || mpfq_fixmp_8_5_cmp(a, b) == 0) {
-        mpn_zero(res, 9);
+        mpfq_zero(res, 9);
         return 0;
       }
     
@@ -17426,7 +17426,7 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
       } while (mpfq_fixmp_8_5_cmp(a,b) != 0);
       {
         if (mpfq_fixmp_8_5_cmp_ui(a, 1) != 0) {
-          mpn_copyi(res, a, 9);
+          mpfq_copy(res, a, 9);
           return 0;
         }
       }
@@ -17437,7 +17437,7 @@ int mpfq_fixmp_8_5_invmod(mp_limb_t * res, const mp_limb_t * x, const mp_limb_t 
           mpfq_fixmp_8_5_add(u, u, fix);
         --t;
       }
-      mpn_copyi(res, u, 9);
+      mpfq_copy(res, u, 9);
       return 1;
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_5_invmod) */
@@ -17473,7 +17473,7 @@ void mpfq_fixmp_8_5_redc(mp_limb_t * z, mp_limb_t * x, const mp_limb_t * mip, co
     if (cy || mpfq_fixmp_8_5_cmp(x, p) >= 0) {
         mpfq_fixmp_8_5_sub(z, x, p);
     } else {
-        if (x != z) mpn_copyi(z, x, 9);
+        mpfq_copy(z, x, 9);
     }
 }
 #endif /* !defined(HAVE_native_mpfq_fixmp_8_5_redc) */

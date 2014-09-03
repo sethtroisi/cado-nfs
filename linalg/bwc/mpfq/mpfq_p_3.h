@@ -496,7 +496,7 @@ void mpfq_p_3_set_ui(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_elt r, unsi
 {
     assert (r);
     r[0] = x;
-    mpn_zero(r + 1, 3 - 1);
+    mpfq_zero(r + 1, 3 - 1);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
@@ -518,8 +518,8 @@ static inline
 void mpfq_p_3_set_mpn(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt r, mp_limb_t * x, size_t n)
 {
     if (n < 3) {
-        mpn_copyi(r, x, n);
-        mpn_zero(r + n, 3 - n);
+        mpfq_copy(r, x, n);
+        mpfq_zero(r + n, 3 - n);
     } else {
         mp_limb_t tmp[n-3+1];
         mpn_tdiv_qr(tmp, r, 0, x, n, k->p->_mp_d, 3);
@@ -542,7 +542,7 @@ void mpfq_p_3_set_mpz(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt r, mpz_t z)
 static inline
 void mpfq_p_3_get_mpn(mpfq_p_3_dst_field k MAYBE_UNUSED, mp_limb_t * r, mpfq_p_3_src_elt x)
 {
-    mpn_copyi(r, x, 3);
+    mpfq_copy(r, x, 3);
 }
 
 /* *Mpfq::gfp::elt::code_for_get_mpz, Mpfq::gfp */
@@ -566,7 +566,7 @@ void mpfq_p_3_random(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt x, gmp_randstate_t s
       mpz_t z;
       mpz_init(z);
       mpz_urandomb(z, state, 3 * GMP_LIMB_BITS);
-      mpn_copyi(x, z->_mp_d, 3);
+      mpfq_copy(x, z->_mp_d, 3);
       mpz_clear(z);
     mpfq_p_3_normalize(k, x);
 }
@@ -578,7 +578,7 @@ void mpfq_p_3_random2(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt x, gmp_randstate_t 
       mpz_t z;
       mpz_init(z);
       mpz_rrandomb(z, state, 3 * GMP_LIMB_BITS);
-      mpn_copyi(x, z->_mp_d, 3);
+      mpfq_copy(x, z->_mp_d, 3);
       mpz_clear(z);
     mpfq_p_3_normalize(k, x);
 }
@@ -776,7 +776,7 @@ void mpfq_p_3_elt_ur_clear(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_elt_ur * 
 static inline
 void mpfq_p_3_elt_ur_set(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_elt_ur z, mpfq_p_3_src_elt_ur x)
 {
-    mpn_copyi(z, x, 7);
+    mpfq_copy(z, x, 7);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
@@ -799,7 +799,7 @@ void mpfq_p_3_elt_ur_set_ui(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_elt_
 {
     assert (r); 
     r[0] = x;
-    mpn_zero(r + 1, 7 - 1);
+    mpfq_zero(r + 1, 7 - 1);
 }
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_add, Mpfq::gfp */
@@ -815,7 +815,7 @@ void mpfq_p_3_elt_ur_neg(mpfq_p_3_dst_field k, mpfq_p_3_dst_elt_ur z, mpfq_p_3_s
 {
     mpfq_p_3_elt_ur tmp;
     mpfq_p_3_elt_ur_init(k, &tmp);
-    mpn_zero(tmp, 7);
+    mpfq_zero(tmp, 7);
     mpn_sub_n(z, tmp, x, 7);
     mpfq_p_3_elt_ur_clear(k, &tmp);
 }
@@ -832,7 +832,7 @@ static inline
 void mpfq_p_3_mul_ur(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_elt_ur z, mpfq_p_3_src_elt x, mpfq_p_3_src_elt y)
 {
     mpfq_fixmp_3_mul(z, x, y);
-    mpn_zero(z + 6, 7 - 6);
+    mpfq_zero(z + 6, 7 - 6);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqr_ur, Mpfq::gfp */
@@ -840,7 +840,7 @@ static inline
 void mpfq_p_3_sqr_ur(mpfq_p_3_dst_field k MAYBE_UNUSED, mpfq_p_3_dst_elt_ur z, mpfq_p_3_src_elt x)
 {
     mpfq_fixmp_3_sqr(z, x);
-    mpn_zero(z + 6, 7 - 6);
+    mpfq_zero(z + 6, 7 - 6);
 }
 
 /* *Mpfq::gfp::elt::code_for_reduce, Mpfq::gfp */
