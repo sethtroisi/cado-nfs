@@ -62,4 +62,37 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1)
 add_dependencies(check mf_scan plingen_p_1)
 
+# Each of these lines has:
+# reference sha1 sum for generator
+# m
+# n
+# length of sequence to compute
+# p
+# seed for random generation (entries are (2^k*(seed/1000) mod q) + (3^k*(seed%1000) mod q) mod p, with q=2^20-3).
+# arguments to be passed to plingen (including mpi arguments)
+
+macro(add_plingen_test testname)
+    string_join(tail " " ${ARGN})
+    add_test(${testname} bash -c
+        "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
+endmacro(add_plingen_test testname)
+
+# For the moment these only test plingen_pz
+add_plingen_test(test-plingen-0 2b6428178054fc0d3931dcdc9257ccf3bdea62f9
+    4 2 36 1009 17042 lingen-threshold=10 lingen-mpi-threshold=10 thr=2x2
+    --ascii)
+add_plingen_test(test-plingen-1 f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9
+    4 2 200 1009 88888 lingen-threshold=10 lingen-mpi-threshold=10
+    thr=2x2 --ascii)
+add_plingen_test(test-plingen-2 f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9
+    4 2 200 1009 88888 lingen-threshold=10 lingen-mpi-threshold=40
+    thr=2x2 --ascii)
+add_plingen_test(test-plingen-3 b448493e04299d8d54be6cc1273c43293520ac9e
+    3 3 1000 1009 1111 lingen-threshold=10 lingen-mpi-threshold=40
+    thr=3x3 --ascii)
+add_plingen_test(test-plingen-4 00a481d0e0e2ee7403fa234b7f8b818dc2ec8db4
+    3 3 1000 1532495540865888858358347027150309183618739122183602191 1111
+    lingen-threshold=10 lingen-mpi-threshold=40 thr=3x3)
+
+
 add_subdirectory(mpfq)
