@@ -1747,7 +1747,10 @@ int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
 {
     int ok= thread_data_eq(pi, buffer, sz);
-    MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
+    if (pi->m->trank == 0) {
+        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
+    }
+    thread_broadcast(pi->m, &ok, sizeof(int), 0);
     if (!ok) return 0;
     return mpi_data_eq(pi, buffer, sz);
 }
