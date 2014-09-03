@@ -29,9 +29,6 @@ dotest() {
 
     TMPDIR=`mktemp -d /tmp/plingen-test.XXXXXXXXXX`
 
-    program=$plingen_binary
-    : ${program:=plingen_pz}
-
     m="$1"; shift
     n="$1"; shift
     kmax="$1"; shift
@@ -45,6 +42,7 @@ dotest() {
     mt_args=()
     for x in "$@" ; do
         case "$x" in
+            plingen_program=*) eval "$x";;
             lingen-mpi-threshold*) mt_args=("${mt_args[@]}" "$x");;
             thr*) mt_args=("${mt_args[@]}" "$x"); thr="${x#thr=}";;
             *) args=("${args[@]}" "$x");
@@ -63,6 +61,8 @@ dotest() {
     nbits_prime=$(echo "l($p)/l(2)+1" | bc -l | cut -d. -f1)
     nwords=$(echo "1+l($p)/l(2)/$wordsize"| bc -l)
     nwords=${nwords/.*/}
+
+    : ${plingen_program:=plingen_p_$nwords}
 
     F="$TMPDIR/base"
     if [ "$ascii" ] ; then
@@ -121,7 +121,7 @@ EOF
     cat $F $F $F > $G
     rm -f $F
 
-    $bindir/linalg/bwc/$program m=$m n=$n prime=$p --afile $G "${args[@]}"
+    $bindir/linalg/bwc/$plingen_program m=$m n=$n prime=$p --afile $G "${args[@]}"
     [ -f "$G.gen" ]
     SHA1=$($SHA1BIN < $G.gen)
     SHA1="${SHA1%% *}"
@@ -145,7 +145,7 @@ EOF
             exit 1
         fi
         njobs=$(($1*$2))
-        $mpi_bindir/mpiexec -n $njobs $bindir/linalg/bwc/$program m=$m n=$n prime=$p --afile $G "${args[@]}" "${mt_args[@]}"
+        $mpi_bindir/mpiexec -n $njobs $bindir/linalg/bwc/$plingen_program m=$m n=$n prime=$p --afile $G "${args[@]}" "${mt_args[@]}"
 
         [ -f "$G.gen" ]
         SHA1=$($SHA1BIN < $G.gen)
