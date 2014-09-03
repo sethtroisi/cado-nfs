@@ -148,7 +148,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
     }
 
     /* reconcile threads */
-    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 1);
+    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 0);
 
     /* ok, got it. Before we possibly leave, make sure everybody has read
      * the data from the pointer. */
