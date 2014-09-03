@@ -702,13 +702,16 @@ if ($mpi_needed) {
     check_mpd_daemons();
     if (!$needs_mpd) {
         # Then we must configure ssh
+        # Note that openmpi changes the name of the option pretty
+        # frequently.
         if ($mpi_ver =~ /^openmpi-1\.2/) {
             push @mpi_precmd, qw/--mca pls_rsh_agent/, ssh_program();
         } elsif ($mpi_ver =~ /^openmpi-1\.[34]/) {
             push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi/) {
-            # Default to orte_rsh_agent which is the new name as of 1.5
+        } elsif ($mpi_ver =~ /^openmpi-1\.[56]/) {
             push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
+        } elsif ($mpi_ver =~ /^openmpi]/) {
+            push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
         } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
             # Not older mpich2's, which need a daemon.
             push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();

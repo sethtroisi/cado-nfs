@@ -143,14 +143,41 @@ derived_variables() {
     done
 
     if [ "$bindir" ] ; then
-        if grep -q 'undef HAVE_MPI' $bindir/../../cado_mpi_config.h ; then
+        mpi_bindir=$(perl -ne '/HAVE_MPI\s*"(.*)"\s*$/ && print "$1\n";' $bindir/../../cado_mpi_config.h)
+        if ! [ "$mpi_bindir" ] ; then
             disable_parallel_plingen=1
+        elif ! [ -d "$mpi_bindir" ] ; then
+            echo "HAVE_MPI variable in cado_mpi_config.h ($mpi_bindir) does not point to a directory" >&2
+            exit 1
         fi
     else
         eval "export $buildopts"
         if ! [ "$MPI" ] || [ "$MPI" = 0 ] ; then
             disable_parallel_plingen=1
+        elif [ "$MPI" = 1 ] ; then
+            :
+        elif [ -d "$MPI" ] ; then
+            mpi_bindir="$MPI"
+        else
+            echo "MPI environment variable ($MPI) does not point to a directory (nor is it 0 or 1)" >&2
+            exit 1
         fi
+    fi
+
+    if [ "$disable_parallel_plingen" ] ; then
+        mpi_njobs_lingen=1
+    fi
+    if [ $mpi_njobs_lingen -gt 1 ] ; then
+        if ! [ -d "$mpi_bindir" ] ; then
+            echo "We need mpi_bindir to run parallel plingen" >&2
+            exit 1
+        fi
+    fi
+    if ! [ "$mpi_bindir" ] || [ -d "$mpi_bindir" ] ; then
+        :
+    else
+        echo "mpi_bindir must be either empty or point to a directory" >&2
+        exit 1
     fi
 
     echo "Working on ${#sequences[@]} sequences"
@@ -485,7 +512,7 @@ do_lingen_step_gfp() {
     afile=$($bindir/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
 
     if [ $mpi_njobs_lingen -gt 1 ] ; then
-        precmd="mpirun -n $mpi_njobs_lingen"
+        precmd="$mpi_bindir/mpiexec -n $mpi_njobs_lingen"
     fi
     set lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile nrhs=$nrhs
     if ! [ "$disable_parallel_plingen" ] ; then
