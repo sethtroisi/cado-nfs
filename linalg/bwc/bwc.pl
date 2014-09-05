@@ -160,6 +160,7 @@ for my $k (keys %$param_defaults) {
     $param->{$k} = $param_defaults->{$k};
 }
 
+
 # }}}
 
 # {{{ global variables. Much resides in $param, but we do have globals
@@ -228,16 +229,22 @@ my $needs_mpd;
 # {{{
 sub set_mpithr_param { # {{{ utility
     my $v = shift @_;
+    my @s = (1,$v);
     if ($v=~/^(\d+)$/) {
         my $nthreads = $1;
         my $s = int(sqrt($nthreads));
         for (; $s >= 1; $s--) {
-            $nthreads % $s or return ($s, $nthreads / $s);
+            next if $nthreads % $s > 1;
+            @s = ($s, $nthreads / $s);
+            last;
         }
-        die "No possible thread split?";
+        die unless $s[0]*$s[1] == $v;
+    } elsif ($v=~/(\d+)x(\d+)$/) {
+        @s = ($1, $2);
+    } else {
+        usage "bad splitting value '$v'";
     }
-    $v=~/(\d+)x(\d+)$/ or usage "bad splitting value '$v'";
-    return ($1, $2);
+    return @s;
 } # }}}
 
 while (my ($k,$v) = each %$param) {
@@ -251,6 +258,11 @@ while (my ($k,$v) = each %$param) {
         for (@$v) { push @hosts, split(',',$_); }
         next;
     }
+    # Some of the command-line arguments are modified before being put
+    # into the main argument list.
+    if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @mpi_split;}
+    if ($k eq 'thr') { @thr_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @thr_split; }
+
     # The rest is passed to subprograms, unless explicitly discarded on a
     # per-program basis.
     if (defined($v)) {
@@ -272,8 +284,6 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'rhs') { $rhs=$v; next; }
     if ($k eq 'nrhs') { $nrhs=$v; next; }
     if ($k eq 'splits') { @splits=split ',', $v; next; }
-    if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; $param->{$k} = join "x", @mpi_split;}
-    if ($k eq 'thr') { @thr_split = set_mpithr_param $v; $param->{$k} = join "x", @mpi_split;}
 
     # Ok, probably there's a fancy argument we don't care about.
 }
@@ -1267,7 +1277,7 @@ sub task_prep {
     if ($prime == 2) {
         task_common_run('prep', @main_args);
         task_common_run('split',
-            (grep { /^(?:m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
             qw{--ifile Y.0 --ofile-fmt V%u-%u.0});
     } else {
         # The prime case is somewhat different. We'll generate random
@@ -1517,7 +1527,7 @@ sub task_lingen {
     if ($prime == 2) {
         task_common_run("lingen", @main_args, qw/--lingen-threshold 64/);
         task_common_run('split',
-            (grep { /^(?:m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
             split(' ', "--ifile F --ofile-fmt F.sols0-$n.%u-%u"));
     } else {
         # NOTE: It may be worthwhile to run specifically this step, but
