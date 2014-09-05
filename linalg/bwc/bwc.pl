@@ -1040,7 +1040,8 @@ sub list_vfiles {
     if ($filesize) {    # take the occasion to store it.
         my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
-        store_cached_entry('nbytes_per_splitwidth', $filesize / $N);
+        eval {store_cached_entry('nbytes_per_splitwidth', $filesize / $N);};
+        die "Problem with the size of V files ($filesize bytes, $N rows):\n$@" if $@;
     }
     my $flatten = sub { local $_; map { shift @$_ } @_; };
     $f->{$_} = [&$flatten(@{$f->{$_}})] for keys %$f;
@@ -1062,7 +1063,8 @@ sub list_afiles {
     if ($filesize) {    # take the occasion to store it.
         (my $k = (keys %$f)[0]) =~ /^(\d+)\.\.(\d+)$/;
         my $length = $m * ($2-$1) * ($f->{$k}->[0]->[1] - $f->{$k}->[0]->[0]);
-        store_cached_entry('nbytes_per_splitwidth', $filesize / ($length / $splitwidth));
+        eval { store_cached_entry('nbytes_per_splitwidth', $filesize / ($length / $splitwidth));};
+        die "Problem with the size of A files:\n$@" if $@;
     }
     @{$f->{$_}} = sort { lexcmp($a, $b) } @{$f->{$_}} for keys %$f;
     return $f;
@@ -1073,7 +1075,13 @@ sub list_sfiles {
     if ($filesize) {    # take the occasion to store it.
         my ($bnh, $bnv, $bnrows, $bncols) = get_cached_balancing_header;
         my $N = $bncols > $bnrows ? $bncols : $bnrows;
-        store_cached_entry('nbytes_per_splitwidth', $filesize / $N);
+        # In some cases (mksol for n=128 and p=2) we may create files
+        # with larger data width than just $splitwidth. This should be
+        # seen in the file name.
+        (my $k = (keys %$f)[0]) =~ /^(\d+)\.\.(\d+)/; 
+        my $length = ($2-$1)*$N;
+        eval { store_cached_entry('nbytes_per_splitwidth', $filesize / ($length/$splitwidth)); };
+        die "Problem with the size of S files:\n$@" if $@;
     }
     my $flatten = sub { local $_; map { shift @$_ } @_; };
     $f->{$_} = [&$flatten(@{$f->{$_}})] for keys %$f;
@@ -1641,8 +1649,17 @@ sub task_mksol {
         die "abort";
     }
 
-    my $n_or_rhs = $nrhs || $n;
-    my @sols = map { $_*=$splitwidth; $_."..".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } elsif ($nrhs) {
+        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
     print "## mksol considering the following solution blocks: @sols\n";
     print "## mksol max iteration is $length\n";
 
@@ -1670,7 +1687,7 @@ sub task_mksol {
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs/} @args) {
-            my $nsolvecs = $nrhs || $splitwidth;
+            my $nsolvecs = $nrhs || ($prime ne '2' ? $splitwidth : $n);
             push @args, "nsolvecs=$nsolvecs";
         }
 
@@ -1689,8 +1706,19 @@ sub task_gather {
     subtask_find_or_create_balancing(-may_create => 'no');
 
     my $n_or_rhs = $nrhs || $n;
-    my @sols = map { $_*=$splitwidth; $_."-".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } elsif ($nrhs) {
+        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
     print "## $current_task considering the following solution blocks: @sols\n";
+    s/\.\./-/g for @sols;
 
     my @missing;
     my $leader_files = get_cached_leadernode_filelist 'HASH';
@@ -1718,56 +1746,33 @@ sub task_gather {
     print "## mksol max iteration is $maxmksol\n";
 
     my $cmat = {};
+    my @all_ys = map { $_*$splitwidth . "-" . ($_+1)*$splitwidth } (0..$n/$splitwidth - 1);
     for my $k (keys %$sfiles) {
         $k =~ /^(\d+)\.\.(\d+)\.\.(\d+)\.\.(\d+)$/ or die;
         my @x = @{$sfiles->{$k}};
-        my $key = ($1/$splitwidth).",".($3/$splitwidth);
+        my $key = "$1-$2,$3-$4";
         $cmat->{$key}= scalar @x;
         $cmat->{$key}.= "*" if $x[$#x] < $maxmksol;
     }
-    my $c = 4;
-    {
-        my $i = -1;
-        for my $j (0..$n/$splitwidth-1) {
-            $cmat->{"$i,$j"}=$splitwidth*$j."-".($splitwidth*($j+1));
-            my $l = length($cmat->{"$i,$j"});
-            $c = $l if $l > $c;
+    my $c0 = 4;
+    my $c = 0;
+    for (@all_ys) { my $l = length($_); $c = $l if $l > $c; }
+    for my $s (@sols) {
+        my $l = 4+length($s); $c0 = $l if $l > $c0;
+        for my $y (@all_ys) {
+            my $key = "$s,$y";
+            my $n = $cmat->{$key} || 'NONE'; $cmat->{$key} = $n;
+            my $l = length($n); $c = $l if $l > $c;
+            push @missing, "S.sols$s.$y" if $n eq 'NONE' || $n =~ /\*$/; 
         }
     }
-    for my $i (0..$n_or_rhs/$splitwidth-1) {
-        $cmat->{"$i,-1"}=$splitwidth*$i."-".($splitwidth*($i+1));
-        my $l = length($splitwidth*$i);
-        $c = $l if $l > $c;
-        for my $j (0..$n/$splitwidth-1) {
-            my $n = $cmat->{"$i,$j"} || 'NONE';
-            $cmat->{"$i,$j"} = $n;
-            push @missing, "S.sols$i-".($i+$splitwidth).".$j-".($j+$splitwidth)
-                if $n eq 'NONE' || $n =~ /\*$/; 
-            my $l = length($cmat->{"$i,$j"});
-            $c = $l if $l > $c;
-        }
+    print "## Number of S files found:\n";
+    print "##    " . " "x$c0 . "|" . join(" ", map { sprintf "%${c}s", $_ } @all_ys) . "\n";
+    print "##    " . "-"x$c0 . "|" . "-" x (($c+1)*scalar @all_ys) . "\n";
+    for my $s (@sols) { 
+        print "##    " . sprintf("%${c0}s","sols$s") . "|" .
+            join(" ", map { sprintf "%${c}s", $cmat->{"$s,$_"} } @all_ys) . "\n";
     }
-    my @count_matrix_rows;
-    for my $i (-1..$n_or_rhs/$splitwidth-1) {
-        my @row;
-        for my $j (-1..$n/$splitwidth-1) {
-            my $t = $cmat->{"$i,$j"};
-            $t = '' if $i==-1 && $j==-1;
-            $t = sprintf("%${c}s", $t);
-            $t .= "|" if $j == -1;
-            push @row, $t;
-        }
-        $row[0] = ($i>=0 ? "sols" : "    ") . $row[0];
-        push @count_matrix_rows, "##    @row\n";
-        if ($i == -1) {
-            my $sep = "";
-            $sep .= "-" x (length($row[0])-1);
-            $sep .= "+";
-            $sep .= "-" x (length("@row[1..$#row]")+1);
-            push @count_matrix_rows, "##    $sep\n";
-        }
-    }
-    print "## Number of S files found:\n" . join("", @count_matrix_rows);
     # }}}
     if (@missing) {
         task_check_message 'error', "Missing files for $current_task:", @missing;
@@ -1788,7 +1793,11 @@ sub task_gather {
     task_check_message 'ok', "All required files for gather seem to be present, good.";
 
     my @args = grep { !/^(ys|rhs)/ } @main_args;
-    push @args, "nsolvecs=$splitwidth";
+    if (!grep { /^nsolvecs/} @args) {
+        # $nrhs or $splitwidth ?
+        my $nsolvecs = $nrhs || ($prime ne '2' ? $splitwidth : $n);
+        push @args, "nsolvecs=$nsolvecs";
+    }
     if ($param->{'rhs'}) {
         push @args, "rhs=$rhs_companion";
     }
@@ -1804,8 +1813,20 @@ sub task_cleanup {
     task_begin_message;
 
     my $n_or_rhs = $nrhs || $n;
-    my @sols = map { $_*=$splitwidth; $_."-".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
+    my $n_or_rhs = $nrhs || $n;
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } elsif ($nrhs) {
+        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
     print "## $current_task considering the following solution blocks: @sols\n";
+    s/\.\./-/g for @sols;
 
     my @missing;
     my $leader_files = get_cached_leadernode_filelist 'HASH';
