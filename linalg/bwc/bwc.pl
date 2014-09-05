@@ -1209,6 +1209,8 @@ sub subtask_krylov_mksol_todo {
     my $vfiles = list_vfiles;
     my $vstarts = {};
 
+    print "## complete range list for krylov: ".join(" ", map {"$_->[0]-$_->[1]";} @all_ys)."\n";
+
     for my $y (@all_ys) {
         my $yrange = $y->[0] . ".." . $y->[1];
         print "## V files for $yrange:";
@@ -1238,6 +1240,8 @@ sub subtask_krylov_mksol_todo {
         @ys = @all_ys;
     }
 
+    print "## range list for krylov: ".join(" ", map {"$_->[0]-$_->[1]";} @ys)."\n";
+
     my @todo;
     my @impossible;
     for my $ab (@ys) {
@@ -1255,7 +1259,7 @@ sub subtask_krylov_mksol_todo {
             my @sub_starts;
             for (@subs) {
                 my $r = $_->[0]."..".$_->[1];
-                my $s = $vstarts->{$r} or do {
+                defined(my $s = $vstarts->{$r}) or do {
                     task_check_message 'error',
                     "No starting vector for range $r"
                     . " (interleaved sub-range from $yrange)\n";
@@ -1290,9 +1294,71 @@ sub subtask_krylov_mksol_todo {
     return @todo;
 }
 # }}}
+
+# {{{ solution blocks relevant to lingen mksol gather cleanup
+sub subtask_solution_blocks {
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } elsif ($nrhs) {
+        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
+    print "## $current_task considering the following solution blocks: @sols\n";
+    return @sols;
+}
+# }}}
+
 # }}}
 
 # {{{ dispatch
+
+sub task_dispatch_missing_output_files {
+    my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
+
+    # Note the ys=0..$splitwidth below. It's here only to match the width
+    # which is used in the main krylov/mksol programs. The reason is that
+    # the data width for vector coefficients gets passed to the cache
+    # building code, which may take decisions depending on processor
+    # cache size, which translate into a given number of vector
+    # coefficients.
+    # XXX For an SSE-2 binary, we would need something else.
+    my @more_args = "ys=0..$splitwidth";
+
+    # Do this always. This is a trivial operation, and we use it to see
+    # who has what as far as cache files are concerned.
+    task_common_run 'dispatch', (grep { !/^ys=/ } @main_args), @more_args, "export_cachelist=$wdir/cachelist.$balancing_hash.txt";
+
+    # TODO: make sure that the matrix cache files are present everywhere.
+    my $cachelist={};
+    for my $line (eval { open F, "$wdir/cachelist.$balancing_hash.txt"; my @x=<F>; @x; }) {
+        my ($token, $node, @files) = split(' ', $line);
+        if ($token eq 'get-cache') {
+            $cachelist->{$node}->{$_}=0 for @files;
+        } elsif ($token eq 'has-cache') {
+            $cachelist->{$node}->{$_}='found' for @files;
+        }
+    }
+    my @missing;
+    for my $node (keys %{$cachelist}) {
+        for my $file (keys %{$cachelist->{$node}}) {
+            push @missing, "$node:$file" unless $cachelist->{$node}->{$file};
+        }
+    }
+    if (@missing == $nh * $nv) {
+        return 'all', @missing;
+    } elsif (@missing) {
+        return 'some', @missing;
+    } else {
+        return 'none';
+    }
+}
+
+
 sub task_dispatch {
     task_begin_message;
     # This does the matrix dispatch, or ensures that it's been already
@@ -1311,70 +1377,54 @@ sub task_dispatch {
     #   - cachelist.$balancing_hash.txt ; recomputed each time, just to
     #   see which cache files are where.
  
-    my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
-    my @more_args = 'sequential_cache_build=1';
+    my ($status, @missing) = task_dispatch_missing_output_files;
 
-    # Note the ys=0..$splitwidth below. It's here only to match the width
-    # which is used in the main krylov/mksol programs. The reason is that
-    # the data width for vector coefficients gets passed to the cache
-    # building code, which may take decisions depending on processor
-    # cache size, which translate into a given number of vector
-    # coefficients.
-    # XXX For an SSE-2 binary, we would need something else.
-    push @more_args, "ys=0..$splitwidth";
-
-    # Do this always. This is a trivial operation, and we use it to see
-    # who has what as far as cache files are concerned.
-    task_common_run 'dispatch', (grep { !/^ys=/ } @main_args), @more_args, "export_cachelist=$wdir/cachelist.$balancing_hash.txt";
-
-    # TODO: make sure that the matrix cache files are present everywhere.
-    my $cachelist={};
-    for my $line (eval { open F, "$wdir/cachelist.$balancing_hash.txt"; my @x=<F>; @x; }) {
-        my ($token, $node, @files) = split(' ', $line);
-        if ($token eq 'get-cache') {
-            $cachelist->{$node}->{$_}=0 for @files;
-        } elsif ($token eq 'has-cache') {
-            $cachelist->{$node}->{$_}='found' for @files;
-        }
+    if ($status eq 'none') {
+        task_check_message 'ok', "All output files for $current_task have been found, good";
+        return;
     }
-    my $missing=0;
-    for my $node (keys %{$cachelist}) {
-        my @bad = ();
-        for my $file (keys %{$cachelist->{$node}}) {
-            push @bad, $file unless $cachelist->{$node}->{$file};
-        }
-        if (@bad) {
-            $missing += scalar @bad;
-            print STDERR "## missing cache files for $node (" . (scalar @bad) . "): @bad\n";
-        }
-    }
-    # Now we require that $missing is either 0 of $nh*$nv. Anthing
-    # inbetween deserves inspection.
-    if ($missing > 0 && $missing < $nh * $nv) {
-        task_check_message 'error', "$missing missing cache files. We don't fix this automatically. Please investigate.";
+
+    if ($status eq 'some') {
+        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
         die;
     }
 
-    if ($missing == $nh * $nv) {
-        task_check_message 'missing', "no cache files have been found, need to run dispatch";
-    } elsif ($missing == 0) {
-        task_check_message 'ok', "all cache files have been found, good";
-    }
+    task_check_message 'missing', "none of the output files for $current_task have been found, need to run $current_task now. We want to create files:", @missing;
 
     # Note that the sanity check vectors Hx.0 and H1 are just
     # side-effects of the dispatch program, but there is no need to keep
     # them around. They're never reused.
 
-    return unless $missing;
-
+    my @more_args = ("ys=0..$splitwidth", 'sequential_cache_build=1');
     push @more_args, "sanity_check_vector=H1" if $prime == 2;
-
-
     task_common_run('dispatch', @main_args, @more_args);
 
 } # }}}
 
 # {{{ prep
+
+sub task_prep_missing_output_files {
+    subtask_find_or_create_balancing(-may_create => 'no');
+
+    my @s = @splits;
+    my @starts;
+    while (scalar @s) {
+        my $x0 = shift @s;
+        my $x1 = shift @s or last;
+        unshift @s, $x1;
+        push @starts, "V${x0}-${x1}.0";
+    }
+    my @missing;
+    my $leader_files = get_cached_leadernode_filelist 'HASH';
+    unshift @starts, "X";
+    for my $file (@starts) {
+        push @missing, $file unless exists $leader_files->{$file};
+    }
+    if (@missing == @starts) { return "all", @missing; }
+    elsif (@missing) { return "some", @missing; }
+    else { return "none" };
+}
+
 sub task_prep {
     task_begin_message;
     # This prepares the starting vectors for block Wiedemann.
@@ -1392,26 +1442,19 @@ sub task_prep {
     #   binary case. This must now be viewed as an intermediary file
     #   only, and will disappear at some point.
 
-    subtask_find_or_create_balancing(-may_create => 'no');
+    my ($status, @missing) = task_prep_missing_output_files;
 
-    my @s = @splits;
-    my @starts;
-    while (scalar @s) {
-        my $x0 = shift @s;
-        my $x1 = shift @s or last;
-        unshift @s, $x1;
-        push @starts, "V${x0}-${x1}.0";
-    }
-    my @missing;
-    my $leader_files = get_cached_leadernode_filelist 'HASH';
-    for my $file ("X", @starts) {
-        push @missing, $file unless exists $leader_files->{$file};
-    }
-    if (!@missing) {
-        task_check_message 'ok', "all starting files are here, good";
+    if ($status eq 'none') {
+        task_check_message 'ok', "All output files for $current_task have been found, good";
         return;
     }
-    task_check_message 'missing', "missing starting files: @missing";
+
+    if ($status eq 'some') {
+        task_check_message 'error', "Missing ouput files for $current_task", @missing, "We don't fix this automatically. Please investigate.";
+        die;
+    }
+
+    task_check_message 'missing', "none of the output files for $current_task have been found, need to run $current_task now. We want to create files:", @missing;
 
     if ($prime == 2) {
         task_common_run('prep', @main_args);
@@ -1487,33 +1530,10 @@ sub task_krylov {
     }
 } # }}}
 
-sub subtask_solution_blocks {
-    my @sols;
-    if ($prime eq '2') {
-        # This should be fixed. For now, mksol creates big files with
-        # nsolvecs solutions. Those should be split in chunks of width
-        # 64.
-        @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
-    } else {
-        @sols = map {"$_..".($_+1);} (0..$n-1);
-    }
-    print "## $current_task considering the following solution blocks: @sols\n";
-    return @sols;
-}
-
 # {{{ lingen
-sub task_lingen {
-    task_begin_message;
-    
-    # input files:
-    #   - A.*-*.*-* ; all A files created by krylov.
-    #     -> this task accumulates them in a single file.
-    # output_file
-    #   - F.sols*-*.*-* ; all polynomial entries of the generating
-    #     matrix.
 
+sub task_lingen_input_errors {
+    my $h = shift;
     my $length = max_krylov_iteration;
     my $afiles = list_afiles;
     my $astrings = {};
@@ -1541,20 +1561,43 @@ sub task_lingen {
         push @strings, [$z0, $z1] if defined $z1;
         $astrings->{$k} = \@strings;
     }
-    if (!$ok) {
-        my $msg='';
-        for my $k (sort {$a cmp $b} keys %$afiles) {
-            $msg .= "$k, computed range(s): " . join(" ", map { $_->[0]."..".$_->[1]; } @{$astrings->{$k}}) . "\n";
-        }
 
-        task_check_message 'error', "Incomplete set of A files found\n" . $msg;
+    if (!$ok) {
+        my @errors;
+        push @errors, "Incomplete set of A files found";
+
+        for my $k (sort {$a cmp $b} keys %$afiles) {
+            push @errors, "$k, computed range(s): " . join(" ", map { $_->[0]."..".$_->[1]; } @{$astrings->{$k}}) . "\n";
+        }
+        return @errors;
+    }
+    $h->{'concatenated_A'} = "A0-$n.0-$rlength";
+    $h->{'need_acollect'} = $nb_afiles > 1;
+    return ();
+}
+
+sub task_lingen {
+    task_begin_message;
+    
+    # input files:
+    #   - A.*-*.*-* ; all A files created by krylov.
+    #     -> this task accumulates them in a single file.
+    # output_file
+    #   - F.sols*-*.*-* ; all polynomial entries of the generating
+    #     matrix.
+
+    # The function task_lingen_input_errors has a few side-effects,
+    # returned back in the hash $h.
+    my $h = {};
+    if (my @errors = task_lingen_input_errors $h) {
+        task_check_message 'error', @errors;
         die;
     }
-    my @all_astrings;
-    task_check_message 'ok', "Complete set of A files found ($nb_afiles files), good.";
 
-    if ($nb_afiles > 1) {
-        task_check_message 'missing', "Running acollect to create A0-$n.0-$rlength";
+    my $concatenated_A = $h->{'concatenated_A'};
+
+    if ($h->{'need_acollect'}) {
+        task_check_message 'missing', "Running acollect to create $concatenated_A";
         task_common_run("acollect", @main_args, "--remove-old");
     }
 
@@ -1563,13 +1606,12 @@ sub task_lingen {
     my $leader_files = get_cached_leadernode_filelist 'HASH';
     my @missing;
     my @expected;
-    for my $i (0..$n/$splitwidth-1) {
-        my $i0 = $splitwidth * $i;
-        my $i1 = $splitwidth + $i0;
+    my @sols = subtask_solution_blocks; s/\.\./-/g for @sols;
+    for my $sol (@sols) {
         for my $j (0..$n/$splitwidth-1) {
             my $j0 = $splitwidth * $j;
             my $j1 = $splitwidth + $j0;
-            my $f = "F.sols${i0}-${i1}.${j0}-${j1}";
+            my $f = "F.sols$sol.${j0}-${j1}";
             push @expected, $f;
             push @missing, $f unless exists $leader_files->{$f};
         }
@@ -1599,7 +1641,7 @@ sub task_lingen {
         my $lmt = $param->{'lingen_mpi_threshold'} || 100;
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
-        push @args, "afile=A0-$n.0-$rlength";
+        push @args, "afile=$concatenated_A";
         push @args, grep { /^(?:m|n|wdir|prime|nrhs|mpi|thr)=/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
@@ -1611,7 +1653,7 @@ sub task_lingen {
         push @args, "splits=" . join(",",@splits);
         push @args, grep { /^(?:m|n|wdir|prime)=/ } @main_args;
         task_common_run "split", @args,
-                "ifile=A0-$n.0-$rlength.gen", "ofile-fmt=F.%u-%u";
+                "ifile=$concatenated_A.gen", "ofile-fmt=F.%u-%u";
         for my $j (0..$n/$splitwidth-1) {
             my $j0 = $splitwidth * $j; 
             my $j1 = $splitwidth + $j0;
