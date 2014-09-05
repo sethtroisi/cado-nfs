@@ -1487,6 +1487,22 @@ sub task_krylov {
     }
 } # }}}
 
+sub subtask_solution_blocks {
+    my @sols;
+    if ($prime eq '2') {
+        # This should be fixed. For now, mksol creates big files with
+        # nsolvecs solutions. Those should be split in chunks of width
+        # 64.
+        @sols = ("0..$n");
+    } elsif ($nrhs) {
+        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
+    } else {
+        @sols = map {"$_..".($_+1);} (0..$n-1);
+    }
+    print "## $current_task considering the following solution blocks: @sols\n";
+    return @sols;
+}
+
 # {{{ lingen
 sub task_lingen {
     task_begin_message;
@@ -1649,18 +1665,8 @@ sub task_mksol {
         die "abort";
     }
 
-    my @sols;
-    if ($prime eq '2') {
-        # This should be fixed. For now, mksol creates big files with
-        # nsolvecs solutions. Those should be split in chunks of width
-        # 64.
-        @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
-    } else {
-        @sols = map {"$_..".($_+1);} (0..$n-1);
-    }
-    print "## mksol considering the following solution blocks: @sols\n";
+    my @sols = subtask_solution_blocks;
+
     print "## mksol max iteration is $length\n";
 
     my @todo = subtask_krylov_mksol_todo $length, sub {
@@ -1705,19 +1711,7 @@ sub task_gather {
 
     subtask_find_or_create_balancing(-may_create => 'no');
 
-    my $n_or_rhs = $nrhs || $n;
-    my @sols;
-    if ($prime eq '2') {
-        # This should be fixed. For now, mksol creates big files with
-        # nsolvecs solutions. Those should be split in chunks of width
-        # 64.
-        @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
-    } else {
-        @sols = map {"$_..".($_+1);} (0..$n-1);
-    }
-    print "## $current_task considering the following solution blocks: @sols\n";
+    my @sols = subtask_solution_blocks;
     s/\.\./-/g for @sols;
 
     my @missing;
@@ -1810,20 +1804,7 @@ sub task_cleanup {
     return if $prime ne 2;
     task_begin_message;
 
-    my $n_or_rhs = $nrhs || $n;
-    my $n_or_rhs = $nrhs || $n;
-    my @sols;
-    if ($prime eq '2') {
-        # This should be fixed. For now, mksol creates big files with
-        # nsolvecs solutions. Those should be split in chunks of width
-        # 64.
-        @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
-    } else {
-        @sols = map {"$_..".($_+1);} (0..$n-1);
-    }
-    print "## $current_task considering the following solution blocks: @sols\n";
+    my @sols = subtask_solution_blocks;
     s/\.\./-/g for @sols;
 
     my @missing;
