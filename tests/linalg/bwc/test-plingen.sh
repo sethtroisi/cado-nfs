@@ -70,8 +70,7 @@ dotest() {
         # provided that p is small. Otherwise, the smallish coefficients
         # we generate are inappropriate and lead to failure, since
         # plingen guesses the length of the ascii input file.
-        set +e
-        read -r -d '' code <<-'EOF'
+        read -s -r -d '' code <<-'EOF'
             my ($m, $n, $kmax, $p, $seed) = @ARGV;
             my $u = int($seed / 1000);
             my $v = $seed % 1000;
@@ -87,14 +86,13 @@ dotest() {
                 }
                 print "\n";
             }
+            
 EOF
-        set -e
         perl -e "$code" $m $n $((kmax/3)) $p $seed > $F
     else
         # generate $F with exactly ($kmax/3)*$m*$n*$nwords_per_gfp_elt
         # machine words of random data.
-        set +e
-        read -r -d '' code <<-'EOF'
+        read -s -r -d '' code <<-'EOF'
             my ($m, $n, $kmax, $nwords, $seed) = @ARGV;
             my $u = int($seed / 1000);
             my $v = $seed % 1000;
@@ -112,8 +110,8 @@ EOF
                     }
                 }
             }
+            
 EOF
-        set -e
         perl -e "$code" $m $n $((kmax/3)) $nwords $seed > $F
     fi
 

@@ -27,6 +27,9 @@ macro(add_bwc_test nm script)
         "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
 endmacro(add_bwc_test)
 
+
+# All this is 64-bit only !
+
 set(prime_1 281474976710677)
 set(prime_2 5192296858534827628530496329220121)
 set(prime_3 95780971304118053647396689196894323976171195136475563)

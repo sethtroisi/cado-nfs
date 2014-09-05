@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <dirent.h>
+#include <gmp.h>
 #include "bwc_config.h"
 #include "portability.h"
 #include "macros.h"
@@ -127,12 +128,22 @@ int read_afiles(struct afile_list * a)
 int main(int argc, char * argv[])
 {
     int rc = 0;
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
 
     param_list pl;
     param_list_init(pl);
     param_list_configure_switch(pl, "--remove-old", &remove_old);
     bw_common_init(bw, pl, &argc, &argv);
-    param_list_parse_int(pl, "bits-per-coeff", &bits_per_coeff);
+    param_list_parse_mpz(pl, "prime", p);
+    if (param_list_lookup_string(pl, "bits_per_coeff")) {
+        fprintf(stderr, "bits_per_coeff is deprecated. Please pass p directly\n");
+        exit(1);
+    }
+
+    bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
+    mpz_clear(p);
+
     param_list_clear(pl);
 
     struct afile_list a[1];

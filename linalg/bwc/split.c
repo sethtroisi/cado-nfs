@@ -37,8 +37,10 @@ void usage()
 int main(int argc, char * argv[])
 {
     FILE ** files;
+    mpz_t p;
     // balancing bal;
 
+    mpz_init_set_ui(p, 2);
     param_list pl;
     param_list_init(pl);
     param_list_configure_switch(pl, "--force", &force);
@@ -50,6 +52,14 @@ int main(int argc, char * argv[])
      * considering
      */
     int scale[2] = {1, 8};      /* default for binary */
+
+    param_list_parse_mpz(pl, "prime", p);
+    int bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
+    if (mpz_cmp_ui(p, 2) > 0) {
+        scale[0] = bits_per_coeff/8;
+        scale[1] = 1;
+    }
+    mpz_clear(p);
 
     param_list_parse_int_and_int(pl, "binary-ratio", scale, "/");
 
