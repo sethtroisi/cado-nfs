@@ -930,6 +930,14 @@ sub get_cached_leadernode_filelist {
     my @x;
     if (defined(my $z = $cache->{$key})) {
         @x = @$z;
+    } elsif (!$hostfile) {
+        # We're running locally, thus there's no need to go to a remote
+        # place just to run find -printf.
+        opendir my $dh, $wdir;
+        for (readdir $dh) {
+            push @x, [$_, (stat "$wdir/$_")[7]];
+        }
+        closedir $dh;
     } else {
         my $foo = join(' ', @mpi_precmd_single, "find $wdir -type f -a -printf '%s %p\\n'");
         for my $line (`$foo`) {
@@ -1141,6 +1149,8 @@ sub task_common_run {
 }
 # }}}
 
+# {{{ SUBTASKS are used by one or several tasks.
+# {{{ subtask_find_or_create_balancing
 sub subtask_find_or_create_balancing {
     my %opts = @_;
 
@@ -1173,6 +1183,105 @@ sub subtask_find_or_create_balancing {
     push @main_args, "balancing=$balancing";
     return wantarray ? @res : $res[0];
 }
+# }}}
+
+# {{{ subtask_krylov_mksol_todo - the hard checkpoint recovery work
+sub subtask_krylov_mksol_todo {
+    # For each sequence, this finds the "most advanced" V file. Being
+    # advanced takes two things. First this means an existing file, and
+    # the code here checks for this. But we also request that some extra
+    # function returns true, and this check is provided by the caller.
+    my $length = shift;
+    my $morecheck = shift || sub{1;};
+    # We unconditionally do a check of the latest V checkpoint found in
+    # $wdir, for all vector.
+    my @all_ys = map { [ $_*$splitwidth, ($_+1)*$splitwidth ] } (0..$n/$splitwidth - 1);
+
+    my $vfiles = list_vfiles;
+    my $vstarts = {};
+
+    for my $y (@all_ys) {
+        my $yrange = $y->[0] . ".." . $y->[1];
+        print "## V files for $yrange:";
+        my @for_this_y =
+            grep { $_ == 0 || &$morecheck($yrange, $_); } @{$vfiles->{$yrange}}
+            or do { print " none\n"; next; };
+        $vstarts->{$yrange} = $for_this_y[$#for_this_y];
+        $vstarts->{$yrange} .= " (DONE!)" if $vstarts->{$yrange} >= $length;
+        print " last $current_task checkpoint is $vstarts->{$yrange}\n";
+    }
+
+    my @ys;
+    if (@ys = grep { /^ys/ } @main_args) {
+        @ys = map { /^(?:ys=)?(\d+)\.\.(\d+)$/; $_=[$1, $2]; } @ys;
+    } elsif ($param->{'interleaving'}) {
+        my @t = @all_ys;
+        # merge 2 by 2.
+        @ys = ();
+        while (scalar @t >= 2) {
+            my ($a, $b0) = @{shift @t};
+            my ($b1, $c) = @{shift @t};
+            push @ys, [ $a, $c ];
+        }
+        # Maybe there's a last one.
+        push @ys, @t;
+    } else {
+        @ys = @all_ys;
+    }
+
+    my @todo;
+    my @impossible;
+    for my $ab (@ys) {
+        # most ys are double ranges, except maybe the last one.
+        my ($a, $b) = @{$ab};
+        my $yrange = $a . ".." . $b;
+        my $start;
+        if ($param->{'interleaving'} && !($b - $a == $splitwidth && $b == $n)) {
+            # interleaving is quite special. At the moment we must make
+            # sure that hte start points for both vectors agree, although
+            # admittedly this restriction is quite artificial.
+            next if $b - $a == $splitwidth && $b == $n;
+            die unless $b-$a == 2 * $splitwidth;
+            my @subs = ([$a, int(($a+$b)/2)], [int(($a+$b)/2), $b]);
+            my @sub_starts;
+            for (@subs) {
+                my $r = $_->[0]."..".$_->[1];
+                my $s = $vstarts->{$r} or do {
+                    task_check_message 'error',
+                    "No starting vector for range $r"
+                    . " (interleaved sub-range from $yrange)\n";
+                    die;
+                };
+                push @sub_starts, $s;
+            } 
+            if ($sub_starts[0] ne $sub_starts[1]) {
+                task_check_message 'error',
+                "Inconsistent start vectors for the two"
+                . " interleaved sub-ranges from $yrange"
+                . " (first at $sub_starts[0],"
+                . " second at $sub_starts[1])\n";
+                die;
+            };
+            $start = $sub_starts[0];
+        } else {
+            $start = $vstarts->{$yrange};
+        }
+        if (!defined($start)) {
+            print STDERR "## Can't schedule any work for $yrange, as *NO* checkpoint is here\n";
+            push @impossible, $yrange;
+            next;
+        }
+        next if $start =~ /DONE/;
+        push @todo, "ys=$yrange start=$start";
+    }
+    if (!@todo && @impossible) {
+        task_check_message 'error', "Cannot schedule remaining work. No checkpoints for ranges:\n", @impossible;
+        die;
+    }
+    return @todo;
+}
+# }}}
+# }}}
 
 # {{{ dispatch
 sub task_dispatch {
@@ -1318,103 +1427,6 @@ sub subtask_secure {
         task_check_message 'missing', "missing check vector @x\n";
         task_common_run('secure', @main_args);
     }
-}
-# }}}
-
-# {{{ subtask_krylov_mksol_todo - the hard checkpoint recovery work
-sub subtask_krylov_mksol_todo {
-    # For each sequence, this finds the "most advanced" V file. Being
-    # advanced takes two things. First this means an existing file, and
-    # the code here checks for this. But we also request that some extra
-    # function returns true, and this check is provided by the caller.
-    my $length = shift;
-    my $morecheck = shift || sub{1;};
-    # We unconditionally do a check of the latest V checkpoint found in
-    # $wdir, for all vector.
-    my @all_ys = map { [ $_*$splitwidth, ($_+1)*$splitwidth ] } (0..$n/$splitwidth - 1);
-
-    my $vfiles = list_vfiles;
-    my $vstarts = {};
-
-    for my $y (@all_ys) {
-        my $yrange = $y->[0] . ".." . $y->[1];
-        print "## V files for $yrange:";
-        my @for_this_y =
-            grep { $_ == 0 || &$morecheck($yrange, $_); } @{$vfiles->{$yrange}}
-            or do { print " none\n"; next; };
-        $vstarts->{$yrange} = $for_this_y[$#for_this_y];
-        $vstarts->{$yrange} .= " (DONE!)" if $vstarts->{$yrange} >= $length;
-        print " last $current_task checkpoint is $vstarts->{$yrange}\n";
-    }
-
-    my @ys;
-    if (@ys = grep { /^ys/ } @main_args) {
-        @ys = map { /^(?:ys=)?(\d+)\.\.(\d+)$/; $_=[$1, $2]; } @ys;
-    } elsif ($param->{'interleaving'}) {
-        my @t = @all_ys;
-        # merge 2 by 2.
-        @ys = ();
-        while (scalar @t >= 2) {
-            my ($a, $b0) = @{shift @t};
-            my ($b1, $c) = @{shift @t};
-            push @ys, [ $a, $c ];
-        }
-        # Maybe there's a last one.
-        push @ys, @t;
-    } else {
-        @ys = @all_ys;
-    }
-
-    my @todo;
-    my @impossible;
-    for my $ab (@ys) {
-        # most ys are double ranges, except maybe the last one.
-        my ($a, $b) = @{$ab};
-        my $yrange = $a . ".." . $b;
-        my $start;
-        if ($param->{'interleaving'} && !($b - $a == $splitwidth && $b == $n)) {
-            # interleaving is quite special. At the moment we must make
-            # sure that hte start points for both vectors agree, although
-            # admittedly this restriction is quite artificial.
-            next if $b - $a == $splitwidth && $b == $n;
-            die unless $b-$a == 2 * $splitwidth;
-            my @subs = ([$a, int(($a+$b)/2)], [int(($a+$b)/2), $b]);
-            my @sub_starts;
-            for (@subs) {
-                my $r = $_->[0]."..".$_->[1];
-                my $s = $vstarts->{$r} or do {
-                    task_check_message 'error',
-                    "No starting vector for range $r"
-                    . " (interleaved sub-range from $yrange)\n";
-                    die;
-                };
-                push @sub_starts, $s;
-            } 
-            if ($sub_starts[0] ne $sub_starts[1]) {
-                task_check_message 'error',
-                "Inconsistent start vectors for the two"
-                . " interleaved sub-ranges from $yrange"
-                . " (first at $sub_starts[0],"
-                . " second at $sub_starts[1])\n";
-                die;
-            };
-            $start = $sub_starts[0];
-        } else {
-            $start = $vstarts->{$yrange};
-        }
-        if (!defined($start)) {
-            print STDERR "## Can't schedule any work for $yrange, as *NO* checkpoint is here\n";
-            push @impossible, $yrange;
-            next;
-        }
-        next if $start =~ /DONE/;
-        push @todo, "ys=$yrange start=$start";
-    }
-    if (!@todo && @impossible) {
-        task_check_message 'error', "Cannot schedule remaining work. No checkpoints for ranges:\n", @impossible;
-        die;
-    }
-    return @todo;
 }
 # }}}
 
