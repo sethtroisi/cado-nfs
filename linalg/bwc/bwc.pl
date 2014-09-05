@@ -176,8 +176,6 @@ my $wdir;
 my $matrix;
 my $rhs;
 my $nrhs;
-my $balancing;
-my $balancing_hash;
 
 ## The mpi_extra_args argument is used to pass information to the mpiexec 
 ## command. The idea is that mpiexec, the mpi driver program, may need
@@ -234,7 +232,7 @@ sub set_mpithr_param { # {{{ utility
         my $nthreads = $1;
         my $s = int(sqrt($nthreads));
         for (; $s >= 1; $s--) {
-            next if $nthreads % $s > 1;
+            next if $nthreads % $s > 0;
             @s = ($s, $nthreads / $s);
             last;
         }
@@ -926,16 +924,6 @@ sub store_cached_entry {
 }
 
 
-sub get_cached_balancing_header {
-    my $key = 'balancing_header';
-    if (defined(my $z = $cache->{$key})) { return @$z; }
-    sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
-    sysread($fh, my $bhdr, 16);
-    my @x = unpack("LLLL", $bhdr);
-    $cache->{$key} = \@x;
-    close($fh);
-    return @x;
-}
 sub get_cached_leadernode_filelist {
     my $key = 'leadernode_filelist';
     my $opt = shift;
@@ -960,10 +948,14 @@ sub get_cached_leadernode_filelist {
         return @x;
     }
 }
-# }}}
 
-# {{{ obtain_bfile -> check for balancing file.
-sub obtain_bfile {
+# {{{ get_cached_bfile -> check for balancing file.
+sub get_cached_bfile {
+    my $key = 'balancing';
+    if (defined(my $z = $cache->{$key})) {
+        my @x = @$z;
+        return wantarray ? @x : $x[0];
+    }
     # We're checking on the leader node only. Because the other nodes
     # don't really mind if they don't see the balancing file.
     # sense.
@@ -973,27 +965,40 @@ sub obtain_bfile {
     $x =~ s/\.(?:bin|txt)$//;
     my $pre_pat = "$x\.${nh}x${nv}";
     if ($param->{'shuffled_product'}) {
-        $pat = qr/\.([0-9a-f]{7}[13579bdf])\.bin\s*$/;
+        $pat = qr/([0-9a-f]{7}[13579bdf])\.bin\s*$/;
     } else {
-        $pat = qr/\.([0-9a-f]{7}[02468ace])\.bin\s*$/;
-    }
-    if ($balancing) {
-        $balancing =~ /$pat/ or die "$balancing does not match pattern";
-        $balancing_hash = $1;
-        return;
+        $pat = qr/([0-9a-f]{7}[02468ace])\.bin\s*$/;
     }
     my @bfiles;
     my $hash;
     for my $fileinfo (get_cached_leadernode_filelist) {
         my ($file, $size) = @$fileinfo;
-        $file =~ /^(.*)$pat/ && $1 eq $pre_pat or next;
+        $file =~ /^(.*)\.$pat/ && $1 eq $pre_pat or next;
         $hash = $2;
         push @bfiles, $file;
     }
     return unless scalar @bfiles;
-    $balancing=$wdir . "/" . $bfiles[0];
-    $balancing_hash = $hash;
-    return @bfiles;
+    if (scalar @bfiles != 1) {
+        print STDERR "Expected 1 bfile, found " . scalar @bfiles . ":\n";
+        print "$_\n" foreach (@bfiles);
+        die;
+    }
+    my @x = ($wdir . "/" . shift @bfiles, $hash);
+    $cache->{$key} = \@x;
+    return wantarray ? @x : $x[0];
+}
+# }}}
+
+sub get_cached_balancing_header {
+    my $key = 'balancing_header';
+    if (defined(my $z = $cache->{$key})) { return @$z; }
+    my $balancing = get_cached_bfile;
+    sysopen(my $fh, $balancing, O_RDONLY) or die "$balancing: $!";
+    sysread($fh, my $bhdr, 16);
+    my @x = unpack("LLLL", $bhdr);
+    $cache->{$key} = \@x;
+    close($fh);
+    return @x;
 }
 # }}}
 
@@ -1136,6 +1141,39 @@ sub task_common_run {
 }
 # }}}
 
+sub subtask_find_or_create_balancing {
+    my %opts = @_;
+
+    my @res = map { /^balancing=(.*\.([0-9a-f]{8})\.bin)$/ ? ($1, $2) : (); } @main_args;
+    if (@res > 2) {
+        die "More than one balancing file found on the command line: @res.";
+    } elsif (@res) {
+        return wantarray ? @res : $res[0];
+    }
+    @res = get_cached_bfile;
+    if (@res) {
+        push @main_args, "balancing=$res[0]";
+        return @res;
+    }
+    if ($opts{'-may_create'} eq 'no') {
+        task_check_message 'error', "No balancing file found, please run dispatch first\n";
+        die;
+    };
+
+    print STDERR "No bfile found, we need a new one\n";
+    my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
+    unshift @mfbal, "--shuffled-product" if $param->{'shuffled_product'};
+    unshift @mfbal, "--withcoeffs" if $prime ne '2';
+    task_common_run "mf_bal", @mfbal;
+    expire_cache_entry "balancing";
+    @res = get_cached_bfile;
+    die unless @res;
+    my ($balancing, $balancing_hash) = @res;
+    print "# Using balancing file $balancing\n";
+    push @main_args, "balancing=$balancing";
+    return wantarray ? @res : $res[0];
+}
+
 # {{{ dispatch
 sub task_dispatch {
     task_begin_message;
@@ -1155,26 +1193,7 @@ sub task_dispatch {
     #   - cachelist.$balancing_hash.txt ; recomputed each time, just to
     #   see which cache files are where.
  
-    my @bfiles = obtain_bfile;
-    if (scalar @bfiles == 0) {
-        print STDERR "No bfile found, we need a new one\n";
-        my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
-        unshift @mfbal, "--shuffled-product" if $param->{'shuffled_product'};
-        unshift @mfbal, "--withcoeffs" if $prime ne '2';
-        task_common_run "mf_bal", @mfbal;
-        @bfiles = obtain_bfile; 
-    }
-    if (scalar @bfiles != 1) {
-        print STDERR "Expected 1 bfile, found " . scalar @bfiles . ":\n";
-        print "$_\n" foreach (@bfiles);
-        die;
-    }
-    print "# Using balancing file $balancing\n";
-    # XXX (TODO another way: inject $balancing within @main_args)
-    # XXX Shall we accept @main_args as being possibly tinkered with by
-    # the task_* functions ? This looks damn ugly...
-    push @main_args, "balancing=$balancing";
-
+    my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
     my @more_args = 'sequential_cache_build=1';
 
     # Note the ys=0..$splitwidth below. It's here only to match the width
@@ -1255,6 +1274,8 @@ sub task_prep {
     #   binary case. This must now be viewed as an intermediary file
     #   only, and will disappear at some point.
 
+    subtask_find_or_create_balancing(-may_create => 'no');
+
     my @s = @splits;
     my @starts;
     while (scalar @s) {
@@ -1290,6 +1311,7 @@ sub task_prep {
 # {{{ secure -- this is now just a subtask of krylov or mksol
 sub subtask_secure {
     return if $param->{'skip_online_checks'};
+    subtask_find_or_create_balancing(-may_create => 'no');
     my $leader_files = get_cached_leadernode_filelist 'HASH';
     my @x = grep { !exists($leader_files->{$_}); } "C.$param->{'interval'}";
     if (@x) {
@@ -1416,6 +1438,8 @@ sub task_krylov {
     # re-run or not:
     #   - A${x0}-${x1}.* ; dot product files which are fed to lingen.
     #   These are write-only as far as this task is concerned.
+
+    subtask_find_or_create_balancing(-may_create => 'no');
 
     subtask_secure;
 
@@ -1582,6 +1606,8 @@ sub task_mksol {
     #   - S.sols*-*.*-*.* ; partial sum which are fed to gather.
     #   These are write-only as far as this task is concerned.
 
+    subtask_find_or_create_balancing(-may_create => 'no');
+
     subtask_secure;
 
     # We choose to require the S files for considering checkpoints as
@@ -1591,7 +1617,11 @@ sub task_mksol {
     my $sfiles = list_sfiles;
     $sfiles->{$_} = eval { my %x=map {$_=>1;} @{$sfiles->{$_}};\%x;} for keys %$sfiles;
 
-    my $length = max_mksol_iteration;
+    my $length = eval { max_mksol_iteration; };
+    if ($@) {
+        task_check_message 'error', "Lingen output files missing", $@, "Please run lingen first.";
+        die "abort";
+    }
 
     my $n_or_rhs = $nrhs || $n;
     my @sols = map { $_*=$splitwidth; $_."..".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
@@ -1618,50 +1648,84 @@ sub task_mksol {
     for my $t (@todo) {
         # take out ys from main_args, put the right one in place if
         # needed.
+        print "main_args: @main_args\n";
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
-        my $nsolvecs = $nrhs || $splitwidth;
-        push @args, "nsolvecs=$nsolvecs";
+        if (!grep { /^nsolvecs/} @args) {
+            my $nsolvecs = $nrhs || $splitwidth;
+            push @args, "nsolvecs=$nsolvecs";
+        }
 
         task_common_run 'mksol', @args;
     }
 }
 # }}}
 
+# {{{ gather
 sub task_gather {
     task_begin_message;
 
     # input files:
     #   - S.sols*-*.*-*.* ; partial sums computed by mksol
 
+    subtask_find_or_create_balancing(-may_create => 'no');
+
     my $n_or_rhs = $nrhs || $n;
-    my @sols = map { $_*=$splitwidth; $_."..".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
-    print "## gather considering the following solution blocks: @sols\n";
-    my $sfiles = list_sfiles;
+    my @sols = map { $_*=$splitwidth; $_."-".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
+    print "## $current_task considering the following solution blocks: @sols\n";
+
     my @missing;
-    my $sfile_count_matrix = {};
+    my $leader_files = get_cached_leadernode_filelist 'HASH';
+    for (map { "K.sols$_.0" } (@sols)) {
+        # Do we have that solution file ?
+        next if exists $leader_files->{$_};
+        push @missing, $_;
+    }
+    if (@missing == 0) {
+        task_check_message 'ok', "All solution files produced by gather seem to be present, good.";
+        return;
+    } elsif (@missing < @sols) {
+        task_check_message 'error', "Only some of the solution files for gather are present. Please investigate. Missing: @missing\n";
+        die;
+    }
+    task_check_message 'missing', "Need to run gather to create the files: @missing\n";
+    @missing=();
+    # {{{ Print the number of files found in a matrix.
+    my $sfiles = list_sfiles;
+    my $maxmksol = eval { max_mksol_iteration; };
+    if ($@) {
+        task_check_message 'error', "Lingen output files missing", $@, "Please run lingen first.";
+        die;
+    }
+
+    my $cmat = {};
     for my $k (keys %$sfiles) {
         $k =~ /^(\d+)\.\.(\d+)\.\.(\d+)\.\.(\d+)$/ or die;
-        $sfile_count_matrix->{($1/$splitwidth).",".($3/$splitwidth)} = scalar @{$sfiles->{$k}};
+        my @x = @{$sfiles->{$k}};
+        my $key = ($1/$splitwidth).",".($3/$splitwidth);
+        $cmat->{$key}= scalar @x;
+        $cmat->{$key}.= "*" if @x && $x[$#x] lt $maxmksol;
+
     }
     my $c = 4;
     {
         my $i = -1;
         for my $j (0..$n/$splitwidth-1) {
-            $sfile_count_matrix->{"$i,$j"}=$splitwidth*$j."-".($splitwidth*($j+1));
-            my $l = length($sfile_count_matrix->{"$i,$j"});
+            $cmat->{"$i,$j"}=$splitwidth*$j."-".($splitwidth*($j+1));
+            my $l = length($cmat->{"$i,$j"});
             $c = $l if $l > $c;
         }
     }
     for my $i (0..$n_or_rhs/$splitwidth-1) {
-        $sfile_count_matrix->{"$i,-1"}=$splitwidth*$i."-".($splitwidth*($i+1));
+        $cmat->{"$i,-1"}=$splitwidth*$i."-".($splitwidth*($i+1));
         my $l = length($splitwidth*$i);
         $c = $l if $l > $c;
         for my $j (0..$n/$splitwidth-1) {
-            my $n = $sfile_count_matrix->{"$i,$j"} || 'NONE';
-            push @missing, "S.sols$i-".($i+$splitwidth).".$j".($j+$splitwidth)
-                if $n eq 'NONE';
-            my $l = length($sfile_count_matrix->{"$i,$j"} || 'NONE');
+            my $n = $cmat->{"$i,$j"} || 'NONE';
+            $cmat->{"$i,$j"} = $n;
+            push @missing, "S.sols$i-".($i+$splitwidth).".$j-".($j+$splitwidth)
+                if $n eq 'NONE' || $n =~ /\*$/; 
+            my $l = length($cmat->{"$i,$j"});
             $c = $l if $l > $c;
         }
     }
@@ -1669,7 +1733,7 @@ sub task_gather {
     for my $i (-1..$n_or_rhs/$splitwidth-1) {
         my @row;
         for my $j (-1..$n/$splitwidth-1) {
-            my $t = $sfile_count_matrix->{"$i,$j"};
+            my $t = $cmat->{"$i,$j"};
             $t = '' if $i==-1 && $j==-1;
             $t = sprintf("%${c}s", $t);
             $t .= "|" if $j == -1;
@@ -1686,12 +1750,11 @@ sub task_gather {
         }
     }
     print "## Number of S files found:\n" . join("", @count_matrix_rows);
+    # }}}
     if (@missing) {
         task_check_message 'error', "Missing files for $current_task:", @missing;
         die;
     }
-
-    my $leader_files = get_cached_leadernode_filelist 'HASH';
 
     my $rhs_companion;
     if ($param->{'rhs'}) {
@@ -1713,6 +1776,60 @@ sub task_gather {
     }
     task_common_run 'gather', @args;
 }
+# }}}
+
+# TODO: check that this works allright for mn=128
+# {{{ cleanup -- For p=2, this extra step produces a RREF solution.
+sub task_cleanup {
+    # This is only for p=2 for the moment.
+    return if $prime ne 2;
+    task_begin_message;
+
+    my $n_or_rhs = $nrhs || $n;
+    my @sols = map { $_*=$splitwidth; $_."-".($_+$splitwidth); } (0..$n_or_rhs/$splitwidth-1);
+    print "## $current_task considering the following solution blocks: @sols\n";
+
+    my @missing;
+    my $leader_files = get_cached_leadernode_filelist 'HASH';
+    my $per_solution_files = {};
+    my $err;
+    my @todo;
+    for my $sol (@sols) {
+        my $wfile = "W.sols$sol";
+        if (exists($leader_files->{$wfile})) {
+            task_check_message 'ok', "Solution $sol is already computed in file $wfile, good.\n";
+            next;
+        }
+        my @ks =
+            sort {
+                basename($a)=~/\.(\d+)$/; my $xa=$1;
+                basename($b)=~/\.(\d+)$/; my $xb=$1;
+                $xa <=> $xb;
+            }
+            grep {
+                /^(.*)\.\d+$/ && $1 eq "K.sols$sol";
+            }
+            (keys %$leader_files);
+        
+        if (!@ks) {
+            task_check_message 'error', "No files created by gather for solution $sol";
+            $err=1;
+        } else {
+            task_check_message 'missing', "Will run cleanup to compute $wfile from the files:", @ks;
+        }
+        push @todo, [$wfile, @ks];
+    }
+    for my $klist (@todo) {
+        my @x = map { "$wdir/$_"; } @$klist;
+        my $wfile = shift @x;
+        task_common_run('cleanup', "--ncols", $n, "--out", $wfile, @x);
+    }
+    if (scalar @sols == 1 && (!-f"$wdir/W" || ((stat "$wdir/W")[7] lt (stat "$wdir/W.sols$sols[0]")[7]))) {
+        print STDERR "## Providing $wdir/W as an alias to $wdir/W.sols$sols[0]\n";
+        symlink "$wdir/W.sols$sols[0]", "$wdir/W";
+    }
+}
+# }}}
 
 my @tasks = (
     [ 'dispatch', \&task_dispatch],
@@ -1721,6 +1838,7 @@ my @tasks = (
     [ 'lingen', \&task_lingen],
     [ 'mksol', \&task_mksol],
     [ 'gather', \&task_gather],
+    [ 'cleanup', \&task_cleanup],
 );
 
 for my $tc (@tasks) {
