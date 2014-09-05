@@ -1794,8 +1794,7 @@ sub task_gather {
 
     my @args = grep { !/^(ys|rhs)/ } @main_args;
     if (!grep { /^nsolvecs/} @args) {
-        # $nrhs or $splitwidth ?
-        my $nsolvecs = $nrhs || ($prime ne '2' ? $splitwidth : $n);
+        my $nsolvecs = ($prime ne '2' ? $splitwidth : $n);
         push @args, "nsolvecs=$nsolvecs";
     }
     if ($param->{'rhs'}) {
@@ -1805,7 +1804,6 @@ sub task_gather {
 }
 # }}}
 
-# TODO: check that this works allright for mn=128
 # {{{ cleanup -- For p=2, this extra step produces a RREF solution.
 sub task_cleanup {
     # This is only for p=2 for the moment.
