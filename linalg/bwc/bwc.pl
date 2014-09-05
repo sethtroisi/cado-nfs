@@ -933,7 +933,8 @@ sub get_cached_leadernode_filelist {
     } elsif (!$hostfile) {
         # We're running locally, thus there's no need to go to a remote
         # place just to run find -printf.
-        opendir my $dh, $wdir;
+        my $dh;
+        opendir $dh, $wdir;
         for (readdir $dh) {
             push @x, [$_, (stat "$wdir/$_")[7]];
         }
@@ -1561,7 +1562,8 @@ sub task_lingen {
     # Now run lingen itself. Which binary we'll run is not totally
     # obvious though.
     if ($prime == 2) {
-        task_common_run("lingen", @main_args, qw/--lingen-threshold 64/);
+        my @args = @main_args;
+        task_common_run("lingen", @args, qw/--lingen-threshold 64/);
         task_common_run('split',
             (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
             split(' ', "--ifile F --ofile-fmt F.sols0-$n.%u-%u"));
@@ -1575,6 +1577,10 @@ sub task_lingen {
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=A0-$n.0-$rlength";
         push @args, grep { /^(?:m|n|wdir|prime|nrhs|mpi|thr)=/ } @main_args;
+        if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
+            print "## non-MPI build, avoiding multithreaded plingen\n";
+            @args = grep { !/^(mpi|thr)=/ } @args;
+        }
         task_common_run("plingen_pz", @args);
         # Some splitting work needed...
         @args=();
@@ -1709,6 +1715,7 @@ sub task_gather {
         task_check_message 'error', "Lingen output files missing", $@, "Please run lingen first.";
         die;
     }
+    print "## mksol max iteration is $maxmksol\n";
 
     my $cmat = {};
     for my $k (keys %$sfiles) {
@@ -1716,8 +1723,7 @@ sub task_gather {
         my @x = @{$sfiles->{$k}};
         my $key = ($1/$splitwidth).",".($3/$splitwidth);
         $cmat->{$key}= scalar @x;
-        $cmat->{$key}.= "*" if @x && $x[$#x] lt $maxmksol;
-
+        $cmat->{$key}.= "*" if $x[$#x] < $maxmksol;
     }
     my $c = 4;
     {
