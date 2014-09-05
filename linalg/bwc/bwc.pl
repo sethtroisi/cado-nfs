@@ -284,7 +284,10 @@ $splitwidth = ($prime == 2) ? 64 : 1;
 
 # {{{ Some important argument checks
 {
-    my @miss = grep { !defined $param->{$_}; } (qw/m n prime matrix interval/);
+    my @miss = grep { !defined $param->{$_}; } (qw/prime matrix interval/);
+    if (!defined($param->{'mn'})) {
+        push @miss, grep { !defined $param->{$_}; } (qw/prime matrix interval/);
+    }
     die "Missing argument(s): @miss" if @miss;
 }
 
