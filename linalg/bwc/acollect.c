@@ -141,7 +141,11 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
-    bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
+    if (mpz_cmp_ui(p, 2) > 0) {
+        bits_per_coeff = 64 * iceildiv(mpz_sizeinbase(p, 2), 64);
+    } else {
+        bits_per_coeff = 1;
+    }
     mpz_clear(p);
 
     param_list_clear(pl);
