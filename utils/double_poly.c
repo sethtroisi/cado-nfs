@@ -128,6 +128,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
           if (side==-1) pa /= 2;
           side=-1;
       }
+      ASSERT_ALWAYS (!isnan(b));
   }
 }
 
