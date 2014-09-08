@@ -299,7 +299,7 @@ create_balancing_file_based_on_mesh_dimensions() {
     if [ "$shuffle" = 1 ] ; then
         shuffle_option=--shuffled-product
     else
-        # I have the impression that it's better to leave this here !
+        # This removes the de-correlating permutation.
         shuffle_option="noshuffle=1"
     fi
 
@@ -336,18 +336,6 @@ prepare_common_arguments() {
 EOF
 }
 
-dispatch_matrix() {
-    # ys=0..$splitwidth here is really a hack. It merely has to match the
-    # version which is used in production.
-    set $common ys=0..$splitwidth
-    submats="save_submatrices=1"
-    if ! [ "$nomagma" ] ; then set "$@" save_submatrices=1 ; fi
-    if [ "$prime" = 2 ] ; then set "$@" sanity_check_vector=H1 ; fi
-    $bindir/bwc.pl dispatch "$@"
-
-}
-
-
 convert_rhs_text_to_matrix() {
     if ! [ -r "$rhs" ] ; then
         echo "$rhs unreadable" >&1
@@ -376,7 +364,6 @@ convert_rhs_text_to_matrix() {
 create_binary_rhs_matrix() {
     echo "Running perl now" >&2
     # This is really done in perl.
-    set +e
     read -s -r -d '' code <<-'EOF'
         use warnings;
         use strict;
@@ -384,10 +371,11 @@ create_binary_rhs_matrix() {
         print STDERR "Create binary RHS started\n";
         sysopen(STDIN,'&STDIN',O_RDONLY);
         binmode(STDIN, ':bytes');
-        my ($nrhs,$n32b,$prefix) = @ARGV;
+        my ($nrhs,$n32b,$prefix,$group) = @ARGV;
+        $group = 1 unless $group;
         my @fds;
-        for(my $i = 0 ; $i < $nrhs; $i++) {
-            my $j = $i + 1;
+        for(my $i = 0 ; $i < $nrhs; $i+=$group) {
+            my $j = $i + $group;
             my $fh;
             my $fname=$prefix . "${i}-${j}.0";
             print STDERR "Opening $fname as file number $i\n";
@@ -399,205 +387,33 @@ create_binary_rhs_matrix() {
             $rowidx++;
             my $v = unpack("L", $x);
             die unless $v == $nrhs;
-            for(my $i = 0 ; $i < $nrhs; $i++) {
-                sysread(STDIN, $x, 4) or die;
-                $x=unpack("L", $x);
-                die unless $x == $i;
-                my $todo = 4 * $n32b;
-                for(my $done = 0; $done < $todo; ) {
-                    my $delta = sysread(STDIN, $x, $todo - $done);
-                    syswrite($fds[$i], $x, $delta);
-                    $done += $delta;
-                }
-                # Do this because we expect 64-bit data !
-                if ($n32b & 1) {
-                    $x="\0\0\0\0";
-                    syswrite($fds[$i], $x, 4);
+            for(my $i = 0 ; $i < $nrhs; $i+=$group) {
+                for(my $k = 0 ; $k < $group ; $k++) {
+                    sysread(STDIN, $x, 4) or die;
+                    $x=unpack("L", $x);
+                    die unless $x == $i + $k;
+                    my $todo = 4 * $n32b;
+                    for(my $done = 0; $done < $todo; ) {
+                        my $delta = sysread(STDIN, $x, $todo - $done);
+                        syswrite($fds[$i], $x, $delta);
+                        $done += $delta;
+                    }
+                    # Do this because we expect 64-bit data !
+                    if ($n32b & 1) {
+                        $x="\0\0\0\0";
+                        syswrite($fds[$i], $x, 4);
+                    }
                 }
             }
         }
-        for(my $i = 0 ; $i < $nrhs; $i++) {
+        for(my $i = 0 ; $i < $nrhs; $i+=$group) {
             close($fds[$i]);
         }
         print STDERR "Create binary RHS ok\n";
 
 EOF
+    set -e
     perl -e "$code" "$@"
-}
-
-
-do_prep_step_gfp() {
-    if [ "$rhs" ] ; then
-        set `head -2 $rhs | tail -n 1`
-        nrhs=$#
-        if [ "$n" -lt "$nrhs" ] ; then
-            echo "Error: $rhs has $nrhs columns, so we need a block size n>=$nrhs (currently have n=$n)" >&2
-            exit 1
-        fi
-        echo "Using $nrhs vectors from RHS"
-        # We create a binary matrix, this will ease things significantly.
-        $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit $wdir/V)
-    else
-        nrhs=0
-    fi
-    j0=$nrhs
-
-    if [ $n -eq 1 ] && [ $j0 -eq 0 ] ; then
-        # This should be the fallback to the "normal" case...
-        $bindir/bwc.pl prep   $common
-        ln -s Y.0 $wdir/V0-1.0
-    else
-        # prep won't work. Let's be stupid. We use the RHS provided, if any,
-        # and later use auto-generated vectors. We will shift the things a
-        # bit in lingen so as to get a proper generators (we'll do A(X) div X
-        # for the columns corresponding to our random vectors here).
-        if [ "$nullspace" = right ] ; then
-            nbytes=$((bits_per_coeff/8 * $ncols))
-        else
-            echo "Untested" >&2
-            exit 1
-            nbytes=$((bits_per_coeff/8 * $nrows))
-        fi
-        if [ "$nrhs" -gt 0 ] ; then
-            echo "Padding $nrhs vectors from RHS matrix with $((n-nrhs)) random vectors"
-        fi
-        for j0 in `seq 0 $splitwidth $((n-1))`; do
-            let j1=j0+splitwidth
-            echo "Generating $wdir/V${j0}-${j1}.0"
-            dd if=/dev/urandom bs=1 count=$nbytes of=$wdir/V${j0}-${j1}.0
-        done
-        (echo 1 ; seq 0 $((m-1))) > $wdir/X
-        # TODO: create Y, too.
-        # XXX Does it make any sense, after all ??
-    fi
-}
-
-
-do_prep_step_gf2() {
-    $bindir/bwc.pl prep $common seed=$seed
-    $bindir/bwc.pl :ysplit $common splits=$all_splits
-}
-
-do_prep_step() {
-    if [ "$prime" = 2 ] ; then
-        do_prep_step_gf2
-    else
-        # This merges prep + ysplit, effectively removing the need for a Y
-        # vector.
-        do_prep_step_gfp
-    fi
-}
-
-do_limited_krylov_step_just_for_magma() {
-    # Just for playing. The output of this is used later on for checking with
-    # magma.
-    if ! [ "$nomagma" ] ; then
-        $bindir/bwc.pl secure  $common interval=1
-        for seq in "${sequences[@]}" ; do
-            $bindir/bwc.pl krylov  $common interval=1 end=$interval ys=$seq skip_online_checks=1
-        done
-        rm -f $wdir/A*
-    fi
-}
-
-do_krylov_step() {
-    # Now do krylov for real.
-    $bindir/bwc.pl secure  $common interval=$interval
-    for seq in "${sequences[@]}" ; do
-        $bindir/bwc.pl krylov  $common interval=$interval ys=$seq
-    done
-}
-
-do_lingen_step_gfp() {
-    afile=$($bindir/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
-
-    if [ $mpi_njobs_lingen -gt 1 ] ; then
-        precmd="$mpi_bindir/mpiexec -n $mpi_njobs_lingen"
-    fi
-    set lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile nrhs=$nrhs
-    if ! [ "$disable_parallel_plingen" ] ; then
-        $precmd $bindir/$plingen_program mpi=$mpi thr=$thr "$@"
-    else
-        $bindir/$plingen_program "$@"
-    fi
-
-    ln $wdir/$afile.gen $wdir/F
-
-    # This does the splitting as documented in mksol.c, e.g. with F on disk
-    # stored as the transpose of the reversal of the F in A*F=G+O(X^t).
-
-    # TODO: We should get rid of splitting altogether, it's ridiculous.
-    # Better do everything within lingen/plingen.
-
-    # Note that the transpose was absent in commits 4f7d835 and earlier.
-    $bindir/split wdir=$wdir m=$m n=$n splits=$all_splits     \
-        ifile=F ofile-fmt=F.%u-%u --binary-ratio $((bits_per_coeff/8))/1
-    for seq in "${sequences[@]}" ; do
-        dseq=$(echo $seq | sed -e 's/\.\./-/g')
-        $bindir/split wdir=$wdir m=$m n=$n              \
-            splits=$all_splits                          \
-            ifile=F.$dseq ofile-fmt=F.sols%u-%u.$dseq   \
-            --binary-ratio $((bits_per_coeff/8))/1
-    done
-
-}
-
-do_lingen_step_gf2() {
-    $bindir/bwc.pl acollect    $common -- --remove-old
-    $bindir/bwc.pl lingen      $common lingen_threshold=64
-    # This keeps *all* solutions, but splits the data into several
-    # chunks, each appropriate for one of the sequences.
-    $bindir/bwc.pl :fsplit     $common splits=$all_splits
-    # We now also need a second split. But it's significantly more
-    # difficult. We have 64 coeffs to skip.
-    #
-    # TODO: We should get rid of splitting altogether, it's ridiculous.
-    # Better do everything within lingen/plingen.
-    if [ "${#sequences[@]}" -gt 1 ] ; then
-        for seq in "${sequences[@]}" ; do
-            dseq=$(echo $seq | sed -e 's/\.\./-/g')
-            $bindir/split wdir=$wdir m=$m n=$n              \
-                splits=$all_splits                          \
-                ifile=F.sols0-$n.$dseq ofile-fmt=F.sols%u-%u.$dseq   \
-                --binary-ratio $splitwidth/8
-        done
-    fi
-#    for seq in "${sequences[@]}" ; do
-#        dseq=$(echo $seq | sed -e 's/\.\./-/g')
-#        ln -s F$dseq $wdir/F.sols0-$n.$dseq
-#    done
-}
-
-do_lingen_step() {
-    if [ "$prime" = 2 ] ; then
-        do_lingen_step_gf2
-    else
-        do_lingen_step_gfp
-    fi
-}
-
-do_mksol_step() {
-    set $common interval=$interval
-    if [ "$nrhs" ] && [ "$nrhs" -gt 0 ] ; then
-        set "$@" nsolvecs=$nrhs
-    else
-        set "$@" nsolvecs=$splitwidth
-    fi
-    for seq in "${sequences[@]}" ; do
-        $bindir/bwc.pl mksol ys=$seq "$@"
-    done
-}
-
-do_gather_step() {
-    set $common interval=$interval nsolvecs=$splitwidth
-    if [ "$nrhs" ] && [ "$nrhs" -gt 0 ] ; then
-        if ! [ -f $wdir/$afile.gen.rhs ] ; then
-            echo "inhomogeneous solving requires the file $wdir/$afile.gen.rhs to be computed by plingen" >&2
-            exit 1
-        fi
-        set "$@" nrhs=$nrhs rhs=$wdir/$afile.gen.rhs
-    fi
-    $bindir/bwc.pl gather "$@"
 }
 
 argument_checking
@@ -612,13 +428,20 @@ create_balancing_file_based_on_mesh_dimensions
 
 prepare_common_arguments
 
-dispatch_matrix
-do_prep_step
-do_limited_krylov_step_just_for_magma
-do_krylov_step
-do_lingen_step
-do_mksol_step
-do_gather_step || :
+if [ "$rhs" ] ; then
+    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
+    rhsbin=`echo $rhs | sed -e s/txt/bin/`
+    if [ "$rhsbin" == "$rhs" ] ; then rhsbin=$rhs.bin ; fi
+    mv ${rhs}.bin0-$nrhs.0 $rhsbin
+    set $common rhs=$rhsbin nrhs=$nrhs
+else
+    set $common
+fi
+$bindir/bwc.pl :complete "$@"
+
+if [ "$nomagma" ] ; then
+    exit 0
+fi
 
 ## Now take solution 0, for instance.
 #j0=0
@@ -650,10 +473,6 @@ mdir=$wdir
 split=${Nh}x${Nv}
 b=`basename $matrix .bin`
 c=$b.$split.$checksum
-
-if [ "$nomagma" ] ; then
-    exit 0
-fi
 
 cmd=`dirname $0`/convert_magma.pl
 

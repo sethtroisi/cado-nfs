@@ -200,11 +200,14 @@ extern void shared_free(pi_wiring_ptr wr, void * ptr);
  */
 extern void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
 
-/* companions to the above, the three functions below compare a data area
+/* companions to the above, the two functions below compare a data area
  * between threads and/or mpi jobs, and collectively return the result.
  * Useful for deciding on a common way to go given a condition.
+ * 
+ * These assume different pointers on all threads. If equal (created with
+ * shared_malloc), then another function may be called -- currently not
+ * exposed because I couldn't come up with a satisfying name.
  */
-extern int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 extern int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 extern int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 

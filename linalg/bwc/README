@@ -78,12 +78,12 @@ using the bwc.pl driver script, documented below.
      processing at each site.
 !10 - mksol
      create the solutions from the polynomial
- 11 - gather / mf_twistvec
+ 11 - gather
      reconstruct solutions from the mess
 
 krylov, lingen, mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather,mf_twistvec are just trivial bookkeeping.
+split,acollect,gather are just trivial bookkeeping.
 dispatch may be I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the
@@ -291,7 +291,6 @@ wdir/S<n1>-<n2>.<j>.<bchecksum>     mksol sequence data.
     read by gather
 wdir/W.<bchecksum>                  kernel vectors
     created by gather
-    read by mf_twistvec
 
 The permutation P
 =================
@@ -342,8 +341,9 @@ mf_bal
     mf_bal computes a ``bchecksum'' which identifies the permutation
     being used.
 
-    Note that as of 20110320, most output files of bwc are in the process
-    of being made invariant under permutations.
+    Note that as of 20110321, output files of bwc are invariant under
+    this permutation. Even though internal computation uses it, this is
+    transparent to the user.
 
 dispatch
 --------
@@ -371,8 +371,13 @@ dispatch
         Sc==Sr, these are conjugates of M in both cases.
     </ugly>
 
-    All vector files created later on, and relative to the matrix Mt, are
-    ``twisted'' by the permutation related to the one computed by mf_bal.
+    All vector files considered *internally* later on, and relative to
+    the matrix Mt, are ``twisted'' by the permutation related to the one
+    computed by mf_bal. Output vectors are not affected, they are
+    invariant under the permutation. For reference, here is how the
+    internal data looks like (bwc-ptrace.m is supposed to have
+    authoritative check lines for this).
+
     In the case of nullspace=left, we have
         Ytwisted = Y * (P*Sc)^-1 -- or P*Sc*Y if written transposed.
         Ytwisted * Mt = Y * M * (P*Sr)^-1 = Y * M * Sr^-1*Sc * (P*Sc)^-1
@@ -572,26 +577,6 @@ gather
 
     W.<bchecksum>                   M^(k-1)*sum_of_S (see note T).
 
-mf_twistvec
-----------
-
-    This un-twists W. There are several options which control exactly how
-    un-twisting is performed. The balancing file must be provided.
-    
-    The option --untwist does what one imagines. This is the one which is
-    used.
-
-    With regard to the above, specifying --nullspace=left or
-    --nullspace=right (the latter being the default as in other parts of
-    the code) changes which permutation is being used for untwisting.
-
-    Specifying --truncate (for untwisting) removes coordinates which
-    correspond to padding rows/cols in the matrix.
-
-    Twisting, as opposed to untwisting, is only useful when working with
-    several sequences. Twisting also recognizes the option --expand,
-    which adds phony coordinates corresponding to padding rows/cols.
-
 Using bwc.pl
 ============
 
@@ -632,7 +617,7 @@ Using bwc.pl with MPI (updated 20120704)
        matrix=   location of the matrix (on the machine where bwc.pl is run)
        wdir=...  working directory (accessible by all machines)
        bwc_bindir= where the binaries are (accessible by all machines)
-       mpi_extra_args= this is needed for openmp
+       mpi_extra_args= this is needed for openmpi
 
     $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
 

@@ -5,6 +5,7 @@
 #include <unistd.h>             // truncate()
 #include <sys/types.h>          // truncate()
 #include <errno.h>
+#include <sys/stat.h>
 #include "bwc_config.h"
 #include "matmul.h"
 #include "matmul_top.h"
@@ -1521,8 +1522,20 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
     thread_broadcast(mmt->pi->m, (void**) &tlines, sizeof(void*), 0);
     tlines[mmt->pi->m->trank] = myline;
     serialize_threads(mmt->pi->m);
+
+    /* Also, just out of curiosity, try to see what we have currently */
+    struct stat st[1];
+    int * has_cache = shared_malloc_set_zero(mmt->pi->m, mmt->pi->m->totalsize * sizeof(int));
+    rc = stat(mmt->mm->cachefile_name, st);
+    unsigned int mynode = mmt->pi->m->ncores * mmt->pi->m->jrank;
+    has_cache[mynode + mmt->pi->m->trank] = rc == 0;
+    serialize_threads(mmt->pi->m);
+
     int len = 0;
     if (mmt->pi->m->trank == 0) {
+    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                has_cache, mmt->pi->m->ncores, MPI_INT, mmt->pi->m->pals);
+
         for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
             int s = strlen(tlines[j]);
             if (s >= len) len = s;
@@ -1542,11 +1555,34 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
             DIE_ERRNO_DIAG(f == NULL, "fopen", cachelist);
             for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
                 unsigned int j0 = j * mmt->pi->m->ncores;
-                fprintf(f, "get-cache %s", info + j0 * (len + 1));
-                for(unsigned int k = 1 ; k < mmt->pi->m->ncores ; k++) {
-                    char * t = strchr(info + (j0 + k) * (len + 1), ' ');
-                    ASSERT_ALWAYS(t);
-                    fprintf(f, "%s", t);
+                fprintf(f, "get-cache ");
+                for(unsigned int k = 0 ; k < mmt->pi->m->ncores ; k++) {
+                    char * t = info + (j0 + k) * (len + 1);
+                    char * q = strchr(t, ' ');
+                    ASSERT_ALWAYS(q);
+                    if (!k) {
+                        *q='\0';
+                        fprintf(f, "%s", t);
+                        *q=' ';
+                    }
+                    fprintf(f, "%s", q);
+                }
+                fprintf(f, "\n");
+            }
+            for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
+                unsigned int j0 = j * mmt->pi->m->ncores;
+                fprintf(f, "has-cache ");
+                for(unsigned int k = 0 ; k < mmt->pi->m->ncores ; k++) {
+                    char * t = info + (j0 + k) * (len + 1);
+                    char * q = strchr(t, ' ');
+                    ASSERT_ALWAYS(q);
+                    if (!k) {
+                        *q='\0';
+                        fprintf(f, "%s", t);
+                        *q=' ';
+                    }
+                    if (!has_cache[mmt->pi->m->ncores * j + k]) continue;
+                    fprintf(f, "%s", q);
                 }
                 fprintf(f, "\n");
             }
@@ -1556,6 +1592,8 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
         free(mybuf);
         free(tlines);
     }
+    serialize_threads(mmt->pi->m);
+    shared_free(mmt->pi->m, has_cache);
     serialize_threads(mmt->pi->m);
     free(myline);
     serialize(mmt->pi->m);

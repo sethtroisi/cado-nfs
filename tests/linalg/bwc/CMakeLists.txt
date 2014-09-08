@@ -27,6 +27,9 @@ macro(add_bwc_test nm script)
         "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
 endmacro(add_bwc_test)
 
+
+# All this is 64-bit only !
+
 set(prime_1 281474976710677)
 set(prime_2 5192296858534827628530496329220121)
 set(prime_3 95780971304118053647396689196894323976171195136475563)
@@ -104,10 +107,15 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
-add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1)
+add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
 add_dependencies(check mf_scan plingen_p_1)
 
+add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
 
+add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 mn=128
+    interleaving=1 seed=1 thr=2)
 
+add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+    seed=1 thr=5)
 
 add_subdirectory(mpfq)

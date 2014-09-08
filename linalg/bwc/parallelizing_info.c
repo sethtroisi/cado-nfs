@@ -1695,6 +1695,10 @@ void pi_interleaving_leave(parallelizing_info_ptr pi)
     my_pthread_barrier_wait(pi->interleaved->b);
 }
 
+#if 0
+/* XXX the name is not very informative, notably about the important
+ * point that pointer must be identical.
+ */
 /* Considering a data area with a pointer identical on all calling
  * threads, tell whether the contents agree on all MPI jobs+threads
  * (returns 1 if this is the case)
@@ -1717,6 +1721,7 @@ int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
     thread_broadcast(pi->m, &cmp, sizeof(int), 0);
     return cmp == 0;
 }
+#endif
 
 /* Here we assume pointers which are different on several calling
  * threads, and we compare the contents. Results may disagree on the
@@ -1729,10 +1734,21 @@ int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
     bufs[pi->m->trank] = buffer;
     oks[pi->m->trank] = 1;
 
+    /* given 5 threads, here is for example what is done at each step.
+     *
+     * stride=1
+     *  ok0 = (x0==x1)
+     *  ok2 = (x2==x3)
+     * stride=2
+     *  ok0 = x0==x1==x2==x3
+     * stride 4
+     *  ok0 = x0==x1==x2==x3==x4
+     */
     for(unsigned int stride = 1 ; stride < pi->m->ncores ; stride <<= 1) {
         unsigned int i = pi->m->trank;
-        serialize_threads(pi->m);
-        if (i + stride > pi->m->ncores) continue;
+        serialize_threads(pi->m);       /* because of this, we don't
+                                           leave the loop with break */
+        if (i + stride >= pi->m->ncores) continue;
         /* many threads are doing nothing here */
         if (i & stride) continue;
         oks[i] = oks[i] && oks[i + stride] && memcmp(bufs[i], bufs[i + stride], sz) == 0;
@@ -1751,7 +1767,6 @@ int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
         MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_BAND, pi->m->pals);
     }
     thread_broadcast(pi->m, &ok, sizeof(int), 0);
-    if (!ok) return 0;
-    return mpi_data_eq(pi, buffer, sz);
+    return ok;
 }
 
