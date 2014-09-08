@@ -1460,8 +1460,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     serialize(mmt->pi->m);
 
     // after that, we need to check for every node if the cache file can
-    // be found. If none is found, rebuild the cache files with an
-    // equivalent of mf_dobal.
+    // be found. If none is found, rebuild the cache files
     mmt_finish_init(mmt, flags, pl, optimized_direction);
 }
 

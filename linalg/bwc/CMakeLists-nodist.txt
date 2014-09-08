@@ -8,12 +8,6 @@ add_executable(bench_polmatmul EXCLUDE_FROM_ALL bench_polmatmul.cpp)
 target_link_libraries(bench_polmatmul utils gf2x-fft gf2x cantor128)
 add_dependencies(bench_polmatmul gf2x-build)
 
-add_executable(mf_dobal mf_dobal.c)
-target_link_libraries(mf_dobal mf m bwc_base)
-set_target_properties(mf_dobal PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
-
 # This is really only for debugging.
 add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
 target_link_libraries(test_hello utils)

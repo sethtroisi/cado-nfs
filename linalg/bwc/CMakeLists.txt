@@ -387,3 +387,4 @@ add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
     all_matmul_libs)
 
+include(CMakeLists-nodist.txt OPTIONAL)
