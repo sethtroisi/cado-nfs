@@ -2294,9 +2294,8 @@ optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int flag, int max_iter)
         }
     }
 
-  mpz_clear (k[2]);
-  mpz_clear (k[1]);
-  mpz_clear (k[0]);
+  for (i = 0; i <= maxi; i++)
+    mpz_clear (k[i]);
   mpz_clear (kt);
   mpz_clear (l);
   mpz_clear (tmp);
