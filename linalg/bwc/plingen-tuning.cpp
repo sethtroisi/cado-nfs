@@ -564,7 +564,7 @@ void plingen_tune_mul_fti_depth(abdst_field ab, unsigned int m, unsigned int n, 
 
     typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
-        x.second = nadjs-1-x.second;
+        x->second = nadjs-1-x->second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)
@@ -735,7 +735,7 @@ void plingen_tune_mp_fti_depth(abdst_field ab, unsigned int m, unsigned int n, c
 
     typedef vector<pair<unsigned int, int> >::iterator it_t;
     for(it_t x = table.begin() ; x != table.end() ; ++x)
-        x.second = nadjs-1-x.second;
+        x->second = nadjs-1-x->second;
 
     cout << "/* FFT depth adjustments for "
                 << (m)<<"*"<<(m+n)
