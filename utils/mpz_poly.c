@@ -1471,6 +1471,9 @@ mpz_poly_sizeinbase (mpz_poly_ptr f, int d, int b)
 static void
 mpz_poly_gcd_mpz_clobber (mpz_poly_ptr f, mpz_poly_ptr g, mpz_srcptr p)
 {
+    /* First reduce mod p */
+    mpz_poly_mod_mpz(f, f, p, NULL);
+    mpz_poly_mod_mpz(g, g, p, NULL);
   while (g->deg >= 0)
     {
       mpz_poly_div_r (f, g, p);

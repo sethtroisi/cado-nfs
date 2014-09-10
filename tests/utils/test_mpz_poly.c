@@ -714,6 +714,27 @@ void test_mpz_poly_factor(unsigned long iter)
     ASSERT_ALWAYS(lf->factors[3]->f->deg == 4);
     ASSERT_ALWAYS(lf->factors[4]->f->deg == 4);
 
+    mpz_set_ui(p, 2);
+    mpz_poly_setcoeffs_ui_var(f, 12, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1);
+    mpz_poly_factor_sqf(lf, f, p);
+    /* beware, mpz_poly_factor_sqf output is a bit peculiar */
+    ASSERT_ALWAYS(lf->size == 4);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 0);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 9);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 0);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 1);
+
+    /* same, with entries not reduced */
+    mpz_set_ui(p, 2);
+    mpz_poly_setcoeffs_ui_var(f, 12, -122661, -9, -9, 9, -3, 0, 0, 0, 0, 0, 0, 0, 1);
+    mpz_poly_factor_sqf(lf, f, p);
+    /* beware, mpz_poly_factor_sqf output is a bit peculiar */
+    ASSERT_ALWAYS(lf->size == 4);
+    ASSERT_ALWAYS(lf->factors[0]->f->deg == 0);
+    ASSERT_ALWAYS(lf->factors[1]->f->deg == 9);
+    ASSERT_ALWAYS(lf->factors[2]->f->deg == 0);
+    ASSERT_ALWAYS(lf->factors[3]->f->deg == 1);
+
     for( ; iter-- ; ) {
         // fprintf(stderr, "%lu ", iter);
         mpz_rrandomb(p, state, 20);
