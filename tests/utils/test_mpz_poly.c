@@ -408,7 +408,7 @@ test_mpz_poly_derivative (void)
 }
 
 /* also exercises mpz_poly_power_mod_f_mod_mpz and
-   mpz_poly_power_mod_f_mod_mpz_Barrett */
+   mpz_poly_power_mod_f_mod_mpz_barrett */
 void
 test_mpz_poly_power_mod_f_mod_ui (void)
 {
@@ -438,7 +438,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   mpz_poly_power_mod_f_mod_mpz (Q, P, f, a, pp);
   ASSERT_ALWAYS(Q->deg == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 1) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(Q->deg == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 1) == 0);
 
@@ -447,7 +447,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   ASSERT_ALWAYS(mpz_poly_cmp (Q, P) == 0);
   mpz_poly_power_mod_f_mod_mpz (Q, P, f, a, pp);
   ASSERT_ALWAYS(mpz_poly_cmp (Q, P) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(mpz_poly_cmp (Q, P) == 0);
 
   mpz_set_ui (a, 2);
@@ -461,7 +461,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[2], 1) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(Q->deg == 2);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 0) == 0);
@@ -480,7 +480,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[2], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[3], 1) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(Q->deg == 3);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 0) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 0) == 0);
@@ -500,7 +500,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 3524154901) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[2], 1102631344) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[3], 2362229259) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(Q->deg == 3);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 2081229567) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 3524154901) == 0);
@@ -520,7 +520,7 @@ test_mpz_poly_power_mod_f_mod_ui (void)
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 502704799) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[2], 3358125388) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[3], 1722383279) == 0);
-  mpz_poly_power_mod_f_mod_mpz_Barrett (Q, P, f, a, pp, invp);
+  mpz_poly_power_mod_f_mod_mpz_barrett (Q, P, f, a, pp, invp);
   ASSERT_ALWAYS(Q->deg == 3);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[0], 4223801964) == 0);
   ASSERT_ALWAYS(mpz_cmp_si (Q->coeff[1], 502704799) == 0);
@@ -727,6 +727,7 @@ void test_mpz_poly_factor(unsigned long iter)
     /* same, with entries not reduced */
     mpz_set_ui(p, 2);
     mpz_poly_setcoeffs_ui_var(f, 12, -122661, -9, -9, 9, -3, 0, 0, 0, 0, 0, 0, 0, 1);
+
     mpz_poly_factor_sqf(lf, f, p);
     /* beware, mpz_poly_factor_sqf output is a bit peculiar */
     ASSERT_ALWAYS(lf->size == 4);
@@ -734,6 +735,10 @@ void test_mpz_poly_factor(unsigned long iter)
     ASSERT_ALWAYS(lf->factors[1]->f->deg == 9);
     ASSERT_ALWAYS(lf->factors[2]->f->deg == 0);
     ASSERT_ALWAYS(lf->factors[3]->f->deg == 1);
+
+    mpz_set_ui(p, 3);
+    mpz_poly_setcoeffs_ui_var(f, 12, -122661, -9, -9, 9, -3, 0, 0, 0, 0, 0, 0, 0, 1);
+    mpz_poly_factor(lf, f, p, state);
 
     for( ; iter-- ; ) {
         // fprintf(stderr, "%lu ", iter);

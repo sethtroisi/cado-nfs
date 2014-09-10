@@ -115,7 +115,7 @@ void mpz_poly_power_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_s
                                mpz_srcptr a, mpz_srcptr p);
 void mpz_poly_power_ui_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_poly_srcptr f,
                                unsigned long a, mpz_srcptr p);
-void mpz_poly_power_mod_f_mod_mpz_Barrett (mpz_poly_ptr, mpz_poly_srcptr,
+void mpz_poly_power_mod_f_mod_mpz_barrett (mpz_poly_ptr, mpz_poly_srcptr,
                                            mpz_poly_srcptr, mpz_srcptr,
                                            mpz_srcptr, mpz_srcptr);
 void mpz_poly_derivative(mpz_poly_ptr df, mpz_poly_srcptr f);

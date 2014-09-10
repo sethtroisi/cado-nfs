@@ -17,7 +17,7 @@ void
 compute_sm (mpz_poly_t SM, mpz_poly_t num, const mpz_poly_t F, const mpz_t ell,
             const mpz_t smexp, const mpz_t ell2, const mpz_t invl2)
 {
-  mpz_poly_power_mod_f_mod_mpz_Barrett(SM, num, F, smexp, ell2, invl2);
+  mpz_poly_power_mod_f_mod_mpz_barrett(SM, num, F, smexp, ell2, invl2);
   mpz_poly_sub_ui(SM, SM, 1);
 
   for(int j = 0; j <= SM->deg; j++)
