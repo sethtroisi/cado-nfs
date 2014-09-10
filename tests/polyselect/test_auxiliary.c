@@ -109,7 +109,7 @@ test_L2_skewness (int t)
       if (t == 0)
         mpz_set_ui (p->coeff[d], 4294967295UL);
       else if (t == 1)
-        mpz_set_ui (p->coeff[0], 1);
+        mpz_set_ui (p->coeff[d], 1);
       else
         {
           do
