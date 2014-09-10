@@ -3193,6 +3193,8 @@ compute_roots_and_extrema_close_to_0(double *roots_and_extrema, double_poly_srcp
   return n;
 }
 
+/* values of q greater than 1e10 in absolute value do not help */
+#define MAX_Q 1e10
 
 static int
 find_best_k_deg5 (mpz_t *K, mpz_poly_srcptr f, mpz_t *g)
@@ -3248,7 +3250,7 @@ find_best_k_deg5 (mpz_t *K, mpz_poly_srcptr f, mpz_t *g)
       int m, t;
       /* it looks like values of q larger than 1 in absolute value do
          not give any good translation */
-      if (fabs (roots_q[i]) > 1.0)
+      if (fabs (roots_q[i]) > MAX_Q)
         continue;
       t = make_rational (Q, roots_q[i], 100.0);
       while (t) {
@@ -3337,7 +3339,7 @@ find_best_k_deg6 (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
     + 64.0 * a4 * a4 * a4 * a6 - 180.0 * a3 * a4 * a5 * a6
     + 135.0 * a3 * a3 * a6 * a6;
 
-  n = double_poly_compute_all_roots (roots_q, R);
+  n = double_poly_compute_all_roots_with_bound (roots_q, R, MAX_Q);
 
   /* add roots of the derivative */
   r[0] = r[1];
@@ -3345,15 +3347,12 @@ find_best_k_deg6 (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
   r[2] = r[3] * 3.0;
   R->deg = 2;
 
-  n += double_poly_compute_all_roots (roots_q + n, R);
+  n += double_poly_compute_all_roots_with_bound (roots_q + n, R, MAX_Q);
 
   double_poly_init (C, 4);
   for (i = 0; i < n; i++)
     {
       double Q[MAXQ+1];
-      /* skip too large values of q */
-      if (fabs (roots_q[i]) > 1e10)
-        continue;
       t = make_rational (Q, roots_q[i], 100.0);
       while (t) {
       roots_q[i] = Q[--t];
@@ -3419,7 +3418,8 @@ find_best_k_deg6 (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
       C->coeff[0] = (3375*a6*a6*a6*m0*m0*m0*m0 + 2250*a5*a6*a6*m0*m0*m0*g1 + 1350*a4*a6*a6*m0*m0*g1*g1 + 675*a3*a6*a6*m0*g1*g1*g1 + 225*a2*a6*a6*g1*g1*g1*g1)*roots_q[i]*roots_q[i]*roots_q[i]*roots_q[i] + (5000*a5*a5*a5*a6*m0*m0*m0 - 18000*a4*a5*a6*a6*m0*m0*m0 + 27000*a3*a6*a6*a6*m0*m0*m0 + 3000*a4*a5*a5*a6*m0*m0*g1 - 10800*a4*a4*a6*a6*m0*m0*g1 + 4500*a3*a5*a6*a6*m0*m0*g1 + 18000*a2*a6*a6*a6*m0*m0*g1 + 1500*a3*a5*a5*a6*m0*g1*g1 - 5400*a3*a4*a6*a6*m0*g1*g1 + 6000*a2*a5*a6*a6*m0*g1*g1 + 500*a2*a5*a5*a6*g1*g1*g1 - 675*a3*a3*a6*a6*g1*g1*g1)*roots_q[i]*roots_q[i]*roots_q[i] + (-6000*a4*a4*a5*a5*a6*m0*m0 + 15000*a3*a5*a5*a5*a6*m0*m0 + 21600*a4*a4*a4*a6*a6*m0*m0 - 63000*a3*a4*a5*a6*a6*m0*m0 + 15000*a2*a5*a5*a6*a6*m0*m0 + 60750*a3*a3*a6*a6*a6*m0*m0 - 36000*a2*a4*a6*a6*a6*m0*m0 - 3000*a3*a4*a5*a5*a6*m0*g1 + 15000*a2*a5*a5*a5*a6*m0*g1 + 10800*a3*a4*a4*a6*a6*m0*g1 - 6750*a3*a3*a5*a6*a6*m0*g1 - 48000*a2*a4*a5*a6*a6*m0*g1 + 54000*a2*a3*a6*a6*a6*m0*g1 - 1500*a3*a3*a5*a5*a6*g1*g1 + 3000*a2*a4*a5*a5*a6*g1*g1 + 4050*a3*a3*a4*a6*a6*g1*g1 - 7200*a2*a4*a4*a6*a6*g1*g1 - 3000*a2*a3*a5*a6*a6*g1*g1 + 12000*a2*a2*a6*a6*a6*g1*g1)*roots_q[i]*roots_q[i] + 6000*a3*a3*a4*a4*a5*a5*a6 - 16000*a2*a4*a4*a4*a5*a5*a6 - 20000*a3*a3*a3*a5*a5*a5*a6 + 60000*a2*a3*a4*a5*a5*a5*a6 - 50000*a2*a2*a5*a5*a5*a5*a6 - 21600*a3*a3*a4*a4*a4*a6*a6 + 57600*a2*a4*a4*a4*a4*a6*a6 + 81000*a3*a3*a3*a4*a5*a6*a6 - 240000*a2*a3*a4*a4*a5*a6*a6 - 15000*a2*a3*a3*a5*a5*a6*a6 + 240000*a2*a2*a4*a5*a5*a6*a6 - 91125*a3*a3*a3*a3*a6*a6*a6 + 324000*a2*a3*a3*a4*a6*a6*a6 - 192000*a2*a2*a4*a4*a6*a6*a6 - 240000*a2*a2*a3*a5*a6*a6*a6 + 160000*a2*a2*a2*a6*a6*a6*a6;
 
 
-      nb_roots_q2 += double_poly_compute_all_roots (roots_q2, C);
+      nb_roots_q2 += double_poly_compute_all_roots_with_bound (roots_q2, C,
+                                                               MAX_Q);
       ASSERT_ALWAYS(nb_roots_q2 <= 4);
 
       /* roots of the derivative of Res(c3,c2) */
@@ -3428,7 +3428,8 @@ find_best_k_deg6 (mpz_t *K, mpz_poly_ptr f, mpz_t *g)
       C->coeff[1] = C->coeff[2] * 2.0;
       C->coeff[2] = C->coeff[3] * 3.0;
       C->coeff[3] = C->coeff[4] * 4.0;
-      nb_roots_q2 += double_poly_compute_all_roots (roots_q2 + nb_roots_q2, C);
+      nb_roots_q2 += double_poly_compute_all_roots_with_bound (roots_q2
+                                                  + nb_roots_q2, C, MAX_Q);
       ASSERT_ALWAYS(nb_roots_q2 <= 7);
 
       for (ii = 0; ii < nb_roots_q2; ii++)

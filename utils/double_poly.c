@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
+#include <float.h> /* for DBL_MAX */
 #include "utils.h"
 #include "portability.h"
 
@@ -344,17 +345,24 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   return sign_changes;
 }
 
+/* compute all roots whose absolute value is <= B */
 unsigned int
-double_poly_compute_all_roots(double *roots, double_poly_srcptr poly)
+double_poly_compute_all_roots_with_bound (double *roots,
+                                          double_poly_srcptr poly,
+                                          double B)
 {
   /* Positive roots */
   double bound = double_poly_bound_roots (poly);
+  if (B < bound)
+    bound = B;
   unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
   /* Negative roots */
   double_poly_t t; /* Copy of poly which gets sign-flipped */
   double_poly_init (t, poly->deg);
   double_poly_neg_x (t, poly);
   bound = double_poly_bound_roots (t);
+  if (B < bound)
+    bound = B;
   unsigned int nr_roots_neg =
     double_poly_compute_roots (roots + nr_roots_pos, t, bound);
   double_poly_clear(t);
@@ -362,6 +370,12 @@ double_poly_compute_all_roots(double *roots, double_poly_srcptr poly)
   for (unsigned int i = 0; i < nr_roots_neg; i++)
     roots[nr_roots_pos + i] *= -1.;
   return nr_roots_pos + nr_roots_neg;
+}
+
+unsigned int
+double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
+{
+  return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
 }
 
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
