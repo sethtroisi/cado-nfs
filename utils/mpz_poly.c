@@ -457,6 +457,29 @@ void mpz_poly_div_xi(mpz_poly_ptr g, mpz_poly_srcptr f, int i)
     g->deg = f->deg - i;
 }
 
+void mpz_poly_mul_xplusa(mpz_poly_ptr g, mpz_poly_srcptr f, mpz_srcptr a)
+{
+    mpz_t aux;
+    mpz_init_set_ui(aux, 0);
+    mpz_poly_realloc(g, f->deg + 2);
+    for(int i = 0 ; i <= f->deg ; i++) {
+        /* aux is is coeff of degree [i-1]. We want
+         * (coeff_i, aux) <- (coeff_{i-1} + a * coeff_i, coeff_i)
+         *                   (aux + a * coeff_i, coeff_i)
+         */
+        mpz_addmul(aux, f->coeff[i], a);
+        mpz_swap(g->coeff[i], aux);
+        if (f != g) {
+            mpz_set(aux, f->coeff[i]);
+        }
+    }
+    /* last coefficient */
+    mpz_swap(g->coeff[f->deg + 1], aux);
+    /* This is just as valid as it was for f */
+    g->deg = f->deg + 1;
+    mpz_clear(aux);
+}
+
 int mpz_poly_valuation(mpz_poly_srcptr f)
 {
     int n = 0;
@@ -1079,31 +1102,31 @@ void
 mpz_poly_reduce_makemonic_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P, mpz_srcptr m)
 {
   int i;
-  mpz_t aux, aux2;
+  mpz_t aux;
   mpz_init(aux);
+  for(i = P->deg; i>=0; i--) {
+      mpz_mod(aux, P->coeff[i], m);
+      if (mpz_cmp_ui(aux, 0) != 0) break;
+  }
+  /* i is the degree of the leading monomial */
+  Q->deg = i;
+  if (i < 0) 
+      /* if i == -1, then Q is the zero polynomial, there's nothing to do */
+      return;
+
+  mpz_t aux2;
   mpz_init(aux2);
-  i = P->deg;
-  do {
-    mpz_mod(aux, P->coeff[i], m);
-    i--;
-  } while ((i>=0) && (mpz_cmp_ui(aux, 0) == 0));
-  /* either i+1 >= 0 and P[i+1] <> 0 (mod m),
-     or i = -1 and P is identically zero modulo m */
-  if (i>=0) {
-    Q->deg = i+1;
-    mpz_invert(aux2, aux, m);
-    for (i = 0; i < Q->deg; ++i) {
+  mpz_invert(aux2, aux, m);
+  for (i = 0; i < Q->deg; ++i) {
       mpz_mul(aux, aux2, P->coeff[i]);
       mpz_mod(aux, aux, m);
       mpz_poly_setcoeff(Q, i, aux);
-    }
-    /* we can directly set the leading coefficient to 1 */
-    mpz_poly_setcoeff_si (Q, Q->deg, 1);
-  } else { /* i=-1, thus P is identically zero modulo m */
-      Q->deg = -1;
   }
-  mpz_clear(aux);
   mpz_clear(aux2);
+
+  /* we can directly set the leading coefficient to 1 */
+  mpz_poly_setcoeff_si (Q, Q->deg, 1);
+  mpz_clear(aux);
 }
 
 /* Coefficients of A need not be reduced mod m
@@ -1895,6 +1918,7 @@ static int mpz_poly_factor_sqf_inner(mpz_poly_factor_list_ptr lf, mpz_poly_srcpt
         r = i * stride;
     }
 
+    mpz_poly_factor_list_prepare_write(lf, 0);
     mpz_poly_divexact(lf->factors[0]->f, f, T, p);
 
     mpz_poly_clear(g);
@@ -2115,6 +2139,14 @@ static int mpz_poly_factor_edf_pre(mpz_poly_t g[2], mpz_poly_srcptr f0, mpz_srcp
     mpz_poly_gcd_mpz(g[0], g[0], f, p);
     mpz_poly_gcd_mpz(g[1], g[1], f, p);
 
+    if (g[0]->deg + g[1]->deg < f->deg) {
+        /* oh, we're lucky. x+a is a factor ! */
+        int s = g[0]->deg > g[1]->deg;
+        /* multiply g[s] by (x+a) */
+        mpz_poly_mul_xplusa(g[s], g[s], a);
+        assert(g[s]->deg < f->deg);
+        mpz_poly_mod_mpz(g[s], g[s], p, NULL);
+    }
     assert(g[0]->deg + g[1]->deg == f->deg);
     assert(g[0]->deg % k == 0);
     assert(g[1]->deg % k == 0);

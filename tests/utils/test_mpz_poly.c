@@ -740,6 +740,15 @@ void test_mpz_poly_factor(unsigned long iter)
     mpz_poly_setcoeffs_ui_var(f, 12, -122661, -9, -9, 9, -3, 0, 0, 0, 0, 0, 0, 0, 1);
     mpz_poly_factor(lf, f, p, state);
 
+    {
+        /* Now factor x^(p-1)-1 */
+        unsigned long pp = 7;
+        mpz_set_ui(p, pp);
+        mpz_poly_set_xi(f, pp - 1);
+        mpz_poly_sub_ui(f, f, 1);
+        mpz_poly_factor(lf, f, p, state);
+    }
+
     for( ; iter-- ; ) {
         // fprintf(stderr, "%lu ", iter);
         mpz_rrandomb(p, state, 20);
