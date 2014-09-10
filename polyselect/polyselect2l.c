@@ -304,7 +304,7 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
     mpz_neg (g[0], m);
     mpz_clear(m);
     /* optimize again, but only translation */
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
   }
 #else
   mpz_t m;

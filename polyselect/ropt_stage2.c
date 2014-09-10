@@ -968,7 +968,7 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
       mpz_set (s2param->g[0], poly->g[0]);
       mpz_set (s2param->g[1], poly->g[1]);
 
-      optimize_aux (F, s2param->g, 0, 0);
+      optimize_aux (F, s2param->g, 0, 0, OPT_STEPS_FINAL);
 
       MurphyE = print_poly_fg (F, s2param->g, poly->n, 0);
 
