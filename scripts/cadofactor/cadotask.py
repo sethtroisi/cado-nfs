@@ -1197,7 +1197,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                   (wuid, cmdline))
     
     def verification(self, wuid, ok, *, commit):
-        """ Mark a workunit as received and update wu_received counter """
+        """ Mark a workunit as verified ok or verified with error and update
+        wu_received counter """
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
@@ -1876,7 +1877,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
@@ -2373,7 +2374,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderrfile(0)
