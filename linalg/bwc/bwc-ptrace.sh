@@ -429,12 +429,12 @@ create_balancing_file_based_on_mesh_dimensions
 prepare_common_arguments
 
 if [ "$rhs" ] ; then
-    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
+    # http://stackoverflow.com/questions/4489139/bash-process-substitution-and-syncing
+    # $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
+    # fortunately mf_scan is stdout-silent...
+    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile /dev/stdout | create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs
     rhsbin=`echo $rhs | sed -e s/txt/bin/`
     if [ "$rhsbin" == "$rhs" ] ; then rhsbin=$rhs.bin ; fi
-    if [[ `uname -n` =~ openbsd ]] ; then
-        echo "NOTE: on cado-openbsd53-amd64-v2.ci, the file ${rhs}.bin0-$nrhs.0 seems to be missing every so often at this point (while it *should* be there), which leads to failure (shell bug ? current version is $BASH_VERSION)"
-    fi
     mv ${rhs}.bin0-$nrhs.0 $rhsbin
     set $common rhs=$rhsbin nrhs=$nrhs
 else
