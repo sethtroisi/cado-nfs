@@ -172,6 +172,8 @@ usage (char **argv)
   fprintf (stderr, " -c C          Fix the constant rotation of the sublattice by C.\n");
   fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
   fprintf (stderr, " --skip_ropt   (switch) skip root sieve (use with option -fm).\n");
+  fprintf (stderr, " --sopt        (switch) do size optimization for polynomial.\n");
+  fprintf (stderr, " --gen_raw     (switch) regenerate raw polynomial and skip root sieve.\n");
   fprintf (stderr, " -Bf F         algebraic smoothness bound (default %.2e).\n", BOUND_F);
   fprintf (stderr, " -Bg G         rational smoothness bound (default %.2e).\n", BOUND_G);
   fprintf (stderr, " -area A       sieving area (default %.2e).\n", AREA);
@@ -313,9 +315,14 @@ ropt_parse_param ( int argc,
           fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
           exit(1);
         }
-        else if (argc >= 3 && strcmp (argv[1], "--skip_ropt2") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "--gen_raw") == 0)
         {
-          fprintf (stderr, "Error: cannot use --skip_ropt with --s2.\n");
+          fprintf (stderr, "Error: cannot use --gen_raw with --s2.\n");
+          exit(1);
+        }
+        else if (argc >= 3 && strcmp (argv[1], "--sopt") == 0)
+        {
+          fprintf (stderr, "Error: cannot use --sopt with --s2.\n");
           exit(1);
         }
         else {
@@ -412,9 +419,15 @@ ropt_parse_param ( int argc,
           argv += 1;
           argc -= 1;
         }
-        else if (argc >= 2 && strcmp (argv[1], "--skip_ropt2") == 0)
+        else if (argc >= 2 && strcmp (argv[1], "--gen_raw") == 0)
         {
-          param->skip_ropt2 = 1;
+          param->gen_raw = 1;
+          argv += 1;
+          argc -= 1;
+        }
+        else if (argc >= 2 && strcmp (argv[1], "--sopt") == 0)
+        {
+          param->sopt = 1;
           argv += 1;
           argc -= 1;
         }

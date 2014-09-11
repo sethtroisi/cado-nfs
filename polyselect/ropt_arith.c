@@ -353,22 +353,39 @@ Lemma21 ( mpz_t *a,
           mpz_t N,
           int d,
           mpz_t p,
-          mpz_t m )
+          mpz_t m,
+          mpz_t res )
 {
-  mpz_t r, mi, invp;
+  mpz_t r, mi, invp, l, ln;
   int i;
 
   mpz_init (r);
+  mpz_init_set_ui (l, 1);
+  mpz_init (ln);
   mpz_init (mi);
   mpz_init (invp);
-  mpz_set (r, N);
   mpz_pow_ui (mi, m, d);
-  if (mpz_cmp_ui (a[d], 0) == 0)
-  {
+
+  if (mpz_cmp_ui (a[d], 0) < 0)
+    mpz_abs (a[d], a[d]);
+  
+  if (mpz_cmp_ui (a[d], 0) == 0) {
     mpz_invert (a[d], mi, p); /* 1/m^d mod p */
     mpz_mul (a[d], a[d], N);
     mpz_mod (a[d], a[d], p);
+    mpz_set_ui (l, 1);
   }
+  /* multiplier l < m1 */
+  else {
+    mpz_invert (l, N, p);
+    mpz_mul (l, l, mi);
+    mpz_mul (l, l, a[d]);
+    mpz_mod (l, l, p);
+  }
+  mpz_mul (ln, N, l);
+  mpz_set (r, ln);
+  mpz_set (res, l);
+  
   for (i = d - 1; i >= 0; i--)
   {
     /* invariant: mi = m^(i+1) */
@@ -401,6 +418,8 @@ Lemma21 ( mpz_t *a,
     mpz_divexact (a[i], a[i], mi);
   }
   mpz_clear (r);
+  mpz_clear (l);
+  mpz_clear (ln);
   mpz_clear (mi);
   mpz_clear (invp);
 }
