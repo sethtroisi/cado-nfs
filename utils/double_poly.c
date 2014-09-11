@@ -390,24 +390,24 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
   fprintf (stream, "%s", name);
 
   if (deg == 0)
-    fprintf (stream, "%f", f[0]);
+    fprintf (stream, "%.16e", f[0]);
 
   if (deg == 1)
-    fprintf (stream, "%f*x", f[1]);
+    fprintf (stream, "%.16e*x", f[1]);
 
   if (deg > 1)
-    fprintf (stream, "%f*x^%d", f[deg], deg);
+    fprintf (stream, "%.16e*x^%d", f[deg], deg);
 
   for (i = deg - 1; i >= 0; i--)
     {
       if (f[i] == 0.)
 	continue;
       if (i == 0)
-	fprintf (stream, " %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else if (i == 1)
-	fprintf (stream, " %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else 
-	fprintf (stream, " %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+	fprintf (stream, " %s %.16e*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
     }
 
   fprintf (stream, "\n");
