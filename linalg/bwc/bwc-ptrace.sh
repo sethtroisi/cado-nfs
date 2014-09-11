@@ -432,7 +432,7 @@ if [ "$rhs" ] ; then
     # http://stackoverflow.com/questions/4489139/bash-process-substitution-and-syncing
     # $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
     # fortunately mf_scan is stdout-silent...
-    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile /dev/stdout | create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs
+    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile - | create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs
     rhsbin=`echo $rhs | sed -e s/txt/bin/`
     if [ "$rhsbin" == "$rhs" ] ; then rhsbin=$rhs.bin ; fi
     mv ${rhs}.bin0-$nrhs.0 $rhsbin
