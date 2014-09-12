@@ -19,6 +19,10 @@
 #include "utils.h"
 #include "cpubinding.h"
 
+/* This causes all messages to be immediately printed to stderr, instead
+ * of being captured to a string */
+#define xxxCPUBINDING_DEBUG
+
 /* All output is prefixed by this. */
 #define PRE "cpubinding: "
 
@@ -353,7 +357,9 @@ istream& operator>>(istream& f, conf_file& result)
         is.putback(c);
         if (is>>t) {
             conf_file::mapped_type::mapped_type v;
-            is >> v;
+            if (!(is >> v)) {
+                goto conf_file_parse_error;
+            }
             current.second.insert(make_pair(t, v));
             continue;
         }
@@ -564,7 +570,8 @@ class cpubinder {
         }
         pinning_group_matrices& chop_off(int n) {
             pinning_group_matrices result(t);
-            for(int k = 0 ; k < outer_dimension() / (int) n ; k+=n) {
+            ASSERT_ALWAYS(outer_dimension() > 0 && outer_dimension() % n == 0);
+            for(int k = 0 ; k < outer_dimension() ; k+=n) {
                 copy(&xs(k,0,0), &xs(k+1,0,0), back_inserter(result.m));
             }
             swap(*this, result);
@@ -777,12 +784,11 @@ void cpubinder::stage()
                     /* well, do it, then ! */
                     coarse_slots.chop_off(rtn);
                 }
-            } else {
-                if (++rt == stopo.rend())
-                    break;
-
-                rtn = rt->n;
             }
+            if (++rt == stopo.rend())
+                break;
+
+            rtn = rt->n;
         }
 
         if (rt == stopo.rend())
@@ -881,7 +887,6 @@ void cpubinder::stage()
 void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
 {
     thread_split thr(ttt);
-    ostringstream os;
 
     const char * cmdline_provided = param_list_lookup_string(pl, "cpubinding");
 
@@ -891,6 +896,12 @@ void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
         }
         return NULL;
     }
+
+#ifdef  CPUBINDING_DEBUG
+    ostream& os(cerr);
+#else   /* CPUBINDING_DEBUG */
+    ostringstream os;
+#endif  /* CPUBINDING_DEBUG */
 
     cpubinder * cb = new cpubinder(os);
 
@@ -914,7 +925,11 @@ void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
     }
 
     if (messages) {
+#ifndef CPUBINDING_DEBUG
         *messages = strdup(os.str().c_str());
+#else
+        *messages = NULL;
+#endif  /* CPUBINDING_DEBUG */
     }
     return static_cast<void*>(cb);
 }

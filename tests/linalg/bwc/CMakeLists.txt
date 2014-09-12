@@ -119,3 +119,10 @@ add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 
 add_subdirectory(mpfq)
+
+if(HAVE_CXX11 AND HAVE_HWLOC)
+    include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+    build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
+
+

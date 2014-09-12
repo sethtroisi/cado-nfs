@@ -10,6 +10,11 @@ extern "C" {
  * single-threaded context.
  * 
  * This returns NULL if cpubinding failed.
+ *
+ * If messages is not NULL, it is set to point to a newly allocated
+ * string indicating all messages from the cpubinding engine. This is
+ * meant to collect messages for various nodes in an MPI context, and
+ * print only the unique ones (see parallelizing_info.c)
  */
 void * cpubinding_get_info(char ** messages, param_list_ptr pl, int thread_split[2]);
 

@@ -1100,3 +1100,5 @@ config/numa.cmake
 linalg/bwc/cpubinding.conf
 linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
+tests/linalg/bwc/cpubind_config_file_for_tests.conf
+tests/linalg/bwc/test_cpubinding.c
