@@ -869,6 +869,7 @@ class WuAccess(object): # {
                    status, WuStatus.get_name(status))
             if status is WuStatus.ASSIGNED and wu_status is WuStatus.CANCELLED:
                 logger.warning ("WuAccess._checkstatus(): %s, presumably timed out", msg)
+                raise StatusUpdateError(msg)
             else:
                 logger.error ("WuAccess._checkstatus(): %s", msg)
                 raise StatusUpdateError(msg)
