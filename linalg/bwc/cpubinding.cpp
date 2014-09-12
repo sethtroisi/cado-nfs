@@ -180,6 +180,21 @@ std::ostream& operator<<(std::ostream& os, synthetic_topology const& t)
     copy(t.begin(), t.end(), ostream_iterator<synthetic_topology::value_type>(os, " "));
     return os;
 }
+istream& operator>>(istream& is, synthetic_topology& L)
+{
+    synthetic_topology v;
+    istream_iterator<synthetic_topology::value_type> w0(is);
+    istream_iterator<synthetic_topology::value_type> w1;
+    copy(w0, w1, back_inserter(L));
+    if (is.rdstate() & ios_base::eofbit) {
+        is.clear();
+    } else {
+        is.setstate(is.rdstate() | ios_base::failbit);
+        is.setstate(is.rdstate() & ~ios_base::goodbit);
+    }
+    return is;
+}
+
 /* }}} */
 
 /* {{{ mapping strings are elementary objects of mapping indications */
@@ -638,7 +653,32 @@ void cpubinder::read_param_list(param_list pl)
         ASSERT_ALWAYS(rc >= 0);
         fake = true;
     } else if (topology_string) {
+        /* hwloc-1.4.1 does not seem to understand "NUMANode" when
+         * parsing synthetic strings. With 1.9.1 it works fine. I don't
+         * know when exactly that changed.
+         * 1.4.1 wants "node" in the synthetic string instead. 1.9.1
+         * still groks that. Let's do a transformation for pre-1.9, that
+         * should keep us safe.
+         */
+#if HWLOC_API_VERSION >= 0x010900
         int rc = hwloc_topology_set_synthetic(topology, topology_string);
+#else
+        int rc;
+        {
+            istringstream is(topology_string);
+            synthetic_topology stopo;
+            if (is >> stopo) {
+                for(auto& x: stopo) {
+                    if (x.object == "NUMANode") { x.object="node"; }
+                }
+                ostringstream os;
+                os << stopo;
+                const char * v = os.str().c_str();
+                rc = hwloc_topology_set_synthetic(topology, v);
+            }
+        }
+#endif
+
         ASSERT_ALWAYS(rc >= 0);
         fake = true;
     } else {

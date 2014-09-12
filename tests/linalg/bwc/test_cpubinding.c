@@ -16,6 +16,7 @@ void usage() {
     exit(1);
 }
 
+int verbose = 0;
 
 int do_cpubinding_tests(const char * cpubinding_conf)
 {
@@ -51,7 +52,7 @@ int do_cpubinding_tests(const char * cpubinding_conf)
         for(int n = strlen(line); n && isspace(line[n-1]); line[--n]='\0');
         ASSERT_ALWAYS(rc >= 2);
 
-        // printf("doing subtest %d: %s\n", idx, line);
+        if (verbose) printf("doing subtest %d: %s\n", idx, line);
         idx++;
 
         param_list pl2;
@@ -62,9 +63,12 @@ int do_cpubinding_tests(const char * cpubinding_conf)
         char * msg;
         void * cc = cpubinding_get_info(&msg, pl2, t);
         /* don't make the tests too verbose */
-        if (msg) free(msg);
+        if (msg) {
+            if (verbose) puts(msg);
+            free(msg);
+        }
         int ok = want == (cc != NULL);
-        // printf("result: %s\n", ok ? "ok" : "NOK");
+        if (verbose) printf("result: %s\n", ok ? "ok" : "NOK");
         nb_ok += ok;
         nb_nok += !ok;
 
@@ -86,6 +90,7 @@ int main(int argc, char * argv[])
     param_list_configure_alias(pl, "input-topology-file", "-i");
     param_list_configure_alias(pl, "input-topology-string", "-s");
     param_list_configure_alias(pl, "cpubinding", "-c");
+    param_list_configure_switch(pl, "-v", &verbose);
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         /* Do perhaps some other things on the argument that haven't
