@@ -733,6 +733,29 @@ sub get_mpi_hosts_sge {
     die "Not enough mpi nodes ($nnodes): want $nmpi\n" if $nmpi > $nnodes;
 }
 
+# {{{ utilities
+sub version_ge {
+    my ($a, $b) = @_;
+    my @a = split(/[\.-]/, $a);
+    my @b = split(/[\.-]/, $b);
+    while (@a && @b) {
+        $a = shift @a;
+        $b = shift @b;
+        $a =~ /^(\d*)(.*)$/; my ($an, $at) = ($1, $2);
+        $b =~ /^(\d*)(.*)$/; my ($bn, $bt) = ($1, $2);
+        $an=0 if length($an)==0;
+        $bn=0 if length($bn)==0;
+        return 1 if $an > $bn;
+        return 0 if $an < $bn;
+        return 1 if $at gt $bt;
+        return 0 if $at lt $bt;
+    }
+    return 0 if @b;
+    return 1;
+}
+
+# }}}
+
 if ($mpi_needed) {
     # This is useful for debugging in case we see new MPI environments.
     print STDERR "Inherited environment:\n";
@@ -799,8 +822,15 @@ if ($mpi_needed) {
             push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
         } elsif ($mpi_ver =~ /^openmpi-1\.[56]/) {
             push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi]/) {
+        } elsif ($mpi_ver =~ /^openmpi/) {
             push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+            if (version_ge($mpi_ver, "openmpi-1.8")) {
+                # This is VERY important for bwc ! The default policy for
+                # openmpi 1.8 seems to be by slot, which obviously
+                # schedules most of the desired jobs on only one node...
+                # which doesn't work too well.
+                push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
+            }
         } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
             # Not older mpich2's, which need a daemon.
             push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
@@ -830,6 +860,10 @@ if ($mpi_needed) {
 # }}}
 
 if ($mpi_needed) {
+    # openmpi seems to properly propagate the path to mpirun as the path
+    # to be forwarded on the remote nodes, so no manual propagation of
+    # LD_LIBRARY_PATH or --prefix is needed.
+
     # mkdir must not be marked fatal, because if the command terminates
     # without having ever tried to join in an mpi collective like
     # mpi_init(), there's potential for the mpirun command to complain.

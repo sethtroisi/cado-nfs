@@ -675,6 +675,8 @@ void cpubinder::read_param_list(param_list pl)
                 os << stopo;
                 const char * v = os.str().c_str();
                 rc = hwloc_topology_set_synthetic(topology, v);
+            } else {
+                rc = -1;
             }
         }
 #endif
