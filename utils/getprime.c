@@ -21,11 +21,17 @@
   MA 02110-1301, USA.
 */
 
+/* compile with -DMAIN to use as a standalone program */
+
+#ifndef MAIN
 #include "cado.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include "getprime.h"
+#ifndef MAIN
 #include "portability.h"
+#endif
 
 /* provided for in cado.h, but we want getprime.c to be standalone */
 #ifndef ASSERT
