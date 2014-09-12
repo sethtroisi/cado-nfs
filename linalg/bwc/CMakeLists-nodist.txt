@@ -10,7 +10,7 @@ add_dependencies(bench_polmatmul gf2x-build)
 
 # This is really only for debugging.
 add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
-target_link_libraries(test_hello utils)
+target_link_libraries(test_hello bwc_base)
 set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")

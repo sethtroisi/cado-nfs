@@ -53,6 +53,9 @@
 #cmakedefine    HAVE_STRLCPY
 #cmakedefine    HAVE_STRLCAT
 #cmakedefine    HAVE_LINUX_BINFMTS_H
+#cmakedefine    HAVE_NUMA
+#cmakedefine    HAVE_HWLOC
+#cmakedefine    HAVE_CXX11
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF

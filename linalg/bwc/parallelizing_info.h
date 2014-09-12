@@ -150,6 +150,10 @@ struct parallelizing_info_s {
     char nodename[PI_NAMELEN];
     char nodeprefix[PI_NAMELEN];
     char nodenumber_s[PI_NAMELEN];
+    /* This pointer is identical on all threads. It is non-null only in
+     * case we happen to have sufficiently recent gcc, together with
+     * sufficiently recent hwloc */
+    void * cpubinding_info;
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];
