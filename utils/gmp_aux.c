@@ -194,9 +194,10 @@ ulong_nextprime (unsigned long q)
 
 #define REPS 3 /* number of Miller-Rabin tests in isprime */
 
-/* with REPS=1, the smallest composite reported prime is 1537381
+/* For GMP 6.0.0:
+   with REPS=1, the smallest composite reported prime is 1537381
    with REPS=2, it is 1943521
-   with REPS=3, correct for p < 300M
+   with REPS=3, it is 465658903
 */
 int
 ulong_isprime (unsigned long p)
