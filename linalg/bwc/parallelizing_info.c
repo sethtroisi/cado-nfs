@@ -29,6 +29,10 @@
 #include <sys/utsname.h>
 #endif
 
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+#include "cpubinding.h"
+#endif  /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
+
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
 {
     struct pthread_things * res;
@@ -84,6 +88,9 @@ struct pi_go_helper_s {
 void * pi_go_helper_func(struct pi_go_helper_s * s)
 {
     pi_interleaving_enter(s->p);
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    cpubinding_do_pinning(s->p->cpubinding_info, s->p->wr[0]->trank, s->p->wr[1]->trank);
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
     void * ret = (s->fcn)(s->p, s->pl, s->arg);
     pi_interleaving_flip(s->p);
     pi_interleaving_leave(s->p);
@@ -355,6 +362,53 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 
     get_node_number_and_prefix(pi);
     display_process_grid(pi);
+
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    /* prepare the cpu binding messages, and print the unique messages we
+     * receive */
+    char * cpubinding_messages;
+    pi->cpubinding_info = cpubinding_get_info(&cpubinding_messages, pl, thr);
+    int msgsize = 0;
+    if (cpubinding_messages)
+        msgsize = strlen(cpubinding_messages);
+    MPI_Allreduce(MPI_IN_PLACE, &msgsize, 1, MPI_INT, MPI_MAX, pi->m->pals);
+    if (msgsize == 0) {
+        if (cpubinding_messages)
+            free(cpubinding_messages);
+    }
+    msgsize++;
+    int chunksize = PI_NAMELEN + msgsize;
+    char * big_pool = malloc(pi->m->njobs * chunksize);
+    memset(big_pool, 0, pi->m->njobs * chunksize);
+    if (cpubinding_messages) {
+        int rc;
+        rc = strlcpy(big_pool + pi->m->jrank * chunksize, pi->nodename, PI_NAMELEN);
+        ASSERT_ALWAYS(rc == (int) strlen(pi->nodename));
+        rc = strlcpy(big_pool + pi->m->jrank * chunksize + PI_NAMELEN, cpubinding_messages, msgsize);
+        ASSERT_ALWAYS(rc == (int) strlen(cpubinding_messages));
+        free(cpubinding_messages);
+    }
+
+    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+            big_pool, chunksize, MPI_BYTE, pi->m->pals);
+
+    if (pi->m->jrank == 0) {
+        const char * refnode = NULL;
+        const char * ref = NULL;
+        for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
+            const char * node = big_pool + i * chunksize;
+            const char * msg = node + PI_NAMELEN;
+            if (!ref || strcmp(msg, ref) != 0) {
+                printf("cpubinding messages on %s:\n%s", node, msg);
+                ref = msg;
+                refnode = node;
+            } else {
+                printf("cpubinding messages on %s: same as %s\n", node, refnode);
+            }
+        }
+    }
+    free(big_pool);
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
 }
 
     static parallelizing_info *
@@ -567,6 +621,11 @@ static void pi_grid_clear(parallelizing_info_ptr pi, parallelizing_info * grid)
 
 static void pi_clear_mpilevel(parallelizing_info_ptr pi)
 {
+#if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
+    int thr[2] = { pi->wr[0]->ncores, pi->wr[1]->ncores };
+    cpubinding_free_info(pi->cpubinding_info, thr);
+#endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
+
     pi_wiring_destroy_pthread_things(pi->m);
 
     for(int d = 0 ; d < 2 ; d++) {

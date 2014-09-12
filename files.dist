@@ -1095,3 +1095,8 @@ tests/linalg/bwc/mpfq/mpfq_test_p_8.c
 tests/linalg/bwc/mpfq/mpfq_test_pz.c
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
+config/hwloc.cmake
+config/numa.cmake
+linalg/bwc/cpubinding.conf
+linalg/bwc/cpubinding.cpp
+linalg/bwc/cpubinding.h
