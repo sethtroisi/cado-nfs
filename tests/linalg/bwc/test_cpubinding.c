@@ -83,9 +83,9 @@ int main(int argc, char * argv[])
     param_list pl;
     param_list_init(pl);
     argv++,argc--;
-    param_list_configure_alias(pl, "input-topology-file", "i");
-    param_list_configure_alias(pl, "input-topology-string", "s");
-    param_list_configure_alias(pl, "cpubinding", "c");
+    param_list_configure_alias(pl, "input-topology-file", "-i");
+    param_list_configure_alias(pl, "input-topology-string", "-s");
+    param_list_configure_alias(pl, "cpubinding", "-c");
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         /* Do perhaps some other things on the argument that haven't
