@@ -4091,6 +4091,8 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
 		if (best_lognorm_k > old_best_lognorm_k + 1.0)
 		  break;
 		old_best_lognorm_k = best_lognorm_k;
+                if (kinc > LONG_MAX / 10)
+                  break;
 		kinc *= 10;
 		kmin = -kinc * (optimize_effort / 2);
 		kmax = kinc * ((optimize_effort + 1) / 2);
