@@ -912,6 +912,7 @@ void pi_log_print_all(parallelizing_info_ptr pi)
     free(strings);
 }
 
+
 struct thread_broadcast_arg {
     pi_wiring_ptr wr;
     /* this pointer is written from all threads. Its contents are
@@ -919,6 +920,8 @@ struct thread_broadcast_arg {
     void * ptr;
     unsigned int root;
     size_t size;
+    thread_reducer_t f;         /* only for reduce */
+    void * dptr;                /* only for reduce */
 };
 
 void thread_broadcast_in(int s MAYBE_UNUSED, struct thread_broadcast_arg * a)
@@ -950,6 +953,54 @@ void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int i)
     barrier_wait(wr->th->bh,
             (void(*)(int,void*)) &thread_broadcast_in,
             (void(*)(int,void*)) &thread_broadcast_out,
+            a);
+    serialize_threads(wr);
+}
+
+void thread_reducer_int_min(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    if (*iother < *imine) *imine = *iother;
+}
+
+void thread_reducer_int_max(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    if (*iother > *imine) *imine = *iother;
+}
+
+void thread_reducer_int_sum(void * mine, const void * other, size_t size MAYBE_UNUSED)
+{
+    int * imine = mine;
+    const int * iother = other;
+    *imine += *iother;
+}
+
+/* this gets called with s = (count-1), (count-2), ..., 0 */
+void thread_allreduce_in(int s, struct thread_broadcast_arg * a)
+{
+    if (s < (int) a->wr->ncores - 1) {
+        (*a->f)(a->ptr, a->wr->th->utility_ptr, a->size);
+    }
+    a->wr->th->utility_ptr = a->ptr;
+    if (!s)
+        memcpy(a->dptr, a->wr->th->utility_ptr, a->size);
+}
+
+void thread_allreduce(pi_wiring_ptr wr, void * dptr, void * ptr, size_t size, thread_reducer_t f)
+{
+    struct thread_broadcast_arg a[1];
+    a->wr = wr;
+    a->ptr = ptr;
+    a->root = 0;        /* meaningless */
+    a->size = size;
+    a->f = f;
+    a->dptr = dptr;
+    barrier_wait(wr->th->bh,
+            (void(*)(int,void*)) &thread_allreduce_in,
+            NULL,
             a);
     serialize_threads(wr);
 }

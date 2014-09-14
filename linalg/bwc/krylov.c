@@ -167,10 +167,13 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_log_init(pi->wr[1]);
 #endif
 
+    matmul_top_comm_bench(mmt, bw->dir);
+
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
+
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.

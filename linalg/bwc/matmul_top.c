@@ -225,11 +225,11 @@ broadcast_down_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
                     continue;   // not our turn.
                 // although the openmpi man page looks funny, I'm assuming that
                 // MPI_Allgather wants MPI_IN_PLACE as a sendbuf argument.
-                pi_log_op(picol, "[%s] MPI_Allgatherv", __func__);
+                pi_log_op(picol, "[%s] MPI_Allgather", __func__);
                 ASSERT((mcol->i1 - mcol->i0) % picol->totalsize == 0);
                 size_t eblock = (mcol->i1 - mcol->i0) /  picol->totalsize;
                 err = MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, v->v, v->stride * eblock * picol->ncores, MPI_BYTE, picol->pals);
-                pi_log_op(picol, "[%s] MPI_Allgatherv done", __func__);
+                pi_log_op(picol, "[%s] MPI_Allgather done", __func__);
                 ASSERT_ALWAYS(!err);
             }
         }
@@ -810,6 +810,112 @@ reduce_across(matmul_top_data_ptr mmt, int d)
     // circumstances after this step.
 }
 /* }}} */
+
+/**********************************************************************/
+/* bench code */
+
+void matmul_top_comm_bench_helper(int * pk, double * pt,
+                                  void (*f) (matmul_top_data_ptr, int),
+				  matmul_top_data_ptr mmt, int d)
+{
+    int k;
+    double t0, t1;
+    int cont;
+    pi_wiring_ptr wr = mmt->pi->wr[d];
+    pi_wiring_ptr xr = mmt->pi->wr[!d];
+    int * ccont = shared_malloc(mmt->pi->m, sizeof(int));
+    t0 = wct_seconds();
+    for (k = 0;; k++) {
+	t1 = wct_seconds();
+	cont = t1 < t0 + 0.25;
+	cont = cont && (t1 < t0 + 1 || k < 100);
+	thread_allreduce(mmt->pi->m, ccont, &cont, sizeof(int), &thread_reducer_int_min);
+        // printf("k=%d cont=%d ccont=%d\n", k, cont, *ccont);
+        cont = *ccont;
+	if (wr->trank == 0) {
+            SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
+                MPI_Allreduce(MPI_IN_PLACE, &cont, 1, MPI_INT, MPI_MIN, wr->pals);
+            }
+            SEVERAL_THREADS_PLAY_MPI_END;
+        }
+	if (!cont)
+	    break;
+	(*f) (mmt, d);
+    }
+    int target = 10 * k / (t1 - t0);
+    ASSERT_ALWAYS(target >= 0);
+    if (target > 100)
+	target = 100;
+    if (target == 0)
+        target = 1;
+    if (wr->trank == 0) {
+        SEVERAL_THREADS_PLAY_MPI_BEGIN(xr) {
+            MPI_Bcast(&target, 1, MPI_INT, 0, wr->pals);
+        }
+        SEVERAL_THREADS_PLAY_MPI_END;
+    }
+    thread_broadcast(mmt->pi->m, &target, sizeof(int), 0);
+    /* note that the broadcast_down and reduce_across operations also
+     * work with threads (not jobs, though) in the other direction.
+     * Therefore, it makes sense to serialize not only on wr, but also on
+     * at least the threads in the other axis xr. While we're at it, we
+     * serialize globally.
+     */
+    serialize(mmt->pi->m);
+    t0 = wct_seconds();
+    for (k = 0; k < target; k++) {
+        pi_log_op(mmt->pi->m, "[%s] iter%d/%d", __func__, k, target);
+        (*f) (mmt, d);
+    }
+    serialize(mmt->pi->m);
+    shared_free(mmt->pi->m, ccont);
+    t1 = wct_seconds();
+    *pk = k;
+    *pt = t1 - t0;
+}
+
+
+void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
+{
+    /* like matmul_top_mul_comm, we'll call reduce_across with !d, and
+     * broadcast_down with d */
+    int k;
+    double dt;
+
+    void (*funcs[2])(matmul_top_data_ptr, int) = {
+        broadcast_down,
+        reduce_across,
+    };
+    const char * text[2] = { "bd", "ra" };
+
+    for(int s = 0 ; s < 2 ; s++) {
+        /* we have our axis, and the other axis */
+        pi_wiring_ptr wr = mmt->pi->wr[d ^ s];          /* our axis */
+        pi_wiring_ptr xr = mmt->pi->wr[d ^ s ^ 1];      /* other axis */
+        /* our operation has operated on the axis wr ; hence, we must
+         * display data relative to the different indices within the
+         * communicator xr.
+         */
+        matmul_top_comm_bench_helper(&k, &dt, funcs[s], mmt, d^s);
+        for(unsigned int z = 0 ; z < xr->njobs ; z++) {
+            if (xr->jrank == z && wr->jrank == 0) {
+                for(unsigned int w = 0 ; w < xr->ncores ; w++) {
+                    if (xr->trank == w && wr->trank == 0)
+                        printf("%s %2d/%d, %s: %2d in %.1fs ; one: %.2fs\n",
+                                wr->th->desc,
+                                xr->jrank * xr->ncores + xr->trank,
+                                xr->totalsize,
+                                text[s],
+                                k, dt, dt/k);
+                }
+            }
+            serialize(mmt->pi->m);
+        }
+        serialize(mmt->pi->m);
+    }
+}
+
+
 
 /**********************************************************************/
 /* Utility stuff for applying standard permutations to vectors.

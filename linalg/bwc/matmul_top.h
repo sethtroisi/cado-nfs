@@ -181,6 +181,7 @@ extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 extern void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk);
 extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d);
 static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 {
