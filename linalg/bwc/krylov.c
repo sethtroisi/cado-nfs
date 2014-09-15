@@ -102,10 +102,16 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     // xvec_to_vec(mmt, gxvecs, bw->m, nx, bw->dir);
     // matmul_top_save_vector(mmt, "Z", bw->dir, 0);
 
+    /* let's be generous with interleaving protection. I don't want to be
+     * bothered, really */
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+    matmul_top_comm_bench(mmt, bw->dir);
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     char * v_name;
-
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
-
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
     if (tcan_print) { printf("done\n"); }
@@ -166,8 +172,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_log_init(pi->wr[0]);
     pi_log_init(pi->wr[1]);
 #endif
-
-    matmul_top_comm_bench(mmt, bw->dir);
 
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
