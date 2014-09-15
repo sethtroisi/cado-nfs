@@ -154,6 +154,9 @@ struct parallelizing_info_s {
      * case we happen to have sufficiently recent gcc, together with
      * sufficiently recent hwloc */
     void * cpubinding_info;
+    int thr_orig[2];            /* when only_mpi is 1, this is what the
+                                   thr parameter was set to originally.
+                                   Otherwise we have {0,0} here. */
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];

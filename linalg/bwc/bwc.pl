@@ -829,7 +829,10 @@ if ($mpi_needed) {
                 # openmpi 1.8 seems to be by slot, which obviously
                 # schedules most of the desired jobs on only one node...
                 # which doesn't work too well.
-                push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
+                if (!$param->{'only_mpi'}) {
+                    # with only_mpi=1, the default policy works fine.
+                    push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
+                }
             }
         } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
             # Not older mpich2's, which need a daemon.
@@ -842,7 +845,11 @@ if ($mpi_needed) {
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_nopthreads = @mpi_precmd;
-    push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    if (!$param->{'only_mpi'}) {
+        push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    } else {
+        push @mpi_precmd, '-n', $nh * $nv;
+    }
     push @mpi_precmd_nopthreads, '-n', $nh * $nv;
     push @mpi_precmd_single, '-n', 1;
 

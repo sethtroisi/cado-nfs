@@ -1735,6 +1735,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     }
 
     if (!rebuild) {
+        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            printf("Now trying to load matrix cache files\n");
+        }
         if (sqread) {
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
                 serialize_threads(mmt->pi->m);
@@ -1776,7 +1779,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
 
     if (!cache_loaded) {
         if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-            fprintf(stderr, "Matrix dispatching starts\n");
+            printf("Matrix dispatching starts\n");
         }
         m->mfile = param_list_lookup_string(pl, "matrix");
         m->bfile = param_list_lookup_string(pl, "balancing");
@@ -1802,7 +1805,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     if (!sqb) {
         if (!cache_loaded) {
             // everybody does it in parallel
-            fprintf(stderr,"[%s] J%uT%u building cache for %s\n",
+            printf("[%s] J%uT%u building cache for %s\n",
                     mmt->pi->nodenumber_s,
                     mmt->pi->m->jrank,
                     mmt->pi->m->trank,
@@ -1815,7 +1818,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             serialize_threads(mmt->pi->m);
             if (cache_loaded) continue;
             if (j == mmt->pi->m->trank) {
-                fprintf(stderr,"[%s] J%uT%u building cache for %s\n",
+                printf("[%s] J%uT%u building cache for %s\n",
                         mmt->pi->nodenumber_s,
                         mmt->pi->m->jrank,
                         mmt->pi->m->trank,
@@ -1830,7 +1833,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
      * matrix_u32 */
 
     my_pthread_mutex_lock(mmt->pi->m->th->m);
-    fprintf(stderr, "[%s] J%uT%u uses cache file %s\n",
+    printf("[%s] J%uT%u uses cache file %s\n",
             mmt->pi->nodenumber_s,
             mmt->pi->m->jrank, mmt->pi->m->trank,
             /* cache for mmt->locfile, */

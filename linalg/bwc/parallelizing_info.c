@@ -253,7 +253,14 @@ static void display_process_grid(parallelizing_info_ptr pi)
         memset(pad, ' ', PI_NAMELEN);
         int node_id_len = strlen(pi->nodenumber_s);
         pad[node_id_len]='\0';
-        if (node_id_len) pad[node_id_len/2]='.';
+        if (node_id_len) {
+            if (pi->thr_orig[0]) {
+                pad[node_id_len/2]='\'';
+            } else {
+                pad[node_id_len/2]='.';
+            }
+        }
+        int mapping_error = 0;
         for(unsigned int i = 0 ; i < pi->wr[1]->njobs ; i++) {       // i == y
         for(unsigned int it = 0 ; it < pi->wr[1]->ncores ; it++) {
             for(unsigned int j = 0 ; j < pi->wr[0]->njobs ; j++) {       // j == x
@@ -262,11 +269,30 @@ static void display_process_grid(parallelizing_info_ptr pi)
                 if (!it && !jt) {
                     what = all_node_ids2 + PI_NAMELEN * (i * pi->wr[0]->njobs + j); 
                 }
+                if (pi->thr_orig[0]) {
+                    /* then we have it==jt==0, but the real leader is not
+                     * this one. Check at least that we have the proper
+                     * identity (same leader)
+                     */
+                    ASSERT_ALWAYS(!it && !jt);
+                    unsigned int i0 = i - (i % pi->thr_orig[0]);
+                    unsigned int j0 = j - (j % pi->thr_orig[1]);
+                    const char * ref = all_node_ids2 + PI_NAMELEN * (i0 * pi->wr[0]->njobs + j0); 
+                    if (strcmp(ref, what) != 0) {
+                        mapping_error=1;
+                    }
+                    if (i != i0 || j != j0)
+                        what = pad;
+                }
                 printf(" %s", what);
             }
             }
             printf("\n");
         }
+        }
+        if (mapping_error) {
+            fprintf(stderr, "Error: we have not obtained the expected node mapping; the only_mpi=1 setting is VERY sensible to the process mapping chosen by the MPI implementation. Chances are you got it wrong. A working setup with openmpi-1.8.2 is a uniqueified host file, with --mca rmaps_base_mapping_policy slot (which is the default setting).\n");
+            exit(1);
         }
         free(pad);
     }
@@ -282,14 +308,6 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     int mpi[2] = { 1, 1, };
     int thr[2] = { 1, 1, };
 
-    param_list_parse_intxint(pl, "mpi", mpi);
-    param_list_parse_intxint(pl, "thr", thr);
-
-    unsigned int nhj = mpi[0];
-    unsigned int nvj = mpi[1];
-    unsigned int nhc = thr[0];
-    unsigned int nvc = thr[1];
-
     memset(pi, 0, sizeof(parallelizing_info));
 
 #ifdef HAVE_UTSNAME_H
@@ -304,20 +322,64 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 #else
     strncpy(pi->nodename, "unknown", sizeof(pi->nodename));
 #endif
-    pi->m->njobs = nhj * nvj;
-    pi->m->ncores = nhc * nvc;
-    pi->m->totalsize = pi->m->njobs * pi->m->ncores;
 
 #ifndef NDEBUG
     /* Must make sure that we have proper ASSERTS after MPI calls then. */
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 #endif
 
+    param_list_parse_intxint(pl, "mpi", mpi);
+    param_list_parse_intxint(pl, "thr", thr);
+
+    unsigned int nhj = mpi[0];
+    unsigned int nvj = mpi[1];
+    unsigned int nhc = thr[0];
+    unsigned int nvc = thr[1];
+
+    pi->m->njobs = nhj * nvj;
+    pi->m->ncores = nhc * nvc;
+    pi->m->totalsize = pi->m->njobs * pi->m->ncores;
     // MPI_Errhandler my_eh;
     // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
     // MPI_Comm_set_errhandler(MPI_COMM_WORLD, my_eh);
 
-    MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
+    int only_mpi=0;
+    param_list_parse_int(pl, "only_mpi", &only_mpi);
+
+    if (only_mpi) {
+        int grank;
+        MPI_Comm_rank(MPI_COMM_WORLD, & grank);
+        if (grank == 0)
+            printf("Making %d independent single-threaded MPI jobs, instead of %d %d-thread jobs\n",
+                pi->m->totalsize, pi->m->njobs, pi->m->ncores);
+        int tt = pi->m->ncores;
+
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        int nnum = rank / tt;
+        int nidx = rank % tt;
+        int ni = nnum / nvj;
+        int nj = nnum % nvj;
+        int ti = nidx / nvc;
+        int tj = nidx % nvc;
+        int i = ni * nhc + ti;
+        int j = nj * nvc + tj;
+        int nrank = i * (nvj * nvc) + j;
+
+        MPI_Comm_split(MPI_COMM_WORLD, 0, nrank, & pi->m->pals);
+        pi->m->ncores = 1;
+        pi->m->njobs = pi->m->totalsize;
+        memcpy(pi->thr_orig, thr, 2*sizeof(int));
+        mpi[0] *= thr[0]; thr[0]=1;
+        mpi[1] *= thr[1]; thr[1]=1;
+        nhj = mpi[0];
+        nvj = mpi[1];
+        nhc = thr[0];
+        nvc = thr[1];
+    } else {
+        MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
+    }
+
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
 
     int size;
@@ -393,7 +455,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
             big_pool, chunksize, MPI_BYTE, pi->m->pals);
 
     if (pi->m->jrank == 0) {
-        const char * refnode = NULL;
+        // const char * refnode = NULL;
         const char * ref = NULL;
         for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
             const char * node = big_pool + i * chunksize;
@@ -401,9 +463,11 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
             if (!ref || strcmp(msg, ref) != 0) {
                 printf("cpubinding messages on %s:\n%s", node, msg);
                 ref = msg;
+                /*
                 refnode = node;
             } else {
                 printf("cpubinding messages on %s: same as %s\n", node, refnode);
+                */
             }
         }
     }
