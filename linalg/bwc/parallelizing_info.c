@@ -89,7 +89,7 @@ void * pi_go_helper_func(struct pi_go_helper_s * s)
 {
     pi_interleaving_enter(s->p);
 #if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
-    cpubinding_do_pinning(s->p->cpubinding_info, s->p->wr[0]->trank, s->p->wr[1]->trank);
+    cpubinding_do_pinning(s->p->cpubinding_info, s->p->wr[1]->trank, s->p->wr[0]->trank);
 #endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
     void * ret = (s->fcn)(s->p, s->pl, s->arg);
     pi_interleaving_flip(s->p);
