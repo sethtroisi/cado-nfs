@@ -2,6 +2,7 @@
 #define BALANCING_MPI_SOURCE_H_
 
 #include "balancing_data_source.h"
+#include "select_mpi.h"
 
 struct mpi_source_s {
     data_source b;
@@ -13,6 +14,7 @@ struct mpi_source_s {
     size_t size;
     size_t tailsize;
     uint32_t * buf;
+    MPI_Comm comm;
 };
 typedef struct mpi_source_s mpi_source[1];
 typedef struct mpi_source_s *mpi_source_ptr;
@@ -22,7 +24,7 @@ extern "C" {
 #endif
 
 extern size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail);
-extern data_source_ptr mpi_source_alloc(int peer, size_t queue_size);
+extern data_source_ptr mpi_source_alloc(MPI_Comm comm, int peer, size_t queue_size);
 extern void mpi_source_free(data_source_ptr q);
 
 #ifdef __cplusplus

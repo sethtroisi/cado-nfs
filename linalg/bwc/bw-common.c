@@ -233,6 +233,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "sanity_check_vector");
     param_list_lookup_string(pl, "cpubinding");
     param_list_lookup_string(pl, "only_mpi");
+    param_list_lookup_string(pl, "balancing_queue_size");
 
     return 0;
 }

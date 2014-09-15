@@ -506,6 +506,7 @@ struct mpi_dest_s {
     int tag;
     MPI_Request req;
     int peer;
+    MPI_Comm comm;
 
     void (*complete_flush)(void *);
     void (*try_flush)(void *);
@@ -596,7 +597,7 @@ int mpi_dest_try_flush(mpi_dest M)
     /* note that the closing message contains no significant data.
      * However the receiving side does not know it. */
     MPI_Isend(M->buf[M->cur], M->size * sizeof(uint32_t),
-            MPI_BYTE, M->peer, M->tag, MPI_COMM_WORLD, &M->req);
+            MPI_BYTE, M->peer, M->tag, M->comm, &M->req);
     M->cur ^= 1;
     M->pos = 0;
     return 1;
@@ -646,10 +647,11 @@ int mpi_dest_put(mpi_dest_ptr C, uint32_t * p, size_t n)
 
 
 // this does not allocate the buffer for the send queues.
-data_dest_ptr mpi_dest_alloc_partial()
+data_dest_ptr mpi_dest_alloc_partial(MPI_Comm comm)
 {
     mpi_dest_ptr p = malloc(sizeof(mpi_dest));
     memset(p, 0, sizeof(mpi_dest));
+    p->comm = comm;
     p->b->put = (int(*)(void*,uint32_t*,size_t))&mpi_dest_put;
     // p->b->progress = NULL;
     ASSERT_ALWAYS(sizeof(size_t) % sizeof(uint32_t) == 0);
@@ -1172,7 +1174,7 @@ void endpoint_loop(parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr 
     }
 
     // the master rank is zero.
-    data_source_ptr input = mpi_source_alloc(0, queue_size);
+    data_source_ptr input = mpi_source_alloc(pi->m->pals, 0, queue_size);
     ((mpi_source_ptr)input)->nparallel = pi->m->ncores;
 
     for (;;) {
@@ -1509,7 +1511,7 @@ data_dest_ptr master_dispatcher_alloc(master_data m, parallelizing_info_ptr pi, 
             d->x[i] = (data_dest_ptr) slaves[i]->tp->dst;
         } else {
             ASSERT_ALWAYS(slaves[i] == NULL);
-            d->x[i] = mpi_dest_alloc_partial();
+            d->x[i] = mpi_dest_alloc_partial(pi->m->pals);
             ((mpi_dest_ptr) d->x[i])->peer = j;
             ((mpi_dest_ptr) d->x[i])->tag = i;
             mpi_dest_alloc_one_queue((mpi_dest_ptr) d->x[i], queue_size);
