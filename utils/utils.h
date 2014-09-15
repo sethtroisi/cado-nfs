@@ -45,5 +45,6 @@
 #include "memory.h"
 #include "stats.h"
 #include "lll.h"
+#include "verbose.h"
 
 #endif	/* CADO_UTILS_H_ */

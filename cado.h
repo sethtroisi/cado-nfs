@@ -70,8 +70,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #ifdef __cplusplus
+/* as per C99 standard:
+ *      § 7.8.1 footnote 182            __STDC_FORMAT_MACROS
+ *      § 7.18.2 footnote 217           __STDC_LIMIT_MACROS
+ *      § 7.18.3 footnote 218           __STDC_LIMIT_MACROS
+ *      § 7.18.4.1 footnote 220         __STDC_CONSTANT_MACROS
+ *
+ * Note though that C++11 items
+ *      § 27.9.2.3                      __STDC_FORMAT_MACROS
+ *      § 18.4.1.2                      the two other
+ * explicitly say that despite what the C standard says, these macros
+ * play no role in C++11. This might not be true for implementations
+ * which do not conform completely to C++11.
+ */
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS    /* PRIu32 in lingen_mat_types.hpp */
+#define __STDC_CONSTANT_MACROS
 #endif
 
 #if	defined(_AIX) && !defined(__cplusplus)

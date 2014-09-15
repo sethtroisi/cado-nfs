@@ -1310,6 +1310,7 @@ main (int argc, char *argv[])
     usage (argv0[0], NULL, pl);
 
   /* print command line */
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
 
   /* check lq and nq */

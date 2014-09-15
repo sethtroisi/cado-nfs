@@ -273,6 +273,7 @@ int main (int argc, char **argv)
   filename = param_list_lookup_string (pl, "f");
 
   /* print out commands */
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
 
   if (param_list_warn_unused(pl)) usage();

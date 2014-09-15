@@ -1129,7 +1129,8 @@ void slave_loop(slave_data s)
 {
     char name[80];
 
-    int disp = s->pi->m->jrank && s->pi->m->trank;
+    int disp = verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_SLAVES)
+        && s->pi->m->jrank && s->pi->m->trank;
 
     // parallelizing_info_ptr pi = s->pi;
     // int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
@@ -1555,7 +1556,8 @@ void master_dispatcher_free(data_dest_ptr xd, parallelizing_info_ptr pi, slave_d
 
 void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr output)/*{{{*/
 {
-    mf_pipe(input, output, "main");
+    mf_pipe(input, output,
+            verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_MASTER) ? "main" : NULL);
     uint32_t r = output->r;
 
     printf("Master loop finished ; read %" PRIu32 " rows\n", r);

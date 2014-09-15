@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
-set -x
+# set -x
 
 # This script is intended *for testing only*. It's used for, e.g.,
 # coverage tests. This even goes with dumping all intermediary data to
@@ -10,7 +10,17 @@ set -x
 # command line with care (command-lines as created by this tool might be
 # a source of inspiration, though).
 
-if [ "$*" ] ; then eval "$*" ; fi
+while [ $# -gt 0 ] ; do
+    a="$1"
+    shift
+    if [ "$a" = "--" ] ; then
+        break
+    else
+        eval "$a"
+    fi
+done
+
+pass_bwcpl_args=("$@")
 
 # various configuration variables. environment can be used to override them
 : ${scriptpath=$0}
@@ -440,7 +450,7 @@ if [ "$rhs" ] ; then
 else
     set $common
 fi
-$bindir/bwc.pl :complete "$@"
+$bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
 
 if [ "$nomagma" ] ; then
     exit 0

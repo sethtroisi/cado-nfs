@@ -199,6 +199,7 @@ main (int argc, char *argv[])
         usage (pl, argv0);
     }
     /* print command-line arguments */
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line (stdout, pl);
     printf ("\n");
     fflush(stdout);

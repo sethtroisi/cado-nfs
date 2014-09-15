@@ -23,8 +23,7 @@ endmacro(string_join var delimiter str_list)
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
-    add_test(test-bwc-${nm} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
+    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
 endmacro(add_bwc_test)
 
 

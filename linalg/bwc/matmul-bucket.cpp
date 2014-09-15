@@ -630,8 +630,10 @@ static int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32
 
     if ((i1-i0) >> SMALL_SLICES_I_BITS) keep2=0;
 
-    if (!keep1) printf(" [cannot be small1, beyond impl limits]");
-    if (!keep2) printf(" [cannot be small2, beyond impl limits]");
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+        if (!keep1) printf(" [cannot be small1, beyond impl limits]");
+        if (!keep2) printf(" [cannot be small2, beyond impl limits]");
+    }
 
     if (!mb->mm->methods.small2) keep2=0;
 
@@ -749,7 +751,8 @@ static void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_
                  * Problem is that in such a case, we would also have to
                  * adjust the indirection pointer as well, which would be
                  * messy. */
-                printf("*** cancelled %td padding coefficient\n", (pmp-q)/4);
+                verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                        "*** cancelled %td padding coefficient\n", (pmp-q)/4);
             }
             pmp[0] = 0;
         }
@@ -774,12 +777,14 @@ static void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_
 
         vbl_ncols_variance += ((double)(j1-j0)) * ((double)(j1-j0));
 #if 0
-        printf(" vbl%u", vblocknum);
-        printf(": %ss %u..%u ", mb->colname, j0, j1);
-        printf("; w %u", V.n);
-        printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
-        if (V.pad) printf("; pad 6*%u", V.pad);
-        printf("\n");
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf(" vbl%u", vblocknum);
+            printf(": %ss %u..%u ", mb->colname, j0, j1);
+            printf("; w %u", V.n);
+            printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
+            if (V.pad) printf("; pad 6*%u", V.pad);
+            printf("\n");
+        }
 #endif
         transfer(&(L->vbl), &V);
     }
@@ -787,7 +792,8 @@ static void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_
     vbl_ncols_mean /= vblocknum;
     vbl_ncols_variance /= vblocknum;
     double vbl_ncols_sdev = sqrt(vbl_ncols_variance - vbl_ncols_mean * vbl_ncols_mean);
-    printf(" %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            " %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
 
 }
 
@@ -904,25 +910,29 @@ static int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32
     /* The average dj is quite easy */
     L->dj_avg = mb->ncols_t / (double) L->hdr->ncoeffs;
 
-    printf(" w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            " w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
             L->hdr->ncoeffs, L->dj_avg, L->dj_max, LSL_NBUCKETS_MAX * L->dj_avg);
 
     if (mb->mm->methods.something_beyond("large")) {
         /* Then we may enforce our separation criterion */
         if (L->dj_avg > DJ_CUTOFF2) {
-            printf("-> too sparse");
+            verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                    "-> too sparse");
             if (imax - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
-                printf("; kept because of short tail\n");
+                verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                        "; kept because of short tail\n");
             } else {
                 /* We won't keep this slice */
-                printf("\n");
+                verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD, "\n");
                 mb->rowhead = ptr0;
                 return 0;
             }
         }
     }
 
-    printf("\n");
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            "\n");
 
     split_large_slice_in_vblocks(mb, L, R, scratch1size);
 
@@ -1107,12 +1117,14 @@ static void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_sli
 
         /* TODO: have some sort of verbosity level */
 #if 0
-        printf(" vbl%u", vblocknum);
-        printf(": %ss %u..%u ", mb->colname, j0, j1);
-        printf("; w %u", V.n);
-        printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
-        if (V.pad) printf("; pad 6*%u", V.pad);
-        printf("\n");
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf(" vbl%u", vblocknum);
+            printf(": %ss %u..%u ", mb->colname, j0, j1);
+            printf("; w %u", V.n);
+            printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
+            if (V.pad) printf("; pad 6*%u", V.pad);
+            printf("\n");
+        }
 #endif
 
         transfer(&(H->vbl), &V);
@@ -1121,7 +1133,8 @@ static void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_sli
     vbl_ncols_mean /= vblocknum;
     vbl_ncols_variance /= vblocknum;
     double vbl_ncols_sdev = sqrt(vbl_ncols_variance - vbl_ncols_mean * vbl_ncols_mean);
-    printf(" %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            " %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
 }/*}}}*/
 
 static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, uint32_t i1, unsigned int scratch2size)
@@ -1155,7 +1168,8 @@ static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t
     ASSERT(lsize * H->nlarge >= i1 - i0);
     R->subs.assign(H->nlarge, huge_subslice_raw_t());
 
-    printf(" (%u*%u) ", H->nlarge, lsize);
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            " (%u*%u) ", H->nlarge, lsize);
     uint32_t last_j = 0;
 
     /* First we create a huge unique vblock, and later on decide on
@@ -1164,10 +1178,12 @@ static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t
     for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
         uint32_t len  = R->col_sizes[j];
 
-        if (j > next_dot) {
-            printf(".");
-            fflush(stdout);
-            next_dot += mb->ncols_t / H->nlarge;
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            if (j > next_dot) {
+                printf(".");
+                fflush(stdout);
+                next_dot += mb->ncols_t / H->nlarge;
+            }
         }
 
         if (!len)
@@ -1207,7 +1223,7 @@ static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t
         }
         R->super.pop_back();
     }
-    printf("\n");
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD, "\n");
     ASSERT(qptr-cols == mb->rowhead - ptr0 - (ptrdiff_t) (i1 - i0));
     qptr = NULL;
     delete[] cols;
@@ -1216,7 +1232,8 @@ static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t
     /* The average dj is quite easy */
     H->dj_avg = mb->ncols_t / (double) H->hdr->ncoeffs;
 
-    printf(" w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket block hit=1/%.1f\n",
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            " w=%" PRIu64 ", avg dj=%.1f, max dj=%u, bucket block hit=1/%.1f\n",
             H->hdr->ncoeffs, H->dj_avg, H->dj_max,
             H->nlarge * H->dj_avg);
 
@@ -1292,11 +1309,13 @@ static vector<unsigned int> flush_periods(unsigned int nvstrips)
         nf = max(nf + 1, (unsigned int) (nf * VSC_BLOCKS_FLUSHFREQ_RATIO));
     }
     std::reverse(fp.begin(), fp.end());
-    printf("Considering cells to be flushed every");
-    for(unsigned int s = 0 ; s < fp.size() ; s++) {
-        printf(" %u", fp[s]);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+        printf("Considering cells to be flushed every");
+        for(unsigned int s = 0 ; s < fp.size() ; s++) {
+            printf(" %u", fp[s]);
+        }
+        printf(" vstrips\n");
     }
-    printf(" vstrips\n");
     ASSERT_ALWAYS(fp.back() == min(255u, nvstrips));
     ASSERT_ALWAYS(fp.front() == 1);
 
@@ -1383,7 +1402,8 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
          * the end. */
         V->steps.erase(V->steps.begin() + k);
         if (merge_with_next) {
-            printf("strip %" PRIu32 "+%lu merged with next\n",
+            verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                    "strip %" PRIu32 "+%lu merged with next\n",
                     old_ii, w);
             ASSERT_ALWAYS(k < V->steps.size());
             V->steps[k].nrows += w;
@@ -1391,7 +1411,8 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
             // don't increment ii either.
         } else {
             ASSERT_ALWAYS(merge_with_previous);
-            printf("strip %" PRIu32 "+%lu merged with previous\n",
+            verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                    "strip %" PRIu32 "+%lu merged with previous\n",
                     old_ii, w);
             V->steps[k-1].nrows += w;
             // don't increment k here.
@@ -1436,10 +1457,12 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
             }
         }
         /*
-        printf("Post counts\n");
-        for(unsigned int d = 0 ; d < nvstrips ; d++) {
-            printf(" (nrows=%u) [%u].sub[%u] : %lu coeffs ; xsize=%zu, csize=%zu\n", V->steps[s].nrows, d, s, V->dispatch[d].sub[s].hdr->ncoeffs, V->dispatch[d].sub[s].x.size(), V->dispatch[d].sub[s].c.size());
-        }
+           if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+                printf("Post counts\n");
+                for(unsigned int d = 0 ; d < nvstrips ; d++) {
+                    printf(" (nrows=%u) [%u].sub[%u] : %lu coeffs ; xsize=%zu, csize=%zu\n", V->steps[s].nrows, d, s, V->dispatch[d].sub[s].hdr->ncoeffs, V->dispatch[d].sub[s].x.size(), V->dispatch[d].sub[s].c.size());
+                }
+            }
         */
         unsigned int acc = 0;
         for(unsigned int d = 0 ; d < nvstrips ; d++) {
@@ -1456,11 +1479,13 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
             cm += V->dispatch[d].sub[s].hdr->ncoeffs;
             if (cm >= m) m = cm;
         }
-        printf("Rows %" PRIu32 "+%" PRIu32, old_ii, V->steps[s].nrows);
-        if (V->steps[s].density_upper_bound != UINT_MAX) {
-            printf(": d < %u", V->steps[s].density_upper_bound);
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf("Rows %" PRIu32 "+%" PRIu32, old_ii, V->steps[s].nrows);
+            if (V->steps[s].density_upper_bound != UINT_MAX) {
+                printf(": d < %u", V->steps[s].density_upper_bound);
+            }
+            printf("; %u flushes (every %u), tbuf space %lu\n", iceildiv(nvstrips, defer), defer, m);
         }
-        printf("; %u flushes (every %u), tbuf space %lu\n", iceildiv(nvstrips, defer), defer, m);
         m += 1; // add space for one dummy pointer.
         V->steps[s].tbuf_space = m;
         V->tbuf_space += m;
@@ -1472,7 +1497,8 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
         V->hdr->ncoeffs+=V->dispatch[d].hdr->ncoeffs;
     }
 
-    printf("Total tbuf space %lu (%lu MB)\n",
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            "Total tbuf space %lu (%lu MB)\n",
             V->tbuf_space, (V->tbuf_space * sizeof(abelt)) >> 20);
 }
 /*}}}*/
@@ -1491,7 +1517,8 @@ static int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint
     V->hdr->nchildren = nvstrips;
 
     uint32_t width = iceildiv(V->hdr->j1 - V->hdr->j0, nvstrips);
-    printf("%u vstrips of width %" PRIu32 "\n", nvstrips, width);
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            "%u vstrips of width %" PRIu32 "\n", nvstrips, width);
 
     // prepare the dispatch slice headers
     for(uint32_t j = V->hdr->j0 ; j < V->hdr->j1 ; j += width) {
@@ -1676,18 +1703,23 @@ static void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t 
 
         small_slice_t S[1];
 
-        printf("Ssl%u: %ss %u+%u...", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf("Ssl%u: %ss %u+%u...", s, mb->rowname, i0, i1-i0);
+            fflush(stdout);
+        }
 
         int keep = builder_do_small_slice(mb, S, i0, i1);
 
-        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u%s\n",
-                S->ncoeffs, S->dj_avg, S->dj_max,
-                S->is_small2 ? " [packed]" : "");
-        fflush(stdout);
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u%s\n",
+                    S->ncoeffs, S->dj_avg, S->dj_max,
+                    S->is_small2 ? " [packed]" : "");
+            fflush(stdout);
+        }
 
         if (!keep) {
-            printf("Switching to large slices. Ssl%u to be redone\n", s);
+            verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                    "Switching to large slices. Ssl%u to be redone\n", s);
             break;
         }
         builder_push_small_slice(mb->mm, S);
@@ -1709,13 +1741,16 @@ static void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned 
         uint32_t i0 = * p_i0 +  s      * (uint64_t) rem_nrows / nlarge_slices;
         uint32_t i1 = * p_i0 + (s + 1) * (uint64_t) rem_nrows / nlarge_slices;
 
-        printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
+            fflush(stdout);
+        }
 
         int keep = builder_do_large_slice(mb, L, i0, i1, imax, scratch1size);
 
         if (!keep) {
-            printf("Switching to huge slices. Lsl%u to be redone\n", s);
+            verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+                    "Switching to huge slices. Lsl%u to be redone\n", s);
             break;
         }
 
@@ -1738,8 +1773,10 @@ static void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned i
         uint32_t i0 = * p_i0 +  s      * (uint64_t) rem_nrows / nhuge_slices;
         uint32_t i1 = * p_i0 + (s + 1) * (uint64_t) rem_nrows / nhuge_slices;
 
-        printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
+        if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+            printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
+            fflush(stdout);
+        }
         builder_do_huge_slice(mb, H, i0, i1, scratch2size);
         builder_push_huge_slice(mb->mm, H);
         // transfer(Hq, H);
@@ -1834,7 +1871,8 @@ static void append_compressed(vector<uint8_t>& t8, vector<uint8_t> const& S, uns
 
 static void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
 {
-    printf("Flushing staircase slices\n");
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            "Flushing staircase slices\n");
 
     mm->headers.push_back(*V->hdr);
 
@@ -1975,7 +2013,8 @@ void MATMUL_NAME(build_cache)(matmul_ptr mm0, uint32_t * data)
     builder mb[1];
     builder_init(mb, mm, data);
 
-    printf("%u rows %u cols\n", mm->public_->dim[0], mm->public_->dim[1]);
+    verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
+            "%u rows %u cols\n", mm->public_->dim[0], mm->public_->dim[1]);
 
     uint32_t main_i0 = 0;
     uint32_t fence = mb->nrows_t;

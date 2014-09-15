@@ -1493,7 +1493,7 @@ sub task_prep {
     if ($prime == 2) {
         task_common_run('prep', @main_args);
         task_common_run('split',
-            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
             qw{--ifile Y.0 --ofile-fmt V%u-%u.0});
     } else {
         # The prime case is somewhat different. We'll generate random
@@ -1665,7 +1665,7 @@ sub task_lingen {
         my @args = @main_args;
         task_common_run("lingen", @args, qw/--lingen-threshold 64/);
         task_common_run('split',
-            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
             split(' ', "--ifile F --ofile-fmt F.sols0-$n.%u-%u"));
     } else {
         # NOTE: It may be worthwhile to run specifically this step, but
@@ -1685,7 +1685,7 @@ sub task_lingen {
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
-        push @args, grep { /^(?:m|n|wdir|prime)=/ } @main_args;
+        push @args, grep { /^(?:m|n|wdir|prime|verbose_flags)=/ } @main_args;
         task_common_run "split", @args,
                 "ifile=$concatenated_A.gen", "ofile-fmt=F.%u-%u";
         for my $j (0..$n/$splitwidth-1) {

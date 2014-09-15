@@ -8,6 +8,7 @@ set (sources
         barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c renumber.c
         ringbuf.c sm_utils.c memalloc.c mpz_vector.c memory.c stats.c lll.c
+        verbose.c
 )
 if (NOT MINGW)
     set (sources ${sources} cado_popen.c)
