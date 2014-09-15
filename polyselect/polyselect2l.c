@@ -2128,6 +2128,10 @@ main (int argc, char *argv[])
   }
 #endif
 
+  if (nthreads > 1 && d >= 5)
+    fprintf (stderr,
+             "# Warning: this code is experimental, and not thread-safe.\n");
+
   /* quiet mode */
   if (quiet == 1)
     verbose = -1;
