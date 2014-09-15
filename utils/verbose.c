@@ -92,3 +92,40 @@ void verbose_set_enabled_flags(param_list pl)
     free(w);
 }
 
+/* returns true if the following verbose flag is enabled */
+int verbose_enabled(int flag) {
+    return verbose_flag_word & (UINT64_C(1) << flag);
+}
+
+int verbose_vfprintf(FILE * f, int flag, const char * fmt, va_list ap)
+{
+    if (verbose_enabled(flag)) {
+        return vfprintf(f, fmt, ap);
+    }
+    return 1;
+}
+
+int verbose_vprintf(int flag, const char * fmt, va_list ap)
+{
+    return verbose_vfprintf(stdout, flag, fmt, ap);
+}
+int verbose_fprintf(FILE * f, int flag, const char * fmt, ...)
+{
+    va_list ap;
+    int rc;
+    va_start(ap, fmt);
+    rc = verbose_vfprintf(f, flag, fmt, ap);
+    va_end(ap);
+    return rc;
+}
+int verbose_printf(int flag, const char * fmt, ...)
+{
+    va_list ap;
+    int rc;
+    va_start(ap, fmt);
+    rc = verbose_vprintf(flag, fmt, ap);
+    va_end(ap);
+    return rc;
+}
+
+
