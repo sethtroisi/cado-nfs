@@ -175,6 +175,7 @@ synthetic_topology hwloc_synthetic_topology(hwloc_topology_t topology)
     return result;
 }
 
+
 std::ostream& operator<<(std::ostream& os, synthetic_topology const& t)
 {
     copy(t.begin(), t.end(), ostream_iterator<synthetic_topology::value_type>(os, " "));
@@ -203,6 +204,7 @@ struct mapping_string {
     int group;
     thread_split t;
     mapping_string() : group(0) {}
+    mapping_string(string const& type, int g, thread_split const& t) : object(type), group(g), t(t) { }
     mapping_string(string const& type, int g, int t[2]) : object(type), group(g), t(t) { }
     mapping_string(string const& type, int g): object(type), group(g) {}
     bool operator<(const mapping_string& o) const {
@@ -601,6 +603,7 @@ class cpubinder {
     /* filled by ::read_param_list */
     conf_file cf;
     bool fake;
+    bool remove_binding;
 
     /* filled by ::find and ::force */
     synthetic_topology stopo;
@@ -632,9 +635,21 @@ void cpubinder::read_param_list(param_list pl)
     const char * topology_string = param_list_lookup_string(pl, "input-topology-string");
     const char * cpubinding_conf = param_list_lookup_string(pl, "cpubinding");
 
-    if (cpubinding_conf && !strstr(cpubinding_conf, "=>")) {
-        if (ifstream(cpubinding_conf) >> cf) {
-            os << PRE << "Read configuration from " << cpubinding_conf << endl;
+    remove_binding = false;
+    if (cpubinding_conf) {
+        if (strcmp(cpubinding_conf, "remove") == 0) {
+            remove_binding = true;
+        } else if (strlen(cpubinding_conf) == 0) {
+            os << PRE << "Interpreting explicitly empty cpubinding string as meaning \"remove\"" << endl;
+            remove_binding = true;
+        } else if (!strstr(cpubinding_conf, "=>")) {
+            if (ifstream(cpubinding_conf) >> cf) {
+                os << PRE << "Read configuration from " << cpubinding_conf << endl;
+            } else {
+                throw invalid_argument("")
+                    << "Could not read cpubinding conf file "
+                    << cpubinding_conf;
+            }
         }
         // cerr << "Configuration:\n" << cf << endl;
     }
@@ -699,6 +714,18 @@ bool cpubinder::find(thread_split const& thr)
     stopo = hwloc_synthetic_topology(topology);
     os << PRE << "Hardware: " << stopo << endl;
     os << PRE << "Target split: " << thr << endl;
+    if (remove_binding) {
+        /* Then we simply need to write down what the most permissing
+         * binding is.
+         */
+        mapping_string top(stopo.front().object, stopo.front().n, thr);
+        mapping.push_back(top);
+        os << PRE << "As per the \"remove\" instruction,"
+            << " applying permissive mapping:"
+            << " " << mapping << endl;
+        return true;
+    }
+
     struct {
         int n;
         pair<conf_file::key_type, conf_file::mapped_type> it;
@@ -743,9 +770,14 @@ bool cpubinder::find(thread_split const& thr)
                 break;
             os << PRE << "not appending " << best.e.front() << " since " << mapping.back().object << " is present\n";
         }
+        mapping.splice(mapping.end(), best.e);
+    } else {
+        mapping_string top(stopo.front().object, stopo.front().n, thr);
+        mapping.push_back(top);
+        os << PRE << "Found empty mapping in config file."
+            << " Applying hence permissive mapping:"
+            << " " << mapping << endl;
     }
-
-    mapping.splice(mapping.end(), best.e);
     stopo = best.s;
     return true;
 }
@@ -782,6 +814,9 @@ void cpubinder::stage()
 
     auto rt = stopo.rbegin()  ;
     auto jt = mapping.rbegin();
+
+    /* rtn is the number of not-yet-assigned (groups of) objects at the
+     * current level */
     int rtn = rt->n;
 
     bool stars = true;
@@ -815,12 +850,12 @@ void cpubinder::stage()
                  */
                 if (stars) {
                     os << PRE << "Warning: while applying " << *jt
-                        << ": this implicitly merges " << (rt->n/rtn)
+                        << ": this implicitly merges " << rtn
                         << " " << rt->object << "-level (groups of) objects\n";
-                    hidden_grouping *= rt->n/rtn;
+                    hidden_grouping *= rtn;
                 } else {
                     os << PRE << "Warning: while applying " << *jt
-                        << ": we have only " << (rt->n/rtn) 
+                        << ": we have only " << rtn
                         << " " << rt->object << " scheduled"
                         << " out of " << rt->n << endl;
                     /* well, do it, then ! */
@@ -861,7 +896,7 @@ void cpubinder::stage()
                     slots[i] += slots[j++];
                 }
             }
-            slots.erase(slots.begin() + slots.size() / jt->group, slots.end());
+            slots.erase(slots.begin() + slots.size() / (jt->group * hidden_grouping), slots.end());
             /* and we reduce the number of items in the topology */
             rtn /= jt->group;
         } else {

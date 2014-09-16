@@ -101,7 +101,10 @@ int main(int argc, char * argv[])
         usage();
     }
 
-    if (param_list_lookup_string(pl, "s") && param_list_lookup_string(pl, "i")) {
+    int seen_i = param_list_lookup_string(pl, "input-topology-file") != NULL;
+    int seen_s = param_list_lookup_string(pl, "input-topology-string") != NULL;
+
+    if (seen_i && seen_s) {
         fprintf(stderr, "Cannot have both -i and -s\n");
         exit(1);
     }
