@@ -2336,6 +2336,13 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     
     def run(self):
         super().run()
+        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        have_two_alg = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        if have_two_alg:
+            fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
+            fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
+        else:
+            factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
@@ -2346,16 +2353,12 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output",
                                    shouldexist=False)
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            if not self.send_request(Request.GET_HAVE_TWO_ALG_SIDES):
-                factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
+            if not have_two_alg:
                 p = cadoprograms.Las(q0=q0, q1=q1,
                                      poly=polyfilename, factorbase=factorbase,
                                      out=outputfilename, stats_stderr=True,
                                      **self.progparams[0])
             else:
-                fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
-                fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
                 p = cadoprograms.Las(q0=q0, q1=q1,
                                      poly=polyfilename,
                                      factorbase0=fb0,
