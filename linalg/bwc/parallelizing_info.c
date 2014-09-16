@@ -1516,6 +1516,7 @@ pi_save_file_leader_init_done:
         free(recvbuf);
 #endif
         rc = ftruncate(fd, sizeondisk);
+        close(fd);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
@@ -1523,7 +1524,6 @@ pi_save_file_leader_init_done:
             rc = rename(filename_pre, filename);
             FATAL_ERROR_CHECK(rc < 0, "rename failed");
         }
-        close(fd);
         free(filename);
         free(filename_pre);
     }
@@ -1638,6 +1638,7 @@ pi_save_file_2d_leader_init_done:
         free(recvbuf);
 #endif
         rc = ftruncate(fd, sizeondisk);
+        close(fd);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
@@ -1645,7 +1646,6 @@ pi_save_file_2d_leader_init_done:
             rc = rename(filename_pre, filename);
             FATAL_ERROR_CHECK(rc < 0, "rename failed");
         }
-        close(fd);
         free(filename);
         free(filename_pre);
     }
