@@ -683,6 +683,12 @@ int main(int argc, char **argv)
          param_list_print_usage (pl, argv0, stderr);
          exit (EXIT_FAILURE);
        }
+     if (outname == NULL)
+       {
+         fprintf (stderr, "Error: parameter -out is mandatory\n");
+         param_list_print_usage (pl, argv0, stderr);
+         exit (EXIT_FAILURE);
+       }
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
     chars = create_characters (nchars, nratchars, pol, lpb);
