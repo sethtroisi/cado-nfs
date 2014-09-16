@@ -65,10 +65,66 @@ else("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
         # We're using this variable in the top-level substitution, so it needs
         # to escape its scope and go into the cache right now.
         set(WITH_MPI 1 CACHE INTERNAL "MPI is being used (for relevant code parts)")
+
+        # Now check for the MPI API version.
+        macro(my_try_compile_mpicc SOURCE VAR)
+            string(RANDOM LENGTH 8 ALPHABET "0123456789abcdef" uuid)
+            string(TOLOWER "${VAR}" lcvar)
+            set(checkfile
+                "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/check_${lcvar}_${UUID}.c")
+
+            FILE(WRITE "${checkfile}" "${SOURCE}\n")
+            MESSAGE(STATUS "Performing Test ${VAR}")
+            execute_process(
+                COMMAND ${MPI_C_COMPILER} -c ${checkfile}
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                RESULT_VARIABLE test_return_code
+                OUTPUT_VARIABLE test_stdout
+                ERROR_VARIABLE test_stderr
+                )
+            FILE(APPEND
+                ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
+                "Summary for ${VAR} check:\n"
+                "Source file was ${checkfile}\n"
+                "Return code: ${test_return_code}\n"
+                "stdout: ${test_stdout}\n"
+                "stderr: ${test_stderr}\n"
+                "\n"
+                )
+            if (test_return_code)
+                SET(${VAR} 0 CACHE INTERNAL "Test ${VAR}")
+                MESSAGE(STATUS "Performing Test ${VAR} -- Failed")
+            else (test_return_code)
+                SET(${VAR} 1 CACHE INTERNAL "Test ${VAR}")
+                MESSAGE(STATUS "Performing Test ${VAR} -- Success")
+            endif (test_return_code)
+        endmacro(my_try_compile_mpicc SOURCE VAR)
+
+        my_try_compile_mpicc("
+        #include <mpi.h>
+        #if !((MPI_VERSION > 2) || (MPI_VERSION == 2 && MPI_SUBVERSION >= 1))
+        #error \"MPI version 2.1 not supported\"
+        #endif
+        int main(int argc, char** argv)
+        {
+        MPI_Init(&argc,&argv);
+        MPI_Finalize();
+        }
+        " HAVE_MPI2_API)
+
+        my_try_compile_mpicc("
+        #include <mpi.h>
+        #if !((MPI_VERSION > 3) || (MPI_VERSION == 3 && MPI_SUBVERSION >= 0))
+        #error \"MPI version 3.0 not supported\"
+        #endif
+        int main(int argc, char** argv)
+        {
+        MPI_Init(&argc,&argv);
+        MPI_Finalize();
+        }
+        " HAVE_MPI3_API)
+
     else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
     endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
 endif("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$")
-
-
-
