@@ -1070,7 +1070,7 @@ sub list_files_generic {
         push @{$files->{join("..", @kmatches)}}, \@matches;
         $filesize = $size if !defined($filesize);
         if ($filesize != $size) {
-            task_check_message 'error', "Inconsistency detected for the sizes of the ${pattern} files. We have seen at least $filesize and $size (last seen: $_). Please fix.\n";
+            task_check_message 'error', "Inconsistency detected for the sizes of the ${pattern} files. We have seen at least $filesize and $size (last seen: $file, $size). Please fix.\n";
             die;
         }
     }
