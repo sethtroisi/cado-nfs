@@ -95,6 +95,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 {
   double pb;
   int side=0;
+  double a0=a, b0=b, pa0=pa;
 
   pb = double_poly_eval(p, b);
 
@@ -129,7 +130,9 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
           if (side==-1) pa /= 2;
           side=-1;
       }
-      ASSERT_ALWAYS (!isnan(b));
+      if (isnan(b)) {
+          return double_poly_dichotomy(p, a0, b0, pa0, 0);
+      }
   }
 }
 
