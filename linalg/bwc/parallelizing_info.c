@@ -1521,6 +1521,8 @@ pi_save_file_leader_init_done:
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
         } else {
+            /* unlink before rename is necessary under windows */
+            unlink(filename);
             rc = rename(filename_pre, filename);
             DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
         }
@@ -1643,6 +1645,8 @@ pi_save_file_2d_leader_init_done:
             fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
         } else {
+            /* unlink before rename is necessary under windows */
+            unlink(filename);
             rc = rename(filename_pre, filename);
             DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
         }
