@@ -1435,7 +1435,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     if (leader) {
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
-        rc = asprintf(&filename_pre, "%s.%u.tmp", name, iter);
+        rc = asprintf(&filename_pre, "%s_%u.tmp", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
         fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
@@ -1522,7 +1522,7 @@ pi_save_file_leader_init_done:
             /* If only ftruncate failed, don't return an error */
         } else {
             rc = rename(filename_pre, filename);
-            FATAL_ERROR_CHECK(rc < 0, "rename failed");
+            DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
         }
         free(filename);
         free(filename_pre);
@@ -1557,7 +1557,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     if (leader) {
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
-        rc = asprintf(&filename_pre, "%s.%u.tmp", name, iter);
+        rc = asprintf(&filename_pre, "%s_%u.tmp", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
         fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
@@ -1644,7 +1644,7 @@ pi_save_file_2d_leader_init_done:
             /* If only ftruncate failed, don't return an error */
         } else {
             rc = rename(filename_pre, filename);
-            FATAL_ERROR_CHECK(rc < 0, "rename failed");
+            DIE_ERRNO_DIAG(rc < 0, "rename", filename_pre);
         }
         free(filename);
         free(filename_pre);
