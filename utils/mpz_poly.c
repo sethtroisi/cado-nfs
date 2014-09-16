@@ -518,8 +518,11 @@ void mpz_poly_fprintf (FILE *fp, mpz_poly_srcptr f)
 /* Tests and comparison functions */
 
 
-/* return 0 if f and g are equal, non-zero otherwise
-   Assumes f and g are normalized */
+/* return 0 if f and g are equal,
+ * -1 if f is "smaller" and 1 if f is "bigger", for some arbitrary
+ * ordering (lowest degree first, then lex order).
+ *
+ * Assumes f and g are normalized */
 int mpz_poly_cmp (mpz_poly_srcptr a, mpz_poly_srcptr b)
 {
     int r = (a->deg > b->deg) - (b->deg > a->deg);
