@@ -910,18 +910,19 @@ my $terminal_colors = {
     yellow	=> "\e[00;33m",
     blue	=> "\e[00;34m",
     violet	=> "\e[00;35m",
+    normal      => "\e[0m",
 };
 $terminal_colors = {} if $ENV{'TERM'} !~ /^(xterm|screen|linux)/;
 
 sub task_begin_message {
     my $blue = $terminal_colors->{'BLUE'} || '';
-    my $normal = $terminal_colors->{'black'} || '';
+    my $normal = $terminal_colors->{'normal'} || '';
     print "## Entering task: ${blue}$current_task${normal}\n";
 }
 
 sub task_check_message {
     my $status = shift;
-    my $normal = $terminal_colors->{'black'} || '';
+    my $normal = $terminal_colors->{'normal'} || '';
     my $color = {
         'ok' => $terminal_colors->{'green'} || '',
         'missing' => $terminal_colors->{'YELLOW'} || '',
