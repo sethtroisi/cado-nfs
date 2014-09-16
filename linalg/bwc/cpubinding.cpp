@@ -35,6 +35,36 @@ template<class T> invalid_argument operator<<(invalid_argument const& i, T const
     os << i.what() << a;
     return invalid_argument(os.str());
 }
+template<typename T> istream& parse_and_copy_to_list(istream& is, list<T>& L)
+{
+    L.clear();
+    /* The following is neat, but is does nothing to distinguish eof from
+     * parse failure */
+#if 0
+    istream_iterator<T> w0(is);
+    istream_iterator<T> w1;
+    copy(w0, w1, back_inserter(L));
+#endif
+    /* Here we promise to set failbit on failure. */
+    string t;
+    while (getline(is, t, ' ')) {
+        if (t.empty()) continue;
+        T v;
+        if (istringstream(t) >> v) {
+            L.push_back(v);
+        } else {
+            is.clear();
+            is.setstate(is.rdstate() | ios_base::failbit);
+            return is;
+        }
+    }
+    /* EOF, but no fail */
+    is.clear();
+    is.setstate(is.rdstate() | ios_base::eofbit);
+    // is.setstate(is.rdstate() | ios_base::failbit);
+    // is.setstate(is.rdstate() & ~ios_base::goodbit);
+    return is;
+}
 /* }}} */
 
 /* {{{ class thread_split understands 2-dimension pairs */
@@ -176,6 +206,7 @@ synthetic_topology hwloc_synthetic_topology(hwloc_topology_t topology)
 }
 
 
+
 std::ostream& operator<<(std::ostream& os, synthetic_topology const& t)
 {
     copy(t.begin(), t.end(), ostream_iterator<synthetic_topology::value_type>(os, " "));
@@ -183,17 +214,7 @@ std::ostream& operator<<(std::ostream& os, synthetic_topology const& t)
 }
 istream& operator>>(istream& is, synthetic_topology& L)
 {
-    synthetic_topology v;
-    istream_iterator<synthetic_topology::value_type> w0(is);
-    istream_iterator<synthetic_topology::value_type> w1;
-    copy(w0, w1, back_inserter(L));
-    if (is.rdstate() & ios_base::eofbit) {
-        is.clear();
-    } else {
-        is.setstate(is.rdstate() | ios_base::failbit);
-        is.setstate(is.rdstate() & ~ios_base::goodbit);
-    }
-    return is;
+    return parse_and_copy_to_list(is, L);
 }
 
 /* }}} */
@@ -223,7 +244,9 @@ istream& operator>>(istream& is, mapping_string& ms)
 {
     ms = mapping_string();
     string s;
-    if (!(is>>s)) return is;
+    if (!(is>>s)) {
+        return is;
+    }
     string::size_type rel = s.find("=>");
     if (rel == string::npos || !(istringstream(s.substr(rel+2)) >> ms.t)) {
         is.setstate(ios_base::failbit);
@@ -253,17 +276,7 @@ ostream& operator<<(ostream& os, list<mapping_string> const& L)
 
 istream& operator>>(istream& is, list<mapping_string>& L)
 {
-    list<mapping_string> v;
-    istream_iterator<mapping_string> w0(is);
-    istream_iterator<mapping_string> w1;
-    copy(w0, w1, back_inserter(L));
-    if (is.rdstate() & ios_base::eofbit) {
-        is.clear();
-    } else {
-        is.setstate(is.rdstate() | ios_base::failbit);
-        is.setstate(is.rdstate() & ~ios_base::goodbit);
-    }
-    return is;
+    return parse_and_copy_to_list(is, L);
 }
 
 
@@ -312,17 +325,7 @@ ostream& operator<<(ostream& os, list<matching_string> const& L)
 
 istream& operator>>(istream& is, list<matching_string>& L)
 {
-    list<matching_string> v;
-    istream_iterator<matching_string> w0(is);
-    istream_iterator<matching_string> w1;
-    copy(w0, w1, back_inserter(L));
-    if (is.rdstate() & ios_base::eofbit) {
-        is.clear();
-    } else {
-        is.setstate(is.rdstate() | ios_base::failbit);
-        is.setstate(is.rdstate() & ~ios_base::goodbit);
-    }
-    return is;
+    return parse_and_copy_to_list(is, L);
 }
 
 /* }}} */
@@ -372,9 +375,16 @@ istream& operator>>(istream& f, conf_file& result)
             continue;
         }
         is.putback(c);
-        if (is>>t) {
+        if (is >> skipws >> t) {
+            string rhs;
+            for( ; (is>>c) && isspace(c) ; ) ;
+            is.putback(c);
+            getline(is, rhs);
             conf_file::mapped_type::mapped_type v;
-            if (!(is >> v)) {
+            if (rhs == "remove") {
+                /* then an empty v is fine */
+            } else if (!(istringstream(rhs) >> v)) {
+                /* try special cases */
                 goto conf_file_parse_error;
             }
             current.second.insert(make_pair(t, v));
@@ -393,7 +403,11 @@ conf_file_parse_error:
     }
 
     /* reaching EOF is *normal* here ! */
-    if (f.rdstate() & ios_base::eofbit) {
+    bool fail = f.rdstate() & ios_base::failbit;
+    bool eof = f.rdstate() & ios_base::eofbit;
+    if (fail && !eof) {
+        return f;
+    } else if (eof) {
         f.clear();
     } else {
         f.setstate(f.rdstate() | ios_base::failbit);
@@ -603,7 +617,6 @@ class cpubinder {
     /* filled by ::read_param_list */
     conf_file cf;
     bool fake;
-    bool remove_binding;
 
     /* filled by ::find and ::force */
     synthetic_topology stopo;
@@ -620,6 +633,7 @@ class cpubinder {
     void read_param_list(param_list pl);
     bool find(thread_split const& thr);
     void force(thread_split const& ,const char * desc);
+    void set_permissive_binding();
     void stage();
     /* this one may be called in MT context */
     void apply(int i, int j) const;
@@ -635,21 +649,16 @@ void cpubinder::read_param_list(param_list pl)
     const char * topology_string = param_list_lookup_string(pl, "input-topology-string");
     const char * cpubinding_conf = param_list_lookup_string(pl, "cpubinding");
 
-    remove_binding = false;
+    /* If we arrive here, then cpubinding_conf is not something which
+     * looks like a forced binding, so this should be a config file
+     */
     if (cpubinding_conf) {
-        if (strcmp(cpubinding_conf, "remove") == 0) {
-            remove_binding = true;
-        } else if (strlen(cpubinding_conf) == 0) {
-            os << PRE << "Interpreting explicitly empty cpubinding string as meaning \"remove\"" << endl;
-            remove_binding = true;
-        } else if (!strstr(cpubinding_conf, "=>")) {
-            if (ifstream(cpubinding_conf) >> cf) {
-                os << PRE << "Read configuration from " << cpubinding_conf << endl;
-            } else {
-                throw invalid_argument("")
-                    << "Could not read cpubinding conf file "
-                    << cpubinding_conf;
-            }
+        if (ifstream(cpubinding_conf) >> cf) {
+            os << PRE << "Read configuration from " << cpubinding_conf << endl;
+        } else {
+            throw invalid_argument("")
+                << "Could not read cpubinding conf file "
+                << cpubinding_conf;
         }
         // cerr << "Configuration:\n" << cf << endl;
     }
@@ -705,6 +714,16 @@ void cpubinder::read_param_list(param_list pl)
     /* }}} */
 }
 
+void cpubinder::set_permissive_binding()
+{
+    /* stopo and thr must have been set */
+    os << PRE << "Selecting permissive mapping:"
+        << " " << mapping << endl;
+    mapping.clear();
+    mapping_string top(stopo.front().object, stopo.front().n, thr);
+    mapping.push_back(top);
+}
+
 /* {{{ finds a mapping for thr. Return true if successful. */
 /* This sets the fields [stopo] [thr] [mapping].
  */
@@ -714,17 +733,6 @@ bool cpubinder::find(thread_split const& thr)
     stopo = hwloc_synthetic_topology(topology);
     os << PRE << "Hardware: " << stopo << endl;
     os << PRE << "Target split: " << thr << endl;
-    if (remove_binding) {
-        /* Then we simply need to write down what the most permissing
-         * binding is.
-         */
-        mapping_string top(stopo.front().object, stopo.front().n, thr);
-        mapping.push_back(top);
-        os << PRE << "As per the \"remove\" instruction,"
-            << " applying permissive mapping:"
-            << " " << mapping << endl;
-        return true;
-    }
 
     struct {
         int n;
@@ -772,11 +780,8 @@ bool cpubinder::find(thread_split const& thr)
         }
         mapping.splice(mapping.end(), best.e);
     } else {
-        mapping_string top(stopo.front().object, stopo.front().n, thr);
-        mapping.push_back(top);
-        os << PRE << "Found empty mapping in config file."
-            << " Applying hence permissive mapping:"
-            << " " << mapping << endl;
+        os << PRE << "Found \"remove\" mapping in config file." << endl;
+        set_permissive_binding();
     }
     stopo = best.s;
     return true;
@@ -787,7 +792,14 @@ void cpubinder::force(thread_split const& t, const char * desc)/*{{{*/
 {
     thr = t;
     stopo = hwloc_synthetic_topology(topology);
-    istringstream(desc) >> mapping;
+    if (strcmp(desc, "remove") == 0 || strlen(desc) == 0) {
+        os << PRE << "As per the provided string \""<<desc<<"\","
+            << " applying permissive mapping:"
+            << " " << mapping << endl;
+        set_permissive_binding();
+    } else {
+        istringstream(desc) >> mapping;
+    }
 }
 /*}}}*/
 
@@ -982,12 +994,14 @@ void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
 
     cpubinder * cb = new cpubinder(os);
 
+    int force = cmdline_provided && (strstr(cmdline_provided, "=>") || strcmp(cmdline_provided, "remove") == 0 || strlen(cmdline_provided) == 0);
+
     try {
         cb->read_param_list(pl);
-        if (cmdline_provided && strstr(cmdline_provided, "=>")) {
-            cb->force(thread_split(ttt), cmdline_provided);
+        if (force) {
+            cb->force(thr, cmdline_provided);
             cb->stage();
-        } else if (cb->find(thread_split(ttt))) {
+        } else if (cb->find(thr)) {
             cb->stage();
         } else {
             os << PRE << "no mapping found\n";
