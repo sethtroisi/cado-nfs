@@ -730,7 +730,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     las->verbose = param_list_parse_switch(pl, "-v");
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->nb_threads = 1;		/* default value */
-    param_list_parse_int(pl, "mt", &las->nb_threads);
+    param_list_parse_int(pl, "t", &las->nb_threads);
     if (las->nb_threads <= 0) {
 	fprintf(stderr,
 		"Error, please provide a positive number of threads\n");
@@ -2498,7 +2498,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
-  param_list_decl_usage(pl, "mt",   "number of threads to use");
+  param_list_decl_usage(pl, "t",   "number of threads to use");
   param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");
