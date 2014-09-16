@@ -67,6 +67,10 @@ struct mmt_vec_s {
 typedef struct mmt_vec_s mmt_vec[1];
 typedef struct mmt_vec_s * mmt_vec_ptr;
 
+/* some handy macros to access portions of mmt_vec's */
+#define SUBVEC(v,w,offset) (v)->abase->vec_subvec(v->abase, (v)->w, offset)
+#define SUBVEC_const(v,w,offset) (v)->abase->vec_subvec_const(v->abase, (v)->w, offset)
+
 /*
 struct mmt_generic_vec_s {
     void * v;
@@ -78,20 +82,6 @@ typedef struct mmt_generic_vec_s mmt_generic_vec[1];
 typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
 */
 
-/* some handy inlines to access portions of mmt_vec's */
-static inline void* mmt_vec_subvec(mmt_vec_ptr v, void * p, ptrdiff_t offset)
-{
-    return pointer_arith(p, v->abase->vec_elt_stride(v->abase, offset));
-}
-static inline const void* mmt_vec_subvec_const(mmt_vec_ptr v, const void * p, ptrdiff_t offset)
-{
-    return pointer_arith_const(p, v->abase->vec_elt_stride(v->abase, offset));
-}
-
-#define SUBVEC(v,w,offset) mmt_vec_subvec((v), (v)->w, (offset))
-#define SUBVEC_const(v,w,offset) mmt_vec_subvec_const((v), (v)->w, (offset))
-
-
 struct mmt_wiring_s {
     unsigned int i0;
     unsigned int i1;
@@ -99,7 +89,7 @@ struct mmt_wiring_s {
      * the two following fields are not ! */
     mmt_vec v;
     size_t rsbuf_size;          // auto-expanded on demand.
-    void * rsbuf[2];             // only for USE_ALTERNATIVE_REDUCE_SCATTER
+    void * rsbuf[2];            // only for USE_ALTERNATIVE_REDUCE_SCATTER
 };
 typedef struct mmt_wiring_s mmt_wiring[1];
 typedef struct mmt_wiring_s * mmt_wiring_ptr;

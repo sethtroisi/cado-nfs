@@ -23,10 +23,17 @@
 
 /* This enables an alternative algorithm instead of the stock
  * reduce_scatter implementation. It's slightly worrying to reach this
- * conclusion, but our simple contender wins with flying colours against
+ * conclusion, but our simple contender wins with flying colors against
  * mvapich2's.
  */
-#define USE_ALTERNATIVE_REDUCE_SCATTER
+#define USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL
+/* XXX Apparently the non-alternative setting fails the checks !
+ * (as of Tue Sep 16 00:49:16 CEST 2014) */
+
+#ifdef  HAVE_MPI3_API
+#define MPI_LIBRARY_NONBLOCKING_COLLECTIVES
+#endif
+
 
 #define PADD(P, n)      mpfq_generic_ptr_add(P, n)
 
@@ -217,6 +224,10 @@ broadcast_down_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
             serialize_threads(picol);
         }
         if (picol->trank == 0) {
+#ifdef  MPI_LIBRARY_NONBLOCKING_COLLECTIVES
+            MPI_Request * req = shared_malloc(pirow, pirow->ncores * sizeof(MPI_Request));
+#endif
+
             for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
                 pi_log_op(pirow, "[%s] serialize_threads", __func__);
                 serialize_threads(pirow);
@@ -228,10 +239,24 @@ broadcast_down_generic(matmul_top_data_ptr mmt, mmt_vec_ptr v, int d)
                 pi_log_op(picol, "[%s] MPI_Allgather", __func__);
                 ASSERT((mcol->i1 - mcol->i0) % picol->totalsize == 0);
                 size_t eblock = (mcol->i1 - mcol->i0) /  picol->totalsize;
+#ifdef  MPI_LIBRARY_NONBLOCKING_COLLECTIVES
+                err = MPI_Iallgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, v->v, v->stride * eblock * picol->ncores, MPI_BYTE, picol->pals, &req[t]);
+#else
                 err = MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, v->v, v->stride * eblock * picol->ncores, MPI_BYTE, picol->pals);
+#endif
                 pi_log_op(picol, "[%s] MPI_Allgather done", __func__);
                 ASSERT_ALWAYS(!err);
             }
+
+#ifdef  MPI_LIBRARY_NONBLOCKING_COLLECTIVES
+            serialize_threads(pirow);
+            if (pirow->trank == 0) {
+                for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
+                    MPI_Wait(&req[t], MPI_STATUS_IGNORE);
+                }
+            }
+            shared_free(pirow, req);
+#endif
         }
         if ((v->flags & THREAD_SHARED_VECTOR) == 0) {
             serialize_threads(picol);
@@ -477,7 +502,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
 }
 
 /* {{{ reduce_across */
-#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+#if defined(USE_ALTERNATIVE_REDUCE_SCATTER) || defined(USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL)
 void alternative_reduce_scatter(matmul_top_data_ptr mmt, mmt_vec_ptr v, int eitems, int d)
 {
     pi_wiring_ptr wr = mmt->pi->wr[d];
@@ -523,6 +548,156 @@ void alternative_reduce_scatter(matmul_top_data_ptr mmt, mmt_vec_ptr v, int eite
     v->abase->vec_set(v->abase, v->all_v[0], b[0], eitems);
 }
 #endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
+
+#ifdef  USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL
+
+
+/* Example data for a factoring matrix (rsa100) of size 135820*135692,
+ * split over 2x3 mpi jobs, and 7x5 threads.
+ *
+ * 2 == mmt->pi->wr[1]->njobs (number of jobs encountered on a vertical axis).
+ * 7 == mmt->pi->wr[1]->ncores (number of jobs per core on a vertical axis).
+ * 3 == mmt->pi->wr[0]->njobs (number of jobs encountered on an horiz. axis).
+ * 5 == mmt->pi->wr[0]->ncores (number of jobs per core on an horiz. axis).
+ *
+ * matrix is padded to a multiple of 210 = 2*3*5*7, which is * N=135870=210*647
+ *
+ * we'll call 647 the "small chunk" size.
+ *
+ * for all jobs/threads, the following relations hold:
+ *      mmt->wr[0]->i1 - mmt->wr[0]->i0 == N/14 == 9705 == 15 * 647
+ *      mmt->wr[1]->i1 - mmt->wr[1]->i0 == N/15 == 9058 == 14 * 647
+ *
+ * a reduce_across operation, in the context of factoring, is with d==1
+ * below. Hence, in fact, we're doing a reduction down a column.
+ *
+ * the value eitems fed to this function is mmt->pi->wr[d]->ncores (here,
+ * 7) times the small chunk size. Here 7*647 == 4529.
+ */
+/* all threads in mmt->wr[!d], one after another a priori, are going to
+ * do alternative_reduce_scatter on their vector v[i]
+ */
+void alternative_reduce_scatter_parallel(matmul_top_data_ptr mmt, mmt_vec_ptr * vs, int eitems, int d)
+{
+    /* we write all data counts below with comments indicating the typical
+     * size in our toy example above */
+
+    mpfq_vbase_ptr ab = vs[0]->abase;
+    pi_wiring_ptr xr = mmt->pi->wr[!d]; /* 3 jobs, 5 cores */
+    pi_wiring_ptr wr = mmt->pi->wr[d];  /* 2 jobs, 7 cores */
+    /* what we're going to do will happen completely in parallel over
+     * xr->njobs==3 communicators. We're simulating here the split into 5
+     * communicators, even though those collide into a unique
+     * communicator as far as MPI is concerned.
+     */
+    int njobs = wr->njobs;      /* 2 */
+    /* note that we no longer care at this point about what happened at
+     * the thread level in our dimension. This is already done, period.
+     */
+    int rank = wr->jrank;
+    MPI_Datatype t = ab->mpi_datatype(ab);
+
+    /* If the rsbuf[] buffers have not yet been allocated, it is time to
+     * do so now. We also take the opportunity to possibly re-allocate
+     * them if because of a larger abase, the corresponding storage has
+     * to be expanded.
+     */
+    size_t needed_per_rsthread = ab->vec_elt_stride(ab, 
+        mmt->n[d] / mmt->pi->m->totalsize * wr->ncores);
+    if (mmt->wr[d]->rsbuf_size < needed_per_rsthread) {
+        mmt->wr[d]->rsbuf[0] = malloc(needed_per_rsthread);
+        mmt->wr[d]->rsbuf[1] = malloc(needed_per_rsthread);
+        mmt->wr[d]->rsbuf_size = needed_per_rsthread;
+    }
+
+    /* are we sure ? */
+    /* caller sets:
+     * eitems == (mmt->wr[1]->i1-mmt->wr[1]->i0) / mmt->pi->wr[1]->njobs
+     *        == mmt->n[1] / mmt->pi->wr[0]->totalsize / mmt->pi->wr[1]->njobs
+     *        == mmt->n[1] / mmt->pi->m->totalsize * mmt->pi->wr[1]->ncores
+     *
+     * as long as the identity
+     *  mmt->wr[1]->(i1-i0) == mmt->n[1] / mmt->pi->wr[0]->totalsize
+     * is maintained throughout the program execution, we are safe on the
+     * assert below.
+     */
+    ASSERT_ALWAYS(needed_per_rsthread == (size_t) ab->vec_elt_stride(ab, eitems));       /* 4529 */
+
+
+    void *(*foo)[2] = shared_malloc(xr, xr->ncores /* 5 */ * sizeof(*foo));
+    void ** mine = foo[xr->trank];
+    ab->vec_set_zero(ab, mmt->wr[d]->rsbuf[0], eitems);
+    mine[0] = mmt->wr[d]->rsbuf[0];
+    mine[1] = mmt->wr[d]->rsbuf[1];
+    serialize_threads(xr);
+
+    int srank = (rank + 1) % njobs;
+    int drank = (rank + njobs - 1) % njobs;
+
+    /* We describe the algorithm for one of the xr->ncores==5 threads.
+     * local vector areas [9058] split into [wr->njobs==2] sub-areas of
+     * size [eitems (==4529)].
+     *
+     * on each job, each thread has 9058 == 2*4529 items
+     *          more generally: njobs * eitems items.
+     *
+     * each has a place where it wants to receive data, let's call that
+     * "his" zone, even though everyone has data at all places.
+     *
+     */
+    /* scheme for 4 jobs: (input, output. All chunks have size eitmes. AA
+     * is the sum a3+a2+a1+a0)
+     *
+     * j0: a0 b0 c0 d0      j0: AA .. .. ..
+     * j1: a1 b1 c1 d1      j1: .. BB .. ..
+     * j2: a2 b2 c2 d2      j2: .. .. CC ..
+     * j3: a3 b3 c3 d3      j3: .. .. .. DD
+     *
+     * loop 0: j0: sends       b0 to j3, receives       c1 from j1
+     * loop 1: j0: sends    c1+c0 to j3, receives    d2+d1 from j1
+     * loop 2: j0: sends d2+d1+d0 to j3, receives a3+a2+a1 from j1
+     * loop 3: we only have to adjust.
+     */
+
+    for (int i = 0, s = 0; i < njobs; i++, s=!s) {
+        int l = (rank + 1 + i) % njobs;
+        int j0 = l * eitems; 
+        int j1 = j0 +  eitems;
+        ab->vec_add(ab, mine[s], mine[s],
+                ab->vec_subvec(ab, vs[xr->trank]->all_v[0], j0),
+                j1-j0);
+        serialize_threads(xr);
+
+        if (i == njobs - 1)  
+            break;
+
+        if (xr->trank == 0) {
+            MPI_Request * r = NULL;
+            r = malloc(2 * xr->ncores * sizeof(MPI_Request));
+            for(unsigned int w = 0 ; w < xr->ncores ; w++) {
+                MPI_Request * rs = r + 2*w;
+                MPI_Request * rr = r + 2*w + 1;
+                MPI_Isend(foo[w][s],  eitems, t, drank, 0xb00+w, wr->pals, rs);
+                MPI_Irecv(foo[w][!s], eitems, t, srank, 0xb00+w, wr->pals, rr);
+                /*
+                MPI_Sendrecv(foo[w][s], eitems, t, drank, 0xbeef,
+                        foo[w][!s], eitems, t, srank, 0xbeef,
+                        wr->pals, MPI_STATUS_IGNORE);
+                        */
+                // MPI_Waitall(2, r + 2*w, MPI_STATUSES_IGNORE);
+            }
+            MPI_Waitall(2 * xr->ncores, r, MPI_STATUSES_IGNORE);
+            free(r);
+        }
+        serialize_threads(xr);
+    }
+
+    ab->vec_set(ab, vs[xr->trank]->all_v[0], mine[(njobs-1)&1], eitems);
+
+    shared_free(xr, foo);
+    pi_log_op(wr, "[%s] MPI_Reduce_scatter done", __func__);
+}
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL */
 
 /* reduce_across reads data in mmt->wr[d]->v, sums it up across the
  * communicator mmt->pi->wr[d], and collects the results in the areas pointed
@@ -685,6 +860,25 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 #ifndef MPI_LIBRARY_MT_CAPABLE
     if (mmt->bal->h->flags & FLAG_SHUFFLED_MUL) {
         if (pirow->trank == 0) {
+            /* openmpi-1.8.2 does not seem to have a working non-blocking
+             * reduce_scatter, at least not a very efficient one. All
+             * I've been able to do is to run MPI_Ireduce_scatter with
+             * MPI_UNSIGNED_LONG and MPI_BXOR. With custom types it seems
+             * to crash. And anyway, it's very inefficient.
+             */
+#ifdef  aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES
+            MPI_Request * req = shared_malloc(picol, picol->ncores * sizeof(MPI_Request));
+
+
+#endif
+            int z = (mrow->i1 - mrow->i0) / pirow->njobs;
+#ifdef USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL
+            mmt_vec_ptr * vs = shared_malloc(picol, picol->ncores * sizeof(mmt_vec_ptr ));
+            vs[picol->trank] = mrow->v;
+            serialize_threads(picol);
+            alternative_reduce_scatter_parallel(mmt, vs, z, d);
+            shared_free(picol, vs);
+#else   /* USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL */
             for(unsigned int t = 0 ; t < picol->ncores ; t++) {
                 pi_log_op(picol, "[%s] serialize_threads", __func__);
                 serialize_threads(picol);
@@ -695,25 +889,71 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                 pi_log_op(pirow, "[%s] MPI_Reduce_scatter", __func__);
                 ASSERT((mrow->i1 - mrow->i0) % pirow->totalsize == 0);
 #ifdef USE_ALTERNATIVE_REDUCE_SCATTER
-                int z = (mrow->i1 - mrow->i0) / pirow->njobs;
                 alternative_reduce_scatter(mmt, mrow->v, z, d);
 #else   /* USE_ALTERNATIVE_REDUCE_SCATTER */
                 void * dptr = mrow->v->all_v[0];
                 // all recvcounts are equal
                 int * rc = malloc(pirow->njobs * sizeof(int));
-                for(unsigned int k = 0 ; k < pirow->njobs ; k++) {
-                    rc[k] = (mrow->i1 - mrow->i0) / pirow->njobs;
-                }
-                int z = (mrow->i1 - mrow->i0) / pirow->njobs;
+                for(unsigned int k = 0 ; k < pirow->njobs ; rc[k++]=z) ;
+
+#ifdef  aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES
+                err = MPI_Ireduce_scatter(dptr, dptr, rc,
+                        MPI_UNSIGNED_LONG, // mrow->v->abase->mpi_datatype(mrow->v->abase),
+                        MPI_BXOR, // mrow->v->abase->mpi_addition_op(mrow->v->abase),
+                        pirow->pals, &req[t]);
+#else   /* aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES */
                 err = MPI_Reduce_scatter(dptr, dptr, rc,
                         mrow->v->abase->mpi_datatype(mrow->v->abase),
                         mrow->v->abase->mpi_addition_op(mrow->v->abase),
                         pirow->pals);
+#endif  /* aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES */
                 ASSERT_ALWAYS(!err);
                 free(rc);
 #endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
                 pi_log_op(pirow, "[%s] MPI_Reduce_scatter done", __func__);
             }
+#ifdef  aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES
+            serialize_threads(picol);
+            if (picol->trank == 0) {
+                for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+                    MPI_Wait(&req[t], MPI_STATUS_IGNORE);
+                }
+            }
+            shared_free(picol, req);
+#endif  /* aaMPI_LIBRARY_NONBLOCKING_COLLECTIVES */
+#if 0
+            void ** dptrs = shared_malloc(picol, picol->ncores * sizeof(void*));
+            dptrs[picol->trank] = mrow->v->all_v[0];
+            serialize_threads(picol);
+            if (picol->trank == 0) {
+                MPI_Request * req = malloc(picol->ncores * sizeof(MPI_Request));
+                int z = (mrow->i1 - mrow->i0) / pirow->njobs;
+                int * rc = malloc(pirow->njobs * sizeof(int));
+                for(unsigned int k = 0 ; k < pirow->njobs ; rc[k++]=z) ;
+                for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+#ifdef  MPI_LIBRARY_NONBLOCKING_COLLECTIVES
+                    err = MPI_Ireduce_scatter(dptrs[t], dptrs[t], rc,
+                            MPI_UNSIGNED_LONG, // mrow->v->abase->mpi_datatype(mrow->v->abase),
+                            MPI_BXOR, // mrow->v->abase->mpi_addition_op(mrow->v->abase),
+                            pirow->pals, &req[t]);
+#else
+                    err = MPI_Reduce_scatter(dptrs[t], dptrs[t], rc,
+                            mrow->v->abase->mpi_datatype(mrow->v->abase),
+                            mrow->v->abase->mpi_addition_op(mrow->v->abase),
+                            pirow->pals);
+#endif
+                    ASSERT_ALWAYS(!err);
+                }
+                for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+                    MPI_Wait(&req[t], MPI_STATUS_IGNORE);
+                }
+                free(rc);
+                free(req);
+            }
+            serialize_threads(picol);
+            shared_free(picol, dptrs);
+#endif  /* #if'0 */
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL */
         }
         serialize_threads(pirow);
         // row threads pick what they're interested in in thread0's reduced
