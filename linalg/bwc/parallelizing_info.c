@@ -1426,28 +1426,31 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
-    int rc;
     int err;
 
+    char * filename;
+    char * filename_pre;
+    int rc;
+
     if (leader) {
-        char * filename;
-        int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        rc = asprintf(&filename_pre, "%s.%u.tmp", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
-        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
 #else
-        fd = open(filename, O_RDWR | O_CREAT, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT, 0666);
 #endif
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
+            fprintf(stderr, "open(%s): %s\n", filename_pre, strerror(errno));
             goto pi_save_file_leader_init_done;
         }
 
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             close(fd);
             goto pi_save_file_leader_init_done;
         }
@@ -1455,7 +1458,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_leader_init_done;
@@ -1465,7 +1468,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         FATAL_ERROR_CHECK(!recvbuf, "out of memory");
 #endif
 pi_save_file_leader_init_done:
-        free(filename);
+        ;
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1514,10 +1517,15 @@ pi_save_file_leader_init_done:
 #endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
-            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
+            fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
+        } else {
+            rc = rename(filename_pre, filename);
+            FATAL_ERROR_CHECK(rc < 0, "rename failed");
         }
         close(fd);
+        free(filename);
+        free(filename_pre);
     }
 
     return 1;
@@ -1543,25 +1551,28 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     int rc;
     int err;
 
+    char * filename;
+    char * filename_pre;
+
     if (leader) {
-        char * filename;
-        int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        rc = asprintf(&filename_pre, "%s.%u.tmp", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
 #ifdef HAVE_MINGW
-        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT | O_BINARY, 0666);
 #else
-        fd = open(filename, O_RDWR | O_CREAT, 0666);
+        fd = open(filename_pre, O_RDWR | O_CREAT, 0666);
 #endif
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
+            fprintf(stderr, "fopen(%s): %s\n", filename_pre, strerror(errno));
             goto pi_save_file_2d_leader_init_done;
         }
 
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
@@ -1569,7 +1580,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    filename, strerror(errno));
+                    filename_pre, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_2d_leader_init_done;
@@ -1579,7 +1590,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         FATAL_ERROR_CHECK(!recvbuf, "out of memory");
 #endif
 pi_save_file_2d_leader_init_done:
-        free(filename);
+        ;
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1628,10 +1639,15 @@ pi_save_file_2d_leader_init_done:
 #endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
-            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
+            fprintf(stderr, "ftruncate(%s): %s\n", filename_pre, strerror(errno));
             /* If only ftruncate failed, don't return an error */
+        } else {
+            rc = rename(filename_pre, filename);
+            FATAL_ERROR_CHECK(rc < 0, "rename failed");
         }
         close(fd);
+        free(filename);
+        free(filename_pre);
     }
 
     return 1;
