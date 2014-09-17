@@ -3,6 +3,7 @@
  * Original author : F. Morain
  * Purpose: creating free relations in a suitable format
  * Modified / rewritten by C. Bouvier (and others)
+ * Multi-thread code by A. Filbois
 
 This file is part of CADO-NFS.
 
@@ -68,7 +69,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
       When a roots buffers contains at the beginning (p_r_values_t) (-1), the program
       increments a counter; when this counter == nb_pthreads, the job is done.
 */
-      
+
 // Must be EXACTLY the same than begin/current/end
 // in the 2 buffers array of each pthread structure. See below.
 typedef struct buf_s {
@@ -204,8 +205,8 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
     roots_t      *my_roots     = my_pth->roots +     my_pth->current_buf;
     free_rels_t  *my_free_rels = my_pth->free_rels + my_pth->current_buf;
     primes_t     *my_primes    = my_pth->primes +    my_pth->current_buf;
-    p_r_values_t *my_p         = my_primes->begin; 
-    
+    p_r_values_t *my_p         = my_primes->begin;
+
     // Have we received the special end buffer in primes buffer ?
     if (UNLIKELY(my_primes->current - my_p == 1 && *my_p == (p_r_values_t) -1)) {
       // Yes: we create a special end buffer in roots buffer, and exit
@@ -267,7 +268,7 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	++(my_free_rels->nb_p);
       } // Next p in current primes buffer
 
-    else       
+    else
 
       while (my_p < my_primes->current) { // 2 algebraics polynomes, normal case
 	p = *my_p++; // p is the current prime
@@ -306,14 +307,14 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 
 	++(my_free_rels->nb_p);
       } // Next p in current primes buffer
-    
+
     sem_post(&(my_pth->primes_sem.empty)); // Drop my now consumed primes buffer
     sem_post(&(my_pth->roots_sem.full));   // Give my produced roots & free_rels buffer
 
     if (UNLIKELY (++(my_pth->current_buf) >= NB_BUFS)) my_pth->current_buf = 0;
 
   } // Endless loop
-}  
+}
 
 /* generate all free relations up to the large prime bound */
 /* generate the renumbering table */
@@ -405,13 +406,13 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     perror ("pthread_primes_producer creation failed\n");
     exit (1);
   }
-  
+
   // Load the roots & free rels buffers, and print them
   for (i = 0;;) {
     sem_wait (&(pth[i].roots_sem.full)); // Need a full root & free rels buffer
-    
+
     roots_t *roots = pth[i].roots + current_buf;
-    
+
     // Is it the special end buffer (with only the end mark ?)
     if ((void *) roots->current - (void *) roots->begin == sizeof (p_r_values_t) &&
 	*(p_r_values_t *) roots->begin == (p_r_values_t) (-1)) {
@@ -421,7 +422,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 	 we stop immediatly. */
       break;
     }
-    
+
     // We write the roots in one ascii bloc
     fwrite (roots->begin, (void *) roots->current - (void *) roots->begin, 1, renumber_table->file);
 
@@ -430,7 +431,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     ASSERT (!((free_rels.current - free_rels.begin) % sum_degs_add_one));
     for (free_rels_buf_t *pt = free_rels.begin; pt < free_rels.current; pt += sum_degs_add_one) {
       fprintf (fpout, "%" PRIx64 ",0:%" PRIx64, (uint64_t) pt[0], (uint64_t) pt[1] + renumber_table->size);
-      for (j = 2; j < sum_degs_add_one; ++j) 
+      for (j = 2; j < sum_degs_add_one; ++j)
 	fprintf (fpout, ",%" PRIx64, (uint64_t) pt[j] + renumber_table->size);
       fputc ('\n', fpout);
     }
@@ -439,7 +440,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     total_p += free_rels.nb_p;
 
     sem_post (&(pth[i].roots_sem.empty)); // Drop the consumed root & free rels buffer
-    
+
     if (stats_test_progress(stats)) stats_print_progress (stats, total_p, 0, 0, 0);
 
     if (UNLIKELY (++i >= nb_pthreads)) {
@@ -447,7 +448,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
       if (UNLIKELY (++current_buf >= NB_BUFS)) current_buf = 0;
     }
   }
-  
+
   // All is done!
   stats_print_progress (stats, total_p, 0, 0, 1);
 
