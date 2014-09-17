@@ -55,7 +55,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    2. Each nb_pthread threads load a primes buffers for this thread by a classical
       one produced/many consumer models (2 semaphores).
       Each pthread produces 2 buffers: one of free_relations, each on the form of
-      a set of (deg(polynôme1)+deg(polynôme2)+1 free_rels_buf_t type (unsigned long or
+      a set of (deg(polynom1)+deg(polynom2)+1 free_rels_buf_t type (unsigned long or
       unsigned int); and one of roots, on the form of a ASCII array.
 
       When a thread loads a buffer which begins with (p_r_values_t) (-1), the thread
