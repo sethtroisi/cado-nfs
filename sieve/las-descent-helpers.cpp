@@ -1,7 +1,5 @@
 #include "cado.h"
-#include "las-descent-helpers.h"
-#include "utils.h"
-#include "relation.h"
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <string.h>
 
 #include <math.h>
@@ -11,6 +9,10 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+
+#include "las-descent-helpers.h"
+#include "utils.h"
+#include "relation.h"
 
 using namespace std;
 
