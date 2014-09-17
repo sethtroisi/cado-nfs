@@ -439,7 +439,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
 
-  if (!sorted_insert_double (best_opt_logmu, keep, *logmu))
+  if (!sorted_insert_double (best_opt_logmu, keep, *logmu) && !raw)
     return 0; /* not among the best 'keep' ones */
 
   if (!raw)
