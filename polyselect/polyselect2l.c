@@ -1932,8 +1932,8 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "n", "(required, alias N) input number");
   param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]\n");
 
-  param_list_decl_usage(pl, "admax", "max value for ad");
-  param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
+  param_list_decl_usage(pl, "admax", "maximal value for ad (+ 1)");
+  param_list_decl_usage(pl, "admin", "minimal value for ad (default 0)");
   param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
@@ -2230,9 +2230,10 @@ main (int argc, char *argv[])
     admin = incr;
   admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
 
-  while (admin <= admax && seconds () - st0 <= maxtime)
+  while (admin < admax && seconds () - st0 <= maxtime)
   {
-    for (int i = 0; i < nthreads ; i++)
+    int i;
+    for (i = 0; i < nthreads && admin < admax; i++)
     {
       tries ++;
       if (verbose >= 1)
@@ -2248,8 +2249,10 @@ main (int argc, char *argv[])
       admin += incr;
     }
 #ifdef MAX_THREADS
-    for (int i = 0 ; i < nthreads ; i++)
-      pthread_join(tid[i], NULL);
+    /* we have created i threads, with i = nthreads usually, except at the
+       end of the [admin, admax-1] range where we might have i < nthreads */
+    while (i > 0)
+      pthread_join (tid[--i], NULL);
 #endif
 
     if (save != NULL)
