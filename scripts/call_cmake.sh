@@ -16,6 +16,10 @@ if [ "$up_path" = "$0" ] ; then
 elif [ "$up_path" = "" ] ; then
     up_path=./
 fi
+pwdP="pwd -P"
+if ! $pwdP >/dev/null 2>&1 ; then
+    pwdP=pwd
+fi
 called_from="`pwd`"
 absolute_path_of_source="`cd "$up_path" ; pwd`"
 relative_path_of_cwd="${called_from##$absolute_path_of_source}"
@@ -162,12 +166,13 @@ fi
 
 if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     mkdir -p "$build_tree"
+    absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
     if [ ! "x$CMAKE_GENERATOR" == "x" ] ; then
       CMAKE_GENERATOR_OPT="-G$CMAKE_GENERATOR"
     else
       unset CMAKE_GENERATOR_OPT
     fi
-    (cd "$build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
+    (cd "$absolute_path_of_build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
 fi
 
 if [ "$1" = "cmake" ] ; then
@@ -179,4 +184,5 @@ fi
 # --no-print-directory option -- but it's not the right cure here).
 # env | grep -i make
 unset MAKELEVEL
-(cd "$build_tree$relative_path_of_cwd" ; make "$@")
+absolute_path_of_build_tree="`cd "$build_tree" ; $pwdP`"
+(cd "$absolute_path_of_build_tree$relative_path_of_cwd" ; make "$@")
