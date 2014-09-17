@@ -857,6 +857,19 @@ if ($mpi_needed) {
 # }}}
 
 if ($mpi_needed) {
+    if ($ENV{'DISPLAY'}) {
+        print "## removing the DISPLAY environment variable, as it interacts badly with MPI startup\n";
+        delete $ENV{'DISPLAY'};
+    }
+    if ($ENV{'SSH_AUTH_SOCK'}) {
+        if ($ENV{'OAR_JOBID'}) {
+            print "## removing the SSH_AUTH_SOCK environment variable, as it interacts badly with MPI startup, and OAR does not need it.\n";
+            delete $ENV{'SSH_AUTH_SOCK'};
+        } else {
+            print "## WARNING: the environment variable SSH_AUTH_SOCK is set. If it so happens that you do *not* need it, you should unset it for faster job startup.\n";
+        }
+    }
+
     # openmpi seems to properly propagate the path to mpirun as the path
     # to be forwarded on the remote nodes, so no manual propagation of
     # LD_LIBRARY_PATH or --prefix is needed.
