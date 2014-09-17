@@ -52,6 +52,11 @@ int bw_common_clear_mpi(struct bw_params * bw)
     MPI_Allreduce(MPI_IN_PLACE, &cpu, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     if (bw->can_print) {
+        /* valgrind has a tendency to complain about this code depending
+         * on unitialized data in the variable "cpu". This is most
+         * probably due to MPI_Allreduce, and there's not much we can do,
+         * unfortunately.
+         */
         printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over %d threads and %d MPI jobs)\n",
                 ptr,
                 wct, cpu,

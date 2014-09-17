@@ -1734,8 +1734,14 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             for(unsigned int j = 0 ; j < w->njobs ; j++) {
                 ts[j] = MIN(chunksize, cs[j]);
                 if (ts[j]) {
-                    if (w->jrank == 0)
+                    if (w->jrank == 0) {
+                        /* If "bus error" appears here, it might be
+                         * because data files are put on /ceph file
+                         * system, which doesn't seem to answer in a very
+                         * satisfactory way to mmaping files...
+                         */
                         memcpy(tsendbuf + j * chunksize, sendbuf + cd[j], ts[j]);
+                    }
                     ts0=0;
                 }
             }
