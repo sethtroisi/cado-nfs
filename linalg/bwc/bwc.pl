@@ -852,16 +852,6 @@ if ($mpi_needed) {
     }
     push @mpi_precmd_nopthreads, '-n', $nh * $nv;
     push @mpi_precmd_single, '-n', 1;
-
-#} elsif (defined(my $mpi_path=$ENV{'MPI'})) {
-#    my $ldlp;
-#    if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {
-#        $ldlp .= ':';
-#    } else {
-#        $ldlp = '';
-#    }
-#    $ldlp .= "$mpi_path/lib";
-#    my_setenv 'LD_LIBRARY_PATH', $ldlp;
 }
 
 # }}}
@@ -1181,9 +1171,14 @@ sub task_common_run {
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
+    @_ = grep !/precmd/, @_;
 
     $program="$bindir/$program";
     unshift @_, $program;
+
+    if ($param->{'precmd'}) {
+        unshift @_, split(' ', $param->{'precmd'});
+    }
 
     if ($mpi_needed) {
         if ($program =~ /\/plingen[^\/]*$/) {
