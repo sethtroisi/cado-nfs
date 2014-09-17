@@ -3796,7 +3796,7 @@ optimize_lll_list (mpz_poly_ptr f, mpz_t *g, polylll_pq *pqueue, double lognorm0
       fprintf (stdout, "\n");
       }
       */
-      LLL (det, m, NULL, a, b, verbose);
+      LLL (det, m, NULL, a, b);
 
       /*
       fprintf (stdout, "--- AFTER --\n");
@@ -4129,7 +4129,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
         mpz_mul (m.coeff[i+2][i+1], m.coeff[i+2][i+1], g[0]);
         mpz_mul (m.coeff[i+2][i+2], m.coeff[i+2][i+2], g[1]);
       }
-      LLL (det, m, NULL, a, b, verbose);
+      LLL (det, m, NULL, a, b);
       for (j = 1; j <= d-1; j++)
       {
         if (mpz_sgn (m.coeff[j][d]) != 0)

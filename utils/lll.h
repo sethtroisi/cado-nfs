@@ -12,7 +12,7 @@ typedef struct {
   int NumRows, NumCols;
 } mat_Z;
 
-long LLL (mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b, long verbose);
+long LLL (mpz_t det, mat_Z B, mat_Z* U, mpz_t a, mpz_t b);
 
 #ifdef __cplusplus
 }
