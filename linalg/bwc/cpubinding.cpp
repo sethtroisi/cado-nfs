@@ -631,7 +631,7 @@ class cpubinder {
     public:
     cpubinder(ostream& os) : os(os) { hwloc_topology_init(&topology); }
     ~cpubinder() { hwloc_topology_destroy(topology); }
-    void read_param_list(param_list pl);
+    void read_param_list(param_list pl, int want_conf_file);
     bool find(thread_split const& thr);
     void force(thread_split const& ,const char * desc);
     void set_permissive_binding();
@@ -641,7 +641,7 @@ class cpubinder {
 };
 
 
-void cpubinder::read_param_list(param_list pl)
+void cpubinder::read_param_list(param_list pl, int want_conf_file)
 {
     /* the first two arguments here are not parsed in the cado-nfs
      * context. It's only used by the helper binary I have for testing
@@ -653,7 +653,7 @@ void cpubinder::read_param_list(param_list pl)
     /* If we arrive here, then cpubinding_conf is not something which
      * looks like a forced binding, so this should be a config file
      */
-    if (cpubinding_conf) {
+    if (cpubinding_conf && want_conf_file) {
         if (ifstream(cpubinding_conf) >> cf) {
             os << PRE << "Read configuration from " << cpubinding_conf << endl;
         } else {
@@ -998,7 +998,7 @@ void * cpubinding_get_info(char ** messages, param_list_ptr pl, int ttt[2])
     int force = cmdline_provided && (strstr(cmdline_provided, "=>") || strcmp(cmdline_provided, "remove") == 0 || strlen(cmdline_provided) == 0);
 
     try {
-        cb->read_param_list(pl);
+        cb->read_param_list(pl, !force);
         if (force) {
             cb->force(thr, cmdline_provided);
             cb->stage();

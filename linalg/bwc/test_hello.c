@@ -56,6 +56,7 @@ int main(int argc, char * argv[])
     param_list_parse_intxint(pl, "mpi", mpi_split);
     param_list_parse_intxint(pl, "thr", thr_split);
     param_list_lookup_string(pl, "only_mpi");
+    param_list_lookup_string(pl, "cpubinding");
 
     if (verbose)
         param_list_display (pl, stderr);
