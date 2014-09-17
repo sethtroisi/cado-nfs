@@ -37,12 +37,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #include "typedefs.h"
 
-// All next define doesn't need to be a power of two... but it's smarter!
+// All those macros don't need to be powers of two... but it's smarter!
 #define NB_BUFS (1<<1)             // 2 buffers are sufficient; in fact it works with only one
-#define SIZE_BUF_PRIMES (1<<12)    // Size of a bloc of generated primes for one pthread
-#define SIZE_BUF_FREE_RELS (1<<10) // Nb of free rels for the primes bloc
+#define SIZE_BUF_PRIMES (1<<12)    // Size of a block of generated primes for one pthread
+#define SIZE_BUF_FREE_RELS (1<<10) // Nb of free rels for the primes block
 #define MIN_BUF_FREE_RELS (1<<8)   // Minimal size in BYTES of free rels buffer before it grows
-#define SIZE_BUF_ROOTS (1<<17)     // Nb of roots for the primes bloc; NB: in ASCII!
+#define SIZE_BUF_ROOTS (1<<17)     // Nb of roots for the primes block; NB: in ASCII!
 #define MIN_BUF_ROOTS (1<<10)      // Max size in ASCII of all the roots for ONE p (1024 bytes)
 
 /* Model of this code : One producer -> Many consumers/producers -> one consumer.
@@ -50,23 +50,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
       (named primes) for each working thread.
 
       When all the primes are produced, this thread produces one buffer with
-      only one "false" prime = (p_r_values_t) (-1). It's the mark of this end.
+      only one "false" prime = (p_r_values_t) (-1). It's the end marker.
 
-   2. Each nb_pthread threads load a primes buffers for this thread by a classical
+   2. Each nb_pthread threads load a primes buffer for this thread by a classical
       one produced/many consumer models (2 semaphores).
       Each pthread produces 2 buffers: one of free_relations, each on the form of
-      a set of (deg(polynom1)+deg(polynom2)+1 free_rels_buf_t type (unsigned long or
+      a set of deg(polynom1)+deg(polynom2)+1 free_rels_buf_t type (unsigned long or
       unsigned int); and one of roots, on the form of a ASCII array.
 
       When a thread loads a buffer which begins with (p_r_values_t) (-1), the thread
       produces a roots buffer which contains only (p_r_values_t) (-1) and an empty free
-      relations buffer, and exit.
+      relations buffer, and exits.
 
-   3. With a many producer/one consumer model, the principal programs load the
-      roots & free_buffers, writes sequentially the roots, computed the real renumber
-      index (sum of all previous index) for the free relations, and write these relations.
+   3. With a many producer/one consumer model, the main program loads the
+      roots & free_buffers, writes sequentially the roots, computes the real renumber
+      index (sum of all previous index) for the free relations, and writes these relations.
 
-      When a roots buffers contains at the beginning (p_r_values_t) (-1), the program
+      When a roots buffer contains at the beginning (p_r_values_t) (-1), the program
       increments a counter; when this counter == nb_pthreads, the job is done.
 */
 
@@ -79,7 +79,7 @@ typedef struct buf_s {
 /* Structure for a buffer which keeps the free relations.
    Problem: we cannot compute directly the true renumber_table->size value:
    it's the sum of all previous values in the others pthreads.
-   So, the buffer cannot be ASCII, but must stock directly
+   So, the buffer cannot be ASCII, but must store directly
    a free relation on the form of one type "p" (so, p_r_values_t)
    and [sum degrees of the 2 poly] type renumber_t.
 */
@@ -227,10 +227,10 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
     my_free_rels->nb_free = 0;
 
     // I prefer to separate the 2 cases (rat & alg) and (alg & alg).
-    // The goal is to suppress the first case in fews months
+    // The goal is to suppress the first case in few months
     if (my_pth->deg[0] == 1)
 
-      while (my_p < my_primes->current) { // rational & algebraic polynomes, special case
+      while (my_p < my_primes->current) { // rational & algebraic polynomials, special case
 	p = (unsigned long) *my_p++; // p is the current prime
 	
 	// First, we compute the roots of alg
@@ -243,7 +243,7 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	  if (UNLIKELY(nb_roots[1] != my_pth->deg[1] &&
 		       mpz_divisible_ui_p (my_pth->coeff[1][my_pth->deg[1]], p))) {
 	    computed_roots[1][nb_roots[1]++] = computed_roots[1][0];
-	    computed_roots[1][0] = p; // p is insered in first place for (the next sort) as a root
+	    computed_roots[1][0] = p; // p is inserted in first place for (the next sort) as a root
 	  }
 	}
 
@@ -270,7 +270,7 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 
     else
 
-      while (my_p < my_primes->current) { // 2 algebraics polynomes, normal case
+      while (my_p < my_primes->current) { // 2 algebraic polynomials, normal case
 	p = *my_p++; // p is the current prime
 
 	// First, we compute the roots of alg1 and alg2 - same treatment for both
@@ -280,7 +280,7 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
 	    if (UNLIKELY(nb_roots[my_alg] != my_pth->deg[my_alg] &&
 			 mpz_divisible_ui_p (my_pth->coeff[my_alg][my_pth->deg[my_alg]], p))) {
 	      computed_roots[my_alg][nb_roots[my_alg]++] = computed_roots[my_alg][0];
-	      computed_roots[my_alg][0] = p; // p is insered in first place (for the next sort) as a root
+	      computed_roots[my_alg][0] = p; // p is inserted in first place (for the next sort) as a root
 	    }
 	  }
 	  else
@@ -423,10 +423,10 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
       break;
     }
 
-    // We write the roots in one ascii bloc
+    // We write the roots in one ascii block
     fwrite (roots->begin, (void *) roots->current - (void *) roots->begin, 1, renumber_table->file);
 
-    // We have to recomputed the real index of the renumber table for the free rels
+    // We have to recompute the real index of the renumber table for the free rels
     free_rels_t free_rels = pth[i].free_rels [current_buf]; // Careful: local copy!
     ASSERT (!((free_rels.current - free_rels.begin) % sum_degs_add_one));
     for (free_rels_buf_t *pt = free_rels.begin; pt < free_rels.current; pt += sum_degs_add_one) {
