@@ -688,6 +688,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  addfullcol: Toggle() = None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
