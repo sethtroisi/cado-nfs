@@ -66,7 +66,6 @@ double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
-double total_adminus2 = 0.0;
 double *best_opt_logmu, *best_logmu;
 double rootsieve_time = 0.0, optimize_time = 0.0;
 int raw = 0;
@@ -610,7 +609,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   mutex_lock (&lock);
   /* information on all polynomials */
-  total_adminus2 += g0;
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
@@ -784,7 +782,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
   mutex_lock (&lock);
   /* information on all polynomials */
-  total_adminus2 += g0;
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
@@ -2311,8 +2308,6 @@ main (int argc, char *argv[])
             printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                     collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
                     sqrt (var_opt_lognorm / collisions_good - mean * mean));
-          printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
-                  total_adminus2 / (double) collisions);
         }
     }
 
