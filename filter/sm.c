@@ -10,7 +10,7 @@ Input:
 * The sub-group order (ell) such that ell | p-1
   Note: All computations are done mod ell^2.
 * (eps): the exponent used in the computation of the Shirokauer maps.
-  Note: eps = ppcm(eps_i), where eps_i = ell^(deg(f_i)) - 1 and f = f_1 ... f_k mod ell
+  Note: eps = lcm(eps_i), where eps_i = ell^(deg(f_i)) - 1 and f = f_1 ... f_k mod ell
   
 Output
 
@@ -278,6 +278,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp", "(required) sm-exponent");
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "nsm", "number of SM (default deg(alg polynomial))");
+  param_list_decl_usage(pl, "side", "alg polynomial to use (default is 1)");
 }
 
 static void usage (const char *argv, const char * missing, param_list pl)
@@ -310,6 +311,7 @@ int main (int argc, char **argv)
   mpz_t ell, ell2, eps;
   int mt = 1;
   double t0;
+  int side = ALGEBRAIC_SIDE;
 
   /* read params */
   param_list_init(pl);
@@ -376,10 +378,13 @@ int main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  /* read side if given */
+  param_list_parse_int(pl, "side", &side);
+
   /* Init polynomial */
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
-  F = pol->pols[ALGEBRAIC_SIDE];
+  F = pol->pols[side];
 
   /* Read number of sm to be printed from command line */
   int nsm = pol->alg->deg;
@@ -400,7 +405,7 @@ int main (int argc, char **argv)
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  fprintf(stdout, "\n# Algebraic polynomial:\nF = ");
+  fprintf(stdout, "\n# Algebraic polynomial on side %d:\nF = ", side);
   mpz_poly_fprintf(stdout, F);
   gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
                       "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
