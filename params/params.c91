@@ -142,13 +142,21 @@ tasks.polyselect.P = 16000		# choose lc(g) with two prime factors in [P,2P]
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
 
-tasks.polyselect.admin = 0		# min value for leading coefficient of f(x)
+tasks.polyselect.admin = 0          # min value for leading coefficient of f(x)
     # If not set, the default is 0.
 
-tasks.polyselect.admax = 250e3		# max value for leading coefficient of f(x)
-tasks.polyselect.nrkeep = 100
+tasks.polyselect.admax = 250e3      # max value for leading coefficient of f(x)
+
+tasks.polyselect.incr = 60	    # increment for leading coefficient of f(x)
+    # This factor is usually a smooth number, which forces projective roots in
+    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
+    # Warning: to ensure lc(f) is divisible by incr, admin should be divisible
+    # by incr too.
+
     # The polynomial selection search time is proportional to the
-    # length of the search interval is [admin, admax]
+    # length of the search interval, i.e., (admax-admin)/incr.
+
+tasks.polyselect.nrkeep = 100
 
 tasks.polyselect.adrange = 5000		# size of individual tasks
     # Polynomial selection is split into several individual tasks. The
@@ -157,13 +165,11 @@ tasks.polyselect.adrange = 5000		# size of individual tasks
     # (polsel_admax-polsel_admin)/polsel_adrange. Each such task is issued as
     # a workunit to a slave for computation.
 
-tasks.polyselect.incr = 60		# forced divisor of lc(f)
-    # This factor is usually a smooth number, which forces projective roots in
-    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
-
 tasks.polyselect.nq = 1000
     # Number of small primes in the leading coefficient of the linear polynomial
     # Safe to leave at the default value
+    # Recommended values are powers of the degree, e.g., 625 for degree 5,
+    # or 1296 for degree 6.
 
 
 ###########################################################################

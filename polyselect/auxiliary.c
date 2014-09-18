@@ -4133,7 +4133,8 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
       LLL (det, m, NULL, a, b);
       for (j = 1; j <= m.NumRows; j++)
       {
-        if (mpz_sgn (m.coeff[j][d]) != 0)
+        /* we want the coefficient of degree d to be non-zero */
+        if (mpz_sgn (m.coeff[j][d+1]) != 0)
         {
           mpz_set_ui (det, 1);
           for (i = 0; i <= d; i++)
@@ -4304,7 +4305,6 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
           mpz_set (best_g0, g[0]);
         }
 #else
-        // optimize_aux (f, g, verbose, use_rotation);
         optimize_lll (f, g, verbose & use_rotation);
         skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
         logmu = L2_lognorm (f, skew);
@@ -4345,120 +4345,6 @@ optimize_deg6 (mpz_poly_ptr f, mpz_t *g, const int verbose,
 }
 #endif
 
-
-#if 0
-/* try all translation -- this is old -- only for test */
-static void
-optimize_deg6_translate ( mpz_poly_ptr f, mpz_t *g, const int verbose,
-                          const int use_rotation )
-{
-  mpz_t k0, k, g0_copy, best_g0, best_k, startk, endk, step;
-  mpz_poly_t best_f, f_copy;
-  double skew, logmu, best_logmu = DBL_MAX;
-  int d = f->deg;
-  mpz_init (k0);
-  mpz_init (step);
-  mpz_init (best_g0);
-  mpz_init (best_k);
-  mpz_init (startk);
-  mpz_init (endk);
-  mpz_poly_init (f_copy, d);
-  mpz_poly_init (best_f, d);
-  mpz_poly_set (f_copy, f);
-  mpz_init_set (g0_copy, g[0]);
-
-  // assuming monotonic, range 2^k
-  mpz_tdiv_q (k0, g[0], f->coeff[d]);
-  mpz_abs (k0, k0);
-  mpz_root (k0, k0, d);
-  mpz_mul (k0, k0, k0);
-
-  mpz_init_set_si (k, 1);
-  for (int i = 0; i < 30; i++, mpz_mul_si (k, k, 2)) {
-    mpz_poly_set (f, f_copy);
-    mpz_set (g[0], g0_copy);
-    do_translate_z (f, g, k);
-    optimize_aux (f, g, verbose, use_rotation, OPT_STEPS_FINAL);
-    skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (f, skew);
-    gmp_fprintf (stdout, "# k: %Zd, logmu %f\n", k, logmu);
-    if (logmu < best_logmu) {
-      best_logmu = logmu;
-      mpz_poly_set (best_f, f);
-      mpz_set (best_g0, g[0]);
-      mpz_set (best_k, k);
-    }
-  }
-
-  // range -2^k
-  mpz_init_set_si (k, -1);
-  for (int i = 0; i < 30; i++, mpz_mul_si (k, k, 2)) {
-    mpz_poly_set (f, f_copy);
-    mpz_set (g[0], g0_copy);
-    do_translate_z (f, g, k);
-    optimize_aux (f, g, verbose, use_rotation, OPT_STEPS_FINAL);
-    skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (f, skew);
-    gmp_fprintf (stdout, "# k: %Zd, logmu %f\n", k, logmu);
-    if (logmu < best_logmu) {
-      best_logmu = logmu;
-      mpz_poly_set (best_f, f);
-      mpz_set (best_g0, g[0]);
-      mpz_set (best_k, k);
-    }
-  }
-
-  /* more */
-  mpz_init_set_si (k, 1);
-  if (mpz_cmp_ui(best_k, 0) >= 0) {
-    mpz_tdiv_q_ui (startk, best_k, 2);
-    mpz_mul_ui (endk, best_k, 2);
-  }
-  else {
-    mpz_tdiv_q_ui (endk, best_k, 2);
-    mpz_mul_ui (startk, best_k, 2);
-  }
-  mpz_sub (step, startk, endk);
-  mpz_abs (step, step);
-  mpz_tdiv_q_ui (step, step, 1000);
-  if (mpz_cmp_ui(step, 1) < 0)
-    mpz_set_ui (step, 2);
-  mpz_set (k, startk);
-  while ( mpz_cmp(k, endk) < 0 ) {
-    mpz_poly_set (f, f_copy);
-    mpz_set (g[0], g0_copy);
-    do_translate_z (f, g, k);
-    optimize_aux (f, g, verbose, use_rotation, OPT_STEPS_FINAL);
-    skew = L2_skewness (f, SKEWNESS_DEFAULT_PREC);
-    logmu = L2_lognorm (f, skew);
-    //gmp_fprintf (stdout, "# k: %Zd, logmu %f\n", k, logmu);
-    if (logmu < best_logmu) {
-      gmp_fprintf (stdout, "# more k: %Zd, logmu %f\n", k, logmu);
-      best_logmu = logmu;
-      mpz_poly_set (best_f, f);
-      mpz_set (best_g0, g[0]);
-      mpz_set (best_k, k);
-    }
-    mpz_add (k, k, step);
-  }
-
-  // end
-  mpz_poly_set (f, f_copy);
-  mpz_set (g[0], g0_copy);
-  do_translate_z (f, g, best_k);
-
-  mpz_clear (k);
-  mpz_clear (startk);
-  mpz_clear (endk);
-  mpz_clear (step);
-  mpz_clear (best_k);
-  mpz_clear (k0);
-  mpz_clear (g0_copy);
-  mpz_clear (best_g0);
-  mpz_poly_clear (best_f);
-  mpz_poly_clear (f_copy);
-}
-#endif
 
 /* if use_rotation is non-zero, also use rotation */
 void
