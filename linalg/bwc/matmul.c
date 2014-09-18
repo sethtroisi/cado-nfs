@@ -20,6 +20,7 @@
 #include "matmul-libnames.h"
 #include "portability.h"
 #include "misc.h"
+#include "verbose.h"
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 
@@ -213,7 +214,9 @@ static void save_to_local_copy(matmul_ptr mm)
 #endif
 
 
-    fprintf(stderr, "Also saving cache data to %s (%lu MB)\n", mm->local_cache_copy, fsize >> 20);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
+        fprintf(stderr, "Also saving cache data to %s (%lu MB)\n", mm->local_cache_copy, fsize >> 20);
+    }
 
     char * normal_cachefile = mm->cachefile_name;
     mm->cachefile_name = mm->local_cache_copy;

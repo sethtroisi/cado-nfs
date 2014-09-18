@@ -392,10 +392,12 @@ foreach(v ${BWC_GFP_ARITHMETIC_BACKENDS})
 endforeach(v)
 
 
+add_custom_target(bwc_matmul)
+add_dependencies(bwc_matmul ${all_matmul_libs})
 
 add_custom_target(bwc_full)
 add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
-    all_matmul_libs)
+    bwc_matmul)
 
 include(CMakeLists-nodist.txt OPTIONAL)

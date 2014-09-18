@@ -87,7 +87,7 @@ EOF
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
 my $main = shift @ARGV or usage;
-print "$0 $main @ARGV\n";
+my $my_cmdline="$0 $main @ARGV";
 
 # ----- cmake substituted variables -----
 ## mpiexec is substituted by cmake in case mpi has been used for the
@@ -245,6 +245,12 @@ sub set_mpithr_param { # {{{ utility
     return @s;
 } # }}}
 
+my $my_verbose_flags = {
+    cmdline => 1,
+    checks => 1,
+    sections => 1,
+};
+
 while (my ($k,$v) = each %$param) {
     # Filter out parameters which are _not_ relevant to the bwc programs.
     if ($k eq 'matrix') { $matrix=$v; next; }
@@ -260,6 +266,20 @@ while (my ($k,$v) = each %$param) {
     # into the main argument list.
     if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @mpi_split;}
     if ($k eq 'thr') { @thr_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @thr_split; }
+    if ($k eq 'verbose_flags') {
+        my @heritage;
+        for my $f (split(',', $v)) {
+            my $w=1;
+            my $f0=$f;
+            $w = 0 if $f =~ s/^[\^!]//;
+            if ($f =~ s/^perl-//) {
+                $my_verbose_flags->{$f}=$w;
+            } else {
+                push @heritage, $f0;
+            }
+        }
+        $v=join(',',@heritage);
+    }
 
     # The rest is passed to subprograms, unless explicitly discarded on a
     # per-program basis.
@@ -289,6 +309,8 @@ $nh = $mpi_split[0] * $thr_split[0];
 $nv = $mpi_split[1] * $thr_split[1];
 $splitwidth = ($prime == 2) ? 64 : 1;
 # }}}
+
+print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
 # {{{ Some important argument checks
 {
@@ -429,7 +451,7 @@ sub dosystem
         $prg=shift @_;
     }
     my @args = @_;
-    print STDERR '#' x 77, "\n";
+    print STDERR '#' x 77, "\n" if $my_verbose_flags->{'sections'};
     my $msg = "$env_strings$prg " . (join(' ', @args)) . "\n";
 
     if ($show_only) {
@@ -437,7 +459,7 @@ sub dosystem
         return 0;
     }
 
-    print STDERR $msg;
+    print STDERR $msg if $my_verbose_flags->{'cmdline'};
     my $rc = system $prg, @args;
     return if $rc == 0;
     if ($rc == -1) {
@@ -924,6 +946,7 @@ sub task_begin_message {
 }
 
 sub task_check_message {
+    return unless $my_verbose_flags->{'checks'};
     my $status = shift;
     my $normal = $terminal_colors->{'normal'} || '';
     my $color = {
@@ -1369,6 +1392,11 @@ sub subtask_solution_blocks {
 
 sub task_dispatch_missing_output_files {
     my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
+
+    if ($param->{'rebuild_cache'}) {
+        # Then we don't even need to bother.
+        return 'all';
+    }
 
     # Note the ys=0..$splitwidth below. It's here only to match the width
     # which is used in the main krylov/mksol programs. The reason is that

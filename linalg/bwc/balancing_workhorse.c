@@ -472,7 +472,8 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
         }
     }
     mf_progress(input, output, time(NULL)-t0, name);
-    printf("\n");
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("\n");
 }/*}}}*/
 
 /* }}} */
@@ -870,12 +871,13 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
 	FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
     */
-    printf("J%uT%u (%2d,%2d) expects"
-	   " rows %" PRIu32 "+%" PRIu32 " cols %" PRIu32 "+%" PRIu32 ".\n",
-           pi->m->jrank, pi->m->trank,
-           s->my_i, s->my_j,
-           s->my_row0, s->my_nrows,
-           s->my_col0, s->my_ncols);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("J%uT%u (%2d,%2d) expects"
+               " rows %" PRIu32 "+%" PRIu32 " cols %" PRIu32 "+%" PRIu32 ".\n",
+               pi->m->jrank, pi->m->trank,
+               s->my_i, s->my_j,
+               s->my_row0, s->my_nrows,
+               s->my_col0, s->my_ncols);
 
     s->mat->twist=malloc(s->my_nrows * sizeof(int[2]));
     s->mat->ntwists=0;
@@ -1004,6 +1006,7 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
 
 void slave_dest_stats(slave_dest_ptr s)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER)) return;
     uint32_t * row_weights = s->row_weights;
     uint32_t my_nrows = s->s->my_nrows;
     uint32_t * col_weights = s->col_weights;
@@ -1150,8 +1153,9 @@ void slave_loop(slave_data s)
     s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(int[2]));
     qsort(s->mat->twist, s->mat->ntwists, sizeof(int[2]), (sortfunc_t) &intpair_cmp);
 
-    printf("[J%uT%u] building local matrix\n",
-            s->pi->m->jrank, s->pi->m->trank);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("[J%uT%u] building local matrix\n",
+                s->pi->m->jrank, s->pi->m->trank);
     snprintf(name, sizeof(name),
             "[J%uT%u] slave loop 2", s->pi->m->jrank, s->pi->m->trank);
     mf_pipe(input, output, disp ? name : NULL);
@@ -1467,6 +1471,8 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
 
 void master_dispatcher_stats(master_dispatcher_ptr d)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER)) return;
+
     for (int i = 0; i < d->npeers; i++) {
         /* There's a -1 that comes from the end marker (which is in fact
          * the same as a new row marker)

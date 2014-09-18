@@ -25,6 +25,7 @@
 #include <list>
 #include <algorithm>    // sort
 #include <iostream>     // cout
+#include <limits>       // underlying_type_{min,max}
 #include "macros.h"
 #include "utils.h"
 #include "bwc_config.h"
@@ -514,6 +515,14 @@ void transfer(list<T> * ctr, T * elem)
     swap(ctr->back(), *elem);
 }
 
+template<typename T> T underlying_type_max(T const&) { return numeric_limits<T>::max(); }
+template<typename T> T underlying_type_min(T const&) { return numeric_limits<T>::min(); }
+template<typename T, typename U> T safe_assign(T & a, U const& b) {
+    ASSERT_ALWAYS(b <= numeric_limits<T>::max());
+    ASSERT_ALWAYS(b >= numeric_limits<T>::min());
+    return a = b;
+}
+
 struct builder {
     uint32_t * data[2];
     // rowhead is a pointer which is naturally excpected to *move* within
@@ -937,7 +946,7 @@ static int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32
 
     split_large_slice_in_vblocks(mb, L, R, scratch1size);
 
-    L->hdr->nchildren = L->vbl.size();
+    safe_assign(L->hdr->nchildren, L->vbl.size());
 
     return 1;
 }
@@ -1246,7 +1255,7 @@ static int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t
 
     split_huge_slice_in_vblocks(mb, H, R, scratch2size);
 
-    H->hdr->nchildren = H->vbl.size();
+    safe_assign(H->hdr->nchildren, H->vbl.size());
 
     return 1;
 }
@@ -1515,7 +1524,7 @@ static int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint
     V->hdr->ncoeffs = 0;
 
     unsigned int nvstrips = iceildiv(V->hdr->j1 - V->hdr->j0, 1 << 16);
-    V->hdr->nchildren = nvstrips;
+    safe_assign(V->hdr->nchildren, nvstrips);
 
     uint32_t width = iceildiv(V->hdr->j1 - V->hdr->j0, nvstrips);
     verbose_printf(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD,
@@ -1538,7 +1547,7 @@ static int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint
 
     compute_staircase(mb, V);
     for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
-        V->dispatch[k].hdr->nchildren = V->steps.size();
+        safe_assign(V->dispatch[k].hdr->nchildren, V->steps.size());
         uint32_t i0 = V->hdr->i0;
         for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
             vsc_sub_slice_t w;
@@ -1641,7 +1650,7 @@ static void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_sli
             hdr->j1 = min(lu_offset, ncols_t);
             hdrs.push_back(*hdr);
         }
-        ehdr->nchildren = hdrs.size();
+        safe_assign(ehdr->nchildren, hdrs.size());
         mm->headers.push_back(*ehdr);
         mm->headers.insert(mm->headers.end(), hdrs.begin(), hdrs.end());
     }

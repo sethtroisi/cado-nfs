@@ -1104,3 +1104,4 @@ tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
 utils/verbose.c
 utils/verbose.h
+tests/linalg/bwc/bwc-dispatch-matmul.sh

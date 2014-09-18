@@ -539,8 +539,8 @@ void alternative_reduce_scatter(matmul_top_data_ptr mmt, mmt_vec_ptr v, int eite
         v->abase->vec_add(v->abase, b[0], b[0], SUBVEC(v, all_v[0], j0), j1-j0);
         if (i == njobs - 1)  
             break;
-        MPI_Sendrecv(b[0], eitems, t, drank, 0xbeef,
-                     b[1], eitems, t, srank, 0xbeef,
+        MPI_Sendrecv(b[0], eitems, t, drank, (i<<16) + rank,
+                     b[1], eitems, t, srank, (i<<16) + srank,
                      wr->pals, MPI_STATUS_IGNORE);
         void * tb = b[0];   b[0] = b[1];  b[1] = tb; 
         l = (l + 1) % njobs;
@@ -1785,6 +1785,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     mmt->mm = NULL;
 
     if (mmt->pi->m->trank == 0) abase->mpi_ops_init(abase);
+    serialize_threads(mmt->pi->m);
 
     // n[]
     // ncoeffs_total, ncoeffs,
@@ -2045,11 +2046,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     if (!sqb) {
         if (!cache_loaded) {
             // everybody does it in parallel
-            printf("[%s] J%uT%u building cache for %s\n",
-                    mmt->pi->nodenumber_s,
-                    mmt->pi->m->jrank,
-                    mmt->pi->m->trank,
-                    mmt->locfile);
+            if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO))
+                printf("[%s] J%uT%u building cache for %s\n",
+                        mmt->pi->nodenumber_s,
+                        mmt->pi->m->jrank,
+                        mmt->pi->m->trank,
+                        mmt->locfile);
             matmul_build_cache(mmt->mm, m);
             matmul_save_cache(mmt->mm);
         }
@@ -2058,11 +2060,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             serialize_threads(mmt->pi->m);
             if (cache_loaded) continue;
             if (j == mmt->pi->m->trank) {
-                printf("[%s] J%uT%u building cache for %s\n",
-                        mmt->pi->nodenumber_s,
-                        mmt->pi->m->jrank,
-                        mmt->pi->m->trank,
-                        mmt->locfile);
+                if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO))
+                    printf("[%s] J%uT%u building cache for %s\n",
+                            mmt->pi->nodenumber_s,
+                            mmt->pi->m->jrank,
+                            mmt->pi->m->trank,
+                            mmt->locfile);
                 matmul_build_cache(mmt->mm, m);
             } else if (j == mmt->pi->m->trank + 1) {
                 matmul_save_cache(mmt->mm);
@@ -2072,19 +2075,23 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     /* see remark in raw_matrix_u32.h about data ownership for type
      * matrix_u32 */
 
-    my_pthread_mutex_lock(mmt->pi->m->th->m);
-    printf("[%s] J%uT%u uses cache file %s\n",
-            mmt->pi->nodenumber_s,
-            mmt->pi->m->jrank, mmt->pi->m->trank,
-            /* cache for mmt->locfile, */
-            mmt->mm->cachefile_name);
-    my_pthread_mutex_unlock(mmt->pi->m->th->m);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO)) {
+        my_pthread_mutex_lock(mmt->pi->m->th->m);
+        printf("[%s] J%uT%u uses cache file %s\n",
+                mmt->pi->nodenumber_s,
+                mmt->pi->m->jrank, mmt->pi->m->trank,
+                /* cache for mmt->locfile, */
+                mmt->mm->cachefile_name);
+        my_pthread_mutex_unlock(mmt->pi->m->th->m);
+    }
 }
 
 
 void matmul_top_clear(matmul_top_data_ptr mmt)
 {
+    serialize_threads(mmt->pi->m);
     serialize(mmt->pi->m);
+    serialize_threads(mmt->pi->m);
 
     if (mmt->pi->m->trank == 0) mmt->abase->mpi_ops_clear(mmt->abase);
 

@@ -19,6 +19,9 @@ const char * verbose_flag_list[] =
     [G(BWC_TIMING_GRIDS)]       = "bwc-timing-grids",
     [G(BWC_ITERATION_TIMINGS)]  = "bwc-iteration-timings",
     [G(BWC_CACHE_BUILD)]        = "bwc-cache-build",
+    [G(BWC_DISPATCH_OUTER)]     = "bwc-dispatch-outer",
+    [G(BWC_CPUBINDING)]         = "bwc-cpubinding",
+    [G(BWC_CACHE_MAJOR_INFO)]   = "bwc-cache-major-info",
 };
 
 struct {
@@ -32,6 +35,7 @@ struct {
     { "all-bwc-dispatch",
             F(BWC_DISPATCH_SLAVES) |
             F(BWC_DISPATCH_MASTER) |
+            F(BWC_DISPATCH_OUTER) |
             F(BWC_CACHE_BUILD) },
     { "all-bwc-sub-timings", 
             F(BWC_TIMING_GRIDS) |

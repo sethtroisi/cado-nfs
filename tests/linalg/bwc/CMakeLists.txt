@@ -23,6 +23,7 @@ endmacro(string_join var delimiter str_list)
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
+    # Don't split this line !
     add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
 endmacro(add_bwc_test)
 
@@ -43,6 +44,7 @@ set(prime_z 69617318994479297159441705409245167921344429126717528237597542082203
 
 macro(add_plingen_test testname)
     string_join(tail " " ${ARGN})
+    # Don't split this line !
     add_test(test-bwc-plingen-${gfp_layer}-${testname} bash -c
         "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
 endmacro(add_plingen_test testname)
@@ -124,4 +126,15 @@ if(HAVE_CXX11 AND HAVE_HWLOC)
     build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
 endif(HAVE_CXX11 AND HAVE_HWLOC)
 
+macro(test_dispatch_matmul testname)
+    string_join(tail " " ${ARGN})
+    # Don't split this line !
+    add_test(${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${tail}")
+endmacro(test_dispatch_matmul testname)
+
+add_dependencies(check bwc_matmul)
+test_dispatch_matmul(dispatch-matmul-65536-thr nrows=65536 density=2 thr=2x2)
+if (HAVE_MPI)
+test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
+endif (HAVE_MPI)
 
