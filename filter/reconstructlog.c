@@ -168,18 +168,18 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
-  const char * abunitsfilename;
+  const char * abunitsdirname;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
 read_data_init (read_data_t *data, logtab_t log, uint64_t nrels, 
-		const char * abunitsfilename)
+		const char * abunitsdirname)
 {
   data->rels = log_rel_init(nrels);
   data->log = log;
-  data->abunitsfilename = abunitsfilename;
+  data->abunitsdirname = abunitsdirname;
 }
 
 static void
@@ -256,7 +256,7 @@ sm_data_free ()
 #ifdef FOR_GFPN
 /* Very naive code for finding the valuations of the units. */
 static int
-get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
+get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
 {
     FILE *in = fopen(abunitsfilename, "r");
     int64_t aa;
@@ -266,30 +266,78 @@ get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
 	for(int i = 0; i < (int)nbsm0; i++)
 	    fscanf(in, "%d", u+i);
 	if(aa == a && bb == b){
-	    printf("# GOTCHA a and b\n");
+	    //	    printf("# GOTCHA a and b\n");
 	    ok = 1;
 	    break;
 	}
     }
     fclose(in);
     if(ok == 0){
-	fprintf(stderr, "GASP: no eps found ");
+	fprintf(stderr, "GASP: no valuation(s) found ");
 	fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
-	exit(-1);
+	exit (EXIT_FAILURE);
     }
+    return ok;
+}
+
+/* Semi-naive code for finding the valuations of the units. Read an index 
+   first, then use the right file. We assume that directory dirname contains
+   a file index, followed by files like 0, 1, 2, 3, ... so that their union
+   contains the list of (a, b, u) by increasing values of a. We assume that
+   all triples with the same a are in the same subfile.
+*/
+static int
+get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname)
+{
+    size_t len = strlen(abunitsdirname);
+    char *index = malloc((len+6+1) * sizeof(char));
+    strncpy(index, abunitsdirname, len);
+    strncpy(index+len, "/index", 6);
+    //printf("index=%s\n", index);
+    /* read index file */
+    FILE *in = fopen(index, "r");
+    if(in == NULL){
+	perror(index);
+	return 0;
+    }
+    int n, ok = 0;
+    int64_t aa;
+    while(fscanf(in, "%" PRId64 " %d", &aa, &n) != EOF){
+	if(a <= aa){
+	    ok = 1;
+	    break;
+	}
+    }
+    fclose(in);
+    free(index);
+    if(ok == 0){
+	fprintf(stderr, "Could not find abunit file for a=%" PRId64 "\n", a);
+	exit (EXIT_FAILURE);
+    }
+    // TODO: use size of n
+    char *fic = malloc((len+10) * sizeof(char));
+    strncpy(fic, abunitsdirname, len);
+    sprintf(fic+len, "/%d", n);
+    //    printf("fic(%" PRId64 ")=%d => %s\n", a, n, fic);
+    ok = get_units_for_ab_from_file(u, a, b, fic);
+    free(fic);
     return ok;
 }
 
 /* we need retrieve the exponents of the units in a-b*x. */
 static inline void
 add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		       const char * abunitsfilename)
+		       const char * abunitsdirname)
 {
     int u[10];
-    if(get_units_for_ab(u, a, b, abunitsfilename)){
+    if(get_units_for_ab(u, a, b, abunitsdirname)){
 	/* add contrib */
 	for(int i = 0; i < (int)nbsm0; i++)
 	    mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
+    }
+    else{
+	fprintf(stderr, "Exiting...!\n");
+	exit (EXIT_FAILURE);
     }
 }
 #endif // FOR_GFPN
@@ -318,12 +366,12 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 */
 static inline void
 add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		      const char * abunitsfilename MAYBE_UNUSED)
+		      const char * abunitsdirname MAYBE_UNUSED)
 {
   add_sm_contribution(l, a, b, q, F1, smexp1, nbsm1, smlog);
 #ifdef FOR_GFPN
   if(mpz_sgn(smexp0) == 0)
-    add_unit_contribution(l, a, b, q, abunitsfilename);
+    add_unit_contribution(l, a, b, q, abunitsdirname);
   else
     add_sm_contribution(l, a, b, q, F0, smexp0, nbsm0, smlog+nbsm1);
 #endif // FOR_GFPN
@@ -338,7 +386,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 
   if (nbsm1 > 0)
       add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
-			    data->abunitsfilename);
+			    data->abunitsdirname);
 
   return NULL;
 }
@@ -354,17 +402,29 @@ thread_insert (void * context_data, earlyparsed_relation_ptr rel)
   unsigned int next = 0;
   ideal_merge_t buf[REL_MAX_SIZE];
 
+#if DEBUG >= 1
+  printf("# Adding logs for relation %" PRIu64 ":", rel->num);
+  printf(" a=%" PRId64 " b=%" PRIu64 "\n", rel->a, rel->b);
+#endif
   for (unsigned int i = 0; i < rel->nb; i++)
   {
     index_t h = rel->primes[i].h;
     exponent_t e = rel->primes[i].e;
 
-	  if (mpz_sgn(data->log->tab[h]) >= 0)
+    if (mpz_sgn(data->log->tab[h]) >= 0){
       mpz_add_log_mod_si (lrel->log_known_part, data->log->tab[h], e,
                           data->log->q);
+#if DEBUG >= 1
+      gmp_printf("+= %d * log[tab[%ld]]=%Zd\n", e, (long)h, data->log->tab[h]);
+#endif
+    }
     else
       buf[next++] = (ideal_merge_t) {.id = h, .e = e};
   }
+#if DEBUG >= 1
+  printf("# number of unknown logs is %u", next);
+  gmp_printf(": sum_log=%Zd\n", lrel->log_known_part);
+#endif
 
   lrel->unknown = idealmerge_my_malloc (next);
   lrel->nb_unknown = next;
@@ -388,15 +448,20 @@ nb_unknown_log (read_data_t *data, uint64_t i)
     int sgn = mpz_sgn(data->log->tab[p[k].id]);
     mutex_unlock (&lock);
 
-	  if (sgn < 0) // we do not know the log if this ideal
+    if (sgn < 0) // we do not know the log of this ideal
     {
       if (j != k)
         p[j] = p[k];
       j++;
     }
-    else // We know this log, add it to log_know_part
-      mpz_add_log_mod_si (data->rels[i].log_known_part, data->log->tab[p[k].id],
+    else{ // we know this log, add it to log_know_part
+      mpz_add_log_mod_si(data->rels[i].log_known_part, data->log->tab[p[k].id],
                           p[k].e, data->log->q);
+#if DEBUG >= 1
+      gmp_printf("rel[%" PRIu64 "] += log(p[%d].id=%d)=%Zd\n", 
+		 i, (int)k, (int)p[k].id, data->log->tab[p[k].id]);
+#endif
+    }
   }
 
   data->rels[i].nb_unknown = j;
@@ -415,9 +480,16 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
   mpz_t tmp;
   mpz_init_set_si (tmp, e);
   mpz_invert (tmp, tmp, q);
+#if 0
   mpz_neg (vlog, vlog);
   mpz_mul (vlog, vlog, tmp);
   mpz_mod (tmp, vlog, q);
+#else
+  /* protect vlog just in case? */
+  mpz_neg (tmp, tmp);
+  mpz_mul (tmp, tmp, vlog);
+  mpz_mod (tmp, tmp, q);
+#endif
 
   mutex_lock (&lock);
 
@@ -439,8 +511,8 @@ compute_missing_log (mpz_t dest, mpz_t vlog, int32_t e, mpz_t q)
 /* Compute all missing logarithms for relations in [start,end[.
  * Return the number of computed logarithms */
 static uint64_t
-log_do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
-                         uint64_t end)
+log_do_one_part_of_iter (read_data_t *data, bit_vector not_used,
+			 uint64_t start, uint64_t end)
 {
   uint64_t i, computed = 0;
 
@@ -453,18 +525,29 @@ log_do_one_part_of_iter (read_data_t *data, bit_vector not_used, uint64_t start,
       {
         bit_vector_clearbit(not_used, (size_t) i);
         mpz_ptr vlog = data->rels[i].log_known_part;
-        if (nb == 0 && mpz_cmp_ui (vlog, 0) != 0)
+        if (nb == 0)
         {
-          gmp_fprintf (stderr, "Error, no unknown log in rel %" PRIu64 " and sum"
-                       " of log is not zero, sum is:\n%Zd\n", i, vlog);
-          exit (EXIT_FAILURE);
+	  if (mpz_cmp_ui (vlog, 0) != 0){
+	    gmp_fprintf (stderr, "Error, no unknown log in rel %" PRIu64 " and"
+			 " sum of log is not zero, sum is:\n%Zd\n", i, vlog);
+	    exit (EXIT_FAILURE);
+	  }
+#if DEBUG >= 1
+	  else
+	    printf("ok: log == 0 for rel %" PRIu64 "\n", i);
+#endif
         }
         else if (nb == 1)
         {
           ideal_merge_t ideal = data->rels[i].unknown[0];
-          computed +=
-             compute_missing_log (data->log->tab[ideal.id], vlog, ideal.e,
-                                  data->log->q);
+	  int ret = compute_missing_log (data->log->tab[ideal.id], vlog, 
+					 ideal.e, data->log->q);
+#if DEBUG >= 1
+	  gmp_printf("new log: %u %Zd obtained from rel[%" PRIu64 "]\n",
+		     ideal.id, data->log->tab[ideal.id], i);
+	  // FIXME: do we need to update data->rels[i].log_known_part?
+#endif
+          computed += ret;
         }
       }
     }
@@ -981,14 +1064,14 @@ compute_log_from_rels (bit_vector needed_rels,
                        const char *relspfilename, uint64_t nrels_purged,
                        const char *relsdfilename, uint64_t nrels_del,
                        uint64_t nrels_needed, logtab_t log, int nt,
-		       const char *abunitsfilename)
+		       const char *abunitsdirname)
 {
   double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
   read_data_t data;
-  read_data_init(&data, log, nrels, abunitsfilename);
+  read_data_init(&data, log, nrels, abunitsdirname);
 
   /* Reading all relations */
   printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
@@ -1011,7 +1094,7 @@ compute_log_from_rels (bit_vector needed_rels,
                 needed_rels, NULL);
 
   /* computing missing log */
-  printf ("# Starting to computing missing logarithms from rels\n");
+  printf ("# Starting to compute missing logarithms from rels\n");
 
   /* adjust the number of threads based on the number of needed relations */
   double ntm = ceil((nrels_needed + 0.0)/SIZE_BLOCK);
@@ -1262,9 +1345,9 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
-  const char * abunitsfilename = param_list_lookup_string(pl, "abunits0");
+  const char * abunitsdirname = param_list_lookup_string(pl, "abunits0");
 # else
-  const char * abunitsfilename = NULL;
+  const char * abunitsdirname = NULL;
 # endif
 #endif
   param_list_parse_int(pl, "mt", &mt);
@@ -1373,7 +1456,7 @@ main(int argc, char *argv[])
   FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
 # else
   F0 = poly->pols[RATIONAL_SIDE];
-  if (abunitsfilename == NULL)
+  if (abunitsdirname == NULL)
   {
     fprintf(stderr, "Error, missing -abunits0 command line argument\n");
     usage (pl, argv0);
@@ -1444,7 +1527,7 @@ main(int argc, char *argv[])
     log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
                                           nrels_purged, relsdfilename,
                                           nrels_del, nrels_needed, log, mt,
-					  abunitsfilename);
+					  abunitsdirname);
     printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
   }
   else
