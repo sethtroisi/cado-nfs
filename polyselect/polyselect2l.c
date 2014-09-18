@@ -66,7 +66,6 @@ double min_raw_lognorm = LOGNORM_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = LOGNORM_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
-double total_adminus2 = 0.0;
 double *best_opt_logmu, *best_logmu;
 double rootsieve_time = 0.0, optimize_time = 0.0;
 int raw = 0;
@@ -304,7 +303,7 @@ void rootsieve_poly(mpz_t *g, const unsigned long d,
     mpz_neg (g[0], m);
     mpz_clear(m);
     /* optimize again, but only translation */
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
   }
 #else
   mpz_t m;
@@ -439,7 +438,7 @@ optimize_raw_poly (double *logmu, mpz_poly_t F, mpz_t *g,
   skew = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
   *logmu = L2_lognorm (F, skew);
 
-  if (!sorted_insert_double (best_opt_logmu, keep, *logmu))
+  if (!sorted_insert_double (best_opt_logmu, keep, *logmu) && !raw)
     return 0; /* not among the best 'keep' ones */
 
   if (!raw)
@@ -610,7 +609,6 @@ match (unsigned long p1, unsigned long p2, const int64_t i, mpz_t m0,
 
   mutex_lock (&lock);
   /* information on all polynomials */
-  total_adminus2 += g0;
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
@@ -784,7 +782,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
   mutex_lock (&lock);
   /* information on all polynomials */
-  total_adminus2 += g0;
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
@@ -1932,8 +1929,8 @@ declare_usage(param_list pl)
   param_list_decl_usage(pl, "n", "(required, alias N) input number");
   param_list_decl_usage(pl, "P", "(required) deg-1 coeff of g(x) has two prime factors in [P,2P]\n");
 
-  param_list_decl_usage(pl, "admax", "max value for ad");
-  param_list_decl_usage(pl, "admin", "min value for ad (default 0)");
+  param_list_decl_usage(pl, "admax", "maximal value for ad (+ 1)");
+  param_list_decl_usage(pl, "admin", "minimal value for ad (default 0)");
   param_list_decl_usage(pl, "incr", "(alias i) forced factor of ad (default 60)");
   param_list_decl_usage(pl, "maxtime", "stop the search after maxtime seconds");
 
@@ -2108,6 +2105,7 @@ main (int argc, char *argv[])
     usage (argv0[0], NULL, pl);
 
   /* print command line */
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
 
   /* check degree */
@@ -2126,6 +2124,10 @@ main (int argc, char *argv[])
     exit (1);
   }
 #endif
+
+  if (nthreads > 1 && d >= 5)
+    fprintf (stderr,
+             "# Warning: this code is experimental, and not thread-safe.\n");
 
   /* quiet mode */
   if (quiet == 1)
@@ -2225,9 +2227,10 @@ main (int argc, char *argv[])
     admin = incr;
   admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
 
-  while (admin <= admax && seconds () - st0 <= maxtime)
+  while (admin < admax && seconds () - st0 <= maxtime)
   {
-    for (int i = 0; i < nthreads ; i++)
+    int i;
+    for (i = 0; i < nthreads && admin < admax; i++)
     {
       tries ++;
       if (verbose >= 1)
@@ -2243,8 +2246,10 @@ main (int argc, char *argv[])
       admin += incr;
     }
 #ifdef MAX_THREADS
-    for (int i = 0 ; i < nthreads ; i++)
-      pthread_join(tid[i], NULL);
+    /* we have created i threads, with i = nthreads usually, except at the
+       end of the [admin, admax-1] range where we might have i < nthreads */
+    while (i > 0)
+      pthread_join (tid[--i], NULL);
 #endif
 
     if (save != NULL)
@@ -2303,8 +2308,6 @@ main (int argc, char *argv[])
             printf ("# Stat: optimized lognorm (nr/min/av/max/std): %lu/%1.2f/%1.2f/%1.2f/%1.2f\n",
                     collisions_good, min_opt_lognorm, mean, max_opt_lognorm,
                     sqrt (var_opt_lognorm / collisions_good - mean * mean));
-          printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
-                  total_adminus2 / (double) collisions);
         }
     }
 

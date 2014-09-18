@@ -53,6 +53,15 @@
 #cmakedefine    HAVE_STRLCPY
 #cmakedefine    HAVE_STRLCAT
 #cmakedefine    HAVE_LINUX_BINFMTS_H
+#cmakedefine    HAVE_NUMA
+#cmakedefine    HAVE_HWLOC
+#cmakedefine    HAVE_CXX11
+/* In the C source files, we may of course check MPI_VERSION and
+ * MPI_SUBVERSION by ourselves. However we would like to possibly
+ * dismiss, on the per-implementation basis, the claim of MPI-3 support.
+ */
+#cmakedefine    HAVE_MPI2_API
+#cmakedefine    HAVE_MPI3_API
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF

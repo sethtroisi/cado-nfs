@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
-set -x
+# set -x
 
 # This script is intended *for testing only*. It's used for, e.g.,
 # coverage tests. This even goes with dumping all intermediary data to
@@ -10,7 +10,17 @@ set -x
 # command line with care (command-lines as created by this tool might be
 # a source of inspiration, though).
 
-if [ "$*" ] ; then eval "$*" ; fi
+while [ $# -gt 0 ] ; do
+    a="$1"
+    shift
+    if [ "$a" = "--" ] ; then
+        break
+    else
+        eval "$a"
+    fi
+done
+
+pass_bwcpl_args=("$@")
 
 # various configuration variables. environment can be used to override them
 : ${scriptpath=$0}
@@ -429,7 +439,10 @@ create_balancing_file_based_on_mesh_dimensions
 prepare_common_arguments
 
 if [ "$rhs" ] ; then
-    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
+    # http://stackoverflow.com/questions/4489139/bash-process-substitution-and-syncing
+    # $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
+    # fortunately mf_scan is stdout-silent...
+    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile - | create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs
     rhsbin=`echo $rhs | sed -e s/txt/bin/`
     if [ "$rhsbin" == "$rhs" ] ; then rhsbin=$rhs.bin ; fi
     mv ${rhs}.bin0-$nrhs.0 $rhsbin
@@ -437,7 +450,7 @@ if [ "$rhs" ] ; then
 else
     set $common
 fi
-$bindir/bwc.pl :complete "$@"
+$bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
 
 if [ "$nomagma" ] ; then
     exit 0

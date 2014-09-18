@@ -23,8 +23,7 @@ endmacro(string_join var delimiter str_list)
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
-    add_test(test-bwc-${nm} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
+    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
 endmacro(add_bwc_test)
 
 
@@ -119,3 +118,10 @@ add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
     seed=1 thr=5)
 
 add_subdirectory(mpfq)
+
+if(HAVE_CXX11 AND HAVE_HWLOC)
+    include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+    build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
+
+

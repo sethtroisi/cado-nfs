@@ -76,7 +76,7 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -105,7 +105,7 @@ rotate_bounds_V_mpz ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     /* get lognorm */
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
@@ -172,7 +172,7 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -205,7 +205,7 @@ rotate_bounds_U_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -269,7 +269,7 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -302,7 +302,7 @@ rotate_bounds_W_lu ( ropt_poly_t poly,
     for (j = 0; j < 2; j ++)
       mpz_set (g[j], poly->g[j]);
 
-    optimize_aux (F, g, 0, 0);
+    optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
 
     skewness = L2_skewness (F, SKEWNESS_DEFAULT_PREC);
 
@@ -1189,7 +1189,8 @@ ropt_param_init ( ropt_param_t param )
   param->verbose = 0;
   param->effort = DEFAULT_RSEFFORT;
   param->skip_ropt = 0;
-  param->skip_ropt2 = 0;
+  param->gen_raw = 0;
+  param->sopt = 0;
 }
 
 

@@ -93,11 +93,22 @@ set(bwc_base_sources
     matmul_top.c
 )
 
+if(HAVE_CXX11 AND HAVE_HWLOC)
+set(bwc_base_sources
+    ${bwc_base_sources}
+    cpubinding.cpp
+    )
+endif(HAVE_CXX11 AND HAVE_HWLOC)
+
 add_library(bwc_base ${CADO_SHARED} ${bwc_base_sources})
 
 if (HAVE_CURL)
 target_link_libraries(bwc_base curl)
 endif (HAVE_CURL)
+
+if(HAVE_CXX11 AND HAVE_HWLOC)
+target_link_libraries(bwc_base hwloc)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
 
 
 set_target_properties(bwc_base PROPERTIES
@@ -387,3 +398,4 @@ add_dependencies(bwc_full mf_bal random_matrix split acollect lingen
     cleanup prep krylov dispatch mksol gather secure bwc_base
     all_matmul_libs)
 
+include(CMakeLists-nodist.txt OPTIONAL)

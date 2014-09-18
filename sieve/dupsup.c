@@ -21,6 +21,7 @@
 #include "las-duplicate.h"
 #include "las-coordinates.h"
 #include "las-norms.h"
+#include "verbose.h"
 
 static void *
 dupsup (FILE *output, relation_t * rel, const mpz_t sq, const mpz_t rho, const int side, const int is_dupe)
@@ -180,6 +181,7 @@ main (int argc, char * argv[])
         // abort();
     }
     /* print command-line arguments */
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

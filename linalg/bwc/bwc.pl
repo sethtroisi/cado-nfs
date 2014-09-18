@@ -733,6 +733,29 @@ sub get_mpi_hosts_sge {
     die "Not enough mpi nodes ($nnodes): want $nmpi\n" if $nmpi > $nnodes;
 }
 
+# {{{ utilities
+sub version_ge {
+    my ($a, $b) = @_;
+    my @a = split(/[\.-]/, $a);
+    my @b = split(/[\.-]/, $b);
+    while (@a && @b) {
+        $a = shift @a;
+        $b = shift @b;
+        $a =~ /^(\d*)(.*)$/; my ($an, $at) = ($1, $2);
+        $b =~ /^(\d*)(.*)$/; my ($bn, $bt) = ($1, $2);
+        $an=0 if length($an)==0;
+        $bn=0 if length($bn)==0;
+        return 1 if $an > $bn;
+        return 0 if $an < $bn;
+        return 1 if $at gt $bt;
+        return 0 if $at lt $bt;
+    }
+    return 0 if @b;
+    return 1;
+}
+
+# }}}
+
 if ($mpi_needed) {
     # This is useful for debugging in case we see new MPI environments.
     print STDERR "Inherited environment:\n";
@@ -799,8 +822,18 @@ if ($mpi_needed) {
             push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
         } elsif ($mpi_ver =~ /^openmpi-1\.[56]/) {
             push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^openmpi]/) {
+        } elsif ($mpi_ver =~ /^openmpi/) {
             push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+            if (version_ge($mpi_ver, "openmpi-1.8")) {
+                # This is VERY important for bwc ! The default policy for
+                # openmpi 1.8 seems to be by slot, which obviously
+                # schedules most of the desired jobs on only one node...
+                # which doesn't work too well.
+                if (!$param->{'only_mpi'}) {
+                    # with only_mpi=1, the default policy works fine.
+                    push @mpi_precmd, qw/--mca rmaps_base_mapping_policy/, 'node';
+                }
+            }
         } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
             # Not older mpich2's, which need a daemon.
             push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
@@ -812,24 +845,22 @@ if ($mpi_needed) {
 
     @mpi_precmd_single = @mpi_precmd;
     @mpi_precmd_nopthreads = @mpi_precmd;
-    push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    if (!$param->{'only_mpi'}) {
+        push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    } else {
+        push @mpi_precmd, '-n', $nh * $nv;
+    }
     push @mpi_precmd_nopthreads, '-n', $nh * $nv;
     push @mpi_precmd_single, '-n', 1;
-
-#} elsif (defined(my $mpi_path=$ENV{'MPI'})) {
-#    my $ldlp;
-#    if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {
-#        $ldlp .= ':';
-#    } else {
-#        $ldlp = '';
-#    }
-#    $ldlp .= "$mpi_path/lib";
-#    my_setenv 'LD_LIBRARY_PATH', $ldlp;
 }
 
 # }}}
 
 if ($mpi_needed) {
+    # openmpi seems to properly propagate the path to mpirun as the path
+    # to be forwarded on the remote nodes, so no manual propagation of
+    # LD_LIBRARY_PATH or --prefix is needed.
+
     # mkdir must not be marked fatal, because if the command terminates
     # without having ever tried to join in an mpi collective like
     # mpi_init(), there's potential for the mpirun command to complain.
@@ -869,18 +900,19 @@ my $terminal_colors = {
     yellow	=> "\e[00;33m",
     blue	=> "\e[00;34m",
     violet	=> "\e[00;35m",
+    normal      => "\e[0m",
 };
 $terminal_colors = {} if $ENV{'TERM'} !~ /^(xterm|screen|linux)/;
 
 sub task_begin_message {
     my $blue = $terminal_colors->{'BLUE'} || '';
-    my $normal = $terminal_colors->{'black'} || '';
+    my $normal = $terminal_colors->{'normal'} || '';
     print "## Entering task: ${blue}$current_task${normal}\n";
 }
 
 sub task_check_message {
     my $status = shift;
-    my $normal = $terminal_colors->{'black'} || '';
+    my $normal = $terminal_colors->{'normal'} || '';
     my $color = {
         'ok' => $terminal_colors->{'green'} || '',
         'missing' => $terminal_colors->{'YELLOW'} || '',
@@ -1029,7 +1061,7 @@ sub list_files_generic {
         push @{$files->{join("..", @kmatches)}}, \@matches;
         $filesize = $size if !defined($filesize);
         if ($filesize != $size) {
-            task_check_message 'error', "Inconsistency detected for the sizes of the ${pattern} files. We have seen at least $filesize and $size (last seen: $_). Please fix.\n";
+            task_check_message 'error', "Inconsistency detected for the sizes of the ${pattern} files. We have seen at least $filesize and $size (last seen: $file, $size). Please fix.\n";
             die;
         }
     }
@@ -1139,9 +1171,14 @@ sub task_common_run {
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
+    @_ = grep !/precmd/, @_;
 
     $program="$bindir/$program";
     unshift @_, $program;
+
+    if ($param->{'precmd'}) {
+        unshift @_, split(' ', $param->{'precmd'});
+    }
 
     if ($mpi_needed) {
         if ($program =~ /\/plingen[^\/]*$/) {
@@ -1459,7 +1496,7 @@ sub task_prep {
     if ($prime == 2) {
         task_common_run('prep', @main_args);
         task_common_run('split',
-            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
             qw{--ifile Y.0 --ofile-fmt V%u-%u.0});
     } else {
         # The prime case is somewhat different. We'll generate random
@@ -1631,7 +1668,7 @@ sub task_lingen {
         my @args = @main_args;
         task_common_run("lingen", @args, qw/--lingen-threshold 64/);
         task_common_run('split',
-            (grep { /^(?:mn|m|n|wdir|prime|splits)=/ } @main_args),
+            (grep { /^(?:mn|m|n|wdir|prime|splits|verbose_flags)=/ } @main_args),
             split(' ', "--ifile F --ofile-fmt F.sols0-$n.%u-%u"));
     } else {
         # NOTE: It may be worthwhile to run specifically this step, but
@@ -1651,7 +1688,7 @@ sub task_lingen {
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
-        push @args, grep { /^(?:m|n|wdir|prime)=/ } @main_args;
+        push @args, grep { /^(?:m|n|wdir|prime|verbose_flags)=/ } @main_args;
         task_common_run "split", @args,
                 "ifile=$concatenated_A.gen", "ofile-fmt=F.%u-%u";
         for my $j (0..$n/$splitwidth-1) {

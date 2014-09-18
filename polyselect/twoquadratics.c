@@ -393,6 +393,7 @@ main (int argc, char *argv[])
   if (quiet)
     verbose = -1;
 
+  verbose_set_enabled_flags(pl);
   if (param_list_warn_unused(pl))
     usage (argv0, pl);
   param_list_print_command_line (stdout, pl);

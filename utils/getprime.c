@@ -21,11 +21,18 @@
   MA 02110-1301, USA.
 */
 
+/* compile with -DMAIN to use as a standalone program */
+
+#ifndef MAIN
 #include "cado.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "getprime.h"
+#ifndef MAIN
 #include "portability.h"
+#endif
 
 /* provided for in cado.h, but we want getprime.c to be standalone */
 #ifndef ASSERT
@@ -75,17 +82,14 @@ getprime (unsigned long pp)
       moduli = NULL;
       return pp;
     }
-  
-  /* the following complex block is equivalent to:
-     while ((++current < len) && (sieve[current] == 0));
-     but is faster.
-  */
-  {
+
+  if (len) {
     unsigned char *ptr = sieve + current;
-    unsigned char *end = sieve + len;
-    while ((++ptr < end) && (*ptr == 0));
+    while (!*++ptr);
     current = ptr - sieve;
   }
+  else
+    current = 0;
 
   if (current < len) /* most calls will end here */
     return offset + 2 * current;
@@ -98,9 +102,10 @@ getprime (unsigned long pp)
     {
       free (sieve);
       len *= 2;
-      sieve = (unsigned char *) malloc (len * sizeof (unsigned char));
+      sieve = (unsigned char *) malloc ((len + 1 ) * sizeof (unsigned char));
       /* assume this "small" malloc will not fail in normal usage */
       ASSERT(sieve != NULL);
+      sieve[len] = 1; /* End mark */
     }
 
   /* now enlarge small prime table if too small */
@@ -118,10 +123,11 @@ getprime (unsigned long pp)
 	    /* assume this "small" malloc will not fail in normal usage */
 	    ASSERT(moduli != NULL);
 	    len = 1;
-	    sieve = (unsigned char *) malloc(len *
+	    sieve = (unsigned char *) malloc((len + 1) *
                                        sizeof(unsigned char)); /* len=1 here */
 	    /* assume this "small" malloc will not fail in normal usage */
 	    ASSERT(sieve != NULL);
+	    sieve[len] = 1; /* End mark */
 	    offset = 5;
 	    sieve[0] = 1; /* corresponding to 5 */
 	    primes[0] = 3;
@@ -166,8 +172,7 @@ getprime (unsigned long pp)
     long i;
     unsigned long j, p;
     
-    for (i = 0; i < len; i++)
-      sieve[i] = 1;
+    memset (sieve, 1, sizeof(unsigned char) * (len + 1));
     for (j = 0; j < nprimes; j++)
       {
 	p = primes[j];
@@ -177,9 +182,9 @@ getprime (unsigned long pp)
       }
   }
 
-  current = -1;
-  while ((++current < len) && (sieve[current] == 0))
-    ;
+  unsigned char *ptr = sieve - 1;
+  while (!*++ptr);
+  current = ptr - sieve;
 
   ASSERT(current < len); /* otherwise we found a prime gap >= sqrt(x) around x */
   return offset + 2 * current;

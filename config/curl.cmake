@@ -32,13 +32,13 @@ endif(HAS_CURL_OVERRIDE)
 
 string(COMPARE NOTEQUAL "$ENV{CURL_INCDIR}" "" HAS_CURL_INCDIR_OVERRIDE)
 if (HAS_CURL_INCDIR_OVERRIDE)
-    message(STATUS "Adding $ENV{CURL_INCDIR} to the search path for Gnu MP")
+    message(STATUS "Adding $ENV{CURL_INCDIR} to the search path for cURL")
     set(CURL_INCDIR_HINTS "$ENV{CURL_INCDIR}" ${CURL_INCDIR_HINTS})
 endif(HAS_CURL_INCDIR_OVERRIDE)
 
 string(COMPARE NOTEQUAL "$ENV{CURL_LIBDIR}" "" HAS_CURL_LIBDIR_OVERRIDE)
 if (HAS_CURL_LIBDIR_OVERRIDE)
-    message(STATUS "Adding $ENV{CURL_LIBDIR} to the search path for Gnu MP")
+    message(STATUS "Adding $ENV{CURL_LIBDIR} to the search path for cURL")
     set(CURL_LIBDIR_HINTS "$ENV{CURL_LIBDIR}"     ${CURL_LIBDIR_HINTS})
 endif(HAS_CURL_LIBDIR_OVERRIDE)
 
@@ -71,10 +71,4 @@ CHECK_C_SOURCE_COMPILES("
     }
 " HAVE_CURL)
 endif(CURL_INCDIR_OK AND CURL_LIBDIR_OK)
-
-if (HAVE_CURL)
-message(STATUS "Check for cURL: ok")
-else (HAVE_CURL)
-message(STATUS "Check for cURL: failed")
-endif (HAVE_CURL)
 endif(${WANT_CURL})

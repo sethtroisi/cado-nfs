@@ -50,11 +50,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     bw->original_argv = *p_argv;
     bw->wct_base = wct_seconds();
 
-    if (bw->can_print) {
-        print_command_line(stderr, *p_argc, *p_argv);
-        print_command_line(stdout, *p_argc, *p_argv);
-    }
-
     (*p_argv)++, (*p_argc)--;
     param_list_configure_switch(pl, "-v", &bw->verbose);
     for( ; (*p_argc) ; ) {
@@ -65,6 +60,13 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         }
         fprintf(stderr, "Unhandled parameter %s\n", (*p_argv)[0]);
         usage();
+    }
+
+    verbose_set_enabled_flags(pl);
+
+    if (bw->can_print) {
+        param_list_print_command_line(stderr, pl);
+        param_list_print_command_line(stdout, pl);
     }
 
     const char * tmp;
@@ -229,6 +231,9 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
+    param_list_lookup_string(pl, "cpubinding");
+    param_list_lookup_string(pl, "only_mpi");
+    param_list_lookup_string(pl, "balancing_queue_size");
 
     return 0;
 }

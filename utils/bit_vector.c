@@ -8,9 +8,16 @@
 
 void bit_vector_init(bit_vector_ptr b, size_t n)
 {
+    /* It's a matter of taste, really. A zero-length bit vector is weird,
+     * but one can imagine that a situation can degenerate to the point
+     * that this happens, which would then have to go with complete
+     * elision of what happens with the bv, yet we might want to keep the
+     * init/clear scheme as it is.
+     */
+    b->n = n;
+    if (!n) { b->p = NULL; return; }
     b->p = malloc(iceildiv(n, BV_BITS) * sizeof(bv_t));
     FATAL_ERROR_CHECK (b->p == NULL, "Cannot allocate memory");
-    b->n = n;
 }
 
 void bit_vector_init_set(bit_vector_ptr b, size_t n, int s)
@@ -21,8 +28,10 @@ void bit_vector_init_set(bit_vector_ptr b, size_t n, int s)
 
 void bit_vector_set(bit_vector_ptr b, int s)
 {
+    ASSERT(s == 0 || s == 1);
+    if (!b->n) return;
     memset(b->p, -s, iceildiv(b->n, BV_BITS) * sizeof(bv_t));
-    /* For the last byte, put the bits to 0 if the bitmap count does not
+    /* For the last byte, put the high bits to 0 if the bitmap count does not
      * correspond to an integer number of words */
     if (b->n & (BV_BITS - 1))
         b->p[b->n >> LN2_BV_BITS] &=
@@ -31,6 +40,7 @@ void bit_vector_set(bit_vector_ptr b, int s)
 
 void bit_vector_clear(bit_vector_ptr b)
 {
+    if (!b->n) return;
     free(b->p); b->p = NULL; b->n = 0;
 }
 
@@ -40,6 +50,7 @@ void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
   size_t i, n;
   n = b->n;
   ASSERT_ALWAYS(n == c->n);
+  if (!n) return;
   for (i = 0; i < iceildiv(n, BV_BITS); i++)
     b->p[i] = ~c->p[i];
   /* For the last byte, put the bits to 0 if the bitmap count does not
@@ -50,6 +61,7 @@ void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
 
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
 {
+    if (pos >= b->n) return 0;
     bv_t val = b->p[pos >> LN2_BV_BITS];
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
     return (val & mask) != 0;
@@ -57,6 +69,7 @@ int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
 
 int bit_vector_setbit(bit_vector_ptr b, size_t pos)
 {
+    if (pos >= b->n) return 0;
     bv_t val = b->p[pos >> LN2_BV_BITS];
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
     b->p[pos >> LN2_BV_BITS] |= mask;
@@ -65,6 +78,7 @@ int bit_vector_setbit(bit_vector_ptr b, size_t pos)
 
 int bit_vector_clearbit(bit_vector_ptr b, size_t pos)
 {
+    if (pos >= b->n) return 0;
     bv_t val = b->p[pos >> LN2_BV_BITS];
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
     b->p[pos >> LN2_BV_BITS] &= ~mask;
@@ -74,6 +88,7 @@ int bit_vector_clearbit(bit_vector_ptr b, size_t pos)
 /* return old value */
 int bit_vector_flipbit(bit_vector_ptr b, size_t pos)
 {
+    if (pos >= b->n) return 0;
     bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
     bv_t val = b->p[pos >> LN2_BV_BITS];
     b->p[pos >> LN2_BV_BITS] ^= mask;
@@ -119,9 +134,11 @@ void bit_vector_read_from_file(bit_vector_ptr b, const char * fname)
 {
     FILE * f = fopen_maybe_compressed(fname, "rb");
     ASSERT_ALWAYS(f);
-    size_t z = iceildiv(b->n, BV_BITS);
-    size_t rz = fread(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz == z);
+    if (b->n) {
+        size_t z = iceildiv(b->n, BV_BITS);
+        size_t rz = fread(b->p, sizeof(bv_t), z, f);
+        ASSERT_ALWAYS(rz == z);
+    }
     fclose(f);
 }
 
@@ -129,9 +146,11 @@ void bit_vector_write_to_file(bit_vector_srcptr b, const char * fname)
 {
     FILE * f = fopen_maybe_compressed(fname, "wb");
     ASSERT_ALWAYS(f);
-    size_t z = iceildiv(b->n, BV_BITS);
-    size_t rz = fwrite(b->p, sizeof(bv_t), z, f);
-    ASSERT_ALWAYS(rz == z);
+    if (b->n) {
+        size_t z = iceildiv(b->n, BV_BITS);
+        size_t rz = fwrite(b->p, sizeof(bv_t), z, f);
+        ASSERT_ALWAYS(rz == z);
+    }
     fclose(f);
 }
 

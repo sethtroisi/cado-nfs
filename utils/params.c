@@ -13,6 +13,7 @@
 #include "misc.h"
 #include "portability.h"
 #include "modified_files.h"
+#include "verbose.h"
 
 static pthread_mutex_t mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
 
@@ -945,51 +946,58 @@ int param_list_save_parameter(param_list pl, enum parameter_origin o,
     return rc;
 }
 
-void print_command_line(FILE * stream, int argc, char * argv[])
-{
-    const char *modified_files = CADO_MODIFIED_FILES;
-    /* print command line */
-    fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
-    for (int i = 1; i < argc; i++)
-        fprintf (stream, " %s", argv[i]);
-    fprintf (stream, "\n");
-    if (strlen(modified_files) > 1)
-      fprintf (stream, "# List of modified files in working directory and "
-               "their SHA1 sum:\n%s", modified_files);
-#ifdef  __GNUC__
-    fprintf (stream, "# Compiled with gcc " __VERSION__ "\n");
-
-    /* Apple Clang (based on llvm) identifies itself as a flavour of GNUC 4.2.1
-       but seems to compile CADO-NFS properly 
-       $ echo | clang -dD -E -pipe -
-       # 1 "<stdin>"
-       # 1 "<stdin>" 1
-       # 1 "<built-in>" 1
-       # 1 "<built-in>" 3
-       #define __llvm__ 1
-       #define __clang__ 1
-       #define __clang_major__ 4
-       #define __clang_minor__ 1
-       #define __clang_patchlevel__ 0
-       #define __clang_version__ "4.1 ((tags/Apple/clang-421.11.66))"
-       #define __GNUC_MINOR__ 2
-       #define __GNUC_PATCHLEVEL__ 1
-       #define __GNUC__ 4
-       ...
-    */
-    
-#if (GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)) \
-  && ! (__llvm__ || __clang__)
-    fprintf (stream, "# WARNING: this version of GCC is known to miscompile CADO-NFS. See https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490\n");
-#endif
-#endif
-    fprintf(stream, "# Compilation flags " CFLAGS "\n");
-}
 
 void param_list_print_command_line(FILE * stream, param_list pl)
 {
     /* remember that the API for calling param_list functions mandates
      * that the binary name $0 is stripped from the provided lists */
-    if (pl->cmdline_argv0 != NULL)
-        print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
+    if (pl->cmdline_argv0 == NULL)
+        return;
+
+    char **argv = pl->cmdline_argv0-1;
+    int argc = pl->cmdline_argc0+1;
+
+    if (verbose_enabled(CADO_VERBOSE_PRINT_CMDLINE)) {
+        /* print command line */
+        fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
+        for (int i = 1; i < argc; i++)
+            fprintf (stream, " %s", argv[i]);
+        fprintf (stream, "\n");
+    }
+    if (verbose_enabled(CADO_VERBOSE_PRINT_MODIFIED_FILES)) {
+        const char *modified_files = CADO_MODIFIED_FILES;
+        if (strlen(modified_files) > 1)
+          fprintf (stream, "# List of modified files in working directory and "
+                   "their SHA1 sum:\n%s", modified_files);
+    }
+    if (verbose_enabled(CADO_VERBOSE_PRINT_COMPILATION_INFO)) {
+#ifdef  __GNUC__
+        fprintf (stream, "# Compiled with gcc " __VERSION__ "\n");
+
+        /* Apple Clang (based on llvm) identifies itself as a flavour of GNUC 4.2.1
+           but seems to compile CADO-NFS properly 
+           $ echo | clang -dD -E -pipe -
+# 1 "<stdin>"
+# 1 "<stdin>" 1
+# 1 "<built-in>" 1
+# 1 "<built-in>" 3
+#define __llvm__ 1
+#define __clang__ 1
+#define __clang_major__ 4
+#define __clang_minor__ 1
+#define __clang_patchlevel__ 0
+#define __clang_version__ "4.1 ((tags/Apple/clang-421.11.66))"
+#define __GNUC_MINOR__ 2
+#define __GNUC_PATCHLEVEL__ 1
+#define __GNUC__ 4
+...
+*/
+
+#if (GNUC_VERSION(4,1,2) || GNUC_VERSION(4,2,0) || GNUC_VERSION(4,2,1) || GNUC_VERSION(4,2,2)) \
+        && ! (__llvm__ || __clang__)
+        fprintf (stream, "# WARNING: this version of GCC is known to miscompile CADO-NFS. See https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490\n");
+#endif
+#endif
+        fprintf(stream, "# Compilation flags " CFLAGS "\n");
+    }
 }

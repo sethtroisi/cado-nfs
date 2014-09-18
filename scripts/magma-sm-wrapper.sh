@@ -51,7 +51,7 @@ do
   then
     NMAPS="$2"
     shift 2
-  elif [ "$1" = "-mt" ]
+  elif [ "$1" = "-t" ]
   then
     MT="$2"
     shift 2
@@ -70,7 +70,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ $EXPLICIT == "no" ]; then
 
-    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
+    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -t $MT"
 
 else
     # operates in 3 steps:

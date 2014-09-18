@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>

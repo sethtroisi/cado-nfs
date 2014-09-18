@@ -276,7 +276,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "out", "output file");
   param_list_decl_usage(pl, "gorder", "(required) group order");
   param_list_decl_usage(pl, "smexp", "(required) sm-exponent");
-  param_list_decl_usage(pl, "mt", "number of threads (default 1)");
+  param_list_decl_usage(pl, "t", "number of threads (default 1)");
   param_list_decl_usage(pl, "nsm", "number of SM (default deg(alg polynomial))");
   param_list_decl_usage(pl, "side", "alg polynomial to use (default is 1)");
 }
@@ -371,7 +371,7 @@ int main (int argc, char **argv)
       exit(EXIT_FAILURE);
   }
 
-  param_list_parse_int(pl, "mt", &mt);
+  param_list_parse_int(pl, "t", &mt);
   if (mt < 1) {
     fprintf(stderr, "Error: parameter mt must be at least 1\n");
     param_list_print_usage(pl, argv0, stderr);
@@ -399,6 +399,7 @@ int main (int argc, char **argv)
   
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
 
   /* Print F, ell, smexp and ell2 */

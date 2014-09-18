@@ -147,19 +147,38 @@ print_info (FILE * f, renumber_t r)
               r->add_full_col, r->lpb0, r->lpb1);
 }
 
-/* sort in decreasing order */
-static void
-sort (unsigned long *r, int n)
-{
-  int i, j;
-  unsigned long v;
+/* sort in decreasing order. Fastest for ~ < 15 values in r[] vs qsort */
+inline void
+renumber_sort_ul (unsigned long *r, size_t n)
+{ 
+  unsigned long rmin;
 
-  for (i = 1; i < n; i++)
-  {
-    v = r[i];
-    for (j = i; j > 0 && v > r[j - 1]; j--)
-      r[j] = r[j - 1];
-    r[j] = v;
+  if (UNLIKELY (n < 2))
+    return;
+
+  if (UNLIKELY (n == 2)) {
+    if (r[0] < r[1]) {
+      rmin = r[0];
+      r[0] = r[1];
+      r[1] = rmin; 
+    }
+    return;
+  }
+
+  for (size_t i = n; --i;) {
+    size_t min = i;
+    rmin = r[min];
+    for (size_t j = i; j--;) {
+      unsigned long rj = r[j];
+      if (UNLIKELY (rj < rmin)) {
+	min = j;
+	rmin = rj;
+      }
+    }
+    if (LIKELY (min != i)) {
+      r[min] = r[i];
+      r[i] = rmin;
+    }
   }
 }
 
@@ -167,31 +186,23 @@ sort (unsigned long *r, int n)
 static int
 get_largest_root_mod_p (p_r_values_t *r, mpz_t *pol, int deg, p_r_values_t p)
 {
-  int k;
-  unsigned long *roots = NULL;
-
-  mpz_poly_t f;
-  f->coeff = pol;
-  f->deg = deg;
-
   // if there is a proj root, this the largest (r = p by convention)
-  if (mpz_divisible_ui_p (pol[deg], p))
-  {
+  if (mpz_divisible_ui_p (pol[deg], p)) {
     *r = p;
     return 1;
   }
 
-  roots = (unsigned long*) malloc (deg * sizeof (unsigned long));
-  k = mpz_poly_roots_ulong (roots, f, p);
-  if (k > 0)
-  {
-    sort(roots, k);
-    *r = roots[0];
-    free(roots);
+  mpz_poly_t f = {{ .coeff = pol, .deg = deg }};
+  unsigned long roots[deg];
+  size_t k = (size_t) mpz_poly_roots_ulong (roots, f, p);
+  if (k) {
+    unsigned long max = roots[--k];
+    while (k--)
+      if (UNLIKELY (roots[k] > max)) max = roots[k];
+    *r = max;
     return 2;
   }
 
-  free(roots);
   return 0;
 }
 
@@ -484,57 +495,65 @@ int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p,
   return bad;
 }
 
-void
-renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
-                  int k[2])
-{
-  unsigned long add_value = p+1;
-  int i;
+inline size_t
+renumber_write_p_2algs (unsigned long p, unsigned long *roots_alg0, size_t nb_roots_alg0,
+		       unsigned long *roots_alg1, size_t nb_roots_alg1, char *buffer) {
+  size_t size_buffer = 0;
+  size_t i;
+  
+  renumber_sort_ul(roots_alg0, nb_roots_alg0);
+  renumber_sort_ul(roots_alg1, nb_roots_alg1);
 
-  // We sort roots by decreasing order
-  sort(r[0], k[0]);
-  sort(r[1], k[1]);
-
-  if (renumber_info->rat == -1) // two algebraic sides
-  {
-    // Add p + 1 on side 1
-    for (i = 0; i < k[1]; i++)
-      r[1][i] += add_value;
-
-    if (k[1] != 0)
-      r[1][0] = (p << 1) + 1; // The largest roots become 2p+1
-    else
-      r[0][0] = (p << 1) + 1; // The largest roots become 2p+1
-
-    for (i = 0; i < k[1]; i++)
-      fprintf(renumber_info->file, "%lx\n", r[1][i]);
-    for (i = 0; i < k[0]; i++)
-      fprintf(renumber_info->file, "%lx\n", r[0][i]);
-
-    renumber_info->size += k[0] + k[1];
+  if (LIKELY (nb_roots_alg1)) {
+    size_buffer += sprintf (buffer, "%lx\n", (p << 1) + 1); // The largest roots become 2p+1
+    for (i = 1; i < nb_roots_alg1; ++i)                      // Add p + 1 on side 1
+      size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg1[i] + p + 1);
   }
   else
-  {
-    int rat = renumber_info->rat, alg = 1 - rat;
+    *roots_alg0 = (p << 1) + 1;                             // The largest roots become 2p+1
+    
+  for (i = 0; i < nb_roots_alg0; ++i)
+    size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg0[i]);
 
-    if(k[rat] == 0) // lpbr < p < lpba
-    {
-      r[alg][0] = add_value;// We put p+1 instead of the largest roots
-    }
-    else // p < lpbr and lpba <= lpbr
-    {
-      ASSERT_ALWAYS (k[rat] == 1);
+  return size_buffer;
+}
 
-      //If there is a rational side, we put p+1 in the renumbering table.
-      fprintf(renumber_info->file, "%lx\n", add_value);
-      renumber_info->size++;
-    }
+inline size_t
+renumber_write_p_rat_alg (unsigned long p, size_t nb_roots_rat,
+			  unsigned long *roots_alg, size_t nb_roots_alg, char *buffer) {
+  size_t size_buffer;
+  size_t i;
 
-    for (i = 0; i < k[alg]; i++)
-      fprintf(renumber_info->file, "%lx\n", r[alg][i]);
+  renumber_sort_ul(roots_alg, nb_roots_alg);
 
-    renumber_info->size += k[alg];
+  if (LIKELY(nb_roots_rat)) {
+    size_buffer = sprintf (buffer, "%lx\n", p + 1);
   }
+  else {
+    size_buffer = 0;
+    *roots_alg = p + 1; // lpbr < p < lpba, we put p+1 instead of the largest roots
+  }
+
+  for (i = 0; i < nb_roots_alg; ++i) {
+    size_buffer += sprintf (buffer + size_buffer, "%lx\n", roots_alg[i]);
+  }
+
+  return size_buffer;
+}
+
+void
+renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long *r[2], int k[2])
+{
+  size_t size_buffer;
+  char buffer[512];
+  
+  if (renumber_info->rat == -1)
+    size_buffer = renumber_write_p_2algs (p, r[0], (size_t) k[0], r[1], (size_t) k[1], buffer);
+  else
+    size_buffer = renumber_write_p_rat_alg (p, (size_t) k[renumber_info->rat], r[renumber_info->rat ^ 1], (size_t) k[renumber_info->rat ^ 1], buffer);
+
+  fwrite ((void *) buffer, size_buffer, 1, renumber_info->file);
+  renumber_info->size += k[0] + k[1];
 }
 
 /* side is 0 if (p,r) corresponds to the left part in the relation,

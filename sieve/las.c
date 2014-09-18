@@ -723,13 +723,14 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	}
     }
 
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line(las->output, pl);
     las_display_config_flags(las->output);
 
     las->verbose = param_list_parse_switch(pl, "-v");
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->nb_threads = 1;		/* default value */
-    param_list_parse_int(pl, "mt", &las->nb_threads);
+    param_list_parse_int(pl, "t", &las->nb_threads);
     if (las->nb_threads <= 0) {
 	fprintf(stderr,
 		"Error, please provide a positive number of threads\n");
@@ -1999,6 +2000,17 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
+            // If q > 64 bits, then the preivous comparison does not
+            // work. Let's do a dirty hack, here, because I don't know
+            // what would be the best patch. FIXME
+            // So we check only the less significant bits to decide
+            // whether we are seeing the current special-q.
+            if (side == si->doing->side &&
+                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
+                unsigned long pp = mpz_get_ui(si->doing->p);
+                if (pp == p)
+                    continue;
+            }
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
             if (k < 0) continue;
@@ -2018,6 +2030,17 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
+            // If q > 64 bits, then the preivous comparison does not
+            // work. Let's do a dirty hack, here, because I don't know
+            // what would be the best patch. FIXME
+            // So we check only the less significant bits to decide
+            // whether we are seeing the current special-q.
+            if (side == si->doing->side &&
+                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
+                unsigned long pp = mpz_get_ui(si->doing->p);
+                if (pp == p)
+                    continue;
+            }
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
             if (k < 0) continue;
@@ -2497,7 +2520,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "rho",  "sieve only root r mod q0");
   param_list_decl_usage(pl, "v",    "(switch) verbose mode, also prints sieve-area checksums");
   param_list_decl_usage(pl, "out",  "filename where relations are written, instead of stdout");
-  param_list_decl_usage(pl, "mt",   "number of threads to use");
+  param_list_decl_usage(pl, "t",   "number of threads to use");
   param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
 
   param_list_decl_usage(pl, "I",    "set sieving region to 2^I");

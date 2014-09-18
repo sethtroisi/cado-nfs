@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
+#include <float.h> /* for DBL_MAX */
 #include "utils.h"
 #include "portability.h"
 
@@ -94,6 +95,7 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
 {
   double pb;
   int side=0;
+  double a0=a, b0=b, pa0=pa;
 
   pb = double_poly_eval(p, b);
 
@@ -128,7 +130,9 @@ double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
           if (side==-1) pa /= 2;
           side=-1;
       }
-      ASSERT_ALWAYS (!isnan(b));
+      if (isnan(b)) {
+          return double_poly_dichotomy(p, a0, b0, pa0, 0);
+      }
   }
 }
 
@@ -344,17 +348,24 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   return sign_changes;
 }
 
+/* compute all roots whose absolute value is <= B */
 unsigned int
-double_poly_compute_all_roots(double *roots, double_poly_srcptr poly)
+double_poly_compute_all_roots_with_bound (double *roots,
+                                          double_poly_srcptr poly,
+                                          double B)
 {
   /* Positive roots */
   double bound = double_poly_bound_roots (poly);
+  if (B < bound)
+    bound = B;
   unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
   /* Negative roots */
   double_poly_t t; /* Copy of poly which gets sign-flipped */
   double_poly_init (t, poly->deg);
   double_poly_neg_x (t, poly);
   bound = double_poly_bound_roots (t);
+  if (B < bound)
+    bound = B;
   unsigned int nr_roots_neg =
     double_poly_compute_roots (roots + nr_roots_pos, t, bound);
   double_poly_clear(t);
@@ -362,6 +373,12 @@ double_poly_compute_all_roots(double *roots, double_poly_srcptr poly)
   for (unsigned int i = 0; i < nr_roots_neg; i++)
     roots[nr_roots_pos + i] *= -1.;
   return nr_roots_pos + nr_roots_neg;
+}
+
+unsigned int
+double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
+{
+  return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
 }
 
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
@@ -376,24 +393,24 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
   fprintf (stream, "%s", name);
 
   if (deg == 0)
-    fprintf (stream, "%f", f[0]);
+    fprintf (stream, "%.16e", f[0]);
 
   if (deg == 1)
-    fprintf (stream, "%f*x", f[1]);
+    fprintf (stream, "%.16e*x", f[1]);
 
   if (deg > 1)
-    fprintf (stream, "%f*x^%d", f[deg], deg);
+    fprintf (stream, "%.16e*x^%d", f[deg], deg);
 
   for (i = deg - 1; i >= 0; i--)
     {
       if (f[i] == 0.)
 	continue;
       if (i == 0)
-	fprintf (stream, " %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else if (i == 1)
-	fprintf (stream, " %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else 
-	fprintf (stream, " %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+	fprintf (stream, " %s %.16e*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
     }
 
   fprintf (stream, "\n");

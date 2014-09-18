@@ -325,7 +325,6 @@ linalg/bwc/matops.cpp
 linalg/bwc/mf.c
 linalg/bwc/mf.h
 linalg/bwc/mf_bal.c
-linalg/bwc/mf_dobal.c
 linalg/bwc/mf_scan.c
 linalg/bwc/mksol.c
 linalg/bwc/mpfq/Makefile.mpfq
@@ -1096,3 +1095,12 @@ tests/linalg/bwc/mpfq/mpfq_test_p_8.c
 tests/linalg/bwc/mpfq/mpfq_test_pz.c
 tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 tests/linalg/bwc/test-plingen.sh
+config/hwloc.cmake
+config/numa.cmake
+linalg/bwc/cpubinding.conf
+linalg/bwc/cpubinding.cpp
+linalg/bwc/cpubinding.h
+tests/linalg/bwc/cpubind_config_file_for_tests.conf
+tests/linalg/bwc/test_cpubinding.c
+utils/verbose.c
+utils/verbose.h

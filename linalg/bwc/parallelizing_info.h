@@ -83,7 +83,7 @@ typedef const struct pi_wiring_s * pi_wiring_srcptr;
 
 struct pi_log_entry {
     struct timeval tv[1];
-    char what[40];
+    char what[80];
 };
 
 #define PI_LOG_BOOK_ENTRIES     32
@@ -150,6 +150,13 @@ struct parallelizing_info_s {
     char nodename[PI_NAMELEN];
     char nodeprefix[PI_NAMELEN];
     char nodenumber_s[PI_NAMELEN];
+    /* This pointer is identical on all threads. It is non-null only in
+     * case we happen to have sufficiently recent gcc, together with
+     * sufficiently recent hwloc */
+    void * cpubinding_info;
+    int thr_orig[2];            /* when only_mpi is 1, this is what the
+                                   thr parameter was set to originally.
+                                   Otherwise we have {0,0} here. */
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];
@@ -184,6 +191,15 @@ extern void hello(parallelizing_info_ptr pi);
  * This function uses the wr->utility_ptr field.
  */
 extern void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int root);
+
+typedef void (*thread_reducer_t)(void *, const void *, size_t);
+
+extern void thread_reducer_int_min(void *, const void *, size_t size);
+extern void thread_reducer_int_max(void *, const void *, size_t size);
+extern void thread_reducer_int_sum(void *, const void *, size_t size);
+/* dptr must be a shared area allocated by shared_malloc */
+/* the area in ptr is clobbered, but its output results are undefined */
+extern void thread_allreduce(pi_wiring_ptr wr, void * dptr, void * ptr, size_t size, thread_reducer_t f);
 
 /* shared_malloc is like malloc, except that the pointer returned will be
  * equal on all threads (proper access will deserve proper locking of

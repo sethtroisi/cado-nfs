@@ -869,6 +869,7 @@ class WuAccess(object): # {
                    status, WuStatus.get_name(status))
             if status is WuStatus.ASSIGNED and wu_status is WuStatus.CANCELLED:
                 logger.warning ("WuAccess._checkstatus(): %s, presumably timed out", msg)
+                raise StatusUpdateError(msg)
             else:
                 logger.error ("WuAccess._checkstatus(): %s", msg)
                 raise StatusUpdateError(msg)
@@ -1068,13 +1069,13 @@ class WuAccess(object): # {
         return True
 
     def cancel(self, wuid, commit=True):
-        self.cancel_by_condition(eq={"wuid":wuid}, commit=commit)
+        self.cancel_by_condition(eq={"wuid": wuid}, commit=commit)
     
     def cancel_all_available(self, commit=True):
-        self.cancel_by_condition(eq={"status": 0}, commit=commit)
+        self.cancel_by_condition(eq={"status": WuStatus.AVAILABLE}, commit=commit)
     
     def cancel_all_assigned(self, commit=True):
-        self.cancel_by_condition(eq={"status": 1}, commit=commit)
+        self.cancel_by_condition(eq={"status": WuStatus.ASSIGNED}, commit=commit)
     
     def cancel_by_condition(self, commit=True, **conditions):
         self.set_status(WuStatus.CANCELLED, commit=commit, **conditions)

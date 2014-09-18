@@ -184,6 +184,9 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     if (iter < timing->next_print)
         return;
 
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_TIMING_GRIDS))
+        return;
+
     /* We're printing something, so we might as well check for signals
      * now */
     timing_rare_checks(wr, timing, iter, print);
@@ -247,6 +250,9 @@ void pi_thread_allreduce_add_double(parallelizing_info pi, double * x, int n)
 /* stage=0 for krylov, 1 for mksol */
 void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_ITERATION_TIMINGS))
+        return;
+
     timing_interval_data since_last_reset[2];
     timing_interval_data since_beginning[2];
     extract_interval(since_last_reset, since_beginning, timing);
