@@ -2000,6 +2000,17 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
+            // If q > 64 bits, then the preivous comparison does not
+            // work. Let's do a dirty hack, here, because I don't know
+            // what would be the best patch. FIXME
+            // So we check only the less significant bits to decide
+            // whether we are seeing the current special-q.
+            if (side == si->doing->side &&
+                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
+                unsigned long pp = mpz_get_ui(si->doing->p);
+                if (pp == p)
+                    continue;
+            }
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
             if (k < 0) continue;
@@ -2019,6 +2030,17 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 continue;
             if (mpz_cmp_ui(si->doing->p, p)==0 && side == si->doing->side)
                 continue;
+            // If q > 64 bits, then the preivous comparison does not
+            // work. Let's do a dirty hack, here, because I don't know
+            // what would be the best patch. FIXME
+            // So we check only the less significant bits to decide
+            // whether we are seeing the current special-q.
+            if (side == si->doing->side &&
+                mpz_sizeinbase(si->doing->p, 2) >= 8*sizeof(unsigned long)) {
+                unsigned long pp = mpz_get_ui(si->doing->p);
+                if (pp == p)
+                    continue;
+            }
             unsigned int n = ULONG_BITS - clzl(p);
             int k = las->hint_lookups[side][n];
             if (k < 0) continue;
