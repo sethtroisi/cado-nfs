@@ -4041,14 +4041,15 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   mpz_init (k);
   mpz_init (copy_g0k);
 
-  /* m has d-1 (row) vectors of d+1 coefficients each */
-  m.NumRows = d - 1;
+  /* m has d (row) vectors of d+1 coefficients each */
+  m.NumRows = d; /* consider rotation up to x^(m.NumRows-2)*g(x) */
   m.NumCols = d + 1;
-  m.coeff = (mpz_t **) malloc (d * sizeof(mpz_t*));
-  for (j = 1; j <= d-1; j++)
+  /* indices in the LLL code start at 1, thus we allocate one more row */
+  m.coeff = (mpz_t **) malloc ((m.NumRows + 1) * sizeof(mpz_t*));
+  for (j = 1; j <= m.NumRows; j++)
   {
-    m.coeff[j] = (mpz_t *) malloc ((d + 2) * sizeof(mpz_t));
-    for (i = 0; i <= d + 1; i++)
+    m.coeff[j] = (mpz_t *) malloc ((m.NumCols + 1) * sizeof(mpz_t));
+    for (i = 1; i <= m.NumCols; i++)
       mpz_init (m.coeff[j][i]);
   }
   smax = pow (fabs (mpz_get_d (g[0]) / mpz_get_d (f->coeff[d])),
@@ -4110,19 +4111,19 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
       do_translate_z (f, g, k);
       mpz_set (copy_g0k, g[0]);
       mpz_set_d (s, skew + 0.5); /* round to nearest */
-      for (j = 1; j <= d-1; j++)
-        for (i = 0; i <= d; i++)
-          mpz_set_ui (m.coeff[j][i+1], 0);
+      for (j = 1; j <= m.NumRows; j++)
+        for (i = 1; i <= m.NumCols; i++)
+          mpz_set_ui (m.coeff[j][i], 0);
       mpz_set_ui (det, 1);
-      for (i = 0; i <= d; i++)
+      for (i = 0; i < m.NumCols; i++)
       {
         if (i > 0)
           mpz_mul (det, det, s); /* s^i */
-        if (i <= d - 3)
+        if (i <= m.NumRows - 2)
           mpz_set (m.coeff[i+2][i+1], det);
         mpz_mul (m.coeff[1][i+1], det, f->coeff[i]);
       }
-      for (i = 0; i <= d - 3; i++)
+      for (i = 0; i <= m.NumRows - 2; i++)
       {
         /* m.coeff[i+2][i+1] is already s^i */
         mpz_mul (m.coeff[i+2][i+2], m.coeff[i+2][i+1], s); /* s^(i+1) */
@@ -4130,7 +4131,7 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
         mpz_mul (m.coeff[i+2][i+2], m.coeff[i+2][i+2], g[1]);
       }
       LLL (det, m, NULL, a, b);
-      for (j = 1; j <= d-1; j++)
+      for (j = 1; j <= m.NumRows; j++)
       {
         if (mpz_sgn (m.coeff[j][d]) != 0)
         {
@@ -4170,9 +4171,9 @@ optimize_lll (mpz_poly_ptr f, mpz_t *g, int verbose)
   for (i = 0; i < MAX_ROOTS; i++)
     mpz_clear (best_k[i]);
 
-  for (j = 1; j <= d-1; j++)
+  for (j = 1; j <= m.NumRows; j++)
   {
-    for (i = 0; i <= d + 1; i++)
+    for (i = 1; i <= m.NumCols; i++)
       mpz_clear (m.coeff[j][i]);
     free (m.coeff[j]);
   }
