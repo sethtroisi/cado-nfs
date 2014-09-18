@@ -1976,6 +1976,8 @@ main (int argc, char *argv[])
 #endif
 
   mpz_init (N);
+  mpz_init (admin);
+  mpz_init (admax);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
 
@@ -2072,10 +2074,8 @@ main (int argc, char *argv[])
 
   /* if no -admin is given, mpz_init did set it to 0, which is exactly
      what we want */
-  mpz_init (admin);
   param_list_parse_mpz (pl, "admin", admin);
 
-  mpz_init (admax);
   if (param_list_parse_mpz (pl, "admax", admax) == 0) /* no -admax */
     mpz_set (admax, N);
 
