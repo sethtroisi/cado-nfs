@@ -938,6 +938,7 @@ class BWC(Program):
                  interleaving: ParameterEq()=None,
                  shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
+                 precmd: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")
