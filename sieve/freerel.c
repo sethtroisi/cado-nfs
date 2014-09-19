@@ -35,7 +35,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h"
 #include "typedefs.h"
-#include "cachebuf.h"
 
 // All those macros don't need to be powers of two... but it's smarter!
 #define NB_BUFS (1<<1)             // 2 buffers are sufficient; in fact it works with only one!
@@ -44,6 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define MIN_BUF_FREE_RELS (1<<8)   // Minimal size in BYTES of free rels buffer before it grows
 #define SIZE_BUF_ROOTS (1<<15)     // Nb of roots for the primes block; NB: in ASCII!
 #define MIN_BUF_ROOTS (1<<10)      // Max size in ASCII of all the roots for ONE p (1024 bytes)
+#define CACHELINESIZE 64
 
 /* Model of this code : One producer -> Many consumers/producers -> one consumer.
    1. First thread produces SIZE_BUF_PRIMES primes by buffer, in NB_BUFS buffers
