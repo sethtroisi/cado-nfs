@@ -35,13 +35,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h"
 #include "typedefs.h"
+#include "cachebuf.h"
 
 // All those macros don't need to be powers of two... but it's smarter!
 #define NB_BUFS (1<<1)             // 2 buffers are sufficient; in fact it works with only one!
-#define SIZE_BUF_PRIMES (1<<12)    // Size of a block of generated primes for one pthread
-#define SIZE_BUF_FREE_RELS (1<<10) // Nb of free rels for the primes block
+#define SIZE_BUF_PRIMES (1<<10)    // Size of a block of generated primes for one pthread
+#define SIZE_BUF_FREE_RELS (1<<8)  // Nb of free rels for the primes block
 #define MIN_BUF_FREE_RELS (1<<8)   // Minimal size in BYTES of free rels buffer before it grows
-#define SIZE_BUF_ROOTS (1<<17)     // Nb of roots for the primes block; NB: in ASCII!
+#define SIZE_BUF_ROOTS (1<<15)     // Nb of roots for the primes block; NB: in ASCII!
 #define MIN_BUF_ROOTS (1<<10)      // Max size in ASCII of all the roots for ONE p (1024 bytes)
 
 /* Model of this code : One producer -> Many consumers/producers -> one consumer.
@@ -191,7 +192,7 @@ resize_buf (buf_t *buf, size_t min_buf) {
 
 /* This function produces all the primes from p to pth->lpbmax,
    for the workers pthreads pool (see next function). The primes are in
-   buffers; each buffer contains SIZE_BUF_PRIMES primes (optimal: 4096),
+   buffers; each buffer contains SIZE_BUF_PRIMES primes (optimal: 1024),
    except the last of course.
    After all buffers have been produced, this function creates again
    nb_pthreads buffers with only the end marker ((p_r_values_t) (-1)),
@@ -259,9 +260,9 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
   producer_t *my_pth = ptvoid;
   unsigned long p;
   size_t i, nb_roots[2];
-  unsigned long *computed_roots[2];
-  computed_roots[0] = malloc_check (my_pth->deg[0] * sizeof(*(computed_roots[0])));
-  computed_roots[1] = malloc_check (my_pth->deg[1] * sizeof(*(computed_roots[1])));
+  unsigned long computed_roots[2][32]; // With malloc, the computed_roots of 2 pthreads
+  ASSERT_ALWAYS (my_pth->deg[0] < 32); // may be in the same cacheline. 
+  ASSERT_ALWAYS (my_pth->deg[1] < 32); // A computed_root with a fixed size is faster.
 
   for (;;) {
 
@@ -281,8 +282,6 @@ pthread_roots_and_free_rels_producer (void *ptvoid) {
       sema_post (&(my_pth->primes_empty)); // Drop my now consumed primes buffer (not useful)
       sema_post (&(my_pth->roots_full));   // Give my produced roots & free_rels buffer
       // OK, the job is done. Bye bye!
-      free (computed_roots[0]);
-      free (computed_roots[1]);
       pthread_exit (NULL); // The exit of the endless loop; the exit of the pthread
     }
 
@@ -450,11 +449,11 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     pth[i].pols[0]            = pol->pols[0];      pth[i].pols[1]  = pol->pols[1];
     for (j = NB_BUFS; j--;) {
       pth[i].free_rels[j].begin = pth[i].free_rels[j].current =
-	malloc_check (SIZE_BUF_FREE_RELS * sum_degs_add_one * sizeof (*(pth[i].free_rels[j].begin)));
+	malloc_aligned (SIZE_BUF_FREE_RELS * sum_degs_add_one * sizeof (*(pth[i].free_rels[j].begin)), CACHELINESIZE);
       pth[i].roots[j].begin =     pth[i].roots[j].current =
-	malloc_check (SIZE_BUF_ROOTS     * sizeof (*(pth[i].roots[j].begin)));
+	malloc_aligned (SIZE_BUF_ROOTS     * sizeof (*(pth[i].roots[j].begin)), CACHELINESIZE);
       pth[i].primes[j].begin =    pth[i].primes[j].current =
-	malloc_check (SIZE_BUF_PRIMES    * sizeof (*(pth[i].primes[j].begin)));
+	malloc_aligned (SIZE_BUF_PRIMES    * sizeof (*(pth[i].primes[j].begin)), CACHELINESIZE);
       pth[i].free_rels[j].end = pth[i].free_rels[j].begin + SIZE_BUF_FREE_RELS;
       pth[i].roots[j].end     = pth[i].roots[j].begin     + SIZE_BUF_ROOTS;
       pth[i].primes[j].end    = pth[i].primes[j].begin    + SIZE_BUF_PRIMES;
