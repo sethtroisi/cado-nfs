@@ -133,7 +133,7 @@ macro(test_dispatch_matmul testname)
 endmacro(test_dispatch_matmul testname)
 
 add_dependencies(check bwc_matmul)
-# mingw has antique bash (3.1) with different regezp syntax, and having
+# mingw has antique bash (3.1) with different regexp syntax, and having
 # the script below work with both isn't a very funny perspective.
 if (NOT MINGW)
 test_dispatch_matmul(dispatch-matmul-65536-thr nrows=65536 density=2 thr=2x2)
