@@ -46,6 +46,7 @@ static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsig
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
@@ -94,7 +95,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
-    load_x(&gxvecs, bw->m, &nx, pi);
+    if (!fake) {
+        load_x(&gxvecs, bw->m, &nx, pi);
+    } else {
+        set_x_fake(&gxvecs, bw->m, &nx, pi);
+    }
+
     indices_apply_S(mmt, gxvecs, nx * bw->m, bw->dir);
     if (bw->dir == 0)
         indices_apply_P(mmt, gxvecs, nx * bw->m, bw->dir);
@@ -110,11 +116,30 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_interleaving_flip(pi);
     pi_interleaving_flip(pi);
 
-    char * v_name;
+    char * v_name = NULL;
     int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
-    if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-    matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
-    if (tcan_print) { printf("done\n"); }
+    ASSERT_ALWAYS(rc >= 0);
+    if (!fake) {
+        if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
+        matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
+        if (tcan_print) { printf("done\n"); }
+    } else {
+        gmp_randstate_t rstate;
+        gmp_randinit_default(rstate);
+        if (pi->m->trank == 0 && !bw->seed) {
+            bw->seed = time(NULL);
+            MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
+        }
+        serialize_threads(pi->m);
+        gmp_randseed_ui(rstate, bw->seed);
+        if (tcan_print) {
+            printf("// Random generator seeded with %d\n", bw->seed);
+        }
+        if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
+        matmul_top_set_random_and_save_vector(mmt, v_name, bw->dir, bw->start, unpadded, rstate);
+        if (tcan_print) { printf("done\n"); }
+        gmp_randclear(rstate);
+    }
 
     mmt_vec check_vector;
     mmt_vec ahead;
@@ -254,6 +279,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
+            int rc;
             rc = asprintf(&tmp, A_FILE_PATTERN, ys[0], ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "wb");
             rc = fwrite(xymats->v, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);

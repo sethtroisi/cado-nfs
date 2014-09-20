@@ -63,6 +63,7 @@ struct balancing_header_s {
     uint32_t pshuf_inv[2];
 };
 typedef struct balancing_header_s balancing_header[1];
+typedef struct balancing_header_s * balancing_header_ptr;
 
 struct balancing_s {
     balancing_header h;

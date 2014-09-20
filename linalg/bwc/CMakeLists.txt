@@ -91,6 +91,7 @@ set(bwc_base_sources
     rolling.c
     matmul.c
     matmul_top.c
+    random_matrix.c
 )
 
 if(HAVE_CXX11 AND HAVE_HWLOC)
@@ -140,6 +141,8 @@ install(TARGETS mf_bal RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
 add_executable(random_matrix ${EXCLUDE_FROM_RELEASE_BUILD} random_matrix.c)
+set_property(TARGET random_matrix PROPERTY COMPILE_DEFINITIONS WANT_MAIN)
+
 
 # balancing.c itself is in fact standalone, and lightweight. We prefer to
 # avoid having the whole thing entangled with too many dependencies all

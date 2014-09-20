@@ -114,30 +114,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
          * better.
          */
 
-        if (pi->m->trank == 0) {
-            const char * filename = Y_FILE_BASE ".0";
-
-            void * y;
-            A->vec_init(A, &y, mmt->n[bw->dir]);
-            A->vec_set_zero(A, y, mmt->n[bw->dir]);
-            /* Again, important. Generate zero coordinates for padding !
-             * This provides reproducibility of random choices.
-             */
-            if (pi->m->jrank == 0)
-                A->vec_random(A, y, mmt->n0[bw->dir], rstate);
-            int err = MPI_Bcast(y,
-                    mmt->n[bw->dir],
-                    A->mpi_datatype(A),
-                    0, pi->m->pals);
-            ASSERT_ALWAYS(!err);
-            FILE * f = fopen(filename, "wb");
-            ASSERT_ALWAYS(f);
-            int rc = fwrite(y, A->vec_elt_stride(A,1), unpadded, f);
-            ASSERT_ALWAYS(rc == (int) unpadded);
-            fclose(f);
-            A->vec_clear(A, &y, mmt->n[bw->dir]);
-        }
-        matmul_top_load_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
+        matmul_top_set_random_and_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded, rstate);
 
         if (tcan_print) {
             printf("// vector generated and dispatched (trial # %u)\n", ntri);

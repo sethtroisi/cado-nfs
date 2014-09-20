@@ -52,7 +52,26 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
     block_control_signals();
 
+    /*****************************************
+     *             Watch out !               *
+     *****************************************/
+     
+    /* HERE is the place where something actually happens. The rest of
+     * this function are just sanity checks. Matrix dispatch can, in
+     * fact, be done from any program which does matmul_top_init. This
+     * function calls mmt_finish_init, which calls
+     * matmul_top_read_submatrix, which eventually calls
+     * balancing_get_matrix_u32, which hooks into the balancing code.
+     * This is UNLESS either of the two command-line arguments are set,
+     * because these trigger special behaviour:
+     * export_cachelist : see this file, in fact. This makes "dispatch" a
+     * quick cache file listing tool, which helps the perl script a bit.
+     * random_matrix_size : for creating test matrices, essentially for
+     * krylov/mksol speed testing.
+     */
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+
+
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     const char * tmp = param_list_lookup_string(pl, "sanity_check_vector");

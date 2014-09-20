@@ -15,6 +15,7 @@
 #include "balancing_workhorse.h"
 #include "portability.h"
 #include "misc.h"
+#include "random_matrix.h"
 
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
@@ -1664,6 +1665,41 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, u
     matmul_top_load_vector_generic(mmt, NULL, name, d, iter, itemsondisk);
 }
 
+void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter, unsigned int itemsondisk, gmp_randstate_t rstate)
+{
+    mpfq_vbase_ptr A = mmt->abase;
+    parallelizing_info_ptr pi = mmt->pi;
+
+    if (pi->m->trank == 0) {
+        char * filename;
+        int rc;
+        rc = asprintf(&filename, "%s.%d", name, iter);
+        ASSERT_ALWAYS(rc >= 0);
+
+        void * y;
+        A->vec_init(A, &y, mmt->n[d]);
+        A->vec_set_zero(A, y, mmt->n[d]);
+        /* Again, important. Generate zero coordinates for padding !
+         * This provides reproducibility of random choices.
+         */
+        if (pi->m->jrank == 0)
+            A->vec_random(A, y, mmt->n0[d], rstate);
+        int err = MPI_Bcast(y,
+                mmt->n[d],
+                A->mpi_datatype(A),
+                0, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+        FILE * f = fopen(filename, "wb");
+        ASSERT_ALWAYS(f);
+        rc = fwrite(y, A->vec_elt_stride(A,1), itemsondisk, f);
+        ASSERT_ALWAYS(rc == (int) itemsondisk);
+        fclose(f);
+        A->vec_clear(A, &y, mmt->n[d]);
+        free(filename);
+    }
+    matmul_top_load_vector(mmt, name, d, iter, itemsondisk);
+}
+
 
 
 /**********************************************************************/
@@ -1795,14 +1831,25 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // are filled in later within read_info_file
     //
 
-    const char * tmp = param_list_lookup_string(pl, "balancing");
-    if (!tmp) {
+    const char * tmp, * rtmp;
+    tmp = param_list_lookup_string(pl, "balancing");
+    rtmp = param_list_lookup_string(pl, "random_matrix");
+    if (tmp && rtmp) {
+        fprintf(stderr, "balancing= and random_matrix= are incompatible\n");
+        exit(1);
+    }
+    if (!tmp && !rtmp) {
         fprintf(stderr, "Missing parameter balancing=\n");
         exit(1);
     }
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        if (tmp) {
+            balancing_read_header(mmt->bal, tmp);
+        } else {
+            random_matrix_fill_fake_balancing_header(mmt->bal, pi, rtmp);
+        }
+    }
 
-    if (pi->m->jrank == 0 && pi->m->trank == 0)
-        balancing_read_header(mmt->bal, tmp);
     global_broadcast(pi->m, mmt->bal, sizeof(mmt->bal), 0, 0);
     serialize(mmt->pi->m);
 
@@ -2030,7 +2077,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         // Thus we have to read this back from the mm structure.
         m->transpose = mmt->mm->store_transposed;
         m->withcoeffs = param_list_lookup_string(pl, "prime") != NULL && strcmp(param_list_lookup_string(pl, "prime"), "2") != 0;
-        balancing_get_matrix_u32(mmt->pi, pl, m);
+
+        if (param_list_lookup_string(pl, "random_matrix")) {
+            random_matrix_get_u32(mmt->pi, pl, m);
+        } else {
+            balancing_get_matrix_u32(mmt->pi, pl, m);
+        }
 
         int ssm = 0;
         param_list_parse_int(pl, "save_submatrices", &ssm);
