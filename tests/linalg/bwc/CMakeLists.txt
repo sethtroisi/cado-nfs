@@ -109,7 +109,7 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
 add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
-add_dependencies(check mf_scan plingen_p_1)
+add_dependencies(check mf_scan)
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
 
