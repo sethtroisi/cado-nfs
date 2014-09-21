@@ -2066,9 +2066,6 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
      * matrix_u32 */
 
     if (!cache_loaded) {
-        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
-            printf("Matrix dispatching starts\n");
-        }
         m->mfile = param_list_lookup_string(pl, "matrix");
         m->bfile = param_list_lookup_string(pl, "balancing");
         // the mm layer is informed of the higher priority computations
@@ -2079,8 +2076,14 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         m->withcoeffs = param_list_lookup_string(pl, "prime") != NULL && strcmp(param_list_lookup_string(pl, "prime"), "2") != 0;
 
         if (param_list_lookup_string(pl, "random_matrix")) {
+            if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+                printf("Begin creation of fake matrix data in parallel\n");
+            }
             random_matrix_get_u32(mmt->pi, pl, m);
         } else {
+            if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+                printf("Matrix dispatching starts\n");
+            }
             balancing_get_matrix_u32(mmt->pi, pl, m);
         }
 

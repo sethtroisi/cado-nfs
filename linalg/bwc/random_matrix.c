@@ -726,6 +726,39 @@ void random_matrix_fill_fake_balancing_header(balancing_ptr bal, parallelizing_i
     random_matrix_process_data_clear(r);
 }
 
+/*{{{ borrowed from balancing_workhorse.c*/
+struct progress_info {
+    time_t t;   /* last printed time */
+    size_t z;   /* last printed data amount */
+};
+
+static int should_print_now(struct progress_info * last_printed, size_t z)
+{
+    if (z >= last_printed->z + (10UL<<20) || time(NULL) >= last_printed->t + 10) {
+        last_printed->z = z;
+        last_printed->t = time(NULL);
+        return 1;
+    }
+    return 0;
+}
+// {{{ trivial utility
+static const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+	ds /= 1024.0;
+	px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
+}
+
+// }}}
+/*}}}*/
+
+
 void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
 {
     const char * rtmp = param_list_lookup_string(pl, "random_matrix");
@@ -774,6 +807,17 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     }									\
     arg->p[arg->size++] = (x);						\
 } while (0)
+
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
+                pi->m->totalsize, pi->m->njobs, r->nrows, r->ncols, r->density, r->seed);
+    }
+
+    time_t t0 = time(NULL);
+    struct progress_info last_printed[1];
+    last_printed->t = t0;
+    last_printed->z = 0;
+
     /* we'd like to avoid constant malloc()'s and free()'s */
     punched_interval_ptr range = punched_interval_alloc(0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
@@ -790,6 +834,18 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         }
         total_coeffs += c;
         tot_sq += (double) c * (double) c;
+        if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+            double dt = last_printed->t - t0;
+            char buf[16];
+            char buf2[16];
+            printf("%s, %lu rows in %d s ; %s/s  \r",
+                    size_disp(arg->size * sizeof(uint32_t), buf), i, (int) dt,
+                    size_disp(dt > 0 ? (size_t) (arg->size * sizeof(uint32_t) / dt) : 0, buf2));
+            fflush(stdout);
+        }
+    }
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        printf("\n");
     }
     punched_interval_free(range);
 #undef PUSH_P
