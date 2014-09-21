@@ -780,8 +780,8 @@ sub version_ge {
 
 if ($mpi_needed) {
     # This is useful for debugging in case we see new MPI environments.
-    print STDERR "Inherited environment:\n";
-    print STDERR "$_=$ENV{$_}\n" for keys %$ENV;
+    # print STDERR "Inherited environment:\n";
+    # print STDERR "$_=$ENV{$_}\n" for keys %ENV;
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
