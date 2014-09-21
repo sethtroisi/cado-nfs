@@ -126,6 +126,16 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     } else {
         gmp_randstate_t rstate;
         gmp_randinit_default(rstate);
+#if 0
+        /* This is for setting the source vector to something consistent
+         * across mappings, so that given a fixed (fake, here) matrix, any
+         * splitting will give the same source vector. This is just a
+         * copy of the mechanism which exists in prep for doing exactly
+         * this. Alas, in what we denote as a fake situation, there is
+         * no chance of course that two different splittings lesad to
+         * identical matrices ! Hence, we'd rather not bother with
+         * generating something consistent.
+         */
         if (pi->m->trank == 0 && !bw->seed) {
             bw->seed = time(NULL);
             MPI_Bcast(&bw->seed, 1, MPI_INT, 0, pi->m->pals);
@@ -138,6 +148,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         if (tcan_print) { printf("Creating fake %s...", v_name); fflush(stdout); }
         matmul_top_set_random_and_save_vector(mmt, v_name, bw->dir, bw->start, unpadded, rstate);
         if (tcan_print) { printf("done\n"); }
+#else
+        unsigned long g = pi->m->jrank * pi->m->ncores + pi->m->trank;
+        gmp_randseed_ui(rstate, bw->seed + g);
+        matmul_top_set_random_inconsistent(mmt, bw->dir, rstate);
+#endif
         gmp_randclear(rstate);
     }
 

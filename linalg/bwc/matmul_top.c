@@ -1700,6 +1700,12 @@ void matmul_top_set_random_and_save_vector(matmul_top_data_ptr mmt, const char *
     matmul_top_load_vector(mmt, name, d, iter, itemsondisk);
 }
 
+void matmul_top_set_random_inconsistent(matmul_top_data_ptr mmt, int d, gmp_randstate_t rstate)
+{
+    mmt_wiring_ptr wr = mmt->wr[d];
+    mmt->abase->vec_random(mmt->abase, wr->v->v, wr->i1 - wr->i0, rstate);
+}
+
 
 
 /**********************************************************************/
@@ -2152,7 +2158,7 @@ void matmul_top_clear(matmul_top_data_ptr mmt)
 
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);
-#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+#if defined(USE_ALTERNATIVE_REDUCE_SCATTER) || defined(USE_ALTERNATIVE_REDUCE_SCATTER_PARALLEL)
     for(int d = 0 ; d < 2 ; d++)  {
         free(mmt->wr[d]->rsbuf[0]); mmt->wr[d]->rsbuf[0] = NULL;
         free(mmt->wr[d]->rsbuf[1]); mmt->wr[d]->rsbuf[1] = NULL;
