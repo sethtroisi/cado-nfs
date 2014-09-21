@@ -35,12 +35,16 @@
 /*{{{ random picking */
 double random_uniform(gmp_randstate_t rstate)
 {
+    /* the constant is 2^-53 */
+    return gmp_urandomm_ui(rstate, 1UL<<53) * 1.11022302462515654042363166809E-16;
+    /*
     mpf_t x;
     mpf_init2(x, 53);
     mpf_urandomb(x, rstate, 53);
     double y = mpf_get_d(x);
     mpf_clear(x);
     return y;
+    */
 }
 
 double random_normal_standard(gmp_randstate_t rstate)
@@ -348,6 +352,7 @@ struct punched_interval_s;
 struct punched_interval_s {
     double b0, b1;
     double holes;
+    int has_left, has_right;
     struct punched_interval_s * left;
     struct punched_interval_s * right;
 };
@@ -361,21 +366,46 @@ void punched_interval_free(punched_interval_ptr c)
     free(c);
 }
 
+void punched_interval_set_full(punched_interval_ptr x, double b0, double b1)
+{
+    x->b0 = b0;
+    x->b1 = b1;
+    x->has_left = 0;
+    x->has_right = 0;
+    x->holes = 0;
+}
+
 punched_interval_ptr punched_interval_alloc(double b0, double b1)
 {
     punched_interval_ptr x = malloc(sizeof(struct punched_interval_s));
     memset(x, 0, sizeof(struct punched_interval_s));
-    x->b0 = b0;
-    x->b1 = b1;
+    punched_interval_set_full(x, b0, b1);
     return x;
 }
+
+void punched_interval_punch(punched_interval_ptr c, double x0, double x1)
+{
+    c->holes += x1 - x0;
+    if (!c->left) {
+        c->left = punched_interval_alloc(c->b0, x0);
+    } else {
+        punched_interval_set_full(c->left, c->b0, x0);
+    }
+    c->has_left=1;
+    if (!c->right) {
+        c->right = punched_interval_alloc(x1, c->b1);
+    } else {
+        punched_interval_set_full(c->right, x1, c->b1);
+    }
+}
+
 
 unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, double x)
 {
     /* x should be within [c->b0, c->b1 - c->holes] */
     ASSERT_ALWAYS(x >= c->b0);
     ASSERT_ALWAYS(x + c->holes < c->b1);
-    if (c->left == NULL) {
+    if (!c->has_left) {
         /* no holes ! */
         double r = dist_qrev(f, x);
         unsigned long i;
@@ -388,9 +418,7 @@ unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, 
         }
         double x0 = dist_q(f, i);
         double x1 = dist_q(f, i + 1);
-        c->holes += x1 - x0;
-        c->left = punched_interval_alloc(c->b0, x0);
-        c->right = punched_interval_alloc(x1, c->b1);
+        punched_interval_punch(c, x0, x1);
         return i;
     }
     /* try to correct x with all left holes */
@@ -410,12 +438,11 @@ unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, 
     }
 }
 
-/*
    void punched_interval_print_rec(FILE * f, punched_interval_ptr c)
    {
-   if (!c->left) return;
+   if (!c->has_left) return;
    punched_interval_print_rec(f, c->left);
-   fprintf(f, "(\e[31m%.2f...%.2f\e[30m)...", c->left->b1, c->right->b0);
+   fprintf(f, "(\e[31m%.2f...%.2f\e[0m)...", c->left->b1, c->right->b0);
    punched_interval_print_rec(f, c->right);
    }
 
@@ -425,6 +452,7 @@ unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, 
    punched_interval_print_rec(f, c);
    fprintf(f, "%.2f\n", c->b1);
    }
+/*
    */
 
 /* }}} */
@@ -438,7 +466,7 @@ int cmp_ulong(unsigned long * a, unsigned long * b)
     return (*a > *b) - (*b > *a);
 }
 
-unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, unsigned long * ptr)
+unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, unsigned long * ptr, punched_interval_ptr range)
 {
     /* pick a row weight */
     /*
@@ -446,7 +474,8 @@ unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, un
        */
     unsigned long weight;
     for( ; (weight = random_poisson(rstate, f->mean)) >= f->ncols ; );
-    punched_interval_ptr range = punched_interval_alloc(0, f->mean);
+    // punched_interval_ptr range = punched_interval_alloc(0, f->mean);
+    punched_interval_set_full(range, 0, f->mean);
     for(unsigned long i = 0 ; i < weight ; i++) {
         // punched_interval_print(stdout, range);
         double x = random_uniform(rstate) * (range->b1 - range->holes);
@@ -454,7 +483,7 @@ unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, un
         ptr[i] = k;
     }
     qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
-    punched_interval_free(range);
+    // punched_interval_free(range);
     return weight;
 }
 
@@ -745,10 +774,11 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     }									\
     arg->p[arg->size++] = (x);						\
 } while (0)
-
+    /* we'd like to avoid constant malloc()'s and free()'s */
+    punched_interval_ptr range = punched_interval_alloc(0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
-        unsigned long c = generate_row(rstate, F, ptr);
+        unsigned long c = generate_row(rstate, F, ptr, range);
         PUSH_P(c);
         for(unsigned long j = 0 ; j < c ; j++) {
             PUSH_P(ptr[j]);
@@ -761,6 +791,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         total_coeffs += c;
         tot_sq += (double) c * (double) c;
     }
+    punched_interval_free(range);
 #undef PUSH_P
     free(ptr);
     F->total_coeffs = total_coeffs;
@@ -792,9 +823,10 @@ void random_matrix_process_print(FILE * out, random_matrix_process_data_ptr r, r
     unsigned long * ptr = malloc(r->ncols * sizeof(unsigned long));
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
+    punched_interval_ptr range = punched_interval_alloc(0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
-        unsigned long c = generate_row(rstate, F, ptr);
+        unsigned long c = generate_row(rstate, F, ptr, range);
         fprintf(out, "%lu", c);
         for(unsigned long j = 0 ; j < c ; j++) {
             fprintf(out, " %lu", ptr[j]);
@@ -828,6 +860,7 @@ void random_matrix_process_print(FILE * out, random_matrix_process_data_ptr r, r
         total_coeffs += c;
         tot_sq += (double) c * (double) c;
     }
+    punched_interval_free(range);
     free(ptr);
     F->total_coeffs = total_coeffs;
     double e = (double) total_coeffs / r->nrows;
@@ -916,6 +949,8 @@ int main(int argc, char * argv[])
 
     if (param_list_warn_unused(pl)) usage();
 
+    param_list_clear(pl);
+
     random_matrix_ddata F;
     random_matrix_ddata_init(F);
     random_matrix_ddata_set_default(F);
@@ -933,6 +968,7 @@ int main(int argc, char * argv[])
     random_matrix_ddata_clear(F);
 
     random_matrix_process_data_clear(r);
+
 
 
     return 0;
