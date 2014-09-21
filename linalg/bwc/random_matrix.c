@@ -758,6 +758,57 @@ static const char *size_disp(size_t s, char buf[16])
 // }}}
 /*}}}*/
 
+int cmp_2u32(uint32_t * a, uint32_t * b)
+{
+    int r = (*a > *b) - (*b > *a);
+    if (r) return r;
+    a++;
+    b++;
+    return (*a > *b) - (*b > *a);
+}
+
+/* This is totally dumb. */
+uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsigned long ncols)
+{
+    size_t ncoeffs = size - nrows;
+    uint32_t * big = malloc(ncoeffs * 2 * sizeof(uint32_t));
+    char buf[16];
+    size_disp(ncoeffs * 2 * sizeof(uint32_t), buf);
+    printf("allocating temp area of size %s\n", buf);
+    uint32_t * q = p;
+    uint32_t * w = big;
+    uint32_t * fence = big + ncoeffs * 2;
+    for(unsigned long i = 0 ; i < nrows ; i++) {
+        unsigned long weight = *q++;
+        for(unsigned long j = 0 ; j < weight ; j++) {
+            /* we'll sort by column indices */
+            *w++=*q++;
+            *w++=i;
+        }
+    }
+    ASSERT_ALWAYS(w == fence);
+
+    free(p);
+    time_t t0 = time(NULL);
+    printf("now sorting\n");
+    qsort(big, ncoeffs, 2 * sizeof(uint32_t), (sortfunc_t) &cmp_2u32);
+    printf("sort time %d s\n", (int) (time(NULL)-t0));
+    p = malloc((ncoeffs + ncols) * sizeof(uint32_t));
+    q = p;
+    w = big;
+    for(unsigned long j = 0 ; j < ncols ; j++) {
+        uint32_t * qq = q++;
+        *qq = 0;
+        for( ; w < fence && *w == j ; w += 2) {
+            ++*qq;
+            *q++ = w[1];
+        }
+        if (j == ncols-1) ASSERT_ALWAYS(w == fence);
+    }
+    free(big);
+    return p;
+}
+
 
 void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
 {
@@ -860,6 +911,16 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
     }
+
+    if (arg->transpose) {
+        /* dammit. We must transpose the thing. */
+        pthread_mutex_lock(pi->m->th->m);
+        printf("Transposing in-memory matrix for job %u thread %u\n",
+                pi->m->jrank, pi->m->trank);
+        arg->p = matrix_transpose(arg->p, arg->size, r->nrows, r->ncols);
+        pthread_mutex_unlock(pi->m->th->m);
+    }
+
 
     gmp_randclear(rstate);
     random_matrix_ddata_clear(F);
