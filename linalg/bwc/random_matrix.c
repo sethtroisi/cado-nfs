@@ -167,6 +167,9 @@ double random_poisson(gmp_randstate_t rstate, double lambda)
      * Society Series C (Applied Statistics) Vol. 28, No. 1. (1979),
      * pages 29-35.
      */
+    if (lambda < 10) {
+        return random_uniform(rstate)*2*lambda;
+    }
     double c = 0.767 - 3.36/lambda;
     double beta = M_PI/sqrt(3.0*lambda);
     double alpha = beta*lambda;
@@ -213,13 +216,14 @@ double random_binomial(gmp_randstate_t rstate, unsigned long n, double p)
 /* {{{ random_matrix_ddata type -- characteristics of the distribution */
 struct random_matrix_ddata_s {
     double alpha;
-    int offset;         /* this controls the peakedness for the leftmost
+    double offset;         /* this controls the peakedness for the leftmost
                            columns. It is difficult to make this much
                            smaller than 32 presently. Quite unsafe to
                            change. */
     double scale;       /* event function is scale/(x+offset)^alpha */
     double mean;        /* computed */
     double sdev;        /* computed */
+    double spread;
     unsigned long ncols;        /* only for constraint correction */
     unsigned long nrows;        /* informational */
 
@@ -233,7 +237,7 @@ typedef struct random_matrix_ddata_s * random_matrix_ddata_ptr;
 void random_matrix_ddata_init(random_matrix_ddata_ptr d);
 void random_matrix_ddata_set_default(random_matrix_ddata_ptr d);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr d);
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density);
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density, double spread);
 void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f);
 void random_matrix_ddata_init(random_matrix_ddata_ptr F);
 void random_matrix_ddata_clear(random_matrix_ddata_ptr F);
@@ -266,22 +270,28 @@ void random_matrix_ddata_clear(random_matrix_ddata_ptr F);
 /* probability mass function */
 double dist_p(random_matrix_ddata_ptr f, double x)
 {
-    return f->scale*pow(x+f->offset,-f->alpha);
+    return f->alpha<=0 ? f->scale : f->scale*pow(x*f->spread+f->offset,-f->alpha);
 }
 
 /* cumulative distribution function */
 double dist_q(random_matrix_ddata_ptr f, double x)
 {
+    if (f->alpha <= 0) {
+        return x * f->scale;
+    }
     double beta = 1 - f->alpha;
-    double u = f->scale / beta;
-    return u * (pow(x + f->offset, beta) - pow(f->offset, beta));
+    double u = f->scale / beta / f->spread;
+    return u * (pow(x*f->spread + f->offset, beta) - pow(f->offset, beta));
 }
 
 /* reciprocal of the cumulative distribution function */
 double dist_qrev(random_matrix_ddata_ptr f, double y)
 {
+    if (f->alpha <= 0) {
+        return y / f->scale;
+    }
     double beta = 1 - f->alpha;
-    double u = f->scale / beta;
+    double u = f->scale / beta / f->spread;
     double r = pow(y / u + pow(f->offset, beta), 1 / beta) - f->offset;
     return r;
 }
@@ -289,8 +299,12 @@ double dist_qrev(random_matrix_ddata_ptr f, double y)
 /* variance for the count of successes */
 double dist_qq(random_matrix_ddata_ptr f, double x)
 {
+    if (f->alpha < 0) {
+        /* don't need it */
+        abort();
+    }
     double gamma = 1 - 2 * f->alpha;
-    double v = f->scale * f->scale / gamma;
+    double v = f->scale * f->scale / gamma / f->spread;
     return v * (pow(x + f->offset, gamma) - pow(f->offset, gamma));
 }
 /* }}} */
@@ -299,6 +313,8 @@ double dist_qq(random_matrix_ddata_ptr f, double x)
 void random_matrix_ddata_init(random_matrix_ddata_ptr F)
 {
     memset(F, 0, sizeof(*F));
+    F->scale = 1;
+    F->spread = 1;
 }
 void random_matrix_ddata_clear(random_matrix_ddata_ptr F MAYBE_UNUSED)
 {
@@ -309,6 +325,7 @@ void random_matrix_ddata_set_default(random_matrix_ddata_ptr F)
     F->alpha = 0.94;
     F->offset = 32;
     F->scale = 1;
+    F->spread = 1;
 }
 
 void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f)
@@ -331,13 +348,14 @@ void random_matrix_ddata_info(FILE * out, random_matrix_ddata_ptr f)
             extreme_normal(nrows, mean_n, -sdev_n));
 }
 
-void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density)
+void random_matrix_ddata_adjust(random_matrix_ddata_ptr f, unsigned long nrows, unsigned long ncols, double density, double spread)
 {
     /* sets the scale parameter so that the expected row weight matches
      * our desired density target */
-    f->scale = density / dist_q(f, nrows);
-    f->mean = dist_q(f, nrows);
-    f->sdev = sqrt(f->mean * f->mean - dist_qq(f, nrows));
+    f->scale = density / dist_q(f, ncols);
+    f->spread = spread;
+    f->mean = dist_q(f, ncols);
+    f->sdev = sqrt(f->mean * f->mean - dist_qq(f, ncols));
     f->nrows = nrows;
     f->ncols = ncols;
     if (dist_p(f, 0) >= 1.0) {
@@ -353,17 +371,23 @@ struct punched_interval_s {
     double b0, b1;
     double holes;
     int has_left, has_right;
+    /* free blocks use the "left" pointer below for the next argument in
+     * the free list */
     struct punched_interval_s * left;
     struct punched_interval_s * right;
 };
 typedef struct punched_interval_s * punched_interval_ptr;
 
-void punched_interval_free(punched_interval_ptr c)
+void punched_interval_free(punched_interval_ptr c, punched_interval_ptr * pool)
 {
     if (!c) return;
-    punched_interval_free(c->left);
-    punched_interval_free(c->right);
-    free(c);
+    /* enqueue both children to the free pool */
+    punched_interval_free(c->left, pool);
+    punched_interval_free(c->right, pool);
+    c->left = *pool;
+    /* also store the count */
+    c->has_left = 1 + ((*pool) ? (*pool)->has_left : 0);
+    *pool = c;
 }
 
 void punched_interval_set_full(punched_interval_ptr x, double b0, double b1)
@@ -375,32 +399,68 @@ void punched_interval_set_full(punched_interval_ptr x, double b0, double b1)
     x->holes = 0;
 }
 
-punched_interval_ptr punched_interval_alloc(double b0, double b1)
+punched_interval_ptr punched_interval_alloc(punched_interval_ptr * pool, double b0, double b1)
 {
-    punched_interval_ptr x = malloc(sizeof(struct punched_interval_s));
+    punched_interval_ptr x;
+    if (*pool) {
+        x = *pool;
+        *pool = x->left;
+    } else {
+        x = malloc(sizeof(struct punched_interval_s));
+    }
     memset(x, 0, sizeof(struct punched_interval_s));
     punched_interval_set_full(x, b0, b1);
     return x;
 }
 
-void punched_interval_punch(punched_interval_ptr c, double x0, double x1)
+void punched_interval_free_pool(punched_interval_ptr * pool)
+{
+    for(punched_interval_ptr q = *pool, v ; q ; q = v) {
+        v = q->left;
+        free(q);
+    }
+    *pool = NULL;
+}
+
+void punched_interval_pre_free_pool(punched_interval_ptr * pool, int max, int print)
+{
+    if (!*pool) return;
+    if ((*pool)->has_left < 2 * max) return;
+    if (print) {
+        fprintf(stderr, "Reducing punched_interval pool from size %d to %d\n",
+                (*pool)->has_left, max);
+    }
+    punched_interval_ptr q = * pool;
+    int size = (*pool)->has_left;
+    for(int i = 0 ; q->has_left >= max ; i++) {
+        ASSERT_ALWAYS(q->left);
+        ASSERT_ALWAYS(q->has_left == size - i);
+        punched_interval_ptr nq = q->left;
+        free(q);
+        q = nq;
+    }
+    *pool = q;
+}
+
+
+void punched_interval_punch(punched_interval_ptr * pool, punched_interval_ptr c, double x0, double x1)
 {
     c->holes += x1 - x0;
     if (!c->left) {
-        c->left = punched_interval_alloc(c->b0, x0);
+        c->left = punched_interval_alloc(pool, c->b0, x0);
     } else {
         punched_interval_set_full(c->left, c->b0, x0);
     }
     c->has_left=1;
     if (!c->right) {
-        c->right = punched_interval_alloc(x1, c->b1);
+        c->right = punched_interval_alloc(pool, x1, c->b1);
     } else {
         punched_interval_set_full(c->right, x1, c->b1);
     }
 }
 
 
-unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, double x)
+unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr * pool, punched_interval_ptr c, double x)
 {
     /* x should be within [c->b0, c->b1 - c->holes] */
     ASSERT_ALWAYS(x >= c->b0);
@@ -418,41 +478,41 @@ unsigned long pick_and_punch(random_matrix_ddata_ptr f, punched_interval_ptr c, 
         }
         double x0 = dist_q(f, i);
         double x1 = dist_q(f, i + 1);
-        punched_interval_punch(c, x0, x1);
+        punched_interval_punch(pool, c, x0, x1);
         return i;
     }
     /* try to correct x with all left holes */
     double xc = x + c->left->holes;
     if (xc < c->left->b1) {
         double h = c->left->holes;
-        unsigned long i = pick_and_punch(f, c->left, x);
+        unsigned long i = pick_and_punch(f, pool, c->left, x);
         c->holes += c->left->holes - h;
         return i;
     } else {
         /* modify x. It's more than just xc ! */
         xc += c->right->b0 - c->left->b1;
         double h = c->right->holes;
-        unsigned long i = pick_and_punch(f, c->right, xc);
+        unsigned long i = pick_and_punch(f, pool, c->right, xc);
         c->holes += c->right->holes - h;
         return i;
     }
 }
 
-   void punched_interval_print_rec(FILE * f, punched_interval_ptr c)
-   {
-   if (!c->has_left) return;
-   punched_interval_print_rec(f, c->left);
-   fprintf(f, "(\e[31m%.2f...%.2f\e[0m)...", c->left->b1, c->right->b0);
-   punched_interval_print_rec(f, c->right);
-   }
-
-   void punched_interval_print(FILE * f, punched_interval_ptr c)
-   {
-   fprintf(f, "%.2f...", c->b0);
-   punched_interval_print_rec(f, c);
-   fprintf(f, "%.2f\n", c->b1);
-   }
 /*
+void punched_interval_print_rec(FILE * f, punched_interval_ptr c)
+{
+    if (!c->has_left) return;
+    punched_interval_print_rec(f, c->left);
+    fprintf(f, "(\e[31m%.2f...%.2f\e[0m)...", c->left->b1, c->right->b0);
+    punched_interval_print_rec(f, c->right);
+}
+
+void punched_interval_print(FILE * f, punched_interval_ptr c)
+{
+    fprintf(f, "%.2f...", c->b0);
+    punched_interval_print_rec(f, c);
+    fprintf(f, "%.2f\n", c->b1);
+}
    */
 
 /* }}} */
@@ -466,7 +526,7 @@ int cmp_ulong(unsigned long * a, unsigned long * b)
     return (*a > *b) - (*b > *a);
 }
 
-unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, unsigned long * ptr, punched_interval_ptr range)
+unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, unsigned long * ptr, punched_interval_ptr range, punched_interval_ptr * pool)
 {
     /* pick a row weight */
     /*
@@ -479,7 +539,7 @@ unsigned long generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, un
     for(unsigned long i = 0 ; i < weight ; i++) {
         // punched_interval_print(stdout, range);
         double x = random_uniform(rstate) * (range->b1 - range->holes);
-        unsigned long k = pick_and_punch(f, range, x);
+        unsigned long k = pick_and_punch(f, pool, range, x);
         ptr[i] = k;
     }
     qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
@@ -767,6 +827,7 @@ int cmp_2u32(uint32_t * a, uint32_t * b)
     return (*a > *b) - (*b > *a);
 }
 
+#if 0
 /* This is totally dumb. */
 uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsigned long ncols)
 {
@@ -808,6 +869,7 @@ uint32_t * matrix_transpose(uint32_t * p, size_t size, unsigned long nrows, unsi
     free(big);
     return p;
 }
+#endif
 
 
 void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr arg)
@@ -833,17 +895,20 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
 
     /* Adapt to the parallelizing_info structure : divide */
     /* note that padding has to still be padding. */
+
+    random_matrix_ddata_adjust(F, r->nrows, r->ncols, r->density, pi->wr[0]->totalsize);
+
     r->nrows /= pi->wr[1]->totalsize;
     r->ncols /= pi->wr[0]->totalsize;
     r->density /= pi->wr[0]->totalsize;
     r->seed += pi->m->jrank * pi->m->ncores + pi->m->trank;
+    // F->offset /= pi->wr[0]->totalsize;
 
     gmp_randseed_ui(rstate, r->seed);
 
-    random_matrix_ddata_adjust(F, r->nrows, r->ncols, r->density);
+
     /* Now we essentially have a copy of printrows above, except that
      * we're outputting binary, and not to a stream but to memory.  */
-    unsigned long * ptr = malloc(r->ncols * sizeof(unsigned long));
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
 
@@ -852,12 +917,12 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     ASSERT_ALWAYS(arg->size == 0);
 
 #define PUSH_P(x) do {    						\
-    if (arg->size >= alloc) {					        \
-        alloc = arg->size + 64 + alloc / 4;			        \
-        arg->p = realloc(arg->p, alloc * sizeof(uint32_t));	        \
-    }									\
-    arg->p[arg->size++] = (x);						\
-} while (0)
+        if (arg->size >= alloc) {					\
+            alloc = arg->size + 64 + alloc / 4;			        \
+            arg->p = realloc(arg->p, alloc * sizeof(uint32_t));	        \
+        }								\
+        arg->p[arg->size++] = (x);					\
+    } while (0)
 
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         printf("Each of the %u jobs on %u nodes creates a matrix with %lu rows %lu cols, and %d coefficients per row on average. Seed for rank 0 is %lu.\n",
@@ -869,56 +934,150 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
     last_printed->t = t0;
     last_printed->z = 0;
 
-    /* we'd like to avoid constant malloc()'s and free()'s */
-    punched_interval_ptr range = punched_interval_alloc(0, 1);
-    for(unsigned long i = 0 ; i < r->nrows ; i++) {
-        long v = 0;
-        unsigned long c = generate_row(rstate, F, ptr, range);
-        PUSH_P(c);
-        for(unsigned long j = 0 ; j < c ; j++) {
-            PUSH_P(ptr[j]);
-            if (r->maxcoeff) {
-                int co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
-                PUSH_P(co);
-                if (r->rhs->n) v += co * (1+ptr[j]);
+    if (!arg->transpose) {
+        unsigned long * ptr = malloc(r->ncols * sizeof(unsigned long));
+        /* we'd like to avoid constant malloc()'s and free()'s */
+        punched_interval_ptr pool = NULL;
+        punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
+        for(unsigned long i = 0 ; i < r->nrows ; i++) {
+            long v = 0;
+            unsigned long c = generate_row(rstate, F, ptr, range, & pool);
+            PUSH_P(c);
+            for(unsigned long j = 0 ; j < c ; j++) {
+                PUSH_P(ptr[j]);
+                if (r->maxcoeff) {
+                    int co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
+                    PUSH_P(co);
+                    if (r->rhs->n) v += co * (1+ptr[j]);
+                }
+            }
+            total_coeffs += c;
+            tot_sq += (double) c * (double) c;
+            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+                double dt = last_printed->t - t0;
+                char buf[16];
+                char buf2[16];
+                printf("%s, %lu rows in %d s ; %s/s  \n",
+                        size_disp(arg->size * sizeof(uint32_t), buf), i, (int) dt,
+                        size_disp(dt > 0 ? (size_t) (arg->size * sizeof(uint32_t) / dt) : 0, buf2));
+                fflush(stdout);
             }
         }
-        total_coeffs += c;
-        tot_sq += (double) c * (double) c;
-        if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
-            double dt = last_printed->t - t0;
-            char buf[16];
-            char buf2[16];
-            printf("%s, %lu rows in %d s ; %s/s  \r",
-                    size_disp(arg->size * sizeof(uint32_t), buf), i, (int) dt,
-                    size_disp(dt > 0 ? (size_t) (arg->size * sizeof(uint32_t) / dt) : 0, buf2));
-            fflush(stdout);
+        if (pi->m->jrank == 0 && pi->m->trank == 0) {
+            printf("\n");
         }
+        punched_interval_free(range, &pool);
+        punched_interval_free_pool(&pool);
+        free(ptr);
+    } else {
+        size_t size0 = 0;
+        unsigned long * ptr = malloc(r->ncols * sizeof(unsigned long));
+        random_matrix_ddata G;
+        random_matrix_ddata_init(G);
+        /* use a special ddata, for our specially simple process (which
+         * still needs the pick-and-punch thing */
+        G->alpha=0;
+        G->ncols = r->nrows; /* yes */
+        /* Then in fact it's easier, as we can avoid inverse transfor
+         * sampling for the computation of the coefficients */
+        // int heavy = 1;
+        punched_interval_ptr pool = NULL;
+        for(unsigned long j = 0 ; j < r->ncols ; j++) {
+            double p = dist_p(F, j);
+            G->scale = p;
+            unsigned long weight;
+            if (p > 0.1) {
+                weight = 0;
+                for(unsigned long i = 0 ; i < r->nrows ; i++) {
+                    if (random_uniform(rstate) < p)
+                        ptr[weight++]=i;
+                }
+            } else {
+                weight = random_binomial(rstate, r->nrows, p);
+                for(unsigned long i = 0 ; i < weight ; i++) {
+                    ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
+                }
+                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                unsigned long nw = 0;
+                for(unsigned long i = 0, j ; i < weight ; i=j) {
+                    for(j = i + 1; j < weight && ptr[i] == ptr[j] ; j++) ;
+                    ptr[nw++] = ptr[i];
+                }
+                weight = nw;
+#if 0
+            double wmean = r->nrows * p; 
+            // double wsdev = sqrt(r->nrows * p * (1-p));
+            unsigned long weight = random_binomial(rstate, r->nrows, p);
+            } else if (heavy && weight < sqrt(0.1 * 2 * r->nrows)) {
+
+            /* pick uniformly a subset of exactly [weight] row
+             * indices, within [0..nrows[.  */
+                if (pi->m->jrank == 0 && pi->m->trank == 0) {
+                    printf("from now on, replacing pick_and_punch by accept-reject\n");
+                }
+                heavy = 0;
+                size0 = arg->size;
+                t0 = time(NULL);
+            }
+            if (heavy) {
+                punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
+                punched_interval_set_full(range, 0, wmean);
+                for(unsigned long i = 0 ; i < weight ; i++) {
+                    // punched_interval_print(stdout, range);
+                    double x = random_uniform(rstate) * (range->b1 - range->holes);
+                    unsigned long k = pick_and_punch(G, &pool, range, x);
+                    ptr[i] = k;
+                }
+                punched_interval_free(range, &pool);
+                punched_interval_pre_free_pool(&pool, 2 * weight,
+                        pi->m->jrank == 0 && pi->m->trank == 0);
+                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+            } else {
+                for(int ok = 0 ; !ok ; ) {
+                    for(unsigned long i = 0 ; i < weight ; i++) {
+                        ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
+                    }
+                    qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                    ok=1;
+                    for(unsigned long i = 1 ; i < weight ; i++) {
+                        if (ptr[i] == ptr[i-1]) {
+                            ok=0;
+                            break;
+                        }
+                    }
+                }
+#endif
+            }
+            PUSH_P(weight);
+            for(unsigned long i = 0 ; i < weight ; i++) {
+                PUSH_P(ptr[i]);
+            }
+            total_coeffs += weight;
+            tot_sq += (double) weight * (double) weight;
+            if (pi->m->jrank == 0 && pi->m->trank == 0 && should_print_now(last_printed, arg->size * sizeof(uint32_t))) {
+                double dt = last_printed->t - t0;
+                char buf[16];
+                char buf2[16];
+                printf("%s, %lu cols in %d s ; %s/s (last weight: %lu) \n",
+                        size_disp(arg->size * sizeof(uint32_t), buf), j, (int) dt,
+                        size_disp(dt > 0 ? (size_t) ((arg->size-size0) * sizeof(uint32_t) / dt) : 0, buf2), weight);
+                fflush(stdout);
+            }
+        }
+        punched_interval_free_pool(&pool);
+        random_matrix_ddata_clear(G);
+        free(ptr);
     }
-    if (pi->m->jrank == 0 && pi->m->trank == 0) {
-        printf("\n");
-    }
-    punched_interval_free(range);
 #undef PUSH_P
-    free(ptr);
     F->total_coeffs = total_coeffs;
     double e = (double) total_coeffs / r->nrows;
     double s = (double) tot_sq / r->nrows;
     double sdev = sqrt(s - e*e);
     F->row_avg = e;
     F->row_sdev = sdev;
-    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD)) {
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_CACHE_BUILD) && pi->m->jrank == 0 && pi->m->trank == 0) {
         fprintf(stderr, "Actual density per row avg %.2f sdev %.2f\n",
                 F->row_avg, F->row_sdev);
-    }
-
-    if (arg->transpose) {
-        /* dammit. We must transpose the thing. */
-        pthread_mutex_lock(pi->m->th->m);
-        printf("Transposing in-memory matrix for job %u thread %u\n",
-                pi->m->jrank, pi->m->trank);
-        arg->p = matrix_transpose(arg->p, arg->size, r->nrows, r->ncols);
-        pthread_mutex_unlock(pi->m->th->m);
     }
 
 
@@ -940,10 +1099,11 @@ void random_matrix_process_print(FILE * out, random_matrix_process_data_ptr r, r
     unsigned long * ptr = malloc(r->ncols * sizeof(unsigned long));
     uint64_t total_coeffs = 0;
     double tot_sq = 0;
-    punched_interval_ptr range = punched_interval_alloc(0, 1);
+    punched_interval_ptr pool = NULL;
+    punched_interval_ptr range = punched_interval_alloc(&pool, 0, 1);
     for(unsigned long i = 0 ; i < r->nrows ; i++) {
         long v = 0;
-        unsigned long c = generate_row(rstate, F, ptr, range);
+        unsigned long c = generate_row(rstate, F, ptr, range, &pool);
         fprintf(out, "%lu", c);
         for(unsigned long j = 0 ; j < c ; j++) {
             fprintf(out, " %lu", ptr[j]);
@@ -977,7 +1137,8 @@ void random_matrix_process_print(FILE * out, random_matrix_process_data_ptr r, r
         total_coeffs += c;
         tot_sq += (double) c * (double) c;
     }
-    punched_interval_free(range);
+    punched_interval_free(range, &pool);
+    punched_interval_free_pool(&pool);
     free(ptr);
     F->total_coeffs = total_coeffs;
     double e = (double) total_coeffs / r->nrows;
@@ -1071,7 +1232,7 @@ int main(int argc, char * argv[])
     random_matrix_ddata F;
     random_matrix_ddata_init(F);
     random_matrix_ddata_set_default(F);
-    random_matrix_ddata_adjust(F, r->nrows - kernel_right, r->ncols - kernel_left, r->density);
+    random_matrix_ddata_adjust(F, r->nrows - kernel_right, r->ncols - kernel_left, r->density, 1);
     if (verbose) random_matrix_ddata_info(stderr, F);
 
     random_matrix_process_print(stdout, r, F);
