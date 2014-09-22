@@ -378,7 +378,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         nhc = thr[0];
         nvc = thr[1];
     } else {
-        MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
+        pi->m->pals = MPI_COMM_WORLD;
     }
 
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
@@ -700,7 +700,8 @@ static void pi_clear_mpilevel(parallelizing_info_ptr pi)
     for(int d = 0 ; d < 2 ; d++) {
         MPI_Comm_free(&pi->wr[d]->pals);
     }
-    MPI_Comm_free(&pi->m->pals);
+    if (pi->m->pals != MPI_COMM_WORLD)
+        MPI_Comm_free(&pi->m->pals);
 
     // MPI_Errhandler_free(&my_eh);
 }
