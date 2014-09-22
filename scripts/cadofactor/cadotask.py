@@ -3059,7 +3059,7 @@ class PurgeTask(Task):
         not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
         not_enough2 = re.compile(r"number of relations <= number of ideals")
-        nrels_nprimes = re.compile(r"nrels=(\d+), nprimes=(\d+); "
+        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); "
                                    r"excess=(-?\d+)")
         for line in stderr.splitlines():
             match = not_enough1.match(line)
