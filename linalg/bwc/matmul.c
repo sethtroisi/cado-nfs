@@ -111,6 +111,7 @@ matmul_ptr matmul_init(mpfq_vbase_ptr x, unsigned int nr, unsigned int nc, const
     // matmul_top... Except that for benches, the matmul structure lives
     // outside of this.
     mm->locfile = locfile;
+    param_list_parse_int(pl, "no_save_cache", &mm->no_save_cache);
 
     int rc = asprintf(&mm->cachefile_name, "%s-%s%s.bin", locfile, mm->bind->impl, mm->store_transposed ? "T" : "");
     FATAL_ERROR_CHECK(rc < 0, "out of memory");
@@ -170,6 +171,7 @@ void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m)
 
 static void save_to_local_copy(matmul_ptr mm)
 {
+    if (mm->no_save_cache) return;
     if (mm->local_cache_copy == NULL)
         return;
 
@@ -273,6 +275,7 @@ int matmul_reload_cache(matmul_ptr mm)
 
 void matmul_save_cache(matmul_ptr mm)
 {
+    if (mm->no_save_cache) return;
     mm->bind->save_cache(mm);
     save_to_local_copy(mm);
 }
