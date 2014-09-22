@@ -2979,7 +2979,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stderr, input_nrels):
+        if self.parse_stderr(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3059,7 +3059,7 @@ class PurgeTask(Task):
         not_enough1 = re.compile(r"\(excess / nprimes\) = \d+.?\d* < \d+.?\d*. "
                                  r"See -required_excess argument.")
         not_enough2 = re.compile(r"number of relations <= number of ideals")
-        nrels_nprimes = re.compile(r"\s*nrels=(\d+), nprimes=(\d+); "
+        nrels_nprimes = re.compile(r"nrels=(\d+), nprimes=(\d+); "
                                    r"excess=(-?\d+)")
         for line in stderr.splitlines():
             match = not_enough1.match(line)
