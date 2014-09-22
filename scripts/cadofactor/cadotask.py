@@ -3128,7 +3128,15 @@ class PurgeTask(Task):
         # but we allow some extra whitespace
         r = {}
         keys = ("nrels", "nprimes", "weight", "excess")
+        final_values_line = "Final values:"
+        had_final_values = False
         for line in stdout.splitlines():
+            # Look for values only after we saw "Final values:" line
+            if not had_final_values:
+                if re.match(final_values_line, line):
+                    had_final_values = True
+                else:
+                    continue
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
@@ -3137,6 +3145,9 @@ class PurgeTask(Task):
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
                     r[key] = int(match.group(1))
+        if not had_final_values:
+            raise Exception("%s: output of %s did not contain '%s'" %
+                            (self.title, self.programs[0].name, final_values_line))
         for key in keys:
             if not key in r:
                 raise Exception("%s: output of %s did not contain value for %s: %s"

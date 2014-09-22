@@ -899,6 +899,7 @@ int main(int argc, char **argv)
             NULL, NULL);
 
     /* write final values to stdout */
+    /* This output, incl. "Final values:", is required by the script */
     fprintf(stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "
             "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
             nrels, nprimes, ((int64_t) nrels) - nprimes, pd->info.W,
