@@ -1207,6 +1207,7 @@ sub task_common_run {
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
+    @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/precmd/, @_;
 
     $program="$bindir/$program";

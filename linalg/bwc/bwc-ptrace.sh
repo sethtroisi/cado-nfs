@@ -309,8 +309,8 @@ create_balancing_file_based_on_mesh_dimensions() {
     if [ "$shuffle" = 1 ] ; then
         shuffle_option=--shuffled-product
     else
-        # This removes the de-correlating permutation.
-        shuffle_option="noshuffle=1"
+        # This *ALSO* removes the de-correlating permutation.
+        shuffle_option="skip_decorrelating_permutation=1"
     fi
 
     if [ "$prime" != 2 ] ; then withcoeffs=--withcoeffs ; fi
