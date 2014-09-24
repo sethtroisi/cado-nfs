@@ -459,6 +459,11 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	exit(2);
     }
 
+    /* adjust npass so that each pass removes at least about 1% wrt the number
+       of ideals */
+    if ((uint64_t) excess / npass < *nprimes / 100)
+      npass = 1 + (100 * excess) / *nprimes;
+
     int64_t chunk = excess / npass;
 
     //npass pass of clique removal + singletons removal
@@ -469,7 +474,7 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	if (target_excess < keep)
 	    target_excess = keep;
 	fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
-		count, npass, target_excess);
+		count + 1, npass, target_excess);
 	cliques_removal(target_excess, nrels, nprimes);
 
 	remove_all_singletons(nrels, nprimes, &excess);
@@ -584,7 +589,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "minindex", "index of the first considered prime");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
-  param_list_decl_usage(pl, "npass", "number of step of clique removal "
+  param_list_decl_usage(pl, "npass", "maximal number of steps of clique removal "
                                      "(default " STR(DEFAULT_PURGE_NPASS) ")");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
