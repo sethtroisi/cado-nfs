@@ -36,6 +36,7 @@ scripts/opal-test/las_declaration.py
 scripts/opal-test/las_optimize.py
 scripts/opal-test/las_run.py
 scripts/opal-test/report.py
+scripts/opal-test/README
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/debug_rootsieve.sage
