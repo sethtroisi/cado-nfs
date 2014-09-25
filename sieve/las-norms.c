@@ -20,6 +20,8 @@
 #include "utils.h"
 #include "portability.h"
 
+static long lg_page;
+
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
 
 /* 1 on 3 pseudo memsets, only for speed tests, do not use. */
@@ -1096,8 +1098,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     unsigned int cptf2id = 0, cpt;
     ssize_t ih;
     {
-      static long lg_page = 0;
-      if (!lg_page) lg_page = pagesize();
+      ASSERT_ALWAYS(lg_page != 0);
       for (ssize_t k = I; (k -= lg_page) >= 0; __builtin_prefetch (S + k, 1));
     }
     poly_scale_double (u, fijd, d, (double) J);
@@ -1597,6 +1598,11 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   double_poly_t poly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
+
+  /* The norm initialisation code needs the page size; we set it here as this
+     function is not thread-safe, to avoid race conditions */
+  if (lg_page == 0)
+    lg_page = pagesize();
 
   /* Update floating point version of both polynomials. They will be used in
    * get_maxnorm_alg(). */
