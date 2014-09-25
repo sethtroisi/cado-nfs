@@ -445,6 +445,14 @@ static int cmp_root (const void *a, const void *b) {
   return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
 }
 
+/* The norm initialisation code needs the page size; we set it here as this
+   function is not thread-safe, to avoid race conditions */
+static void set_lg_page()
+{
+  if (lg_page == 0)
+    lg_page = pagesize();
+}
+
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
   
@@ -455,6 +463,7 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
   unsigned int n, cumul_nroots;
   size_t k;
   
+  set_lg_page();
   for (k = degree << 1, mpz_init (p[k]); k--; mpz_init (p[k]), root_struct_init (&(Roots[k])));
   for (k = degree + 1; k--; mpz_set_d (p[k], coeff[k]));
     
@@ -1598,11 +1607,6 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   double_poly_t poly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-
-  /* The norm initialisation code needs the page size; we set it here as this
-     function is not thread-safe, to avoid race conditions */
-  if (lg_page == 0)
-    lg_page = pagesize();
 
   /* Update floating point version of both polynomials. They will be used in
    * get_maxnorm_alg(). */
