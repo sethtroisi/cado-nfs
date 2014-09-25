@@ -694,7 +694,7 @@ void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
   const size_t roots_batchlen = 128;
-  static struct contexts_s Q_to_Fp_contexts;
+  struct contexts_s Q_to_Fp_contexts;
   WHERE_AM_I_UPDATE(w, side, side);
   sieve_info_srcptr si = th->si;
   bucket_array_t BA = th->sides[side]->BA;  /* local copy. Gain a register + use stack */
