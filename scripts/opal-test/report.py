@@ -29,9 +29,9 @@ class NumInt(object):
     >>> n.add(2,3)
     >>> n.get_value()
     4.0
-    >>> 1.6457 < n.interpolate_for_value(3.) < 1.6458
+    >>> x = n.interpolate_for_value(3.); 1.6457 < x < 1.6458
     True
-    >>> 2.9999 < n.interpolate_at_coord(1.6457513110645907) < 3.0001
+    >>> 2.9999 < n.interpolate_at_coord(x) < 3.0001
     True
     """
     def __init__(self):
@@ -52,13 +52,9 @@ class NumInt(object):
     def get_value(self):
         return self.sum
     def interpolate_for_value(self, value):
-        """ Find a coordinate c, i.e., greater than the
-        second-last one, such that cutting or extending the last trapezoidal
-        up to ascissa c results in a sum = "value"
-
-        >>> m = NumInt(); m.add(0,1); m.add(1,2); m.add(1.6457513110645907,2.6457513110645907)
-        >>> 2.9999 < m.get_value() < 3.0001
-        True
+        """ Find a coordinate c, greater than the second-last one, such that
+        cutting or extending the last trapezoidal up to ascissa c results in
+        sum = "value"
         """
         prev_sum = self.sum - self.trapez_area()
         diff = value - prev_sum
@@ -81,7 +77,7 @@ class NumInt(object):
         """ Return the sum that would result if the last trapezoidal had been
         cut or extended to abscissa "coord".
         """
-        assert self.lastcoord[1] <= coord and coord <= self.lastcoord[0]
+        assert self.lastcoord[1] <= coord <= self.lastcoord[0]
         x = coord - self.lastcoord[1]
         prev_sum = self.sum - self.trapez_area()
         t = (self.lastvalue[0] - self.lastvalue[1]) / (self.lastcoord[0] - self.lastcoord[1])

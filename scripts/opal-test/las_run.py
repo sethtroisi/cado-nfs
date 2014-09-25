@@ -3,7 +3,7 @@ import sys
 import subprocess
 import re
 from math import log
-from os import unlink
+import os
 
 from report import LasStats
 
@@ -20,13 +20,16 @@ def primepi(x):
 def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
-    makefb = "/users/caramel/kruppaal/build/cado-nfs/normal/sieve/makefb"
-    las = "/users/caramel/kruppaal/build/cado-nfs/normal/sieve/las"
+    home_dir = os.environ["HOME"]
+    build_dir = "%s/build/cado-nfs/normal/" % home_dir
+
+    makefb = "%s/sieve/makefb" % build_dir
+    las = "%s/sieve/las" % build_dir
 
     las_params = {
         "I": 11,
-        "poly": "/tmp/work/test_run.polyselect2.poly",
-        "fb": "/tmp/test_run.factorbase.roots.gz",
+        "poly": "c59.polyselect2.poly",
+        "fb": "/tmp/c59.factorbase.roots.gz",
         "rlim": 50000,
         "alim": 100000,
         "lpbr": 22,
@@ -85,7 +88,7 @@ def run(param_file, problem):
             raise Exception("las exited with status %d" % las_process.returncode)
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
-        unlink(outputfile)
+        os.unlink(outputfile)
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
