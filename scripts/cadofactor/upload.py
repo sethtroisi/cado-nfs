@@ -6,6 +6,7 @@ DEBUG = 1
 
 import cgi, os
 import sys
+import errno
 from tempfile import mkstemp
 from shutil import copyfileobj
 import wudb
@@ -150,7 +151,14 @@ def do_upload(dbfilename, uploaddir, inputfp=sys.stdin, output=sys.stdout,
             diag(1, "Getting file object for temp file")
             file = os.fdopen(filedesc, "wb")
             diag(1, "Writing data to temp file")
-            copyfileobj(fileitem.file, file)
+            try:
+                copyfileobj(fileitem.file, file)
+            except OSError as e:
+                if e.errno == errno.ENOSPC:
+                    sys.stderr.write("Disk full, deleting %s\n" % filename)
+                    file.close()
+                    os.unlink(filename)
+                raise
             nr_bytes = file.tell()
             diag(1, "Wrote %d bytes" % nr_bytes)
             diag(1, "Closing file")
