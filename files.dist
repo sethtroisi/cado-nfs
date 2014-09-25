@@ -603,6 +603,10 @@ scripts/cadofactor/wuserver.py
 scripts/cadofactor/README
 scripts/cadofactor/parameters
 scripts/cadofactor/CMakeLists.txt
+scripts/opal-test/las_declaration.py
+scripts/opal-test/las_optimize.py
+scripts/opal-test/las_run.py
+scripts/opal-test/report.py
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/README.fb_format
