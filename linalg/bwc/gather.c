@@ -288,7 +288,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     sf->sfiles[i]->n0, sf->sfiles[i]->n1);
             ASSERT_ALWAYS(rc >= 0);
 
-            if (tcan_print) {
+            if (tcan_print && verbose_enabled(CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES)) {
                 printf("loading %s.%u\n", tmp, sf->sfiles[i]->iter);
             }
             pi_load_file_2d(pi, bw->dir, tmp, sf->sfiles[i]->iter, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));

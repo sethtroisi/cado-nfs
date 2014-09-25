@@ -1726,6 +1726,7 @@ sub task_lingen {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
         }
+        push @args, grep { /^verbose_flags=/ } @main_args;
         task_common_run("plingen_pz", @args);
         # Some splitting work needed...
         @args=();
@@ -1810,7 +1811,7 @@ sub task_mksol {
     for my $t (@todo) {
         # take out ys from main_args, put the right one in place if
         # needed.
-        print "main_args: @main_args\n";
+        # print "main_args: @main_args\n";
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs/} @args) {

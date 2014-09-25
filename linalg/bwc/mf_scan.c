@@ -39,7 +39,7 @@ void usage(int rc)
             " rwfile      row weight file\n"
             " cwfile      col weight file\n"
             " ofile       output file name ; no output if unspecified\n"
-            "Recognized flags:"
+            "Recognized flags:\n"
             " --ascii-in   mfile in ascii\n"
             " --ascii-out  ofile in ascii\n"
             " --binary-in  mfile in binary\n"

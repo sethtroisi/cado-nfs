@@ -24,7 +24,7 @@ endmacro(string_join var delimiter str_list)
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
     # Don't split this line !
-    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
+    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
 endmacro(add_bwc_test)
 
 
@@ -64,7 +64,26 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
     if(gfp_layer STREQUAL "p_1")
-        add_bwc_test(modp-inhomogeneous-minimal bwc-ptrace.sh prime=1009 random_matrix_size=50 nrhs=3 m=6 n=6 seed=1)
+        find_program(MAGMA magma)
+        set(mextra)
+        if (MAGMA)
+            set(mextra magma=${MAGMA})
+        endif(MAGMA)
+        add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
+            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1
+            ${mextra})
+        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1
+            ${mextra})
+        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
+            ${mextra})
+        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 m=4 n=4 seed=1
+            ${mextra})
+        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1
+            ${mextra})
     endif(gfp_layer STREQUAL "p_1")
     add_dependencies(check plingen_${gfp_layer})
 

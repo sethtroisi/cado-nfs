@@ -22,6 +22,7 @@ const char * verbose_flag_list[] =
     [G(BWC_DISPATCH_OUTER)]     = "bwc-dispatch-outer",
     [G(BWC_CPUBINDING)]         = "bwc-cpubinding",
     [G(BWC_CACHE_MAJOR_INFO)]   = "bwc-cache-major-info",
+    [G(BWC_LOADING_MKSOL_FILES)]= "bwc-loading-mksol-files",
 };
 
 struct {

@@ -52,13 +52,18 @@ struct balancing_header_s {
     uint64_t ncoeffs;
     uint32_t checksum;
     uint32_t flags;
-    // rshuf indicates two integers a,b such that the column i of the input
+    // pshuf indicates two integers a,b such that the COLUMN i of the input
     // matrix is in fact mapped to column a*i+b mod n in the matrix we work
-    // with. rshuf_inv indicates the inverse permutation. a and b do
+    // with. pshuf_inv indicates the inverse permutation. a and b do
     // **NOT** depend on nh and nv. Therefore all balancing are
     // compatible even though a permutation is being used.
     // a == rhuf[0] is the smallest integer greater than floor(sqrt(n)) which
-    // is coprime to n. b is 42. rshuf_inv[0,1] are computed accordingly.
+    // is coprime to n. b is 42. pshuf_inv[0,1] are computed accordingly.
+    //
+    // This means that on all occasions, we are in fact working with the
+    // matrix M*S, for some permutation S. As long as we are concerned
+    // with left nullspace, this does not make any difference, but it
+    // does for right nullspace !
     uint32_t pshuf[2];
     uint32_t pshuf_inv[2];
 };

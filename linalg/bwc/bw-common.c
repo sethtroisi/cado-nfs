@@ -236,7 +236,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "balancing_queue_size");
     param_list_lookup_string(pl, "random_matrix");
     param_list_lookup_string(pl, "no_save_cache");
-    param_list_lookup_string(pl, "skip_decorrelating_permutation");
 
     return 0;
 }
