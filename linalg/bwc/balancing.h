@@ -13,6 +13,20 @@
 #define DUMMY_VECTOR_COORD_VALUE2(j)     \
         (DUMMY_VECTOR_COORD_VALUE((j) ^ 0xbeef) ^ ((DUMMY_VECTOR_COORD_VALUE((j) ^ 0xcafe) << 32)))
 
+/* here's some magma code for generating these arbitrary vectors, but
+ * it's not checked.
+  nrows:=65536;
+  vv:=func<x|VectorSpace(GF(2),64)!Intseq(x mod 2^64,2,64)>;
+  p:=2^64-59;
+  q:=2^63-25;
+  i2p:=func<a|Polynomial(GF(2),Intseq(a,2))>;
+  p2i:=func<p|Seqint(ChangeUniverse(Eltseq(p),Integers()),2)>;
+  ixor:=func<a,b|p2i(i2p(a)+i2p(b))>;
+  vs:=func<v|vv(Seqint(ChangeUniverse(Eltseq(v),Integers()),2)*2^32)>;
+  arbitrary1:=Matrix([vv(p div j + q * j) : j in [1..65536]]);                 
+  arbitrary2:=[arbitrary1[1+ixor(j, 0xbeef)] + vs(arbitrary1[1+ixor(j, 0xcafe)]):j in [0..nrows-1]];
+ */
+
 /* balancing structure */
 
 #define FLAG_COLPERM    1
@@ -49,6 +63,7 @@ struct balancing_header_s {
     uint32_t pshuf_inv[2];
 };
 typedef struct balancing_header_s balancing_header[1];
+typedef struct balancing_header_s * balancing_header_ptr;
 
 struct balancing_s {
     balancing_header h;

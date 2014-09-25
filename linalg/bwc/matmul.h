@@ -55,6 +55,7 @@ struct matmul_public_s {
                                  */
 
     const char * locfile;
+    int no_save_cache;          /* if true, cache file is not saved */
 
     char * cachefile_name;
     char * local_cache_copy;

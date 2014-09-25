@@ -54,11 +54,13 @@
 #if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002
 /* In fact, even in this case we might consider disabling it. */
 #define xxxMPI_LIBRARY_MT_CAPABLE
+#elif defined(OPEN_MPI) && OMPI_VERSION_ATLEAST(1,8,2)
+#define xxxMPI_LIBRARY_MT_CAPABLE
 /*
  * at present I know of no version of openmpi with MPI_THREAD_MULTIPLE
- * working.
-#elif defined(OPEN_MPI) && OMPI_MAJOR_VERSION >= 123456789
-#define MPI_LIBRARY_MT_CAPABLE
+ * working, but to be honest I haven't tried hard. For sure there are
+ * some bugs in my code as well anyway, at least that's what enabling it
+ * shows.
  */
 #else
 /* Assume it does not work */
@@ -83,7 +85,7 @@ typedef const struct pi_wiring_s * pi_wiring_srcptr;
 
 struct pi_log_entry {
     struct timeval tv[1];
-    char what[40];
+    char what[80];
 };
 
 #define PI_LOG_BOOK_ENTRIES     32
@@ -150,6 +152,13 @@ struct parallelizing_info_s {
     char nodename[PI_NAMELEN];
     char nodeprefix[PI_NAMELEN];
     char nodenumber_s[PI_NAMELEN];
+    /* This pointer is identical on all threads. It is non-null only in
+     * case we happen to have sufficiently recent gcc, together with
+     * sufficiently recent hwloc */
+    void * cpubinding_info;
+    int thr_orig[2];            /* when only_mpi is 1, this is what the
+                                   thr parameter was set to originally.
+                                   Otherwise we have {0,0} here. */
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];
@@ -185,6 +194,15 @@ extern void hello(parallelizing_info_ptr pi);
  */
 extern void thread_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int root);
 
+typedef void (*thread_reducer_t)(void *, const void *, size_t);
+
+extern void thread_reducer_int_min(void *, const void *, size_t size);
+extern void thread_reducer_int_max(void *, const void *, size_t size);
+extern void thread_reducer_int_sum(void *, const void *, size_t size);
+/* dptr must be a shared area allocated by shared_malloc */
+/* the area in ptr is clobbered, but its output results are undefined */
+extern void thread_allreduce(pi_wiring_ptr wr, void * dptr, void * ptr, size_t size, thread_reducer_t f);
+
 /* shared_malloc is like malloc, except that the pointer returned will be
  * equal on all threads (proper access will deserve proper locking of
  * course). shared_malloc_set_zero sets to zero too */
@@ -200,11 +218,14 @@ extern void shared_free(pi_wiring_ptr wr, void * ptr);
  */
 extern void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
 
-/* companions to the above, the three functions below compare a data area
+/* companions to the above, the two functions below compare a data area
  * between threads and/or mpi jobs, and collectively return the result.
  * Useful for deciding on a common way to go given a condition.
+ * 
+ * These assume different pointers on all threads. If equal (created with
+ * shared_malloc), then another function may be called -- currently not
+ * exposed because I couldn't come up with a satisfying name.
  */
-extern int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 extern int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 extern int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 

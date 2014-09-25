@@ -51,7 +51,7 @@ do
   then
     NMAPS="$2"
     shift 2
-  elif [ "$1" = "-mt" ]
+  elif [ "$1" = "-t" ]
   then
     MT="$2"
     shift 2
@@ -70,7 +70,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ $EXPLICIT == "no" ]; then
 
-    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -mt $MT"
+    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -t $MT"
 
 else
     # operates in 3 steps:
@@ -92,6 +92,8 @@ else
     # guess names
     algpr=`echo $RENUMBER | sed 's/freerel.renumber/algpr/'`
     generators=`echo $RENUMBER | sed 's/freerel.renumber/generators/'`
+    relsdel=`echo $PURGED | sed 's/purged/relsdel/'`
+    abunits=`echo $OUT | sed 's/units.units/units.abunits/'`
 
     if [ ! -s $algpr ]; then
 	echo "Building file $algpr using debug_renumber"
@@ -103,13 +105,13 @@ else
     fi
     if [ ! -s $generators ]; then
 	echo "Building file $generators using Magma"
-	CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=true $DIR/nfsunits.mag"
+	CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED relsdel:=$relsdel index:=$INDEX ficunits:=$OUT abunits:=$abunits ww:=true $DIR/nfsunits.mag"
 	echo $CMD; $CMD
     fi
 
     echo "## Using magma to compute units (version 2)"
     # results are put in $OUT
-    CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED index:=$INDEX ficunits:=$OUT ww:=false $DIR/nfsunits.mag"
+    CMD="magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$algpr generators:=$generators badidealinfo:=$BADIDEALINFO purged:=$PURGED relsdel:=$relsdel index:=$INDEX ficunits:=$OUT abunits:=$abunits ww:=false $DIR/nfsunits.mag"
 fi
 
 echo $CMD

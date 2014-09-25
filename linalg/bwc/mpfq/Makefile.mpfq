@@ -13,11 +13,15 @@ all: basic binary-fields prime-fields
 MPFQ_TEMP:=/tmp/mpfq-cado
 
 basic:
+	# # The GF(p) layers are now also generated from abase.pl
+	# # $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
 	$(MPFQ)/simd/abase.pl w=64 $(mpfq_tag_list)
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq.h .
 	/bin/cp -f $(MPFQ)/gfp/mpfq_gfp_common.h .
+	for tag in $(filter p%,$(mpfq_tag_list)) ; do (echo '#include "cado.h"' ; sed -e "s/TAG/$$tag/g" -e "/^#line/ d" < $(MPFQ)/test/mpfq_test.c.meta) > ../../../tests/linalg/bwc/mpfq/mpfq_test_$$tag.c ; done
 	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift > mpfq_name_ab.h
+	$(MPFQ)/test/mk_name_k.pl  name=K > ../../../tests/linalg/bwc/mpfq/mpfq_name_K.h
 
 .PHONY: mpfq-buildtree
 
@@ -44,9 +48,13 @@ binary-fields: mpfq-buildtree
 	-rm -f *.orig
 
 prime-fields: mpfq-buildtree
+	# This would almost suffice, except for the mpfq_fixmp.h file.
+	# $(MPFQ)/fixmp/gen_fixmp.pl output_path=.
+	$(MPFQ)/fixmp/gen_test_fixmp.pl > ../../../tests/linalg/bwc/mpfq/mpfq_test_fixmp.c
 	$(MAKE) -C $(MPFQ_TEMP) fixmp_files
-	# $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
-	/bin/cp -f $(MPFQ_TEMP)/include/fixmp*h .
+	/bin/cp -f $(MPFQ_TEMP)/include/mpfq_fixmp*h .
+	patch -p1 -d. < asm-constraints.patch
+	-rm -f *.orig
 
 clean-mpfq_%:
 	-rm -f mpfq_$*.c
@@ -61,7 +69,7 @@ clean:	$(patsubst %,clean-mpfq_%,$(mpfq_tag_list))
 	-rm -f binary-dotprods-backends.h
 	-rm -f mpfq.h
 	-rm -f mpfq_gfp_common.h
-	-rm -f fixmp*.h
+	-rm -f mpfq_fixmp*.h
 	-rm -f mpfq_2_128.[ch]
 	-rm -f mpfq_2_64.[ch]
 	-rm -f mpfq_2_128.h.orig

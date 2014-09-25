@@ -33,6 +33,24 @@ extern "C" {
 #define LEXLE2(X,Y,A,B) LEXGE2(A,B,X,Y)
 #define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
 
+#ifndef GNU_MP_VERSION
+#define GNU_MP_VERSION(X,Y,Z)     \
+    defined(__GNU_MP_VERSION) &&        \
+(__GNU_MP_VERSION == X && __GNU_MP_VERSION_MINOR == Y && __GNU_MP_VERSION_PATCHLEVEL == Z)
+#endif
+
+#ifndef GNU_MP_VERSION_ATLEAST
+#define GNU_MP_VERSION_ATLEAST(X,Y,Z)     \
+    defined(__GNU_MP_VERSION) &&        \
+LEXGE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
+
+#ifndef GNU_MP_VERSION_ATMOST
+#define GNU_MP_VERSION_ATMOST(X,Y,Z)     \
+    defined(__GNU_MP__) &&        \
+LEXLE3(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL,X,Y,Z)
+#endif
+
 #ifndef GNUC_VERSION
 #define GNUC_VERSION(X,Y,Z)     \
     defined(__GNUC__) &&        \
@@ -231,6 +249,49 @@ static inline void malloc_failed() {
     fprintf(stderr, "malloc() failed\n");
     abort();
 }
+
+
+#if !GNU_MP_VERSION_ATLEAST(5, 0, 0)
+static inline void mpn_copyi (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
+    memmove(dst, src, n * sizeof(mp_limb_t));
+}
+static inline void mpn_copyd (mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
+    memmove(dst, src, n * sizeof(mp_limb_t));
+}
+static inline void mpn_zero (mp_limb_t * dst, mp_size_t n) {
+    memset(dst, 0, n * sizeof(mp_limb_t));
+}
+#endif /* GMP < 5.0.0 */
+
+/* Given the fact that copies are always very small, we're probably
+ * better off giving the compiler the opportunity to optimize all this
+ * away.
+ */
+
+/* dst and src known to not overlap, except possibly if dst == src */
+static inline void mpfq_copy(mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
+    // if (dst != src) mpn_copyi(dst, src, n);
+    for( ; n-- ; ) *dst++ = *src++;
+}
+
+/* dst and src possibly overlap, copy increasingly so that src >= dst is ok */
+static inline void mpfq_copyi(mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
+    // mpn_copyi(dst, src, n);
+    for( ; n-- ; ) *dst++ = *src++;
+}
+
+/* dst and src possibly overlap, copy decreasingly so that src <= dst is ok */
+static inline void mpfq_copyd(mp_limb_t * dst, const mp_limb_t * src, mp_size_t n) {
+    // mpn_copyd(dst, src, n);
+    for(dst += n, src += n ; n-- ; ) *--dst = *--src;
+}
+
+static inline void mpfq_zero(mp_limb_t * dst, mp_size_t n) {
+    // mpn_zero(dst, 0, n);
+    for( ; n-- ; ) *dst++ = 0;
+}
+
+
 
 #ifdef __cplusplus
 }

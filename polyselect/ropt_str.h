@@ -149,7 +149,10 @@ typedef struct {
   int skip_ropt;
 
   /* skip ropt and output polynomial with short c5 */
-  int skip_ropt2;
+  int gen_raw;
+
+  /* do sopt if true; default not */
+  int sopt;
 
   /* verbose */
   int verbose;

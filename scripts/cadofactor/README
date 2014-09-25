@@ -142,3 +142,10 @@ tasks.filter.purge.required_excess=0.2
 If any positive excess is enough:
 
 tasks.filter.purge.required_excess=0.0
+
+Note: if your factorization already started the linear algebra step, and you
+want to do more sieving, you can restart it with a larger "rels_wanted" than
+the current number of relations. For example if you have say 1000000 relations
+(grep "is now" in the log file), just add in the cadofactor.py line:
+
+tasks.sieve.rels_wanted=1000001

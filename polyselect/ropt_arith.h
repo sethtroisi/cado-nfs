@@ -32,7 +32,8 @@ void Lemma21 ( mpz_t *a,
                mpz_t N,
                int d,
                mpz_t p,
-               mpz_t m );
+               mpz_t m,
+               mpz_t res );
 
 void eval_polys ( mpz_t *f,
                   mpz_t *g,

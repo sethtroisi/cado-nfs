@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include "bwc_config.h"
 #include "cado_config.h"
 #include "bw-common.h"
@@ -49,11 +50,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     bw->original_argv = *p_argv;
     bw->wct_base = wct_seconds();
 
-    if (bw->can_print) {
-        print_command_line(stderr, *p_argc, *p_argv);
-        print_command_line(stdout, *p_argc, *p_argv);
-    }
-
     (*p_argv)++, (*p_argc)--;
     param_list_configure_switch(pl, "-v", &bw->verbose);
     for( ; (*p_argc) ; ) {
@@ -64,6 +60,13 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         }
         fprintf(stderr, "Unhandled parameter %s\n", (*p_argv)[0]);
         usage();
+    }
+
+    verbose_set_enabled_flags(pl);
+
+    if (bw->can_print) {
+        param_list_print_command_line(stderr, pl);
+        param_list_print_command_line(stdout, pl);
     }
 
     const char * tmp;
@@ -116,10 +119,18 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
 
 
     mpz_init_set_ui(bw->p, 2);
-    param_list_parse_mpz(pl, "p", bw->p);
+    param_list_parse_mpz(pl, "prime", bw->p);
+    int nullspace_forced = 0;
 
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
-        if (strcmp(tmp, dirtext[0]) == 0) {
+        char * tmp_l = strdup(tmp);
+        for(unsigned int i = 0 ; i < strlen(tmp_l) ; i++) {
+            char c = tmp[i];
+            char cl = tolower(c);
+            tmp_l[i] = cl;
+            nullspace_forced |= c != cl;
+        }
+        if (strcmp(tmp_l, dirtext[0]) == 0) {
             bw->dir = 0;
         } else if (strcmp(tmp, dirtext[1]) == 0) {
             bw->dir = 1;
@@ -128,8 +139,31 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
                     dirtext[0], dirtext[1]);
             exit(1);
         }
+        free(tmp_l);
     } else {
+        /* Default is right nullspace for p>2, and left for p==2 */
+        bw->dir = mpz_cmp_ui(bw->p, 2) != 0;
         param_list_add_key(pl, "nullspace", dirtext[bw->dir], PARAMETER_FROM_FILE);
+    }
+
+    if ((mpz_cmp_ui(bw->p, 2) == 0) != (bw->dir == 0)) {
+        if (mpz_cmp_ui(bw->p, 2) == 0) {
+            fprintf(stderr, "p==2 seems appropriate for factoring. Yet, the nullspace parameter has been passed as nullspace=right. This looks odd.\n");
+            if (nullspace_forced) {
+                fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
+            } else {
+                fprintf(stderr, "Aborting. Pass nullspace=LEFT if this is really intended.\n");
+                exit(1);
+            }
+        } else {
+            fprintf(stderr, "p>2 seems appropriate for discrete logarithm. Yet, the nullspace parameter has been passed as nullspace=left. This looks odd.\n");
+            if (nullspace_forced) {
+                fprintf(stderr, "Proceeding anyway (uppercase nullspace argument)\n");
+            } else {
+                fprintf(stderr, "Aborting. Pass nullspace=RIGHT if this is really intended.\n");
+                exit(1);
+            }
+        }
     }
 
     
@@ -197,8 +231,12 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
+    param_list_lookup_string(pl, "cpubinding");
+    param_list_lookup_string(pl, "only_mpi");
+    param_list_lookup_string(pl, "balancing_queue_size");
+    param_list_lookup_string(pl, "random_matrix");
+    param_list_lookup_string(pl, "no_save_cache");
 
-    param_list_lookup_string(pl, "prime");
     return 0;
 }
 

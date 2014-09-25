@@ -290,11 +290,11 @@ cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
     for (j = 0; j < ltmp && *nrels > target_excess + *nprimes; j++)
 	*nrels -= delete_connected_component(tmp[j].i, nprimes);
 
-    fprintf(stderr, "    deleted %u heavier connected components at %2.2lf\n",
+    fprintf(stdout, "    deleted %u heavier connected components at %2.2lf\n",
 	    j, seconds());
 
 #if DEBUG >= 1
-    fprintf(stderr, "    DEBUG: ltmp=%u chunk=%u target=%u\n",
+    fprintf(stdout, "    DEBUG: ltmp=%u chunk=%u target=%u\n",
 	    ltmp, chunk, target_excess);
 #endif
 
@@ -419,7 +419,7 @@ remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
 {
     uint64_t oldnrels;
     *excess = (((int64_t) * nrels) - *nprimes);
-    fprintf(stderr,
+    fprintf(stdout,
 	    "  nrels=%" PRIu64 " nprimes=%" PRIu64 " excess=%" PRId64 "\n",
 	    *nrels, *nprimes, *excess);
     do {
@@ -431,7 +431,7 @@ remove_all_singletons(uint64_t * nrels, uint64_t * nprimes, int64_t * excess)
 	onepass_singleton_removal(nrels, nprimes);
 #endif
 	*excess = (((int64_t) * nrels) - *nprimes);
-	fprintf(stderr,
+	fprintf(stdout,
 		"  new_nrels=%" PRIu64 " new_nprimes=%" PRIu64 " excess=%" PRId64
 		"" " at %2.2lf\n", *nrels, *nprimes, *excess, seconds());
     } while (oldnrels != *nrels);
@@ -447,17 +447,22 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
     remove_all_singletons(nrels, nprimes, &excess);
 
     if (excess <= 0) {		/* covers case nrel = nprimes = 0 */
-	fprintf(stderr, "number of relations <= number of ideals\n");
+	fprintf(stdout, "number of relations <= number of ideals\n");
 	exit(2);
     }
 
     if ((double) excess < required_excess * ((double) *nprimes)) {
-	fprintf(stderr,
+	fprintf(stdout,
 		"(excess / nprimes) = %.2f < %.2f. See -required_excess "
 		"argument.\n", ((double) excess / (double) *nprimes),
 		required_excess);
 	exit(2);
     }
+
+    /* adjust npass so that each pass removes at least about 1% wrt the number
+       of ideals */
+    if ((uint64_t) excess / npass < *nprimes / 100)
+      npass = 1 + (100 * excess) / *nprimes;
 
     int64_t chunk = excess / npass;
 
@@ -468,12 +473,12 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	target_excess = excess - chunk;
 	if (target_excess < keep)
 	    target_excess = keep;
-	fprintf(stderr, "Step %u on %u: target excess is %" PRId64 "\n",
-		count, npass, target_excess);
+	fprintf(stdout, "Step %u on %u: target excess is %" PRId64 "\n",
+		count + 1, npass, target_excess);
 	cliques_removal(target_excess, nrels, nprimes);
 
 	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stderr, "  [each excess row deleted %2.2lf rows]\n",
+	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
 		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
     }
 
@@ -488,12 +493,12 @@ static void singletons_and_cliques_removal(uint64_t * nrels, uint64_t * nprimes)
 	target_excess = excess - chunk;
 	target_excess = keep;
 
-	fprintf(stderr, "Step extra: target excess is %" PRId64 "\n",
+	fprintf(stdout, "Step extra: target excess is %" PRId64 "\n",
 		target_excess);
 	cliques_removal(target_excess, nrels, nprimes);
 
 	remove_all_singletons(nrels, nprimes, &excess);
-	fprintf(stderr, "  [each excess row deleted %2.2lf rows]\n",
+	fprintf(stdout, "  [each excess row deleted %2.2lf rows]\n",
 		(double) (oldnrels - *nrels) / (double) (oldexcess - excess));
     }
 }
@@ -584,7 +589,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "minindex", "index of the first considered prime");
   param_list_decl_usage(pl, "keep", "wanted excess at the end of purge "
                                     "(default " STR(DEFAULT_FILTER_EXCESS) ")");
-  param_list_decl_usage(pl, "npass", "number of step of clique removal "
+  param_list_decl_usage(pl, "npass", "maximal number of steps of clique removal "
                                      "(default " STR(DEFAULT_PURGE_NPASS) ")");
   param_list_decl_usage(pl, "required_excess", "\% of excess required at the "
                             "end of the 1st singleton removal step (default "
@@ -639,6 +644,7 @@ int main(int argc, char **argv)
         break;
     }
     /* print command-line arguments */
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 
@@ -720,14 +726,14 @@ int main(int argc, char **argv)
     }
 
     /* Printing relevant information */
-    fprintf(stderr, "Weight function used during clique removal:\n"
+    fprintf(stdout, "Weight function used during clique removal:\n"
                     "  0     1     2     3     4     5     6     7\n");
     for (k = 0; k < 8; k++)
-      fprintf(stderr, "%0.3f ", weight_function_clique((weight_t) k));
-    fprintf(stderr, "\n");
+      fprintf(stdout, "%0.3f ", weight_function_clique((weight_t) k));
+    fprintf(stdout, "\n");
 
-    fprintf(stderr, "Number of relations is %" PRIu64 "\n", nrelmax);
-    fprintf(stderr, "Number of prime ideals below the two large prime bounds: "
+    fprintf(stdout, "Number of relations is %" PRIu64 "\n", nrelmax);
+    fprintf(stdout, "Number of prime ideals below the two large prime bounds: "
                     "%" PRIu64 "\n", nprimemax);
     /*}}}*/
 
@@ -740,7 +746,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(variable_ != NULL);					\
     size_t cur_alloc = amount_ * sizeof(type_);                         \
     tot_alloc_bytes += cur_alloc;                                       \
-    fprintf(stderr,							\
+    fprintf(stdout,							\
             "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",	\
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);                  	\
 } while (0)
@@ -756,7 +762,7 @@ int main(int argc, char **argv)
     bit_vector_init(variable_, amount_);				\
     size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
     tot_alloc_bytes += cur_alloc;					\
-    fprintf(stderr,                                                     \
+    fprintf(stdout,                                                     \
             "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",       \
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
 } while (0)
@@ -792,7 +798,7 @@ int main(int argc, char **argv)
     ALLOC_VERBOSE_MALLOC(index_t*, rel_compact, nrelmax);
     ALLOC_VERBOSE_CALLOC(weight_t, ideals_weight, nprimemax);
 
-    fprintf(stderr, "Pass 1, reading and storing ideals with index h >= "
+    fprintf(stdout, "Pass 1, reading and storing ideals with index h >= "
             "%" PRIu64 "\n", min_index);
 
     nrels = nrelmax;
@@ -812,20 +818,20 @@ int main(int argc, char **argv)
 		"Error, -nrels value should match the number of scanned "
 		"relations\nexpected %" PRIu64 " relations, found %" PRIu64
 		"\n", nrelmax, pd->info.nrels);
-        abort();
+        exit (EXIT_FAILURE);
     }
 
     nprimes = pd->info.nprimes;
 
     tot_alloc_bytes += get_my_malloc_bytes();
-    fprintf(stderr, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
+    fprintf(stdout, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
 	    get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
 #ifdef STAT
     {
 	size_t tmp = ((uint64_t) buf_arg.W + nrelmax) * sizeof(index_t);
 	double ratio = 100.0 * (double) (((double) tmp) /
 					 ((double) get_my_malloc_bytes()));
-	fprintf(stderr,
+	fprintf(stdout,
 		"STAT: W_active=%1.0f\nSTAT: Should take %zuMB in memory, "
 		"take %zuMB (%.2f %%)\n", buf_arg.W, tmp >> 20,
 		get_my_malloc_bytes() >> 20, ratio);
@@ -837,28 +843,28 @@ int main(int argc, char **argv)
 
     singletons_and_cliques_removal(&nrels, &nprimes);
     if (nrels < nprimes) {
-      fprintf(stderr, "number of relations < number of ideals\n");
+      fprintf(stdout, "number of relations < number of ideals\n");
       exit(2);
     }
     if (nrels == 0 || nprimes == 0) {
-      fprintf(stderr, "number of relations or number of ideals is 0\n");
+      fprintf(stdout, "number of relations or number of ideals is 0\n");
       exit(2);
     }
 
     /* free rel_compact[i] and rel_compact. We no longer need them */
     tot_alloc_bytes -= get_my_malloc_bytes();
-    fprintf(stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
+    fprintf(stdout, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
             get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
     my_malloc_free_all();
 
     free(rel_compact);
     size_t tmp = (nrelmax * sizeof(index_t *));
     tot_alloc_bytes -= tmp;
-    fprintf(stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
+    fprintf(stdout, "Freed rel_compact %zuMB (total %zuMB so far)\n",
             tmp >> 20, tot_alloc_bytes >> 20);
 
     /* reread the relation files and convert them to the new coding */
-    fprintf(stderr, "Storing remaining relations...\n");
+    fprintf(stdout, "Storing remaining relations...\n");
 
     if (!(pd->fd[0] = fopen_maybe_compressed(purgedname, "w"))) {
 	fprintf(stderr, "Error, cannot open file %s for writing.\n",
@@ -898,6 +904,7 @@ int main(int argc, char **argv)
             NULL, NULL);
 
     /* write final values to stdout */
+    /* This output, incl. "Final values:", is required by the script */
     fprintf(stdout, "Final values:\nnrels=%" PRIu64 " nprimes=%" PRIu64 " "
             "excess=%" PRId64 "\nweight=%1.0f weight*nrels=%1.2e\n",
             nrels, nprimes, ((int64_t) nrels) - nprimes, pd->info.W,

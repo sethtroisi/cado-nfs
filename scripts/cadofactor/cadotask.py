@@ -1197,7 +1197,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
                                   (wuid, cmdline))
     
     def verification(self, wuid, ok, *, commit):
-        """ Mark a workunit as received and update wu_received counter """
+        """ Mark a workunit as verified ok or verified with error and update
+        wu_received counter """
         ok_str = "ok" if ok else "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, ok_str)
         assert self.get_number_outstanding_wus() >= 1
@@ -1273,7 +1274,8 @@ class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
         cutoff = str(datetime.datetime.utcnow() - delta)
         # self.logger.debug("Doing timeout check, cutoff=%s, and setting last check to %f",
         #                   cutoff, now)
-        results = self.wuar.query(eq={"status":1}, lt={"timeassigned": cutoff})
+        results = self.wuar.query(eq={"status": wudb.WuStatus.ASSIGNED},
+                                      lt={"timeassigned": cutoff})
         if not results:
             # self.logger.debug("Found no timed-out workunits")
             pass
@@ -1876,7 +1878,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         (filename, ) = message.get_output_files()
         self.process_polyfile(filename, commit=False)
         self.parse_stats(filename, commit=False)
@@ -2334,6 +2336,13 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     
     def run(self):
         super().run()
+        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        have_two_alg = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
+        if have_two_alg:
+            fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
+            fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
+        else:
+            factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
 
         while self.get_nrels() < self.state["rels_wanted"]:
             q0 = self.state["qnext"]
@@ -2344,16 +2353,12 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                 self.workdir.make_filename("%d-%d%s" % (q0, q1, use_gz))
             self.check_files_exist([outputfilename], "output",
                                    shouldexist=False)
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            if not self.send_request(Request.GET_HAVE_TWO_ALG_SIDES):
-                factorbase = self.send_request(Request.GET_FACTORBASE_FILENAME)
+            if not have_two_alg:
                 p = cadoprograms.Las(q0=q0, q1=q1,
                                      poly=polyfilename, factorbase=factorbase,
                                      out=outputfilename, stats_stderr=True,
                                      **self.progparams[0])
             else:
-                fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
-                fb1 = self.send_request(Request.GET_FACTORBASE1_FILENAME)
                 p = cadoprograms.Las(q0=q0, q1=q1,
                                      poly=polyfilename,
                                      factorbase0=fb0,
@@ -2373,7 +2378,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             # This notification was not for me
             return False
         if self.handle_error_result(message):
-            return False
+            return True
         output_files = message.get_output_files()
         assert len(output_files) == 1
         stderrfilename = message.get_stderrfile(0)
@@ -2974,7 +2979,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stderr, input_nrels):
+        if self.parse_stderr(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3123,7 +3128,15 @@ class PurgeTask(Task):
         # but we allow some extra whitespace
         r = {}
         keys = ("nrels", "nprimes", "weight", "excess")
+        final_values_line = "Final values:"
+        had_final_values = False
         for line in stdout.splitlines():
+            # Look for values only after we saw "Final values:" line
+            if not had_final_values:
+                if re.match(final_values_line, line):
+                    had_final_values = True
+                else:
+                    continue
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
@@ -3132,6 +3145,9 @@ class PurgeTask(Task):
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
                     r[key] = int(match.group(1))
+        if not had_final_values:
+            raise Exception("%s: output of %s did not contain '%s'" %
+                            (self.title, self.programs[0].name, final_values_line))
         for key in keys:
             if not key in r:
                 raise Exception("%s: output of %s did not contain value for %s: %s"

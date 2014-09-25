@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>   /* for fabs */
+#include <float.h> /* for DBL_MAX */
 #include "utils.h"
 #include "portability.h"
 
@@ -68,34 +69,88 @@ double_poly_dichotomy (double_poly_srcptr p, double a, double b, double sa,
 {
   double s;
 
-  do
-    {
+  for(;;) {
+#if defined(__i386)
+      /* See comment in utils/usp.c on this. We want to avoid comparison
+       * involving an extended precision double ! */
+      { volatile double ms = (a + b) * 0.5; s = ms; }
+#else
       s = (a + b) * 0.5;
+#endif
+      if (s == a || s == b) return s;
       if (double_poly_eval (p, s) * sa > 0)
 	a = s;
       else
 	b = s;
-    }
-  while (s != a && s != b);
+  }
   return s;
 }
 
-/* Stores the derivative of f in df. Assumes df different from f.
+/* assuming g(a)*g(b) < 0, and g has a single root in [a, b],
+   refines that root by the weighted false position method
+   Assumes sa is of same sign as g(a).
+*/
+double
+double_poly_falseposition (double_poly_srcptr p, double a, double b, double pa)
+{
+  double pb;
+  int side=0;
+  double a0=a, b0=b, pa0=pa;
+
+  pb = double_poly_eval(p, b);
+
+  for(;;) {
+      double s, middle;
+#if defined(__i386)
+      /* See above */
+      { volatile double ms = (a*pb-b*pa)/(pb-pa); s = ms; }
+      { volatile double ms = (a + b) * 0.5; middle = ms; }
+#else
+      s = (a*pb-b*pa)/(pb-pa);
+      middle = (a + b) * 0.5;
+#endif
+      /* It may happen that because of overflow, (a*pb-b*pa)/(pb-pa)
+       * reaches s==a or s==b too early. If it so happens that we're
+       * doing this, while the middle cut doesn't behave this way, use
+       * the middle cut instead.
+       *
+       * Note that almost by design, this countermeasure also cancels
+       * some of the benefit of the false position method.
+       */
+      if (s < a || s > b || ((s == a || s == b) && !(middle == a || middle == b)))
+          s = middle;
+      if (s == a || s == b) return s;
+      double ps = double_poly_eval (p, s);
+      if (ps * pa > 0) {
+          a = s; pa = ps;
+          if (side==1) pb /= 2;
+          side=1;
+      } else {
+          b = s; pb = ps;
+          if (side==-1) pa /= 2;
+          side=-1;
+      }
+      if (isnan(b)) {
+          return double_poly_dichotomy(p, a0, b0, pa0, 0);
+      }
+  }
+}
+
+/* Stores the derivative of f in df. f and df may be identical.
    Assumes df has been initialized with degree at least f->deg-1. */
 void
 double_poly_derivative(double_poly_ptr df, double_poly_srcptr f)
 {
   unsigned int n;
-  double d_n;
   if (f->deg == 0) {
     df->deg = 0; /* How do we store deg -\infty polynomials? */
     df->coeff[0] = 0.;
     return;
   }
   // at this point, f->deg >=1
+  for (n = 1; n <= f->deg; n++)
+    df->coeff[n - 1] = f->coeff[n] * (double) n;
   df->deg = f->deg - 1;
-  for(n = 0, d_n = 1.; n < f->deg; n++, d_n += 1.)
-    df->coeff[n] = f->coeff[n + 1] * d_n;
 }
 
 /* Stores the product of f and g in h (h = f * g).
@@ -174,6 +229,19 @@ double_poly_revert (double_poly_ptr f)
     }
 }
 
+/* Change sign of variable: x -> -x */
+static void
+double_poly_neg_x (double_poly_ptr r, double_poly_srcptr s)
+{
+  unsigned int i;
+  r->deg = s->deg;
+  for (i = 0; i < s->deg; i += 2) {
+    r->coeff[i]     = s->coeff[i]; /* Even power coeff */
+    r->coeff[i + 1] = -s->coeff[i + 1]; /* Odd power */
+  }
+  if (i == s->deg) /* iff deg is even */
+    r->coeff[i] = s->coeff[i];
+}
 
 static unsigned int
 recurse_roots(double_poly_srcptr poly, double *roots,
@@ -201,7 +269,7 @@ recurse_roots(double_poly_srcptr poly, double *roots,
           const double b = (l < sign_changes) ? roots[l] : s;
           const double vb = double_poly_eval (poly, b);
           if (va * vb < 0) /* root in interval [va, vb] */
-            roots[new_sign_changes++] = double_poly_dichotomy (poly, a, b, va, 20);
+            roots[new_sign_changes++] = double_poly_falseposition (poly, a, b, va);
           a = b;
           va = vb;
         }
@@ -280,6 +348,39 @@ double_poly_compute_roots(double *roots, double_poly_srcptr poly, double s)
   return sign_changes;
 }
 
+/* compute all roots whose absolute value is <= B */
+unsigned int
+double_poly_compute_all_roots_with_bound (double *roots,
+                                          double_poly_srcptr poly,
+                                          double B)
+{
+  /* Positive roots */
+  double bound = double_poly_bound_roots (poly);
+  if (B < bound)
+    bound = B;
+  unsigned int nr_roots_pos = double_poly_compute_roots (roots, poly, bound);
+  /* Negative roots */
+  double_poly_t t; /* Copy of poly which gets sign-flipped */
+  double_poly_init (t, poly->deg);
+  double_poly_neg_x (t, poly);
+  bound = double_poly_bound_roots (t);
+  if (B < bound)
+    bound = B;
+  unsigned int nr_roots_neg =
+    double_poly_compute_roots (roots + nr_roots_pos, t, bound);
+  double_poly_clear(t);
+  /* Flip sign of negative roots */
+  for (unsigned int i = 0; i < nr_roots_neg; i++)
+    roots[nr_roots_pos + i] *= -1.;
+  return nr_roots_pos + nr_roots_neg;
+}
+
+unsigned int
+double_poly_compute_all_roots (double *roots, double_poly_srcptr poly)
+{
+  return double_poly_compute_all_roots_with_bound (roots, poly, DBL_MAX);
+}
+
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
@@ -292,24 +393,24 @@ double_poly_print (FILE *stream, double_poly_srcptr p, char *name)
   fprintf (stream, "%s", name);
 
   if (deg == 0)
-    fprintf (stream, "%f", f[0]);
+    fprintf (stream, "%.16e", f[0]);
 
   if (deg == 1)
-    fprintf (stream, "%f*x", f[1]);
+    fprintf (stream, "%.16e*x", f[1]);
 
   if (deg > 1)
-    fprintf (stream, "%f*x^%d", f[deg], deg);
+    fprintf (stream, "%.16e*x^%d", f[deg], deg);
 
   for (i = deg - 1; i >= 0; i--)
     {
       if (f[i] == 0.)
 	continue;
       if (i == 0)
-	fprintf (stream, " %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else if (i == 1)
-	fprintf (stream, " %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %.16e*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else 
-	fprintf (stream, " %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+	fprintf (stream, " %s %.16e*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
     }
 
   fprintf (stream, "\n");

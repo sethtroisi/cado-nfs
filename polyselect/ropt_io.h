@@ -27,6 +27,10 @@ double print_poly_info_short ( mpz_t *f,
                                int d,
                                mpz_t N );
 
+void ropt_regen_raw ( mpz_t *f,
+                      int d,
+                      mpz_t *g );
+
 #if 0
 /* parse stage 2 parameters from argv */
 void ropt_parse_param ( int argc,

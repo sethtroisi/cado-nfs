@@ -706,7 +706,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (m[0].m % 2 != 0);
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
 #if defined(MODTRACE)
-  printf ("(%lu * %lu / 2^%ld) %% %lu", a[0], b[0], LONG_BIT, m[0].m);
+  printf ("(%lu * %lu / 2^%d) %% %lu", a[0], b[0], LONG_BIT, m[0].m);
 #endif
 
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
@@ -729,7 +729,7 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (a[0] < m[0].m);
 
 #if defined(MODTRACE)
-  printf ("(%lu^2 / 2^%ld) %% %lu", a[0], LONG_BIT, m[0].m);
+  printf ("(%lu^2 / 2^%d) %% %lu", a[0], LONG_BIT, m[0].m);
 #endif
 
   ularith_sqr_ul_2ul (&plow, &phigh, a[0]);

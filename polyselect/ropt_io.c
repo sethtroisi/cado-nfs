@@ -38,7 +38,8 @@ ropt_L1_cachesize ()
  */
 static void
 ropt_common ( ropt_poly_t poly,
-              ropt_param_t param )
+              ropt_param_t param,
+              int fm )
 {
   /* bestpoly, info */
   ropt_info_t info;
@@ -51,22 +52,74 @@ ropt_common ( ropt_poly_t poly,
   ropt_bestpoly_init (bestpoly, poly->d);
   ropt_bestpoly_setup (bestpoly, poly->f, poly->g, poly->d);
 
-  /* print f, g and effort */
+  /* reducing c5 to raw and skip ropt */
+  if (param->gen_raw) {
+    mpz_t l, m, res;
+    mpz_poly_t F;
+    mpz_init (l);
+    mpz_init (m);
+    mpz_init (res);
+    mpz_poly_init (F, poly->d);
+    F->deg = poly->d;
+    for (int j = 0; j <= poly->d; j++) {
+      mpz_set (F->coeff[j], poly->f[j]);
+    }
+    /* original polynomial */
+    print_poly_fg (F, poly->g, poly->n, 1);
+    mpz_set (l, poly->g[1]);
+    mpz_neg (m, poly->g[0]);
+    Lemma21 (poly->f, poly->n, poly->d, l, m, res);
+    mpz_div (poly->f[poly->d], poly->f[poly->d], res);
+    Lemma21 (poly->f, poly->n, poly->d, l, m, res);
+    ropt_regen_raw (poly->f, poly->d, poly->g);
+    mpz_set (l, poly->g[1]);
+    mpz_neg (m, poly->g[0]);
+    Lemma21 (poly->f, poly->n, poly->d, l, m, res);
+    mpz_poly_clear (F);
+    mpz_clear (l);
+    mpz_clear (m);
+    mpz_clear (res);
+  }
+
   mpz_poly_t F;
   F->coeff = poly->f;
   F->deg = poly->d;
-  print_poly_fg (F, poly->g, poly->n, 1);
-  if (param->verbose) {
-    fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
-    fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+  /* print original or reduced polynomial */
+  if (param->gen_raw)
+    fprintf (stderr, "\n# Reduced polynomial.\n");
+  if (fm==0)
+    print_poly_fg (F, poly->g, poly->n, 1);
+
+  /* if sopt and not from -fm */
+  if (fm==0) {
+    if (param->sopt) {
+      mpz_poly_t F2;
+      mpz_poly_init (F2, poly->d);
+      F2->deg = poly->d;
+      for (int j = 0; j <= poly->d; j++)
+        mpz_set (F2->coeff[j], poly->f[j]);
+      optimize (F2, poly->g, 0, 1);
+      fprintf (stderr, "\n# Size-optimized polynomial.\n");
+      print_poly_fg (F2, poly->g, poly->n, 1);
+      for (int j = 0; j <= poly->d; j++)
+        mpz_set (poly->f[j], F2->coeff[j]);
+      mpz_poly_clear (F2);
+    }
   }
   
-  /* call ropt */
-  ropt (poly, bestpoly, param, info);
+  if (!param->gen_raw) {
 
-  fprintf (stderr, "\n# Info: Best E is:\n");
-  F->coeff = bestpoly->f;
-  print_poly_fg (F, bestpoly->g, poly->n, 1);
+    if (param->verbose) {
+      fprintf(stderr, "# Info: verbose level: %d\n", param->verbose);
+      fprintf(stderr, "# Info: sieving effort: %d\n", param->effort);
+    }
+    
+    /* call ropt */
+    ropt (poly, bestpoly, param, info);
+    fprintf (stderr, "\n# Info: Best E is:\n");
+    F->coeff = bestpoly->f;
+    print_poly_fg (F, bestpoly->g, poly->n, 1);
+  }
 
   ropt_info_free (info);
   ropt_bestpoly_free (bestpoly, poly->d);
@@ -96,7 +149,8 @@ static void
 ropt_on_stdin_readpoly ( mpz_t N,
                          mpz_t *f,
                          mpz_t *g,
-                         mpz_t M )
+                         mpz_t M,
+                         int *degree )
 {
   fflush(stdin);
   int i, ret, d;
@@ -152,6 +206,7 @@ ropt_on_stdin_readpoly ( mpz_t N,
   }
 
   for (d = MAXDEGREE; d > 0 && mpz_cmp_ui (f[d], 0) == 0; d --);
+  *degree = d;
   if (mpz_cmp_ui (M, 0) == 0) {
     mpz_t t;
     /* M = -Y0/Y1 mod N */
@@ -187,11 +242,12 @@ ropt_on_stdin ( ropt_param_t param )
   ropt_poly_init (poly);
 
   /* read poly from stdin */
-  ropt_on_stdin_readpoly (poly->n, poly->f, poly->g, poly->m);
+  ropt_on_stdin_readpoly (poly->n, poly->f, poly->g, poly->m, &(poly->d));
+  param->d = poly->d;
 
   /* run ropt */
   fprintf (stderr, "\n# Polynomial (# 0).\n");
-  ropt_common (poly, param);
+  ropt_common (poly, param, 0);
 
   ropt_poly_free (poly);
 }
@@ -283,7 +339,7 @@ ropt_on_cadopoly ( FILE *file,
          flag == 1807 ) // deg 3
     {
       fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-      ropt_common (poly, param);
+      ropt_common (poly, param, 0);
       count ++;
       flag = 0U;
     }
@@ -297,7 +353,7 @@ ropt_on_cadopoly ( FILE *file,
 /**
  * Regenerate raw polyomial with small c_{d-1}.
  */
-static void
+void
 ropt_regen_raw (mpz_t *f, int d, mpz_t *g)
 {
   mpz_t t, d_ad;
@@ -329,10 +385,11 @@ ropt_on_msievepoly ( FILE *file,
   ropt_poly_t poly;
   ropt_poly_init (poly);
 
-  mpz_t ad, l, m;
+  mpz_t ad, l, m, res;
   mpz_init (ad);
   mpz_init (l);
   mpz_init (m);
+  mpz_init (res);
 
   /* parse each line */
   while (1) {
@@ -352,15 +409,17 @@ ropt_on_msievepoly ( FILE *file,
     mpz_neg (poly->g[0], m);
 
     /* generate polynomial */
-    Lemma21 (poly->f, poly->n, poly->d, l, m);
+    Lemma21 (poly->f, poly->n, poly->d, l, m, res);
 
-    /* undo translation and generate again */
-    if (param->skip_ropt2) {
+    /* scale ad back and generate poly with small c5 */
+    if (param->gen_raw) {
+      mpz_div (poly->f[poly->d], poly->f[poly->d], res);
+      Lemma21 (poly->f, poly->n, poly->d, l, m, res);
       ropt_regen_raw (poly->f, poly->d, poly->g);
       mpz_neg (m, poly->g[0]);
-      Lemma21 (poly->f, poly->n, poly->d, l, m);
+      Lemma21 (poly->f, poly->n, poly->d, l, m, res);
     }
-        
+
     mpz_poly_t F;
     mpz_poly_init (F, poly->d);
     F->deg = poly->d;
@@ -372,11 +431,9 @@ ropt_on_msievepoly ( FILE *file,
     print_poly_fg (F, poly->g, poly->n, 1);
 
     /* optimize size */
-    optimize (F, poly->g, 0, 1, 1);
-
-    /* skip or do ropt */
-    if (param->skip_ropt || param->skip_ropt2) {
+    if (param->sopt) {
       fprintf (stderr, "\n# Size-optimize only (# %5d).", count);
+      optimize (F, poly->g, 0, 1);
 
       /* print in Msieve format */
       // print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
@@ -384,10 +441,12 @@ ropt_on_msievepoly ( FILE *file,
       /* print in CADO format */
       print_poly_fg (F, poly->g, poly->n, 1);
     }
-    else {
+    
+    /* skip or do ropt */
+    if (param->skip_ropt == 0 && param->gen_raw == 0) {
       for (int j = 0; j <= poly->d; j++)
         mpz_set (poly->f[j], F->coeff[j]);
-      ropt_common (poly, param);
+      ropt_common (poly, param, 1);
     }
 
     mpz_poly_clear (F);
@@ -398,6 +457,7 @@ ropt_on_msievepoly ( FILE *file,
   mpz_clear (ad);
   mpz_clear (l);
   mpz_clear (m);
+  mpz_clear (res);
   ropt_poly_free (poly);
 }
 

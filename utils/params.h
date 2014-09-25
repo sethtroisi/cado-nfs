@@ -166,10 +166,6 @@ extern void param_list_display(param_list pl, FILE *f);
 extern int param_list_save_parameter(param_list pl, enum parameter_origin o, 
         const char * key, const char * format, ...) ATTR_PRINTF(4,5);
 
-// Some miscellany really. Why here more than somewhere else, not clear.
-// But why not...
-extern void print_command_line(FILE * stream, int argc, char * argv[]);
-
 // This function is a shorthand which does employ some hackery put into
 // param lists, which remember their oldest argv, argc pair.
 extern void param_list_print_command_line(FILE * stream, param_list pl);

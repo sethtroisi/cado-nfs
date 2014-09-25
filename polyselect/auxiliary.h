@@ -37,6 +37,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MURPHY_K 1000
 
+/* maximal number of steps in optimize_aux */
+#define OPT_STEPS 300
+#define OPT_STEPS_FINAL OPT_STEPS
+
 extern double bound_f, bound_g, area;
 
 #define mpz_add_si(a,b,c)                       \
@@ -56,6 +60,7 @@ extern "C" {
 
 double L2_lognorm (mpz_poly_ptr, double);
 double L2_skewness (mpz_poly_ptr, int);
+double L2_skew_lognorm (mpz_poly_ptr, int);
 
 /* alpha */
 double special_val0 (mpz_poly_ptr, unsigned long);
@@ -74,9 +79,10 @@ long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 void rotate_auxg_z (mpz_t*, const mpz_t, const mpz_t, const mpz_t, unsigned int);
 double rotate (mpz_poly_ptr, unsigned long, mpz_t, mpz_t, long*, long*, int,
                int);
-void optimize (mpz_poly_ptr, mpz_t*, int, int, int);
+void optimize (mpz_poly_ptr, mpz_t*, int, int);
 void optimize_lll (mpz_poly_ptr, mpz_t*, int);
-void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation);
+void optimize_aux (mpz_poly_ptr f, mpz_t *g, int verbose, int use_rotation,
+                   int max_iter);
 void optimize_dir_aux (mpz_poly_ptr f, mpz_t *g, int verbose);
 void rotate_bounds (mpz_poly_ptr f, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose);
 void do_translate_z (mpz_poly_ptr f, mpz_t *g, const mpz_t k);

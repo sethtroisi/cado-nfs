@@ -295,8 +295,8 @@ void bigmatpoly_allgather_row(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[1]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[1]);
+        ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
+        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[1]);
     }
 }
 void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
@@ -313,8 +313,8 @@ void bigmatpoly_allgather_col(abdst_field ab, bigmatpoly a)
         MPI_Bcast(&size, 1, MPI_UNSIGNED_LONG, k, a->com[2]);
         data->size = size;
         ASSERT_ALWAYS(data->size <= data->alloc);
-        ASSERT_ALWAYS((data->m * data->n * data->size) < (size_t) INT_MAX);
-        MPI_Bcast(data->x, data->m * data->n * data->size, abmpi_datatype(ab), k, a->com[2]);
+        ASSERT_ALWAYS((data->m * data->n * data->alloc) < (size_t) INT_MAX);
+        MPI_Bcast(data->x, data->m * data->n * data->alloc, abmpi_datatype(ab), k, a->com[2]);
     }
 }
 /* scatter from node 0. This is not a very interesting function, in fact

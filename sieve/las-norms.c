@@ -456,13 +456,13 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
   for (k = degree << 1, mpz_init (p[k]); k--; mpz_init (p[k]), root_struct_init (&(Roots[k])));
   for (k = degree + 1; k--; mpz_set_d (p[k], coeff[k]));
     
-  /* Pseudo root 0.0 is insered first as a root of F */
+  /* Pseudo root 0.0 is inserted first as a root of F */
   roots[0].derivate = 0;
   roots[0].value = 0.;
   cumul_nroots = 1;
 
   if (degree) {
-    /* The roots of F are insered in roots */
+    /* The roots of F are inserted in roots */
     n = numberOfRealRoots (p, degree, max_abs_root, 0, Roots);
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
 	.derivate = 0, .value = rootRefine (&(Roots[k]), p, degree, precision) } );
@@ -472,7 +472,7 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_init (df, MAX(0,((int)degree - 1)));
     double_poly_derivative (df, f);
     
-    /* The roots of F' are insered in roots */
+    /* The roots of F' are inserted in roots */
     for (k = df->deg + 1; k--; mpz_set_d (p[k], df->coeff[k]));
     n = numberOfRealRoots (p, df->deg, max_abs_root, 0, Roots);
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
@@ -489,7 +489,7 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
     double_poly_product (f_ddf, f, ddf);
     double_poly_subtract (d2f, f_ddf, df_df);
     
-    /* The roots of F" are insered in roots */
+    /* The roots of F" are inserted in roots */
     for (k = d2f->deg + 1; k--; mpz_set_d (p[k], d2f->coeff[k]));
     n = numberOfRealRoots (p, d2f->deg, max_abs_root, 0, Roots);
     for (k = n; k--; roots[k + cumul_nroots] = (struct root_s) {
@@ -1075,7 +1075,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
   /* F, F' and F" roots needs stability for their neighbourhood ?
      F roots, sure; F', sure not; F"... maybe. */
   const unsigned char stability_for_derivate[3] =
-    { SMART_NORM_STABILITY, 0, /* SMART_NORM_STABILITY */ 0 };
+    { SMART_NORM_STABILITY, 0, SMART_NORM_STABILITY };
   const ssize_t Idiv2 = (ssize_t) (I >> 1);
   sg_t sg[d * 4 + 3]; /* For (F, F', F") roots, -Idiv2, Idiv2 - 1, 0 */
   size_t nsg;
@@ -1104,7 +1104,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 
     /* Insertion of point (-Idiv2, F(-Idiv2)) in sg[0] : an artificial one-point segment. */
     g = compute_f (d, u, (double) -Idiv2);
-    g = log2 (fabs(g) + 1.) * original_scale + (double) GUARD;
+    g = lg2abs (g, add, scale);
     sg[0] = (sg_t) { .begin = -Idiv2, .end = -Idiv2, .f_begin = g, .f_end = g };
     nsg = 1;
     S[-Idiv2] = (uint8_t) g;
@@ -1113,25 +1113,26 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
       hl = floor((double)J * roots[r].value);
       ih = (ssize_t) hl;
       /* Need stability for this root ? */
-      if (!stability_for_derivate[roots[r].derivate]) {
+      if (UNLIKELY(!stability_for_derivate[roots[r].derivate])) {
 	/* No. It's an one-point segment. */
 	/* Is it not in the interesting region or in the last segment ? Yes -> next root */
-	if (UNLIKELY(ih <= -Idiv2 || ih >= Idiv2 - 1 || ih <= sg[nsg - 1].end)) continue;
+	if (ih <= -Idiv2 || ih >= Idiv2 - 1 || ih <= sg[nsg - 1].end) continue;
 	/* Ok, we insert this one-point segment */
+	sg[nsg].begin = sg[nsg].end = ih;
 	g = compute_f (d, u, hl);
-	sg[nsg].begin   = sg[nsg].end   = ih;
-	sg[nsg].f_begin = sg[nsg].f_end = log2(fabs(g) + 1.) * original_scale + (double) GUARD;
-	S[ih] = (unsigned char) sg[nsg].f_begin;
+	g = lg2abs (g, add, scale);
+	sg[nsg].f_begin = sg[nsg].f_end = g;
+	S[ih] = (unsigned char) g;
       } 
       else {
 	/* It's a real (non an one-point) segment. */
 	/* Is the root really far after the interesting zone ? Yes -> end of roots */
-	if (UNLIKELY(ih > Idiv2 - 1 + SMART_NORM_INFLUENCE)) break;
+	if (ih > Idiv2 - 1 + SMART_NORM_INFLUENCE) break;
 
 	/* Is the root really far before the interesting zone or is this segment is
 	   included (in all sides) in the previous segment ? Yes -> next root */
-	if (UNLIKELY((ih < -Idiv2 - SMART_NORM_INFLUENCE) || 
-		     (sg[nsg - 1].end - SMART_NORM_STABILITY >= ih))) continue;
+	if (ih < -Idiv2 - SMART_NORM_INFLUENCE || 
+	    ih <= sg[nsg - 1].end - SMART_NORM_STABILITY) continue;
 
 	/* OK, we have the right side to compute, and maybe the left side */
 	hr = hl;
@@ -1141,19 +1142,20 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	   2. in the previous segment AND [the beginning of the previous segment
    	   is far enough of the root OR this previous segment is the first, so
               its beginning is the beginning of the interesting zone] ? */
-	if (ih <= -Idiv2 || (sg[nsg - 1].end >= ih && 
-			     (nsg == 1 || sg[nsg - 1].begin + SMART_NORM_STABILITY <= ih))) {
+	if (UNLIKELY(ih <= -Idiv2 || (sg[nsg - 1].end >= ih && 
+				      (nsg == 1 || sg[nsg - 1].begin + SMART_NORM_STABILITY <= ih)))) {
 	  /* OK, this segment and the previous could be fusionned on this left side.
 	     It's not 100% true in fact, but really very probable. */
 	  sg[nsg].begin   = sg[nsg - 1].begin;
 	  sg[nsg].f_begin = sg[nsg - 1].f_begin;
-	  fg = S[ih];
+	  fg = (ih >= -Idiv2 && ih < Idiv2) ? S[ih] : 0;
 	} else {
 
 	  /* Here we compute the left side. -Idiv2 < ih <= Idiv2 - 1 + SMART_NORM_INFLUENCE */
 	  /* First, we compute the root itself */
 	  g = compute_f (d, u, hl);
-	  fg = (unsigned char) lg2abs (g, add, scale);
+	  g = lg2abs (g, add, scale);
+	  fg = (unsigned char) g;
 	  if (LIKELY(ih < Idiv2)) S[ih] = fg;    /* Right guard for the write */
 
 	  /* The loop on the left side */
@@ -1166,22 +1168,25 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	      break;
 	    }
 	    g = compute_f (d, u, hl);
-	    f1 = (unsigned char) lg2abs (g, add, scale);
+	    g = lg2abs (g, add, scale);
+	    f1 = (unsigned char) g;
 	    if (LIKELY(ih < Idiv2)) S[ih] = f1;  /* Right guard for the write */
-	    if (LIKELY(f1 != f2)) {
+	    if (LIKELY(f1 == f2)) {
+	      if (++cptf2id >= SMART_NORM_STABILITY) goto end_left;
+	    } else {
 	      cptf2id = 0;
 	      f2 = f1;
-	    } else if (UNLIKELY(++cptf2id >= SMART_NORM_STABILITY)) goto end_left;
+	    }
 	    if (UNLIKELY(++cpt >= SMART_NORM_INFLUENCE)) {
 	    end_left:
 	      sg[nsg].begin = ih;
-	      sg[nsg].f_begin = log2(fabs(g) + 1.) * original_scale + (double) GUARD;
+	      sg[nsg].f_begin = g;
 	      break;
 	    }
 	  }
 	}
 	/* If the left side is totally out of the interesting region ? -> next root */
-	if (UNLIKELY(sg[nsg].begin > Idiv2 - 1)) continue;
+	if (sg[nsg].begin > Idiv2 - 1) continue;
 
 	/* Now, the right side. */
 	ih = (ssize_t) hr; /* -Idiv2-SMART_NORM_INFLUENCE <= ih <= Idiv2-1+SMART_NORM_INFLUENCE */
@@ -1191,30 +1196,33 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
 	  ih = Idiv2 - 1;
 	  hr = (double) ih;
 	  g = compute_f (d, u, hr);
+	  g = lg2abs (g, add, scale);
 	} else {
 	  /* The loop on the right side */
 	  for (f1 = fg, f2 = 0, cpt = 0;;) {
 	    ++ih; hr += 1.;
 	    g = compute_f (d, u, hr);
-	    f1 = (unsigned char) lg2abs (g, add, scale);
+	    g = lg2abs (g, add, scale);
+	    f1 = (unsigned char) g;
 	    if (LIKELY(ih > -Idiv2)) S[ih] = f1; /* Left guard for the write */
 	    if (UNLIKELY(ih >= Idiv2 - 1)) {     /* Right guard: in fact ==, not >= */
 	      ASSERT(ih == Idiv2 - 1);
 	      break;
 	    }
-	    if (LIKELY (f1 != f2)) {
+	    if (LIKELY (f1 == f2)) {
+	      if (++cptf2id >= SMART_NORM_STABILITY) break;
+	    } else {
 	      cptf2id = 0;
 	      f2 = f1;
 	    }
-	    else if (UNLIKELY( ++cptf2id >= SMART_NORM_STABILITY)) break;
-	    if (UNLIKELY(++cpt >= SMART_NORM_INFLUENCE)) break;
+	    if (++cpt >= SMART_NORM_INFLUENCE) break;
 	  }
 	  /* If the right side is totally out of the interesting region ? -> next root */
-	  if (UNLIKELY(ih <= -Idiv2)) continue;
+	  if (ih <= -Idiv2) continue;
 	}
 	sg[nsg].end = ih;
-	sg[nsg].f_end = log2(fabs(g) + 1.) * original_scale + (double) GUARD;
-	S[ih] = (unsigned char) sg[nsg].f_end;
+	sg[nsg].f_end = g;
+	S[ih] = (unsigned char) g;
       }
       /* We have to do the possible fusions */
       while (nsg && sg[nsg - 1].end + 1 >= sg[nsg].begin) {
@@ -1231,7 +1239,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     if (LIKELY(sg[nsg - 1].end != Idiv2 - 1)) {
       /* We have to add a segment, except if the last ends at Idiv2 - 2 */
       g = compute_f (d, u, (double) (Idiv2 - 1));
-      g = log2(fabs(g) + 1.) * original_scale + (double) GUARD;
+      g = lg2abs (g, add, scale);
       S[Idiv2 - 1] = (unsigned char) g;
       if (LIKELY(sg[nsg - 1].end != Idiv2 - 2)) {
 	sg[nsg].begin = Idiv2 - 1;
@@ -1303,7 +1311,7 @@ void init_norms_bucket_region (unsigned char *S, uint32_t J, sieve_info_ptr si, 
 static double
 get_maxnorm_aux (double_poly_srcptr poly, double s)
 {
-  double_poly_t deriv;
+  double_poly_t derivative;
   const int d = poly->deg;
 
   ASSERT_ALWAYS(d >= 0);
@@ -1315,11 +1323,11 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
   FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
 
   /* Compute the derivative of polynomial */
-  double_poly_init (deriv, d - 1);
-  double_poly_derivative (deriv, poly);
+  double_poly_init (derivative, d - 1);
+  double_poly_derivative (derivative, poly);
 
   /* Look for extrema of the polynomial, i.e., for roots of the derivative */
-  const unsigned int nr_roots = double_poly_compute_roots(roots, deriv, s);
+  const unsigned int nr_roots = double_poly_compute_roots(roots, derivative, s);
 
   /* now abscissae of all extrema of poly are 0, roots[0], ..., 
      roots[nr_roots-1], s */
@@ -1332,7 +1340,7 @@ get_maxnorm_aux (double_poly_srcptr poly, double s)
         gmax = va;
     }
   free (roots);
-  double_poly_clear(deriv);
+  double_poly_clear(derivative);
   return gmax;
 }
 

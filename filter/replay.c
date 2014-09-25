@@ -109,8 +109,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         smatfile = fopen_maybe_compressed(smatname, wmode);
         srwfile  = fopen_maybe_compressed(srwname, wmode);
         /* XXX sm-outside-matrix creates a square matrix here */
-        // if (!bin) fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
-        if (!bin) fprintf(smatfile, "%d %d\n", small_ncols, small_ncols - skip);
+        if (!bin) fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
+        //if (!bin) fprintf(smatfile, "%d %d\n", small_ncols, small_ncols - skip);
     }
 
     char * dmatname = NULL;
@@ -138,7 +138,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     }
 
     for(int i = 0; i < small_nrows; i++){
-#ifdef FOR_DL
+//#ifdef FOR_DL
+#if 0
         /* this is for sm-outside-matrix */
         if (i == small_ncols) {
             printf("Rotating file names\n");
@@ -811,6 +812,7 @@ main(int argc, char *argv[])
         usage(pl, argv0);
     }
     /* print command-line arguments */
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

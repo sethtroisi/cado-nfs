@@ -688,6 +688,7 @@ class FreeRel(Program):
                  pmin: Parameter(checktype=int)=None,
                  pmax: Parameter(checktype=int)=None,
                  addfullcol: Toggle() = None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
 
@@ -719,7 +720,7 @@ class Las(Program):
                  factorbase0: Parameter("fb0", is_input_file=True)=None,
                  factorbase1: Parameter("fb1", is_input_file=True)=None,
                  out: Parameter(is_output_file=True)=None,
-                 threads: Parameter("mt", checktype=int)=None,
+                 threads: Parameter("t", checktype=int)=None,
                  ratq: Toggle()=None,
                  dup: Toggle()=None,
                  galois: Toggle()=None,
@@ -937,6 +938,7 @@ class BWC(Program):
                  interleaving: ParameterEq()=None,
                  shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
+                 precmd: ParameterEq()=None,
                  **kwargs):
         if os.name == "nt":
             kwargs.setdefault("runprefix", "perl.exe")
@@ -966,7 +968,7 @@ class SM(Program):
                  smexp: Parameter(),
                  explicit_units: Toggle()=None,
                  nmaps: Parameter("nsm")=None,
-                 threads: Parameter("mt")=None,
+                 threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
  

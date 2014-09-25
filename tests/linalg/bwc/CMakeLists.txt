@@ -23,9 +23,12 @@ endmacro(string_join var delimiter str_list)
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
-    add_test(test-bwc-${nm} bash -c
-        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail}")
+    # Don't split this line !
+    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
 endmacro(add_bwc_test)
+
+
+# All this is 64-bit only !
 
 set(prime_1 281474976710677)
 set(prime_2 5192296858534827628530496329220121)
@@ -37,6 +40,14 @@ set(prime_7 11090678776483259438313656736572334813745748301503266300681918322458
 set(prime_8 204586912993508866875824356051724947013540127877691549342705710506008362275292159680204380770369009821930417757972504438076078534117837065833032974919)
 set(prime_9 3773962424821541352241554580988268890916921220416440428376206300245624162392148852086126725177658767541468375030763844899770584629924792632561434251432696043649395327187)
 set(prime_z 69617318994479297159441705409245167921344429126717528237597542082203295398081625160307507496908132931192662194421301381083506846944815643283884602656894137393981852330936660004926669193667)
+
+
+macro(add_plingen_test testname)
+    string_join(tail " " ${ARGN})
+    # Don't split this line !
+    add_test(test-bwc-plingen-${gfp_layer}-${testname} bash -c
+        "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
+endmacro(add_plingen_test testname)
 
 foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(extra)
@@ -56,8 +67,78 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
         add_bwc_test(modp-inhomogeneous-minimal bwc-ptrace.sh prime=1009 random_matrix_size=50 nrhs=3 m=6 n=6 seed=1)
     endif(gfp_layer STREQUAL "p_1")
     add_dependencies(check plingen_${gfp_layer})
+
+    # Also add some plingen tests if it so occurs that the current
+    # backend can process them
+    # Each of the add_plingen_test lines has the following arguments
+    # plingen test name
+    # reference sha1 sum for generator
+    # m
+    # n
+    # length of sequence to compute
+    # p
+    # seed for random generation (entries are (2^k*(seed/1000) mod q) + (3^k*(seed%1000) mod q) mod p, with q=2^20-3).
+    # arguments to be passed to plingen (including mpi arguments)
+
+    if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
+        add_plingen_test(test0
+            2b6428178054fc0d3931dcdc9257ccf3bdea62f9 4 2 36 1009 17042
+            lingen-threshold=10 lingen-mpi-threshold=10 thr=2x2 --ascii
+            ${extra})
+        add_plingen_test(test1
+            f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
+            lingen-threshold=10 lingen-mpi-threshold=10 thr=2x2 --ascii
+            ${extra})
+        add_plingen_test(test2
+            f9bc59f0caaca0fd523ef6a020a6f49fa97f38e9 4 2 200 1009 88888
+            lingen-threshold=10 lingen-mpi-threshold=40 thr=2x2 --ascii
+            ${extra})
+        add_plingen_test(test3
+            b448493e04299d8d54be6cc1273c43293520ac9e 3 3 1000 1009 1111
+            lingen-threshold=10 lingen-mpi-threshold=40 thr=3x3 --ascii
+            ${extra})
+    endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_1")
+    if(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
+        add_plingen_test(test4
+            00a481d0e0e2ee7403fa234b7f8b818dc2ec8db4 3 3 1000
+            1532495540865888858358347027150309183618739122183602191 1111
+            lingen-threshold=10 lingen-mpi-threshold=40 thr=3x3
+            ${extra})
+    endif(gfp_layer STREQUAL "pz" OR gfp_layer STREQUAL "p_3")
 endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
-add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1)
-add_dependencies(check mf_scan plingen_p_1)
+add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
+add_dependencies(check mf_scan)
+
+add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
+
+add_bwc_test(mod2-interleaving bwc-trace.sh random_matrix_size=800 mn=128
+    interleaving=1 seed=1 thr=2)
+
+add_bwc_test(mod2-m-neq-n bwc-trace.sh random_matrix_size=400 m=128 n=64
+    seed=1 thr=5)
+
+add_subdirectory(mpfq)
+
+if(HAVE_CXX11 AND HAVE_HWLOC)
+    include_directories(${PROJECT_SOURCE_DIR}/linalg/bwc)
+    build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
+endif(HAVE_CXX11 AND HAVE_HWLOC)
+
+macro(test_dispatch_matmul testname)
+    string_join(tail " " ${ARGN})
+    # Don't split this line !
+    add_test(${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${tail}")
+endmacro(test_dispatch_matmul testname)
+
+add_dependencies(check bwc_matmul)
+# mingw has antique bash (3.1) with different regexp syntax, and having
+# the script below work with both isn't a very funny perspective.
+if (NOT MINGW)
+test_dispatch_matmul(dispatch-matmul-65536-thr nrows=65536 density=2 thr=2x2)
+if (HAVE_MPI)
+test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
+endif (HAVE_MPI)
+endif (NOT MINGW)
+

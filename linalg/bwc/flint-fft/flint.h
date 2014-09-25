@@ -30,7 +30,6 @@
 #define ulong ulongxx		/* ensure vendor doesn't typedef ulong */
 #include <sys/param.h>		/* for BSD define */
 #include <gmp.h>
-#include <mpfr.h>
 #include <stdio.h>
 #include <stdlib.h>		/* for alloca on FreeBSD */
 #if !defined(BSD) && !defined(__MINGW64__) && !defined(__MINGW32__)
@@ -72,9 +71,6 @@ extern "C" {
 #error GMP 5.0.0 or MPIR 2.6.0 or later are required
 #endif
 
-#if MPFR_VERSION_MAJOR < 3
-#error MPFR 3.0.0 or later is required
-#endif
 
 /* 
  * We define alternative key words for "asm" and "inline", allowing the code 
@@ -191,7 +187,6 @@ static __inline__ void flint_randclear(flint_rand_t state)
 
 /* 
  * We define this here as there is no mpfr.h */
-typedef __mpfr_struct mpfr;
 
 #if WANT_ASSERT
 #define FLINT_ASSERT(param) assert(param)

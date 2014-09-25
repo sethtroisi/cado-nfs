@@ -56,6 +56,7 @@ void mpfq_2_64_powz(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt y, mpfq_2_64_src_el
             mpz_t zr;
             mpz_init(zr);
             mpz_t ppz;
+            mpz_init(ppz);
             mpfq_2_64_field_characteristic(k, ppz);
             mpz_pow_ui(ppz,ppz,mpfq_2_64_field_degree(k));
             mpz_sub_ui(ppz,ppz,1);
@@ -182,11 +183,20 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
         tmp = (unsigned char *)mpfq_malloc_check(len+1);
         int i;
         for (i = 0; i < len; ++i) {
-            if (str[i] > '9')
-                tmp[i] = str[i] + 10 - 'a';
-            else 
+            if (str[i] >= '0' && str[i] <= '9' && str[i] < '0' + k->io_type) {
                 tmp[i] = str[i] - '0';
+            } else if (str[i] >= 'a' && str[i] < 'a' + k->io_type - 10) {
+                tmp[i] = str[i] + 10 - 'a';
+            } else if (str[i] >= 'A' && str[i] < 'A' + k->io_type - 10) {
+                tmp[i] = str[i] + 10 - 'A';
+            } else {
+                break;
+            }
         }
+        if (i == 0)
+            return 0;
+        len = i;
+        tmp[len]='\0';
         mp_limb_t *zz;
         // Allocate one limb per byte... very conservative.
         zz = (mp_limb_t *)mpfq_malloc_check(len*sizeof(mp_limb_t));
@@ -196,12 +206,10 @@ int mpfq_2_64_sscan(mpfq_2_64_dst_field k, mpfq_2_64_dst_elt z, const char * str
             free(zz);
             return 0;
         }
-        for (i = 0; i < ret; ++i)
-            z[i] = zz[i];
-        for (i = ret; i < 1; ++i)
-            z[i] = 0;
+        mpfq_copy(z, zz, ret);
+        mpfq_zero(z + ret, 1 - ret);
         free(zz);
-        return 1;
+        return len;
     } else {
         fprintf(stderr, "Polynomial io not implemented for reading\n");
         return 0;
@@ -227,7 +235,7 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
                 break;
         } else {
             if (len==allocated) {
-                allocated+=100;
+                allocated = len + allocated / 4;
                 tmp = (char*)realloc(tmp, allocated*sizeof(char));
             }
             tmp[len]=c;
@@ -241,7 +249,7 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
     tmp[len]='\0';
     int ret=mpfq_2_64_sscan(k,z,tmp);
     free(tmp);
-    return ret;
+    return ret ? len : 0;
 }
 
 
@@ -305,7 +313,7 @@ int mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mpf
         mpfq_2_64_asprint(K, &tmp, w[i]);
         int ltmp = strlen(tmp);
         if (len+ltmp+4 > alloc) {
-            alloc = len+ltmp+100;
+            alloc = len+ltmp+100 + alloc / 4;
             *pstr = (char *)realloc(*pstr, alloc*sizeof(char));
         }
         strncpy(*pstr+len, tmp, ltmp+4);
@@ -339,44 +347,49 @@ int mpfq_2_64_vec_print(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec w,
 int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
+    unsigned int nn;
+    int len = 0;
     mpfq_2_64_vec_reinit(K, w, *n, 0);
-    *n = 0;
-    while (isspace((int)(unsigned char)str[0]))
-        str++;
-    if (str[0] != '[')
+    *n = nn = 0;
+    while (isspace((int)(unsigned char)str[len]))
+        len++;
+    if (str[len] != '[')
         return 0;
-    str++;
-    if (str[0] != ' ')
-        return 0;
-    str++;
-    if (str[0] == ']') {
-        return 1;
+    len++;
+    while (isspace((int)(unsigned char)str[len]))
+        len++;
+    if (str[len] == ']') {
+        len++;
+        return len;
     }
     unsigned int i = 0;
     for (;;) {
-        if (*n < i+1) {
-            mpfq_2_64_vec_reinit(K, w, *n, i+1);
-            *n = i+1;
+        if (nn < i+1) {
+            mpfq_2_64_vec_reinit(K, w, nn, i+1);
+            *n = nn = i+1;
         }
-        int ret;
-        ret = mpfq_2_64_sscan(K, (*w)[i], str);
+        int ret = mpfq_2_64_sscan(K, mpfq_2_64_vec_coeff_ptr(K, *w, i), str + len);
         if (!ret) {
+            *n = 0; /* invalidate data ! */
             return 0;
         }
         i++;
-        while (isdigit((int)(unsigned char)str[0]))
-            str++;
-        while (isspace((int)(unsigned char)str[0]))
-            str++;
-        if (str[0] == ']')
+        len += ret;
+        while (isspace((int)(unsigned char)str[len]))
+            len++;
+        if (str[len] == ']') {
+            len++;
             break;
-        if (str[0] != ',')
+        }
+        if (str[len] != ',') {
+            *n = 0; /* invalidate data ! */
             return 0;
-        str++;
-        while (isspace((int)(unsigned char)str[0]))
-            str++;
+        }
+        len++;
+        while (isspace((int)(unsigned char)str[len]))
+            len++;
     }
-    return 1;
+    return len;
 }
 
 /* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec */
@@ -387,17 +400,26 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_
     int allocated, len=0;
     allocated=100;
     tmp = (char *)mpfq_malloc_check(allocated*sizeof(char));
+    int nest = 0, mnest = 0;
     for(;;) {
         c = fgetc(file);
-        if (c==EOF)
+        if (c==EOF) {
+            free(tmp);
             return 0;
+        }
+        if (c == '[') {
+            nest++, mnest++;
+        }
         if (len==allocated) {
-            allocated+=100;
+            allocated = len + 10 + allocated / 4;
             tmp = (char*)realloc(tmp, allocated*sizeof(char));
         }
         tmp[len]=c;
         len++;
-        if (c==']')
+        if (c == ']') {
+            nest--, mnest++;
+        }
+        if (mnest && nest == 0)
             break;
     }
     if (len==allocated) {
@@ -474,31 +496,29 @@ void mpfq_2_64_poly_setmonic(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_p
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_divmod */
-void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_dst_poly r, mpfq_2_64_src_poly a, mpfq_2_64_src_poly b)
+int mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_dst_poly r, mpfq_2_64_src_poly a, mpfq_2_64_src_poly b)
 {
     if (b->size == 0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (a->size == 0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     int dega = mpfq_2_64_poly_deg(K, a);
     if (dega<0) {
         q->size = 0; r->size = 0;
-        return;
+        return 1;
     }
     // Compute deg b and inverse of leading coef
     int degb = mpfq_2_64_poly_deg(K, b);
     if (degb<0) {
-        fprintf(stderr, "Error: division by 0\n");
-        exit(1);
+        return 0;
     }
     if (degb > dega) {
         q->size=0;
         mpfq_2_64_poly_set(K, r, a);
-        return;
+        return 1;
     }
     int bmonic;
     mpfq_2_64_elt ilb;
@@ -550,15 +570,18 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     if (r != NULL)
         mpfq_2_64_poly_set(K, r, rr);
     mpfq_2_64_clear(K, &temp);
+    mpfq_2_64_clear(K, &ilb);
     mpfq_2_64_clear(K, &aux);
     mpfq_2_64_clear(K, &aux2);
     mpfq_2_64_poly_clear(K, rr);
     mpfq_2_64_poly_clear(K, qq);
+    return 1;
 }
 
 static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, unsigned int);
-static /* *Mpfq::defaults::poly::code_for_poly_precomp_mod */
-void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, unsigned int n)
+/* *Mpfq::defaults::poly::code_for_poly_precomp_mod */
+/* Triggered by: poly_precomp_mod */
+static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, unsigned int n)
 {
     // Compute the inverse of p(x) modulo x^n
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)

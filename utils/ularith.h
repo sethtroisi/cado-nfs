@@ -845,8 +845,8 @@ ularith_post_process_inverse(const unsigned long r, const unsigned long p,
      a properly reduced sum mod p. */
   ularith_addmod_ul_ul (&t, ratio_p, t, p);
 
-  ASSERT_ALWAYS(t < p);
-  ASSERT_ALWAYS(k == 0 || p % 2 == 1);
+  ASSERT_EXPENSIVE(t < p);
+  ASSERT_EXPENSIVE(k == 0 || p % 2 == 1);
   for (unsigned long j = 0; j < k; j++) {
     t = ularith_div2mod(t, p);
   }

@@ -12,7 +12,7 @@
 
 int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
-#ifdef  MPI_LIBRARY_MT_CAPABLE
+#if defined(MPI_LIBRARY_MT_CAPABLE)
     int req = MPI_THREAD_MULTIPLE;
     int prov;
     MPI_Init_thread(p_argc, p_argv, req, &prov);
@@ -22,6 +22,21 @@ int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char 
                 prov, req);
         exit(1);
     }
+#if 0   /* was: elif OMPI_VERSION_ATLEAST(1,8,2) */
+    /* This is just a try, right. In practice, we do rely on the
+     * SERIALIZED model, so let's at least do as we cared about telling
+     * the MPI implementation about it.
+     */
+    int req = MPI_THREAD_SERIALIZED;
+    int prov;
+    MPI_Init_thread(p_argc, p_argv, req, &prov);
+    if (req != prov) {
+        fprintf(stderr, "Cannot init mpi with MPI_THREAD_SERIALIZED ;"
+                " got %d != req %d\n",
+                prov, req);
+        exit(1);
+    }
+#endif  /* #if 0 */
 #else
     MPI_Init(p_argc, p_argv);
 #endif
@@ -52,6 +67,11 @@ int bw_common_clear_mpi(struct bw_params * bw)
     MPI_Allreduce(MPI_IN_PLACE, &cpu, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     if (bw->can_print) {
+        /* valgrind has a tendency to complain about this code depending
+         * on unitialized data in the variable "cpu". This is most
+         * probably due to MPI_Allreduce, and there's not much we can do,
+         * unfortunately.
+         */
         printf("Timings for %s: wct=%.2f cpu=%.2f (aggregated over %d threads and %d MPI jobs)\n",
                 ptr,
                 wct, cpu,

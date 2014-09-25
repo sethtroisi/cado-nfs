@@ -1,5 +1,6 @@
 #include "cado.h"
 
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <sys/time.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -173,9 +174,7 @@ namespace globals {
 void compute_E_from_A(polmat const &a)/*{{{*/
 {
     using namespace globals;
-    /* FIXME: Hmmm, should be m, not n here, right ??? */
-    ASSERT_ALWAYS(m == n);      /* plausible error trap */
-    polmat tmp_E(n, m + n, a.ncoef - t0);
+    polmat tmp_E(m, m + n, a.ncoef - t0);
     for(unsigned int j = 0 ; j < n ; j++) {
         tmp_E.import_col_shift(j, a, j, - (int) t0);
     }

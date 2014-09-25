@@ -44,27 +44,43 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     }
     */
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
-    mpz_clear(p);
 
     block_control_signals();
 
+    /*****************************************
+     *             Watch out !               *
+     *****************************************/
+     
+    /* HERE is the place where something actually happens. The rest of
+     * this function are just sanity checks. Matrix dispatch can, in
+     * fact, be done from any program which does matmul_top_init. This
+     * function calls mmt_finish_init, which calls
+     * matmul_top_read_submatrix, which eventually calls
+     * balancing_get_matrix_u32, which hooks into the balancing code.
+     * This is UNLESS either of the two command-line arguments are set,
+     * because these trigger special behaviour:
+     * export_cachelist : see this file, in fact. This makes "dispatch" a
+     * quick cache file listing tool, which helps the perl script a bit.
+     * random_matrix_size : for creating test matrices, essentially for
+     * krylov/mksol speed testing.
+     */
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+
+
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     const char * tmp = param_list_lookup_string(pl, "sanity_check_vector");
     int only_export = param_list_lookup_string(pl, "export_cachelist") != NULL;
 
     // in no situation shall we try to do our sanity check if we've just
-    // been told to export our cache list
-    if (tmp != NULL && !only_export && !param_list_lookup_string(pl, "prime")) {
+    // been told to export our cache list. Note also that this sanity
+    // check is currently only valid for GF(2).
+    if (tmp != NULL && !only_export && mpz_cmp_ui(bw->p, 2) == 0) {
         /* We have computed a sanity check vector, which is H=M*K, with K
          * constant and easily given. Note that we have not computed K*M,
          * but really M*K. Thus independently of which side we prefer, we
@@ -78,6 +94,11 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
          */
         mmt_wiring_ptr mcol = mmt->wr[1];
         mmt_wiring_ptr mrow = mmt->wr[0];
+
+        const char * checkname;
+
+        checkname = "1st check: consistency of M*arbitrary1 (Hx.0 == H1)";
+
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
         for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
             void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
@@ -96,6 +117,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
+                printf("%s : failed\n", checkname);
 #ifdef WEXITSTATUS
                 fprintf(stderr, "%s returned %d\n", cmd, WEXITSTATUS(rc));
 #else
@@ -103,10 +125,13 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 #endif
                 exit(1);
             } else {
-                printf("Check of %s against %s: ok\n", tmp, "Hx.0");
+                printf("%s : ok\n", checkname);
             }
         }
         serialize(pi->m);
+
+        checkname = "2nd check: (arbitrary2, M*arbitrary1) == (arbitrary2*M==Hy, arbitrary1)";
+
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
         for(unsigned int i = mrow->i0 ; i < mrow->i1 && i < unpadded ; i++) {
             void * dst = SUBVEC(mrow->v, v, i - mrow->i0);
@@ -133,6 +158,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_twist_vector(mmt, 0);
         matmul_top_mul(mmt, 0);
         matmul_top_untwist_vector(mmt, 0);
+        matmul_top_save_vector(mmt, "Hy", 0, 0, unpadded);
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
         for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
             void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
@@ -147,11 +173,12 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         allreduce_generic(dp1, pi->m, A->groupsize(A));
         int diff = memcmp(dp0->v, dp1->v, A->vec_elt_stride(A, A->groupsize(A)));
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            printf("Secondary sanity check: %d\n", diff);
             if (diff) {
+                printf("%s : failed\n", checkname);
                 fprintf(stderr, "aborting on sanity check failure.\n");
                 exit(1);
             }
+            printf("%s : ok\n", checkname);
         }
         vec_clear_generic(pi->m, dp0, A->groupsize(A));
         vec_clear_generic(pi->m, dp1, A->groupsize(A));

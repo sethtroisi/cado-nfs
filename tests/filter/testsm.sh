@@ -19,29 +19,29 @@ smexp="8565679074042993029589360"
 
 args="-poly ${poly} -purged ${purged} -index ${id} -gorder ${go} -smexp ${smexp}"
 
-#without -nsm (ie nsm = deg F) and -mt 1
-"${SM}" ${args} -out "${TMPDIR}"/sm.5.1 -mt 1
+#without -nsm (ie nsm = deg F) and -t 1
+"${SM}" ${args} -out "${TMPDIR}"/sm.5.1 -t 1
 if [ "$?" -ne "0" ] ; then
-  echo "$0: sm binary failed with -mt 1 and without -nsm. Files remain in ${TMPDIR}"
+  echo "$0: sm binary failed with -t 1 and without -nsm. Files remain in ${TMPDIR}"
   exit 1
 fi
-#without -nsm (ie nsm = deg F) and -mt 2
-"${SM}" ${args} -out "${TMPDIR}"/sm.5.2 -mt 2
+#without -nsm (ie nsm = deg F) and -t 2
+"${SM}" ${args} -out "${TMPDIR}"/sm.5.2 -t 2
 if [ "$?" -ne "0" ] ; then
-  echo "$0: sm binary failed with -mt 2 and without -nsm. Files remain in ${TMPDIR}"
+  echo "$0: sm binary failed with -t 2 and without -nsm. Files remain in ${TMPDIR}"
   exit 1
 fi
 
-#with -nsm 2 and -mt 1
-"${SM}" ${args} -out "${TMPDIR}"/sm.2.1 -mt 1 -nsm 2
+#with -nsm 2 and -t 1
+"${SM}" ${args} -out "${TMPDIR}"/sm.2.1 -t 1 -nsm 2
 if [ "$?" -ne "0" ] ; then
-  echo "$0: sm binary failed with -mt 1 and -nsm 2. Files remain in ${TMPDIR}"
+  echo "$0: sm binary failed with -t 1 and -nsm 2. Files remain in ${TMPDIR}"
   exit 1
 fi
-#with -nsm 2 and -mt 2
-"${SM}" ${args} -out "${TMPDIR}"/sm.2.2 -mt 2 -nsm 2
+#with -nsm 2 and -t 2
+"${SM}" ${args} -out "${TMPDIR}"/sm.2.2 -t 2 -nsm 2
 if [ "$?" -ne "0" ] ; then
-  echo "$0: sm binary failed with -mt 2 and -nsm 2. Files remain in ${TMPDIR}"
+  echo "$0: sm binary failed with -t 2 and -nsm 2. Files remain in ${TMPDIR}"
   exit 1
 fi
 

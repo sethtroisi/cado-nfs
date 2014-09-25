@@ -477,7 +477,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   // then multiply num and denom by fd to make it even.
   if (((AA->v)&1) == 0) {
     v = AA->v / 2;
-    mpz_poly_copy(A, AA->p);
+    mpz_poly_set(A, AA->p);
   } else {
     v = (1+AA->v) / 2;
     mpz_poly_mul_mpz(A, AA->p, F->coeff[d]);
@@ -507,7 +507,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
       mpz_mul_ui (pk, pk, p);
       target_k ++;
     }
-  mpz_poly_reduce_mod_mpz (A, A, pk);
+  mpz_poly_mod_mpz (A, A, pk, NULL);
   for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
     K[logk] = k;
   K[logk] = 1;
@@ -522,7 +522,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   P = mpz_poly_base_modp_init (A, p, K, logk);
   fprintf (stderr, "mpz_poly_base_modp_init took %2.2lf\n", seconds () - st);
 
-  mpz_poly_copy (a, P[0]);
+  mpz_poly_set (a, P[0]);
 
   // First compute the inverse square root modulo p
   {
@@ -606,7 +606,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
 #ifdef VERBOSE
     fprintf (stderr, "   mpz_poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-    mpz_poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
+    mpz_poly_sub_ui (tmp, tmp, 1); /* a*invsqrtA^2-1 */
     mpz_poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
     mpz_poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
@@ -622,9 +622,9 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, mpz_poly_t F, unsigned long p)
   mpz_poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
   mpz_poly_mod_center (tmp, pk);
 
-  mpz_poly_base_modp_clear (P);
+  mpz_poly_base_modp_clear (P, logk);
 
-  mpz_poly_copy(res->p, tmp);
+  mpz_poly_set(res->p, tmp);
   res->v = v;
 
   mpz_clear (pk);
@@ -833,7 +833,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
       fclose_maybe_compressed (depfile, depname);
       free (depname);
   
-      mpz_poly_copy(prd->p, prd_tab[0]->p);
+      mpz_poly_set(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
       for (i = 0; i < (long)lprd; ++i)
         mpz_poly_clear(prd_tab[i]->p);

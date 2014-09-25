@@ -45,8 +45,8 @@ void
 cado_poly_set2 (cado_poly poly, mpz_poly_t f, mpz_poly_t g, mpz_t N, 
                 mpz_t skew)
 {
-  mpz_poly_set (poly->pols[0], f->coeff, f->deg);
-  mpz_poly_set (poly->pols[1], g->coeff, g->deg);
+  mpz_poly_set (poly->pols[0], f);
+  mpz_poly_set (poly->pols[1], g);
   mpz_set (poly->n, N);
   poly->skew = mpz_get_d (skew);
 }
@@ -55,8 +55,8 @@ void
 cado_poly_extended_set (cado_poly_extended poly, mpz_poly_t f, mpz_poly_t g,
                         mpz_t N, mpz_t p, mpz_t skew, double E)
 {
-  mpz_poly_set (poly->poly->pols[0], f->coeff, f->deg);
-  mpz_poly_set (poly->poly->pols[1], g->coeff, g->deg);
+  mpz_poly_set (poly->poly->pols[0], f);
+  mpz_poly_set (poly->poly->pols[1], g);
   mpz_set (poly->poly->n, N);
   poly->poly->skew = mpz_get_d (skew);
 
@@ -393,6 +393,7 @@ main (int argc, char *argv[])
   if (quiet)
     verbose = -1;
 
+  verbose_set_enabled_flags(pl);
   if (param_list_warn_unused(pl))
     usage (argv0, pl);
   param_list_print_command_line (stdout, pl);

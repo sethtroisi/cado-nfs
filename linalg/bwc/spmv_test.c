@@ -36,17 +36,13 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    mpz_t p;
-    mpz_init_set_ui(p, 2);
-    param_list_parse_mpz(pl, "prime", p);
-    int withcoeffs = mpz_cmp_ui(p, 2) > 0;
+    int withcoeffs = mpz_cmp_ui(bw->p, 2) > 0;
     int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpfq_vbase A;
     mpfq_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME_MPZ, p,
+            MPFQ_PRIME_MPZ, bw->p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
-    mpz_clear(p);
 
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);

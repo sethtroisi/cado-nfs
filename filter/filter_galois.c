@@ -305,6 +305,7 @@ main (int argc, char *argv[])
     break;
   }
   /* print command-line arguments */
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
   fflush(stdout);
 

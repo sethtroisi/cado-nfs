@@ -148,7 +148,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
     }
 
     /* reconcile threads */
-    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 1);
+    thread_broadcast(wr, &caught_something, sizeof(unsigned int), 0);
 
     /* ok, got it. Before we possibly leave, make sure everybody has read
      * the data from the pointer. */
@@ -182,6 +182,9 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     }
 
     if (iter < timing->next_print)
+        return;
+
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_TIMING_GRIDS))
         return;
 
     /* We're printing something, so we might as well check for signals
@@ -247,6 +250,9 @@ void pi_thread_allreduce_add_double(parallelizing_info pi, double * x, int n)
 /* stage=0 for krylov, 1 for mksol */
 void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_ITERATION_TIMINGS))
+        return;
+
     timing_interval_data since_last_reset[2];
     timing_interval_data since_beginning[2];
     extract_interval(since_last_reset, since_beginning, timing);

@@ -2,6 +2,7 @@
 /* It's in C++ because the STL is handy, but that's really all there is
  * to it... */
 #include "cado.h"
+#include <cstddef>      /* see https://gcc.gnu.org/gcc-4.9/porting_to.html */
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>

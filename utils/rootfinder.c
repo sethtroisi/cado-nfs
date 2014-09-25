@@ -154,7 +154,7 @@ static int
 mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
 {
   mpz_t a, aux;
-  mpz_poly_t q, h, ff;
+  mpz_poly_t q, h;
   int d = f->deg, dq, n, m;
 
   mpz_init (a);
@@ -174,7 +174,6 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
      powering algorithm */
   mpz_poly_init (q, 2 * d - 1);
   mpz_poly_init (h, 2 * d - 1);
-  mpz_poly_init (ff, d);
 
   /* random polynomial by a */
   mpz_set_ui (a, lrand48());
@@ -190,11 +189,10 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
     mpz_sub_ui (aux, p, 1);
     mpz_divexact_ui (aux, aux, 2);
     mpz_poly_power_mod_f_mod_mpz (h, q, f, aux, p);
-    mpz_poly_sub_ui (h, 1);
+    mpz_poly_sub_ui (h, h, 1);
 
     /* q = gcd(f,h) */
-    mpz_poly_copy (q, f);
-    mpz_poly_gcd_mpz (q, h, p);
+    mpz_poly_gcd_mpz (q, f, h, p);
     dq = q->deg;
     ASSERT (dq >= 0);
 
@@ -204,9 +202,7 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
       n = mpz_poly_cantor_zassenhaus (r, q, p, depth+1);
       ASSERT (n == dq);
 
-      mpz_poly_copy (ff, f);
-      /* mpz_poly_divexact clobbers its 2nd arg */
-      mpz_poly_divexact (h, ff, q, p);
+      mpz_poly_divexact (h, f, q, p);
       m = mpz_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
       ASSERT (m == h->deg);
       n += m;
@@ -219,7 +215,6 @@ mpz_poly_cantor_zassenhaus (mpz_t *r, mpz_poly_t f, const mpz_t p, int depth)
 
   mpz_poly_clear (q);
   mpz_poly_clear (h);
-  mpz_poly_clear (ff);
 
 clear_a:
   mpz_clear (a);
@@ -248,7 +243,6 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_t f, const mpz_t p)
   mpz_poly_init (h, 2*d-1);
 
   /* reduce f to monic and modulo p */
-  /* mpz_poly_set (mpz_poly_f, f, d); */
   mpz_poly_reduce_makemonic_mod_mpz (fp, f, p);
   if (fp->deg <= 0)
     goto clear_and_exit;
@@ -258,7 +252,7 @@ mpz_poly_roots_mpz (mpz_t *r, mpz_poly_t f, const mpz_t p)
   mpz_poly_power_mod_f_mod_mpz (h, g, fp, p, p);
   mpz_poly_sub (h, h, g);
   /* g = gcd (mpz_poly_fp, h) */
-  mpz_poly_gcd_mpz (fp, h, p);
+  mpz_poly_gcd_mpz (fp, fp, h, p);
   /* mpz_poly_fp contains gcd(x^p-x, f) */
   nr = fp->deg;
   ASSERT (nr >= 0);

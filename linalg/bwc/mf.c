@@ -156,13 +156,18 @@ void matrix_read_pass(
         large_coeff_buffer = malloc(withcoeffs * sizeof(uint32_t));
     }
 
+    size_t readbytes = 0;
+    int delta;
+
     for(i = 0 ; ; i++) {
         uint32_t j;
         /* {{{ read row weight w */
         uint32_t w;
         if (m_in->f) {
             if (m_in->ascii) {
-                rc = fscanf(m_in->f, "%"SCNu32, &w);
+                delta=0;
+                rc = fscanf(m_in->f, "%"SCNu32"%n", &w, &delta);
+                readbytes += delta;
                 if (i >= exp_nr) {
                     if (rc == EOF)
                         break;
@@ -175,6 +180,7 @@ void matrix_read_pass(
             } else {
                 rc = fread32_little(&w, 1, m_in->f);
                 if (rc == 0 && feof(m_in->f)) break;
+                readbytes += rc?4:0;
             }
         } else {
             if (((uint64_t) (ptr - m_in->p) >= m_in->size))
@@ -202,27 +208,35 @@ void matrix_read_pass(
                             uint32_t c;
                             rc = fread32_little(&c, 1, m_in->f);
                             if (!rc) abort_unexpected_eof();
+                            readbytes += rc?4:0;
                         }
                     }
                 } else {
                     /* TODO: do better */
                     for(j = 0 ; j < w ; j++) {
                         uint32_t c;
-                        rc = fscanf(m_in->f, "%" SCNu32, &c);
+                        delta=0;
+                        rc = fscanf(m_in->f, "%" SCNu32"%n", &c, &delta);
+                        readbytes += delta;
                         if (rc == EOF) abort_unexpected_eof();
                         if (withcoeffs == 1) {
                             /* XXX Can probably be more tolerant on how
                              * coeffs are presented */
                             int sp = fgetc(m_in->f);
                             ASSERT_ALWAYS(sp == ' ' || sp == ':');
-                            rc = fscanf(m_in->f, "%" SCNd32, (int32_t *) &c);
+                            delta=0;
+                            rc = fscanf(m_in->f, "%" SCNd32"%n", (int32_t *) &c, &delta);
+                            readbytes += delta;
                             if (rc == EOF) abort_unexpected_eof();
                         } else if (withcoeffs > 1) {
                             int sp = fgetc(m_in->f);
                             ASSERT_ALWAYS(sp == ' ' || sp == ':');
+                            readbytes++;
                             /* suppressed */
-                            rc = gmp_fscanf(m_in->f, "%*Zd");
+                            delta = 0;
+                            rc = gmp_fscanf(m_in->f, "%*Zd%n", &delta);
                             if (rc == EOF) abort_unexpected_eof();
+                            readbytes += delta;
                         }
                     }
                 }
@@ -267,18 +281,26 @@ void matrix_read_pass(
             int32_t coeff=0;
             if (m_in->f) {
                 if (m_in->ascii) {
-                    rc = fscanf(m_in->f, "%" SCNu32, &c);
+                    delta = 0;
+                    rc = fscanf(m_in->f, "%" SCNu32"%n", &c, &delta);
                     if (rc == EOF) abort_unexpected_eof();
+                    readbytes += delta;
                     if (withcoeffs == 1) {
                         int sp = fgetc(m_in->f);
                         ASSERT_ALWAYS(sp == ' ' || sp == ':');
-                        rc = fscanf(m_in->f, "%" SCNd32, (int32_t*) &coeff);
+                        readbytes++;
+                        delta = 0;
+                        rc = fscanf(m_in->f, "%" SCNd32"%n", (int32_t*) &coeff, &delta);
                         if (rc == EOF) abort_unexpected_eof();
+                        readbytes += delta;
                     } else if (withcoeffs > 1) {
                         int sp = fgetc(m_in->f);
                         ASSERT_ALWAYS(sp == ' ' || sp == ':');
-                        rc = gmp_fscanf(m_in->f, "%Zd", large_coeff);
+                        readbytes++;
+                        delta = 0;
+                        rc = gmp_fscanf(m_in->f, "%Zd%n", large_coeff,&delta);
                         if (rc == EOF) abort_unexpected_eof();
+                        readbytes += delta;
                         uint32_t * q = large_coeff_buffer;
                         memset(q, 0, withcoeffs * sizeof(uint32_t));
                         size_t countp;
@@ -288,12 +310,15 @@ void matrix_read_pass(
                 } else {
                     rc = fread32_little(&c, 1, m_in->f);
                     if (!rc) abort_unexpected_eof();
+                    readbytes += rc?4:0;
                     if (withcoeffs == 1) {
                         rc = fread32_little((uint32_t*) &coeff, 1, m_in->f);
                         if (!rc) abort_unexpected_eof();
+                        readbytes += rc?4:0;;
                     } else {
                         rc = fread(large_coeff_buffer, sizeof(uint32_t), withcoeffs, m_in->f);
                         if (rc != withcoeffs) abort_unexpected_eof();
+                        readbytes += rc?4:0;;
                     }
                 }
             } else {
@@ -431,15 +456,16 @@ row_done:
                 t1 = t + 1;
                 int dt = t - t0;
                 size_t sz;
-                if (m_in->f) {
-                    sz = ftell(m_in->f);
+                long o = -1;
+                if (m_in->f && (o = ftell(m_in->f)) >= 0) {
+                    sz = o;
                 } else {
                     sz = (ptr - m_in->p) * sizeof(uint32_t);
                 }
-                fprintf(stderr, "read %zu MB in %d s (%.1f MB/s)   \r",
-                        sz >> 20,
+                fprintf(stderr, "read %zu MB in %d s (%.1f MB/s) %zu %zu  \r",
+                        readbytes >> 20,
                         dt,
-                        1.0e-6 * (double) sz / dt);
+                        1.0e-6 * (double) readbytes / dt, readbytes, sz);
             }
         }/*}}}*/
     }

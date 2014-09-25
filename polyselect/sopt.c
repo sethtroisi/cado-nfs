@@ -171,9 +171,9 @@ opt_file (FILE *file, int deg, mpz_t N) {
 
       /* optimize */
       if (translate)
-        optimize_aux (F, g, 0, 0);
+        optimize_aux (F, g, 0, 0, OPT_STEPS_FINAL);
       else
-        optimize (F, g, 0, 1, 1);
+        optimize (F, g, 0, 1);
 
       /* output size-optimized polynomials */
       nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
@@ -184,6 +184,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
       polyprint (f, g, deg, N);
       printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots, skew: %.2f\n",
               logmu, alpha, logmu + alpha, nroots, skew);
+      fflush (stdout);
 
       ave_logmu += logmu;
       min_logmu = (logmu < min_logmu) ? logmu : min_logmu;
@@ -272,6 +273,7 @@ int main (int argc, char **argv)
   filename = param_list_lookup_string (pl, "f");
 
   /* print out commands */
+  verbose_set_enabled_flags(pl);
   param_list_print_command_line (stdout, pl);
 
   if (param_list_warn_unused(pl)) usage();

@@ -63,10 +63,14 @@ ropt_get_bestpoly ( ropt_poly_t poly,
     compute_fuv_mp (fuv, poly->f, poly->g, poly->d, global_E_pqueue->u[i],
                     global_E_pqueue->v[i]);
 
-    optimize_aux (Fuv, guv, 0, 0);
+    optimize_aux (Fuv, guv, 0, 0, OPT_STEPS_FINAL);
 
     ave_MurphyE = print_poly_fg (Fuv, guv, poly->n, 0);
 
+    mpz_poly_content (t, Fuv);
+    for (k = 0; k <= poly->d; k++) {
+      mpz_div (fuv[k], fuv[k], t);
+    }
     mpz_poly_content (t, Fuv);
 
     if ( (ave_MurphyE > best_E) && (mpz_cmp_ui (t, 1) == 0) ) {

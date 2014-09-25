@@ -198,7 +198,7 @@ polygen_JL_g ( mpz_t N,
         }
     }
 
-    LLL(det, g, NULL, a, b, 0);
+    LLL (det, g, NULL, a, b);
 
     mpz_clear (det);
     mpz_clear (a);

@@ -113,6 +113,17 @@ split_iter_open_next_file(split_output_iter_t *iter)
   if (iter->msg != NULL)
     fprintf (stderr, "%s%s\n", iter->msg, iter->filename);
   iter->file = fopen_maybe_compressed(iter->filename, "w");
+  if (iter->file == NULL) {
+    char *msg;
+    rc = asprintf(&msg, "Could not open file %s for writing", iter->filename);
+    if (rc >= 0) {
+      perror(msg);
+      free(msg);
+    } else {
+      perror("Could not open file for writing");
+    }
+    exit(EXIT_FAILURE);
+  }
   iter->lines_left = iter->lines_per_file;
 }
 
@@ -223,6 +234,7 @@ main (int argc, char * argv[])
         // abort();
     }
     /* print command-line arguments */
+    verbose_set_enabled_flags(pl);
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
 

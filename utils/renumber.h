@@ -52,6 +52,9 @@ void renumber_init_for_writing (renumber_t, int, int, unsigned long *);
 /* Last argument of renumber_write_open can be NULL. It will not print the
    polynomials on the file */
 void renumber_write_open (renumber_t, const char *, const char *, cado_poly);
+void renumber_sort_ul(unsigned long *, size_t);
+size_t renumber_write_p_rat_alg (unsigned long, size_t, unsigned long *, size_t, char *);
+size_t renumber_write_p_2algs (unsigned long, unsigned long *, size_t, unsigned long *, size_t, char *);
 void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 void renumber_write_close (renumber_t, const char*);
 

@@ -182,9 +182,9 @@ void mpfq_2_128_add_uipoly(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_
 static inline
 void mpfq_2_128_mul_uipoly(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
 static inline
-void mpfq_2_128_longaddshift_left(unsigned long *, const unsigned long *, int, int);
-static inline
 void mpfq_2_128_longshift_left(unsigned long *, const unsigned long *, int, int);
+static inline
+void mpfq_2_128_longaddshift_left(unsigned long *, const unsigned long *, int, int);
 static inline
 int mpfq_2_128_inv(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
 static inline
@@ -348,6 +348,8 @@ void mpfq_2_128_poly_add(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_s
 static inline
 void mpfq_2_128_poly_sub(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly);
 static inline
+void mpfq_2_128_poly_set_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, unsigned long);
+static inline
 void mpfq_2_128_poly_add_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, unsigned long);
 static inline
 void mpfq_2_128_poly_sub_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, unsigned long);
@@ -357,7 +359,7 @@ static inline
 void mpfq_2_128_poly_scal_mul(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_elt);
 static inline
 void mpfq_2_128_poly_mul(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly);
-void mpfq_2_128_poly_divmod(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly);
+int mpfq_2_128_poly_divmod(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly);
 void mpfq_2_128_poly_precomp_mod(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly);
 void mpfq_2_128_poly_mod_pre(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly, mpfq_2_128_src_poly);
 static inline
@@ -642,13 +644,12 @@ void mpfq_2_128_pow(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt res, mpfq_2_128_s
     long i, j, lead;     /* it is a signed type */
     unsigned long mask;
     
-    assert (n>0);
-    
     /* get the correct (i,j) position of the most significant bit in x */
-    for(i = n-1; i>=0 && x[i]==0; i--)
+    for(i = ((long)n)-1; i>=0 && x[i]==0; i--)
         ;
     if (i < 0) {
-        mpfq_2_128_set_ui(k, res, 0);
+        /* power zero gets 1 */
+        mpfq_2_128_set_ui(k, res, 1);
         return;
     }
     j = 64 - 1;
@@ -719,26 +720,7 @@ void mpfq_2_128_mul_uipoly(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt r, mpfq_2_
 }
 
 /* *Mpfq::gf2n::inversion::code_for_inv */
-static inline
-void mpfq_2_128_longaddshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
-{
-    int m = s / 64;
-    int i;
-    s %= 64;
-    if (s>0) {
-        for(i = n-m-1 ; i > 0 ; i--) {
-            dst[m+i] ^= src[i] << s ^ src[i-1] >> (64-s);
-        }
-        dst[m] ^= src[0] << s;
-    } else {
-        for(i = n-m-1 ; i > 0 ; i--) {
-            dst[m+i] ^= src[i];
-        }
-        dst[m] ^= src[0];
-    }
-}
-
-/* *Mpfq::gf2n::inversion::code_for_inv */
+/* Triggered by: inv */
 static inline
 void mpfq_2_128_longshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
 {
@@ -760,6 +742,27 @@ void mpfq_2_128_longshift_left(unsigned long * dst, const unsigned long * src, i
         dst[i] = 0UL;
     }
     
+}
+
+/* *Mpfq::gf2n::inversion::code_for_inv */
+/* Triggered by: inv */
+static inline
+void mpfq_2_128_longaddshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
+{
+    int m = s / 64;
+    int i;
+    s %= 64;
+    if (s>0) {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i] << s ^ src[i-1] >> (64-s);
+        }
+        dst[m] ^= src[0] << s;
+    } else {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i];
+        }
+        dst[m] ^= src[0];
+    }
 }
 
 /* *Mpfq::gf2n::inversion::code_for_inv */
@@ -1589,6 +1592,7 @@ void mpfq_2_128_vec_scal_mul_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_
 }
 
 /* *Mpfq::defaults::vec::conv::code_for_vec_conv_ur */
+/* Triggered by: vec_conv_ur */
 static inline
 void mpfq_2_128_vec_conv_ur_n(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec_ur w, mpfq_2_128_src_vec u, mpfq_2_128_src_vec v, unsigned int n)
 {
@@ -1804,6 +1808,7 @@ void mpfq_2_128_poly_setcoeff(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_ds
         w->size = i+1;
     }
     mpfq_2_128_vec_setcoeff(k, w->c, x, i);
+    w->size = 1 + mpfq_2_128_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_setcoeff_ui */
@@ -1819,6 +1824,7 @@ void mpfq_2_128_poly_setcoeff_ui(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128
         w->size = i+1;
     }
     mpfq_2_128_vec_setcoeff_ui(k, w->c, x, i);
+    w->size = 1 + mpfq_2_128_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_getcoeff */
@@ -1898,6 +1904,23 @@ void mpfq_2_128_poly_sub(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_pol
         mpfq_2_128_vec_set(k, mpfq_2_128_vec_subvec(k, w->c, sv), mpfq_2_128_vec_subvec_const(k, u->c, sv), su-sv);
     }
     w->size = 1 + mpfq_2_128_poly_deg(k, w);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_set_ui */
+static inline
+void mpfq_2_128_poly_set_ui(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_poly w, unsigned long x)
+{
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            mpfq_2_128_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        mpfq_2_128_vec_setcoeff_ui(k, w->c, x, 0);
+        w->size = 1;
+        w->size = 1 + mpfq_2_128_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add_ui */

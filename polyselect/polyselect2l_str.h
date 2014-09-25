@@ -77,7 +77,7 @@ typedef struct
 {
   mpz_t N;
   unsigned int d;
-  uint64_t ad;
+  mpz_t ad;
   int thread;
 } __tab_struct;
 typedef __tab_struct tab_t[1];
@@ -107,7 +107,7 @@ typedef struct
 {
   mpz_t N;
   unsigned long d;
-  uint64_t ad;
+  mpz_t ad;
   mpz_t Ntilde;
   mpz_t m0;
 } _header_struct;
@@ -144,8 +144,9 @@ unsigned long initPrimes (unsigned long, uint32_t**);
 void printPrimes (uint32_t*, unsigned long);
 void clearPrimes (uint32_t**);
 
-void header_init (header_t, mpz_t, unsigned long, uint64_t);
+void header_init (header_t, mpz_t, unsigned long, mpz_t);
 void header_clear (header_t);
+int header_skip (header_t, unsigned long);
 
 void proots_init (proots_t, unsigned long);
 void proots_add (proots_t, unsigned long, uint64_t*, unsigned long);
@@ -161,10 +162,10 @@ void qroots_clear (qroots_t);
 
 void hash_init (hash_t, unsigned int);
 void shash_init (shash_t, unsigned int);
-void hash_add (hash_t, unsigned long, int64_t, mpz_t, uint64_t,
+void hash_add (hash_t, unsigned long, int64_t, mpz_t, mpz_t,
                unsigned long, mpz_t, unsigned long, mpz_t);
 int shash_find_collision (shash_t);
-void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, uint64_t,
+void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, mpz_t,
 		   unsigned long, mpz_t, uint64_t, mpz_t);
 void hash_grow (hash_t);
 void hash_clear (hash_t);

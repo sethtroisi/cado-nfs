@@ -711,7 +711,7 @@ int matpoly_read(abdst_field ab, FILE * f, matpoly_ptr M, unsigned int k0, unsig
                 x = transpose ? matpoly_coeff(ab, M, j, i, k)
                               : matpoly_coeff(ab, M, i, j, k);
                 if (ascii) {
-                    err = abfscan(ab, f, x) != 1;
+                    err = abfscan(ab, f, x) == 0;
                 } else {
                     err = fread(x, abvec_elt_stride(ab, 1), 1, f) < 1;
                 }
@@ -1920,7 +1920,7 @@ int bm_io_read1(bm_io_ptr aa, unsigned int io_window)/*{{{*/
             int rc;
             if (aa->ascii) {
                 rc = abfscan(ab, aa->f, x);
-                rc = rc == 1;
+                /* rc is the number of bytes read -- non-zero on success */
             } else {
                 size_t elemsize = abvec_elt_stride(ab, 1);
                 rc = fread(x, elemsize, 1, aa->f);

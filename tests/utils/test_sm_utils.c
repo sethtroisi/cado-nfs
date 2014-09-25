@@ -125,15 +125,15 @@ test_sm (FILE * datafile)
       mpz_poly_getcoeff_wrapper (tmp, 1, ab_polys[r[0]]);
       b = mpz_get_ui (tmp);
       sm_single_rel(SMc, a, b, F, smexp, ell, ell2, invl2);
-      mpz_poly_copy (Nc, ab_polys[r[0]]);
+      mpz_poly_set (Nc, ab_polys[r[0]]);
       mpz_poly_setcoeff_si (Dc, 0, 1);
     }
     else
     {
       sm_relset_init (relset, degF);
       sm_build_one_relset (relset, r, e, len_relset, ab_polys, F, ell2);
-      mpz_poly_copy (Nc, relset->num);
-      mpz_poly_copy (Dc, relset->denom);
+      mpz_poly_set (Nc, relset->num);
+      mpz_poly_set (Dc, relset->denom);
       mpz_poly_reduce_frac_mod_f_mod_mpz (relset->num, relset->denom, F, ell2);
       compute_sm (SMc, relset->num, F, ell, smexp, ell2, invl2);
       sm_relset_clear (relset);

@@ -28,6 +28,7 @@ scripts/typecast.py
 scripts/check_dup.py
 scripts/parse_found.py
 scripts/poly_stats.py
+scripts/make_size_opt.sh
 scripts/cadofactor/parameters.oar
 scripts/cadofactor/parameters.rsa512.oar
 scripts/cadofactor/index.html

@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include "assert.h"
 #include <limits.h>
-#include "fixmp.h"
+#include "mpfq_fixmp.h"
 #include "mpfq_gfp_common.h"
 #include "select_mpi.h"
 #include "mpfq_vbase.h"
@@ -328,9 +328,9 @@ static inline
 void mpfq_p_8_vec_ur_rev(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec_ur, unsigned int);
 static inline
 void mpfq_p_8_vec_scal_mul_ur(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, mpfq_p_8_src_elt, unsigned int);
+void mpfq_p_8_vec_conv_ur_ks(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, unsigned int, mpfq_p_8_src_vec, unsigned int);
 static inline
 void mpfq_p_8_vec_conv_ur_n(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, mpfq_p_8_src_vec, unsigned int);
-void mpfq_p_8_vec_conv_ur_ks(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, unsigned int, mpfq_p_8_src_vec, unsigned int);
 static inline
 void mpfq_p_8_vec_conv_ur(mpfq_p_8_dst_field, mpfq_p_8_dst_vec_ur, mpfq_p_8_src_vec, unsigned int, mpfq_p_8_src_vec, unsigned int);
 static inline
@@ -369,6 +369,8 @@ void mpfq_p_8_poly_add(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly,
 static inline
 void mpfq_p_8_poly_sub(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly);
 static inline
+void mpfq_p_8_poly_set_ui(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, unsigned long);
+static inline
 void mpfq_p_8_poly_add_ui(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, unsigned long);
 static inline
 void mpfq_p_8_poly_sub_ui(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, unsigned long);
@@ -378,7 +380,7 @@ static inline
 void mpfq_p_8_poly_scal_mul(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_elt);
 static inline
 void mpfq_p_8_poly_mul(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly);
-void mpfq_p_8_poly_divmod(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly);
+int mpfq_p_8_poly_divmod(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly);
 void mpfq_p_8_poly_precomp_mod(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly);
 void mpfq_p_8_poly_mod_pre(mpfq_p_8_dst_field, mpfq_p_8_dst_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly, mpfq_p_8_src_poly);
 static inline
@@ -432,9 +434,9 @@ MPI_Op mpfq_p_8_mpi_addition_op_ur(mpfq_p_8_dst_field);
 void mpfq_p_8_mpi_ops_clear(mpfq_p_8_dst_field);
 
 /* Object-oriented interface */
+void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 static inline
 void mpfq_p_8_oo_field_clear(mpfq_vbase_ptr);
-void mpfq_p_8_oo_field_init(mpfq_vbase_ptr);
 #ifdef  __cplusplus
 }
 #endif
@@ -492,11 +494,9 @@ void mpfq_p_8_set(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt r, mpfq_p_
 static inline
 void mpfq_p_8_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt r, unsigned long x)
 {
-    int i; 
     assert (r);
     r[0] = x;
-    for (i = 1; i < 8; ++i)
-        r[i] = 0;
+    mpfq_zero(r + 1, 8 - 1);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_set_zero, Mpfq::gfp::elt, Mpfq::gfp */
@@ -517,12 +517,9 @@ unsigned long mpfq_p_8_get_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_src_el
 static inline
 void mpfq_p_8_set_mpn(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt r, mp_limb_t * x, size_t n)
 {
-    int i;
     if (n < 8) {
-        for (i = 0; i < (int)n; ++i)
-            r[i] = x[i];
-        for (i = n; i < 8; ++i)
-            r[i] = 0;
+        mpfq_copy(r, x, n);
+        mpfq_zero(r + n, 8 - n);
     } else {
         mp_limb_t tmp[n-8+1];
         mpn_tdiv_qr(tmp, r, 0, x, n, k->p->_mp_d, 8);
@@ -545,11 +542,7 @@ void mpfq_p_8_set_mpz(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt r, mpz_t z)
 static inline
 void mpfq_p_8_get_mpn(mpfq_p_8_dst_field k MAYBE_UNUSED, mp_limb_t * r, mpfq_p_8_src_elt x)
 {
-    int i; 
-    assert (r);
-    assert (x);
-    for (i = 0; i < 8; ++i)
-        r[i] = x[i];
+    mpfq_copy(r, x, 8);
 }
 
 /* *Mpfq::gfp::elt::code_for_get_mpz, Mpfq::gfp */
@@ -573,7 +566,7 @@ void mpfq_p_8_random(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt x, gmp_randstate_t s
       mpz_t z;
       mpz_init(z);
       mpz_urandomb(z, state, 8 * GMP_LIMB_BITS);
-      memcpy(x, z->_mp_d, 8 * sizeof(mp_limb_t));  /* UGLY */
+      mpfq_copy(x, z->_mp_d, 8);
       mpz_clear(z);
     mpfq_p_8_normalize(k, x);
 }
@@ -585,7 +578,7 @@ void mpfq_p_8_random2(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt x, gmp_randstate_t 
       mpz_t z;
       mpz_init(z);
       mpz_rrandomb(z, state, 8 * GMP_LIMB_BITS);
-      memcpy(x, z->_mp_d, 8 * sizeof(mp_limb_t));  /* UGLY */
+      mpfq_copy(x, z->_mp_d, 8);
       mpz_clear(z);
     mpfq_p_8_normalize(k, x);
 }
@@ -595,9 +588,9 @@ static inline
 void mpfq_p_8_add(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
     mp_limb_t cy;
-    cy = add_8(z, x, y);
-    if (cy || (cmp_8(z, k->p->_mp_d) >= 0))
-        sub_8(z, z, k->p->_mp_d);
+    cy = mpfq_fixmp_8_add(z, x, y);
+    if (cy || (mpfq_fixmp_8_cmp(z, k->p->_mp_d) >= 0))
+        mpfq_fixmp_8_sub(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sub, Mpfq::gfp */
@@ -605,17 +598,17 @@ static inline
 void mpfq_p_8_sub(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
     mp_limb_t cy;
-    cy = sub_8(z, x, y);
+    cy = mpfq_fixmp_8_sub(z, x, y);
     if (cy) // negative result
-        add_8(z, z, k->p->_mp_d);
+        mpfq_fixmp_8_add(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_neg, Mpfq::gfp */
 static inline
 void mpfq_p_8_neg(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x)
 {
-    if (cmp_ui_8(x, 0))
-        sub_8(z, k->p->_mp_d, x);
+    if (mpfq_fixmp_8_cmp_ui(x, 0))
+        mpfq_fixmp_8_sub(z, k->p->_mp_d, x);
     else {
         int i;
         for (i = 0; i < 8; ++i)
@@ -627,18 +620,18 @@ void mpfq_p_8_neg(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x)
 static inline
 void mpfq_p_8_mul(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
-    mp_limb_t tmp[2*8];
-    mul_8(tmp, x, y);
-    mod_8(z, tmp, k->p->_mp_d);
+    mp_limb_t tmp[16];
+    mpfq_fixmp_8_mul(tmp, x, y);
+    mpfq_fixmp_8_mod(z, tmp, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqr, Mpfq::gfp */
 static inline
 void mpfq_p_8_sqr(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x)
 {
-    mp_limb_t tmp[2*8];
-    sqr_8(tmp, x);
-    mod_8(z, tmp, k->p->_mp_d);
+    mp_limb_t tmp[16];
+    mpfq_fixmp_8_sqr(tmp, x);
+    mpfq_fixmp_8_mod(z, tmp, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_is_sqr, Mpfq::gfp */
@@ -647,11 +640,11 @@ int mpfq_p_8_is_sqr(mpfq_p_8_dst_field k, mpfq_p_8_src_elt x)
 {
     mp_limb_t pp[8];
     mpfq_p_8_elt y;
-    sub_ui_nc_8(pp, k->p->_mp_d, 1);
-    rshift_8(pp, 1);
+    mpfq_fixmp_8_sub_ui_nc(pp, k->p->_mp_d, 1);
+    mpfq_fixmp_8_rshift(pp, 1);
     mpfq_p_8_init(k, &y);
     mpfq_p_8_pow(k, y, x, pp, 8);
-    int res = cmp_ui_8(y, 1);
+    int res = mpfq_p_8_cmp_ui(k, y, 1);
     mpfq_p_8_clear(k, &y);
     if (res == 0)
         return 1;
@@ -667,13 +660,12 @@ void mpfq_p_8_pow(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt res, mpfq_p_8_src_elt r
     long i, j, lead;     /* it is a signed type */
     unsigned long mask;
     
-    assert (n>0);
-    
     /* get the correct (i,j) position of the most significant bit in x */
-    for(i = n-1; i>=0 && x[i]==0; i--)
+    for(i = ((long)n)-1; i>=0 && x[i]==0; i--)
         ;
     if (i < 0) {
-        mpfq_p_8_set_ui(k, res, 0);
+        /* power zero gets 1 */
+        mpfq_p_8_set_ui(k, res, 1);
         return;
     }
     j = 64 - 1;
@@ -710,9 +702,9 @@ static inline
 void mpfq_p_8_add_ui(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, unsigned long y)
 {
     mp_limb_t cy;
-    cy = add_ui_8(z, x, y);
-    if (cy || (cmp_8(z, k->p->_mp_d) >= 0))
-        sub_8(z, z, k->p->_mp_d);
+    cy = mpfq_fixmp_8_add_ui(z, x, y);
+    if (cy || (mpfq_fixmp_8_cmp(z, k->p->_mp_d) >= 0))
+        mpfq_fixmp_8_sub(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_sub_ui, Mpfq::gfp */
@@ -720,9 +712,9 @@ static inline
 void mpfq_p_8_sub_ui(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, unsigned long y)
 {
     mp_limb_t cy;
-    cy = sub_ui_8(z, x, y);
+    cy = mpfq_fixmp_8_sub_ui(z, x, y);
     if (cy) // negative result
-        add_8(z, z, k->p->_mp_d);
+        mpfq_fixmp_8_add(z, z, k->p->_mp_d);
 }
 
 /* *Mpfq::gfp::elt::code_for_mul_ui, Mpfq::gfp */
@@ -730,7 +722,7 @@ static inline
 void mpfq_p_8_mul_ui(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x, unsigned long y)
 {
     mp_limb_t tmp[8+1], q[2];
-    mul1_8(tmp,x,y);
+    mpfq_fixmp_8_mul1(tmp,x,y);
     mpn_tdiv_qr(q, z, 0, tmp, 8+1, k->p->_mp_d, 8);
 }
 
@@ -738,7 +730,7 @@ void mpfq_p_8_mul_ui(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt 
 static inline
 int mpfq_p_8_inv(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_src_elt x)
 {
-    int ret=invmod_8(z, x, k->p->_mp_d);
+    int ret=mpfq_fixmp_8_invmod(z, x, k->p->_mp_d);
     if (!ret)
         mpfq_p_8_get_mpz(k, k->factor, z);
     return ret;
@@ -784,9 +776,7 @@ void mpfq_p_8_elt_ur_clear(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_elt_ur * 
 static inline
 void mpfq_p_8_elt_ur_set(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt_ur x)
 {
-    int i;
-    for (i = 0; i < 17; ++i) 
-        z[i] = x[i];
+    mpfq_copy(z, x, 17);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gfp::elt, Mpfq::gfp */
@@ -807,11 +797,9 @@ void mpfq_p_8_elt_ur_set_zero(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_el
 static inline
 void mpfq_p_8_elt_ur_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur r, unsigned long x)
 {
-    int i; 
     assert (r); 
     r[0] = x;
-    for (i = 1; i < 17; ++i)
-        r[i] = 0;
+    mpfq_zero(r + 1, 17 - 1);
 }
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_add, Mpfq::gfp */
@@ -827,9 +815,7 @@ void mpfq_p_8_elt_ur_neg(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt_ur z, mpfq_p_8_s
 {
     mpfq_p_8_elt_ur tmp;
     mpfq_p_8_elt_ur_init(k, &tmp);
-    int i;
-    for (i = 0; i < 17; ++i) 
-        tmp[i] = 0;
+    mpfq_zero(tmp, 17);
     mpn_sub_n(z, tmp, x, 17);
     mpfq_p_8_elt_ur_clear(k, &tmp);
 }
@@ -845,22 +831,16 @@ void mpfq_p_8_elt_ur_sub(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur 
 static inline
 void mpfq_p_8_mul_ur(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
-    mul_8(z, x, y);
-    int i;
-    for (i = 16; i < 17; ++i) {
-        z[i] = 0;
-    }
+    mpfq_fixmp_8_mul(z, x, y);
+    mpfq_zero(z + 16, 17 - 16);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqr_ur, Mpfq::gfp */
 static inline
 void mpfq_p_8_sqr_ur(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_elt_ur z, mpfq_p_8_src_elt x)
 {
-    sqr_8(z, x);
-    int i;
-    for (i = 16; i < 17; ++i) {
-        z[i] = 0;
-    }
+    mpfq_fixmp_8_sqr(z, x);
+    mpfq_zero(z + 16, 17 - 16);
 }
 
 /* *Mpfq::gfp::elt::code_for_reduce, Mpfq::gfp */
@@ -879,7 +859,7 @@ void mpfq_p_8_reduce(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt z, mpfq_p_8_dst_elt_
 static inline
 void mpfq_p_8_normalize(mpfq_p_8_dst_field k, mpfq_p_8_dst_elt x)
 {
-    if (cmp_8(x,k->p->_mp_d)>=0) {
+    if (mpfq_fixmp_8_cmp(x,k->p->_mp_d)>=0) {
       mp_limb_t q[8+1];
       mpfq_p_8_elt r;
       mpn_tdiv_qr(q, r, 0, x, 8, k->p->_mp_d, 8);
@@ -912,14 +892,14 @@ void mpfq_p_8_addmul_si_ur(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_elt_u
 static inline
 int mpfq_p_8_cmp(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_src_elt x, mpfq_p_8_src_elt y)
 {
-    return cmp_8(x,y);
+    return mpfq_fixmp_8_cmp(x,y);
 }
 
 /* *Mpfq::gfp::elt::code_for_cmp_ui, Mpfq::gfp */
 static inline
 int mpfq_p_8_cmp_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_src_elt x, unsigned long y)
 {
-    return cmp_ui_8(x,y);
+    return mpfq_fixmp_8_cmp_ui(x,y);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_is_zero, Mpfq::gfp::elt, Mpfq::gfp */
@@ -1195,6 +1175,7 @@ void mpfq_p_8_vec_scal_mul_ur(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_ve
 }
 
 /* *Mpfq::defaults::vec::conv::code_for_vec_conv_ur, Mpfq::gfp */
+/* Triggered by: vec_conv_ur */
 static inline
 void mpfq_p_8_vec_conv_ur_n(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_vec_ur w, mpfq_p_8_src_vec u, mpfq_p_8_src_vec v, unsigned int n)
 {
@@ -1418,6 +1399,7 @@ void mpfq_p_8_poly_setcoeff(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_poly
         w->size = i+1;
     }
     mpfq_p_8_vec_setcoeff(k, w->c, x, i);
+    w->size = 1 + mpfq_p_8_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_setcoeff_ui, Mpfq::gfp */
@@ -1433,6 +1415,7 @@ void mpfq_p_8_poly_setcoeff_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_p
         w->size = i+1;
     }
     mpfq_p_8_vec_setcoeff_ui(k, w->c, x, i);
+    w->size = 1 + mpfq_p_8_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_getcoeff, Mpfq::gfp */
@@ -1512,6 +1495,23 @@ void mpfq_p_8_poly_sub(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_poly w, m
         mpfq_p_8_vec_set(k, mpfq_p_8_vec_subvec(k, w->c, sv), mpfq_p_8_vec_subvec_const(k, u->c, sv), su-sv);
     }
     w->size = 1 + mpfq_p_8_poly_deg(k, w);
+}
+
+/* *Mpfq::defaults::poly::code_for_poly_set_ui, Mpfq::gfp */
+static inline
+void mpfq_p_8_poly_set_ui(mpfq_p_8_dst_field k MAYBE_UNUSED, mpfq_p_8_dst_poly w, unsigned long x)
+{
+        if (x == 0) {
+            w->size = 0;
+            return;
+        }
+        if (w->alloc == 0) {
+            mpfq_p_8_vec_reinit(k, &(w->c), w->alloc, 1);
+            w->alloc = 1;
+        }
+        mpfq_p_8_vec_setcoeff_ui(k, w->c, x, 0);
+        w->size = 1;
+        w->size = 1 + mpfq_p_8_poly_deg(k, w);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_add_ui, Mpfq::gfp */
@@ -1836,6 +1836,8 @@ void mpfq_p_8_elt_ur_set_ui_all(mpfq_p_8_dst_field K MAYBE_UNUSED, mpfq_p_8_dst_
     mpfq_p_8_set_ui(K,p,v);
 }
 
+/* Mpfq::engine::oo::oo_field_clear */
+/* Triggered by: oo */
 static inline
 void mpfq_p_8_oo_field_clear(mpfq_vbase_ptr f)
 {
