@@ -239,7 +239,7 @@ tasks.sieve.threads = 2
 tasks.filter.purge.keep = 160		# maximal excess wanted after purge
 					# (purge shrinks if needed)
 tasks.filter.maxlevel = 15		# perform up to <maxlevel>-way merges
-tasks.filter.ratio = 1.1		# used only when bwstrat=0 (see below)
+tasks.filter.ratio = 1.1		# used only when forbw=0 (see below)
 tasks.filter.merge.forbw = 3 # forbw=0: stops the merge when the weight of the
 			     #    matrix multiplied by the number of rows c*N
 			     #    exceeds ratio*min(c*N)
