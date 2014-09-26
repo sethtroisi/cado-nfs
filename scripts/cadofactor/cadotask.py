@@ -3348,11 +3348,14 @@ class MergeTask(Task):
     def run(self):
         super().run()
 
+        if "mergedfile" in self.state:
+            fn = self.workdir.path_in_workdir(self.state["mergedfile"])
+            if not fn.isfile():
+                self.logger.warning("Output file %s disappeared, generating it again", fn)
+                del(self.state["mergedfile"])
         if not "mergedfile" in self.state:
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
-            if "mergedfile" in self.state:
-                del(self.state["mergedfile"])
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
