@@ -61,11 +61,14 @@ int has_suffix(const char * path, const char * sfx)
     return strcmp(path + lp - ls, sfx) == 0;
 }
 
-// given a path to a file (prefix), and a suffix called (what), returns
-// if the ext parameter is NULL, a malloced string equal to
-// (prefix).(what) ; if ext is non-null AND (ext) is already a suffix of
-// (prefix), say we have (prefix)=(prefix0)(ext), then we return
-// (prefix0).(what)(ext)
+// given a path to a file (prefix), and a suffix called (what), returns:
+// - if the ext parameter is NULL, return (prefix).(what) ;
+// - if ext is non-null AND (ext) is already a suffix of (prefix), say
+//   we have (prefix)=(prefix0)(ext), then we return (prefix0).(what)(ext)
+// - if ext is non-null AND (ext) is NOT a suffix of (prefix), 
+//   we return (prefix).(what)(ext)
+// In all cases the returned string is malloced, and must be freed by the
+// caller later.
 // It is typical to use ".bin" or ".txt" as ext parameters.
 char * derived_filename(const char * prefix, const char * what, const char * ext)
 {

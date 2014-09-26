@@ -788,14 +788,6 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                 unsigned int offset_there = (znum % nh) * z;
                 unsigned int count = MIN(ii1 - ii, cz - offset_there);
                 unsigned int offset_me = ii - mrow->i0;
-                /*
-                ASSERT(l < mrow->ylen);
-                ASSERT(mrow->y[l].k == (int) k);
-                ASSERT(mrow->y[l].offset_me == offset_me);
-                ASSERT(mrow->y[l].offset_there == offset_there);
-                ASSERT(mrow->y[l].count == count);
-                */
-
                 unsigned int dst = k % pirow->ncores;
                 /* Note that ``offset_there'' does not count here, since
                  * at this point we're not yet flipping to the buffer in
@@ -1222,7 +1214,7 @@ allreduce_across(matmul_top_data_ptr mmt, int d)
 /* }}} */
 
 /* {{{ utility: matmul_top_zero_vec_area */
-static void matmul_top_zero_vec_area(matmul_top_data_ptr mmt, int d)
+void matmul_top_zero_vec_area(matmul_top_data_ptr mmt, int d)
 {
     mmt_wiring_ptr mdst = mmt->wr[d];
     pi_wiring_ptr pidst = mmt->pi->wr[d];
@@ -1258,17 +1250,17 @@ static void matmul_top_restrict_vec_area(matmul_top_data_ptr mmt, int d)
 }
 /* }}} */
 
-/* {{{ apply_permutation -- this applies the permutation S */
+/* {{{ apply_balancing_permutation -- this applies the permutation S */
 /* This is sort of an equivalent to matmul_top_cpu, although since it is
  * meant to work on permutation matrices, it works equally well even if
  * output buffers are shared.  */
-void apply_permutation(matmul_top_data_ptr mmt, int d)
+void apply_balancing_permutation(matmul_top_data_ptr mmt, int d)
 {
     mmt_wiring_ptr mrow = mmt->wr[0];
     mmt_wiring_ptr mcol = mmt->wr[1];
 
     matmul_top_zero_vec_area(mmt, !d);
-    serialize_threads(mmt->pi->wr[d]);
+    serialize_threads(mmt->pi->m);
     for(uint32_t i = 0 ; i < mmt->mm->ntwists ; i++) {
         uint32_t u = mmt->mm->twist[i][0];
         uint32_t v = mmt->mm->twist[i][1];
@@ -1291,6 +1283,56 @@ void apply_permutation(matmul_top_data_ptr mmt, int d)
 }
 /* }}} */
 
+/* {{{ apply_decorrelating_permutation -- this applies the fixed
+ * permutation which we use unconditionally in bwc to avoid correlation
+ * of row and column weights. Because of this permutation T, we never
+ * work with the matrix M the user thinks, but rather with the matrix MT.
+ */
+/* This is sort of an equivalent to matmul_top_cpu, although since it is
+ * meant to work on permutation matrices, it works equally well even if
+ * output buffers are shared.  */
+void apply_decorrelating_permutation(matmul_top_data_ptr mmt, int d)
+{
+    /* See matmul_top_apply_T and matmul_top_unapply_T below. Because we
+     * use the same mechanism as for matmul_top_apply_S and friends, we
+     * must pay attention that the real operation we're concerned with is
+     * only with vector for direction d==1 (column vector).
+     *
+     * At the point where we get here, the situation where the action of
+     * T is asked for the vector in direction 0 has already been evicted
+     * -- there's an early return in matmul_top_unapply_T. Therefore we
+     * must use d (which, by convention, indicates the source argument)
+     * to indicate whether we're at the beginning or the end of the
+     * chain. If at the beginning, by convention, we're unapplying.
+     */
+
+    mmt_wiring_ptr msrc = mmt->wr[d];
+    mmt_wiring_ptr mdst = mmt->wr[!d];
+
+    matmul_top_zero_vec_area(mmt, !d);
+    serialize_threads(mmt->pi->m);
+
+    mpfq_vbase_ptr A = mmt->abase;
+
+    for(uint32_t u = msrc->i0 ; u < msrc->i1 ; u++) {
+        uint32_t v;
+        if (d == 1) {
+            /* source is the col vector, hence we're at the beginning of the
+             * chain */
+            v = balancing_pre_unshuffle(mmt->bal, u);
+        } else {
+            v = balancing_pre_shuffle(mmt->bal, u);
+        }
+        if (v < mdst->i0) continue;
+        if (v >= mdst->i1) continue;
+        A->vec_set(A,
+                A->vec_coeff_ptr(A, mdst->v->v, v - mdst->i0),
+                A->vec_coeff_ptr_const(A, msrc->v->v, u - msrc->i0),
+                1);
+    }
+}
+/* }}} */
+
 /* {{{ This applies the identity matrix (thus copies the vector from [d]
  * to [!d]) */
 void apply_identity(matmul_top_data_ptr mmt, int d)
@@ -1299,7 +1341,7 @@ void apply_identity(matmul_top_data_ptr mmt, int d)
     mmt_wiring_ptr mdst = mmt->wr[!d];
 
     matmul_top_zero_vec_area(mmt, !d);
-    serialize_threads(mmt->pi->wr[d]);
+    serialize_threads(mmt->pi->m);
 
     for(unsigned int i = msrc->i0 ; i < msrc->i1 ; i++) {
         if (i >= mdst->i0 && i < mdst->i1) {
@@ -1325,7 +1367,7 @@ void apply_identity(matmul_top_data_ptr mmt, int d)
 void matmul_top_unapply_S_unapply_P(matmul_top_data_ptr mmt, int d)
 {
     // if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) printf("[%s] d == %d\n", __func__, d);
-    apply_permutation(mmt, d);
+    apply_balancing_permutation(mmt, d);
     matmul_top_mul_comm(mmt, d);
 }
 /* }}} */
@@ -1347,7 +1389,7 @@ void matmul_top_apply_P_apply_S(matmul_top_data_ptr mmt, int d)
     matmul_top_restrict_vec_area(mmt, d);
     serialize_threads(picol);
     matmul_top_mul_comm(mmt, !d);
-    apply_permutation(mmt, !d);
+    apply_balancing_permutation(mmt, !d);
     allreduce_across(mmt, d);
 }
 /* }}} */
@@ -1374,7 +1416,7 @@ void matmul_top_unapply_P(matmul_top_data_ptr mmt, int d)
 /* {{{ matmul_top_unapply_S */
 void matmul_top_unapply_S(matmul_top_data_ptr mmt, int d)
 {
-    apply_permutation(mmt, d);
+    apply_balancing_permutation(mmt, d);
     allreduce_across(mmt, !d);
     apply_identity(mmt, !d);
     allreduce_across(mmt, d);
@@ -1386,7 +1428,29 @@ void matmul_top_apply_S(matmul_top_data_ptr mmt, int d)
 {
     apply_identity(mmt, d);
     allreduce_across(mmt, !d);
-    apply_permutation(mmt, !d);
+    apply_balancing_permutation(mmt, !d);
+    allreduce_across(mmt, d);
+}
+/* }}} */
+
+/* {{{ matmul_top_unapply_T */
+void matmul_top_unapply_T(matmul_top_data_ptr mmt, int d)
+{
+    if (d == 0) return;
+    apply_decorrelating_permutation(mmt, d);
+    allreduce_across(mmt, !d);
+    apply_identity(mmt, !d);
+    allreduce_across(mmt, d);
+}
+/* }}} */
+
+/* {{{ matmul_top_apply_T */
+void matmul_top_apply_T(matmul_top_data_ptr mmt, int d)
+{
+    if (d == 0) return;
+    apply_identity(mmt, d);
+    allreduce_across(mmt, !d);
+    apply_decorrelating_permutation(mmt, !d);
     allreduce_across(mmt, d);
 }
 /* }}} */
@@ -1401,7 +1465,7 @@ void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d)
         matmul_top_unapply_S_unapply_P(mmt, d);
     // I know this looks odd, but I have witnessed inconsistencies when
     // matmul_top_mul is called directly after twist_vector, for the case
-    // of on-shared vectors. twist_vector() is rare enough to allow an
+    // of shared vectors. twist_vector() is rare enough to allow an
     // extra serializing call.
     serialize(mmt->pi->m);
 }

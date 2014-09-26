@@ -1,0 +1,16 @@
+For inhomogeneous linear system solving over GF(p), one should do:
+
+make check ARGS="-R 3rhs-mn6"
+
+which should create a random matrix of size 50x50, and solve it for a
+3-dimensional right-hand side.
+
+At the moment, there are some bugs:
+
+ - the vectors produced by gather do not carry the correct permutation.
+ - the following tests fail:
+
+          91 - test-bwc-modp-inhomogeneous-minimal-1rhs-mn1 (Failed)
+          93 - test-bwc-modp-homogeneous-minimal-mn4 (Failed)
+          94 - test-bwc-modp-inhomogeneous-minimal-2rhs-mn2 (Failed)
+

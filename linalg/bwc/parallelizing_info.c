@@ -1368,21 +1368,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 
     free(alldisps);
 
-#if 0
-    for(unsigned int i = 0 ; i < w->njobs ; i++) {
-        my_pthread_mutex_lock(w->th->m);
-        printf("J%uT%u %u @ %u\n", i, w->trank, counts[i], displs[i]);
-        my_pthread_mutex_unlock(w->th->m);
-    }
-#endif
-
     serialize_threads(w);
-
-#if 0
-    ASSERT_ALWAYS(displs[w->jrank] >= 0);
-    if (displs[w->jrank] == 0)
-        ASSERT_ALWAYS(w->trank == 0);
-#endif
 
     if (w->trank == 0) {
         free(allcounts);

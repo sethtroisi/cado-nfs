@@ -27,10 +27,8 @@ pass_bwcpl_args=("$@")
 : ${m=8}
 : ${n=4}
 : ${prime=4148386731260605647525186547488842396461625774241327567978137}
-: ${Mh=1}
-: ${Mv=1}
-: ${Th=2}
-: ${Tv=2}
+: ${mpi=1x1}
+: ${thr=2x2}
 # Set the "matrix" variable in order to work on a real matrix.
 : ${matrix=}
 # Set the "bindir" variable to use pre-built binaries (must point to the
@@ -45,19 +43,21 @@ pass_bwcpl_args=("$@")
 : ${random_matrix_minkernel=10}
 : ${mats=$HOME/Local/mats}
 : ${matsfallback=/local/rsa768/mats}
-: ${wipe=}
-: ${seed=}
+: ${pre_wipe=}
+: ${seed=$RANDOM}
 
 wordsize=64
 # XXX note that $wdir is wiped out by this script !
 : ${wdir=/tmp/bwcp}
-: ${buildopts="MPI=1 DEBUG=1"}
 : ${shuffle=1}
-: ${nomagma=}
+
+# By default we don't enable magma. Just say magma=magma (or
+# magma=/path/to/magma) to get (very expensive) magma checks.
+: ${magma=}
 
 # This has to be provided as auxiliary data for the GF(p) case (or we'll
 # do without any rhs whatsoever).
-: ${rhs=}
+: ${rhsfile=}
 : ${nullspace=right}
 : ${interval=50}
 : ${mm_impl=basicp}
@@ -95,21 +95,9 @@ argument_checking() {
         left|right) ;;
         *) echo "\$nullspace must be left or right" >&2; usage;;
     esac
-    if ! [ "$prime" ] ; then
-        prime=2
-    fi
-    if [ "$prime" = 2 ] ; then
-        if [ $((m % 64)) != 0 ] || [ $((n % 64)) != 0 ] ; then
-            echo "\$m and \$n must be multiples of 64" >&2
-            usage
-        fi
-        if [ "$rhs" ] || [ "$nrhs" ] ; then
-            echo "\$rhs and \$nrhs are unsupported in the GF(2) case" >&2
-            usage
-        fi
-    else
-        if [ "$rhs" ] && ! [ "$matrix" ] ; then
-            echo "Please specify \$rhs only with \$matrix" >&2
+    if [ "$prime" != 2 ] ; then
+        if [ "$rhsfile" ] && ! [ "$matrix" ] ; then
+            echo "Please specify \$rhsfile only with \$matrix" >&2
             usage
         fi
         if [ "$matrix" ] && [ "$nrhs" ] ; then
@@ -120,110 +108,24 @@ argument_checking() {
 }
 
 derived_variables() {
-    # Set here the variables which merit global scope, as they have
-    # global relevance.
-    Nh=$((Mh*Th))
-    Nv=$((Mv*Tv))
-    mpi=${Mh}x${Mv}
-    thr=${Th}x${Tv}
-
-    mpi_njobs_lingen=$((Nh*Nv))
-    mpi_njobs_other=$((Mh*Mv))
-
-    nwords=$(echo "1+l($prime)/l(2)/$wordsize"| bc -l | cut -d. -f1)
-    n32bit=$(echo "1+l($prime)/l(2)/32"| bc -l | cut -d. -f1)
-    bits_per_coeff=$((nwords*$wordsize))
-
-    : ${plingen_program:=plingen_p_${nwords}}
-
-    top=`dirname $0`/../..
-
     if ! [ -d $mats ] ; then mats=$matsfallback; fi
     if [ "$prime" = 2 ] ; then
         splitwidth=64
     else
         splitwidth=1
     fi
-
-    sequences=()
-    all_splits=0
-    for j in `seq 0 $splitwidth $((n-1))`; do
-        sequences=("${sequences[@]}" $j..$((j+splitwidth)))
-        all_splits=$all_splits,$((j+splitwidth))
-    done
-
-    if [ "$bindir" ] ; then
-        mpi_bindir=$(perl -ne '/HAVE_MPI\s*"(.*)"\s*$/ && print "$1\n";' $bindir/../../cado_mpi_config.h)
-        if ! [ "$mpi_bindir" ] ; then
-            disable_parallel_plingen=1
-        elif ! [ -d "$mpi_bindir" ] ; then
-            echo "HAVE_MPI variable in cado_mpi_config.h ($mpi_bindir) does not point to a directory" >&2
-            exit 1
-        fi
-    else
-        eval "export $buildopts"
-        if ! [ "$MPI" ] || [ "$MPI" = 0 ] ; then
-            disable_parallel_plingen=1
-        elif [ "$MPI" = 1 ] ; then
-            :
-        elif [ -d "$MPI" ] ; then
-            mpi_bindir="$MPI"
-        else
-            echo "MPI environment variable ($MPI) does not point to a directory (nor is it 0 or 1)" >&2
-            exit 1
-        fi
-    fi
-
-    if [ "$disable_parallel_plingen" ] ; then
-        mpi_njobs_lingen=1
-    fi
-    if [ $mpi_njobs_lingen -gt 1 ] ; then
-        if ! [ -d "$mpi_bindir" ] ; then
-            echo "We need mpi_bindir to run parallel plingen" >&2
-            exit 1
-        fi
-    fi
-    if ! [ "$mpi_bindir" ] || [ -d "$mpi_bindir" ] ; then
-        :
-    else
-        echo "mpi_bindir must be either empty or point to a directory" >&2
-        exit 1
-    fi
-
-    echo "Working on ${#sequences[@]} sequences"
-
-    if ! [ "$seed" ] ; then
-        seed=$RANDOM
-        echo "Setting seed to $seed"
-    fi
-}
-
-optionally_build() {
-    # build the software. This is optional, really. The only thing is that
-    # it's so easy to mess with the location of the binaries that building it
-    # by ourselves looks like a reasonable thing to do, for this illustrative
-    # script.
-
-    if ! [ "$bindir" ] ; then
-        eval "export $buildopts"
-        make -s -C $top -j 4
-        make -s -C $top -j 4 $plingen_program
-        eval `make -s -C $top show`
-        bindir=$top/$build_tree/linalg/bwc
-    fi
 }
 
 prepare_wdir() {
     if [ -d $wdir ] ; then
-        if [ "$wipe" ] ; then
+        if [ "$pre_wipe" ] ; then
             rm -rf $wdir 2>/dev/null
         else
-            echo "Won't wipe $wdir unless \$wipe is set" >&2
+            echo "Won't wipe $wdir unless \$pre_wipe is set" >&2
             exit 1
         fi
     fi
     mkdir $wdir
-    echo $seed > $wdir/seed.txt
 }
 
 
@@ -235,8 +137,8 @@ create_test_matrix_if_needed() {
         fi
         # Get absolute path.
         matrix=$(readlink /proc/self/fd/99 99< $matrix)
-        if [ -e "$rhs" ] ; then
-            rhs=$(readlink /proc/self/fd/99 99< $rhs)
+        if [ -e "$rhsfile" ] ; then
+            rhsfile=$(readlink /proc/self/fd/99 99< $rhsfile)
         fi
         return
     fi
@@ -253,31 +155,48 @@ create_test_matrix_if_needed() {
     # We're not setting the density, as there is an automatic setting in
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
+
+    rmargs=(${random_matrix_size} -s $seed)
     if [ "$prime" = 2 ] ; then
-        $bindir/random_matrix  ${random_matrix_size} -s $seed --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}.txt
-        matrix=$mats/t${random_matrix_size}.txt
+        basename=$mats/t${random_matrix_size}
+        matrix="$basename.matrix.bin"
+        rmargs=("${rmargs[@]}"  --k$nullspace ${random_matrix_minkernel})
     elif ! [ "$nrhs" ] ; then
-        $bindir/random_matrix  ${random_matrix_size} -s $seed -c ${random_matrix_maxcoeff} --k$nullspace ${random_matrix_minkernel} > $mats/t${random_matrix_size}p.txt
-        matrix=$mats/t${random_matrix_size}p.txt
+        basename=$mats/t${random_matrix_size}p
+        matrix="$basename.matrix.bin"
+        rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
+        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
     else
-        # We use specialized magma code to create the example.
         basename=$mats/t${random_matrix_size}p+${nrhs}
-        # I'm adding a density info here, because I've too often stumbled
-        # across problems.
         density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
         if [ "$density" -lt 12 ] ; then density=12; fi
-        $bindir/random_matrix $random_matrix_size -s $seed -d $density -c ${random_matrix_maxcoeff}  rhs=$nrhs,$prime,"${basename}".rhs.txt > "${basename}".matrix.txt
-        # TODO: This will probably have to be tweaked, as we rather
-        # expect the matrix to come with some expected excess.
-        matrix="$basename.matrix.txt"
-        rhs="$basename.rhs.txt"
+        rmargs=("${rmargs[@]}" -d $density)
+        matrix="$basename.matrix.bin"
+        rhsfile="$basename.rhs.bin"
+        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
+        rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
     fi
+    rmargs=("${rmargs[@]}" --freq --binary --output "$matrix")
+    ${bindir}/random_matrix "${rmargs[@]}"
+    rwfile=${matrix%%bin}rw.bin
+    cwfile=${matrix%%bin}cw.bin
+    ncols=$((`wc -c < $cwfile` / 4))
+    nrows=$((`wc -c < $rwfile` / 4))
 }
 
+# This is only useful in the situation where an input matrix has been
+# provided by the user (which may be ither in text or binary format). In
+# this case, we must make sure that we have the .cw and .rw files too.
 create_auxiliary_weight_files() {
     if [ "$prime" != 2 ] ; then withcoeffs=--withcoeffs ; fi
     case "$matrix" in
         *.txt)
+            if [ "$rhsfile" ] ; then
+                # It's really a hassle to keep the conversion code (which
+                # existed until dad7019)
+                echo "Please supply $rhs as a *binary* file, please\n" >&2
+                exit 1
+            fi
             matrix_txt="$matrix"
             matrix=${matrix%%txt}bin
             rwfile=${matrix%%bin}rw.bin
@@ -295,38 +214,12 @@ create_auxiliary_weight_files() {
             if [ "$rwfile" -nt "$matrix" ] && [ "$cwfile" -nt "$matrix" ] ; then
                 echo "Taking existing $rwfile, $cwfile as accompanying $matrix"
             else
-                $bindir/mf_scan  --binary-in $withcoeffs --mfile $matrix --binary-out --freq
+                $bindir/mf_scan  --binary-in $withcoeffs --mfile $matrix --freq
             fi
             ;;
     esac
     ncols=$((`wc -c < $cwfile` / 4))
     nrows=$((`wc -c < $rwfile` / 4))
-}
-
-
-
-create_balancing_file_based_on_mesh_dimensions() {
-    if [ "$shuffle" = 1 ] ; then
-        shuffle_option=--shuffled-product
-    else
-        # This removes the de-correlating permutation.
-        shuffle_option="noshuffle=1"
-    fi
-
-    if [ "$prime" != 2 ] ; then withcoeffs=--withcoeffs ; fi
-
-    $bindir/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/ $withcoeffs
-
-    if [ $(ls $wdir/`basename $matrix .bin`.${Nh}x${Nv}.*.bin | wc -l) != 1 ] ; then
-        echo "Weird -- should have only one balancing file as output." >&2
-        exit 1
-    fi
-    bfile=$(ls $wdir/`basename $matrix .bin`.${Nh}x${Nv}.????????.bin)
-    echo "Using balancing file $bfile"
-
-    # The checksum file is used later on for the magma code.
-    checksum=${bfile#$wdir/`basename $matrix .bin`.${Nh}x${Nv}.}
-    checksum=`basename $checksum .bin`
 }
 
 prepare_common_arguments() {
@@ -335,7 +228,6 @@ prepare_common_arguments() {
         matrix=$matrix
         mpi=$mpi
         thr=$thr
-        balancing=$bfile
         m=$m
         n=$n
         wdir=$wdir
@@ -346,159 +238,71 @@ prepare_common_arguments() {
 EOF
 }
 
-convert_rhs_text_to_matrix() {
-    if ! [ -r "$rhs" ] ; then
-        echo "$rhs unreadable" >&1
-        usage
-    fi
-    (set +x
-    rhs="$1"
-    set `head -2 $rhs | tail -n 1`
-    nrhs=$#
-    set `head -1 $rhs`
-    if [ $# = 1 ] ; then set "$@" $nrhs ; fi
-    echo "$@"
-    tail -n +2 $rhs | tr ':' ' ' | while read a; do
-        set $a
-        echo -n "$#"
-        j=0
-        while [ $# -gt 0 ] ; do
-            echo -n " $j:$1" 
-            let j+=1
-            shift
-        done
-        echo
-    done)
-}
-
-create_binary_rhs_matrix() {
-    echo "Running perl now" >&2
-    # This is really done in perl.
-    read -s -r -d '' code <<-'EOF'
-        use warnings;
-        use strict;
-        use Fcntl;
-        print STDERR "Create binary RHS started\n";
-        sysopen(STDIN,'&STDIN',O_RDONLY);
-        binmode(STDIN, ':bytes');
-        my ($nrhs,$n32b,$prefix,$group) = @ARGV;
-        $group = 1 unless $group;
-        my @fds;
-        for(my $i = 0 ; $i < $nrhs; $i+=$group) {
-            my $j = $i + $group;
-            my $fh;
-            my $fname=$prefix . "${i}-${j}.0";
-            print STDERR "Opening $fname as file number $i\n";
-            sysopen($fh, $fname, O_CREAT | O_WRONLY) or die "$fname: $!";
-            push @fds, $fh;
-        }
-        my $rowidx=0;
-        while(sysread(STDIN, my $x, 4)) {
-            $rowidx++;
-            my $v = unpack("L", $x);
-            die unless $v == $nrhs;
-            for(my $i = 0 ; $i < $nrhs; $i+=$group) {
-                for(my $k = 0 ; $k < $group ; $k++) {
-                    sysread(STDIN, $x, 4) or die;
-                    $x=unpack("L", $x);
-                    die unless $x == $i + $k;
-                    my $todo = 4 * $n32b;
-                    for(my $done = 0; $done < $todo; ) {
-                        my $delta = sysread(STDIN, $x, $todo - $done);
-                        syswrite($fds[$i], $x, $delta);
-                        $done += $delta;
-                    }
-                    # Do this because we expect 64-bit data !
-                    if ($n32b & 1) {
-                        $x="\0\0\0\0";
-                        syswrite($fds[$i], $x, 4);
-                    }
-                }
-            }
-        }
-        for(my $i = 0 ; $i < $nrhs; $i+=$group) {
-            close($fds[$i]);
-        }
-        print STDERR "Create binary RHS ok\n";
-
-EOF
-    set -e
-    perl -e "$code" "$@"
-}
-
 argument_checking
 derived_variables
-optionally_build
 prepare_wdir
 
-create_test_matrix_if_needed
-# This also sets rwfile cwfile nrows ncols
-create_auxiliary_weight_files
-create_balancing_file_based_on_mesh_dimensions
+if ! [ "$matrix" ] ; then
+    # This also sets rwfile cwfile nrows ncols
+    create_test_matrix_if_needed
+else
+    # This also sets rwfile cwfile nrows ncols
+    create_auxiliary_weight_files
+fi
 
 prepare_common_arguments
 
-if [ "$rhs" ] ; then
-    # http://stackoverflow.com/questions/4489139/bash-process-substitution-and-syncing
-    # $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile >(create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs)
-    # fortunately mf_scan is stdout-silent...
-    $bindir/mf_scan  --ascii-in --with-long-coeffs $n32bit --mfile <(convert_rhs_text_to_matrix $rhs)  --binary-out --ofile - | create_binary_rhs_matrix $nrhs $n32bit ${rhs}.bin $nrhs
-    rhsbin=`echo $rhs | sed -e s/txt/bin/`
-    if [ "$rhsbin" == "$rhs" ] ; then rhsbin=$rhs.bin ; fi
-    mv ${rhs}.bin0-$nrhs.0 $rhsbin
-    set $common rhs=$rhsbin nrhs=$nrhs
+if [ "$rhsfile" ] ; then
+    set $common rhs=$rhsfile nrhs=$nrhs
 else
     set $common
 fi
+
+if [ "$magma" ] ; then
+    echo "### Enabling magma checking ###"
+    interval=1
+    set "$@" save_submatrices=1 interval=1
+fi
+
 $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
 
-if [ "$nomagma" ] ; then
+if ! [ "$magma" ] ; then
     exit 0
 fi
 
-## Now take solution 0, for instance.
-#j0=0
-#while [ $j0 -lt $n ] ; do
-#    let j1=$j0+1
-#    ln -s F.sols0-1.${j0}-${j1} $wdir/F${j0}-${j1}
-#    j0=$j1
-#done
-
-
-#j0=0
-#while [ $j0 -lt $n ] ; do
-#    let j1=$j0+1
-#    $bindir/bwc.pl mksol  $common interval=$interval ys=$j0..$j1 nsolvecs=$nrhs
-#    j0=$j1
-#done
-
 set +x
 
-# [ "$?" = 0 ] && $bindir/bwc.pl acollect    $common -- --remove-old
-# 
-# 
-# 
-# # set +e
-# # $bindir/bench  --nmax 1000 --prime $prime --nbys 1 --impl basicp  -- $matrix
- 
 mdir=$wdir
 
+if ! [[ "$mpi,$thr" =~ ^([0-9]*)x([0-9]*),([0-9]*)x([0-9]*)$ ]] ; then
+    echo "bad format for mpi=$mpi and thr=$thr" >&2
+    exit 1
+fi
+
+Nh=$((${BASH_REMATCH[1]}*${BASH_REMATCH[3]}))
+Nv=$((${BASH_REMATCH[2]}*${BASH_REMATCH[4]}))
+
 split=${Nh}x${Nv}
-b=`basename $matrix .bin`
-c=$b.$split.$checksum
+
+echo find $wdir -name "`basename $matrix .bin`.$split.????????.bin"
+bfile=$(find $wdir -name "`basename $matrix .bin`.$split.????????.bin")
+if ! [[ "$bfile" =~ \.[0-9a-f]{8}\.bin$ ]] ; then
+    echo "Found no bfile, or nothing satisfactory ($bfile)" >&2
+    exit 1
+fi
 
 cmd=`dirname $0`/convert_magma.pl
 
 
 # This is for the **unbalanced** matrix !!
 
-echo "m:=$m;n:=$n;" > $mdir/mn.m
+echo "m:=$m;n:=$n;interval:=$interval;nrhs:=$nrhs;" > $mdir/mn.m
 
 echo "Saving matrix to magma format"
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 $cmd bpmatrix < $matrix > $mdir/t.m
-$cmd balancing < $wdir/$c.bin > $mdir/b.m
+$cmd balancing < "$bfile" > $mdir/b.m
 
 placemats() {
     if [ "$nullspace" = left ] ; then
@@ -528,7 +332,7 @@ EOF
             snr$i:=$i*nrp; /* $i*(nr div nh) + Min($i, nr mod nh); */
 EOF
         for j in `seq 0 $((Nv-1))` ; do
-            $cmd bpmatrix < $wdir/$c.h$i.v$j> $mdir/t$i$j.m
+            $cmd bpmatrix < ${bfile%%.bin}.h$i.v$j> $mdir/t$i$j.m
             cat <<-EOF
                 nc$j:=ncp; /*  div nv + ($j lt nc mod nv select 1 else 0); */
                 snc$j:=$j*ncp; /* (nc div nv) + Min($j, nc mod nv); */
@@ -603,6 +407,7 @@ $cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
 
 
 echo "Saving krylov sequence to magma format"
+afile=$(basename `find $wdir -name 'A*[0-9]'`)
 $cmd spvector64 < $wdir/$afile > $mdir/A.m
 
 
@@ -611,6 +416,10 @@ echo "Saving linear generator to magma format"
 $cmd spvector64 < $wdir/$afile.gen > $mdir/F.m
 if [ -f $wdir/$afile.gen.rhs ] ; then
 $cmd spvector64 < $wdir/$afile.gen.rhs > $mdir/rhscoeffs.m
+else
+    # We must create an empty file, because otherwise magma won't accept
+    # "load" being conditional...
+    echo > $mdir/rhscoeffs.m
 fi
 
 print_all_Ffiles() {
@@ -635,21 +444,49 @@ print_all_Ffiles > $mdir/Fchunks.m
 
 
 
-echo "Saving mksol and gather data to magma format"
+echo "Saving mksol data to magma format"
 
-
-if [ -f $wdir/K.sols0-1.0 ] ; then
-$cmd spvector64 < $wdir/K.sols0-1.0 > $mdir/K.sols0-1.0.m
-fi
 
 echo "vars:=[];" > $mdir/S.m
-
-for i in `seq 0 $((nrhs-1))` ; do
-    let i1=i+1
-    for j in `seq 0 $((n-1))` ; do
-        let j1=j+1
-        $cmd spvector64 < $wdir/S.sols${i}-${i1}.${j}-${j1}.$interval > $mdir/S${i},${j}.m
-        echo "load \"$mdir/S${i},${j}.m\"; Append(~vars, var);" >> $mdir/S.m
+k=$interval;
+while true ; do
+    for i in `seq 0 $((nrhs-1))` ; do
+        let i1=i+1
+        for j in `seq 0 $((n-1))` ; do
+            let j1=j+1
+            if ! [ -f $wdir/S.sols${i}-${i1}.${j}-${j1}.$k ] ; then
+                if [ $i = 0 ] && [ $j = 0 ] ; then
+                    echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
+                    break
+                else
+                    echo "Weird. Short of S files not at i,j=0 ?" >&2
+                    exit 1
+                fi
+            fi
+            $cmd spvector64 < $wdir/S.sols${i}-${i1}.${j}-${j1}.$k > $mdir/S${i},${j}.${k}.m
+            echo "load \"$mdir/S${i},${j}.${k}.m\"; Append(~vars, var);" >> $mdir/S.m
+        done
+        if [ $i = 0 ] && [ $j = 0 ] ; then break ; fi
     done
+    if [ $i = 0 ] && [ $j = 0 ] ; then break ; fi
+    k=$((k+interval))
 done
 
+echo "Saving gather data to magma format"
+echo "vars:=[];" > $mdir/K.m
+(cd $wdir ; find  -name K.sols\*[0-9]) | while read f ; do
+$cmd spvector64 < $wdir/$f > $mdir/$f.m
+echo "load \"$mdir/$f.m\"; Append(~vars, var);" >> $mdir/K.m
+done
+
+echo "Running magma verification script"
+
+s=$0
+s=${s%%sh}m
+cd $wdir
+# magma does not exit with a useful return code, so we have to grep its
+# output.
+$magma -b $s < /dev/null | tee magma.out | grep -v '^Loading'
+if egrep -q "(Runtime error|Assertion failed)" magma.out ; then
+    exit 1
+fi
