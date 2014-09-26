@@ -259,10 +259,14 @@ print "Checking consistency of A: done";
 
 
 load "F.m";
+// while IsZero(var[#var-n*n*plimbs+1..#var]) do var:=var[1..#var-n*n*plimbs]; end while;
 F,Fr:=matpol_from_sequence(g(var),n,n);
 F:=Transpose(F);
 Fr:=Transpose(Fr);
-assert (1+mdeg(F))*n*n*plimbs eq #var;
+assert #var mod (n*n*plimbs) eq 0;
+degF := #var div (n*n*plimbs) - 1;
+assert degF ge mdeg(F);
+// assert (1+mdeg(F))*n*n*plimbs eq #var;
 
 load "Fchunks.m";
 print "Checking consistency of big file F with chunks saved in F.*.sols*";
@@ -282,7 +286,7 @@ load "rhscoeffs.m";
 rhscoeffs:=Matrix(GF(p),#RHS,n,g(var));
 print "Checking generator computed by plingen";
 
-degF:=mdeg(F);
+// degF:=mdeg(F);
 
 if #RHS eq 0 then
     print "(homogeneous case)";

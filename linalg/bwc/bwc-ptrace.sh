@@ -447,30 +447,53 @@ print_all_Ffiles > $mdir/Fchunks.m
 echo "Saving mksol data to magma format"
 
 
+
+save_s() {
+    i="$1"
+    j="$2"
+    k="$3"
+    let i1=i+1
+    let j1=j+1
+    binfile="S.sols${i}-${i1}.${j}-${j1}.$k"
+    magmafile="S${i},${j}.${k}.m"
+    if ! [ -f "$wdir/$binfile" ] ; then return 1 ; fi
+    $cmd spvector64 < "$wdir/$binfile" > "$mdir/$magmafile"
+    echo "load \"$mdir/$magmafile\"; Append(~vars, var);" >> "$mdir/S.m"
+    return 0
+}
+
+save_s_j() {
+    i="$1"
+    k="$2"
+    for j in `seq 0 $((n-1))` ; do
+        if ! save_s $i $j $k ; then
+            if [ $i != 0 ] || [ $j != 0 ] ; then
+                echo "Weird. Short of S files not at i,j=0 ?" >&2
+                exit 1
+            fi
+            echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
+            return 1
+        fi
+    done
+    return 0
+}
+
+save_s_ij() {
+    k="$1"
+    for i in `seq 0 $((nrhs-1))` ; do
+        if ! save_s_j $i $k ; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 echo "vars:=[];" > $mdir/S.m
 k=$interval;
-while true ; do
-    for i in `seq 0 $((nrhs-1))` ; do
-        let i1=i+1
-        for j in `seq 0 $((n-1))` ; do
-            let j1=j+1
-            if ! [ -f $wdir/S.sols${i}-${i1}.${j}-${j1}.$k ] ; then
-                if [ $i = 0 ] && [ $j = 0 ] ; then
-                    echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
-                    break
-                else
-                    echo "Weird. Short of S files not at i,j=0 ?" >&2
-                    exit 1
-                fi
-            fi
-            $cmd spvector64 < $wdir/S.sols${i}-${i1}.${j}-${j1}.$k > $mdir/S${i},${j}.${k}.m
-            echo "load \"$mdir/S${i},${j}.${k}.m\"; Append(~vars, var);" >> $mdir/S.m
-        done
-        if [ $i = 0 ] && [ $j = 0 ] ; then break ; fi
-    done
-    if [ $i = 0 ] && [ $j = 0 ] ; then break ; fi
+while save_s_ij $k ; do
     k=$((k+interval))
 done
+echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
 
 echo "Saving gather data to magma format"
 echo "vars:=[];" > $mdir/K.m
