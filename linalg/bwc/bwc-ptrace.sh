@@ -57,7 +57,9 @@ wordsize=64
 
 # This has to be provided as auxiliary data for the GF(p) case (or we'll
 # do without any rhs whatsoever).
-: ${rhsfile=}
+: ${rhs=}
+# For the rest of this script, we'll prefer the variable name "rhsfile"
+rhsfile="$rhs"
 : ${nullspace=right}
 : ${interval=50}
 : ${mm_impl=basicp}
@@ -96,12 +98,35 @@ argument_checking() {
         *) echo "\$nullspace must be left or right" >&2; usage;;
     esac
     if [ "$prime" != 2 ] ; then
-        if [ "$rhsfile" ] && ! [ "$matrix" ] ; then
-            echo "Please specify \$rhsfile only with \$matrix" >&2
-            usage
-        fi
-        if [ "$matrix" ] && [ "$nrhs" ] ; then
-            echo "Please specify \$nrhs only without \$matrix (so that a random problem gets generated)" >&2
+        if [ "$matrix" ] && [ "$rhsfile" ] && [ "$nrhs" ] ; then
+            # inhomogeneous mod p
+            :
+        elif [ "$matrix" ] && ! [ "$rhsfile" ] && ! [ "$nrhs" ] ; then
+            # homogeneous mod p (bogus as of 755e9c5).
+            :
+        elif ! [ "$matrix" ] && ! [ "$rhsfile" ] ; then
+            if ! [ "$random_matrix_size" ] || ! [ "$random_matrix_maxcoeff" ] ; then
+                echo "Please give random matrix dimensions" >&2
+                exit 1
+            fi
+            if ! [ "$nrhs" ] && ! [ "$random_matrix_minkernel" ] ; then
+                echo "Please give random matrix dimensions" >&2
+                exit 1
+            fi
+        else
+            echo "Unsupported combination of arguments for specifying system" >&2
+            echo "Detected arguments:" >&2
+            for a in matrix rhsfile nrhs random_matrix_size random_matrix_maxcoeff ; do
+                v=`eval echo "\$$a"`
+                if [ "$v" != "" ] ; then
+                    echo "$a=$v" >&2
+                fi
+            done
+            echo "Supported combinations:">&2
+            echo "matrix rhsfile nrhs" >&2
+            echo "matrix" >&2
+            echo "random_matrix_size random_matrix_maxcoeff random_matrix_minkernel" >&2
+            echo "random_matrix_size random_matrix_maxcoeff nrhs" >&2
             usage
         fi
     fi
