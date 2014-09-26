@@ -20,6 +20,8 @@
 #include "utils.h"
 #include "portability.h"
 
+static long lg_page;
+
 #if defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM) && defined(LAS_MEMSET)
 
 /* 1 on 3 pseudo memsets, only for speed tests, do not use. */
@@ -443,6 +445,14 @@ static int cmp_root (const void *a, const void *b) {
   return (((root_ptr) a)->value > ((root_ptr)b)->value) ? 1 : -1;
 }
 
+/* The norm initialisation code needs the page size; we set it here as this
+   function is not thread-safe, to avoid race conditions */
+static void set_lg_page()
+{
+  if (lg_page == 0)
+    lg_page = pagesize();
+}
+
 void init_norms_roots_internal (unsigned int degree, double *coeff, double max_abs_root, double precision, unsigned int *nroots, root_ptr roots)
 {
   
@@ -453,6 +463,7 @@ void init_norms_roots_internal (unsigned int degree, double *coeff, double max_a
   unsigned int n, cumul_nroots;
   size_t k;
   
+  set_lg_page();
   for (k = degree << 1, mpz_init (p[k]); k--; mpz_init (p[k]), root_struct_init (&(Roots[k])));
   for (k = degree + 1; k--; mpz_set_d (p[k], coeff[k]));
     
@@ -1096,8 +1107,7 @@ void init_smart_degree_X_norms_bucket_region_internal (unsigned char *S, uint32_
     unsigned int cptf2id = 0, cpt;
     ssize_t ih;
     {
-      static long lg_page = 0;
-      if (!lg_page) lg_page = pagesize();
+      ASSERT_ALWAYS(lg_page != 0);
       for (ssize_t k = I; (k -= lg_page) >= 0; __builtin_prefetch (S + k, 1));
     }
     poly_scale_double (u, fijd, d, (double) J);
