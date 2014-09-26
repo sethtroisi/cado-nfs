@@ -64,26 +64,29 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
     if(gfp_layer STREQUAL "p_1")
-        find_program(MAGMA magma)
         set(mextra)
-        if (MAGMA)
-            set(mextra magma=${MAGMA})
-        endif(MAGMA)
+        # Only try to enable magma if CHECKS_EXPENSIVE is set.
+        if(DEFINED ENV{CHECKS_EXPENSIVE})
+            find_program(MAGMA magma)
+            if (MAGMA)
+                set(mextra magma=${MAGMA})
+            endif(MAGMA)
+        endif(DEFINED ENV{CHECKS_EXPENSIVE})
         add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
-            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1
-            ${mextra})
-        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1
-            ${mextra})
+            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
         add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1
-            ${mextra})
-        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 m=4 n=4 seed=1
-            ${mextra})
-        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
-            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1
-            ${mextra})
+            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
+        if(DEFINED ENV{CHECKS_EXPENSIVE})
+            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
+                prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
+        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+
+#        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+#            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
+#        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+#            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
+#        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
+#            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
     endif(gfp_layer STREQUAL "p_1")
     add_dependencies(check plingen_${gfp_layer})
 

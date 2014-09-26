@@ -97,6 +97,7 @@ export ENABLE_SHARED
 export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
+export CHECKS_EXPENSIVE
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -123,6 +124,7 @@ if [ "$1" = "show" ] ; then
     echo "PTHREADS=\"$PTHREADS\""
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
+    echo "CHECKS_EXPENSIVE=\"$CHECKS_EXPENSIVE\""
     exit 0
 fi
 
