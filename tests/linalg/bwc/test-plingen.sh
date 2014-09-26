@@ -4,8 +4,6 @@ set -e
 set -x
 # Create a fake sequence
 
-F=`mktemp /tmp/base.XXXXXXXXX`
-
 # Note that if we arrive here, we are 64-bit only, since the GFP backends
 # for bwc are explicitly disabled on i386 (for now -- most probably
 # forever too).

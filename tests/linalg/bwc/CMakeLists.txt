@@ -24,7 +24,8 @@ endmacro(string_join var delimiter str_list)
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
     # Don't split this line !
-    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
+    add_test(test-bwc-${nm} bash -c
+        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
 endmacro(add_bwc_test)
 
 

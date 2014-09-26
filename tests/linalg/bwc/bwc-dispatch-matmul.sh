@@ -75,8 +75,6 @@ D=`mktemp -d /tmp/bwc.XXXXXXXXXXX`
 
 "$bindir/mf_scan" --ascii-in --mfile <("$bindir/random_matrix" $nrows -d $density -s $seed)  --binary-out --freq --ofile $D/$M.bin
 
-mkdir -p /tmp/$M 
-
 $bindir/mf_bal --shuffled-product mfile=$D/$M.bin out=$D/ $nh $nv
 
 set +e
