@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <unistd.h>
 #include "bit_vector.h"
 #include "test_iter.h"
 #include "tests_common.h"
