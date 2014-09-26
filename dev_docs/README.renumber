@@ -44,6 +44,13 @@ The format of the file is described in filter/REAME.fileformat
 * The index of the ideal of (p,r) on side s in the renumbering table is i
       
 
+This can be done with misc/renumber_convert with the following command line:
+
+   echo "p r side" | ./misc/renumber_convert -renumber /path/to/renumber/file
+
+Warning: p and r should be in hexa.
+
+
 3. Given an index in the table (and the polynomial pair), how do I find the
    corresponding ideal ?
 ===========================================================================
@@ -85,3 +92,8 @@ The format of the file is described in filter/REAME.fileformat
         r = largest_root_mod_p (side 0 polynomial)
         side = 0
 
+This can be done with misc/renumber_convert with the following command line:
+
+   echo "i" | ./misc/renumber_convert -renumber /path/to/renumberfile -poly /path/to/polyfile -inverse
+
+Warning: i should be in hexa.
