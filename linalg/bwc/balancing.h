@@ -123,10 +123,12 @@ static inline unsigned long balancing_row_shuffle_common_(unsigned long r, unsig
  * rshuf_inv arrays */
 static inline unsigned long balancing_pre_shuffle(balancing_ptr bal, unsigned long r)
 {
+    if (r >= bal->h->ncols) return r;
     return balancing_row_shuffle_common_(r, bal->h->ncols, bal->h->pshuf);
 }
 static inline unsigned long balancing_pre_unshuffle(balancing_ptr bal, unsigned long r)
 {
+    if (r >= bal->h->ncols) return r;
     return balancing_row_shuffle_common_(r, bal->h->ncols, bal->h->pshuf_inv);
 }
 

@@ -448,9 +448,7 @@ assert #vars eq #RHS;
 ker:=[Vector(GF(p),x):x in vars];
 print "Checking that gather has computed what we expect: done";
 
-/* FIXME -- we must get rid of Qsmall here !!!! */
-print "WARNING: the data in K.sols* is not correctly de-shuffled !!";
-assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall*Qsmall, Transpose(Matrix(RHS)))));
+assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall, Transpose(Matrix(RHS)))));
 
 exit;
 

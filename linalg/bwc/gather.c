@@ -182,13 +182,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (sl->nsols == 0) {
         if (tcan_print) {
             fprintf(stderr, "Found zero S files. Problem with command line ?\n");
-            exitcode = 1;
+            pthread_mutex_lock(pi->m->th->m);
+            exitcode=1;
+            pthread_mutex_unlock(pi->m->th->m);
         }
         serialize_threads(pi->m);
         return NULL;
     }
 
-    pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
+    pi_wiring_ptr picol = pi->wr[bw->dir];
 
     unsigned int ii0, ii1;
     unsigned int di = mcol->i1 - mcol->i0;
@@ -200,8 +202,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     mmt_vec svec;
     mmt_vec tvec;
-    vec_init_generic(mmt->pi->m, A, svec, 0, ii1-ii0);
-    vec_init_generic(mmt->pi->m, A, tvec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, svec, 0, ii1-ii0);
+    vec_init_generic(pi->m, A, tvec, 0, ii1-ii0);
 
     const char * rhs_name = param_list_lookup_string(pl, "rhs");
     FILE * rhs = NULL;
@@ -261,6 +263,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 char * tmp;
                 int rc = asprintf(&tmp, V_FILE_BASE_PATTERN, j, j + 1);
                 ASSERT_ALWAYS(rc >= 0);
+                /* equivalently, we may load the data in mmt->wr[1]->v
+                 * with
+                 * matmul_top_load_vector(mmt, v_name, bw->dir, 0, unpadded);
+                 */
 
                 pi_load_file_2d(pi, bw->dir, tmp, 0, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
                 A->vec_scal_mul(A, svec->v, svec->v, A->vec_coeff_ptr(A, rhscoeffs, j), ii1 - ii0);
@@ -279,8 +285,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
         }
 
-        /* Let now tvec be the sum of the LHS contributions */
-        A->vec_set_zero(A, tvec->v, ii1 - ii0);
+        /* Collect now the sum of the LHS contributions */
+        matmul_top_zero_vec_area(mmt, bw->dir);
+        void * sv = A->vec_subvec(A, mcol->v->v, ii0-mcol->i0);
+
         for(int i = 0 ; i < sf->nsfiles ; i++) {
             char * tmp;
             int rc = asprintf(&tmp, S_FILE_BASE_PATTERN,
@@ -293,20 +301,20 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             pi_load_file_2d(pi, bw->dir, tmp, sf->sfiles[i]->iter, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
             free(tmp);
-            A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
+            A->vec_add(A, sv, sv, svec->v, ii1 - ii0);
         }
 
-        /* As before, we're simply using file I/O as a means of
-         * broadcast. It's much easier, since we'll be doing I/O
-         * anyway...  */
-        pi_save_file_2d(pi, bw->dir, kprefix, 0, tvec->v, A->vec_elt_stride(A, ii1 - ii0),  A->vec_elt_stride(A, unpadded));
-        
+        /* allgather, really */
+        allreduce_across(mmt, bw->dir);
 
-
+        /* This is a noop if bw->dir == 0 */
+        matmul_top_unapply_T(mmt, bw->dir);
+        matmul_top_save_vector(mmt, kprefix, bw->dir, 0, unpadded);
+        matmul_top_apply_T(mmt, bw->dir);
+                
         int is_zero = 0;
 
         serialize(pi->m);
-        matmul_top_load_vector(mmt, kprefix, bw->dir, 0, unpadded);
         matmul_top_twist_vector(mmt, bw->dir);
 
         unsigned int how_many;
@@ -371,14 +379,18 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             if (rhs_name) break;
 
+            matmul_top_unapply_T(mmt, bw->dir);
             matmul_top_save_vector(mmt, kprefix, bw->dir, i, unpadded);
+            matmul_top_apply_T(mmt, bw->dir);
             matmul_top_twist_vector(mmt, bw->dir);
         }
         if (!is_zero) {
             if (tcan_print) {
                 printf("Solution range %u..%u: no solution found, most probably a bug\n", sf->s0, sf->s1);
             }
+            pthread_mutex_lock(pi->m->th->m);
             exitcode=1;
+            pthread_mutex_unlock(pi->m->th->m);
             return NULL;
         }
         if (rhs) {
@@ -406,8 +418,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (rhs) fclose(rhs);
     if (rhs_name) matmul_top_vec_clear_generic(mmt, rhsvec, bw->dir);
 
-    vec_clear_generic(mmt->pi->m, svec, ii1-ii0);
-    vec_clear_generic(mmt->pi->m, tvec, ii1-ii0);
+    vec_clear_generic(pi->m, svec, ii1-ii0);
+    vec_clear_generic(pi->m, tvec, ii1-ii0);
 
     matmul_top_clear(mmt);
     A->oo_field_clear(A);
