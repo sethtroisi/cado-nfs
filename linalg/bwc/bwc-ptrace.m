@@ -20,7 +20,8 @@ function group(nlimbs)
     return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
 end function;
 
-g:=group(Ceiling(Log(2^64,p)));
+plimbs:=Ceiling(Log(2^64,p));
+g:=group(plimbs);
 
 
 // assert nc le nr;
@@ -261,7 +262,7 @@ load "F.m";
 F,Fr:=matpol_from_sequence(g(var),n,n);
 F:=Transpose(F);
 Fr:=Transpose(Fr);
-assert (1+mdeg(F))*n*n eq #var;
+assert (1+mdeg(F))*n*n*plimbs eq #var;
 
 load "Fchunks.m";
 print "Checking consistency of big file F with chunks saved in F.*.sols*";
@@ -445,7 +446,7 @@ print "Check that we have w such that (M||RHS) * w = 0: ",
 print "Checking that gather has computed what we expect";
 load "K.m";
 assert #vars eq #RHS;
-ker:=[Vector(GF(p),x):x in vars];
+ker:=[Vector(GF(p),g(x)):x in vars];
 print "Checking that gather has computed what we expect: done";
 
 assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall, Transpose(Matrix(RHS)))));
