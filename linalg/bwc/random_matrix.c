@@ -1148,7 +1148,11 @@ static inline void write_in_32bit_limbs(FILE * out, mpz_srcptr x, mpz_srcptr p)
     uint32_t temp[n32+1];
     memset(temp, 0, (n32+1)*sizeof(uint32_t));
     ASSERT_ALWAYS(mpz_size(x) * sizeof(mp_limb_t) <= (n32+1)*sizeof(uint32_t));
+#if GMP_VERSION_ATLEAST(6,0,0)
     memcpy(temp, mpz_limbs_read(x), mpz_size(x) * sizeof(mp_limb_t));
+#else
+    memcpy(temp, x->_mp_d, mpz_size(x) * sizeof(mp_limb_t));
+#endif
     fwrite(temp, n32*sizeof(uint32_t), mpz_size(x), out);
     ASSERT_ALWAYS(temp[n32]==0);
 }

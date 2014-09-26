@@ -81,8 +81,8 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
                 prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
         endif(DEFINED ENV{CHECKS_EXPENSIVE})
 
-#        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
-#            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
+        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
 #        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
 #            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
 #        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
