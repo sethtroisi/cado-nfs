@@ -194,12 +194,15 @@ static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
  * is appropriate. The multiplications are transposed in the case of
  * d==!bw->dir
  */
+extern void matmul_top_zero_vec_area(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_P_apply_S(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_S_unapply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_P(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_apply_S(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_unapply_S(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_apply_T(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_unapply_T(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d);
 extern void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d);
 extern void indices_apply_S(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int d);

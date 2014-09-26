@@ -24,6 +24,7 @@ extern "C" {
 #define CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER           8
 #define CADO_VERBOSE_PRINT_BWC_CPUBINDING               9
 #define CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO         10
+#define CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES      11
 
 /* This must be called in single-threaded context, preferably at program
  * start */

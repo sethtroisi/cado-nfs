@@ -172,7 +172,8 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     }
 
     int32_t buried_max = mat->wt[heaviest[0]];
-    int32_t buried_min = mat->wt[heaviest[mat->nburied-1]];
+    index_t id_buried_min = heaviest[mat->nburied-1];
+    int32_t buried_min = mat->wt[id_buried_min];
 
     /* Compute weight of buried part of the matrix. */
     for (i = 0; i < mat->nburied; i++)
@@ -186,6 +187,8 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     }
     printf("# Number of buried columns is %" PRIu64 " (min_weight=%" PRId32 ", "
            "max_weight=%" PRId32 ")\n", mat->nburied, buried_min, buried_max);
+    printf("# Weight of the buried part of the matrix: %" PRIu64 "\n",
+           weight_buried);
 
     /* Remove buried column from rows in mat structure */
     printf("# Start to remove buried columns from rels...\n");
@@ -195,7 +198,11 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       unsigned int k = 1;
       for (unsigned int j = 1; j <= matLengthRow(mat, i) ; j++)
       {
-        if (mat->wt[matCell(mat, i, j)] < buried_min) /* not a buried column */
+        index_t cur_id = matCell(mat, i, j);
+        int32_t w = mat->wt[cur_id];
+        if (w < buried_min
+            || (w == buried_min && cur_id != id_buried_min))
+        /* not a buried column */
         {
           mat->weight++;
           mat->rows[i][k++] = mat->rows[i][j];

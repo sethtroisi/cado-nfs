@@ -237,17 +237,15 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
 
     unsigned int ii0, ii1;
-    unsigned int di = mcol->i1 - mcol->i0;
+    unsigned int eblock = (mcol->i1 - mcol->i0) / picol->totalsize;
 
-    ii0 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank) /
-        picol->totalsize;
-    ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
-        picol->totalsize;
+    ii0 = mcol->i0 + eblock * (picol->jrank * picol->ncores + picol->trank);
+    ii1 = ii0 + eblock;
 
     mmt_vec * sum;
     sum = malloc(multi * sizeof(mmt_vec));
     for(unsigned int k = 0 ; k < multi ; k++) {
-        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, ii1-ii0);
+        vec_init_generic(mmt->pi->m, Ar, sum[k], 0, eblock);
     }
 
     if (bw->end == 0) {
@@ -429,16 +427,17 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          */
         /* Since S is possibly wider than one single vector, we need
          * several passes. Each corresponds to one batch of potential
-         * solutions in the end.
+         * solutions in the end. There are two levels:
          *
-         * We first make sure that an integral number of passes is
-         * needed.
+         *  - npasses: this is made of nsolvecs_pervec vectors over the
+         *  base field, which correspond to one of several of the vectors
+         *  we work with. Those get saved *together* in S files.
          *
-         * TODO: I've just added the "multi" wrap around existing code. I
-         * don't quite get recall what npasses does, but it's quite
-         * possible that the overlap between the two functionalities is
-         * nontrivial. Well, at least for my q&d adaptation of mksol, I'm
-         * happy with the "multi" thing.
+         *  - multi: these are saved to distinct files.
+         *
+         * in reality this corresponds to the same functionality. It's
+         * just a design choice to force one behaviour in a situation and
+         * not in the other. This mess ought to be fixed. (TODO)
          */
         serialize(pi->m);
         size_t  stride =  A->vec_elt_stride(A, 1);
@@ -448,7 +447,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         for(unsigned int k = 0 ; k < multi ; k++) {
             for(int i = 0 ; i < npasses ; i++) {
                 serialize(pi->m);
-                A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+                matmul_top_zero_vec_area(mmt, bw->dir);
                 serialize(pi->m);
                 /* Each job/thread copies its data share to mcol->v */
                 void * dst;
@@ -485,6 +484,19 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             }
             char * s_name;
             rc = asprintf(&s_name, S_FILE_BASE_PATTERN, k, k + nsolvecs_pervec, ys[0], ys[1]);
+            // TODO: There is not much preventing us from using simply
+            // something like:
+            // matmul_top_save_vector(mmt, s_name, bw->dir, s +
+            // bw->interval, unpadded);
+            // since after the matmul_top_untwist_vector call, we really
+            // have something which is ready to go trhough
+            // matmul_top_save_vector.
+            // the difficulty is that if we do so, we need to do so
+            // within the loop over i. Which means that we'll create
+            // (npasses) files instead of just one. When we provide the
+            // preferred-io-width modification (see TODO), this whole
+            // code branch should be simplified, and at least the
+            // pi_save_file_2d call here should go away.
             pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum[k]->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
             free(s_name);
         }

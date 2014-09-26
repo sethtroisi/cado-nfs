@@ -6,6 +6,9 @@ last update: 20130724
 See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
 to the exact meaning of most files.
 
+See bwc-ptrace.sh and bwc-ptrace.m for the most up-to-date checks relative
+to the exact meaning of most files for the case of linear systems over
+GF(p). More generally, all GF(p) specific information is in README.gfp
 
 
 The tools present in this subdirectory form an implementation of the

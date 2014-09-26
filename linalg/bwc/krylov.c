@@ -189,7 +189,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
         unsigned int length;
-        length = MAX(mmt->n[0], mmt->n[1]);
+        /* The padded dimension is not the important one */
+        length = MAX(mmt->n0[0], mmt->n0[1]);
         length = iceildiv(length, bw->m) + iceildiv(length, bw->n);
         length += 2 * iceildiv(bw->m, bw->n);
         length += 2 * iceildiv(bw->n, bw->m);

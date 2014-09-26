@@ -1107,3 +1107,4 @@ utils/verbose.c
 utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh
 linalg/bwc/random_matrix.h
+linalg/bwc/README.gfp
