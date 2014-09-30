@@ -82,7 +82,7 @@ end if;
 
 // Computing...
 printf "Computing kernel...\n";
-time v := ModularSolution(M, ell : Lanczos := true);
+time v := ModularSolution(M, ell : Lanczos := false);
 
 printf "Write result to %o...\n", kerfile;
 SetOutputFile(kerfile: Overwrite:=true);
