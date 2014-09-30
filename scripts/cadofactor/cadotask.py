@@ -1134,6 +1134,14 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
 
+    def make_filelist(self, files):
+        """ Create file file containing a list of files, one per line """
+        filelist_idx = self.state.get("filelist_idx", 0) + 1
+        self.state["filelist_idx"] = filelist_idx
+        filelistname = self.workdir.make_filename("filelist.%d" % filelist_idx)
+        with filelistname.open("w") as filelistfile:
+            filelistfile.write("\n".join(files) + "\n")
+        return filelistname
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
@@ -2617,9 +2625,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
                 else:
-                    filelistname = self.workdir.make_filename("filelist")
-                    with filelistname.open("w") as filelistfile:
-                        filelistfile.write("\n".join(newfiles) + "\n")
+                    filelistname = self.make_filelist(newfiles)
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  prefix=prefix,
                                                  out=outputdir,
@@ -2793,9 +2799,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
             else:
-                filelistname = self.workdir.make_filename("filelist")
-                with filelistname.open("w") as filelistfile:
-                    filelistfile.write("\n".join(files) + "\n")
+                filelistname = self.make_filelist(files)
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count,
                                              badidealinfo=badinfofilename,
@@ -2966,9 +2970,7 @@ class PurgeTask(Task):
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
-            filelistname = self.workdir.make_filename("filelist")
-            with filelistname.open("w") as filelistfile:
-                filelistfile.write("\n".join(files))
+            filelistname = self.make_filelist(files)
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
                                    outdel=relsdelfile,
