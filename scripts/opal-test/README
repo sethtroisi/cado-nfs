@@ -20,3 +20,6 @@ Edit las_run.py so that build_dir variable points to your CADO build
 directory. A (very slow) automatic optimization of the 
 {a,r}{lambda,lim,pba} and I parameters can then be started with
   python las_optimize.py
+
+For larger numbers, you should also update the hard-coded parameters in
+las_declaration.py.
