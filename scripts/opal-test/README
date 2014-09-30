@@ -22,4 +22,5 @@ directory. A (very slow) automatic optimization of the
   python las_optimize.py
 
 For larger numbers, you should also update the hard-coded parameters in
-las_declaration.py.
+las_declaration.py, especially if one of the optimized parameters equals
+one of its bounds defined in that file.
