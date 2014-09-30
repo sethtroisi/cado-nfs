@@ -1103,6 +1103,7 @@ linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
+tests/test_full_p59.sh
 utils/verbose.c
 utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh
