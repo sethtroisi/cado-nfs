@@ -172,8 +172,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     }
 
     int32_t buried_max = mat->wt[heaviest[0]];
-    index_t id_buried_min = heaviest[mat->nburied-1];
-    int32_t buried_min = mat->wt[id_buried_min];
+    int32_t buried_min = mat->wt[heaviest[mat->nburied-1]];
 
     /* Compute weight of buried part of the matrix. */
     for (i = 0; i < mat->nburied; i++)
@@ -200,9 +199,23 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       {
         index_t cur_id = matCell(mat, i, j);
         int32_t w = mat->wt[cur_id];
-        if (w < buried_min
-            || (w == buried_min && cur_id != id_buried_min))
-        /* not a buried column */
+        unsigned int is_buried;
+        if (w < buried_min)
+          is_buried = 0;
+        else if (w > buried_min)
+          is_buried = 1;
+        else /* w == buried_min */
+        {
+          unsigned int l = mat->nburied;
+          is_buried = 0;
+          while (l > 0 && w == mat->wt[heaviest[l-1]])
+          {
+            if (heaviest[l-1] == cur_id)
+              is_buried = 1;
+            l--;
+          }
+        }
+        if (!is_buried) /* not a buried column */
         {
           mat->weight++;
           mat->rows[i][k++] = mat->rows[i][j];
