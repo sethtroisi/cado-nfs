@@ -43,7 +43,7 @@ def run(param_file, problem):
     makefb_params = {
         "poly" : las_params["poly"],
         "alim": las_params["alim"],
-        "maxbits": 10
+        "maxbits": las_params["I"] - 1
     }
 
     params = read_params_from_file(param_file)
@@ -78,7 +78,7 @@ def run(param_file, problem):
         outputfile = "las.%d.out" % q0
         las_params.update({"q0": q0, "q1": q0 + q_range, "out": outputfile})
 
-        las_cmd_line = [las]
+        las_cmd_line = [las, "-allow-largesq"]
         for (key, value) in las_params.items():
             las_cmd_line += ["-%s" % key, str(value)]
         # sys.stderr.write("Running: %s\n" % " ".join(las_cmd_line))
