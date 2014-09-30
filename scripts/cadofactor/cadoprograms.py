@@ -869,6 +869,7 @@ class Replay(Program):
                  index: Parameter()=None,
                  out: Parameter()=None,
                  for_msieve: Toggle()=None,
+                 skip: Parameter(checktype=int)=None,
                  force_posix_threads: Toggle("force-posix-threads")=None,
                  bwcostmin: Parameter(checktype=int)=None,
                  **kwargs):
