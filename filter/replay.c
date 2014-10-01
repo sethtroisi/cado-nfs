@@ -431,14 +431,14 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
     fflush(stdout);
     renumber (&small_ncols, colweight, ncols, idealsfilename);
 
-    printf("small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
+    printf ("Sparse submatrix: nrows=%d ncols=%d\n", small_nrows, small_ncols);
 
     double tt = seconds();
     printf("Writing sparse representation to %s\n", sparsename);
     fflush(stdout);
     W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, skip, bin);
     printf("# Writing matrix took %.1lfs\n", seconds()-tt);
-    printf("# Weight of the small part of the matrix: %lu\n", W);
+    printf("# Weight of the sparse submatrix: %lu\n", W);
     fflush(stdout);
 
     return small_ncols;
