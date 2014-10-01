@@ -60,7 +60,6 @@
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
-#include <pthread.h>
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
@@ -68,11 +67,6 @@
 #include "portability.h"
 
 #include "filter_common.h"
-
-/* Some define, no so interesting. */
-#define TO_EXPLORE_MIN_BUFFER 16 // Minimal size of the "stack" to explore cliques
-#define EXPLORED_MIN_BUFFER 16   // Id, for the relations already explored */
-#define RELS_BLOCK (BV_BITS<<4)    // The size of the relations minimal block : BV_BITS << x
 
 //#define STAT
 //#define STAT_VALUES_COEFF //STAT must be defined. Interesting only DL
@@ -96,18 +90,12 @@ typedef struct purge_data_s purge_data[1];
 typedef struct purge_data_s * purge_data_ptr;
 typedef const struct purge_data_s * purge_data_srcptr;
 
-/* A clique is a connected components of the relation R, where R(i1,i2) iff
- * i1 and i2 share a prime of weight 2. */
-typedef struct {
-  float w;   /* Weight of the clique */
-  index_t i; /* smallest relation of the clique (index in rel_compact) */
-} comp_t;
-
 uint64_t min_index;
 index_t **rel_compact;	/* see main documentation */
 weight_t *ideals_weight;
 
-static bit_vector rel_used;
+
+static bit_vector rel_used, Tbv;
 static index_t *sum2_index = NULL;	/*sum of rows index for primes of weight 2 */
 
 static uint64_t nrelmax = 0, nprimemax = 0;
@@ -115,6 +103,8 @@ static int64_t keep = DEFAULT_FILTER_EXCESS; /* maximun final excess */
 static unsigned int npass = DEFAULT_PURGE_NPASS;
 static double required_excess = DEFAULT_PURGE_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_PURGE_NPT;
+
+static float w_ccc;
 
 #ifdef STAT
 uint64_t __stat_weight;
@@ -124,24 +114,6 @@ uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN + 1];
 #endif
 #endif
 
-typedef struct index_buffer_s { // Classical buffer (here, a stack in fact)
-  index_t *begin, *current, *end;
-} index_buffer_t;
-
-/* The main structure for the working pthreads pool which
-   compute the heaviest cliques */
-typedef struct pth_s {
-// Read only part
-  unsigned int pthread_number;
-  size_t chunk;
-// Read-write part
-  pthread_t pthread;
-  comp_t *clique_graph;     // Array/binary tree sorted of the heaviest cliques
-  size_t size_clique_graph; // max & optimal size of the tree = chunk
-  comp_t clique;            // current clique
-  index_buffer_t to_explore, explored; // stacks to explore and already explored
-} pth_t;
-
 /*****************************************************************************/
 
 
@@ -149,8 +121,6 @@ typedef struct pth_s {
  * in that relation.
  * Warning: we only update the count of primes that we consider, i.e.,
  * primes with index >= min_index.
- * CAREFUL: no multithread compatible with " !(--(*o))) " and
- * bit_vector_clearbit.
  */
 static unsigned int delete_relation (uint64_t i)
 {
@@ -164,10 +134,14 @@ static unsigned int delete_relation (uint64_t i)
 	if (*o < UMAX(*o) && !(--(*o)))
 	    nremoveprimes++;
     }
+
     /* We do not free rel_compact[i] as it is freed with my_malloc_free_all */
     bit_vector_clearbit(rel_used, (size_t) i);
+
     return nremoveprimes;
 }
+
+
 
 /*****************************************************************************/
 /* Code for clique removal.
@@ -178,7 +152,20 @@ static unsigned int delete_relation (uint64_t i)
  * weight (see weight_function_clique).
  */
 
-inline float weight_function_clique(weight_t w)
+typedef struct {
+    float w;
+    index_t i;
+} comp_t;
+
+static int compare(const void *v1, const void *v2)
+{
+    comp_t *w1 = (comp_t *) v1;
+    comp_t *w2 = (comp_t *) v2;
+
+    return (w1->w >= w2->w) ? -1 : 1;
+}
+
+float weight_function_clique(weight_t w)
 {
 #ifdef USE_CAVALLAR_WEIGHT_FUNCTION
     if (w >= 3)
@@ -189,7 +176,7 @@ inline float weight_function_clique(weight_t w)
 	return 0.0;
 #else
     if (w >= 3)
-	return powf(0.8, (float) (w - 2));
+	return powf(0.8, (float) (w - 2.0));
     else if (w == 2)
 	return 0.125;
     else
@@ -197,371 +184,121 @@ inline float weight_function_clique(weight_t w)
 #endif
 }
 
-// This function grows a possible too small index_t buffer.
-inline void resize_buf_index (index_buffer_t *buf, size_t min_buf) {
-  if (UNLIKELY(buf->current + min_buf > buf->end)) {
-    size_t ind_current = buf->current - buf->begin,
-      new_lg = (buf->end - buf->begin) << 1;
-    buf->begin = realloc (buf->begin, new_lg * sizeof (index_t));
-    if (!buf->begin) {
-      perror ("Realloc error\n");
-      exit (1);
+/* Compute connected component of row i for the relation R(i1,i2) if rows
+ * i1 and i2 share a prime of weight 2.
+ * Return number of rows of components, and put in w the total weight. */
+static index_t compute_connected_component(index_t i)
+{
+    index_t *myrel_compact = rel_compact[i], h, k, n = 1;
+
+    bit_vector_setbit(Tbv, (size_t) i);	/* mark row as visited */
+    while ((h = *myrel_compact++) != UMAX(h)) {
+	if (ideals_weight[h] == 2) {
+	    k = sum2_index[h] - i;	/* other row where prime of index h appears */
+	    if (!bit_vector_getbit(Tbv, (size_t) k))	/* row k not visited yet */
+		n += compute_connected_component(k);
+	}
+	/* we use the multiplier 5 here, so that the average weight (assumed to
+	   be 1) is in the middle of the Count[10] array */
+	w_ccc += 5.0 * weight_function_clique(ideals_weight[h]);
     }
-    buf->current = buf->begin + ind_current;
-    buf->end = buf->begin + new_lg;
-  }
+    return n;
 }
 
-/* This function insert a clique in a binary tree on the classical array form:
-   2 sons at the index 2n+1 and 2n+2 for a father at the index n.
-   The property is: the weight of the clique father is less than its 2 sons.
-*/
-static void insert_clique_pth (pth_t *pth) {
-  size_t son, father, place;
-  son = pth->size_clique_graph;
-  while (son) {
-    father = (son - 1) >> 1;
-    if (UNLIKELY (pth->clique.w >= pth->clique_graph[father].w)) break;
-    son = father;
-  }
-  place = son;
-  son = (pth->size_clique_graph)++;
-  while (place != son) {
-    father = (son - 1) >> 1;
-    pth->clique_graph[son] = pth->clique_graph[father];
-    son = father;
-  }
-  pth->clique_graph[son] = pth->clique;
-}
-  
-/* This function takes a clique where the clique weight is greater than the weight
-   of the clique root of a binary tree build by insert_clique_pth.
-   The function searchs the right place in this tree for the clique in respect with
-   the property described in insert_clique_pth.
-*/
-static void replace_clique_pth (pth_t *pth) {
-  ASSERT_EXPENSIVE (pth->clique_graph->w < pth->clique.w);
-  size_t father = 0;
-  for (;;) { // In this loop, always, clique_graph[father].w < weight_clique
-    float weight1, weight2;
-    size_t son = father * 2 + 1; // son is son1
-    if (UNLIKELY (son >= pth->chunk)) break; // No son: father is a leaf. Found!
-    weight1 = pth->clique_graph[son].w;
-    weight2 = pth->clique_graph[son + 1].w;
-    if (UNLIKELY(weight1 > weight2)) {
-      ++son; // son is here the son 2
-      weight1 = weight2;
-    }
-    // here, weight1 is the lightest weight and son is its clique index
-    if (UNLIKELY (weight1 >= pth->clique.w)) break; // Found!
-    // The lightest son has a weight lighter than clique, so
-    // we have to go down the tree, but before the son replaces its father.
-    pth->clique_graph[father] = pth->clique_graph[son];
-    father = son;
-  }
-  pth->clique_graph[father] = pth->clique;
-}
-
-/* Compute connected component of row clique->i for the relation R(i1,i2)
- * if rows i1 and i2 share a prime of weight 2.
- * The total weight of the clique is written in pth->clique.w
- *
- * NB: Multithread version! if it exists a row i1 with i1 < clique_pth->clique.i in
- * the connected component, this component has been already found when we
- * have treated the row i1.
- * In this case, the function returns 0.
- * If no, the function returns the number of connected relations.
- */
-static int compute_connected_component_pth (pth_t *pth) {
-  index_t *primes_of_current_row, current_prime, current_row, the_other_row, nb_rels = 1;
-  weight_t current_ideal_weight;
-
-  pth->to_explore.current = pth->to_explore.begin; // Empty buffer
-  pth->explored.current   = pth->explored.begin;   // Empty buffer
-  current_row = pth->clique.i;
-  pth->clique.w = 0.;
-  for (;;) { // Loop on all connected rows
-    primes_of_current_row = rel_compact[current_row];
-    for (;;) { // Loop on all primes of the current row
-      next_row:
-      current_prime = *primes_of_current_row++;
-      if (UNLIKELY (current_prime == UMAX(current_prime))) break; // exit of the current loop
-      current_ideal_weight = ideals_weight[current_prime];
-      pth->clique.w += weight_function_clique (current_ideal_weight);
-      if (LIKELY(current_ideal_weight == 2)) {
-	the_other_row = sum2_index[current_prime] - current_row;
-	// First, if the_other_row < original row, it's an already found clique. Bye.
-	if (UNLIKELY (the_other_row < pth->clique.i)) return 0;
-	// Second, is the_other_row already explored ?
-	for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
-	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
-	// No: store the new clique row in order to explore it later
-	++nb_rels;
-	*(pth->to_explore.current)++ = the_other_row;
-	resize_buf_index (&(pth->to_explore), 0);
-      }
-    }
-    // current row is now explored
-    *(pth->explored.current)++ = current_row;
-    resize_buf_index (&(pth->explored), 0);
-    // We need another row to explore, or it's the end
-    if (UNLIKELY(pth->to_explore.current == pth->to_explore.begin)) break;
-    current_row = *(--(pth->to_explore.current));
-  }
-  return nb_rels;
-}
-
-/* Delete connected component of row current_row
- * CAREFUL: this code itself is multithread compatible, but
- * it calls delete_relation, which is NOT compatible!
+/* Delete connected component of row i, assuming the bit-vector is set.
  * Warning: we might have some H->hashcount[h] = 3, which is decreased
  * to 2, but we don't want to treat that case. Thus we check in addition
  * that sum2_index[h] <> 0, which only occurs when H->hashcount[h] = 2
  * initially.
  */
-static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row, uint64_t *nprimes)
+static index_t delete_connected_component(index_t i, uint64_t * nprimes)
 {
-  index_t *primes_of_current_row, current_prime, the_other_row;
-  weight_t current_ideal_weight;
+    index_t *myrel_compact = rel_compact[i], h, k, w = 1;
 
-  pth->to_explore.current = pth->to_explore.begin;   // Empty buffer
-  pth->explored.current   = pth->explored.begin;     // Empty buffer
-  for (;;) { // Loop on all connected rows
-    primes_of_current_row = rel_compact[current_row];
-    for (;;) { // Loop on all primes of the current row
-      next_row:
-      current_prime = *primes_of_current_row++;
-      if (UNLIKELY (current_prime == UMAX(current_prime))) break; // exit of the current loop
-      current_ideal_weight = ideals_weight[current_prime];
-      if (LIKELY(current_ideal_weight == 2 && sum2_index[current_prime])) {
-	the_other_row = sum2_index[current_prime] - current_row;
-	// is the_other_row already explored ?
-	for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
-	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
-	// No: store the new clique row in order to explore it later
-	*(pth->to_explore.current)++ = the_other_row;
-	resize_buf_index (&(pth->to_explore), 0);
-      }
-    }
-    // current row is now explored
-    *(pth->explored.current)++ = current_row;
-    resize_buf_index (&(pth->explored), 0);
-    // We need another row to explore, or it's the end
-    if (pth->to_explore.current == pth->to_explore.begin) break;
-    current_row = *(--(pth->to_explore.current));
-    }
-  // Now, we deleted all rows explored
-  for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
-    *nprimes -= delete_relation (*pt);
-  return (pth->explored.current - pth->explored.begin);
-}
-
-/* This MT function search the heaviest pth->chunk cliques in
-   interlaced parts of rel_used cliques.
-*/
-static void *search_chunk_max_cliques (void *pt) {
-  pth_t *pth = (pth_t *) pt;
-  index_t end_step_rels;
-  bv_t bv, *pbv;
-
-  // Init of the structure & malloc
-  pth->clique_graph = (comp_t *) malloc_check (sizeof(comp_t) * pth->chunk);
-  pth->size_clique_graph = 0;
-  pth->to_explore.begin = pth->to_explore.current
-    = (index_t *) malloc_check (sizeof(index_t) * TO_EXPLORE_MIN_BUFFER);
-  pth->to_explore.end = pth->to_explore.begin + TO_EXPLORE_MIN_BUFFER;
-  pth->explored.begin = pth->explored.current
-    = (index_t *) malloc_check (sizeof(index_t) * EXPLORED_MIN_BUFFER);
-  pth->explored.end = pth->explored.begin + EXPLORED_MIN_BUFFER;
-
-  // Now the first begin of the search
-  pth->clique.i = pth->pthread_number * RELS_BLOCK;
-  if (UNLIKELY (pth->clique.i >= nrelmax)) pthread_exit (NULL);
-  // And the first end
-  end_step_rels = pth->clique.i + RELS_BLOCK;
-
-  pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
-  while (pth->clique.i < nrelmax) {
-    index_t save_i = pth->clique.i;
-    for (bv = *pbv++; bv; ++(pth->clique.i), bv >>= 1) {
-      if (LIKELY(bv & 1)) {
-	unsigned int nb_rels_connected = compute_connected_component_pth (pth);
-	if (UNLIKELY (!nb_rels_connected)) continue;
-	if (UNLIKELY (pth->size_clique_graph < pth->chunk))
-	  insert_clique_pth (pth);
-	else 
-	  if (UNLIKELY(pth->clique.w > pth->clique_graph->w))
-	    replace_clique_pth (pth);
-      }
-    }
-    pth->clique.i = save_i + BV_BITS;
-    // Have we reach the actuel end ?
-    if (UNLIKELY (pth->clique.i == end_step_rels)) {
-      // The new begin & end.
-      end_step_rels += npt * RELS_BLOCK;
-      pth->clique.i = end_step_rels - RELS_BLOCK;
-      pbv = rel_used->p + (pth->clique.i >> LN2_BV_BITS);
-    }
-  }
-  pthread_exit (NULL);
-}
-
-#ifdef HAVE_SYNC_FETCH
-/* The main structure for the working pthreads pool which
-   compute sum2_index, only if HAVE_SYNC_FETCH is defined.
-*/
-typedef struct sum2_pth_s {
-  // Read only part
-  unsigned int pthread_number;
-  // Read-write part
-  pthread_t pthread;
-  index_t rels_found;
-} sum2_pth_t;
-  
-static void *compute_sum2_index (void *pt) {
-  sum2_pth_t *sum2_pth = (sum2_pth_t *) pt;
-  index_t j = nrelmax / npt;
-  index_t i = (j * sum2_pth->pthread_number) & ~((size_t) (BV_BITS - 1));
-  index_t end = (sum2_pth->pthread_number == npt - 1) ? nrelmax :
-    (j * (sum2_pth->pthread_number + 1)) & ~((size_t) (BV_BITS - 1));
-  bv_t bv, *pbv;
-  index_t rels_found = 0, h, *myrelcompact;
-
-  pbv = rel_used->p + (i >> LN2_BV_BITS);
-  for (; i < end; i += BV_BITS) {
-    for (j = i, bv = *pbv++; bv; ++j, bv >>= 1) {
-      if (LIKELY(bv & 1)) {
-	++rels_found;
-	myrelcompact = rel_compact[j];
-	for (;;) {
-	  h = *myrelcompact++;
-	  if (UNLIKELY (h == UMAX(h))) break;
-	  if (LIKELY (ideals_weight[h] == 2))
-	    __sync_add_and_fetch (sum2_index + h, j);
+    bit_vector_clearbit(Tbv, (size_t) i);	/* mark row as visited */
+    /* bit i of rel_used is cleared in delete_relation below */
+    while ((h = *myrel_compact++) != UMAX(h)) {
+	if (ideals_weight[h] == 2 && sum2_index[h]) {	/* first row that contains ideal of index h */
+	    k = sum2_index[h] - i;	/* other row where prime of index h appears */
+	    if (bit_vector_getbit(Tbv, (size_t) k) == 1)	/* row k was not visited yet */
+		w += delete_connected_component(k, nprimes);
 	}
-      }
     }
-  }
-  sum2_pth->rels_found = rels_found;
-  pthread_exit (NULL);
+    *nprimes -= delete_relation(i);
+    return w;
 }
-#endif
 
 static void
 cliques_removal(int64_t target_excess, uint64_t * nrels, uint64_t * nprimes)
 {
-  int64_t excess = (((int64_t) *nrels) - *nprimes);
-  size_t i, chunk;
-  index_t N = 0;		/* number of rows */
+    int64_t excess = (((int64_t) * nrels) - *nprimes);
+    int64_t chunk;
+    uint64_t i;
+    comp_t *tmp = NULL;		/* (weight, index) */
+    index_t *myrelcompact, h;
+    double N = 0.0;		/* number of rows */
+    unsigned int wceil, j, ltmp = 0, alloctmp = 0xff;
+#define MAX_WEIGHT 10
+    unsigned int Count[MAX_WEIGHT], *pc;	/* Count[w] is the # of components of weight >= w */
 
-  ASSERT(npt);
+    if (excess <= keep || excess <= target_excess)
+	return;
 
-  if (excess <= keep || excess <= target_excess) return;
-  chunk = (size_t) (excess - target_excess);
+    chunk = excess - target_excess;
 
-  /* first collect sums for primes with weight 2, and compute total weight.
-     If HAVE_SYNC_FETCH is defined, this part is done with the previous
-     multithread function; if not, it's done in sequential, immediatly.
-  */
-  memset(sum2_index, 0, nprimemax * sizeof(index_t));
-#ifndef HAVE_SYNC_FETCH
-  for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i)) {
-      index_t h, *myrelcompact;
-      ++N;
-      for (myrelcompact = rel_compact[i];
-	   (h = *myrelcompact++) != UMAX(h);)
-	if (ideals_weight[h] == 2)
-	  sum2_index[h] += i;
-    }
-#else
-  sum2_pth_t *sum2_pth = malloc_check (npt * sizeof (*sum2_pth));
-  for (i = npt; i--; ) {
-    sum2_pth[i].pthread_number = i;
-    if (pthread_create (&(sum2_pth[i].pthread), NULL,
-			compute_sum2_index, (void *) (sum2_pth + i))) {
-      perror ("compute_sum2_index pthread creation failed\n");
-      exit (1);
-    }
-  }
-  for (i = npt; i--; ) {
-    pthread_join (sum2_pth[i].pthread, NULL);
-    N += sum2_pth[i].rels_found;
-  }
-  free (sum2_pth);
-#endif
-
-  ASSERT_ALWAYS(N == *nrels);
-  
-  // Second we search in parallel the chunk heaviest cliques.
-  // For this, each thread search its chunk heaviest cliques.
-  pth_t *pth = malloc_check (npt * sizeof (*pth));
-  memset (pth, 0, npt * sizeof (*pth));
-  for (i = npt; i--; ) {
-    pth[i].pthread_number = i;
-    pth[i].chunk = chunk;
-    if (pthread_create (&(pth[i].pthread), NULL,
-			search_chunk_max_cliques, (void *) (pth + i))) {
-      perror ("search_chunk_max_cliques pthread creation failed\n");
-      exit (1);
-    }
-  }
-  for (i = npt; i--; ) pthread_join (pth[i].pthread, NULL);
-
-  
-  /* At this point, in each pth[i].graph_cliques we have
-     chunk cliques at most.
-     Boring problem: we need if possible chunk cliques in pth->clique_graph
-     (in pth[0].clique_graph). If not enough, we try to add the
-     others pth[i].clique_graph, until chunk.
-  */
-  if (UNLIKELY (pth->size_clique_graph < chunk)) {
-    for (i = 1; i < npt; ++i) {
-      if (UNLIKELY(pth[i].size_clique_graph + pth->size_clique_graph >= chunk)) {
-	while (pth->size_clique_graph < chunk) {
-	  pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	  insert_clique_pth (pth);
+    /* first collect sums for primes with weight 2, and compute total weight */
+    memset(sum2_index, 0, nprimemax * sizeof(index_t));
+    for (i = 0; i < nrelmax; i++)
+	if (bit_vector_getbit(rel_used, (size_t) i)) {
+	    for (myrelcompact = rel_compact[i];
+		 (h = *myrelcompact++) != UMAX(h);)
+		if (ideals_weight[h] == 2)
+		    sum2_index[h] += i;
+	    N += 1.0;
 	}
-	// Right, we have chunk cliques in pth[0].clique_graph now
-	break;
-      }
-      // We could insert all pth[i].clique_graph in pth[0].clique_graph
-      while (pth[i].size_clique_graph) {
-	pth->clique = pth[i].clique_graph[--pth[i].size_clique_graph];
-	insert_clique_pth (pth);
-      }
-    }
-  }
-  // we do a fusion with pth->clique_graph and all pth[i != 0].clique_graph
-  if (LIKELY(pth->size_clique_graph == chunk)) // if NOT, pth[1...npt[.clique_graph are empty
-    for (i = 1; i < npt; ++i)
-      while (pth[i].size_clique_graph)
-	if (UNLIKELY(pth[i].clique_graph[--pth[i].size_clique_graph].w > pth->clique_graph->w)) {
-	  pth->clique = pth[i].clique_graph[pth[i].size_clique_graph];
-	  replace_clique_pth (pth);
+
+    ASSERT_ALWAYS(N == (double) *nrels);
+
+    /* now initialize bit table for relations used */
+    bit_vector_neg(Tbv, rel_used);
+    memset(Count, 0, sizeof(unsigned int) * MAX_WEIGHT);
+    tmp = (comp_t *) malloc(alloctmp * sizeof(comp_t));
+    ASSERT_ALWAYS(tmp != NULL);
+
+    for (i = 0; i < nrelmax; i++) {
+	if (!bit_vector_getbit(Tbv, (size_t) i)) {
+	    w_ccc = 0.0;
+	    h = compute_connected_component(i);
+	    wceil = (unsigned int) w_ccc + 1;
+	    /* don't consider weight-0 components */
+	    if ((w_ccc > 0.0)
+		&& ((wceil >= MAX_WEIGHT) || (Count[wceil] < chunk))) {
+		if (ltmp >= alloctmp) {
+		    alloctmp = 2 * alloctmp + 1;
+		    tmp = (comp_t *) realloc(tmp, alloctmp * sizeof(comp_t));
+		}
+		tmp[ltmp++] = (comp_t) {
+		w_ccc, i};
+		if (wceil > MAX_WEIGHT)
+		    wceil = MAX_WEIGHT;
+		for (pc = &(Count[wceil]); pc-- != Count; (*pc)++);
+	    }
 	}
-  // We could suppress pth[1...npt[
-  for (i = 1; i < npt; ++i) {
-    free (pth[i].clique_graph);
-    free (pth[i].to_explore.begin);
-    free (pth[i].explored.begin);
-  }
-  // pth->size_clique_graph has at most the chunk heaviest cliques -> suppress them!
-  comp_t *pt = pth->clique_graph + pth->size_clique_graph;
-  while (pt > pth->clique_graph)
-    *nrels -= delete_connected_component_nopth (pth, (--pt)->i, nprimes);
-  
-  fprintf(stdout, "    deleted %lu heavier connected components at %2.2lf\n",
-	  pth->size_clique_graph, seconds());
+    }
+    qsort(tmp, ltmp, sizeof(comp_t), compare);
+
+    for (j = 0; j < ltmp && *nrels > target_excess + *nprimes; j++)
+	*nrels -= delete_connected_component(tmp[j].i, nprimes);
+
+    fprintf(stdout, "    deleted %u heavier connected components at %2.2lf\n",
+	    j, seconds());
+
 #if DEBUG >= 1
-  fprintf(stdout, "    DEBUG: nb heaviest cliques=%lu chunk=%u target=%u\n",
-	  pth->size_clique_graph, chunk, target_excess);
+    fprintf(stdout, "    DEBUG: ltmp=%u chunk=%u target=%u\n",
+	    ltmp, chunk, target_excess);
 #endif
-  // We could suppress pth[0] and pth itself
-  free (pth->clique_graph);
-  free (pth->to_explore.begin);
-  free (pth->explored.begin);
-  free (pth);
+
+    free(tmp);
 }
 
 /*****************************************************************************/
@@ -586,6 +323,7 @@ static void onepass_singleton_removal(uint64_t * nrels, uint64_t * nprimes)
 	    }
 	}
     }
+
     *nrels -= nremoverels;
     *nprimes -= nremoveprimes;
 }
@@ -602,31 +340,31 @@ static ti_t *ti;
 /* Hightest criticality for performance. I inline all myself. */
 static void onepass_thread_singleton_removal(ti_t * mti)
 {
-  index_t *tab;
-  uint64_t i;
-  weight_t *o;
-  bv_t j;
-  
-  mti->sup_nrel = mti->sup_npri = 0;
-  for (i = mti->begin; i < mti->end; i++) {
-    j = (((bv_t) 1) << (i & (BV_BITS - 1)));
-    
-    if (rel_used->p[i >> LN2_BV_BITS] & j)
-      for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
-	if (UNLIKELY(ideals_weight[*tab] == 1)) {
-	  for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
-	    o = &(ideals_weight[*tab]);
-	    ASSERT(*o);
-	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
-	      (mti->sup_npri)++;
-	  }
-	  /* rel_compact[i] is not freed , it is freed with my_malloc_free_all */
-	  rel_used->p[i >> LN2_BV_BITS] &= ~j;
-	  (mti->sup_nrel)++;
-	  break;
-	}
-  }
-  pthread_exit(NULL);
+    index_t *tab;
+    uint64_t i;
+    weight_t *o;
+    bv_t j;
+
+    mti->sup_nrel = mti->sup_npri = 0;
+    for (i = mti->begin; i < mti->end; i++) {
+	j = (((bv_t) 1) << (i & (BV_BITS - 1)));
+
+	if (rel_used->p[i >> LN2_BV_BITS] & j)
+	    for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
+		if (ideals_weight[*tab] == 1) {
+		    for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++) {
+			o = &(ideals_weight[*tab]);
+			ASSERT(*o);
+			if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
+			    (mti->sup_npri)++;
+		    }
+		    /* rel_compact[i] is not freed , it is freed with my_malloc_free_all */
+		    rel_used->p[i >> LN2_BV_BITS] &= ~j;
+		    (mti->sup_nrel)++;
+		    break;
+		}
+    }
+    pthread_exit(NULL);
 }
 
 static void
@@ -857,7 +595,8 @@ static void declare_usage(param_list pl)
                             "end of the 1st singleton removal step (default "
                             STR(DEFAULT_PURGE_REQUIRED_EXCESS) ")");
   param_list_decl_usage(pl, "outdel", "outfile for deleted relations (for DL)");
-  param_list_decl_usage(pl, "npthr", "number of threads (default " STR(DEFAULT_PURGE_NPT) ")");
+  param_list_decl_usage(pl, "npthr", "number of threads used for singletons "
+                                     "removal (default " STR(DEFAULT_PURGE_NPT) ")");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
 }
@@ -1002,7 +741,7 @@ int main(int argc, char **argv)
      * malloc()'ed amount only for informational purposes */
 
     /* {{{ Some macros for tracking memory-consuming variables */
-#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {		\
+#define ALLOC_VERBOSE_MALLOC(type_, variable_, amount_) do {			\
     variable_ = (type_ *) malloc(amount_ * sizeof(type_));		\
     ASSERT_ALWAYS(variable_ != NULL);					\
     size_t cur_alloc = amount_ * sizeof(type_);                         \
@@ -1019,16 +758,17 @@ int main(int argc, char **argv)
     memset(variable_, 0, amount_);					\
 } while (0)
 
-#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {		\
+#define ALLOC_VERBOSE_BIT_VECTOR(variable_, amount_) do {			\
     bit_vector_init(variable_, amount_);				\
     size_t cur_alloc = bit_vector_memory_footprint(variable_);		\
     tot_alloc_bytes += cur_alloc;					\
     fprintf(stdout,                                                     \
-            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",	\
+            "Allocated " #variable_ " of %zuMB (total %zuMB so far)\n",       \
 	    cur_alloc >> 20, tot_alloc_bytes >> 20);			\
 } while (0)
     /* }}} */
 
+    ALLOC_VERBOSE_BIT_VECTOR(Tbv, nrelmax);
     ALLOC_VERBOSE_MALLOC(index_t, sum2_index, nprimemax);
 
 
@@ -1078,7 +818,7 @@ int main(int argc, char **argv)
 		"Error, -nrels value should match the number of scanned "
 		"relations\nexpected %" PRIu64 " relations, found %" PRIu64
 		"\n", nrelmax, pd->info.nrels);
-        abort();
+        exit (EXIT_FAILURE);
     }
 
     nprimes = pd->info.nprimes;
@@ -1180,6 +920,7 @@ int main(int argc, char **argv)
     sum2_index = NULL;
 
     bit_vector_clear(rel_used);
+    bit_vector_clear(Tbv);
 
     if (filelist)
         filelist_clear(input_files);
