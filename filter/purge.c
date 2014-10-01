@@ -295,6 +295,9 @@ static int compute_connected_component_pth (pth_t *pth) {
 	// Second, is the_other_row already explored ?
 	for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
 	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
+	// Third, is the_other_row is already in the to_explore buffer ?
+	for (index_t *pt = pth->to_explore.begin; pt < pth->to_explore.current; pt++)
+	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
 	// No: store the new clique row in order to explore it later
 	++nb_rels;
 	resize_buf_index (&(pth->to_explore), 0);
@@ -337,6 +340,9 @@ static index_t delete_connected_component_nopth (pth_t *pth, index_t current_row
 	the_other_row = sum2_index[current_prime] - current_row;
 	// is the_other_row already explored ?
 	for (index_t *pt = pth->explored.begin; pt < pth->explored.current; pt++)
+	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
+	// Is the_other_row already in the to explore buffer ?
+	for (index_t *pt = pth->to_explore.begin; pt < pth->to_explore.current; pt++)
 	  if (UNLIKELY(*pt == the_other_row)) goto next_row;
 	// No: store the new clique row in order to explore it later
 	resize_buf_index (&(pth->to_explore), 0);
@@ -425,7 +431,8 @@ typedef struct sum2_pth_s {
   pthread_t pthread;
   index_t rels_found;
 } sum2_pth_t;
-  
+
+MAYBE_UNUSED  
 static void *compute_sum2_index (void *pt) {
   sum2_pth_t *sum2_pth = (sum2_pth_t *) pt;
   index_t j = nrelmax / npt;
