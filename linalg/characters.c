@@ -337,10 +337,8 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
         }
         i += bs;
     }
-    free(all_A);
-    fprintf (stderr, "all_A freed\n");
-    free(all_B);
-    fprintf (stderr, "all_B freed\n");
+    free (all_A);
+    free (all_B);
 
     return res;
 }
