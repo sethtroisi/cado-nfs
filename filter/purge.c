@@ -880,7 +880,7 @@ int main(int argc, char **argv)
 	}
       else
       {
-	      fprintf(pd->fd[1], "# %" PRIu64 "\n", nrelmax - nrels);
+          fprintf(pd->fd[1], "# %" PRIu64 "\n", nrelmax - nrels);
       }
     }
 
