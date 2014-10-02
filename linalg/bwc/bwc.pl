@@ -1008,7 +1008,7 @@ sub get_cached_leadernode_filelist {
         }
         closedir $dh;
     } else {
-        my $foo = join(' ', @mpi_precmd_single, "find $wdir -type f -a -printf '%s %p\\n'");
+        my $foo = join(' ', @mpi_precmd_single, "find $wdir -follow -type f -a -printf '%s %p\\n'");
         for my $line (`$foo`) {
             $line =~ s/^\s*//;
             chomp($line);
