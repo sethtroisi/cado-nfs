@@ -269,3 +269,18 @@ char * path_resolve(const char * progname, char * resolved)
   return NULL;
 }
 
+//  trivial utility
+const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+	ds /= 1024.0;
+	px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
+}
+// 
+

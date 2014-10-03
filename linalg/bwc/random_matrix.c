@@ -848,21 +848,6 @@ static int should_print_now(struct progress_info * last_printed, size_t z)
     }
     return 0;
 }
-// {{{ trivial utility
-static const char *size_disp(size_t s, char buf[16])
-{
-    char *prefixes = "bkMGT";
-    double ds = s;
-    const char *px = prefixes;
-    for (; px[1] && ds > 500.0;) {
-	ds /= 1024.0;
-	px++;
-    }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
-    return buf;
-}
-
-// }}}
 /*}}}*/
 
 int cmp_2u32(uint32_t * a, uint32_t * b)

@@ -1045,21 +1045,6 @@ struct sqrt_globals {
 
 struct sqrt_globals glob = { .lll_maxdim=50, .ncores = 2 };
 
-// {{{ trivial utility
-static const char * size_disp(size_t s, char buf[16])
-{
-    char * prefixes = "bkMGT";
-    double ds = s;
-    const char * px = prefixes;
-    for( ; px[1] && ds > 500.0 ; ) {
-        ds /= 1024.0;
-        px++;
-    }
-    snprintf(buf, 10, "%.1f%c", ds, *px);
-    return buf;
-}
-// }}}
-
 
 
 // {{{ TODO: Now that the v field is gone, replace the polymodF layer.

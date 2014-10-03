@@ -170,6 +170,7 @@ static inline int ctz(unsigned int x)
 #endif
 #endif  /* HAVE_ctzl */
 
+const char *size_disp(size_t s, char buf[16]);
 
 #ifdef __cplusplus
 }

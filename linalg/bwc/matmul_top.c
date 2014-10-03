@@ -1213,6 +1213,31 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
     };
     const char * text[2] = { "bd", "ra" };
 
+    mpfq_vbase_ptr abase = mmt->abase;
+
+    mmt_wiring_ptr mrow = mmt->wr[!d];
+    mmt_wiring_ptr mcol = mmt->wr[d];
+    pi_wiring_ptr pirow = mmt->pi->wr[!d];
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+
+    /* within each row, all jobs are concerned with the same range
+     * mrow->i0 to mrow->i1. This is split into m=pirow->njobs chunks,
+     * and reduce_scatter has m-1 communication rounds where all of the m
+     * nodes output and receive one such chunk. All this happens for all
+     * column threads, so we multiply by picol->ncores, too.
+     */
+    size_t data_out_ra = abase->vec_elt_stride(abase, picol->ncores * (mrow->i1 - mrow->i0) / pirow->njobs * (pirow->njobs - 1));
+
+    /* one way to do all-gather is to mimick this, except that each node
+     * will output the same chunk at each round. Beyond that, the
+     * calculation is similar, and we'll use it as a guide. Note of
+     * course that if hardware-level multicast is used, our throughput
+     * estimation is way off.
+     */
+    size_t data_out_ag = abase->vec_elt_stride(abase, pirow->ncores * (mcol->i1 - mcol->i0) / picol->njobs * (picol->njobs - 1));
+
+    size_t datasize[2] = { data_out_ag, data_out_ra };
+
     for(int s = 0 ; s < 2 ; s++) {
         /* we have our axis, and the other axis */
         pi_wiring_ptr wr = mmt->pi->wr[d ^ s];          /* our axis */
@@ -1225,13 +1250,16 @@ void matmul_top_comm_bench(matmul_top_data_ptr mmt, int d)
         for(unsigned int z = 0 ; z < xr->njobs ; z++) {
             if (xr->jrank == z && wr->jrank == 0) {
                 for(unsigned int w = 0 ; w < xr->ncores ; w++) {
-                    if (xr->trank == w && wr->trank == 0)
-                        printf("%s %2d/%d, %s: %2d in %.1fs ; one: %.2fs\n",
+                    if (xr->trank == w && wr->trank == 0) {
+                        char buf[16];
+                        printf("%s %2d/%d, %s: %2d in %.1fs ; one: %.2fs (xput: %s/s)\n",
                                 wr->th->desc,
                                 xr->jrank * xr->ncores + xr->trank,
                                 xr->totalsize,
                                 text[s],
-                                k, dt, dt/k);
+                                k, dt, dt/k,
+                                size_disp(datasize[d^s] * k/dt, buf));
+                    }
                 }
             }
             serialize(mmt->pi->m);
