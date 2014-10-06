@@ -253,11 +253,13 @@ class FilePath(object):
     path relative to the working directory. For persistent storage in the DB,
     the path relative to the workdir should be used, whereas for any file
     accesses, the full path needs to be used.
+    It also piggy-backs a version information field.
     """
 
-    def __init__(self, workdir, filepath):
+    def __init__(self, workdir, filepath, version=None):
         self.workdir = workdir.rstrip(os.sep)
         self.filepath = filepath
+        self.version = version
 
     def __str__(self):
         return "%s%s%s" % (self.workdir, os.sep, self.filepath)
@@ -270,6 +272,9 @@ class FilePath(object):
 
     def isdir(self):
         return os.path.isdir(str(self))
+
+    def get_version(self):
+        return self.version
 
     def mkdir(self, *, parent=False, mode=None):
         """ Creates a directory.
@@ -328,8 +333,8 @@ class WorkDir(object):
         self.jobname = jobname
         self.taskname = taskname
     
-    def path_in_workdir(self, filename):
-        return FilePath(self.workdir, filename)
+    def path_in_workdir(self, filename, version=None):
+        return FilePath(self.workdir, filename, version=version)
     
     def make_filename2(self, jobname=None, taskname=None, filename=None):
         if jobname is None:
@@ -1105,10 +1110,18 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     def verification(self, wuid, ok, *, commit):
         pass
 
-    def get_state_filename(self, key):
+    def get_state_filename(self, key, version=None):
+        """ Return a file name stored in self.state as a FilePath object
+        
+        If a version parameter is passed, then this version is set as the
+        version field of the FilePath object. If no parameter is passed, but
+        our state includes an "output_version" key, then that is used.
+        """
         if not key in self.state:
             return None
-        return self.workdir.path_in_workdir(self.state[key])
+        if version is None:
+            version = self.state.get("output_version", None)
+        return self.workdir.path_in_workdir(self.state[key], version)
 
     def make_std_paths(self, progname, do_increment=True):
         count = self.state.get("stdiocount", 0)
@@ -2985,8 +2998,10 @@ class PurgeTask(Task):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
+            output_version = self.state.get("output_version", 0) + 1
             update = {"purgedfile": purgedfile.get_wdir_relative(),
-                      "input_nrels": input_nrels }
+                      "input_nrels": input_nrels,
+                      "output_version": output_version}
             if self.params["dlp"]:
                 update["relsdelfile"] = relsdelfile.get_wdir_relative()
             self.state.update(update)
@@ -3247,11 +3262,14 @@ class MergeDLPTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.progparams[0]["skip"] = 0
+        self.state.setdefault("processed_purged_version", 0)
 
     def run(self):
         super().run()
 
-        if not "mergedfile" in self.state:
+        purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
+        if not "mergedfile" in self.state or \
+           purged_filename.get_version() > self.state["processed_purged_version"]:
             if "idealfile" in self.state:
                 del(self.state["idealfile"])
             if "indexfile" in self.state:
@@ -3261,7 +3279,6 @@ class MergeDLPTask(Task):
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
-            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             nmaps = self.send_request(Request.GET_NMAPS)
             keep = nmaps[0] + nmaps[1]
             # We use .gzip by default, unless set to no in parameters
@@ -3298,15 +3315,18 @@ class MergeDLPTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
+            output_version = self.state.get("output_version", 0) + 1
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative(),
-                      "idealfile": idealfile.get_wdir_relative()}
+                      "idealfile": idealfile.get_wdir_relative(),
+                      "processed_purged_version": purged_filename.get_version(),
+                      "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
             self.state.update(update)
             
-        self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+        self.logger.debug("Exit MergeDLPTask.run(" + self.name + ")")
         return True
     
     def get_index_filename(self):
@@ -3347,6 +3367,7 @@ class MergeTask(Task):
         skip = int(self.progparams[0].get("skip", 32))
         self.progparams[0].setdefault("skip", skip)
         self.progparams[0].setdefault("keep", skip + 128)
+        self.state.setdefault("processed_purged_version", 0)
 
     def run(self):
         super().run()
@@ -3356,13 +3377,14 @@ class MergeTask(Task):
             if not fn.isfile():
                 self.logger.warning("Output file %s disappeared, generating it again", fn)
                 del(self.state["mergedfile"])
-        if not "mergedfile" in self.state:
+        purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
+        if not "mergedfile" in self.state or \
+           purged_filename.get_version() > self.state["processed_purged_version"]:
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
-            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
@@ -3392,8 +3414,11 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
+            output_version = self.state.get("output_version", 0) + 1
             update = {"indexfile": indexfile.get_wdir_relative(),
-                      "mergedfile": mergedfile.get_wdir_relative()}
+                      "mergedfile": mergedfile.get_wdir_relative(),
+                      "processed_purged_version": purged_filename.get_version(),
+                      "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
                 update["densefile"] = densefilename.get_wdir_relative()
@@ -3410,6 +3435,7 @@ class MergeTask(Task):
     
     def get_dense_filename(self):
         return self.get_state_filename("densefile")
+
 
 class NmbrthryTask(Task):
     """ Number theory tasks for dlp"""
@@ -3534,13 +3560,15 @@ class LinAlgDLPTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("processed_merged_version", 0)
 
     def run(self):
         super().run()
 
-        if not "kerfile" in self.state: 
+        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+        if not "kerfile" in self.state or \
+           mergedfile.get_version() > self.state["processed_merged_version"]:
             kerfile = self.workdir.make_filename("ker")
-            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             smfile = self.send_request(Request.GET_SM_FILENAME)
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
@@ -3560,7 +3588,10 @@ class LinAlgDLPTask(Task):
             
             if not kerfile.isfile():
                 raise Exception("Output file %s does not exist" % kerfile)
-            update = {"kerfile": kerfile.get_wdir_relative()}
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"kerfile": kerfile.get_wdir_relative(),
+                      "processed_merged_version": mergedfile.get_version(),
+                      "output_version": output_version}
             self.state.update(update)
             
         self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
@@ -3637,14 +3668,16 @@ class LinAlgTask(Task, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("processed_merged_version", 0)
     
     def run(self):
         super().run()
 
-        if not "dependency" in self.state:
+        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
+        if not "dependency" in self.state or \
+           mergedfile.get_version() > self.state["processed_merged_version"]:
             workdir = self.workdir.make_dirname()
             workdir.mkdir(parent=True)
-            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             if mergedfile is None:
                 self.logger.critical("No merged file received.")
                 return False
@@ -3663,7 +3696,10 @@ class LinAlgTask(Task, HasStatistics):
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
-            update = {"dependency": dependencyfilename.get_wdir_relative()}
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"dependency": dependencyfilename.get_wdir_relative(),
+                      "processed_merged_version": mergedfile.get_version(),
+                      "output_version": output_version}
             self.state.update(update, commit=True)
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
         return True
@@ -3697,18 +3733,20 @@ class CharactersTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        self.state.setdefault("processed_dependency_version", 0)
     
     def run(self):
         super().run()
 
-        if not "kernel" in self.state:
+        dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
+        if not "kernel" in self.state or \
+           dependencyfilename.get_version() > self.state["processed_dependency_version"]:
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             kernelfilename = self.workdir.make_filename("kernel")
             
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             densefilename = self.send_request(Request.GET_DENSE_FILENAME)
-            dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Characters.name)
@@ -3723,7 +3761,9 @@ class CharactersTask(Task):
                 raise Exception("Program failed")
             if not kernelfilename.isfile():
                 raise Exception("Output file %s does not exist" % kernelfilename)
-            self.state["kernel"] = kernelfilename.get_wdir_relative()
+            update = {"kernel": kernelfilename.get_wdir_relative(),
+                      "processed_dependency_version": dependencyfilename.get_version()}
+            self.state.update(update)
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return True
     
