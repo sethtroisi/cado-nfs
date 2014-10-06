@@ -45,7 +45,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 }
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
-                             uint64_t * small_nrows, mpz_poly_srcptr *F,
+                             uint64_t * small_nrows, mpz_poly_ptr *F,
                              const mpz_t ell2)
 {
   uint64_t nrows, ncols, small_ncols, len_relset;
@@ -117,7 +117,7 @@ struct thread_info {
   int offset;
   int nb;
   sm_relset_ptr rels;
-  mpz_poly_srcptr *F;
+  mpz_poly_ptr *F;
   mpz_ptr *eps;
   mpz_srcptr ell;
   mpz_srcptr ell2;
@@ -130,7 +130,7 @@ struct thread_info {
 void * thread_start(void *arg) {
   struct thread_info *ti = (struct thread_info *) arg;
   sm_relset_ptr rels = ti->rels;
-  mpz_poly_srcptr *F = ti->F;
+  mpz_poly_ptr *F = ti->F;
   mpz_ptr *eps = ti->eps;
   mpz_srcptr ell = ti->ell;
   mpz_srcptr ell2 = ti->ell2;
@@ -159,7 +159,7 @@ void * thread_start(void *arg) {
 #define SM_BLOCK 512
 
 void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
-            mpz_poly_srcptr *F, mpz_ptr *eps,
+            mpz_poly_ptr *F, mpz_ptr *eps,
             const mpz_t ell, const mpz_t ell2,
             int *nsm)
 {
@@ -261,7 +261,7 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
 
 
 void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
-        mpz_poly_srcptr *F, mpz_ptr *eps,
+        mpz_poly_ptr *F, mpz_ptr *eps,
         const mpz_t ell, const mpz_t ell2, int *nsm)
 {
   FILE * out = fopen(outname, "w");
@@ -335,7 +335,7 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  mpz_poly_srcptr F[2];
+  mpz_poly_ptr F[2];
   sm_relset_ptr rels = NULL;
   uint64_t sr;
   mpz_t ell, ell2, epsilon[2];
