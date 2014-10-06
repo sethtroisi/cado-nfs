@@ -879,6 +879,8 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.debug("self.parameters = %s", self.parameters)
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
+        # The progparams entries should not be modified after a class'
+        # constuctor (within __init__() is fine tho)
         self.progparams = []
         for prog, override in zip(self.programs, self.progparam_override):
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
@@ -2049,6 +2051,7 @@ class FactorBaseTask(Task):
         if "outputfile" in self.state:
             assert "poly" in self.state
             # The target file must correspond to the polynomial "poly"
+        self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
     
     def run(self):
         super().run()
@@ -2085,7 +2088,6 @@ class FactorBaseTask(Task):
                 outputfilename1 = self.workdir.make_filename("roots1" + use_gz)
 
             # Run command to generate factor base file
-            self.progparams[0].setdefault("maxbits", self.params["I"] - 1)
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
@@ -2169,6 +2171,9 @@ class FreeRelTask(Task):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
+        if self.params["dlp"]:
+            # default for dlp is addfullcol
+            self.progparams[0].setdefault("addfullcol", True)
         # Invariant: if we have a result (in self.state["freerelfilename"])
         # then we must also have a polynomial (in self.state["poly"])
         if "freerelfilename" in self.state:
@@ -2210,9 +2215,6 @@ class FreeRelTask(Task):
                     self.make_std_paths(cadoprograms.FreeRel.name)
             if self.params["dlp"]:
                 badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
-                # default for dlp is addfullcol
-                if not "addfullcol" in self.progparams[0]:
-                    self.progparams[0]["addfullcol"] = True;
                 p = cadoprograms.FreeRel(poly=polyfilename,
                                          renumber=renumberfilename,
                                          badideals=badidealfilename,
@@ -2917,6 +2919,8 @@ class PurgeTask(Task):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.state.setdefault("input_nrels", 0)
+        # We use a computed keep value for DLP
+        self.keep = self.progparams[0].pop("keep", None)
     
     def run(self):
         super().run()
@@ -2958,8 +2962,11 @@ class PurgeTask(Task):
         purgedfile = self.workdir.make_filename("purged" + use_gz)
         if self.params["dlp"]:
             relsdelfile = self.workdir.make_filename("relsdel" + use_gz)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            keep = sum(nmaps)
         else:
             relsdelfile = None
+            keep = self.keep
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         # Remark: "Galois unique" and "unique" are in the same files
         # because filter_galois works in place. Same request.
@@ -2970,14 +2977,10 @@ class PurgeTask(Task):
             files = unique_filenames
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Purge.name)
         
-        if self.params["dlp"]:
-            nmaps = self.send_request(Request.GET_NMAPS)
-            self.progparams[0]["keep"] = nmaps[0] + nmaps[1]
-        
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
                                    nrels=input_nrels, out=purgedfile,
-                                   outdel=relsdelfile,
+                                   outdel=relsdelfile, keep=keep,
                                    minindex=minindex, nprimes=nprimes,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
@@ -2986,8 +2989,9 @@ class PurgeTask(Task):
             filelistname = self.make_filelist(files)
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
-                                   outdel=relsdelfile,
-                                   nprimes=nprimes, filelist=filelistname,
+                                   outdel=relsdelfile, keep=keep,
+                                   nprimes=nprimes,
+                                   filelist=filelistname,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
