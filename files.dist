@@ -1109,3 +1109,7 @@ utils/verbose.h
 tests/linalg/bwc/bwc-dispatch-matmul.sh
 linalg/bwc/random_matrix.h
 linalg/bwc/README.gfp
+linalg/bwc/mpfq/mpfq_u64k4.c
+linalg/bwc/mpfq/mpfq_u64k4.h
+linalg/bwc/mpfq/mpfq_u64k4_t.c
+linalg/bwc/mpfq/mpfq_u64k4_t.h

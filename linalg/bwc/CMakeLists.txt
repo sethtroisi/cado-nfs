@@ -19,7 +19,7 @@ set(BUILD_DYNAMICALLY_LINKABLE_BWC ${ENABLE_SHARED})
 # target_link_libraries picks the static or shared ones...
 
 # This is a default setting
-set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2
+set(BWC_GF2_ARITHMETIC_BACKENDS u64k1 u64k2 u64k4
     CACHE STRING
     "which low-level arithmetic backends to use for GF(2) linear algebra")
 set(BWC_GF2_MATMUL_BACKENDS bucket basic sliced threaded
@@ -165,7 +165,7 @@ set_target_properties(bcast-file PROPERTIES
 
 ### bwc_mpfq
 
-set(bwc_abases u64k1 u64k2)
+set(bwc_abases u64k1 u64k2 u64k4)
 
 set(bwc_mpfq_sources mpfq/mpfq_vbase.c)
 foreach(v ${bwc_abases})
