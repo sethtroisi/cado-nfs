@@ -937,7 +937,7 @@ my $terminal_colors = {
     violet	=> "\e[00;35m",
     normal      => "\e[0m",
 };
-$terminal_colors = {} if $ENV{'TERM'} !~ /^(xterm|screen|linux)/;
+$terminal_colors = {} if !defined($ENV{'TERM'}) || $ENV{'TERM'} !~ /^(xterm|screen|linux)/;
 
 sub task_begin_message {
     my $blue = $terminal_colors->{'BLUE'} || '';
