@@ -858,6 +858,9 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         return self.join_params(super().paramnames, 
             {"name": str, "workdir": str, "run": True})
     @property
+    def needed_input(self):
+        return {}
+    @property
     def param_nodename(self):
         return self.name
     
@@ -909,6 +912,11 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
+        self.input_files = self.batch_request(self.needed_input)
+        # Since merged_args is re-generated in each run(), the subclass can
+        # modify it as it pleases (unlike progparams)
+        self.merged_args = [dict(self.input_files.items() | p.items())
+                            for p in self.progparams]
 
     def translate_input_filename(self, filename):
         return filename
@@ -1105,7 +1113,13 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         """
         request = Request(self, key, *args)
         return super().send_request(request)
-    
+
+    def batch_request(self, requests):
+        """ Given a dict from keys to Request objects, return a dict with the
+        same keys to the results of the requests.
+        """
+        return {key: self.send_request(request) for key, request in requests.items()}
+
     def get_number_outstanding_wus(self):
         return 0
     
