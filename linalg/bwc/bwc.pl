@@ -472,7 +472,7 @@ sub dosystem
         my $ret = $rc >> 8;
         print STDERR "$prg: exited with status $ret\n";
     }
-    exit 1;
+    die "aborted on subprogram error";
 }
 
 sub ssh_program
@@ -1008,7 +1008,7 @@ sub get_cached_leadernode_filelist {
         }
         closedir $dh;
     } else {
-        my $foo = join(' ', @mpi_precmd_single, "find $wdir -type f -a -printf '%s %p\\n'");
+        my $foo = join(' ', @mpi_precmd_single, "find $wdir -follow -type f -a -printf '%s %p\\n'");
         for my $line (`$foo`) {
             $line =~ s/^\s*//;
             chomp($line);
@@ -1208,7 +1208,7 @@ sub task_common_run {
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
     @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
-    @_ = grep !/precmd/, @_;
+    @_ = grep !/(?:precmd|tolerate_failure)/, @_;
 
     $program="$bindir/$program";
     unshift @_, $program;
@@ -1228,7 +1228,19 @@ sub task_common_run {
             die "Don't know the parallel status of program $program ... ?";
         }
     }
-    dosystem @_;
+    eval { dosystem @_; };
+
+    if ($@) {
+        if (defined(my $tol = $param->{'tolerate_failure'})) {
+            my $re = qr/$tol/;
+            if ($program =~ /$re/) {
+                print STDERR "Not aborting because $program matches tolerate_failure regexp $tol\n";
+                return;
+            }
+        } else {
+            die;
+        }
+    }
 }
 # }}}
 

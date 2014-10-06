@@ -92,7 +92,7 @@ def run(param_file, problem):
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
-    sys.stderr.write("Estimated special-q up to %f and %f seconds for %d relations\n"
+    sys.stderr.write("Estimated special-q up to %.0f and %.2f seconds for %d relations\n"
                       % (qmax, sievetime, rels_wanted))
     # Estimate how far the sieving should have gone to get the desired number
     # of relations

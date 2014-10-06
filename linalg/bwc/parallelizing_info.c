@@ -4,7 +4,7 @@
 #include <string.h>
 
 // we're doing open close mmap truncate...
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
 #include <sys/mman.h>
 #endif
 #include <sys/types.h>
@@ -841,9 +841,6 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         void * arg)
 {
     int interleaving = 0;
-#ifndef HAVE_MMAN_H
-    fprintf(stderr, "Warning: copy-based mmaped I/O replacement has never been tested, and could very well be bogus\n");
-#endif
     param_list_parse_int(pl, "interleaving", &interleaving);
     if (interleaving) {
         pi_go_inner_interleaved(fcn, pl, arg);
@@ -1446,7 +1443,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             close(fd);
             goto pi_save_file_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1501,7 +1498,7 @@ pi_save_file_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
 #else
         write(fd, recvbuf, wsiz);
@@ -1570,7 +1567,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1625,7 +1622,7 @@ pi_save_file_2d_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
 #else
         write(fd, recvbuf, wsiz);
@@ -1677,7 +1674,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1774,7 +1771,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);
@@ -1813,7 +1810,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1854,7 +1851,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);

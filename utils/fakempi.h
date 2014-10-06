@@ -145,6 +145,12 @@ static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE
     if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
     return 0;
 }
+
+static inline int MPI_Iallgather(void *sendbuf, int  sendcount, MPI_Datatype st, void *recvbuf, int recvcount, MPI_Datatype rt, MPI_Comm comm, MPI_Request *request MAYBE_UNUSED)
+{
+    return MPI_Allgather(sendbuf, sendcount, st, recvbuf, recvcount, rt, comm);
+}
+
 static inline int MPI_Allgatherv(void *sendbuf, int sendcount MAYBE_UNUSED,
             MPI_Datatype sendtype MAYBE_UNUSED, void *recvbuf MAYBE_UNUSED, int *recvcount MAYBE_UNUSED,
             int *displs MAYBE_UNUSED, MPI_Datatype recvtype MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
