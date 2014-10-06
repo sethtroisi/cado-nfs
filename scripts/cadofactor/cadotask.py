@@ -886,6 +886,11 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # constuctor (within __init__() is fine tho)
         self.progparams = []
         for prog, override in zip(self.programs, self.progparam_override):
+            # Parameters listed in needed_input are assumed to be overridden
+            for key in (set(override) & set(self.needed_input)):
+                self.logger.warning("Parameter %s listed in both "
+                                    "progparam_override and needed_input, "
+                                    "only one is needed", key)
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
             for param in set(override) & set(progparams):
@@ -2104,7 +2109,7 @@ class FactorBaseTask(Task):
         return (cadoprograms.MakeFB,)
     @property
     def progparam_override(self):
-        return [["poly", "out", "side"]]
+        return [["out", "side"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
@@ -2224,7 +2229,7 @@ class FreeRelTask(Task):
         return (cadoprograms.FreeRel,)
     @property
     def progparam_override(self):
-        return [["poly", "renumber", "badideals", "out"]]
+        return [["renumber", "out"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
@@ -2347,7 +2352,7 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return (cadoprograms.Las,)
     @property
     def progparam_override(self):
-        return [["q0", "q1", "poly", "factorbase", "out", "stats_stderr"]]
+        return [["q0", "q1", "factorbase", "out", "stats_stderr"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -2799,7 +2804,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return (cadoprograms.Duplicates2,)
     @property
     def progparam_override(self):
-        return [["poly", "rel_count", "badidealinfo", "renumber", "filelist"]]
+        return [["rel_count", "filelist"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
@@ -2973,7 +2978,7 @@ class PurgeTask(Task):
             {"dlp": False, "galois": False, "gzip": True})
     @property
     def needed_input(self):
-        return {"freerel": Request.GET_FREEREL_FILENAME}
+        return {"_freerel": Request.GET_FREEREL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3027,7 +3032,7 @@ class PurgeTask(Task):
         else:
             relsdelfile = None
             keep = self.keep
-        freerel_filename = self.merged_args[0].pop("freerel", None)
+        freerel_filename = self.merged_args[0].pop("_freerel", None)
         # Remark: "Galois unique" and "unique" are in the same files
         # because filter_galois works in place. Same request.
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
@@ -3248,7 +3253,7 @@ class FilterGaloisTask(Task):
         return (cadoprograms.GaloisFilter,)
     @property
     def progparam_override(self):
-        return [["nrels", "poly", "renumber"]]
+        return [["nrels"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"galois": False})
@@ -3317,8 +3322,8 @@ class MergeDLPTask(Task):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
     def progparam_override(self):
-        return [["purged", "out", "keep"],
-            ["purged", "ideals", "history", "index", "out"]]
+        return [["out", "keep"],
+            ["ideals", "history", "index", "out"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
@@ -3419,7 +3424,7 @@ class MergeTask(Task):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
     def progparam_override(self):
-        return [["purged", "out"], ["purged", "history", "index"]]
+        return [["out"], ["history", "index"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
@@ -3512,7 +3517,7 @@ class NmbrthryTask(Task):
         return (cadoprograms.MagmaNmbrthry,)
     @property
     def progparam_override(self):
-        return [["poly", "badidealinfo", "badideals"]]
+        return [["badidealinfo", "badideals"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nsm0": -1, "nsm1": -1})
@@ -3615,7 +3620,7 @@ class LinAlgDLPTask(Task):
         return (cadoprograms.MagmaLinalg,)
     @property
     def progparam_override(self):
-        return [["sparsemat", "ker", "sm", "ell", "nmaps"]]
+        return [["ker", "ell", "nmaps"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3787,7 +3792,7 @@ class CharactersTask(Task):
         return (cadoprograms.Characters,)
     @property
     def progparam_override(self):
-        return [["poly", "purged", "index", "wfile", "out", "heavyblock"]]
+        return [["out"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3842,8 +3847,7 @@ class SqrtTask(Task):
         return (cadoprograms.Sqrt,)
     @property
     def progparam_override(self):
-        return [["ab", "poly", "purged", "index", "kernel", "prefix", "rat",
-                 "alg", "gcd", "dep"]]
+        return [["ab", "prefix", "rat", "alg", "gcd", "dep"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"N": int, "gzip": True})
@@ -3898,7 +3902,7 @@ class SqrtTask(Task):
                     if line == "Failed":
                         break
                     self.add_factor(int(line))
-                self.state.update("next_dep", dep+1)
+                self.state.update({"next_dep": dep+1})
             self.remember_input_versions(commit=True)
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
@@ -4028,8 +4032,7 @@ class SMTask(Task):
         return (cadoprograms.SM,)
     @property
     def progparam_override(self):
-        return [["poly", "renumber", "purged", "index", "ell",
-                 "smexp0", "smexp1", "nmaps0", "nmaps1", "out"]]
+        return [["ell", "smexp0", "smexp1", "nmaps0", "nmaps1", "out"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -4094,9 +4097,8 @@ class ReconstructLogTask(Task):
         return (cadoprograms.ReconstructLog,)
     @property
     def progparam_override(self):
-        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp0",
-                 "nmaps0", "smexp1", "nmaps1", "ker", "ideals",
-                 "relsdel", "nrels"]]
+        return [["dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1",
+                 "nrels"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"partial": True})
