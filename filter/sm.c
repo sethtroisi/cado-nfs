@@ -10,7 +10,7 @@ Input:
 * The sub-group order (ell) such that ell | p-1
   Note: All computations are done mod ell^2.
 * (eps): the exponent used in the computation of the Shirokauer maps.
-  Note: eps = lcm(eps_i), where eps_i = ell^(deg(f_i)) - 1 and f = f_1 ... f_k mod ell
+  Note: eps = ppcm(eps_i), where eps_i = ell^(deg(f_i)) - 1 and f = f_1 ... f_k mod ell
   
 Output
 
@@ -309,7 +309,6 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
   param_list_decl_usage(pl, "nsm1", "number of SM on the 1-side, default deg(polynomial))");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
-  param_list_decl_usage(pl, "side", "alg polynomial to use (default is 1)");
 }
 
 static void usage (const char *argv, const char * missing, param_list pl)
@@ -345,7 +344,6 @@ int main (int argc, char **argv)
   eps[1] = &epsilon[1][0];
   int mt = 1;
   double t0;
-  int side = ALGEBRAIC_SIDE;
 
   /* read params */
   param_list_init(pl);
@@ -414,9 +412,6 @@ int main (int argc, char **argv)
     param_list_print_usage(pl, argv0, stderr);
     exit(EXIT_FAILURE);
   }
-
-  /* read side if given */
-  param_list_parse_int(pl, "side", &side);
 
   /* Init polynomial */
   cado_poly_init (pol);

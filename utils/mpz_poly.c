@@ -1253,10 +1253,7 @@ mpz_poly_mul_mod_f_mod_mpz (mpz_poly_ptr Q, mpz_poly_srcptr P1, mpz_poly_srcptr 
 
   mpz_poly_init(R, d);
 
-  if(d1 == 1 || d2 == 1)
-      d = mpz_poly_mul_basecase (R->coeff, P1->coeff, d1, P2->coeff, d2);
-  else
-      d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+  d = mpz_poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
   mpz_poly_cleandeg(R, d);
 
   // reduce mod f
