@@ -60,8 +60,9 @@ sm_single_rel(mpz_poly_ptr *SM, int64_t a, uint64_t b, mpz_poly_ptr *F,
   mpz_poly_t rel;
 
   mpz_poly_init_set_ab(rel, a, b);
-  compute_sm (SM[0], rel, F[0], ell, eps[0], ell2, invl2);
-  compute_sm (SM[1], rel, F[1], ell, eps[1], ell2, invl2);
+  for (int s = 0; s < 2; s++) {
+    compute_sm (SM[s], rel, F[s], ell, eps[s], ell2, invl2);
+  }
   mpz_poly_clear(rel);
 }
 
@@ -97,8 +98,10 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
   mpz_t ee;
   mpz_init(ee);  
   mpz_poly_t tmp[2];
-  mpz_poly_init(tmp[0], F[0]->deg);
-  mpz_poly_init(tmp[1], F[1]->deg);
+  for (int side = 0; side < 2; side++) {
+    if (F[side] == NULL) continue;
+    mpz_poly_init(tmp[side], F[side]->deg);
+  }
 
   /* Set the initial fraction to 1 / 1 */
   for (int side = 0; side < 2; side++) {
@@ -118,6 +121,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
       mpz_set_si(ee, e[k]);
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
       for (int s = 0; s < 2; ++s) {
+        if (F[s] == NULL) continue;
         mpz_poly_power_mod_f_mod_mpz (tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz (rel->num[s], rel->num[s], tmp[s], F[s],
             ell2, NULL);
@@ -128,6 +132,7 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
       mpz_set_si(ee, -e[k]);
       /* TODO: mpz_poly_long_power_mod_f_mod_mpz */
       for (int s = 0; s < 2; ++s) {
+        if (F[s] == NULL) continue;
         mpz_poly_power_mod_f_mod_mpz(tmp[s], abpolys[r[k]], F[s], ee, ell2);
         mpz_poly_mul_mod_f_mod_mpz(rel->denom[s], rel->denom[s], tmp[s], F[s],
             ell2, NULL);
@@ -135,11 +140,11 @@ sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
     }
   }
   for (int s = 0; s < 2; ++s) {
+    if (F[s] == NULL) continue;
     mpz_poly_cleandeg(rel->num[s], F[s]->deg);
     mpz_poly_cleandeg(rel->denom[s], F[s]->deg);
+    mpz_poly_clear(tmp[s]);
   }
 
   mpz_clear (ee);
-  mpz_poly_clear(tmp[0]);
-  mpz_poly_clear(tmp[1]);
 }

@@ -20,10 +20,14 @@ void mpz_poly_init_set_ab (mpz_poly_ptr, int64_t, uint64_t);
 
 // array of rows and exponents -> rational fractions corresponding to the
 // combination of these rows, stored in a sm_relset structure.
+// If F[0] or F[1] is NULL, then no computation is done on the
+// corresponding side.
 void sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
         mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2);
 
 // (a,b) -> SM as a polynomial.
+// If F[0] or F[1] is NULL, then no computation is done on the
+// corresponding side.
 void sm_single_rel (mpz_poly_ptr *SM, int64_t a, uint64_t b,
         mpz_poly_ptr * F, const mpz_ptr *eps,
         const mpz_t ell, const mpz_t ell2, const mpz_t invl2);

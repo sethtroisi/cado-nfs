@@ -95,8 +95,11 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
       ASSERT_ALWAYS(ret == 2);
     }
     
-    int dF[2];
-    dF[0] = F[0]->deg; dF[1] = F[1]->deg;
+    int dF[2] = {0, 0};
+    for (int s = 0; s < 2; ++s) {
+        if (F[s] == NULL) continue;
+        dF[s] = F[s]->deg;
+    }
     sm_relset_init (&rels[i], dF);
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
 
@@ -170,7 +173,8 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
       for (int i = 0; i < nt; ++i) {
           SM[side][i] = (mpz_poly_t *) malloc(SM_BLOCK*sizeof(mpz_poly_t));
           for (int j = 0; j < SM_BLOCK; ++j)
-              mpz_poly_init(SM[side][i][j], F[side]->deg);
+              if (F[side] != 0)
+                  mpz_poly_init(SM[side][i][j], F[side]->deg);
       }
   }
 
@@ -225,8 +229,13 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
     pthread_join(threads[threads_head], NULL);
     active_threads--;
     for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt) {
-      print_sm (out, SM[0][threads_head][k], nsm[0], F[0]->deg);
-      print_sm (out, SM[1][threads_head][k], nsm[1], F[1]->deg);
+      if (F[0] != NULL)
+        print_sm (out, SM[0][threads_head][k], nsm[0], F[0]->deg);
+      if (F[1] != NULL) {
+        if (F[0] != NULL)
+          fprintf(out, " ");
+        print_sm (out, SM[1][threads_head][k], nsm[1], F[1]->deg);
+      }
       fprintf(out, "\n");
     }
 
@@ -251,7 +260,8 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   for (int side = 0; side < 2; side++) {
       for (int i = 0; i < nt; ++i) {
           for (int j = 0; j < SM_BLOCK; ++j) {
-              mpz_poly_clear(SM[side][i][j]);
+              if (F[side] != NULL)
+                  mpz_poly_clear(SM[side][i][j]);
           }
           free(SM[side][i]);
       }
@@ -271,7 +281,12 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
   mpz_init(invl2);
   barrett_init(invl2, ell2);
 
-  mpz_poly_init(SM, MAX(F[0]->deg, F[1]->deg));
+  int dd = 0;
+  if (F[0] != NULL)
+      dd = MAX(dd, F[0]->deg);
+  if (F[1] != NULL)
+      dd = MAX(dd, F[1]->deg);
+  mpz_poly_init(SM, dd);
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
@@ -284,6 +299,8 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
               F[side], ell2);
       compute_sm (SM, rels[i].num[side], F[side], ell, eps[side], ell2, invl2);
       print_sm (out, SM, nsm[side], F[side]->deg);
+      if ((side == 0) && (nsm[1] != 0))
+          fprintf(out, " ");
     }
     fprintf(out, "\n");
     // report
@@ -435,6 +452,13 @@ int main (int argc, char **argv)
     param_list_print_usage(pl, argv0, stderr);
     exit(EXIT_FAILURE);
   }
+
+  // If nsm is 0 on one side, then set F[side] to NULL to desactivate the
+  // corresponding computations.
+  for (int side = 0; side < 2; ++side) {
+      if (nsm[side] == 0)
+          F[side] = NULL;
+  }
   
   if (param_list_warn_unused(pl))
     usage (argv0, NULL, pl);
@@ -446,6 +470,7 @@ int main (int argc, char **argv)
   mpz_mul(ell2, ell, ell);
 
   for (int side = 0; side < 2; side++) {
+      if (F[side] == NULL) continue;
       fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
       mpz_poly_fprintf(stdout, F[side]);
       gmp_fprintf(stdout,

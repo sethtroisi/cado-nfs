@@ -215,12 +215,12 @@ mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
 
 /************************ Handling of the SMs *******************************/
 /* number of SM that must be used for side 1. Must be 0 for FFS */
-unsigned int nbsm1 = 0;
 unsigned int nbsm0 = 0;
+unsigned int nbsm1 = 0;
 
 #ifndef FOR_FFS /* Not needed for FFS */
-mpz_t smexp1; /* exponent for SM */
 mpz_t smexp0; /* exponent for SM on the 0 side */
+mpz_t smexp1; /* exponent for SM on the 1 side */
 mpz_poly_ptr F0;
 mpz_poly_ptr F1;
 # endif
@@ -300,8 +300,12 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
   mpz_poly_ptr F[2] = {F0, F1};
   mpz_ptr smexp[2] = {smexp0, smexp1};
   mpz_poly_t SMres[2];
-  int degF0 = F0->deg;
-  int degF1 = F1->deg;
+  int degF0 = 0;
+  int degF1 = 0;
+  if (F0 != NULL)
+      degF0 = F0->deg;
+  if (F1 != NULL)
+      degF1 = F1->deg;
   mpz_poly_init(SMres[0], degF0);
   mpz_poly_init(SMres[1], degF1);
   SMres[0]->deg = 0;
@@ -311,10 +315,14 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
   mpz_poly_ptr Res[2] = { &SMres[0][0], &SMres[1][0] };
   sm_single_rel(Res, a, b, F, smexp, q, q2, invq2);
   unsigned int i;
-  for (i = degF0 - SMres[0]->deg - 1; i < nbsm0; i++)
-    mpz_add_log_mod_mpz (l, smlg[i], SMres[0]->coeff[degF0-1-i], q);
-  for (i = degF1 - SMres[1]->deg - 1; i < nbsm1; i++)
-    mpz_add_log_mod_mpz (l, smlg[i+nbsm0], SMres[1]->coeff[degF1-1-i], q);
+  if (F0 != NULL) {
+    for (i = degF0 - SMres[0]->deg - 1; i < nbsm0; i++)
+      mpz_add_log_mod_mpz (l, smlg[i], SMres[0]->coeff[degF0-1-i], q);
+  }
+  if (F1 != NULL) {
+    for (i = degF1 - SMres[1]->deg - 1; i < nbsm1; i++)
+      mpz_add_log_mod_mpz (l, smlg[i+nbsm0], SMres[1]->coeff[degF1-1-i], q);
+  }
   mpz_poly_clear(SMres[0]);
   mpz_poly_clear(SMres[1]);
 }
@@ -344,6 +352,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   read_data_t *data = (read_data_t *) context_data;
   log_rel_t *lrel = &(data->rels[rel->num]);
 
+  // FIXME: here, the explicit units are obvisouly broken!!!
   if (nbsm1 > 0)
       add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
 			    data->abunitsfilename);
@@ -1372,11 +1381,18 @@ main(int argc, char *argv[])
   }
 
 #ifndef FOR_FFS
-  /* Get mpz_poly_t F from cado_poly pol (algebraic side) */
-  F1 = poly->pols[ALGEBRAIC_SIDE];
-  FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
-  F0 = poly->pols[RATIONAL_SIDE];
-  FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->rat->deg, "Too many SM");
+  if (nbsm0) {
+      F0 = poly->pols[RATIONAL_SIDE];
+      FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->rat->deg, "Too many SM");
+  } else {
+      F0 = NULL;
+  }
+  if (nbsm1) {
+      F1 = poly->pols[ALGEBRAIC_SIDE];
+      FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
+  } else {
+      F1 = NULL;
+  }
 #else
   FATAL_ERROR_CHECK((nbsm0 != 0) || (nbsm1 != 0), "sm should be 0 for FFS");
 #endif
