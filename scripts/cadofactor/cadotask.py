@@ -3260,7 +3260,7 @@ class MergeDLPTask(Task):
         return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
     @property
     def progparam_override(self):
-        return [["mat", "out", "keep"],
+        return [["purged", "out", "keep"],
             ["purged", "ideals", "history", "index", "out"]]
     @property
     def paramnames(self):
@@ -3293,7 +3293,7 @@ class MergeDLPTask(Task):
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MergeDLP.name)
-            p = cadoprograms.MergeDLP(mat=purged_filename,
+            p = cadoprograms.MergeDLP(purged=purged_filename,
                                    out=historyfile,
                                    keep=keep,
                                    stdout=str(stdoutpath),
@@ -3363,7 +3363,7 @@ class MergeTask(Task):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
     def progparam_override(self):
-        return [["mat", "out"], ["purged", "history", "index"]]
+        return [["purged", "out"], ["purged", "history", "index"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
@@ -3397,7 +3397,7 @@ class MergeTask(Task):
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
-            p = cadoprograms.Merge(mat=purged_filename,
+            p = cadoprograms.Merge(purged=purged_filename,
                                    out=historyfile,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
