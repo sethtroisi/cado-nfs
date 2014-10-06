@@ -629,6 +629,10 @@ class cpubinder {
     pinning_group_matrices coarse_slots;
 
     public:
+    /* we don't want the hwloc private thing be copied around without
+     * notice. */
+    cpubinder(cpubinder const&) = delete;
+    cpubinder&operator=(cpubinder const&) = delete;
     cpubinder(ostream& os) : os(os) { hwloc_topology_init(&topology); }
     ~cpubinder() { hwloc_topology_destroy(topology); }
     void read_param_list(param_list pl, int want_conf_file);

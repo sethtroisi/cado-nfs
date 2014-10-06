@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdio.h>
+#include <unistd.h>
 #include "bit_vector.h"
 #include "test_iter.h"
 #include "tests_common.h"
@@ -81,6 +82,7 @@ test_bit_vector_read_from_file (void)
 
   bit_vector_init (c, n);
   bit_vector_read_from_file (c, s);
+  unlink(s);
 
   /* check both vectors are equal */
   for (i = 0; i < n; i++)

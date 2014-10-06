@@ -86,8 +86,11 @@ InitMatR (filter_matrix_t *mat)
 void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
 {
   filter_matrix_t *mat = (filter_matrix_t *) context_data;
-  unsigned int next_id = 0;
-  typerow_t buf[REL_MAX_SIZE];
+
+  /* XXX For now can't use my_malloc, because rows are realloc later */
+  mat->rows[rel->num] = (typerow_t*) malloc ((rel->nb + 1) * sizeof (typerow_t));
+  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
+  matLengthRow(mat, rel->num) = rel->nb;
 
   for (unsigned int i = 0; i < rel->nb; i++)
   {
@@ -107,21 +110,11 @@ void * insert_rel_into_table (void *context_data, earlyparsed_relation_ptr rel)
     else if (mat->wt[h] != SMAX(int32_t))
       mat->wt[h]++;
 
-    if (h >= mat->nburied)
-    {
-      mat->weight++;
-      setCell(buf[next_id], h, e);
-      next_id++;
-    }
+    setCell(mat->rows[rel->num][i+1], h, e);
   }
 
-  //FIXME for now can't use my malloc, because rows is realloc later
-  mat->rows[rel->num] = (typerow_t*) malloc ((next_id + 1) * sizeof (typerow_t));
-  FATAL_ERROR_CHECK(mat->rows[rel->num] == NULL, "Cannot allocate memory");
-  matLengthRow(mat, rel->num) = next_id;
-  memcpy(&(mat->rows[rel->num][1]), buf, next_id * sizeof(typerow_t));
-  // sort indices in val to ease row merges
-  qsort(&(mat->rows[rel->num][1]), next_id, sizeof(typerow_t), cmp_typerow_t);
+  /* sort indices to ease row merges */
+  qsort(&(mat->rows[rel->num][1]), rel->nb, sizeof(typerow_t), cmp_typerow_t);
 
   return NULL;
 }
@@ -138,8 +131,6 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
                       EARLYPARSE_NEED_INDEX, NULL, NULL);
   ASSERT_ALWAYS(nread == mat->nrows);
   mat->rem_nrows = nread;
-  printf("# Weight of the active part of the matrix: %" PRIu64 "\n# Total "
-         "weight of the matrix: %" PRIu64 "\n", mat->weight, mat->tot_weight);
 
   /* print weight count */
   uint64_t *nbm;
@@ -148,50 +139,116 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
   for (h = 0; h < mat->ncols; h++)
     if (mat->wt[h] <= mat->mergelevelmax)
       nbm[mat->wt[h]]++;
-  for (h = 0; h <= (uint64_t) mat->mergelevelmax; h++)
+  for (h = 1; h <= (uint64_t) mat->mergelevelmax; h++)
     printf ("There are %" PRIu64 " column(s) of weight %" PRIu64 "\n", nbm[h], h);
   ASSERT_ALWAYS(mat->rem_ncols == mat->ncols - nbm[0]);
   free (nbm);
 
-  /* Print info on buried columns (columns not take into account during merge).
-    The 'nburied'-first cols are buried, should be the heaviest by construction.
-  */
+  /* Bury heavy coloumns. The 'nburied' heaviest column are buried. */
+  /* Buried columns are not took into account by merge. */
   uint64_t weight_buried = 0;
   if (mat->nburied)
   {
-    int32_t bmin = mat->nrows, bmax = 0;
+    uint64_t *heaviest = NULL;
+    heaviest = (uint64_t *) malloc (mat->nburied * sizeof (uint64_t));
+    for (i = 0; i < mat->nburied; i++)
+      heaviest[i] = UMAX(uint64_t);
 
-    for (h = 0; h < mat->nburied; h++)
+    /* Find the 'nburied' heaviest columns */
+    for (i = 0; i < mat->ncols; i++)
     {
-      int32_t w = ABS(mat->wt[h]);
+      int32_t w_cur = mat->wt[i];
+      uint64_t j = mat->nburied;
+
+      while (j > 0 && (heaviest[j-1] == UMAX(uint64_t) ||
+                       w_cur > mat->wt[heaviest[j-1]]))
+      {
+        if (j < mat->nburied)
+          heaviest[j] = heaviest[j-1];
+        j--;
+      }
+      if (j < mat->nburied)
+        heaviest[j] = i;
+    }
+
+    int32_t buried_max = mat->wt[heaviest[0]];
+    int32_t buried_min = mat->wt[heaviest[mat->nburied-1]];
+
+    /* Compute weight of buried part of the matrix. */
+    for (i = 0; i < mat->nburied; i++)
+    {
+      int32_t w = mat->wt[heaviest[i]];
       weight_buried += w;
-      if (w > bmax)
-        bmax = w;
-      if (w < bmin)
-        bmin = w;
 #if DEBUG >= 1
-      fprintf(stderr, "# Burying j=%" PRIu64 " (wt=%" PRId32 ")\n", h, w);
+      fprintf(stderr, "# Burying j=%" PRIu64 " (wt = %" PRId32 ")\n",
+                      heaviest[i], w);
 #endif
     }
     printf("# Number of buried columns is %" PRIu64 " (min_weight=%" PRId32 ", "
-           "max_weight=%" PRId32 ")\n", mat->nburied, bmin, bmax);
+           "max_weight=%" PRId32 ")\n", mat->nburied, buried_min, buried_max);
+    printf("# Weight of the buried part of the matrix: %" PRIu64 "\n",
+           weight_buried);
+
+    /* Remove buried column from rows in mat structure */
+    printf("# Start to remove buried columns from rels...\n");
+    fflush (stdout);
+    for (i = 0; i < mat->nrows; i++)
+    {
+      unsigned int k = 1;
+      for (unsigned int j = 1; j <= matLengthRow(mat, i) ; j++)
+      {
+        index_t cur_id = matCell(mat, i, j);
+        int32_t w = mat->wt[cur_id];
+        unsigned int is_buried;
+        if (w < buried_min)
+          is_buried = 0;
+        else if (w > buried_min)
+          is_buried = 1;
+        else /* w == buried_min */
+        {
+          unsigned int l = mat->nburied;
+          is_buried = 0;
+          while (l > 0 && w == mat->wt[heaviest[l-1]])
+          {
+            if (heaviest[l-1] == cur_id)
+              is_buried = 1;
+            l--;
+          }
+        }
+        if (!is_buried) /* not a buried column */
+        {
+          mat->weight++;
+          mat->rows[i][k++] = mat->rows[i][j];
+        }
+      }
+
+      matLengthRow(mat, i) = k-1;
+      mat->rows[i] = (typerow_t*) realloc (mat->rows[i], k * sizeof (typerow_t));
+    }
+    printf ("# Done\n");
+
+    free (heaviest);
   }
   else
+  {
     printf("# No columns were buried.\n");
+    mat->weight = mat->tot_weight;
+  }
+  printf("# Weight of the active part of the matrix: %" PRIu64 "\n# Total "
+         "weight of the matrix: %" PRIu64 "\n", mat->weight, mat->tot_weight);
   ASSERT_ALWAYS (mat->weight + weight_buried == mat->tot_weight);
 
   /* Allocate mat->R[h] if necessary */
   InitMatR (mat);
 
   /* Re-read all rels (in memory) to fill-in mat->R */
-  printf("# Start to fill-in columns of the matrix.\n");
+  printf("# Start to fill-in columns of the matrix...\n");
   fflush (stdout);
   for (i = 0; i < mat->nrows; i++)
   {
     for(unsigned int k = 1 ; k <= matLengthRow(mat, i); k++)
     {
       h = matCell(mat, i, k);
-      ASSERT (mat->nburied <= h && h < mat->ncols);
       if(mat->wt[h] > 0)
       {
         mat->R[h][0]++;
@@ -199,6 +256,7 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       }
     }
   }
+    printf ("# Done\n");
 }
 
 void

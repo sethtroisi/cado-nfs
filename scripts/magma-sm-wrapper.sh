@@ -7,8 +7,10 @@ unset PURGED
 unset INDEX
 unset OUT
 unset ELL
-unset SMEXP
-unset NMAPS
+unset SMEXP0
+unset SMEXP1
+unset NMAPS0
+unset NMAPS1
 unset MT
 
 EXPLICIT="no"
@@ -43,13 +45,21 @@ do
   then
     ELL="$2"
     shift 2
-  elif [ "$1" = "-smexp" ]
+  elif [ "$1" = "-smexp0" ]
   then
-    SMEXP="$2"
+    SMEXP0="$2"
     shift 2
-  elif [ "$1" = "-nsm" ]
+  elif [ "$1" = "-smexp1" ]
   then
-    NMAPS="$2"
+    SMEXP1="$2"
+    shift 2
+  elif [ "$1" = "-nsm0" ]
+  then
+    NMAPS0="$2"
+    shift 2
+  elif [ "$1" = "-nsm1" ]
+  then
+    NMAPS1="$2"
     shift 2
   elif [ "$1" = "-t" ]
   then
@@ -70,7 +80,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ $EXPLICIT == "no" ]; then
 
-    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp $SMEXP -nsm $NMAPS -t $MT"
+    CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL -smexp0 $SMEXP0 -nsm0 $NMAPS0 -smexp1 $SMEXP1 -nsm1 $NMAPS1 -t $MT"
 
 else
     # operates in 3 steps:

@@ -1134,6 +1134,14 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
             self.state["stdiocount"] = count
         return (stdoutpath, stderrpath)
 
+    def make_filelist(self, files):
+        """ Create file file containing a list of files, one per line """
+        filelist_idx = self.state.get("filelist_idx", 0) + 1
+        self.state["filelist_idx"] = filelist_idx
+        filelistname = self.workdir.make_filename("filelist.%d" % filelist_idx)
+        with filelistname.open("w") as filelistfile:
+            filelistfile.write("\n".join(files) + "\n")
+        return filelistname
 
 class ClientServerTask(Task, wudb.UsesWorkunitDb, patterns.Observer):
     @abc.abstractproperty
@@ -2617,9 +2625,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
                                                  stderr=str(stderrpath),
                                                  **self.progparams[0])
                 else:
-                    filelistname = self.workdir.make_filename("filelist")
-                    with filelistname.open("w") as filelistfile:
-                        filelistfile.write("\n".join(newfiles) + "\n")
+                    filelistname = self.make_filelist(newfiles)
                     p = cadoprograms.Duplicates1(filelist=filelistname,
                                                  prefix=prefix,
                                                  out=outputdir,
@@ -2793,9 +2799,7 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
                                              stderr=str(stderrpath),
                                              **self.progparams[0])
             else:
-                filelistname = self.workdir.make_filename("filelist")
-                with filelistname.open("w") as filelistfile:
-                    filelistfile.write("\n".join(files) + "\n")
+                filelistname = self.make_filelist(files)
                 p = cadoprograms.Duplicates2(poly=polyfilename,
                                              rel_count=rel_count,
                                              badidealinfo=badinfofilename,
@@ -2955,7 +2959,7 @@ class PurgeTask(Task):
         
         if self.params["dlp"]:
             nmaps = self.send_request(Request.GET_NMAPS)
-            self.progparams[0]["keep"] = nmaps
+            self.progparams[0]["keep"] = nmaps[0] + nmaps[1]
         
         if len(files) <= 10:
             p = cadoprograms.Purge(*files,
@@ -2966,9 +2970,7 @@ class PurgeTask(Task):
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
         else:
-            filelistname = self.workdir.make_filename("filelist")
-            with filelistname.open("w") as filelistfile:
-                filelistfile.write("\n".join(files))
+            filelistname = self.make_filelist(files)
             p = cadoprograms.Purge(nrels=input_nrels,
                                    out=purgedfile, minindex=minindex,
                                    outdel=relsdelfile,
@@ -2979,7 +2981,7 @@ class PurgeTask(Task):
         message = self.submit_command(p, "")
         stdout = message.read_stdout(0).decode('utf-8')
         stderr = message.read_stderr(0).decode('utf-8')
-        if self.parse_stderr(stderr, input_nrels):
+        if self.parse_stderr(stdout, input_nrels):
             stats = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations with %d primes remain "
                              "with weight %s and excess %s", *stats)
@@ -3128,7 +3130,15 @@ class PurgeTask(Task):
         # but we allow some extra whitespace
         r = {}
         keys = ("nrels", "nprimes", "weight", "excess")
+        final_values_line = "Final values:"
+        had_final_values = False
         for line in stdout.splitlines():
+            # Look for values only after we saw "Final values:" line
+            if not had_final_values:
+                if re.match(final_values_line, line):
+                    had_final_values = True
+                else:
+                    continue
             for key in keys:
                 # Match the key at the start of a line, or after a whitespace
                 # Note: (?:) is non-capturing group
@@ -3137,6 +3147,9 @@ class PurgeTask(Task):
                     if key in r:
                         raise Exception("Found multiple values for %s" % key)
                     r[key] = int(match.group(1))
+        if not had_final_values:
+            raise Exception("%s: output of %s did not contain '%s'" %
+                            (self.title, self.programs[0].name, final_values_line))
         for key in keys:
             if not key in r:
                 raise Exception("%s: output of %s did not contain value for %s: %s"
@@ -3249,7 +3262,8 @@ class MergeDLPTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            keep = self.send_request(Request.GET_NMAPS)
+            nmaps = self.send_request(Request.GET_NMAPS)
+            keep = nmaps[0] + nmaps[1]
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
@@ -3337,11 +3351,14 @@ class MergeTask(Task):
     def run(self):
         super().run()
 
+        if "mergedfile" in self.state:
+            fn = self.workdir.path_in_workdir(self.state["mergedfile"])
+            if not fn.isfile():
+                self.logger.warning("Output file %s disappeared, generating it again", fn)
+                del(self.state["mergedfile"])
         if not "mergedfile" in self.state:
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
-            if "mergedfile" in self.state:
-                del(self.state["mergedfile"])
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
@@ -3410,7 +3427,7 @@ class NmbrthryTask(Task):
         return [["poly", "badidealinfo", "badideals"]]
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"nsm": -1})
+        return self.join_params(super().paramnames, {"nsm0": -1, "nsm1": -1})
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3439,24 +3456,36 @@ class NmbrthryTask(Task):
             match = re.match(r'ell (\d+)', line)
             if match:
                 update["ell"] = int(match.group(1))
-            match = re.match(r'smexp (\d+)', line)
+            match = re.match(r'smexp0 (\d+)', line)
             if match:
-                update["smexp"] = int(match.group(1))
-            match = re.match(r'nmaps (\d+)', line)
+                update["smexp0"] = int(match.group(1))
+            match = re.match(r'smexp1 (\d+)', line)
             if match:
-                update["nmaps"] = int(match.group(1))
+                update["smexp1"] = int(match.group(1))
+            match = re.match(r'nmaps0 (\d+)', line)
+            if match:
+                update["nmaps0"] = int(match.group(1))
+            match = re.match(r'nmaps1 (\d+)', line)
+            if match:
+                update["nmaps1"] = int(match.group(1))
         # Allow user-given parameter to override what we compute:
-        if self.params["nsm"] != -1:
-            update["nmaps"] = self.params["nsm"]
+        if self.params["nsm0"] != -1:
+            update["nmaps0"] = self.params["nsm0"]
+        if self.params["nsm1"] != -1:
+            update["nmaps1"] = self.params["nsm1"]
         update["badinfofile"] = badinfofile.get_wdir_relative()
         update["badfile"] = badfile.get_wdir_relative()
         
         if not "ell" in update:
             raise Exception("Stdout does not give ell")
-        if not "smexp" in update:
-            raise Exception("Stdout does not give smexp")
-        if not "nmaps" in update:
-            raise Exception("Stdout does not give nmaps")
+        if not "smexp0" in update:
+            raise Exception("Stdout does not give smexp0")
+        if not "nmaps0" in update:
+            raise Exception("Stdout does not give nmaps0")
+        if not "smexp1" in update:
+            raise Exception("Stdout does not give smexp1")
+        if not "nmaps1" in update:
+            raise Exception("Stdout does not give nmaps1")
         if not badfile.isfile():
             raise Exception("Output file %s does not exist" % badfile)
         if not badinfofile.isfile():
@@ -3478,10 +3507,10 @@ class NmbrthryTask(Task):
         return self.state["ell"]
     
     def get_smexp(self):
-        return self.state["smexp"]
+        return (self.state["smexp0"], self.state["smexp1"])
     
     def get_nmaps(self):
-        return self.state["nmaps"]
+        return (self.state["nmaps0"], self.state["nmaps1"])
 
 
 class LinAlgDLPTask(Task):
@@ -3515,12 +3544,13 @@ class LinAlgDLPTask(Task):
             smfile = self.send_request(Request.GET_SM_FILENAME)
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
+            nn = nmaps[0] + nmaps[1];
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
             p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
                                    ker=kerfile,
                                    sm=smfile,
                                    ell=gorder,
-                                   nmaps=nmaps,
+                                   nmaps=nn,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
                                    **self.progparams[0])
@@ -3901,8 +3931,8 @@ class SMTask(Task):
         return (cadoprograms.SM,)
     @property
     def progparam_override(self):
-        return [["poly", "renumber", "purged", "index", "ell", "smexp",
-                 "nmaps", "out"]]
+        return [["poly", "renumber", "purged", "index", "ell",
+                 "smexp0", "smexp1", "nmaps0", "nmaps1", "out"]]
     @property
     def paramnames(self):
         return super().paramnames
@@ -3916,7 +3946,7 @@ class SMTask(Task):
 
         if not "sm" in self.state:
             nmaps = self.send_request(Request.GET_NMAPS)
-            if nmaps == 0:
+            if nmaps[0]+nmaps[1] == 0:
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
             polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
@@ -3934,8 +3964,11 @@ class SMTask(Task):
             p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
 	      	    badidealinfo=badidealinfofilename,
                     purged=purgedfilename, index=indexfilename,
-                    ell=gorder, smexp=smexp,
-                    nmaps=nmaps,
+                    ell=gorder,
+                    smexp0=smexp[0],
+                    smexp1=smexp[1],
+                    nmaps0=nmaps[0],
+                    nmaps1=nmaps[1],
                     out=smfilename,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
@@ -3965,8 +3998,9 @@ class ReconstructLogTask(Task):
         return (cadoprograms.ReconstructLog,)
     @property
     def progparam_override(self):
-        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp",
-                 "nmaps", "ker", "ideals", "relsdel", "nrels"]]
+        return [["poly", "purged", "renumber", "dlog",  "ell", "smexp0",
+                 "nmaps0", "smexp1", "nmaps1", "ker", "ideals",
+                 "relsdel", "nrels"]]
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"partial": True})
@@ -4002,8 +4036,11 @@ class ReconstructLogTask(Task):
                     purged=purgedfilename,
                     renumber=renumberfilename,
                     dlog=dlogfilename,
-                    ell=gorder, smexp=smexp,
-                    nmaps=nmaps,
+                    ell=gorder,
+                    smexp0=smexp[0],
+                    smexp1=smexp[1],
+                    nmaps0=nmaps[0],
+                    nmaps1=nmaps[1],
                     ker=kerfilename,
                     ideals=idealfilename,
                     relsdel=relsdelfilename,

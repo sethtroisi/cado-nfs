@@ -45,7 +45,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
 }
 
 sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
-                             uint64_t * small_nrows, mpz_poly_t F,
+                             uint64_t * small_nrows, mpz_poly_srcptr *F,
                              const mpz_t ell2)
 {
   uint64_t nrows, ncols, small_ncols, len_relset;
@@ -94,8 +94,10 @@ sm_relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
       ret = fscanf(ix, " %" SCNx64 ":%" SCNd64 "", &r[k], &e[k]); 
       ASSERT_ALWAYS(ret == 2);
     }
-     
-    sm_relset_init (&rels[i], F->deg);
+    
+    int dF[2];
+    dF[0] = F[0]->deg; dF[1] = F[1]->deg;
+    sm_relset_init (&rels[i], dF);
     sm_build_one_relset (&rels[i], r, e, len_relset, pairs, F, ell2);
 
     if (stats_test_progress(stats))
@@ -115,29 +117,40 @@ struct thread_info {
   int offset;
   int nb;
   sm_relset_ptr rels;
-  mpz_poly_srcptr F;
-  mpz_srcptr eps;
+  mpz_poly_srcptr *F;
+  mpz_ptr *eps;
   mpz_srcptr ell;
   mpz_srcptr ell2;
   mpz_srcptr invl2;
-  mpz_poly_t *sm;
+  mpz_poly_t *sm0;
+  mpz_poly_t *sm1;
+  int *nsm;
 };
 
 void * thread_start(void *arg) {
   struct thread_info *ti = (struct thread_info *) arg;
   sm_relset_ptr rels = ti->rels;
-  mpz_poly_srcptr F = ti->F;
-  mpz_srcptr eps = ti->eps;
+  mpz_poly_srcptr *F = ti->F;
+  mpz_ptr *eps = ti->eps;
   mpz_srcptr ell = ti->ell;
   mpz_srcptr ell2 = ti->ell2;
   mpz_srcptr invl2 = ti->invl2;
-  mpz_poly_t *sm = ti->sm;
+  mpz_poly_t *sm0 = ti->sm0;
+  mpz_poly_t *sm1 = ti->sm1;
+  int *nsm = ti->nsm;
   int offset = ti->offset;
 
   for (int i = 0; i < ti->nb; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz(rels[offset+i].num, rels[offset+i].denom,
-                                       F, ell2);
-    compute_sm (sm[i], rels[offset+i].num, F, ell, eps, ell2, invl2);
+    if (nsm[0] > 0) {
+      mpz_poly_reduce_frac_mod_f_mod_mpz(rels[offset+i].num[0],
+              rels[offset+i].denom[0], F[0], ell2);
+      compute_sm (sm0[i], rels[offset+i].num[0], F[0], ell, eps[0], ell2, invl2);
+    }
+    if (nsm[1] > 0) {
+      mpz_poly_reduce_frac_mod_f_mod_mpz(rels[offset+i].num[1],
+              rels[offset+i].denom[1], F[1], ell2);
+      compute_sm (sm1[i], rels[offset+i].num[1], F[1], ell, eps[1], ell2, invl2);
+    }
   }
 
   return NULL;
@@ -146,16 +159,19 @@ void * thread_start(void *arg) {
 #define SM_BLOCK 512
 
 void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
-            mpz_poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2,
-            int nsm)
+            mpz_poly_srcptr *F, mpz_ptr *eps,
+            const mpz_t ell, const mpz_t ell2,
+            int *nsm)
 {
   // allocate space for results of threads
-  mpz_poly_t **SM;
-  SM = (mpz_poly_t **) malloc(nt*sizeof(mpz_poly_t *));
-  for (int i = 0; i < nt; ++i) {
-    SM[i] = (mpz_poly_t *) malloc(SM_BLOCK*sizeof(mpz_poly_t));
-    for (int j = 0; j < SM_BLOCK; ++j)
-      mpz_poly_init(SM[i][j], F->deg);
+  mpz_poly_t **SM[2];
+  for (int side = 0; side < 2; side++) {
+      SM[side] = (mpz_poly_t **) malloc(nt*sizeof(mpz_poly_t *));
+      for (int i = 0; i < nt; ++i) {
+          SM[side][i] = (mpz_poly_t *) malloc(SM_BLOCK*sizeof(mpz_poly_t));
+          for (int j = 0; j < SM_BLOCK; ++j)
+              mpz_poly_init(SM[side][i][j], F[side]->deg);
+      }
   }
 
   // We'll use a rotating buffer of thread id.
@@ -183,7 +199,9 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
     tis[i].ell = ell;
     tis[i].ell2 = ell2;
     tis[i].invl2 = invl2;
-    tis[i].sm = SM[i];
+    tis[i].sm0 = SM[0][i];
+    tis[i].sm1 = SM[1][i];
+    tis[i].nsm = nsm;
     // offset and nb must be adjusted.
   }
 
@@ -206,8 +224,11 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
     // Wait for the next thread to finish in order to print result.
     pthread_join(threads[threads_head], NULL);
     active_threads--;
-    for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt)
-      print_sm (out, SM[threads_head][k], nsm, F->deg);
+    for (int k = 0; k < SM_BLOCK && out_cpt < sr; ++k, ++out_cpt) {
+      print_sm (out, SM[0][threads_head][k], nsm[0], F[0]->deg);
+      print_sm (out, SM[1][threads_head][k], nsm[1], F[1]->deg);
+      fprintf(out, "\n");
+    }
 
     // report
     if (stats_test_progress(stats))
@@ -227,18 +248,21 @@ void mt_sm (int nt, const char * outname, sm_relset_ptr rels, uint64_t sr,
   fclose(out);
   free(tis);
   free(threads);
-  for (int i = 0; i < nt; ++i) {
-    for (int j = 0; j < SM_BLOCK; ++j) {
-      mpz_poly_clear(SM[i][j]);
-    }
-    free(SM[i]);
+  for (int side = 0; side < 2; side++) {
+      for (int i = 0; i < nt; ++i) {
+          for (int j = 0; j < SM_BLOCK; ++j) {
+              mpz_poly_clear(SM[side][i][j]);
+          }
+          free(SM[side][i]);
+      }
+      free(SM[side]);
   }
-  free(SM);
 }
 
 
-void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
-         const mpz_t eps, const mpz_t ell, const mpz_t ell2, int nsm)
+void sm (const char * outname, sm_relset_ptr rels, uint64_t sr,
+        mpz_poly_srcptr *F, mpz_ptr *eps,
+        const mpz_t ell, const mpz_t ell2, int *nsm)
 {
   FILE * out = fopen(outname, "w");
   mpz_poly_t SM;
@@ -247,16 +271,21 @@ void sm (const char * outname, sm_relset_ptr rels, uint64_t sr, mpz_poly_t F,
   mpz_init(invl2);
   barrett_init(invl2, ell2);
 
-  mpz_poly_init(SM, F->deg);
+  mpz_poly_init(SM, MAX(F[0]->deg, F[1]->deg));
 
   fprintf(out, "%" PRIu64 "\n", sr);
 
   uint64_t i;
   stats_init (stats, stdout, &i, nbits(sr)-5, "Computed", "SMs", "", "SMs");
   for (i = 0; i < sr; i++) {
-    mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num, rels[i].denom, F, ell2);
-    compute_sm (SM, rels[i].num, F, ell, eps, ell2, invl2);
-    print_sm (out, SM, nsm, F->deg);
+    for (int side = 0; side < 2; side++) {
+      if (nsm[side] == 0) continue;
+      mpz_poly_reduce_frac_mod_f_mod_mpz (rels[i].num[side], rels[i].denom[side],
+              F[side], ell2);
+      compute_sm (SM, rels[i].num[side], F[side], ell, eps[side], ell2, invl2);
+      print_sm (out, SM, nsm[side], F[side]->deg);
+    }
+    fprintf(out, "\n");
     // report
     if (stats_test_progress(stats))
       stats_print_progress (stats, i, 0, 0, 0);
@@ -275,9 +304,11 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "index", "(required) index file");
   param_list_decl_usage(pl, "out", "output file");
   param_list_decl_usage(pl, "gorder", "(required) group order");
-  param_list_decl_usage(pl, "smexp", "(required) sm-exponent");
+  param_list_decl_usage(pl, "smexp0", "(required) sm-exponent");
+  param_list_decl_usage(pl, "nsm0", "number of SM on the 0-side, default deg(polynomial))");
+  param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
+  param_list_decl_usage(pl, "nsm1", "number of SM on the 1-side, default deg(polynomial))");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
-  param_list_decl_usage(pl, "nsm", "number of SM (default deg(alg polynomial))");
   param_list_decl_usage(pl, "side", "alg polynomial to use (default is 1)");
 }
 
@@ -305,10 +336,13 @@ int main (int argc, char **argv)
 
   param_list pl;
   cado_poly pol;
-  mpz_poly_ptr F;
+  mpz_poly_srcptr F[2];
   sm_relset_ptr rels = NULL;
   uint64_t sr;
-  mpz_t ell, ell2, eps;
+  mpz_t ell, ell2, epsilon[2];
+  mpz_ptr eps[2];
+  eps[0] = &epsilon[0][0];
+  eps[1] = &epsilon[1][0];
   int mt = 1;
   double t0;
   int side = ALGEBRAIC_SIDE;
@@ -364,13 +398,16 @@ int main (int argc, char **argv)
   }
 
   /* Read sm exponent from command line (assuming radix 10) */
-  mpz_init (eps);
-  if (!param_list_parse_mpz(pl, "smexp", eps)) {
-      fprintf(stderr, "Error: parameter -smexp is mandatory\n");
-      param_list_print_usage(pl, argv0, stderr);
-      exit(EXIT_FAILURE);
+  for (int side = 0; side < 2; side++) {
+      mpz_init (eps[side]);
+      char str[10];
+      sprintf(str, "smexp%c", '0'+side);
+      if (!param_list_parse_mpz(pl, str, eps[side])) {
+          fprintf(stderr, "Error: parameter -%s is mandatory\n", str);
+          param_list_print_usage(pl, argv0, stderr);
+          exit(EXIT_FAILURE);
+      }
   }
-
   param_list_parse_int(pl, "t", &mt);
   if (mt < 1) {
     fprintf(stderr, "Error: parameter mt must be at least 1\n");
@@ -384,15 +421,22 @@ int main (int argc, char **argv)
   /* Init polynomial */
   cado_poly_init (pol);
   cado_poly_read(pol, polyfile);
-  F = pol->pols[side];
+  F[0] = pol->pols[RATIONAL_SIDE];
+  F[1] = pol->pols[ALGEBRAIC_SIDE];
 
   /* Read number of sm to be printed from command line */
-  int nsm = pol->alg->deg;
-  param_list_parse_int(pl, "nsm", &nsm);
-  if (nsm < 1 || nsm > pol->alg->deg)
+  int nsm[2];
+  nsm[0] = F[0]->deg;
+  nsm[1] = F[1]->deg;
+  param_list_parse_int(pl, "nsm0", &nsm[0]);
+  param_list_parse_int(pl, "nsm1", &nsm[1]);
+  if (nsm[0] + nsm[1] == 0) {
+      fprintf(stderr, "Error: no SM to compute!\n");
+      exit(EXIT_FAILURE);
+  }
+  if (nsm[0] > F[0]->deg || nsm[1] > F[1]->deg)
   {
-    fprintf(stderr, "Error: parameter nsm must be at least 1 and at most "
-                    "the degree of the rational polynomial\n");
+    fprintf(stderr, "Error: nsm can not exceed the degree\n");
     param_list_print_usage(pl, argv0, stderr);
     exit(EXIT_FAILURE);
   }
@@ -406,12 +450,15 @@ int main (int argc, char **argv)
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  fprintf(stdout, "\n# Algebraic polynomial on side %d:\nF = ", side);
-  mpz_poly_fprintf(stdout, F);
-  gmp_fprintf(stdout, "# Sub-group order:\nell = %Zi\n# Computation is done "
-                      "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
-                      "exponent:\neps = %Zi\n", ell, ell2, eps);
-  fflush(stdout);
+  for (int side = 0; side < 2; side++) {
+      fprintf(stdout, "\n# Polynomial on side %d:\nF[%d] = ", side, side);
+      mpz_poly_fprintf(stdout, F[side]);
+      gmp_fprintf(stdout,
+              "# Sub-group order:\nell = %Zi\n# Computation is done "
+              "modulo ell2 = ell^2:\nell2 = %Zi\n# Shirokauer maps' "
+              "exponent:\neps[%d] = %Zi\n", ell, ell2, side, eps[side]);
+      fflush(stdout);
+  }
 
   t0 = seconds();
   rels = build_rel_sets(purgedfile, indexfile, &sr, F, ell2);
@@ -436,7 +483,8 @@ int main (int argc, char **argv)
   for (uint64_t i = 0; i < sr; i++)
     sm_relset_clear (&rels[i]);
   free(rels);
-  mpz_clear(eps);
+  mpz_clear(eps[0]);
+  mpz_clear(eps[1]);
   mpz_clear(ell);
   mpz_clear(ell2);
   cado_poly_clear(pol);

@@ -23,7 +23,9 @@ endmacro(string_join var delimiter str_list)
 
 macro(add_bwc_test nm script)
     string_join(tail " " ${ARGN})
-    add_test(test-bwc-${nm} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_BINARY_DIR}/linalg/bwc ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch")
+    # Don't split this line !
+    add_test(test-bwc-${nm} bash -c
+        "${CMAKE_CURRENT_SOURCE_DIR}/bwc-tests.sh ${CADO_NFS_SOURCE_DIR}/linalg/bwc/${script} bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc pre_wipe=1 ${tail} -- verbose_flags=^all-bwc-sub-timings,^all-cmdline,^all-bwc-dispatch,^bwc-loading-mksol-files,^bwc-cache-major-info,^bwc-cpubinding,^perl-checks,^perl-sections")
 endmacro(add_bwc_test)
 
 
@@ -43,6 +45,7 @@ set(prime_z 69617318994479297159441705409245167921344429126717528237597542082203
 
 macro(add_plingen_test testname)
     string_join(tail " " ${ARGN})
+    # Don't split this line !
     add_test(test-bwc-plingen-${gfp_layer}-${testname} bash -c
         "${CMAKE_CURRENT_SOURCE_DIR}/test-plingen.sh ${CADO_NFS_BINARY_DIR} ${tail}")
 endmacro(add_plingen_test testname)
@@ -62,7 +65,29 @@ foreach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
     set(p "${prime_${width}}")
     add_bwc_test(modp-inhomogeneous-${gfp_layer} bwc-ptrace.sh prime=${p} random_matrix_size=500 nrhs=4 m=8 n=8 seed=1 ${extra})
     if(gfp_layer STREQUAL "p_1")
-        add_bwc_test(modp-inhomogeneous-minimal bwc-ptrace.sh prime=1009 random_matrix_size=50 nrhs=3 m=6 n=6 seed=1)
+        set(mextra)
+        # Only try to enable magma if CHECKS_EXPENSIVE is set.
+        if(DEFINED ENV{CHECKS_EXPENSIVE})
+            find_program(MAGMA magma)
+            if (MAGMA)
+                set(mextra magma=${MAGMA})
+            endif(MAGMA)
+        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+        add_bwc_test(modp-inhomogeneous-minimal-3rhs-mn6 bwc-ptrace.sh prime=1009
+            random_matrix_size=50 nrhs=3 m=6 n=6 seed=1 ${mextra})
+        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=2 m=4 n=4 seed=1 ${mextra})
+        if(DEFINED ENV{CHECKS_EXPENSIVE})
+            add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn4-expensive bwc-ptrace.sh
+                prime=1237940039285380274899124357 random_matrix_size=200 nrhs=2 m=4 n=4 seed=1 ${mextra})
+        endif(DEFINED ENV{CHECKS_EXPENSIVE})
+
+        add_bwc_test(modp-inhomogeneous-minimal-1rhs-mn1 bwc-ptrace.sh
+            prime=1009 random_matrix_size=50 nrhs=1 m=1 n=1 seed=1 ${mextra})
+#        add_bwc_test(modp-homogeneous-minimal-mn4 bwc-ptrace.sh
+#            prime=1009 random_matrix_size=50 m=4 n=4 seed=1 ${mextra})
+#        add_bwc_test(modp-inhomogeneous-minimal-2rhs-mn2 bwc-ptrace.sh
+#            prime=1009 random_matrix_size=50 nrhs=2 m=2 n=2 seed=1 ${mextra})
     endif(gfp_layer STREQUAL "p_1")
     add_dependencies(check plingen_${gfp_layer})
 
@@ -107,7 +132,7 @@ endforeach(gfp_layer ${BWC_GFP_ARITHMETIC_BACKENDS})
 
 
 add_bwc_test(mod2 bwc-trace.sh random_matrix_size=800 m=64 n=64 seed=1 thr=2x2)
-add_dependencies(check mf_scan plingen_p_1)
+add_dependencies(check mf_scan)
 
 add_bwc_test(mod2-oddthr bwc-trace.sh random_matrix_size=800 mn=128 seed=1 thr=3)
 
@@ -124,4 +149,19 @@ if(HAVE_CXX11 AND HAVE_HWLOC)
     build_and_run_test(test_cpubinding.c "utils;bwc_base" --cpubinding ${CMAKE_CURRENT_SOURCE_DIR}/cpubind_config_file_for_tests.conf)
 endif(HAVE_CXX11 AND HAVE_HWLOC)
 
+macro(test_dispatch_matmul testname)
+    string_join(tail " " ${ARGN})
+    # Don't split this line !
+    add_test(${testname} bash -c "${CMAKE_CURRENT_SOURCE_DIR}/bwc-dispatch-matmul.sh bindir=${CADO_NFS_BINARY_DIR}/linalg/bwc ${tail}")
+endmacro(test_dispatch_matmul testname)
+
+add_dependencies(check bwc_matmul)
+# mingw has antique bash (3.1) with different regexp syntax, and having
+# the script below work with both isn't a very funny perspective.
+if (NOT MINGW)
+test_dispatch_matmul(dispatch-matmul-65536-thr nrows=65536 density=2 thr=2x2)
+if (HAVE_MPI)
+test_dispatch_matmul(dispatch-matmul-65536-mpi nrows=65536 density=2 mpi=2x2)
+endif (HAVE_MPI)
+endif (NOT MINGW)
 

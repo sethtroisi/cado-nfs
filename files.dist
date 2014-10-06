@@ -406,6 +406,7 @@ misc/convert_poly.c
 misc/convert_rels.c
 misc/check_rels.c
 misc/debug_renumber.c
+misc/renumber_convert.c
 params/params.c100
 params/params.c101
 params/params.c102
@@ -1102,5 +1103,9 @@ linalg/bwc/cpubinding.cpp
 linalg/bwc/cpubinding.h
 tests/linalg/bwc/cpubind_config_file_for_tests.conf
 tests/linalg/bwc/test_cpubinding.c
+tests/test_full_p59.sh
 utils/verbose.c
 utils/verbose.h
+tests/linalg/bwc/bwc-dispatch-matmul.sh
+linalg/bwc/random_matrix.h
+linalg/bwc/README.gfp

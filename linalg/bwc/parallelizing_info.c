@@ -4,7 +4,7 @@
 #include <string.h>
 
 // we're doing open close mmap truncate...
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
 #include <sys/mman.h>
 #endif
 #include <sys/types.h>
@@ -23,6 +23,7 @@
 #include "macros.h"
 #include "misc.h"
 #include "memory.h"
+#include "verbose.h"
 
 #include <sys/time.h>   // gettimeofday
 #ifdef  HAVE_UTSNAME_H
@@ -377,7 +378,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         nhc = thr[0];
         nvc = thr[1];
     } else {
-        MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
+        pi->m->pals = MPI_COMM_WORLD;
     }
 
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
@@ -428,54 +429,58 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 #if defined(HAVE_HWLOC) && defined(HAVE_CXX11)
     /* prepare the cpu binding messages, and print the unique messages we
      * receive */
-    char * cpubinding_messages;
-    pi->cpubinding_info = cpubinding_get_info(&cpubinding_messages, pl, thr);
-    int msgsize = 0;
-    if (cpubinding_messages)
-        msgsize = strlen(cpubinding_messages);
-    MPI_Allreduce(MPI_IN_PLACE, &msgsize, 1, MPI_INT, MPI_MAX, pi->m->pals);
-    if (msgsize == 0) {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_CPUBINDING)) {
+        pi->cpubinding_info = cpubinding_get_info(NULL, pl, thr);
+    } else {
+        char * cpubinding_messages;
+        pi->cpubinding_info = cpubinding_get_info(&cpubinding_messages, pl, thr);
+        int msgsize = 0;
         if (cpubinding_messages)
+            msgsize = strlen(cpubinding_messages);
+        MPI_Allreduce(MPI_IN_PLACE, &msgsize, 1, MPI_INT, MPI_MAX, pi->m->pals);
+        if (msgsize == 0) {
+            if (cpubinding_messages)
+                free(cpubinding_messages);
+        }
+        msgsize++;
+        int chunksize = PI_NAMELEN + msgsize;
+        char * big_pool = malloc(pi->m->njobs * chunksize);
+        memset(big_pool, 0, pi->m->njobs * chunksize);
+        if (cpubinding_messages) {
+            int rc;
+            rc = strlcpy(big_pool + pi->m->jrank * chunksize, pi->nodename, PI_NAMELEN);
+            ASSERT_ALWAYS(rc == (int) strlen(pi->nodename));
+            rc = strlcpy(big_pool + pi->m->jrank * chunksize + PI_NAMELEN, cpubinding_messages, msgsize);
+            ASSERT_ALWAYS(rc == (int) strlen(cpubinding_messages));
             free(cpubinding_messages);
-    }
-    msgsize++;
-    int chunksize = PI_NAMELEN + msgsize;
-    char * big_pool = malloc(pi->m->njobs * chunksize);
-    memset(big_pool, 0, pi->m->njobs * chunksize);
-    if (cpubinding_messages) {
-        int rc;
-        rc = strlcpy(big_pool + pi->m->jrank * chunksize, pi->nodename, PI_NAMELEN);
-        ASSERT_ALWAYS(rc == (int) strlen(pi->nodename));
-        rc = strlcpy(big_pool + pi->m->jrank * chunksize + PI_NAMELEN, cpubinding_messages, msgsize);
-        ASSERT_ALWAYS(rc == (int) strlen(cpubinding_messages));
-        free(cpubinding_messages);
-    }
+        }
 
-    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-            big_pool, chunksize, MPI_BYTE, pi->m->pals);
+        MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                big_pool, chunksize, MPI_BYTE, pi->m->pals);
 
-    if (pi->m->jrank == 0) {
-        // const char * refnode = NULL;
-        const char * ref = NULL;
-        for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
-            const char * node = big_pool + i * chunksize;
-            const char * msg = node + PI_NAMELEN;
-            if (!ref || strcmp(msg, ref) != 0) {
-                printf("cpubinding messages on %s:\n%s", node, msg);
-                ref = msg;
-                /*
-                refnode = node;
-            } else {
-                printf("cpubinding messages on %s: same as %s\n", node, refnode);
-                */
+        if (pi->m->jrank == 0) {
+            // const char * refnode = NULL;
+            const char * ref = NULL;
+            for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
+                const char * node = big_pool + i * chunksize;
+                const char * msg = node + PI_NAMELEN;
+                if (!ref || strcmp(msg, ref) != 0) {
+                    printf("cpubinding messages on %s:\n%s", node, msg);
+                    ref = msg;
+                    /*
+                       refnode = node;
+                       } else {
+                       printf("cpubinding messages on %s: same as %s\n", node, refnode);
+                       */
+                }
             }
         }
+        free(big_pool);
     }
-    free(big_pool);
 #endif /* defined(HAVE_HWLOC) && defined(HAVE_CXX11) */
 }
 
-    static parallelizing_info *
+static parallelizing_info *
 pi_grid_init(parallelizing_info_ptr pi)
 {
     // unsigned int nvj = pi->wr[0]->njobs;
@@ -695,7 +700,8 @@ static void pi_clear_mpilevel(parallelizing_info_ptr pi)
     for(int d = 0 ; d < 2 ; d++) {
         MPI_Comm_free(&pi->wr[d]->pals);
     }
-    MPI_Comm_free(&pi->m->pals);
+    if (pi->m->pals != MPI_COMM_WORLD)
+        MPI_Comm_free(&pi->m->pals);
 
     // MPI_Errhandler_free(&my_eh);
 }
@@ -835,9 +841,6 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         void * arg)
 {
     int interleaving = 0;
-#ifndef HAVE_MMAN_H
-    fprintf(stderr, "Warning: copy-based mmaped I/O replacement has never been tested, and could very well be bogus\n");
-#endif
     param_list_parse_int(pl, "interleaving", &interleaving);
     if (interleaving) {
         pi_go_inner_interleaved(fcn, pl, arg);
@@ -1362,21 +1365,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 
     free(alldisps);
 
-#if 0
-    for(unsigned int i = 0 ; i < w->njobs ; i++) {
-        my_pthread_mutex_lock(w->th->m);
-        printf("J%uT%u %u @ %u\n", i, w->trank, counts[i], displs[i]);
-        my_pthread_mutex_unlock(w->th->m);
-    }
-#endif
-
     serialize_threads(w);
-
-#if 0
-    ASSERT_ALWAYS(displs[w->jrank] >= 0);
-    if (displs[w->jrank] == 0)
-        ASSERT_ALWAYS(w->trank == 0);
-#endif
 
     if (w->trank == 0) {
         free(allcounts);
@@ -1454,7 +1443,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             close(fd);
             goto pi_save_file_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1509,7 +1498,7 @@ pi_save_file_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
 #else
         write(fd, recvbuf, wsiz);
@@ -1578,7 +1567,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1633,7 +1622,7 @@ pi_save_file_2d_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(recvbuf, wsiz);
 #else
         write(fd, recvbuf, wsiz);
@@ -1685,7 +1674,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1734,8 +1723,14 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             for(unsigned int j = 0 ; j < w->njobs ; j++) {
                 ts[j] = MIN(chunksize, cs[j]);
                 if (ts[j]) {
-                    if (w->jrank == 0)
+                    if (w->jrank == 0) {
+                        /* If "bus error" appears here, it might be
+                         * because data files are put on /ceph file
+                         * system, which doesn't seem to answer in a very
+                         * satisfactory way to mmaping files...
+                         */
                         memcpy(tsendbuf + j * chunksize, sendbuf + cd[j], ts[j]);
+                    }
                     ts0=0;
                 }
             }
@@ -1776,7 +1771,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);
@@ -1815,7 +1810,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         fd = open(filename, O_RDONLY, 0666);
 #endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
 #else
@@ -1856,7 +1851,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     free(displs);
 
     if (leader) {
-#ifdef HAVE_MMAN_H
+#ifdef disabled_because_apparently_buggy_with_openib_yesss_HAVE_MMAN_H
         munmap(sendbuf, wsiz);
 #else
         free(sendbuf);

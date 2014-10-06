@@ -492,15 +492,19 @@ modul_poly_is_squarefree (modul_poly_t f, modulusul_t p)
   return squarefree;
 }
 
-/* Return the number n of roots of f mod p using a naive algorithm.
-   If r is not NULL, put the roots in r[0], ..., r[n-1]. */
+/* Return the number n of roots of f mod p (without multiplicities)
+   using a naive algorithm.
+   If r is not NULL, put the roots in r[0], ..., r[n-1].
+   TODO: rewrite using a table of differences, with cost O(d*p) additions
+   after an initialization of O(d^2), instead of O(d*p) multiplications.
+*/
 static int
 modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   int n = 0;
   residueul_t x;
   modul_set0(x, p);
-  for ( ; !modul_finished(x, p) ; modul_next(x, p) ) {
+  for ( ; !modul_finished(x, p); modul_next(x, p) ) {
       residueul_t v;
     modul_poly_eval (v, f, x, p);
     if (modul_is0(v, p))
@@ -508,6 +512,12 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 	if (r != NULL)
 	  modul_set(r[n], x, p);
 	n ++;
+	/* Let d = f->degree: if we have already d roots, then we have
+	   them all. Warning: if we have already d-1 roots, one of them
+           might have order 2, thus the return value is either d-1 or d,
+           but we can't conclude at that point. */
+	if (n == f->degree)
+          break;
       }
   }
   return n;

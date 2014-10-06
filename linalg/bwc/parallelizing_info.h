@@ -54,11 +54,13 @@
 #if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002
 /* In fact, even in this case we might consider disabling it. */
 #define xxxMPI_LIBRARY_MT_CAPABLE
+#elif defined(OPEN_MPI) && OMPI_VERSION_ATLEAST(1,8,2)
+#define xxxMPI_LIBRARY_MT_CAPABLE
 /*
  * at present I know of no version of openmpi with MPI_THREAD_MULTIPLE
- * working.
-#elif defined(OPEN_MPI) && OMPI_MAJOR_VERSION >= 123456789
-#define MPI_LIBRARY_MT_CAPABLE
+ * working, but to be honest I haven't tried hard. For sure there are
+ * some bugs in my code as well anyway, at least that's what enabling it
+ * shows.
  */
 #else
 /* Assume it does not work */

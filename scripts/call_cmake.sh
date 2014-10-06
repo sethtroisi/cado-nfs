@@ -97,6 +97,7 @@ export ENABLE_SHARED
 export NO_PYTHON_CHECK
 export NO_SSE
 export NO_INLINE_ASSEMBLY
+export CHECKS_EXPENSIVE
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -123,6 +124,7 @@ if [ "$1" = "show" ] ; then
     echo "PTHREADS=\"$PTHREADS\""
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     echo "ENABLE_SHARED=\"$ENABLE_SHARED\""
+    echo "CHECKS_EXPENSIVE=\"$CHECKS_EXPENSIVE\""
     exit 0
 fi
 
@@ -133,7 +135,7 @@ if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2
     cmake_path=
 # Recall that (some versions of) bash do not want quoting for regex patterns.
-elif ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
+elif [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ [012] ]] && ! [[ "`"$cmake_path" --version`" =~ ^cmake\ version\ 2.[89] ]] ; then
     echo "CMake found, but not with version 2.8 or newer" >&2
     cmake_path=
 fi

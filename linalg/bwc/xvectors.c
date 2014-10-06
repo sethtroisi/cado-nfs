@@ -85,6 +85,18 @@ void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
     serialize(pi->m);
 }
 
+void set_x_fake(uint32_t ** xs, unsigned int m, unsigned int *pnx,
+        parallelizing_info_ptr pi)
+{
+    /* Don't bother. */
+    *pnx=3;
+    *xs = malloc(*pnx * m * sizeof(unsigned int));
+    for(unsigned int i = 0 ; i < *pnx*m ; i++) {
+        (*xs)[i] = i;
+    }
+    serialize(pi->m);
+}
+
 void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_ptr pi)
 {
     /* Here, we expect that the data is already available to everybody, so

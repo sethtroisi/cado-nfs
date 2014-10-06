@@ -119,7 +119,7 @@
  *          implementation in this case flushes its input buffer by
  *          feeding it to a companion thread which works as a consumer.
  *          - the consumer threads do exactly what is done in the step
- *          called ``slave loop 1 above''. Henceforth, the must have the
+ *          called ``slave loop 1'' above. Henceforth, they must have the
  *          capability of rewinding their input.
  *          XXX => the data_dest buffers are all parts of big
  *          per-thread buffers. they are tightly bound to the source
@@ -420,7 +420,7 @@ struct progress_info {
     size_t z;   /* last printed data amount */
 };
 
-int should_print_now(struct progress_info * last_printed, size_t z)
+static int should_print_now(struct progress_info * last_printed, size_t z)
 {
     if (z >= last_printed->z + (10UL<<20) || time(NULL) >= last_printed->t + 10) {
         last_printed->z = z;
@@ -472,7 +472,8 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
         }
     }
     mf_progress(input, output, time(NULL)-t0, name);
-    printf("\n");
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("\n");
 }/*}}}*/
 
 /* }}} */
@@ -694,6 +695,17 @@ struct master_data_s {/*{{{*/
     parallelizing_info_ptr pi;
 
     int withcoeffs;
+
+    /* This is the column renumbering table, combining
+     * balancing_pre_shuffle and fw_colperm. We would like to
+     * incoroporate both in fw_colperm, but for obscure reasons we need
+     * to keep all.
+     */
+    struct {
+        uint32_t c;
+        uint16_t n;
+        uint64_t w;
+    } * colmap;
 };
 typedef struct master_data_s master_data[1];
 typedef struct master_data_s *master_data_ptr;/*}}}*/
@@ -870,12 +882,13 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
 	FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
     */
-    printf("J%uT%u (%2d,%2d) expects"
-	   " rows %" PRIu32 "+%" PRIu32 " cols %" PRIu32 "+%" PRIu32 ".\n",
-           pi->m->jrank, pi->m->trank,
-           s->my_i, s->my_j,
-           s->my_row0, s->my_nrows,
-           s->my_col0, s->my_ncols);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("J%uT%u (%2d,%2d) expects"
+               " rows %" PRIu32 "+%" PRIu32 " cols %" PRIu32 "+%" PRIu32 ".\n",
+               pi->m->jrank, pi->m->trank,
+               s->my_i, s->my_j,
+               s->my_row0, s->my_nrows,
+               s->my_col0, s->my_ncols);
 
     s->mat->twist=malloc(s->my_nrows * sizeof(int[2]));
     s->mat->ntwists=0;
@@ -907,6 +920,12 @@ struct slave_dest_s {/*{{{*/
     uint32_t *row_weights;
     uint32_t *col_weights;
     uint32_t current_row;
+
+    /* I'm not really sure that this field is properly named. It receives
+     * fw_colperm(fw_rowperm(real, true, original row index)). That
+     * pretty much seems to be the permutation caused by the shuffled
+     * product option. And we use it exactly that way.
+     */
     uint32_t original_row;
     int incoming_rowindex;
     uint64_t tw;
@@ -937,8 +956,8 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
             continue;
         }
         if (R->incoming_rowindex) {
-            /* TODO: for now this is unused. We can obtain the info on
-             * the balancing permutation for a small cost */
+            /* We can obtain the info on the balancing permutation for a
+             * small cost */
             R->original_row = x;
             R->incoming_rowindex = 0;
             // don't increase the row counter upon exit.
@@ -1004,6 +1023,7 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
 
 void slave_dest_stats(slave_dest_ptr s)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER)) return;
     uint32_t * row_weights = s->row_weights;
     uint32_t my_nrows = s->s->my_nrows;
     uint32_t * col_weights = s->col_weights;
@@ -1150,8 +1170,9 @@ void slave_loop(slave_data s)
     s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(int[2]));
     qsort(s->mat->twist, s->mat->ntwists, sizeof(int[2]), (sortfunc_t) &intpair_cmp);
 
-    printf("[J%uT%u] building local matrix\n",
-            s->pi->m->jrank, s->pi->m->trank);
+    if (verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER))
+        printf("[J%uT%u] building local matrix\n",
+                s->pi->m->jrank, s->pi->m->trank);
     snprintf(name, sizeof(name),
             "[J%uT%u] slave loop 2", s->pi->m->jrank, s->pi->m->trank);
     mf_pipe(input, output, disp ? name : NULL);
@@ -1318,7 +1339,7 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
 
     /* one more check. The cost is tiny compared to what we do in other
      * parts of the code. */
-    printf("Consistency check...");
+    printf("Consistency check ...");
     fflush(stdout);
     uint32_t *ttab = malloc(m->bal->h->nh * sizeof(uint32_t));
     memset(ttab, 0, m->bal->h->nh * sizeof(uint32_t));
@@ -1330,11 +1351,27 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
         ASSERT_ALWAYS(ttab[k] == m->exp_rows[k * m->bal->h->nv]);
     }
     free(ttab);
-    printf("ok\n");
+    printf(" ok\n");
+
+    char buf[16];
+    size_t sz = m->bal->h->ncols * sizeof(*m->colmap);
+    printf("Creating column map of size %s ...", size_disp(sz, buf));
+    fflush(stdout);
+    m->colmap = malloc(sz);
+    for(uint32_t i = 0 ; i < m->bal->h->ncols ; i++) {
+        uint32_t q = balancing_pre_shuffle(m->bal, i);
+        ASSERT_ALWAYS(q < m->bal->h->ncols);
+        uint32_t c = m->fw_colperm[q];
+        m->colmap[i].w = DUMMY_VECTOR_COORD_VALUE(q);
+        m->colmap[i].c = m->fw_colperm[q];
+        m->colmap[i].n = who_has_col(m, c);
+    }
+    printf(" done\n");
 }/*}}}*/
 
 void clear_master_variables(master_data m)/*{{{*/
 {
+    free(m->colmap);
     if (m->bal->h->flags & FLAG_REPLICATE) {
         if (m->bal->h->flags & FLAG_SHUFFLED_MUL)
             free(m->fw_colperm);
@@ -1398,6 +1435,16 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             /* Send a new row info _only_ to the nodes on the
              * corresponding row in the process grid ! */
             for (int i = 0; i < (int) m->bal->h->nv; i++) {
+                /* See comment about the field original_row_index. It's a
+                 * misnomer, really. We do want to put
+                 * fw_colperm(fw_rowperm(r)), here. This is used for
+                 * untwisting the shuffle-product vectors, if we ever
+                 * want to.
+                 *
+                 * To be honest, it's rather likely that this is
+                 * completely bogus if we are doing anything different
+                 * from the shuffled-product tactics.
+                 */
                 uint32_t x[3] = {UINT32_MAX, rr, m->fw_colperm[rr], };
                 data_dest_ptr where = d->x[d->noderow + i];
                 where->put(where, x, 3);
@@ -1428,17 +1475,12 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             break;
         } else {
             uint32_t q = p[s];
-            ASSERT_ALWAYS(q < m->bal->h->ncols);
-            q = balancing_pre_shuffle(m->bal, q);
+            uint32_t c = m->colmap[q].c;
+            int nodecol = m->colmap[q].n;
             if (d->check_vector) {
-                /* column index is q. Get the index of our constant
-                 * vector which corresponds to q */
-                /* FIXME. When we have a matrix with coefficients, it's
-                 * difficult to make sense out of this. */
-                d->w ^= DUMMY_VECTOR_COORD_VALUE(q);
+                d->w ^= m->colmap[q].w;
             }
-            uint32_t c = m->fw_colperm[q];
-            int nodecol = who_has_col(m, c);
+            
             ASSERT_ALWAYS(d->noderow + nodecol < (int) d->m->pi->m->totalsize);
             data_dest_ptr where = d->x[d->noderow + nodecol];
             where->put(where, &c, 1);
@@ -1467,6 +1509,8 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
 
 void master_dispatcher_stats(master_dispatcher_ptr d)
 {
+    if (!verbose_enabled(CADO_VERBOSE_PRINT_BWC_DISPATCH_OUTER)) return;
+
     for (int i = 0; i < d->npeers; i++) {
         /* There's a -1 that comes from the end marker (which is in fact
          * the same as a new row marker)
@@ -1673,6 +1717,8 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
 
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         read_bfile(m, arg->bfile);
+
+        printf("Balancing flags: 0x%"PRIx32"\n", m->bal->h->flags);
 
         int ok = 1;
 

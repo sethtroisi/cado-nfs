@@ -6,6 +6,9 @@ last update: 20130724
 See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
 to the exact meaning of most files.
 
+See bwc-ptrace.sh and bwc-ptrace.m for the most up-to-date checks relative
+to the exact meaning of most files for the case of linear systems over
+GF(p). More generally, all GF(p) specific information is in README.gfp
 
 
 The tools present in this subdirectory form an implementation of the
@@ -16,7 +19,7 @@ Block-Wiedemann algorithm with the following features:
 - checkpointing / restarting in case of problem.
 - checksums during the computation to detect problems.
 - possibility to compute either a left or right kernel vector.
-
+- cpu binding (if hwloc is available)
 
 Properly documenting bwc implies a bit of knowledge of the block Wiedemann
 algorithm and its parameters. This README does not cover this aspect.
@@ -620,6 +623,17 @@ Using bwc.pl with MPI (updated 20120704)
        mpi_extra_args= this is needed for openmpi
 
     $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chipolata,chorizo,merguez matrix=/localdisk/tmp/nfs/c156.sparse.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+
+Cpu binding (updated 20141002)
+===========
+
+If hwloc (Portable Hardware Locality, http://www.open-mpi.org/projects/hwloc/)
+is installed, then bwc.pl might use it for cpu binding, which will improve the
+performance of the linear algebra step. When hwloc is used, the keyword
+"cpubinding" should appear in cxxx.bwc.log.
+
+See cpubinding.conf for more information. In short, you need to add
+cpubinding=$(CADO)/linalg/bwc/cpubinding.conf on the bwc.pl command line.
 
 
 Notes:

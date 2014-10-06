@@ -869,6 +869,7 @@ class Replay(Program):
                  index: Parameter()=None,
                  out: Parameter()=None,
                  for_msieve: Toggle()=None,
+                 skip: Parameter(checktype=int)=None,
                  force_posix_threads: Toggle("force-posix-threads")=None,
                  bwcostmin: Parameter(checktype=int)=None,
                  **kwargs):
@@ -965,9 +966,11 @@ class SM(Program):
                  index: Parameter(),
                  out: Parameter(),
                  ell: Parameter("gorder"),
-                 smexp: Parameter(),
+                 smexp0: Parameter(),
+                 smexp1: Parameter(),
                  explicit_units: Toggle()=None,
-                 nmaps: Parameter("nsm")=None,
+                 nmaps0: Parameter("nsm0")=None,
+                 nmaps1: Parameter("nsm1")=None,
                  threads: Parameter("t")=None,
                  **kwargs):
         super().__init__(locals(), **kwargs)
@@ -978,7 +981,6 @@ class ReconstructLog(Program):
     subdir = "filter"
     def __init__(self, *,
                  ell: Parameter("gorder"),
-                 smexp: Parameter(),
                  ker: Parameter("log"),
                  dlog: Parameter("out"),
                  renumber: Parameter(),
@@ -988,7 +990,10 @@ class ReconstructLog(Program):
                  relsdel: Parameter(),
                  nrels: Parameter(),
                  partial: Toggle()=None,
-                 nmaps: Parameter("sm"),
+                 nmaps0: Parameter("sm0"),
+                 smexp0: Parameter(),
+                 nmaps1: Parameter("sm1"),
+                 smexp1: Parameter(),
                  **kwargs):
         super().__init__(locals(), **kwargs)
 

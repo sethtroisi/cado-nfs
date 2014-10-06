@@ -55,10 +55,17 @@ struct matmul_public_s {
                                  */
 
     const char * locfile;
+    int no_save_cache;          /* if true, cache file is not saved */
 
     char * cachefile_name;
     char * local_cache_copy;
 
+    /* This is the local copy of the balancing permutation. (twist) is an
+     * array of pairs (row index in the (sub)-matrix) ==> (row index in
+     * the original matrix), but only when both coordinates of this pair
+     * are in the current row and column range. This can be viewed as the
+     * set of non-zero positions in the permutation matrix if it were
+     * split just like the current matrix is. */
     uint32_t (*twist)[2];
     uint32_t ntwists;
 

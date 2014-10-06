@@ -87,7 +87,7 @@ EOF
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
 my $main = shift @ARGV or usage;
-print "$0 $main @ARGV\n";
+my $my_cmdline="$0 $main @ARGV";
 
 # ----- cmake substituted variables -----
 ## mpiexec is substituted by cmake in case mpi has been used for the
@@ -245,6 +245,12 @@ sub set_mpithr_param { # {{{ utility
     return @s;
 } # }}}
 
+my $my_verbose_flags = {
+    cmdline => 1,
+    checks => 1,
+    sections => 1,
+};
+
 while (my ($k,$v) = each %$param) {
     # Filter out parameters which are _not_ relevant to the bwc programs.
     if ($k eq 'matrix') { $matrix=$v; next; }
@@ -260,6 +266,20 @@ while (my ($k,$v) = each %$param) {
     # into the main argument list.
     if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @mpi_split;}
     if ($k eq 'thr') { @thr_split = set_mpithr_param $v; $param->{$k} = $v = join "x", @thr_split; }
+    if ($k eq 'verbose_flags') {
+        my @heritage;
+        for my $f (split(',', $v)) {
+            my $w=1;
+            my $f0=$f;
+            $w = 0 if $f =~ s/^[\^!]//;
+            if ($f =~ s/^perl-//) {
+                $my_verbose_flags->{$f}=$w;
+            } else {
+                push @heritage, $f0;
+            }
+        }
+        $v=join(',',@heritage);
+    }
 
     # The rest is passed to subprograms, unless explicitly discarded on a
     # per-program basis.
@@ -289,6 +309,8 @@ $nh = $mpi_split[0] * $thr_split[0];
 $nv = $mpi_split[1] * $thr_split[1];
 $splitwidth = ($prime == 2) ? 64 : 1;
 # }}}
+
+print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
 
 # {{{ Some important argument checks
 {
@@ -429,7 +451,7 @@ sub dosystem
         $prg=shift @_;
     }
     my @args = @_;
-    print STDERR '#' x 77, "\n";
+    print STDERR '#' x 77, "\n" if $my_verbose_flags->{'sections'};
     my $msg = "$env_strings$prg " . (join(' ', @args)) . "\n";
 
     if ($show_only) {
@@ -437,7 +459,7 @@ sub dosystem
         return 0;
     }
 
-    print STDERR $msg;
+    print STDERR $msg if $my_verbose_flags->{'cmdline'};
     my $rc = system $prg, @args;
     return if $rc == 0;
     if ($rc == -1) {
@@ -450,7 +472,7 @@ sub dosystem
         my $ret = $rc >> 8;
         print STDERR "$prg: exited with status $ret\n";
     }
-    exit 1;
+    die "aborted on subprogram error";
 }
 
 sub ssh_program
@@ -758,8 +780,8 @@ sub version_ge {
 
 if ($mpi_needed) {
     # This is useful for debugging in case we see new MPI environments.
-    print STDERR "Inherited environment:\n";
-    print STDERR "$_=$ENV{$_}\n" for keys %$ENV;
+    # print STDERR "Inherited environment:\n";
+    # print STDERR "$_=$ENV{$_}\n" for keys %ENV;
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
@@ -857,6 +879,19 @@ if ($mpi_needed) {
 # }}}
 
 if ($mpi_needed) {
+    if ($ENV{'DISPLAY'}) {
+        print "## removing the DISPLAY environment variable, as it interacts badly with MPI startup\n";
+        delete $ENV{'DISPLAY'};
+    }
+    if ($ENV{'SSH_AUTH_SOCK'}) {
+        if ($ENV{'OAR_JOBID'}) {
+            print "## removing the SSH_AUTH_SOCK environment variable, as it interacts badly with MPI startup, and OAR does not need it.\n";
+            delete $ENV{'SSH_AUTH_SOCK'};
+        } else {
+            print "## WARNING: the environment variable SSH_AUTH_SOCK is set. If it so happens that you do *not* need it, you should unset it for faster job startup.\n";
+        }
+    }
+
     # openmpi seems to properly propagate the path to mpirun as the path
     # to be forwarded on the remote nodes, so no manual propagation of
     # LD_LIBRARY_PATH or --prefix is needed.
@@ -911,6 +946,7 @@ sub task_begin_message {
 }
 
 sub task_check_message {
+    return unless $my_verbose_flags->{'checks'};
     my $status = shift;
     my $normal = $terminal_colors->{'normal'} || '';
     my $color = {
@@ -972,7 +1008,7 @@ sub get_cached_leadernode_filelist {
         }
         closedir $dh;
     } else {
-        my $foo = join(' ', @mpi_precmd_single, "find $wdir -type f -a -printf '%s %p\\n'");
+        my $foo = join(' ', @mpi_precmd_single, "find $wdir -follow -type f -a -printf '%s %p\\n'");
         for my $line (`$foo`) {
             $line =~ s/^\s*//;
             chomp($line);
@@ -1171,7 +1207,8 @@ sub task_common_run {
     @_ = grep !/^ys=/, @_ unless $program =~ /(?:krylov|mksol|dispatch)$/;
     @_ = grep !/^n?rhs=/, @_ unless $program =~ /(?:prep|gather|plingen.*|mksol)$/;
     @_ = grep !/shuffled_product/, @_ unless $program =~ /mf_bal/;
-    @_ = grep !/precmd/, @_;
+    @_ = grep !/skip_decorrelating_permutation/, @_ unless $program =~ /mf_bal/;
+    @_ = grep !/(?:precmd|tolerate_failure)/, @_;
 
     $program="$bindir/$program";
     unshift @_, $program;
@@ -1191,7 +1228,19 @@ sub task_common_run {
             die "Don't know the parallel status of program $program ... ?";
         }
     }
-    dosystem @_;
+    eval { dosystem @_; };
+
+    if ($@) {
+        if (defined(my $tol = $param->{'tolerate_failure'})) {
+            my $re = qr/$tol/;
+            if ($program =~ /$re/) {
+                print STDERR "Not aborting because $program matches tolerate_failure regexp $tol\n";
+                return;
+            }
+        } else {
+            die;
+        }
+    }
 }
 # }}}
 
@@ -1356,6 +1405,11 @@ sub subtask_solution_blocks {
 
 sub task_dispatch_missing_output_files {
     my ($balancing, $balancing_hash) = subtask_find_or_create_balancing(-may_create=>'yes');
+
+    if ($param->{'rebuild_cache'}) {
+        # Then we don't even need to bother.
+        return 'all';
+    }
 
     # Note the ys=0..$splitwidth below. It's here only to match the width
     # which is used in the main krylov/mksol programs. The reason is that
@@ -1684,6 +1738,7 @@ sub task_lingen {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
         }
+        push @args, grep { /^verbose_flags=/ } @main_args;
         task_common_run("plingen_pz", @args);
         # Some splitting work needed...
         @args=();
@@ -1768,7 +1823,7 @@ sub task_mksol {
     for my $t (@todo) {
         # take out ys from main_args, put the right one in place if
         # needed.
-        print "main_args: @main_args\n";
+        # print "main_args: @main_args\n";
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs/} @args) {

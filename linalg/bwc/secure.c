@@ -86,6 +86,8 @@ void save_untwisted_transposed_vector(matmul_top_data_ptr mmt, const char * name
 
 void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    int fake = param_list_lookup_string(pl, "random_matrix") != NULL;
+
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
     if (pi->interleaved && pi->interleaved->idx)
@@ -128,7 +130,12 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
 
-    load_x(&gxvecs, bw->m, &nx, mmt->pi);
+    if (!fake) {
+        load_x(&gxvecs, bw->m, &nx, pi);
+    } else {
+        set_x_fake(&gxvecs, bw->m, &nx, pi);
+    }
+
 
     xvec_to_vec(mmt, gxvecs, MIN(nchecks, bw->m), nx, !bw->dir);
 
