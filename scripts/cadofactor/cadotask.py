@@ -2056,6 +2056,9 @@ class FactorBaseTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames,
                 {"gzip": True, "I": int, "rlim": int, "alim": int})
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2090,7 +2093,6 @@ class FactorBaseTask(Task):
             self.state["poly"] = str(poly)
         
         if not "outputfile" in self.state:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
@@ -2105,33 +2107,30 @@ class FactorBaseTask(Task):
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.MakeFB.name)
             if not twoalgsides:
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename),
+                p = cadoprograms.MakeFB(out=str(outputfilename),
                                     lim=self.params["alim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
             else:
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename0),
+                p = cadoprograms.MakeFB(out=str(outputfilename0),
                                     side=0,
                                     lim=self.params["rlim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
-                p = cadoprograms.MakeFB(poly=polyfilename,
-                                    out=str(outputfilename1),
+                p = cadoprograms.MakeFB(out=str(outputfilename1),
                                     side=1,
                                     lim=self.params["alim"],
                                     stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[0])
+                                    **self.merged_args[0])
                 message = self.submit_command(p, "", log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
@@ -2177,6 +2176,13 @@ class FreeRelTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames,
                 {"dlp": False, "gzip": True, "addfullcol": None})
+    @property
+    def needed_input(self):
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
+        if self.params["dlp"]:
+            input["badideals"] = Request.GET_BADIDEAL_FILENAME
+        return input
+
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
         'nprimes': (r'Renumbering struct: nprimes=(\d+)', int)
@@ -2217,9 +2223,6 @@ class FreeRelTask(Task):
             self.state["poly"] = str(poly)
         
         if not "freerelfilename" in self.state:
-            # Write polynomial to a file
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
@@ -2227,23 +2230,12 @@ class FreeRelTask(Task):
             renumberfilename = self.workdir.make_filename("renumber" + use_gz)
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.FreeRel.name)
-            if self.params["dlp"]:
-                badidealfilename = self.send_request(Request.GET_BADIDEAL_FILENAME)
-                p = cadoprograms.FreeRel(poly=polyfilename,
-                                         renumber=renumberfilename,
-                                         badideals=badidealfilename,
-                                         out=str(freerelfilename),
-                                         stdout=str(stdoutpath),
-                                         stderr=str(stderrpath),
-                                         **self.progparams[0])
-            else:
-                # Run command to generate factor base/free relations file
-                p = cadoprograms.FreeRel(poly=polyfilename,
-                                         renumber=renumberfilename,
-                                         out=str(freerelfilename),
-                                         stdout=str(stdoutpath),
-                                         stderr=str(stderrpath),
-                                         **self.progparams[0])
+            # Run command to generate factor base/free relations file
+            p = cadoprograms.FreeRel(renumber=renumberfilename,
+                                     out=str(freerelfilename),
+                                     stdout=str(stdoutpath),
+                                     stderr=str(stderrpath),
+                                     **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -2309,6 +2301,10 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
             "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
             "gzip": True})
     @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
+
+    @property
     def stat_conversions(self):
         # Average J=1017 for 168 special-q's, max bucket fill 0.737035
         # Total cpu time 7.0s [precise timings available only for mono-thread]
@@ -2373,7 +2369,6 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
     
     def run(self):
         super().run()
-        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
         have_two_alg = self.send_request(Request.GET_HAVE_TWO_ALG_SIDES)
         if have_two_alg:
             fb0 = self.send_request(Request.GET_FACTORBASE0_FILENAME)
@@ -2392,16 +2387,15 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
                                    shouldexist=False)
             if not have_two_alg:
                 p = cadoprograms.Las(q0=q0, q1=q1,
-                                     poly=polyfilename, factorbase=factorbase,
+                                     factorbase=factorbase,
                                      out=outputfilename, stats_stderr=True,
-                                     **self.progparams[0])
+                                     **self.merged_args[0])
             else:
                 p = cadoprograms.Las(q0=q0, q1=q1,
-                                     poly=polyfilename,
                                      factorbase0=fb0,
                                      factorbase1=fb1,
                                      out=outputfilename, stats_stderr=True,
-                                     **self.progparams[0])
+                                     **self.merged_args[0])
             self.submit_command(p, "%d-%d" % (q0, q1), commit=False)
             self.state.update({"qnext": q1}, commit=True)
         self.logger.info("Reached target of %d relations, now have %d",
@@ -2758,6 +2752,14 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
     @property
+    def needed_input(self):
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                "renumber": Request.GET_RENUMBER_FILENAME}
+        if self.params["dlp"]:
+            input["badidealinfo"] = Request.GET_BADIDEALINFO_FILENAME
+        return input
+
+    @property
     def stat_conversions(self):
         # "End of read: 229176 relations in 0.9s -- 21.0 MB/s -- 253905.7 rels/s"
         # Without leading "# " !
@@ -2791,8 +2793,6 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
 
         input_nrel = 0
         for i in range(0, self.nr_slices):
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
             rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
             input_nrel += rel_count
@@ -2813,30 +2813,20 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
             (stdoutpath, stderrpath) = \
                 self.make_std_paths(name, do_increment=(i == 0))
              
-            if self.params["dlp"]:
-                badinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
-            else:
-                badinfofilename = None
 
             if len(files) <= 10:
                 p = cadoprograms.Duplicates2(*files,
-                                             poly=polyfilename,
                                              rel_count=rel_count,
-                                             badidealinfo=badinfofilename,
-                                             renumber=renumber_filename,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
-                                             **self.progparams[0])
+                                             **self.merged_args[0])
             else:
                 filelistname = self.make_filelist(files)
-                p = cadoprograms.Duplicates2(poly=polyfilename,
-                                             rel_count=rel_count,
-                                             badidealinfo=badinfofilename,
-                                             renumber=renumber_filename,
+                p = cadoprograms.Duplicates2(rel_count=rel_count,
                                              filelist=filelistname,
                                              stdout=str(stdoutpath),
                                              stderr=str(stderrpath),
-                                             **self.progparams[0])
+                                             **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
