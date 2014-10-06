@@ -53,7 +53,7 @@ print_sm (FILE *f, mpz_poly_t SM, int nSM, int d)
 /* Compute the Shirokauer maps of a single pair (a,b). 
    SM must be allocated and is viewed as a polynomial of degree F->deg. */
 void
-sm_single_rel(mpz_poly_t *SM, int64_t a, uint64_t b, mpz_poly_ptr *F,
+sm_single_rel(mpz_poly_ptr *SM, int64_t a, uint64_t b, mpz_poly_ptr *F,
               const mpz_ptr *eps, const mpz_t ell, const mpz_t ell2,
               const mpz_t invl2)
 {
@@ -92,7 +92,7 @@ sm_relset_clear (sm_relset_t r)
  */
 void
 sm_build_one_relset (sm_relset_ptr rel, uint64_t *r, int64_t *e, int len,
-                 mpz_poly_t * abpolys, mpz_poly_srcptr *F, const mpz_t ell2)
+                 mpz_poly_t * abpolys, mpz_poly_ptr *F, const mpz_t ell2)
 {
   mpz_t ee;
   mpz_init(ee);  

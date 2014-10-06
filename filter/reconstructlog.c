@@ -308,7 +308,8 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
   SMres[1]->deg = 0;
   mpz_poly_setcoeff_si(SMres[0], 0, 1);
   mpz_poly_setcoeff_si(SMres[1], 0, 1);
-  sm_single_rel(SMres, a, b, F, smexp, q, q2, invq2);
+  mpz_poly_ptr Res[2] = { &SMres[0][0], &SMres[1][0] };
+  sm_single_rel(Res, a, b, F, smexp, q, q2, invq2);
   unsigned int i;
   for (i = degF0 - SMres[0]->deg - 1; i < nbsm0; i++)
     mpz_add_log_mod_mpz (l, smlg[i], SMres[0]->coeff[degF0-1-i], q);
