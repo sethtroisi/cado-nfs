@@ -168,8 +168,7 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
-  const char * abunits0dirname;
-  const char * abunits1dirname;
+  const char * abunits0dirname, abunits1dirname;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
@@ -356,8 +355,8 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
   mpz_poly_setcoeff_si(SMres, 0, 1);
   sm_single_rel(SMres, a, b, F, smexp, q, q2, invq2);
   unsigned int i;
-  for (i = degF - SMres->deg - 1; i < nbsm; i++)
-    mpz_add_log_mod_mpz (l, smlg[i], SMres->coeff[degF-1-i], q);
+  for (i = degF0 - SMres->deg - 1; i < nbsm0; i++)
+    mpz_add_log_mod_mpz (l, smlg[i], SMres->coeff[degF0-1-i], q);
   mpz_poly_clear(SMres);
 }
 
@@ -369,11 +368,11 @@ add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 {
     // TODO: loopify!
     if (abunits0dirname)
-	add_unit_contribution(l, a, b, q, abunits0dirname);
+	add_unit_contribution(l, a, b, q, abunit0sdirname);
     else
 	add_sm_contribution(l, a, b, q, F0, smexp0, nbsm0, smlog);
     if (abunits1dirname)
-	add_unit_contribution(l, a, b, q, abunits1dirname);
+	add_unit_contribution(l, a, b, q, abunit1sdirname);
     else
 	add_sm_contribution(l, a, b, q, F1, smexp1, nbsm1, smlog);
 }
@@ -1263,7 +1262,6 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "sm1", "number of SM to add on side 1");
   param_list_decl_usage(pl, "smexp1", "sm exponent on side 1");
 # ifdef FOR_GFPN
-  param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels for side 1");
   param_list_decl_usage(pl, "sm0", "number of SM to add on side 0");
   param_list_decl_usage(pl, "smexp0", "sm exponent on side 0");
   param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels for side 0");
@@ -1339,7 +1337,7 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
-# ifdef FOR_GFPN
+# if FOR_GFPN
   /* we do not need abunits0 if no units are used */
   const char * abunits0dirname = 
       (mpz_sgn(smexp0) == 0 ? param_list_lookup_string(pl, "abunits0") : NULL);
@@ -1464,7 +1462,7 @@ main(int argc, char *argv[])
   FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
   F0 = poly->pols[RATIONAL_SIDE];
   FATAL_ERROR_CHECK(nbsm0 > (unsigned int) poly->rat->deg, "Too many SM");
-# ifdef FOR_GFPN
+# if FOR_GFPN
   if ((mpz_sgn(smexp0) == 0) && (abunits0dirname == NULL))
   {
     fprintf(stderr, "Error, missing -abunits0 command line argument\n");
