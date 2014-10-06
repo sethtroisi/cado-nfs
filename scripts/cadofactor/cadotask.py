@@ -923,7 +923,60 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
 
     def test_outputfile_exists(self, filename):
         return filename.isfile()
-    
+
+    def cmp_input_version(self, state_key, version):
+        """ Compare the version of the input file with the version we have
+        processed before
+
+        Returns None if filename does not include file version information,
+        returns -2 if we have never processed the file before,
+        returns -1 if the previously processed file is older,
+        returns 0 if they are the same version,
+        throws an exception if the processed version is newer than the
+        current one.
+        """
+        if version is None:
+            return None
+        if not state_key in self.state:
+            return -2
+        if self.state[state_key] < version:
+            return -1
+        if self.state[state_key] == version:
+            return 0
+        raise ValueError("Previously processed version is newer than current")
+
+
+    @staticmethod
+    def _input_file_to_state_dict(key, filename):
+        return ("processed_version_%s" % key, filename.get_version())
+
+    def have_new_input_files(self):
+        # Change this to "self.logger.info" for showing each check on screen
+        log = self.logger.debug
+        result = False
+        for key, filename in self.input_files.items():
+            (state_key, version) = self._input_file_to_state_dict(key, filename)
+            c = self.cmp_input_version(state_key, version)
+            if c == -2:
+                log("File %s was not processed before", filename)
+                result = True
+            if c == -1:
+                log("File %s is newer than last time", filename)
+                result = True
+        if result is False and self.input_files:
+            (n, v) = (("", "is"), ("s", "are"))[len(self.input_files) > 1]
+            log("Input file%s %s %s unchanged since last time",
+                n, ", ".join(map(str, self.input_files.values())), v)
+        return result
+
+    def remember_input_versions(self, commit=True):
+        update = {}
+        for (key, filename) in self.input_files.items():
+            (state_key, version) = self._input_file_to_state_dict(key, filename)
+            if version is not None:
+                update[state_key] = version
+        self.state.update(update, commit)
+
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist,
@@ -2092,7 +2145,7 @@ class FactorBaseTask(Task):
         else:
             self.state["poly"] = str(poly)
         
-        if not "outputfile" in self.state:
+        if not "outputfile" in self.state or self.have_new_input_files():
             
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
@@ -2222,7 +2275,7 @@ class FreeRelTask(Task):
         else:
             self.state["poly"] = str(poly)
         
-        if not "freerelfilename" in self.state:
+        if not "freerelfilename" in self.state or self.have_new_input_files():
             # Make file name for factor base/free relations file
             # We use .gzip by default, unless set to no in parameters
             use_gz = ".gz" if self.params["gzip"] else ""
@@ -2918,7 +2971,10 @@ class PurgeTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "galois": False, "gzip": True})
-    
+    @property
+    def needed_input(self):
+        return {"freerel": Request.GET_FREEREL_FILENAME}
+
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
@@ -2946,7 +3002,7 @@ class PurgeTask(Task):
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         minindex = int(nprimes / 20.0)
         
-        if "purgedfile" in self.state and \
+        if "purgedfile" in self.state and not self.have_new_input_files() and \
                 input_nrels == self.state["input_nrels"]:
             self.logger.info("Already have a purged file, and no new input "
                              "relations available. Nothing to do")
@@ -2971,11 +3027,11 @@ class PurgeTask(Task):
         else:
             relsdelfile = None
             keep = self.keep
-        freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
+        freerel_filename = self.merged_args[0].pop("freerel", None)
         # Remark: "Galois unique" and "unique" are in the same files
         # because filter_galois works in place. Same request.
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
-        if not self.params["galois"]:
+        if not self.params["galois"] and freerel_filename is not None:
             files = unique_filenames + [str(freerel_filename)]
         else:
             files = unique_filenames
@@ -3196,6 +3252,11 @@ class FilterGaloisTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"galois": False})
+    @property
+    def needed_input(self):
+        return {"merged": Request.GET_MERGED_FILENAME,
+                "poly": Request.GET_POLYNOMIAL_FILENAME,
+                "renumber": Request.GET_RENUMBER_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3210,18 +3271,14 @@ class FilterGaloisTask(Task):
 
         files = self.send_request(Request.GET_UNIQUE_FILENAMES)
         nrels = self.send_request(Request.GET_UNIQUE_RELCOUNT)
-        polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-        renumber_filename = self.send_request(Request.GET_RENUMBER_FILENAME)
 
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.GaloisFilter.name)
         # TODO: if there are too many files, pass a filelist (cf PurgeTask)
         p = cadoprograms.GaloisFilter(*files,
                 nrels=nrels,
-                poly=polyfilename,
-                renumber=renumber_filename,
                 stdout=str(stdoutpath),
                 stderr=str(stderrpath),
-                **self.progparams[0])
+                **self.merged_args[0])
         message = self.submit_command(p, "", log_errors=True)
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
@@ -3265,19 +3322,20 @@ class MergeDLPTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
+    @property
+    def needed_input(self):
+        return {"purged": Request.GET_PURGED_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
         self.progparams[0]["skip"] = 0
-        self.state.setdefault("processed_purged_version", 0)
 
     def run(self):
         super().run()
 
-        purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-        if not "mergedfile" in self.state or \
-           purged_filename.get_version() > self.state["processed_purged_version"]:
+        if not "mergedfile" in self.state or self.have_new_input_files():
+
             if "idealfile" in self.state:
                 del(self.state["idealfile"])
             if "indexfile" in self.state:
@@ -3293,12 +3351,11 @@ class MergeDLPTask(Task):
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MergeDLP.name)
-            p = cadoprograms.MergeDLP(purged=purged_filename,
-                                   out=historyfile,
+            p = cadoprograms.MergeDLP(out=historyfile,
                                    keep=keep,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3307,12 +3364,11 @@ class MergeDLPTask(Task):
             mergedfile = self.workdir.make_filename("sparse.txt")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             idealfile = self.workdir.make_filename("ideal")
-            p = cadoprograms.ReplayDLP(purged=purged_filename,
-                                    ideals=idealfile,
+            p = cadoprograms.ReplayDLP(ideals=idealfile,
                                     history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[1])
+                                    **self.merged_args[1])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3324,10 +3380,10 @@ class MergeDLPTask(Task):
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
             output_version = self.state.get("output_version", 0) + 1
+            self.remember_input_versions(commit=False)
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative(),
                       "idealfile": idealfile.get_wdir_relative(),
-                      "processed_purged_version": purged_filename.get_version(),
                       "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
@@ -3368,6 +3424,9 @@ class MergeTask(Task):
     def paramnames(self):
         return self.join_params(super().paramnames,  \
             {"skip": None, "keep": None, "gzip": True})
+    @property
+    def needed_input(self):
+        return {"purged": Request.GET_PURGED_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3375,7 +3434,6 @@ class MergeTask(Task):
         skip = int(self.progparams[0].get("skip", 32))
         self.progparams[0].setdefault("skip", skip)
         self.progparams[0].setdefault("keep", skip + 128)
-        self.state.setdefault("processed_purged_version", 0)
 
     def run(self):
         super().run()
@@ -3385,9 +3443,7 @@ class MergeTask(Task):
             if not fn.isfile():
                 self.logger.warning("Output file %s disappeared, generating it again", fn)
                 del(self.state["mergedfile"])
-        purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-        if not "mergedfile" in self.state or \
-           purged_filename.get_version() > self.state["processed_purged_version"]:
+        if not "mergedfile" in self.state or self.have_new_input_files():
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "densefile" in self.state:
@@ -3397,11 +3453,10 @@ class MergeTask(Task):
             use_gz = ".gz" if self.params["gzip"] else ""
             historyfile = self.workdir.make_filename("history" + use_gz)
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Merge.name)
-            p = cadoprograms.Merge(purged=purged_filename,
-                                   out=historyfile,
+            p = cadoprograms.Merge(out=historyfile,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3409,11 +3464,10 @@ class MergeTask(Task):
             indexfile = self.workdir.make_filename("index" + use_gz)
             mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
-            p = cadoprograms.Replay(purged=purged_filename,
-                                    history=historyfile, index=indexfile,
+            p = cadoprograms.Replay(history=historyfile, index=indexfile,
                                     out=mergedfile, stdout=str(stdoutpath),
                                     stderr=str(stderrpath),
-                                    **self.progparams[1])
+                                    **self.merged_args[1])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3422,10 +3476,10 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % indexfile)
             if not mergedfile.isfile():
                 raise Exception("Output file %s does not exist" % mergedfile)
+            self.remember_input_versions(commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"indexfile": indexfile.get_wdir_relative(),
                       "mergedfile": mergedfile.get_wdir_relative(),
-                      "processed_purged_version": purged_filename.get_version(),
                       "output_version": output_version}
             densefilename = self.workdir.make_filename("dense.bin")
             if densefilename.isfile():
@@ -3462,6 +3516,9 @@ class NmbrthryTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nsm0": -1, "nsm1": -1})
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3472,14 +3529,12 @@ class NmbrthryTask(Task):
 
         badfile = self.workdir.make_filename("badideals")
         badinfofile = self.workdir.make_filename("badidealinfo")
-        polyfile = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
         (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaNmbrthry.name)
-        p = cadoprograms.MagmaNmbrthry(poly=polyfile,
-                               badidealinfo=badinfofile,
+        p = cadoprograms.MagmaNmbrthry(badidealinfo=badinfofile,
                                badideals=badfile,
                                stdout=str(stdoutpath),
                                stderr=str(stderrpath),
-                               **self.progparams[0])
+                               **self.merged_args[0])
         message = self.submit_command(p, "", log_errors=True)
         if message.get_exitcode(0) != 0:
             raise Exception("Program failed")
@@ -3564,41 +3619,39 @@ class LinAlgDLPTask(Task):
     @property
     def paramnames(self):
         return super().paramnames
+    @property
+    def needed_input(self):
+        return {"sparsemat": Request.GET_MERGED_FILENAME,
+                "sm": Request.GET_SM_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
-        self.state.setdefault("processed_merged_version", 0)
 
     def run(self):
         super().run()
 
-        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
-        if not "kerfile" in self.state or \
-           mergedfile.get_version() > self.state["processed_merged_version"]:
+        if not "kerfile" in self.state or self.have_new_input_files():
             kerfile = self.workdir.make_filename("ker")
-            smfile = self.send_request(Request.GET_SM_FILENAME)
             gorder = self.send_request(Request.GET_ELL)
             nmaps = self.send_request(Request.GET_NMAPS)
             nn = nmaps[0] + nmaps[1];
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.MagmaLinalg.name)
-            p = cadoprograms.MagmaLinalg(sparsemat=mergedfile,
-                                   ker=kerfile,
-                                   sm=smfile,
+            p = cadoprograms.MagmaLinalg(ker=kerfile,
                                    ell=gorder,
                                    nmaps=nn,
                                    stdout=str(stdoutpath),
                                    stderr=str(stderrpath),
-                                   **self.progparams[0])
+                                   **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             
             if not kerfile.isfile():
                 raise Exception("Output file %s does not exist" % kerfile)
+            self.remember_input_versions(commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"kerfile": kerfile.get_wdir_relative(),
-                      "processed_merged_version": mergedfile.get_version(),
                       "output_version": output_version}
             self.state.update(update)
             
@@ -3626,6 +3679,9 @@ class LinAlgTask(Task, HasStatistics):
     @property
     def paramnames(self):
         return super().paramnames
+    @property
+    def needed_input(self):
+        return {"merged": Request.GET_MERGED_FILENAME}
     @property
     def stat_conversions(self):
         return (
@@ -3676,16 +3732,14 @@ class LinAlgTask(Task, HasStatistics):
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
-        self.state.setdefault("processed_merged_version", 0)
     
     def run(self):
         super().run()
 
-        mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
-        if not "dependency" in self.state or \
-           mergedfile.get_version() > self.state["processed_merged_version"]:
+        if not "dependency" in self.state or self.have_new_input_files():
             workdir = self.workdir.make_dirname()
             workdir.mkdir(parent=True)
+            mergedfile = self.merged_args[0].pop("merged")
             if mergedfile is None:
                 self.logger.critical("No merged file received.")
                 return False
@@ -3704,9 +3758,9 @@ class LinAlgTask(Task, HasStatistics):
             if not dependencyfilename.isfile():
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.parse_stats(stdoutpath, commit=False)
+            self.remember_input_versions(commit=False)
             output_version = self.state.get("output_version", 0) + 1
             update = {"dependency": dependencyfilename.get_wdir_relative(),
-                      "processed_merged_version": mergedfile.get_version(),
                       "output_version": output_version}
             self.state.update(update, commit=True)
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
@@ -3737,40 +3791,36 @@ class CharactersTask(Task):
     @property
     def paramnames(self):
         return super().paramnames
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                "wfile": Request.GET_DEPENDENCY_FILENAME,
+                "purged": Request.GET_PURGED_FILENAME,
+                "index": Request.GET_INDEX_FILENAME,
+                "heavyblock": Request.GET_DENSE_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
                          path_prefix=path_prefix)
-        self.state.setdefault("processed_dependency_version", 0)
     
     def run(self):
         super().run()
 
-        dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
-        if not "kernel" in self.state or \
-           dependencyfilename.get_version() > self.state["processed_dependency_version"]:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
+        if not "kernel" in self.state or self.have_new_input_files():
             kernelfilename = self.workdir.make_filename("kernel")
-            
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-            densefilename = self.send_request(Request.GET_DENSE_FILENAME)
-            
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Characters.name)
-            p = cadoprograms.Characters(poly=polyfilename,
-                    purged=purgedfilename, index=indexfilename,
-                    wfile=dependencyfilename, out=kernelfilename,
-                    heavyblock=densefilename, stdout=str(stdoutpath),
+            p = cadoprograms.Characters(out=kernelfilename,
+                    stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
             if not kernelfilename.isfile():
                 raise Exception("Output file %s does not exist" % kernelfilename)
-            update = {"kernel": kernelfilename.get_wdir_relative(),
-                      "processed_dependency_version": dependencyfilename.get_version()}
+            self.remember_input_versions(commit=False)
+            update = {"kernel": kernelfilename.get_wdir_relative()}
             self.state.update(update)
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return True
@@ -3797,6 +3847,12 @@ class SqrtTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"N": int, "gzip": True})
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                "purged": Request.GET_PURGED_FILENAME,
+                "index": Request.GET_INDEX_FILENAME,
+                "kernel": Request.GET_KERNEL_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3807,11 +3863,7 @@ class SqrtTask(Task):
     def run(self):
         super().run()
 
-        if not self.is_done():
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
-            kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
+        if not self.is_done() or self.have_new_input_files():
             prefix = self.send_request(Request.GET_LINALG_PREFIX)
             if self.params["gzip"]:
                 prefix += ".gz"
@@ -3819,10 +3871,8 @@ class SqrtTask(Task):
                 self.make_std_paths(cadoprograms.Sqrt.name)
             self.logger.info("Creating file of (a,b) values")
             p = cadoprograms.Sqrt(ab=True,
-                    poly=polyfilename, purged=purgedfilename,
-                    index=indexfilename, kernel=kernelfilename,
                     prefix=prefix, stdout=str(stdoutpath),
-                    stderr=str(stderrpath), **self.progparams[0])
+                    stderr=str(stderrpath), **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -3833,11 +3883,9 @@ class SqrtTask(Task):
                 (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.Sqrt.name)
                 p = cadoprograms.Sqrt(ab=False, rat=True,
-                        alg=True, gcd=True, dep=dep, poly=polyfilename,
-                        purged=purgedfilename, index=indexfilename,
-                        kernel=kernelfilename, prefix=prefix,
+                        alg=True, gcd=True, dep=dep, prefix=prefix,
                         stdout=str(stdoutpath), stderr=str(stderrpath), 
-                        **self.progparams[0])
+                        **self.merged_args[0])
                 message = self.submit_command(p, "dep%d" % dep, log_errors=True)
                 if message.get_exitcode(0) != 0:
                     raise Exception("Program failed")
@@ -3850,7 +3898,8 @@ class SqrtTask(Task):
                     if line == "Failed":
                         break
                     self.add_factor(int(line))
-                self.state["next_dep"] = dep+1
+                self.state.update("next_dep", dep+1)
+            self.remember_input_versions(commit=True)
             self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
@@ -3984,6 +4033,13 @@ class SMTask(Task):
     @property
     def paramnames(self):
         return super().paramnames
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                "renumber": Request.GET_RENUMBER_FILENAME,
+                "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
+                "purged": Request.GET_PURGED_FILENAME,
+                "index": Request.GET_INDEX_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3992,16 +4048,11 @@ class SMTask(Task):
     def run(self):
         super().run()
 
-        if not "sm" in self.state:
+        if not "sm" in self.state or self.have_new_input_files():
             nmaps = self.send_request(Request.GET_NMAPS)
             if nmaps[0]+nmaps[1] == 0:
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
-            badidealinfofilename = self.send_request(Request.GET_BADIDEALINFO_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
             smfilename = self.workdir.make_filename("sm")
 
             gorder = self.send_request(Request.GET_ELL)
@@ -4009,10 +4060,7 @@ class SMTask(Task):
             
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.SM(poly=polyfilename, renumber=renumberfilename,
-	      	    badidealinfo=badidealinfofilename,
-                    purged=purgedfilename, index=indexfilename,
-                    ell=gorder,
+            p = cadoprograms.SM(ell=gorder,
                     smexp0=smexp[0],
                     smexp1=smexp[1],
                     nmaps0=nmaps[0],
@@ -4020,7 +4068,7 @@ class SMTask(Task):
                     out=smfilename,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
@@ -4052,6 +4100,14 @@ class ReconstructLogTask(Task):
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"partial": True})
+    @property
+    def needed_input(self):
+        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                "renumber": Request.GET_RENUMBER_FILENAME,
+                "purged": Request.GET_PURGED_FILENAME,
+                "ker": Request.GET_KERNEL_FILENAME,
+                "ideals": Request.GET_IDEAL_FILENAME,
+                "relsdel": Request.GET_RELSDEL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4061,14 +4117,7 @@ class ReconstructLogTask(Task):
     def run(self):
         super().run()
 
-
-        if not "dlog" in self.state:
-            polyfilename = self.send_request(Request.GET_POLYNOMIAL_FILENAME)
-            renumberfilename = self.send_request(Request.GET_RENUMBER_FILENAME)
-            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
-            kerfilename = self.send_request(Request.GET_KERNEL_FILENAME)
-            idealfilename = self.send_request(Request.GET_IDEAL_FILENAME)
-            relsdelfilename = self.send_request(Request.GET_RELSDEL_FILENAME)
+        if not "dlog" in self.state or self.have_new_input_files():
             dlogfilename = self.workdir.make_filename("dlog")
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
@@ -4080,22 +4129,17 @@ class ReconstructLogTask(Task):
 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
-            p = cadoprograms.ReconstructLog(poly=polyfilename,
-                    purged=purgedfilename,
-                    renumber=renumberfilename,
+            p = cadoprograms.ReconstructLog(
                     dlog=dlogfilename,
                     ell=gorder,
                     smexp0=smexp[0],
                     smexp1=smexp[1],
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
-                    ker=kerfilename,
-                    ideals=idealfilename,
-                    relsdel=relsdelfilename,
                     nrels=nrels,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
-                    **self.progparams[0])
+                    **self.merged_args[0])
             message = self.submit_command(p, "", log_errors=True)
             if message.get_exitcode(0) != 0:
                 raise Exception("Program failed")
