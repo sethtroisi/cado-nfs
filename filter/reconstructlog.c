@@ -293,6 +293,7 @@ get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname)
     char *index = malloc((len+6+1) * sizeof(char));
     strncpy(index, abunitsdirname, len);
     strncpy(index+len, "/index", 6);
+    index[len+6] = '\0';
     //printf("index=%s\n", index);
     /* read index file */
     FILE *in = fopen(index, "r");
@@ -1346,7 +1347,9 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm0", &nbsm0);
   mpz_init (smexp0);
   param_list_parse_mpz(pl, "smexp0", smexp0);
-  const char * abunitsdirname = param_list_lookup_string(pl, "abunits0");
+  /* we do not need abunits0 if no units are used */
+  const char * abunitsdirname = 
+      (mpz_sgn(smexp0) == 0 ? param_list_lookup_string(pl, "abunits0") : NULL);
 # else
   const char * abunitsdirname = NULL;
 # endif
@@ -1457,7 +1460,7 @@ main(int argc, char *argv[])
   FATAL_ERROR_CHECK(nbsm1 > (unsigned int) poly->alg->deg, "Too many SM");
 # else
   F0 = poly->pols[RATIONAL_SIDE];
-  if (abunitsdirname == NULL)
+  if ((mpz_sgn(smexp0) == 0) && (abunitsdirname == NULL))
   {
     fprintf(stderr, "Error, missing -abunits0 command line argument\n");
     usage (pl, argv0);
