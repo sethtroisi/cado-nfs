@@ -11,9 +11,6 @@
 #endif
 #define DEBUG 0
 
-/* to use in the GF(p^n) computations, uncomment the following */
-//#define FOR_GFPN
-
 stats_data_t stats; /* struct for printing progress */
 
 /*********************** mutex for multi threaded version ********************/
@@ -168,18 +165,20 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
-  const char * abunitsfilename;
+  const char * abunits0dirname;
+  const char * abunits1dirname;
 } read_data_t;
 
 /* Init a read_data_t structure for nrels rels and nprimes primes. Assume the
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
 read_data_init (read_data_t *data, logtab_t log, uint64_t nrels, 
-		const char * abunitsfilename)
+		const char * abunits0dirname, const char * abunits1dirname)
 {
   data->rels = log_rel_init(nrels);
   data->log = log;
-  data->abunitsfilename = abunitsfilename;
+  data->abunits0dirname = abunits0dirname;
+  data->abunits1dirname = abunits1dirname;
 }
 
 static void
@@ -223,7 +222,7 @@ mpz_t smexp0; /* exponent for SM on the 0 side */
 mpz_t smexp1; /* exponent for SM on the 1 side */
 mpz_poly_ptr F0;
 mpz_poly_ptr F1;
-# endif
+#endif
 mpz_t q2;    /* q^2 */
 mpz_t invq2;
 mpz_t *smlog;
@@ -251,7 +250,7 @@ sm_data_free ()
 
 /* Very naive code for finding the valuations of the units. */
 static int
-get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
+get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
 {
     FILE *in = fopen(abunitsfilename, "r");
     int64_t aa;
@@ -263,30 +262,76 @@ get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
             ASSERT_ALWAYS(ret == 1);
         }
 	if(aa == a && bb == b){
-	    printf("# GOTCHA a and b\n");
+	    //	    printf("# GOTCHA a and b\n");
 	    ok = 1;
 	    break;
 	}
     }
     fclose(in);
     if(ok == 0){
-	fprintf(stderr, "GASP: no eps found ");
+	fprintf(stderr, "GASP: no valuation(s) found ");
 	fprintf(stderr, "for a=%" PRId64 " b=%" PRIu64 "\n", a, b);
-	exit(-1);
+	exit (EXIT_FAILURE);
     }
+    return ok;
+}
+
+/* Semi-naive code for finding the valuations of the units. Read an index 
+   first, then use the right file. We assume that directory dirname contains
+   a file index, followed by files like 0, 1, 2, 3, ... so that their union
+   contains the list of (a, b, u) by increasing values of a. We assume that
+   all triples with the same a are in the same subfile.
+*/
+static int
+get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname)
+{
+    size_t len = strlen(abunitsdirname);
+    char *index = malloc((len+6+1) * sizeof(char));
+    strncpy(index, abunitsdirname, len);
+    strncpy(index+len, "/index", 6);
+    index[len+6] = '\0';
+    //printf("index=%s\n", index);
+    /* read index file */
+    FILE *in = fopen(index, "r");
+    if(in == NULL){
+	perror(index);
+	return 0;
+    }
+    int n, ok = 0;
+    int64_t aa;
+    while(fscanf(in, "%" PRId64 " %d", &aa, &n) != EOF){
+	if(a <= aa){
+	    ok = 1;
+	    break;
+	}
+    }
+    fclose(in);
+    free(index);
+    if(ok == 0){
+	fprintf(stderr, "Could not find abunit file for a=%" PRId64 "\n", a);
+	exit (EXIT_FAILURE);
+    }
+    // TODO: use size of n
+    char *fic = malloc((len+10) * sizeof(char));
+    strncpy(fic, abunitsdirname, len);
+    sprintf(fic+len, "/%d", n);
+    //    printf("fic(%" PRId64 ")=%d => %s\n", a, n, fic);
+    ok = get_units_for_ab_from_file(u, a, b, fic);
+    free(fic);
     return ok;
 }
 
 /* we need retrieve the exponents of the units in a-b*x. */
 static inline void
 add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		       const char * abunitsfilename)
+		       const char * abunitsdirname, unsigned int nunits,
+                       mpz_t *smlog)
 {
     int u[10];
-    if(get_units_for_ab(u, a, b, abunitsfilename)){
+    if(get_units_for_ab(u, a, b, abunitsdirname)){
 	/* add contrib */
-	for(int i = 0; i < (int)nbsm0; i++)
-	    mpz_add_log_mod_si (l, smlog[nbsm1+i], u[i], q);
+	for(int i = 0; i < (int)nunits; i++)
+	    mpz_add_log_mod_si (l, smlog[i], u[i], q);
     }
 }
 
@@ -333,16 +378,29 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 */
 static inline void
 add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
-		      const char * abunitsfilename MAYBE_UNUSED)
+		      const char * abunits0dirname MAYBE_UNUSED,
+		      const char * abunits1dirname MAYBE_UNUSED)
 {
-  if (abunitsfilename)
-    add_unit_contribution(l, a, b, q, abunitsfilename);
-  else {
+    unsigned int nunits0 = 0, nunits1 = 0, mynbsm0 = nbsm0, mynbsm1 = nbsm1;
+
+    if (abunits0dirname){
+	nunits0 = nbsm0;
+	mynbsm0 = 0;
+	/* add unit contrib with smlog[0..nunits0[ */
+	add_unit_contribution(l, a, b, q, abunits0dirname, nunits0, smlog);
+    }
+    if (abunits1dirname){
+	nunits1 = nbsm1;
+	mynbsm1 = 0;
+	/* add unit contrib with smlog[nunits0..nunits0+nunits1[ */
+	add_unit_contribution(l, a, b, q, abunits1dirname,
+			      nunits1, smlog+nunits0);
+    }
+    /* add smlog[nunits0+nunits1..nunits0+nunits1+mynbsm0+mynbsm1[ */
     add_sm_contribution(l, a, b, q,
-        F0, smexp0, nbsm0, 
-        F1, smexp1, nbsm1, 
-        smlog);
-  }
+        F0, smexp0, mynbsm0, 
+        F1, smexp1, mynbsm1, 
+        smlog+nunits0+nunits1);
 }
 
 /* Callback function called by filter_rels in compute_log_from_rels */
@@ -355,7 +413,7 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   // FIXME: here, the explicit units are obvisouly broken!!!
   if (nbsm1 > 0)
       add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
-			    data->abunitsfilename);
+			    data->abunits0dirname, data->abunits1dirname);
 
   return NULL;
 }
@@ -994,14 +1052,15 @@ compute_log_from_rels (bit_vector needed_rels,
                        const char *relspfilename, uint64_t nrels_purged,
                        const char *relsdfilename, uint64_t nrels_del,
                        uint64_t nrels_needed, logtab_t log, int nt,
-		       const char *abunitsfilename)
+		       const char *abunits0dirname,
+		       const char *abunits1dirname)
 {
   double wct_tt0, wct_tt;
   uint64_t total_computed = 0, iter = 0, computed;
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
   read_data_t data;
-  read_data_init(&data, log, nrels, abunitsfilename);
+  read_data_init(&data, log, nrels, abunits0dirname, abunits1dirname);
 
   /* Reading all relations */
   printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
@@ -1197,7 +1256,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp0", "sm exponent on side 0");
   param_list_decl_usage(pl, "sm1", "number of SM to add on side 1");
   param_list_decl_usage(pl, "smexp1", "sm exponent on side 1");
-  param_list_decl_usage(pl, "abunits", "units for all (a, b) pairs from purged and relsdels");
+  param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels on side 0");
+  param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels on side 1");
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
@@ -1272,8 +1332,10 @@ main(int argc, char *argv[])
   param_list_parse_uint(pl, "sm1", &nbsm1);
   mpz_init (smexp1);
   param_list_parse_mpz(pl, "smexp1", smexp1);
-  const char * abunitsfilename = NULL;
-  abunitsfilename = param_list_lookup_string(pl, "abunits");
+  const char * abunits0dirname = NULL;
+  abunits0dirname = param_list_lookup_string(pl, "abunits0");
+  const char * abunits1dirname = NULL;
+  abunits1dirname = param_list_lookup_string(pl, "abunits1");
 #endif
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
@@ -1454,7 +1516,7 @@ main(int argc, char *argv[])
     log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
                                           nrels_purged, relsdfilename,
                                           nrels_del, nrels_needed, log, mt,
-					  abunitsfilename);
+                                          abunits0dirname, abunits1dirname);
     printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
   }
   else
