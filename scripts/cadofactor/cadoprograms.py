@@ -822,7 +822,7 @@ class Merge(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file=True),
+                 purged: Parameter("mat", is_input_file=True),
                  out: Parameter(is_output_file=True),
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
@@ -843,7 +843,7 @@ class MergeDLP(Program):
     name = binary
     subdir = "filter"
     def __init__(self,
-                 mat: Parameter(is_input_file=True),
+                 purged: Parameter("mat", is_input_file=True),
                  out: Parameter(is_output_file=True),
                  maxlevel: Parameter(checktype=int)=None,
                  keep: Parameter(checktype=int)=None,
