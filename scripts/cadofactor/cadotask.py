@@ -4042,7 +4042,7 @@ class ReconstructLogTask(Task):
                  "ker": Request.GET_KERNEL_FILENAME,
                  "ideals": Request.GET_IDEAL_FILENAME,
                  "relsdel": Request.GET_RELSDEL_FILENAME}
-        override = ("dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1", "nrels")
+        override = ("dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1", "nrels", "abunits0", "abunits1")
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):

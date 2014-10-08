@@ -166,7 +166,7 @@ if [ $side -ne -1 ]; then
 	echo $CMD; $CMD
 
 	# split abunits
-	# typicaly abunits="...../p3dd15-f4g3-GJL-1.units.abunits.1"
+	# typicaly ABUNITS="...../p3dd15-f4g3-GJL-1.sm.abunits.dir"
 	abunitsdir=$ABUNITS".$side"
 	if [ -d $abunitsdir ]; then
 	    echo "Directory $abunitsdir already exists"
