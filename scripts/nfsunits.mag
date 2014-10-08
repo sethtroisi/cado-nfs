@@ -1,6 +1,6 @@
 /*
 Wrapper version, to be used with
-  magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$ALGPR generators:=$GENERATORS badideals:=BADIDEALS purged:=$PURGED relsdel:=$RELSDEL index:=$INDEX ficunits:=$FICUNITS abunits:=$ABUNITS ww:=true/false $DIR/nfsunits.mag
+  magma -b polyfile:=$POLY renumber:=$RENUMBER algpr:=$ALGPR generators:=$GENERATORS badideals:=BADIDEALS purged:=$PURGED relsdel:=$RELSDEL index:=$INDEX ficunits:=$FICUNITS abunits:=$ABUNITS usef:=true/false ww:=true/false $DIR/nfsunits.mag
 */
 
 //
@@ -23,6 +23,7 @@ NFSUNITS_VERSION:="20140826.1830"; // precision pbs again
 NFSUNITS_VERSION:="20140828.1550"; // cleaning potential unit bugs
 NFSUNITS_VERSION:="20140828.1840"; // making code work for non-Galois groups
 NFSUNITS_VERSION:="20140829.1030"; // bug found
+NFSUNITS_VERSION:="20141008.1030"; // symmetrization, etc.
 
 printf "## NFSUNITS_VERSION %o\n", NFSUNITS_VERSION;
 
@@ -151,7 +152,8 @@ end if;
 	elif n eq 5 then
 	    return [20 : i in [1..n]];
 	elif n eq 6 then
-	    return [10 : i in [1..n]];
+//	    return [10 : i in [1..n]];
+	    return [3 : i in [1..n]];
 	else
 	    return [20 : i in [1..n]];
 	end if;
@@ -230,6 +232,7 @@ end function;
 
 // If K is Galois, only one generator has to be stored and the other
 // deduced via Galois action; and the first one is enough, no division...
+// TODO: use pmax??
 InsertInBox := procedure(~l, Kdata, elt, lipr, pmax)
 	no:=Integers() ! Abs(Norm(elt));
 	if IsDefined(lipr, no) then // meaning no is prime...!
@@ -263,11 +266,11 @@ EPN3 := function(Kdata, lipr, bounds, pmax)
         OK:=Kdata["OK"];
         tp:=Cputime();
 	l:=AssociativeArray();
-	for a0:=0 to bounds[1] do
-	    printf "# a0 = %o at %o\n", a0, Cputime();
-	    for a1:=-bounds[2] to bounds[2] do
-	        for a2:=-bounds[3] to bounds[3] do
-		    elt:=a0*OK.1+a1*OK.2+a2*OK.3;
+	for a1:=0 to bounds[1] do
+	    printf "# a1 = %o at %o\n", a1, Cputime();
+	    for a2:=-bounds[2] to bounds[2] do
+	        for a3:=-bounds[3] to bounds[3] do
+		    elt:=a1*OK.1+a2*OK.2+a3*OK.3;
 		    InsertInBox(~l, Kdata, elt, lipr, pmax);
 	    	end for;
 	    end for;
@@ -280,12 +283,12 @@ EPN4 := function(Kdata, lipr, bounds, pmax)
        	OK:=Kdata["OK"];
         tp:=Cputime();
 	l:=AssociativeArray();
-	for a0:=0 to bounds[1] do
-	    printf "# a0 = %o at %o\n", a0, Cputime();
-	    for a1:=-bounds[2] to bounds[2] do
-	        for a2:=-bounds[3] to bounds[3] do
-	 	    for a3:=-bounds[4] to bounds[4] do
-		    	elt:=a0*OK.1+a1*OK.2+a2*OK.3+a3*OK.4;
+	for a1:=0 to bounds[1] do
+	    printf "# a1 = %o at %o\n", a1, Cputime();
+	    for a2:=-bounds[2] to bounds[2] do
+	        for a3:=-bounds[3] to bounds[3] do
+	 	    for a4:=-bounds[4] to bounds[4] do
+		    	elt:=a1*OK.1+a2*OK.2+a3*OK.3+a4*OK.4;
 			InsertInBox(~l, Kdata, elt, lipr, pmax);
 	 	    end for;
 	    	end for;
@@ -299,13 +302,13 @@ EPN5 := function(Kdata, lipr, bounds, pmax)
        	OK:=Kdata["OK"];
         tp:=Cputime();
 	l:=AssociativeArray();
-	for a0:=0 to bounds[1] do
-	    printf "# a0 = %o at %o\n", a0, Cputime();
-	    for a1:=-bounds[2] to bounds[2] do
-	        for a2:=-bounds[3] to bounds[3] do
-	 	    for a3:=-bounds[4] to bounds[4] do
-		        for a4:=-bounds[5] to bounds[5] do
-		    	    elt:=a0*OK.1+a1*OK.2+a2*OK.3+a3*OK.4+a4*OK.5;
+	for a1:=0 to bounds[1] do
+	    printf "# a1 = %o at %o\n", a1, Cputime();
+	    for a2:=-bounds[2] to bounds[2] do
+	        for a3:=-bounds[3] to bounds[3] do
+	 	    for a4:=-bounds[4] to bounds[4] do
+		        for a5:=-bounds[5] to bounds[5] do
+		    	    elt:=a1*OK.1+a2*OK.2+a3*OK.3+a4*OK.4+a5*OK.5;
 			    InsertInBox(~l, Kdata, elt, lipr, pmax);
 	 	    	end for;
 	 	    end for;
@@ -320,21 +323,21 @@ EPN6 := function(Kdata, lipr, bounds, pmax)
        	OK:=Kdata["OK"];
         tp:=Cputime();
 	l:=AssociativeArray();
-	for a0:=0 to bounds[1] do
-	  printf "# a0 = %o at %o\n", a0, Cputime();
-	  elt0:=a0*OK.1;
-	  for a1:=-bounds[2] to bounds[2] do
-	    printf "# a1 = %o at %o\n", a1, Cputime();
-	    elt1:=elt0+a1*OK.2;
-	    for a2:=-bounds[3] to bounds[3] do
-	      elt2:=elt1+a2*OK.3;
-	      for a3:=-bounds[4] to bounds[4] do
-	        elt3:=elt2+a3*OK.4;
-		for a4:=-bounds[5] to bounds[5] do
-		  elt4:=elt3+a4*OK.5;
-		  for a5:=-bounds[6] to bounds[6] do
-		    elt5:=elt4+a5*OK.6;
-		    InsertInBox(~l, Kdata, elt5, lipr, pmax);
+	for a1:=0 to bounds[1] do
+	  printf "# a1 = %o at %o\n", a1, Cputime();
+	  elt1:=a1*OK.1;
+	  for a2:=-bounds[2] to bounds[2] do
+	    printf "# a2 = %o at %o\n", a2, Cputime();
+	    elt2:=elt1+a2*OK.2;
+	    for a3:=-bounds[3] to bounds[3] do
+	      elt3:=elt2+a3*OK.3;
+	      for a4:=-bounds[4] to bounds[4] do
+	        elt4:=elt3+a4*OK.4;
+		for a5:=-bounds[5] to bounds[5] do
+		  elt5:=elt4+a5*OK.5;
+		  for a6:=-bounds[6] to bounds[6] do
+		    elt6:=elt5+a6*OK.6;
+		    InsertInBox(~l, Kdata, elt6, lipr, pmax);
 	 	  end for;
 	 	end for;
 	      end for;
@@ -696,6 +699,9 @@ PrepareField := function(K, niceK)
 	elif Degree(f) eq 3 then
 	    // at this point, we have sign = (1, 1)
 	    lr:=[r[1] : r in Roots(AlgToComplex(f))];
+	elif Degree(f) eq 5 then
+	    // do we care, really?
+	    lr:=[r[1] : r in Roots(AlgToComplex(f))];
 	else
 	    // TODO: order roots of f...!
 	    error("NYI in PrepareField");
@@ -714,7 +720,14 @@ PrepareField := function(K, niceK)
 	printf "# hK = %o\n", Kdata["hK"];
 	U:=AssociativeArray();
 	PrepareUnits(~U,~G,Kdata,niceK);
-	if niceK then U["grouptable"]:=G; end if; // FIXME niceK -> generate?
+	if niceK then // FIXME niceK -> generate?
+	    U["grouptable"]:=G;
+	    if DLP_DEBUG ge 3 then
+	        for key in Keys(G) do
+		    printf "G[%o]=%o\n", key, G[key];
+		end for;
+	    end if;
+	end if;
 	Kdata["UK"]:=U;
 	return Kdata;
 end function;
@@ -1161,7 +1174,7 @@ end if;
 	return bad;
 end function;
 
-// <elt_of_K, e, f>
+// OUTPUT: <elt_of_K, e, f>
 GeneratorForBad := function(Kdata, p, id)
 	lf:=Factorization(id);
 //	printf "# p=%o, id=%o => lf=%o\n", p, id, lf;
@@ -1219,13 +1232,15 @@ PrintGenerator := procedure(fo, i, gef, isbad)
 	fprintf fo, "\n";
 end procedure;
 
+// elt has norm p; we look for some Galois tau s.t. tau(elt) = [p, r]
 InspectIdeals := procedure(p, r, Kdata, elt)
-	assert(Degree(Kdata) eq 4);
         FpW<W>:=PolynomialRing(GF(p));
 	K:=Kdata["K"];
+	deg:=Degree(K);
 	t:=K.1;
 	galac:=Kdata["Galois"];
-        id:=ideal<Kdata["OK"] | [p, 0, 0, 0], [p-r, 1, 0, 0]>;
+	zero:=[0 : i in [1..deg-2]];
+        id:=ideal<Kdata["OK"] | [p, 0] cat zero, [p-r, 1] cat zero>;
 	ok,gen:=IsPrincipal(id);
 	printf "gen(%o, %o)=%o\n", p, r, K!gen;
 	eltW:=FpW!Eltseq(K!elt);
@@ -1251,6 +1266,24 @@ RatEvaluate := function(FpW, PZ, r)
 	return true,Evaluate(FpW!Eltseq(PZ), r);
 end function;
 
+// [q, X-r] = <gen>, where gen is in OK
+// OUTPUT: r
+FindrGivenGenerator := function(K, q, gen)
+        FpW<W>:=PolynomialRing(GF(q));
+	genW:=FpW!Eltseq(K!gen);
+	g:=Gcd(genW, FpW!Eltseq(DefiningPolynomial(K)));
+	if DLP_DEBUG ge 2 then
+	    printf "# Gcd = %o\n", g;
+	end if;
+	if Degree(g) ne 1 then
+	    printf "# Gcd = %o mod %o\n", g, q;
+//	    InspectIdeals(q, r, Kdata, gen);
+	    error("Degree(g) != 1");
+//	    return false, 0;
+	end if;
+	return -Coefficient(g, 0);
+end function;
+
 // INPUT: lp a list of elements in K of norm p; id = [p, alpha-r] an ideal.
 // OUTPUT: true/false, a generator for id found using conjugates of elt
 // 	   under Galois.
@@ -1266,19 +1299,7 @@ FindGeneratorWithGalois := function(p, r, Kdata, lp)
 	galac:=Kdata["Galois"];
 	if not galac[1] then return false, 0; end if;
 	for elt in lp do
-	    // a priori, elt is in OK
-	    eltW:=FpW!Eltseq(K!elt);
-	    g:=Gcd(eltW, FpW!Eltseq(DefiningPolynomial(K)));
-	    if DLP_DEBUG ge 2 then
-	        printf "# Gcd = %o\n", g;
-	    end if;
-	    if Degree(g) ne 1 then
-	        printf "# Gcd = %o mod %o\n", g, p;
-		InspectIdeals(p, r, Kdata, elt);
-		error("Degree(g) != 1");
-		return false, 0;
-	    end if;
-	    e:=-Coefficient(g, 0);
+	    e:=FindrGivenGenerator(K, p, elt);
 	    if DLP_DEBUG ge 2 then
 	        printf "# root(%o) = %o\n", elt, e;
 	    end if;
@@ -1341,7 +1362,8 @@ end if;
 	end while;
 end procedure;
 
-BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, ldone, algprimes)
+BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, 
+		   		    ldone, algprimes)
 	K:=Kdata["K"];
 	OK:=Kdata["OK"];
 	zero:=[0 : i in [1..Degree(K)-2]];
@@ -1422,6 +1444,8 @@ BatchGenerators := procedure(~good, ~bad, generators, Kdata, badp, lipr, ldone, 
 end procedure;
 
 // SIDE-EFFECT: fills in GEN with generators of all ideals, good or bad.
+// good[i] = x
+// bad[i] = <x, ind, deg>
 // REQUIRES: "algpr" should have been computed for Kdata.
 GeneratorsForPR := procedure(~GEN,Kdata,badidealinfo,algpr,generators)
 	K:=Kdata["K"];
@@ -1444,8 +1468,9 @@ GeneratorsForPR := procedure(~GEN,Kdata,badidealinfo,algpr,generators)
 	GEN["bad"]:=bad;
 end procedure;
 
-// GEN[i] = x
-// BAD[i] = <x, ind, deg>
+// SIDE EFFECT: GEN = {good, bad}
+// good[i] = x
+// bad[i] = <x, ind, deg>
 ReadGeneratorsForPR := procedure(~GEN, K, generators)
 	printf "# Reading generators for renumbered ideals from %o\n", 
 	       	  generators;
@@ -1494,6 +1519,7 @@ ReadGeneratorsForPR := procedure(~GEN, K, generators)
 	    // GEN[i], BAD[i] = <elt_of_K, ...>
 	    if j0 eq 3 then
 	        good[i]:=x/den;
+//		assert IsPrime(Integers()!Norm(good[i]));
 		if DLP_DEBUG ge 2 then
 	  	    printf "good[%o]=%o (%o)\n", i, good[i], Norm(good[i]);
 		end if;
@@ -2016,10 +2042,8 @@ end procedure;
 // If generate = true, we must build algpr and generators.
 ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,
 				     badidealinfo,purged,relsdel,index,
-				     ficunits,abunits,generate)
+				     ficunits,abunits,usef,generate)
 
-//	usef:=false; // TODO
-	usef:=true;
 	printf "# usef = %o\n", usef;
 
         params:=AssociativeArray();
@@ -2050,9 +2074,11 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,
 	if usef then
 	    f:=params["f"];
 	    K:=ext<QQ | f>;
+	    printf "# using f = %o\n", f;
 	else
 	    g:=params["g"];
 	    K:=ext<QQ | g>;
+	    printf "# using g = %o\n", g;
 	end if;
 	Kdata:=PrepareField(K, true); // FIXME
 	if generate then
@@ -2066,22 +2092,26 @@ ComputeUnitsFromWrapper := procedure(polyfile,renumber,algpr,generators,
 	end if;
 end procedure;
 
-// Simul("SNFS", "p59", true); // ===> "SNFS/p59"
-// Simul("GFP2", "p2dd30", true);
-// Simul("GFP2", "p277", true);
-// Simul("../catrel/GFP3", "p3dd10", true);
-// Simul("../catrel/GFP3", "p3dd10g", true);
-// Simul("../catrel/GFP2", "p2dd10-f4g2-1mod2-t1--12", true);
-// Simul("../catrel/GFP", "p37", true);
-Simul := procedure(dir, name, gen)
+// Simul("GFP2", "p2dd30", true, true);
+// Simul("GFP2", "p277", true, true);
+// Simul("../catrel/GFP3", "p3dd10", true, true);
+// Simul("../catrel/GFP3", "p3dd10g", true, true);
+// Simul("../catrel/GFP2", "p2dd10-f4g2-1mod2-t1--12", true, true);
+// Simul("../catrel/GFP", "p37", true, true);
+Simul := procedure(dir, name, usef, usegen)
         if DLP_VERIFICATION then
 	    SetOutputFile("foo": Overwrite:=true);
  	end if;
 	dir:=dir * "/" * name;
 	poly:=dir * "/" * name * ".polyselect2.poly";
 	renumber:=dir * "/" * name * ".freerel.renumber.gz";
-	algpr:=dir * "/" * name * ".algpr.gz";
-	generators:=dir * "/" * name * ".generators.gz";
+	if usef then
+	    algpr:=dir * "/" * name * ".algpr.1.gz";
+	    generators:=dir * "/" * name * ".generators.1.gz";
+	else
+	    algpr:=dir * "/" * name * ".algpr.0.gz";
+	    generators:=dir * "/" * name * ".generators.0.gz";
+	end if;
 	purged:=dir * "/" * name * ".purge.purged.gz";
 	relsdel:=dir * "/" * name * ".purge.relsdel.gz";
 	index:=dir * "/" * name * ".merge.index.gz";
@@ -2090,494 +2120,21 @@ Simul := procedure(dir, name, gen)
 	bad:=dir * "/" * name * ".magmanmbrthry.badidealinfo";
 
 	// FIXME: strange what happens here -> simplify?
-	if gen then
+	if usegen then
 	    printf "# computing generators\n";
 	    ComputeUnitsFromWrapper(poly,renumber,algpr,generators,bad,
 				    purged,relsdel,index,
-				    ficunits,abunits,true);
+				    ficunits,abunits,usef,true);
 //error("p277");
 	end if;
 	printf "# computing units for file %o\n", purged;
 	ComputeUnitsFromWrapper(poly,renumber,algpr,generators,bad,
-				purged,relsdel,index,ficunits,abunits,false);
+				purged,relsdel,index,ficunits,abunits,
+				usef,false);
 end procedure;
 
-print "Simul(\"../catrel/GFP3\", \"p3dd10\", true);";
+print "Simul(\"../catrel/GFP3\", \"p3dd15-f4g3-GJL-1\", false, true);";
 // Simul("SNFS", "p60x4x4", false);
 
-// units = non-torsion units.
-CheckUnitsAux := function(K, units)
-	Kdata:=PrepareField(K, true);
-	logu:=[AllEmbeddings(Kdata, K!units[i]) : i in [1..#units]];
-	M:=KMatrixSpace(Rsmall, #units, #units+1)!logu;
-//	print M;
-	printf "rank(M)=%o\n", Rank(M);
-	return M;
-end function;
-
-// We want to solve eps^P(sigma) = eps0.
-// Typical example: eps^{1+sigma^2} = eps0.
-// Write eps = prod units[i]^a[i].
-// All eps are in K.
-UnitPolyEq := function(Kdata, Psig, eps0)
-      U:=Kdata["UK"];
-      rK:=Kdata["rK"];
-      units:=U["units"];
-      y:=U["logunits"];
-      leps0:=AllEmbeddings(Kdata, eps0);
-      print eps0, leps0;
-      // TODO: apply Psig here!!!
-      l:=[AllEmbeddings(Kdata, units[i]) : i in [1..#units]];
-      M:=KMatrixSpace(Rsmall, rK+1, rK+1)!l;
-      print M;
-      print Rank(M);
-      print IsConsistent(M, leps0);
-error("FF");
-      // we want to solve M.V = leps0
-      return true;
-end function;
-
-// K totally real cyclic sextic.
-Maki := procedure(K, unitsW)
-      	Kdata:=PrepareField(K, true);
-	 // TODO: match units with units...!
-	KZ:=PolynomialRing(K);
-	r:=K.1;
-	UK:=Kdata["UK"];
-end procedure;
-
-// when d = 4
-//   case QK = 2: A = 1
-//   case QK = 1: A = 2
-CheckUnits := function(d, A)
-	 if d eq 3 then
-	    // from Foster12
-	    K<r>:=ext<QQ | X^3-A*X^2-(A+3)*X-1>;
-	    KZ:=PolynomialRing(K);
-	    Kdata:=PrepareField(K, true);
-	    U:=Kdata["UK"];
-	    OK:=Kdata["OK"];
-	    units:=U["units"];
-	    sigr:=-(r+1)/r;
-	    for i:=2 to 3 do
-	        ui:=units[i];
-		sigui:=Evaluate(KZ!Eltseq(ui), sigr);
-		printf "u%o=%o, sigma(ui)=%o => %o\n", i, ui, sigui, RecoverUnits(Kdata, OK!sigui);
-	    end for;
-	    eta:=(r+1)/r; print "eta=", eta, Norm(eta);
-	    sigeta:=1/r; print "sigma(eta)=", sigeta, Norm(sigeta);
-	    print "chk1=", eta*units[2]/units[3];
-	    print "chk2=", sigeta*r;
-	    // r = X and its conjugates are units
-	    // sigma:=(-r-1)/r; sigma2:=-1/(r+1); sigma3:=r;
-	    // eps1 = r, eps2 = -(1+1/r) = -r^2+r+3
-	    // eps3 = 1/(eps1*eps2) -- of course
-	    // g2 = r+1 = eps1+1 = -eps1*eps2
-	    // g3 = -r^2+2*r+1 = 1/eps2
-	    // => {eps1, eps2} system of fundamental units
-	    // sigma(eps1) = eps2
-	    // sigma(eps2) = eps3 = 1/(eps1*eps2)
-	    // log(sigma(eps1)) = p^kapp*log(eps1) = log(eps2)
-	    units:=[];
-	    units[1]:=r;
-	    for i:=2 to 2 do
-	    	units[i]:=(-units[i-1]-1)/units[i-1];
-	    end for;
-//	    CheckUnitsModP(K, units);
-	    return 0;
-	 elif d eq 4 then
-            K<w>:=ext<QQ | X^4-A*X^3-6*X^2+A*X+1>;
-	    units:=[];
-	    // w -> w2 = sigma(w) -> w3 = sigma^2(w) -> w4 = 1/w/w2/w3
-	    units[1]:=w;
-	    for i:=2 to 3 do
-	    	units[i]:=(units[i-1]-1)/(units[i-1]+1);
-	    end for;
-	    w4:=1/(units[1]*units[2]*units[3]);
-	    printf "<w>=%o, %o\n", units, w4;
-	    return Gras4(K, units);
-	 elif d eq 6 then
-            K<w>:=ext<QQ|X^6-2*A*X^5-5*(A+3)*X^4-20*X^3+5*A*X^2+(2*A+6)*X+1>;
-	    units:=[];
-	    // w -> w2 = sigma(w) -> w3 = sigma^2(w)
-	    units[1]:=w;
-	    for i:=2 to 5 do
-	    	units[i]:=(-2*units[i-1]-1)/(units[i-1]-1);
-	    end for;
-	    // sigma[1]:=(-2*X-1)/(X-1);
-	    // disc(f) = 2^6*3^6*(A^2+3*A+9)^5
-	    // by inspection, we have a quadratic field:
-	    // PY:=Y^2-2*A*Y-3*A-9; of disc 2^2*(A^2+3*A+9)
-	    // with f factoring as two degree 3 polynomials
-	    // (X^3+(Y-2 A) X^2+(Y-3-2 A) X-1)(X^3-Y X^2-(Y+3) X-1)
-	    // the same thing should be true for 3 degree 2 polynomials
-	    // and cubic fields
-	    Maki(A, units);
-	 end if;
-	 print units;
-//	 return CheckUnitsAux(K, units);
-end function;
-
-TryRankAux := function(K)
-	Kdata:=PrepareField(K, true);
-	OK:=Kdata["OK"];
-	galac:=Kdata["Galois"];
-	UK:=Kdata["UK"];
-	// UK = { grouptable, Minv, logunits, units, rK }
-	units:=UK["units"];
-	G:=UK["grouptable"];
-	for i:=1 to #units do
-	    eps:=K!units[i];
-	    printf "\neps[%o]=%o\n", i, eps;
-	    for cyc in galac[2] do
-	    	for sig in cyc do
-		    eta:=Evaluate(sig, eps);
-		    if Abs(Norm(eta)) eq 1 then
-	    	        printf "sigma:=%o;\n", sig;
-	    	    	printf "eta:=%o; Norm:=%o;\n", eta, Norm(eta);
-			print RecoverUnits(Kdata, OK!eta);
-		    end if;
-		end for;
-	    end for;
-	end for;
-	return Kdata;
-end function;
-
-TryRank := function(d, A)
-	if d eq 3 then
-	    K:=ext<QQ | X^3-A*X^2-(A+3)*X-1>;
-	elif d eq 4 then
-            K:=ext<QQ | X^4-A*X^3-6*X^2+A*X+1>;
-	    // sigma(r):=(-r-1)/(r-1);
-	    // r2:=sigma(r);
-	    // r3:=sigma(r2);
-	    // r4:=sigma(r3)=1/(r1*r2*r3)
-	end if;
-	return TryRankAux(K);
-end function;
-
-FindFixedField := function(orbit)
-	KZ:=Parent(orbit[1]);
-	K:=Parent(Coefficient(KZ.1, 0));
-	t:=K.1;
-	P:=[];
-	for j:=1 to #orbit do
-	    P[j]:=&* [ KZ.1 - Evaluate(orbit[j], t) : j in [1..#orbit]];
-	    printf "P[%o]=%o (disc=%o)\n", j, P[j], Discriminant(P[j]);
-	end for;
-	Q:=[];
-	for j:=0 to (Degree(K)-1) div #orbit do
-	    Q[j +1]:=&* [ KZ.1 - Coefficient(P[r], j) : r in [1..#orbit]];
-	    printf "Q[%o]=%o\n", j, Q[j +1];
-	end for;
-	return Q;
-end function;
-
-TwoOrbits := function(t, Z, orb1, orb2)
-	printf "orb1=%o\norb2=%o\n", orb1, orb2;
-	printf "# => extensions of degree %o\n", #orb2;
-	P:=[];
-	for i:=1 to #orb2 do
-//	    P[i]:=&* [Z-Evaluate(orb2[i], Evaluate(orb1[j], t)) : j in [1..#orb1]];
-	    P[i]:=&* [Z-Evaluate(orb1[j], Evaluate(orb2[i], t)) : j in [1..#orb1]];
-	    if DLP_DEBUG ge 2 then
-	        printf "P[%o]=%o\n", i, P[i];
-	    end if;
-	end for;
-	Q:=[];
-	lK:=[];
-	for j:=0 to #orb1-1 do
-	    Q[j +1]:=&* [Z-Coefficient(P[i], j) : i in [1..#orb2]];
-	    R:=QX!Eltseq(Q[j +1]);
-	    printf "Q[%o]=%o\n", j, Factorization(R);
-	    if IsIrreducible(R) then
-	        Append(~lK, R);
-	    end if;
-	    disc:=Discriminant(R);
-	    if disc ne 0 then
-	        printf "disc=%o; ", Factorization(Integers()!disc);
-		K:=ext<QQ | R>;
-		r1,r2:=Signature(K);
-		printf "sig=%o\n", [r1, r2];
-	    end if;
-//	    printf "Q[%o]=%o\n", j, Q[j +1];
-	end for;
-	return lK;
-end function;
-
-FindFixedFields := function(orbits)
-	KZ:=Parent(orbits[1][1]);
-	Z:=KZ.1;
-	K:=Parent(Coefficient(Z, 0));
-	t:=K.1;
-	// clean orbits
-	orbs:=[];
-	for i:=1 to #orbits do
-	    // compute field fixed by sigma_i
-	    gi:=orbits[i][1];
-	    printf "g%o=%o\n", i, gi;
-	    ok:=true;
-	    for j:=1 to i-1 do
-	        if orbits[i][1] in orbits[j] then
-		    printf "g%o is in Orb(g%o)\n", i, j;
-		    ok:=false;
-		    break;
-		end if;
-	    end for;
-	    if not ok then continue; end if;
-	    Append(~orbs, orbits[i]);
-	end for;
-	// precompute table of products
-	tab:=AssociativeArray();
-	tab[t]:="Id";
-	for i:=1 to #orbs do
-	    for j:=1 to #orbs[i] do
-	        str:="g" * IntegerToString(i) * "^" * IntegerToString(j);
-		tmp:=Evaluate(orbs[i][j], t);
-		if not IsDefined(tab, tmp) then
-		    printf "tab[%o,%o=%o]=%o\n", i, j, tmp, str;
-	            tab[tmp]:=str;
-		end if;
-	    end for;
-	end for;
-	// compute all products
-	for i:=1 to #orbs do
-	    gi:=orbs[i][1];
-	    git:=Evaluate(gi, t);
-	    for j:=1 to #orbs do
-	        gj:=orbs[j][1];
-	        gji:=Evaluate(gj, git);
-		printf "g%o o g%o = %o = %o\n", j, i, gji, tab[gji];
-	    end for;
-//	    FindFixedField(orbits[i]);
-	end for;
-// TODO: we need 3x2 or 2x3...!
-        orbs:=Sort(orbs, func<x, y | #y - #x>);
-	// quadratic subfield
-	TwoOrbits(t, Z, orbs[1], orbs[2]);
-	// cubic subfield
-	l3:=TwoOrbits(t, Z, orbs[2], orbs[1]);
-	l3:=l3 cat TwoOrbits(t, Z, orbs[3], orbs[1]);
-	l3:=l3 cat TwoOrbits(t, Z, orbs[4], orbs[1]);
-	for i:=1 to #l3 do
-	    Ki:=ext<QQ | l3[i]>;
-	    printf "Gal(K%o)=%o\n", i, GaloisGroup(Ki);
-	    for j:=i+1 to #l3 do
-	        Kj:=ext<QQ | l3[j]>;
-		ok,isom:=IsIsomorphic(Ki, Kj);
-		if ok then
-		    printf "K%o is isomorphic to K%o: %o\n", j, i, isom(Ki.1);
-		end if;
-	    end for;
-	end for;
-	return l3;
-end function;
-
-// INPUT: P of degree 3 over a quadratic field, f = Norm(P)
-// OUTPUT: ok0,K0,dK0
-GetK0 := function(P, f, dk)
-        // cheating
-	Kf:=ext<QQ | f>;
-	l3:=Subfields(Kf, 3);
-	if l3 eq [] then return false, QQ, -1; end if;
-	K0:=l3[1][1];
-	return true, K0, Discriminant(K0);
-end function;
-
-BeMaOl := function(dk, tP)
-        k<zk>:=QuadraticField(dk);
-	Ok:=MaximalOrder(k);
-	omega:=k!Ok.2;
-	kX<X1>:=PolynomialRing(k);
-	P:=&+ [ (Ok!tP[i]) * X1^(i-1) : i in [1..#tP] ];
-	printf "# dk = %o, P = %o\n", dk, P;
-
-	// checking Galois group
-	K<zK>:=ext<k | P>;
-	f:=Norm(P);
-	KK<z>:=ext<QQ | f>;
-	dP:=Discriminant(P);
-	NdP:=Norm(dP);
-	normalK:=false;
-	if IsSquare(NdP) then // Gal 1.
-	    printf "# Norm(dP) is a square\n";
-	    // Gal 4.
-	    ok0,K0,dK0:=GetK0(P, f, dk);
-	    if ok0 then
-	        r1,r2:=Signature(K0);
-	        printf "# K0=%o, sgn=%o\n", K0, [r1, r2];
-	        if IsSquare(dK0) then // Gal 7.
-		    printf "# d(K0) is a square => C_6\n";
-		    normalK:=true;
-		elif IsSquare(dK0/dk) then
-		    printf "# dK0/dkP is a square => D_3\n";		
-		    normalK:=true;
-		else
-		    printf "# dK0=%o => D_6\n", dK0;
-		end if;
-	    else
-		if IsSquare(dP) then // Gal 5.
-	            printf "# dP is a square => G_{18}\n";
-	    	else // Gal 6.
-	            printf "# dP is a square => G_{36}^-\n";
-		end if;
-	    end if;
-	else
-	    if IsSquare(NdP/dk) then // Gal 2.
-	        printf "# Norm(dP)/dk is a square => G_{36}^+\n";
-	    else // Gal 3.
-	        printf "# G_{72}\n";
-	    end if;
-	end if;
-	G,roots:=GaloisGroup(f);
-	printf "# f=%o\nGal(f)=%o\n", f, G;
-if false then
-	for g in G do
-	    ord:=Order(g);
-	    printf "ord(%o)=%o\n", g, ord;
-	    if ord eq 1 then continue; end if;
-	    Gg:=sub<G | g>;
-	    print "g=%o => K^<g>=%o\n", g, FixedField(KK, Gg);
-	end for;
-end if;
-if true then
-	orbits:=GaloisAction(KK, true);
-	if normalK then return FindFixedFields(orbits); end if;
-	// at this point, K isn't normal
-	Zq:=Parent(roots[1]);
-	Qq:=FieldOfFractions(Zq);
-	pol<ZZ>:=PolynomialRing(Qq);
-	printf "r -> %o\n", &* [ZZ-r : r in roots];
-	for i:=1 to #orbits do
-	    printf "g%o(roots):\n", i;
-	    tmp:=Eltseq(orbits[i][1]);
-	    tmp:=pol![Qq!(QQ!x) : x in tmp];
-	    rootsl:=[];
-	    rootsr:=[];
-	    used:=[false : x in [1..#roots]];
-	    for j:=1 to #roots do
-	        if used[j] then continue; end if;
-		used[j]:=true;
-		Append(~rootsl, roots[j]);
-	        tmpr:=Evaluate(tmp, roots[j]);
-	        printf "%o -> %o\n", roots[j], tmpr;
-		ok:=false;
-		for k:=1 to #roots do
-		    if roots[k] eq tmpr then
-		        printf "roots[%o]=%o=%o\n", k, roots[k], tmpr;
-		        used[k]:=true;
-			ok:=true;
-			break;
-		    end if;
-		end for;
-		Append(~rootsr, tmpr);
-	    end for;
-	    P:=[];
-	    P[1]:=&* [ ZZ-x : x in rootsl];
-	    P[2]:=&* [ ZZ-x : x in rootsr];
-	    print P[1], P[2], P[1]*P[2];
-	    Q0:=&* [ ZZ-Coefficient(P[i], 0) : i in [1..2]];
-	    Q1:=&* [ ZZ-Coefficient(P[i], 1) : i in [1..2]];
-	    print Q0, Q1;
-	end for;
-	return 0;
-end if;
-end function;
-
-TestBeMaOl := function(group)
-	if group eq "C6r" then
-            dk:=5;
-	    // P:=X1^3-(7+7*omega)*X1+(7+14*omega);
-	    tP:=[[7, 14], [-7, -7], [0, 0], [1, 0]];
-	elif group eq "C6i" then
-	    // reconstructed from pari tables
-            dk:=-7;
-	    // factor of Phi_7: 
-	    // kZ.1^3 + 1/2*(zk + 1)*kZ.1^2 + 1/2*(zk - 1)*kZ.1 - 1;
-	    // P:=X1^3+omega*X1^2+(omega-1)*X1-1;
-	    tP:=[[-1, 0], [-1, 1], [0, 1], [1, 0]];
-        elif group eq "D3r" then
-            dk:=37;
-	    // P:=X1^3-X1^2+(-5-2*omega)*X1+(-5-2*omega);
-	    tP:=[[-5, -2], [-5, -2], [-1, 0], [1, 0]];
-        elif group eq "D3i" then
-	    // sig = (0, 3)
-            dk:=-23;
-	    tP:=[[1, 0], [-2, 1], [-1, -1], [1, 0]];
-        elif group eq "D6i" then
-	    // sig = (2, 2)
-	    dk:=5; dkt:=13225;
-	    tP:=[[5, 8], [0, 0], [-1, -1], [1, 0]];
-        elif group eq "G18" then
-	    // sig = (6, 0)
-	    dk:=5;
-	    tP:=[[-1, -6], [-5, -4], [-1, 0], [1, 0]];
-        elif group eq "G72" then
-	    // sig = (6, 0)
-	    dk:=5; dkt:=97025;
-	    tP:=[[7, 10], [-6, -7], [0, 0], [1, 0]];
-	end if;
-	return BeMaOl(dk, tP);
-end function;
-
-// for d = 3, t0 = 1 (and more?)
-// TODO: recover formula for the units in a canonical way and compute
-// action of sigma, also in a canonical form.
-// alpha is a unit.
-//
-// sigma(alpha) = -1/(alpha+1)?????
-// (alpha+1)*(alpha^2-(a+1)*alpha-2) = -1
-//
-// eps_1 = alpha+1
-// eps_2 = -alpha^2+1
-// sigma:=-Z^2 - Z + 1;
-// sigma(eps_1) = eps_1^3*eps_2
-// sigma(eps_2) = -eps_1*eps_2 = eps_1-1
-// does it help?
-// log(sigma(eps_1)) = p*log(eps_1) = 3*log(eps_1)+log(eps_2)
-// log(sigma(eps_2)) = p*log(eps_2) = log(eps_1)+log(eps_2)
-// or (p-3)*log(eps_1) - log(eps_2) = 0
-//    log(eps_1) - (p-2)*log(eps_2) = 0
-// and det = -(p-3)(p-2)+1 = - (-4)(-3)+1 <> 0 mod p => log(eps_1)=log(eps_2)=0
-
-PGEX := procedure()
-        f:=X^4-35*X^3-48*X^2-35*X+1;
-	// On a K = Q/f, K2 = l'unique sous-corps quad de K:
-	K<t>:=ext<QQ | f>; // signature (2, 1) => r_K = 2
-	// UK is generated by
-	eps1:=-t^3 + 35*t^2 + 48*t + 35;
-	eps2:=-8*t^3 + 280*t^2 + 392*t + 291;
-
-	K2:=Subfields(K,2);
-	K2,m2K:=Explode(K2[1]); // m2K envoie K2 dans K
-	UK2,map2K2:=UnitGroup(K2); // map2K2 envoie UK2 dans K2
-	eps0:=K2!map2K2(UK2.2); // unite fdale de K2
-	// go up to K
-	Keps0:=m2K(eps0);
-	// -> Keps0 = 8*t^3 - 280*t^2 - 392*t + 11
-	// and this Razvan's unit:
-	u:=-8*t^3 + 280*t^2 + 392*t + 291;
-	// et miracle : u = eps2 = 1/Keps0!!!
-	printf "u=%o\n1/u=%o\neps0=%o\n", u, 1/u, Keps0;
-end procedure;
-
-Bug0724 := procedure()
-	A:=1;
-        K<z>:=ext<QQ | X^4-A*X^3-6*X^2+A*X+1>;
-	OK:=MaximalOrder(K);
-	badC:={
-"3f409", "34561", "2fe99", "28d71", "21f79", "17029", "df21", "df21", "17029", "21f79", "28d71", "2fe99", "34561", "3f409", "3f409", "34561", "2fe99", "28d71", "21f79", "17029", "df21", "df21", "17029", "21f79", "28d71", "2fe99", "34561", "3f409", "3f409", "34561", "2fe99", "28d71", "21f79", "17029", "17029"
-};
-	for C16 in badC do
-	    C:=StringToInteger(C16, 16);
-	    lC:=Factorization(C);
-	    printf "# C = %o = %o\n", C, lC;
-	    for qe in lC do
-	        q:=qe[1];
-	        printf "q*OK = %o\n", Factorization(q * OK);
-	    end for;
-	end for;
-end procedure;
-
-ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,relsdel,index,ficunits,abunits,ww eq "true"); // don't ask why we should write this...!
+ComputeUnitsFromWrapper(polyfile,renumber,algpr,generators,badidealinfo,purged,relsdel,index,ficunits,abunits,usef eq "true",ww eq "true"); // don't ask why we should write this...!
 exit;

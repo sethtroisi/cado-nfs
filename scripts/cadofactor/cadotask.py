@@ -3994,6 +3994,7 @@ class SMTask(Task):
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
             smfilename = self.workdir.make_filename("sm")
+            abunitsdirname = self.workdir.make_filename("abunits.dir")
 
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
@@ -4006,6 +4007,7 @@ class SMTask(Task):
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     out=smfilename,
+		    abunits=abunitsdirname,
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
@@ -4020,6 +4022,9 @@ class SMTask(Task):
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
+
+    def get_units_dirname(self):
+        return self.get_state_filename("abunits.dir")
 
 class ReconstructLogTask(Task):
     """ Logarithms Reconstruction Task """
@@ -4061,6 +4066,8 @@ class ReconstructLogTask(Task):
             nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
             nrels = nfree+nunique
 
+            abunitsdirname = self.send_request(Request.GET_UNITS_DIRNAME)
+                 
             (stdoutpath, stderrpath) = \
                     self.make_std_paths(cadoprograms.SM.name)
             p = cadoprograms.ReconstructLog(
@@ -4071,6 +4078,8 @@ class ReconstructLogTask(Task):
                     nmaps0=nmaps[0],
                     nmaps1=nmaps[1],
                     nrels=nrels,
+		    abunits0=str(abunitsdirname) + ".0",
+		    abunits1=str(abunitsdirname) + ".1",
                     stdout=str(stdoutpath),
                     stderr=str(stderrpath),
                     **self.merged_args[0])
@@ -4482,6 +4491,7 @@ class Request(Message):
     GET_KERNEL_FILENAME = object()
     GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
+    GET_UNITS_DIRNAME = object()
     GET_BADIDEAL_FILENAME = object()
     GET_BADIDEALINFO_FILENAME = object()
     GET_SMEXP = object()
@@ -4681,6 +4691,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
+            self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_units_dirname
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
         else:

@@ -1077,6 +1077,7 @@ linalg/bwc/lingen-bigmatpoly-ft.c
 linalg/bwc/lingen-bigmatpoly-ft.h
 scripts/magma-sm-wrapper.sh
 scripts/nfsunits.mag
+scripts/split.py
 linalg/bwc/mpfq/mpfq_pz.c
 linalg/bwc/mpfq/mpfq_pz.h
 linalg/bwc/mpfq/mpfq_pz_t.c
