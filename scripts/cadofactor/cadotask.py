@@ -781,12 +781,12 @@ class SimpleStatistics(BaseStatistics, HasState, DoesLogging,
         """ Return tuple with number of seconds of cpu and real time spent
         by all programs of this Task
         """
-        times = [self.get_cpu_real_time(p) for p in self.programs]
+        times = [self.get_cpu_real_time(p) for p, o, i in self.programs]
         times = tuple(map(sum, zip(*times)))
         return times[0 if is_cpu else 1]
 
     def print_stats(self):
-        for program in self.programs:
+        for program, o, i in self.programs:
             cputotal, realtotal  = self.get_cpu_real_time(program)
             self.print_cpu_real_time(cputotal, realtotal, program.name)
         super().print_stats()
@@ -829,6 +829,14 @@ class DoesImport(DoesLogging, cadoparams.UseParameters, Runnable,
     def import_one_file(self, filename):
         pass
 
+def chain_dict(d1, d2):
+    """ Chain two mappings.
+
+    If d[x] == y and e[y] == z, then chain_dict(d, e)[x] == z.
+    >>> chain_dict({1: 17}, {17: 42})
+    {1: 42}
+    """
+    return {key: d2[value] for key, value in d1.items()}
 
 class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
            cadoparams.UseParameters, Runnable, metaclass=abc.ABCMeta):
@@ -840,26 +848,19 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
     # Properties that subclasses need to define
     @abc.abstractproperty
     def programs(self):
-        # A list of classes of Programs which this tasks uses
-        pass
-    @abc.abstractproperty
-    def progparam_override(self):
-        # A list of lists of program parameters that get overridden by the
-        # Task, such as admin for polyselect2l. Specifying these overridden
-        # parameters here lets cadofactor print a warning message when the
-        # user tries to supply them in the parameter file. Not specifying
-        # them here may also lead to a program abort, when a parameter is
-        # specified both in the progparams dictionary (as extracted via
-        # .myparams()) and as a direct parameter as supplied by the Task.
+        # A tuple of 3-tuples, with each 3-tuple containing
+        # 1. the class of Program which this tasks uses
+        # 2. a tuple of parameters to the Program which the Task computes and
+        #    which therefore should not be filled in from the Parameters file
+        # 3. a dict of parameters which are file names and which should be
+        #    filled in by sending Requests to other Tasks. This also enables
+        #    testing whether input files have been changed by the other Task.
         pass
     @abc.abstractproperty
     def paramnames(self):
         # Parameters that all tasks use
         return self.join_params(super().paramnames, 
             {"name": str, "workdir": str, "run": True})
-    @property
-    def needed_input(self):
-        return {}
     @property
     def param_nodename(self):
         return self.name
@@ -885,12 +886,12 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         # The progparams entries should not be modified after a class'
         # constuctor (within __init__() is fine tho)
         self.progparams = []
-        for prog, override in zip(self.programs, self.progparam_override):
+        for prog, override, needed_input in self.programs:
             # Parameters listed in needed_input are assumed to be overridden
-            for key in (set(override) & set(self.needed_input)):
-                self.logger.warning("Parameter %s listed in both "
-                                    "progparam_override and needed_input, "
-                                    "only one is needed", key)
+            for key in (set(override) & set(needed_input)):
+                self.logger.warning("Parameter %s listed in both overridden "
+                                    "parameters and in input files for %s, "
+                                    "only one is needed", key, prog.name)
             progparams = self.parameters.myparams(prog.get_accepted_keys(),
                                                   prog.name)
             for param in set(override) & set(progparams):
@@ -917,11 +918,18 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         super().run()
-        self.input_files = self.batch_request(self.needed_input)
+        # Make set of requests so multiply listed requests are sent only once
+        # The input_file dict maps key -> Request. Make set union of requests
+        requests = set.union(*[set(i.values()) for p, o, i in self.programs])
+        # Make dict mapping Request -> answer (i.e., FileName object)
+        answers = self.batch_request(dict(zip(requests, requests)))
+        # Make list of dicts mapping key -> answer
+        self._input_files = [chain_dict(i, answers) for p, o, i in self.programs]
         # Since merged_args is re-generated in each run(), the subclass can
         # modify it as it pleases (unlike progparams)
-        self.merged_args = [dict(self.input_files.items() | p.items())
-                            for p in self.progparams]
+        # For each program, merge the progparams and the input_files dicts
+        self.merged_args = [dict(p.items() | i.items())
+                            for p, i in zip(self.progparams, self._input_files)]
 
     def translate_input_filename(self, filename):
         return filename
@@ -952,34 +960,40 @@ class Task(patterns.Colleague, SimpleStatistics, HasState, DoesLogging,
 
 
     @staticmethod
-    def _input_file_to_state_dict(key, filename):
-        return ("processed_version_%s" % key, filename.get_version())
+    def _input_file_to_state_dict(key, index, filename):
+        return ("processed_version_%d_%s" % (index, key), filename.get_version())
 
     def have_new_input_files(self):
         # Change this to "self.logger.info" for showing each check on screen
         log = self.logger.debug
         result = False
-        for key, filename in self.input_files.items():
-            (state_key, version) = self._input_file_to_state_dict(key, filename)
-            c = self.cmp_input_version(state_key, version)
-            if c == -2:
-                log("File %s was not processed before", filename)
-                result = True
-            if c == -1:
-                log("File %s is newer than last time", filename)
-                result = True
-        if result is False and self.input_files:
-            (n, v) = (("", "is"), ("s", "are"))[len(self.input_files) > 1]
+        for index, input_files in enumerate(self._input_files):
+            for key, filename in input_files.items():
+                (state_key, version) = \
+                    self._input_file_to_state_dict(key, index, filename)
+                c = self.cmp_input_version(state_key, version)
+                if c == -2:
+                    log("File %s was not processed before", filename)
+                    result = True
+                if c == -1:
+                    log("File %s is newer than last time", filename)
+                    result = True
+        # Collapse programs from all dict into one set
+        all = set.union(*[set(i.values()) for i in self._input_files])
+        if result is False and all:
+            (n, v) = (("", "is"), ("s", "are"))[len(all) > 1]
             log("Input file%s %s %s unchanged since last time",
-                n, ", ".join(map(str, self.input_files.values())), v)
+                n, ", ".join(map(str, all)), v)
         return result
 
     def remember_input_versions(self, commit=True):
         update = {}
-        for (key, filename) in self.input_files.items():
-            (state_key, version) = self._input_file_to_state_dict(key, filename)
-            if version is not None:
-                update[state_key] = version
+        for index, input_files in enumerate(self._input_files):
+            for (key, filename) in input_files.items():
+                (state_key, version) = \
+                    self._input_file_to_state_dict(key, index, filename)
+                if version is not None:
+                    update[state_key] = version
         self.state.update(update, commit)
 
     @staticmethod
@@ -1414,15 +1428,12 @@ class Polysel1Task(ClientServerTask, DoesImport, HasStatistics, patterns.Observe
         return "Polynomial Selection (size optimized)"
     @property
     def programs(self):
-        return (cadoprograms.Polyselect2l,)
-    @property
-    def progparam_override(self):
         # admin and admax are special, which is a bit ugly: these parameters
         # to the Polyselect2l constructor are supplied by the task, but the
         # task has itself admin, admax parameters, which specify the total
         # size of the search range. Thus we don't include admin, admax here,
         # or PolyselTask would incorrectly warn about them not being used.
-        return [[]]
+        return ((cadoprograms.Polyselect2l, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -1873,10 +1884,7 @@ class Polysel2Task(ClientServerTask, HasStatistics, DoesImport, patterns.Observe
         return "Polynomial Selection (root optimized)"
     @property
     def programs(self):
-        return (cadoprograms.Polyselect2l,)
-    @property
-    def progparam_override(self):
-        return [[]]
+        return ((cadoprograms.Polyselect2l, (), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
@@ -2106,17 +2114,11 @@ class FactorBaseTask(Task):
         return "Generate Factor Base"
     @property
     def programs(self):
-        return (cadoprograms.MakeFB,)
-    @property
-    def progparam_override(self):
-        return [["out", "side"]]
+        return ((cadoprograms.MakeFB, ("out", "side"), {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
                 {"gzip": True, "I": int, "rlim": int, "alim": int})
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -2226,20 +2228,14 @@ class FreeRelTask(Task):
         return "Generate Free Relations"
     @property
     def programs(self):
-        return (cadoprograms.FreeRel,)
-    @property
-    def progparam_override(self):
-        return [["renumber", "out"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
+        if self.params["dlp"]:
+            input["badideals"] = Request.GET_BADIDEAL_FILENAME
+        return ((cadoprograms.FreeRel, ("renumber", "out"), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,
                 {"dlp": False, "gzip": True, "addfullcol": None})
-    @property
-    def needed_input(self):
-        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
-        if self.params["dlp"]:
-            input["badideals"] = Request.GET_BADIDEAL_FILENAME
-        return input
 
     wanted_regex = {
         'nfree': (r'# Free relations: (\d+)', int),
@@ -2349,18 +2345,14 @@ class SievingTask(ClientServerTask, DoesImport, FilesCreator, HasStatistics,
         return "Lattice Sieving"
     @property
     def programs(self):
-        return (cadoprograms.Las,)
-    @property
-    def progparam_override(self):
-        return [["q0", "q1", "factorbase", "out", "stats_stderr"]]
+        override = ("q0", "q1", "factorbase", "out", "stats_stderr")
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME}
+        return ((cadoprograms.Las, override, input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {
             "qmin": 0, "qrange": int, "rels_wanted": 1, "alim": int, 
             "gzip": True})
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
 
     @property
     def stat_conversions(self):
@@ -2587,10 +2579,7 @@ class Duplicates1Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
-        return (cadoprograms.Duplicates1,)
-    @property
-    def progparam_override(self):
-        return [["filelist", "prefix", "out"]]
+        return ((cadoprograms.Duplicates1, ("filelist", "prefix", "out"), {}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nslices_log": 1})
@@ -2801,21 +2790,15 @@ class Duplicates2Task(Task, FilesCreator, HasStatistics):
         return "Filtering - Duplicate Removal, removal pass"
     @property
     def programs(self):
-        return (cadoprograms.Duplicates2,)
-    @property
-    def progparam_override(self):
-        return [["rel_count", "filelist"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME}
+        if self.params["dlp"]:
+            input["badidealinfo"] = Request.GET_BADIDEALINFO_FILENAME
+        return ((cadoprograms.Duplicates2, ("rel_count", "filelist"), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "nslices_log": 1})
-    @property
-    def needed_input(self):
-        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                "renumber": Request.GET_RENUMBER_FILENAME}
-        if self.params["dlp"]:
-            input["badidealinfo"] = Request.GET_BADIDEALINFO_FILENAME
-        return input
 
     @property
     def stat_conversions(self):
@@ -2968,17 +2951,12 @@ class PurgeTask(Task):
         return "Filtering - Singleton removal"
     @property
     def programs(self):
-        return (cadoprograms.Purge,)
-    @property
-    def progparam_override(self):
-        return [["nrels", "out", "minindex", "outdel", "nprimes", "filelist"]]
+        override = ("nrels", "out", "minindex", "outdel", "nprimes", "filelist")
+        return ((cadoprograms.Purge, override, {"_freerel": Request.GET_FREEREL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, 
             {"dlp": False, "galois": False, "gzip": True})
-    @property
-    def needed_input(self):
-        return {"_freerel": Request.GET_FREEREL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3233,11 +3211,11 @@ class PurgeTask(Task):
                     r[key] = int(match.group(1))
         if not had_final_values:
             raise Exception("%s: output of %s did not contain '%s'" %
-                            (self.title, self.programs[0].name, final_values_line))
+                            (self.title, self.programs[0][0].name, final_values_line))
         for key in keys:
             if not key in r:
                 raise Exception("%s: output of %s did not contain value for %s: %s"
-                                % (self.title, self.programs[0].name, key, stdout))
+                                % (self.title, self.programs[0][0].name, key, stdout))
         return [r[key] for key in keys]
 
 class FilterGaloisTask(Task):
@@ -3250,18 +3228,13 @@ class FilterGaloisTask(Task):
         return "Filtering - Galois"
     @property
     def programs(self):
-        return (cadoprograms.GaloisFilter,)
-    @property
-    def progparam_override(self):
-        return [["nrels"]]
+        input = {"merged": Request.GET_MERGED_FILENAME,
+                 "poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME}
+        return ((cadoprograms.GaloisFilter, ("nrels",), input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"galois": False})
-    @property
-    def needed_input(self):
-        return {"merged": Request.GET_MERGED_FILENAME,
-                "poly": Request.GET_POLYNOMIAL_FILENAME,
-                "renumber": Request.GET_RENUMBER_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3319,17 +3292,12 @@ class MergeDLPTask(Task):
         return "Filtering - Merging"
     @property
     def programs(self):
-        return (cadoprograms.MergeDLP, cadoprograms.ReplayDLP)
-    @property
-    def progparam_override(self):
-        return [["out", "keep"],
-            ["ideals", "history", "index", "out"]]
+        input = {"purged": Request.GET_PURGED_FILENAME}
+        return ((cadoprograms.MergeDLP, ("out", "keep"), input),
+                (cadoprograms.ReplayDLP, ("ideals", "history", "index", "out"), input))
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"gzip": True})
-    @property
-    def needed_input(self):
-        return {"purged": Request.GET_PURGED_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3421,17 +3389,13 @@ class MergeTask(Task):
         return "Filtering - Merging"
     @property
     def programs(self):
-        return (cadoprograms.Merge, cadoprograms.Replay)
-    @property
-    def progparam_override(self):
-        return [["out"], ["history", "index"]]
+        input = {"purged": Request.GET_PURGED_FILENAME}
+        return ((cadoprograms.Merge, ("out",), input),
+                (cadoprograms.Replay, ("history", "index"), input))
     @property
     def paramnames(self):
         return self.join_params(super().paramnames,  \
             {"skip": None, "keep": None, "gzip": True})
-    @property
-    def needed_input(self):
-        return {"purged": Request.GET_PURGED_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3514,16 +3478,11 @@ class NmbrthryTask(Task):
         return "Number Theory for DLP"
     @property
     def programs(self):
-        return (cadoprograms.MagmaNmbrthry,)
-    @property
-    def progparam_override(self):
-        return [["badidealinfo", "badideals"]]
+        return ((cadoprograms.MagmaNmbrthry, ("badidealinfo", "badideals"),
+                 {"poly": Request.GET_POLYNOMIAL_FILENAME}),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"nsm0": -1, "nsm1": -1})
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3617,17 +3576,12 @@ class LinAlgDLPTask(Task):
         return "Linear Algebra for DLP"
     @property
     def programs(self):
-        return (cadoprograms.MagmaLinalg,)
-    @property
-    def progparam_override(self):
-        return [["ker", "ell", "nmaps"]]
+        return ((cadoprograms.MagmaLinalg, ("ker", "ell", "nmaps"),
+                 {"sparsemat": Request.GET_MERGED_FILENAME,
+                  "sm": Request.GET_SM_FILENAME}),)
     @property
     def paramnames(self):
         return super().paramnames
-    @property
-    def needed_input(self):
-        return {"sparsemat": Request.GET_MERGED_FILENAME,
-                "sm": Request.GET_SM_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3677,16 +3631,12 @@ class LinAlgTask(Task, HasStatistics):
         return "Linear Algebra"
     @property
     def programs(self):
-        return (cadoprograms.BWC,)
-    @property
-    def progparam_override(self):
-        return [["complete", "matrix",  "wdir", "nullspace"]]
+        return ((cadoprograms.BWC, ("complete", "matrix",  "wdir", "nullspace"),
+                 {"merged": Request.GET_MERGED_FILENAME}),)
     @property
     def paramnames(self):
         return super().paramnames
-    @property
-    def needed_input(self):
-        return {"merged": Request.GET_MERGED_FILENAME}
+
     @property
     def stat_conversions(self):
         return (
@@ -3789,20 +3739,15 @@ class CharactersTask(Task):
         return "Quadratic Characters"
     @property
     def programs(self):
-        return (cadoprograms.Characters,)
-    @property
-    def progparam_override(self):
-        return [["out"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "wfile": Request.GET_DEPENDENCY_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME,
+                 "heavyblock": Request.GET_DENSE_FILENAME}
+        return ((cadoprograms.Characters, ("out",), input),)
     @property
     def paramnames(self):
         return super().paramnames
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                "wfile": Request.GET_DEPENDENCY_FILENAME,
-                "purged": Request.GET_PURGED_FILENAME,
-                "index": Request.GET_INDEX_FILENAME,
-                "heavyblock": Request.GET_DENSE_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -3844,19 +3789,15 @@ class SqrtTask(Task):
         return "Square Root"
     @property
     def programs(self):
-        return (cadoprograms.Sqrt,)
-    @property
-    def progparam_override(self):
-        return [["ab", "prefix", "rat", "alg", "gcd", "dep"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME,
+                 "kernel": Request.GET_KERNEL_FILENAME}
+        return ((cadoprograms.Sqrt, ("ab", "prefix", "rat", "alg", "gcd", "dep"),
+                 input), )
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"N": int, "gzip": True})
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                "purged": Request.GET_PURGED_FILENAME,
-                "index": Request.GET_INDEX_FILENAME,
-                "kernel": Request.GET_KERNEL_FILENAME}
     
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4029,20 +3970,16 @@ class SMTask(Task):
         return "Schirokauer Maps"
     @property
     def programs(self):
-        return (cadoprograms.SM,)
-    @property
-    def progparam_override(self):
-        return [["ell", "smexp0", "smexp1", "nmaps0", "nmaps1", "out"]]
+        override = ("ell", "smexp0", "smexp1", "nmaps0", "nmaps1", "out")
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME,
+                 "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "index": Request.GET_INDEX_FILENAME}
+        return ((cadoprograms.SM, override, input),)
     @property
     def paramnames(self):
         return super().paramnames
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                "renumber": Request.GET_RENUMBER_FILENAME,
-                "badidealinfo": Request.GET_BADIDEALINFO_FILENAME,
-                "purged": Request.GET_PURGED_FILENAME,
-                "index": Request.GET_INDEX_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4094,22 +4031,17 @@ class ReconstructLogTask(Task):
         return "Logarithms Reconstruction"
     @property
     def programs(self):
-        return (cadoprograms.ReconstructLog,)
-    @property
-    def progparam_override(self):
-        return [["dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1",
-                 "nrels"]]
+        input = {"poly": Request.GET_POLYNOMIAL_FILENAME,
+                 "renumber": Request.GET_RENUMBER_FILENAME,
+                 "purged": Request.GET_PURGED_FILENAME,
+                 "ker": Request.GET_KERNEL_FILENAME,
+                 "ideals": Request.GET_IDEAL_FILENAME,
+                 "relsdel": Request.GET_RELSDEL_FILENAME}
+        override = ("dlog",  "ell", "smexp0", "nmaps0", "smexp1", "nmaps1", "nrels")
+        return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
         return self.join_params(super().paramnames, {"partial": True})
-    @property
-    def needed_input(self):
-        return {"poly": Request.GET_POLYNOMIAL_FILENAME,
-                "renumber": Request.GET_RENUMBER_FILENAME,
-                "purged": Request.GET_PURGED_FILENAME,
-                "ker": Request.GET_KERNEL_FILENAME,
-                "ideals": Request.GET_IDEAL_FILENAME,
-                "relsdel": Request.GET_RELSDEL_FILENAME}
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4297,10 +4229,7 @@ class StartClientsTask(Task):
         return "Client Launcher"
     @property
     def programs(self):
-        return (cadoprograms.WuClient,)
-    @property
-    def progparam_override(self):
-        return [["clientid", "certsha1"]]
+        return ((cadoprograms.WuClient, ("clientid", "certsha1"), {}),)
     @property
     def paramnames(self):
         return {'hostnames': str, 'scriptpath': None, "nrclients": [int], "run": True}
