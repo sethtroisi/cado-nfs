@@ -996,6 +996,8 @@ class ReconstructLog(Program):
                  smexp0: Parameter(),
                  nmaps1: Parameter("sm1"),
                  smexp1: Parameter(),
+                 explicit_units0: Toggle()=None,
+                 explicit_units1: Toggle()=None,
     		 abunits0: Parameter(is_input_file=True),
     		 abunits1: Parameter(is_input_file=True),
                  **kwargs):

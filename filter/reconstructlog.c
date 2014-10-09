@@ -1258,6 +1258,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp1", "sm exponent on side 1");
   param_list_decl_usage(pl, "abunits0", "units for all (a, b) pairs from purged and relsdels on side 0");
   param_list_decl_usage(pl, "abunits1", "units for all (a, b) pairs from purged and relsdels on side 1");
+  param_list_decl_usage(pl, "explicit_units0", "use units for all (a, b) pairs from purged and relsdels on side 0");
+  param_list_decl_usage(pl, "explicit_units1", "use units for all (a, b) pairs from purged and relsdels on side 1");
 #endif
   param_list_decl_usage(pl, "mt", "number of threads (default 1)");
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
@@ -1295,6 +1297,17 @@ main(int argc, char *argv[])
 
   param_list_configure_switch(pl, "partial", &partial);
   param_list_configure_switch(pl, "force-posix-threads", &filter_rels_force_posix_threads);
+
+#ifndef FOR_FFS
+  int units0 = 0;
+  param_list_configure_switch(pl, "explicit_units0", &units0);
+  int units1 = 0;
+  param_list_configure_switch(pl, "explicit_units1", &units1);
+  if(units0 != 0 && units1 != 0){
+      fprintf (stderr, "units0 and units1 cannot be both set\n");
+      exit (EXIT_FAILURE);
+  }
+#endif
 
 #ifdef HAVE_MINGW
   _fmode = _O_BINARY;     /* Binary open for all files */
@@ -1336,6 +1349,11 @@ main(int argc, char *argv[])
   abunits0dirname = param_list_lookup_string(pl, "abunits0");
   const char * abunits1dirname = NULL;
   abunits1dirname = param_list_lookup_string(pl, "abunits1");
+  /* humf */
+  if(units0)
+      abunits1dirname = NULL;
+  if(units1)
+      abunits0dirname = NULL;
 #endif
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");

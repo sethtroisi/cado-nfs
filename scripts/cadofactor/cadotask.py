@@ -3994,7 +3994,7 @@ class SMTask(Task):
                 self.logger.info("Number of SM is 0: skipping this part.")
                 return True
             smfilename = self.workdir.make_filename("sm")
-            abunitsdirname = self.workdir.make_filename("abunits.dir")
+            abunitsdirname = self.workdir.make_filename("abunits")
 
             gorder = self.send_request(Request.GET_ELL)
             smexp = self.send_request(Request.GET_SMEXP)
@@ -4017,14 +4017,15 @@ class SMTask(Task):
             if not smfilename.isfile():
                 raise Exception("Output file %s does not exist" % smfilename)
             self.state["sm"] = smfilename.get_wdir_relative()
+            self.state["abunits"] = abunitsdirname.get_wdir_relative()
         self.logger.debug("Exit SMTask.run(" + self.name + ")")
         return True
     
     def get_sm_filename(self):
         return self.get_state_filename("sm")
 
-    def get_units_dirname(self):
-        return self.get_state_filename("abunits.dir")
+    def get_abunits_dirname(self):
+        return self.get_state_filename("abunits")
 
 class ReconstructLogTask(Task):
     """ Logarithms Reconstruction Task """
@@ -4691,7 +4692,7 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_SMEXP] = self.nmbrthry.get_smexp
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
-            self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_units_dirname
+            self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_abunits_dirname
             self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
         else:
