@@ -102,7 +102,7 @@ if [ $EXPLICIT1 = "yes" ]; then
     side=1
     usef=true
 else
-    smopts="$smopts-smexp1 $SMEXP1 -nsm1 $NMAPS1"
+    smopts="$smopts -smexp1 $SMEXP1 -nsm1 $NMAPS1"
 fi
 
 ## build required SM's
