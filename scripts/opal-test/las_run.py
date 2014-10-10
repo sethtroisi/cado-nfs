@@ -14,8 +14,11 @@ def update_existing(a, b):
     for key in set(a) & set(b):
         a[key] = b[key]
 
+# return prime_pi(2^x)
 def primepi(x):
-    return x / (log(x) - 1)
+    # precomputed values up to x=40 (obtained with Sage)
+    l = [0, 1, 2, 4, 6, 11, 18, 31, 54, 97, 172, 309, 564, 1028, 1900, 3512, 6542, 12251, 23000, 43390, 82025, 155611, 295947, 564163, 1077871, 2063689, 3957809, 7603553, 14630843, 28192750, 54400028, 105097565, 203280221, 393615806, 762939111, 1480206279, 2874398515, 5586502348, 10866266172, 21151907950, 41203088796]
+    return l[x]
 
 def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
@@ -70,7 +73,7 @@ def run(param_file, problem):
     q0 = las_params["alim"]
     q_range = 1000
     q_inc = 10000
-    rels_wanted = int(primepi(2**las_params["lpba"]) + primepi(2**las_params["lpbr"]))
+    rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
     # sys.stderr.write("Estimate %f relations needed\n" % rels_wanted)
     
     while stats.get_rels() < rels_wanted:
