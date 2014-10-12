@@ -72,7 +72,7 @@ def run(param_file, problem):
     stats = LasStats()
     q0 = las_params["alim"]
     q_range = 1000
-    q_inc = 10000
+    q_inc = 0
     rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
     # sys.stderr.write("Estimate %f relations needed\n" % rels_wanted)
     
@@ -92,6 +92,9 @@ def run(param_file, problem):
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
         os.unlink(outputfile)
+        # set q_inc so that we do about 10 sieving tests of length q_range
+        if q_inc == 0:
+           q_inc = int(rels_wanted / (10.0 * stats.relations_int.lastvalue[0]))
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
