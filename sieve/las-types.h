@@ -302,13 +302,6 @@ typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 /* }}} */
 
-typedef uint64_t plattice_x_t;
-/* DONT modify this: asm code writes in this with hardcoded deplacement */
-typedef struct {
-  int32_t a0; uint32_t a1;
-  int32_t b0; uint32_t b1;
-} plattice_info_t;
-
 /* FIXME: This does not seem to work well */
 #ifdef  __GNUC__
 #define TYPE_MAYBE_UNUSED     __attribute__((unused));

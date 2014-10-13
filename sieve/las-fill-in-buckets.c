@@ -163,6 +163,14 @@ static const uint8_t optimal_move[] = { 0, 1, 2, 4, 4, 8, 8, 8, 8, 16, 16, 16, 1
 // These guards are needed because the conditional affectations use the
 // sign change; this sign may changed at max 1 times, not 2 (with an
 // overflow).  In fact, these guards are 99.99999% useless.
+
+typedef uint64_t plattice_x_t;
+/* DONT modify this: asm code writes in this with hardcoded deplacement */
+typedef struct {
+  int32_t a0; uint32_t a1;
+  int32_t b0; uint32_t b1;
+} plattice_info_t;
+
 NOPROFILE_INLINE int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
