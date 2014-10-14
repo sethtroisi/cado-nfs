@@ -2,12 +2,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <pthread.h>
 #include "portability.h" /* For vasprintf */
 #include "verbose.h"
 
 #define G(X) CADO_VERBOSE_PRINT_ ## X
 #define F(X) (UINT64_C(1) << G(X))
 
+/* Mutex for verbose_output_*() functions */
+static pthread_mutex_t io_mutex[1] = {PTHREAD_MUTEX_INITIALIZER};
 
 const char * verbose_flag_list[] = 
 {
@@ -150,6 +153,7 @@ int verbose_printf(int flag, const char * fmt, ...)
   after calling verbose_output_clear(), has 2 channels:
   channel 0 with 1 output, going to stdout with verbosity 1, and
   channel 1 with 1 output, going to stderr with verbosity 1.
+  All functions are mutex-protected, i.e., output system forms a "monitor."
 */
 
 struct outputs_s {
@@ -224,36 +228,56 @@ print_output(const struct outputs_s * const output, const int verbosity,
 static size_t _nr_channels = 0;
 static struct outputs_s *_channel_outputs = NULL;
 
+/* Init nr_channels channels, with no outputs attached
+   Returns 1 on success, and 0 on error. */
 int
 verbose_output_init(const size_t nr_channels)
 {
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return 0;
     _channel_outputs = (struct outputs_s *) malloc(nr_channels * sizeof(struct outputs_s));
     if (_channel_outputs == NULL)
         return 0;
     _nr_channels = nr_channels;
     for (size_t i = 0; i < nr_channels; i++)
         init_output(&_channel_outputs[i]);
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return 0;
     return 1;
 }
 
-/* Reset channels back to the 2 default channels. */
-void
+/* Reset channels back to the 2 default channels.
+   Returns 1 on success, and 0 on error. */
+int
 verbose_output_clear()
 {
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return 0;
     for (size_t i = 0; i < _nr_channels; i++)
         clear_output(&_channel_outputs[i]);
     free(_channel_outputs);
     _nr_channels = 0;
     _channel_outputs = NULL;
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return 0;
+    return 1;
 }
 
+/* Returns 1 on success, and 0 on error. */
 int
 verbose_output_add(const size_t channel, FILE * const out, const int verbose)
 {
     ASSERT_ALWAYS(channel < _nr_channels);
-    return add_output(&_channel_outputs[channel], out, verbose);
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return 0;
+    int rc = add_output(&_channel_outputs[channel], out, verbose);
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return 0;
+    return rc;
 }
 
+/* Returns the return value of the last *printf() call on success,
+   or 0 if nothing gets printed. Returns a negative value on error. */
 int
 verbose_output_print(const size_t channel, const int verbose,
                      const char * const fmt, ...)
@@ -261,6 +285,8 @@ verbose_output_print(const size_t channel, const int verbose,
     va_list ap;
     int rc = 0;
 
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return -1;
     va_start(ap, fmt);
     if (_channel_outputs == NULL) {
         /* Default behaviour: print to stdout or stderr */
@@ -279,5 +305,7 @@ verbose_output_print(const size_t channel, const int verbose,
         }
     }
     va_end(ap);
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return -1;
     return rc;
 }
