@@ -10,8 +10,9 @@
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "relation.h"
+#include "las-unsieve.h"
 
-/* These must be forward-declared, because the header files below use
+/* These must be forward-declared, because the header file below uses
  * them */
 
 struct sieve_info_s;
@@ -24,7 +25,6 @@ struct where_am_I_s;
 typedef struct where_am_I_s * where_am_I_ptr;
 typedef const struct where_am_I_s * where_am_I_srcptr;
 
-#include "las-unsieve.h"
 #include "las-smallsieve.h"
 
 /* {{{ siever_config */
