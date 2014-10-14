@@ -132,4 +132,145 @@ int verbose_printf(int flag, const char * fmt, ...)
     return rc;
 }
 
+/*
+  The program can initialise zero or more "channels".
+  To each "channel", zero or more "outputs" (FILE handles) can be attached,
+  each with an output verbosity value.
+  Text can be printed to a channel, with a verbosity v, then the text is
+  sent to each output attached to this channel for which the output verbosity
+  is at least v.
+  The default behaviour, before calling the verbose_output_init() function or
+  after calling verbose_output_clear(), has 2 channels:
+  channel 0 with 1 output, going to stdout with verbosity 1, and
+  channel 1 with 1 output, going to stderr with verbosity 1.
+*/
 
+struct outputs_s {
+    size_t nr_outputs;
+    int *verbosity;
+    FILE **outputs;
+};
+
+static void
+init_output(struct outputs_s * const output)
+{
+    output->nr_outputs = 0;
+    output->verbosity = NULL;
+    output->outputs = NULL;
+}
+
+static void
+clear_output(struct outputs_s * const output)
+{
+    free (output->outputs);
+    free (output->verbosity);
+    output->nr_outputs = 0;
+    output->outputs = NULL;
+    output->verbosity = NULL;
+}
+
+static int
+add_output(struct outputs_s *output, FILE * const out, const int verbosity)
+{
+    const size_t new_nr = output->nr_outputs + 1;
+
+    FILE ** const new_output = (FILE **) realloc(output->outputs, new_nr * sizeof(FILE *));
+    if (new_output == NULL)
+        return 0;
+    output->outputs = new_output;
+
+    int * const new_verbosity = (int *) realloc(output->verbosity, new_nr * sizeof(int));
+    if (new_verbosity == NULL)
+        return 0;
+    output->verbosity = new_verbosity;
+
+    output->nr_outputs = new_nr;
+    output->outputs[new_nr - 1] = out;
+    output->verbosity[new_nr - 1] = verbosity;
+    return 1;
+}
+
+/* Print a string to each output attached to this channel whose verbosity
+   is at least the "verbosity" parameter.
+   If any output operation returns with an error, no further output is
+   performed, and the error code of the failed operation is returned.
+   Otherwise returns the return code of the last output operation.
+   If no outputs are attached to this channel, returns 0. */
+static int
+print_output(const struct outputs_s * const output, const int verbosity,
+             const char * const str)
+{
+    int rc = 0;
+    /* For each output attached to this channel */
+    for (size_t i = 0; i < output->nr_outputs; i++) {
+        /* print string if output verbosity is at least "verbosity" */
+        if (output->verbosity[i] >= verbosity) {
+            rc = fprintf(output->outputs[i], "%s", str);
+            if (rc < 0)
+                return rc;
+        }
+    }
+    return rc;
+}
+
+/* Static variables, the poor man's Singleton. */
+static size_t _nr_channels = 0;
+static struct outputs_s *_channel_outputs = NULL;
+
+int
+verbose_output_init(const size_t nr_channels)
+{
+    _channel_outputs = (struct outputs_s *) malloc(nr_channels * sizeof(struct outputs_s));
+    if (_channel_outputs == NULL)
+        return 0;
+    _nr_channels = nr_channels;
+    for (size_t i = 0; i < nr_channels; i++)
+        init_output(&_channel_outputs[i]);
+    return 1;
+}
+
+/* Reset channels back to the 2 default channels. */
+void
+verbose_output_clear()
+{
+    for (size_t i = 0; i < _nr_channels; i++)
+        clear_output(&_channel_outputs[i]);
+    free(_channel_outputs);
+    _nr_channels = 0;
+    _channel_outputs = NULL;
+}
+
+int
+verbose_output_add(const size_t channel, FILE * const out, const int verbose)
+{
+    ASSERT_ALWAYS(channel < _nr_channels);
+    return add_output(&_channel_outputs[channel], out, verbose);
+}
+
+int
+verbose_output_print(const size_t channel, const int verbose,
+                     const char * const fmt, ...)
+{
+    va_list ap;
+    int rc = 0;
+
+    va_start(ap, fmt);
+    if (_channel_outputs == NULL) {
+        /* Default behaviour: print to stdout or stderr */
+        ASSERT_ALWAYS(channel < 2);
+        if (verbose <= 1) {
+            FILE *out[2] = {stdout, stderr};
+            rc = vfprintf(out[channel], fmt, ap);
+        }
+    } else {
+        ASSERT_ALWAYS(channel < _nr_channels);
+        char *str;
+        rc = vasprintf(&str, fmt, ap);
+        if (rc != -1) {
+            rc = print_output(&_channel_outputs[channel], verbose, str);
+            free (str);
+        }
+    }
+    va_end(ap);
+    return rc;
+}
