@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "portability.h" /* For vasprintf */
 #include "verbose.h"
 
 #define G(X) CADO_VERBOSE_PRINT_ ## X
