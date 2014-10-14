@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "params.h"
 #include "verbose.h"
 
 #define G(X) CADO_VERBOSE_PRINT_ ## X

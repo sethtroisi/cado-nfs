@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include "params.h"
 
 #ifdef __cplusplus
 extern "C" {
