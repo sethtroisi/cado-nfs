@@ -165,6 +165,8 @@ typedef struct
 {
   log_rel_t *rels;
   logtab_ptr log;
+  unsigned int nbsm0;
+  unsigned int nbsm1;
   const char * abunits0dirname;
   const char * abunits1dirname;
 } read_data_t;
@@ -173,10 +175,13 @@ typedef struct
  * table of log is already allocated, but not the table of log_rel_t     */
 static void
 read_data_init (read_data_t *data, logtab_t log, uint64_t nrels, 
+		const unsigned int nbsm0, const unsigned int nbsm1,
 		const char * abunits0dirname, const char * abunits1dirname)
 {
   data->rels = log_rel_init(nrels);
   data->log = log;
+  data->nbsm0 = nbsm0;
+  data->nbsm1 = nbsm1;
   data->abunits0dirname = abunits0dirname;
   data->abunits1dirname = abunits1dirname;
 }
@@ -214,8 +219,6 @@ mpz_add_log_mod_mpz (mpz_ptr a, mpz_t l, mpz_t e, mpz_t q)
 
 /************************ Handling of the SMs *******************************/
 /* number of SM that must be used for side 1. Must be 0 for FFS */
-unsigned int nbsm0 = 0;
-unsigned int nbsm1 = 0;
 
 #ifndef FOR_FFS /* Not needed for FFS */
 mpz_t smexp0; /* exponent for SM on the 0 side */
@@ -250,14 +253,14 @@ sm_data_free ()
 
 /* Very naive code for finding the valuations of the units. */
 static int
-get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfilename)
+get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfilename, unsigned int nbsm)
 {
     FILE *in = fopen(abunitsfilename, "r");
     int64_t aa;
     uint64_t bb;
     int32_t ok = 0;
     while(fscanf(in, "%" PRId64 " %" PRIu64, &aa, &bb) != EOF){
-	for(int i = 0; i < (int)nbsm0; i++) {
+	for(int i = 0; i < (int)nbsm; i++) {
             int ret = fscanf(in, "%d", u+i);
             ASSERT_ALWAYS(ret == 1);
         }
@@ -283,7 +286,8 @@ get_units_for_ab_from_file(int* u, int64_t a, uint64_t b, const char * abunitsfi
    all triples with the same a are in the same subfile.
 */
 static int
-get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname)
+get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname,
+		 unsigned int nbsm)
 {
     size_t len = strlen(abunitsdirname);
     char *index = malloc((len+6+1) * sizeof(char));
@@ -316,7 +320,7 @@ get_units_for_ab(int* u, int64_t a, uint64_t b, const char * abunitsdirname)
     strncpy(fic, abunitsdirname, len);
     sprintf(fic+len, "/%d", n);
     //    printf("fic(%" PRId64 ")=%d => %s\n", a, n, fic);
-    ok = get_units_for_ab_from_file(u, a, b, fic);
+    ok = get_units_for_ab_from_file(u, a, b, fic, nbsm);
     free(fic);
     return ok;
 }
@@ -328,14 +332,17 @@ add_unit_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
                        mpz_t *smlog)
 {
     int u[10];
-    if(get_units_for_ab(u, a, b, abunitsdirname)){
+    if(get_units_for_ab(u, a, b, abunitsdirname, nunits)){
 	/* add contrib */
 	for(int i = 0; i < (int)nunits; i++)
 	    mpz_add_log_mod_si (l, smlog[i], u[i], q);
     }
 }
 
-/* Given a and b, compute the SM and add the contribution to l */
+/* Given a and b, compute the SM and add the contribution to l.
+   smlg[0..nbsm0[           contains the logs of the SM's on side 0
+   smlg[nbsm0..nbsm0+nbsm1[ contains the logs of the SM's on side 1
+*/
 static inline void
 add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
 		     mpz_poly_ptr F0, mpz_t smexp0, unsigned int nbsm0,
@@ -372,35 +379,33 @@ add_sm_contribution (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
   mpz_poly_clear(SMres[1]);
 }
 
-/* TODO: everything is easily adaptable for sm/sm or sm/unit or unit/unit.
-   We need just throw away global variables smexp, F, etc. At least replacing
-   them by smexp1 and F1, so as to function-ify the above function.
-*/
+/* 
+   smlog[0..nbsm0[           contains the logs of the SM on side 0
+   smlog[nbsm0..nbsm0+nbsm1[ contains the logs of the SM on side 1
+ */
 static inline void
 add_sm_contributions (mpz_ptr l, int64_t a, uint64_t b, mpz_t q,
+		      unsigned int nbsm0, unsigned int nbsm1,
 		      const char * abunits0dirname MAYBE_UNUSED,
 		      const char * abunits1dirname MAYBE_UNUSED)
 {
-    unsigned int nunits0 = 0, nunits1 = 0, mynbsm0 = nbsm0, mynbsm1 = nbsm1;
+    mpz_poly_ptr FF0 = F0, FF1 = F1;
 
     if (abunits0dirname){
-	nunits0 = nbsm0;
-	mynbsm0 = 0;
-	/* add unit contrib with smlog[0..nunits0[ */
-	add_unit_contribution(l, a, b, q, abunits0dirname, nunits0, smlog);
+	/* add unit contrib with smlog[0..nbsm0[ */
+	add_unit_contribution(l, a, b, q, abunits0dirname, nbsm0, smlog);
+	FF0 = NULL;
     }
     if (abunits1dirname){
-	nunits1 = nbsm1;
-	mynbsm1 = 0;
-	/* add unit contrib with smlog[nunits0..nunits0+nunits1[ */
+	/* add unit contrib with smlog[nbsm0..nbsm0+nbsm1[ */
 	add_unit_contribution(l, a, b, q, abunits1dirname,
-			      nunits1, smlog+nunits0);
+			      nbsm1, smlog+nbsm0);
+	FF1 = NULL;
     }
-    /* add smlog[nunits0+nunits1..nunits0+nunits1+mynbsm0+mynbsm1[ */
     add_sm_contribution(l, a, b, q,
-        F0, smexp0, mynbsm0, 
-        F1, smexp1, mynbsm1, 
-        smlog+nunits0+nunits1);
+			FF0, smexp0, nbsm0, 
+			FF1, smexp1, nbsm1, 
+			smlog);
 }
 
 /* Callback function called by filter_rels in compute_log_from_rels */
@@ -410,10 +415,9 @@ thread_sm (void * context_data, earlyparsed_relation_ptr rel)
   read_data_t *data = (read_data_t *) context_data;
   log_rel_t *lrel = &(data->rels[rel->num]);
 
-  // FIXME: here, the explicit units are obvisouly broken!!!
-  if (nbsm1 > 0)
-      add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
-			    data->abunits0dirname, data->abunits1dirname);
+  add_sm_contributions (lrel->log_known_part, rel->a, rel->b, data->log->q,
+			data->nbsm0, data->nbsm1,
+			data->abunits0dirname, data->abunits1dirname);
 
   return NULL;
 }
@@ -841,7 +845,8 @@ dep_do_one_iter_mt (dep_read_data_t *d, bit_vector bv, int nt, uint64_t nrels)
 /***************** Important functions called by main ************************/
 /* Read the logarithms computed by the linear algebra */
 static void
-read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile)
+read_log_format_LA (logtab_t log, const char *logfile, const char *idealsfile,
+		    unsigned int nbsm0, unsigned int nbsm1)
 {
   uint64_t i, ncols, col;
   index_t h;
@@ -958,7 +963,7 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   for (unsigned int nsm = 0; nsm < log->nbsm; nsm++)
   {
     unsigned int n;
-    if (nsm == 0) /* h was already red by previous gmp_fscanf */
+    if (nsm == 0) /* h was already read by previous gmp_fscanf */
     {
       ret = gmp_fscanf (f, "SM col %u %Zd\n", &n, tmp_log);
       ASSERT_ALWAYS (ret == 2);
@@ -974,9 +979,6 @@ read_log_format_reconstruct (logtab_t log, MAYBE_UNUSED renumber_t renumb,
   }
   ASSERT_ALWAYS (feof(f));
 
-  // TODO: what's this?
-  if (nbsm1)
-    printf ("# Logarithms for %u SM columns were also read\n", nbsm1);
   mpz_clear (tmp_log);
   fclose_maybe_compressed (f, filename);
 }
@@ -1052,6 +1054,7 @@ compute_log_from_rels (bit_vector needed_rels,
                        const char *relspfilename, uint64_t nrels_purged,
                        const char *relsdfilename, uint64_t nrels_del,
                        uint64_t nrels_needed, logtab_t log, int nt,
+		       const unsigned int nbsm0, const unsigned int nbsm1,
 		       const char *abunits0dirname,
 		       const char *abunits1dirname)
 {
@@ -1060,7 +1063,7 @@ compute_log_from_rels (bit_vector needed_rels,
   uint64_t nrels = nrels_purged + nrels_del;
   ASSERT_ALWAYS (nrels_needed > 0);
   read_data_t data;
-  read_data_init(&data, log, nrels, abunits0dirname, abunits1dirname);
+  read_data_init(&data, log, nrels, nbsm0, nbsm1, abunits0dirname, abunits1dirname);
 
   /* Reading all relations */
   printf ("# Reading relations from %s and %s\n", relspfilename, relsdfilename);
@@ -1083,7 +1086,7 @@ compute_log_from_rels (bit_vector needed_rels,
                 needed_rels, NULL);
 
   /* computing missing log */
-  printf ("# Starting to computing missing logarithms from rels\n");
+  printf ("# Starting to compute missing logarithms from rels\n");
 
   /* adjust the number of threads based on the number of needed relations */
   double ntm = ceil((nrels_needed + 0.0)/SIZE_BLOCK);
@@ -1285,6 +1288,7 @@ main(int argc, char *argv[])
   uint64_t nprimes;
   int mt = 1;
   int partial = 0;
+  unsigned int nbsm0 = 0, nbsm1 = 0;
 
   mpz_t q;
   logtab_t log;
@@ -1494,7 +1498,7 @@ main(int argc, char *argv[])
   fflush(stdout);
   logtab_init (log, nprimes, nbsm1+nbsm0, q);
   if (logformat == NULL || strcmp(logformat, "LA") == 0)
-    read_log_format_LA (log, logfilename, idealsfilename);
+    read_log_format_LA (log, logfilename, idealsfilename, nbsm0, nbsm1);
   else
     read_log_format_reconstruct (log, renumber_table, logfilename);
 
@@ -1534,6 +1538,7 @@ main(int argc, char *argv[])
     log->nknown += compute_log_from_rels (rels_to_process, relspfilename,
                                           nrels_purged, relsdfilename,
                                           nrels_del, nrels_needed, log, mt,
+					  nbsm0, nbsm1,
                                           abunits0dirname, abunits1dirname);
     printf ("# %" PRIu64 " logarithms are known.\n", log->nknown);
   }

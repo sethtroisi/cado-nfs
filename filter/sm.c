@@ -16,8 +16,12 @@ Output
 
 * A matrix of (small_nrows) rows and (nmaps)=deg(f) cols (mpz_t).  For each
   relation (rel) the (nmaps) Shirokauer maps are computed as the second
-  least-significant digit of the ell-adic representation of the polynomial equal
-  to (rel^eps - 1) / ell.  
+  least-significant digit of the ell-adic representation of the polynomial 
+  equal to (rel^eps - 1) / ell.
+
+  In case of two algebraic sides, SM's are computed for sides 0..1 in that
+  order.
+
 */
 
 #include "cado.h"
