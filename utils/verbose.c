@@ -267,9 +267,9 @@ verbose_output_clear()
 int
 verbose_output_add(const size_t channel, FILE * const out, const int verbose)
 {
-    ASSERT_ALWAYS(channel < _nr_channels);
     if (pthread_mutex_lock(io_mutex) != 0)
         return 0;
+    ASSERT_ALWAYS(channel < _nr_channels);
     int rc = add_output(&_channel_outputs[channel], out, verbose);
     if (pthread_mutex_unlock(io_mutex) != 0)
         return 0;
@@ -292,8 +292,8 @@ verbose_output_print(const size_t channel, const int verbose,
         /* Default behaviour: print to stdout or stderr */
         ASSERT_ALWAYS(channel < 2);
         if (verbose <= 1) {
-            FILE *out[2] = {stdout, stderr};
-            rc = vfprintf(out[channel], fmt, ap);
+            FILE *out = (channel == 0) ? stdout : stderr;
+            rc = vfprintf(out, fmt, ap);
         }
     } else {
         ASSERT_ALWAYS(channel < _nr_channels);
