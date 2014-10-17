@@ -41,6 +41,7 @@ int verbose_output_clear();
 int verbose_output_add(size_t, FILE *, int);
 int verbose_output_print(size_t, int, const char *, ...);
 int verbose_decl_usage(param_list pl);
+FILE *verbose_output_get(size_t, int, size_t);
 
 #ifdef __cplusplus
 }

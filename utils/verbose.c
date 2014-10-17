@@ -309,3 +309,46 @@ verbose_output_print(const size_t channel, const int verbose,
         return -1;
     return rc;
 }
+
+/* Get the index-th FILE handle attached to a channel, counting only those
+   outputs whose output verbosity is at least "verbose."
+   This is rather hackish, but we need it to be able to pass a FILE handle
+   to functions that, e.g., print complex data to a stream. */
+
+FILE *
+verbose_output_get(const size_t channel, const int verbose, const size_t index)
+{
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return NULL;
+
+    FILE *output = NULL;
+    if (_channel_outputs == NULL) {
+        /* Default behaviour: channel 0 has stdout, channel 1 has stderr,
+           each with verbosity 1. */
+        ASSERT_ALWAYS(channel < 2);
+        if (verbose <= 1) {
+            output = (channel == 0) ? stdout : stderr;
+        }
+    } else {
+        ASSERT_ALWAYS(channel < _nr_channels);
+        struct outputs_s * const chan = &_channel_outputs[channel];
+        size_t j = 0;
+        /* Iterate through all the outputs for this channel */
+        for (size_t i = 0; i < chan->nr_outputs; i++) {
+            /* Count those outputs that have verbosity at least "verbose" */
+            if (chan->verbosity[i] >= verbose) {
+                /* If that's the index-th output with enough verbosity,
+                   return it. */
+                if (index == j) {
+                    output = chan->outputs[j];
+                    break;
+                }
+                j++;
+            }
+        }
+    }
+
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return NULL;
+    return output;
+}
