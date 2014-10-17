@@ -1354,10 +1354,10 @@ main(int argc, char *argv[])
   const char * abunits1dirname = NULL;
   abunits1dirname = param_list_lookup_string(pl, "abunits1");
   /* humf */
-  if(units0)
-      abunits1dirname = NULL;
-  if(units1)
+  if(units0 == 0)
       abunits0dirname = NULL;
+  if(units1 == 0)
+      abunits1dirname = NULL;
 #endif
   param_list_parse_int(pl, "mt", &mt);
   const char *path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
