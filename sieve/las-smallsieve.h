@@ -49,7 +49,7 @@ typedef struct {
 extern "C" {
 #endif
 
-extern void small_sieve_info(las_info_ptr las, const char * what, int side, small_sieve_data_t * r);
+extern void small_sieve_info(const char * what, int side, small_sieve_data_t * r);
 extern void small_sieve_clear(small_sieve_data_t * ssd);
 extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
 extern void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbase_degn_t *fb,

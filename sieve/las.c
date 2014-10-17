@@ -2885,10 +2885,10 @@ int main (int argc0, char *argv0[])/*{{{*/
             sieve_side_info_ptr s = si->sides[side];
 
             small_sieve_init(s->ssd, las, s->fb, si, side);
-            small_sieve_info(las, "small sieve", side, s->ssd);
+            small_sieve_info("small sieve", side, s->ssd);
 
             small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
-            small_sieve_info(las, "resieve", side, s->rsd);
+            small_sieve_info("resieve", side, s->rsd);
         }
 
         /* FIXME: For the descent, the current logic is not

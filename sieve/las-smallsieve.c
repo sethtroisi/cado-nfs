@@ -5,15 +5,12 @@
 #endif
 #include "las-config.h"
 #include "las-smallsieve.h"
-#include "las-types.h"
 #include "las-debug.h"
 #include "las-qlattice.h"
 #include "misc.h"
 #include "portability.h"
+#include "verbose.h"
 
-
-/* It's defined as a global variable in las.c */
-extern pthread_mutex_t io_mutex;
 
 static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
@@ -61,7 +58,7 @@ static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
 /* {{{ Some code for information purposes only */
 
-static void small_sieve_print_contents(FILE * f, const char * prefix, small_sieve_data_t * ssd)
+static void small_sieve_print_contents(const char * prefix, small_sieve_data_t * ssd)
 {
     ssp_marker_t * next_marker = ssd->markers;
     int nice=ssd->nb_ssp;
@@ -77,23 +74,22 @@ static void small_sieve_print_contents(FILE * f, const char * prefix, small_siev
     }
     ASSERT_ALWAYS(next_marker->index == ssd->nb_ssp);
 
-    fprintf (f, "# %s: %d nice primes", prefix, nice);
+    verbose_output_print(0, 1, "# %s: %d nice primes", prefix, nice);
     /* Primes may be both even and projective... */
-    if (npow2) fprintf (f, ", %d powers of 2", npow2);
-    if (nproj) fprintf (f, ", and %d projective primes", nproj);
-    fprintf (f, ".");
-    if (ndiscard) fprintf (f, " %d discarded.", ndiscard);
-    fprintf (f, "\n");
+    if (npow2) verbose_output_print(0, 1, ", %d powers of 2", npow2);
+    if (nproj) verbose_output_print(0, 1, ", and %d projective primes", nproj);
+    verbose_output_print(0, 1, ".");
+    if (ndiscard) verbose_output_print(0, 1, " %d discarded.", ndiscard);
+    verbose_output_print(0, 1, "\n");
 }
 
 
-void small_sieve_info(las_info_ptr las, const char * what, int side, small_sieve_data_t * r)
+void small_sieve_info(const char * what, int side, small_sieve_data_t * r)
 {
-    if (!las->verbose) return;
     char * tmp;
     int rc = asprintf(&tmp, "%s(%s side)", what, sidenames[side]);
     ASSERT_ALWAYS(rc >= 0);
-    small_sieve_print_contents(las->output, tmp, r);
+    small_sieve_print_contents(tmp, r);
     free(tmp);
 }
 
@@ -247,7 +243,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
             if (verbose && (fb->roots[nr] >= p || r >= p))
-                fprintf (las->output, "# small_sieve_init: %s side, prime " 
+                verbose_output_print(0, 1, "# small_sieve_init: %s side, prime " 
                         FBPRIME_FORMAT " root " FBPRIME_FORMAT " -> " 
                         FBPRIME_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
 
@@ -265,7 +261,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
                  */
                 if (!do_bad_primes) {
                     if (verbose) {
-                        fprintf (las->output,
+                        verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding bad prime"
                                 " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
                                 " to small sieve because do_bad_primes = 0\n",
@@ -274,7 +270,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
                     event |= SSP_DISCARD;
                 } else if (ssp->g >= si->J) {
                     if (verbose) {
-                        fprintf (las->output,
+                        verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding bad prime"
                                 " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
                                 " to small sieve  because g=%d >= si->J = %d\n",
@@ -1000,12 +996,10 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     bucket_prime_t prime;
                     unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {
-                        pthread_mutex_lock(&io_mutex);
-                        fprintf (stderr, "resieve_small_bucket_region: root "
+                        verbose_output_print(0, 1, "resieve_small_bucket_region: root "
                                 FBPRIME_FORMAT ",%d divides at x = "
                                 "%d = %lu * %u + %d\n",
                                 p, r, x, j, 1 << si->conf->logI, i);
-                        pthread_mutex_unlock(&io_mutex);
                     }
                     prime.p = p;
                     prime.x = x;
@@ -1048,10 +1042,8 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             ASSERT (i0 % I == 0); /* make sure ssdpos points at start
                                      of line */
             if (resieve_very_verbose_bad) {
-                pthread_mutex_lock(&io_mutex);
-                fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
+                verbose_output_print(0, 1, "# resieving bad prime " FBPRIME_FORMAT
                         ", i0 = %u\n", g, i0);
-                pthread_mutex_unlock(&io_mutex);
             }
             while (i0 < (unsigned int) bucket_region) {
                 unsigned char *S_ptr = S + i0;
@@ -1062,11 +1054,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             bucket_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
-                                pthread_mutex_lock(&io_mutex);
-                                fprintf (stderr, "resieve_small_bucket_region even j: root "
+                                verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root "
                                         FBPRIME_FORMAT ",inf divides at x = %u\n",
                                         g, x);
-                                pthread_mutex_unlock(&io_mutex);
                             }
                             prime.p = g;
                             prime.x = x;
@@ -1081,11 +1071,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             bucket_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
-                                pthread_mutex_lock(&io_mutex);
-                                fprintf (stderr, "resieve_small_bucket_region odd j: root "
+                                verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root "
                                         FBPRIME_FORMAT ",inf divides at x = %u\n",
                                         g, x);
-                                pthread_mutex_unlock(&io_mutex);
                             }
                             prime.p = g;
                             prime.x = x;
@@ -1098,11 +1086,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             }
             ssdpos[i] = i0 - bucket_region;
             if (resieve_very_verbose_bad) {
-                pthread_mutex_lock(&io_mutex);
-                fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
+                verbose_output_print(0, 1, "# resieving: new i0 = %u, bucket_region = %d, "
                         "new ssdpos = %d\n",
                         i0, bucket_region, ssdpos[i]);
-                pthread_mutex_unlock(&io_mutex);
             }
         }
     }
