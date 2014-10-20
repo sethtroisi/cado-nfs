@@ -214,3 +214,12 @@ dickman_rho (double x)
   }
   return 0.0332357434363490 * pow (x, -x);
 }
+
+#define EULER_GAMMA 0.57721566490153286060651209008240243104
+
+/* Return the probability that a random integer close to N is N^(1/x)-smooth */
+double
+dickman_rho_local (const double x, const double N)
+{
+  return dickman_rho(x) - EULER_GAMMA * dickman_rho(x - 1.) / log(N);
+}
