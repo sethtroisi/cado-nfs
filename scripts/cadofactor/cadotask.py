@@ -4047,7 +4047,8 @@ class ReconstructLogTask(Task):
         return ((cadoprograms.ReconstructLog, override, input),)
     @property
     def paramnames(self):
-        return self.join_params(super().paramnames, {"partial": True})
+        return self.join_params(super().paramnames,
+                {"checkdlp": True, "partial": True})
 
     def __init__(self, *, mediator, db, parameters, path_prefix):
         super().__init__(mediator=mediator, db=db, parameters=parameters,
@@ -4097,23 +4098,26 @@ class ReconstructLogTask(Task):
         return self.get_state_filename("dlog")
     
     def get_log2log3(self):
-        filename = self.get_state_filename("dlog").get_wdir_relative()
-        fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
-        log2 = None
-        log3 = None
-        myfile = open(fullfile, "rb")
-        data = myfile.read()
-        for line in data.splitlines():
-            match = re.match(br'(\d+) 2 0 rat (\d+)', line)
-            if match:
-                log2 = match.group(2)
-            match = re.match(br'(\d+) 3 0 rat (\d+)', line)
-            if match:
-                log3 = match.group(2)
-            if log2 != None and log3 != None:
-                myfile.close()
-                return [ log2, log3 ]
-        raise Exception("Could not find log2 and log3 in %s" % filename)
+        if self.params["checkdlp"]:
+            filename = self.get_state_filename("dlog").get_wdir_relative()
+            fullfile = self.params["workdir"].rstrip(os.sep) + os.sep + filename
+            log2 = None
+            log3 = None
+            myfile = open(fullfile, "rb")
+            data = myfile.read()
+            for line in data.splitlines():
+                match = re.match(br'(\d+) 2 0 rat (\d+)', line)
+                if match:
+                    log2 = match.group(2)
+                match = re.match(br'(\d+) 3 0 rat (\d+)', line)
+                if match:
+                    log3 = match.group(2)
+                if log2 != None and log3 != None:
+                    myfile.close()
+                    return [ log2, log3 ]
+            raise Exception("Could not find log2 and log3 in %s" % filename)
+        else:
+            return [ 0, 0 ]
 
 class StartServerTask(DoesLogging, cadoparams.UseParameters, wudb.HasDbConnection):
     """ Starts HTTP server """
