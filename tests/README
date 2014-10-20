@@ -25,6 +25,9 @@ the ARGS parameter. For instance, to run only the 'test_memusage' check,
 use:
   make check ARGS="-R test_memusage"
 
+Note that the argument to -R is a regular expression, so in the example
+above, if a test called test_memusage2 exists it gets run too.
+
 ** Expensive tests
 ------------------
 
