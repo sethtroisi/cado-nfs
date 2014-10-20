@@ -4,7 +4,6 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 README.nonlinear
-README.dlp.nonlinear
 Toolchain-MinGW64.cmake
 gf2x/gf2x-fft/cantor128.m
 dev_docs/
