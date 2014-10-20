@@ -61,7 +61,8 @@ sm_single_rel(mpz_poly_ptr *SM, int64_t a, uint64_t b, mpz_poly_ptr *F,
 
   mpz_poly_init_set_ab(rel, a, b);
   for (int s = 0; s < 2; s++) {
-    compute_sm (SM[s], rel, F[s], ell, eps[s], ell2, invl2);
+    if(F[s] != NULL)
+      compute_sm (SM[s], rel, F[s], ell, eps[s], ell2, invl2);
   }
   mpz_poly_clear(rel);
 }

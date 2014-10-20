@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+#
+# OUTPUT: SM's for side 0..1 in that order, whatever SM's or units are used,
+#         are put in file $OUT, each line corresponding to a relation-set
+#
 
 unset POLY
 unset RENUMBER
@@ -88,7 +92,7 @@ done
 # where am I ?
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-## set parameters
+## set parameters depending on units or not
 side=-1
 if [ $EXPLICIT0 = "yes" ]; then
     smopts="-smexp0 $SMEXP0 -nsm0 0"
@@ -107,9 +111,12 @@ fi
 
 ## build required SM's
 if [ $NMAPS0 -gt 0 -o $NMAPS1 -gt 0 ]; then
+    # at least one side requires SM's
     if [ -s $OUT ]; then
 	echo "File $OUT already exists"
     else
+	# out contains SM's for side=0..1 in that order, or 0 or 1 depending
+	# on the unit side if any
 	CMD="$DIR/../filter/sm -poly $POLY -purged $PURGED -index $INDEX -out $OUT -gorder $ELL $smopts -t $MT"
 	echo $CMD; $CMD
     fi
@@ -179,12 +186,12 @@ if [ $side -ne -1 ]; then
 	    /bin/rm -f /tmp/foo$$
 	fi
 
-        # paste files if needed
-	if [ $side -eq 1 ]; then
-	    # paste $OUT.$side and $OUT to get a new $OUT
+        # paste files if needed: we require sides 0..1 in that order
+	if [ $side -eq 0 ]; then
+	    # paste $OUT.0 and $OUT to get a new $OUT
 	    f1=$OUT.$side; f2=$OUT
 	else
-	    # paste $OUT and $OUT.$side to get a new $OUT
+	    # paste $OUT and $OUT.1 to get a new $OUT
 	    f1=$OUT; f2=$OUT.$side
 	fi
 	paste -d" " $f1 $f2 | awk '{n++; if(n==1){print $1}else{print}}' > $OUT.$$

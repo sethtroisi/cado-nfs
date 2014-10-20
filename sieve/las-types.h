@@ -10,8 +10,9 @@
 #include "cado_poly.h"
 #include "ecm/facul.h"
 #include "relation.h"
+#include "las-unsieve.h"
 
-/* These must be forward-declared, because the header files below use
+/* These must be forward-declared, because the header file below uses
  * them */
 
 struct sieve_info_s;
@@ -24,7 +25,6 @@ struct where_am_I_s;
 typedef struct where_am_I_s * where_am_I_ptr;
 typedef const struct where_am_I_s * where_am_I_srcptr;
 
-#include "las-unsieve.h"
 #include "las-smallsieve.h"
 
 /* {{{ siever_config */
@@ -301,13 +301,6 @@ typedef struct thread_data_s thread_data[1];
 typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 /* }}} */
-
-typedef uint64_t plattice_x_t;
-/* DONT modify this: asm code writes in this with hardcoded deplacement */
-typedef struct {
-  int32_t a0; uint32_t a1;
-  int32_t b0; uint32_t b1;
-} plattice_info_t;
 
 /* FIXME: This does not seem to work well */
 #ifdef  __GNUC__

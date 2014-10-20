@@ -178,7 +178,8 @@ static unsigned int delete_relation (uint64_t i)
  * weight (see weight_function_clique).
  */
 
-inline float weight_function_clique(weight_t w)
+static inline
+float weight_function_clique(weight_t w)
 {
 #ifdef USE_CAVALLAR_WEIGHT_FUNCTION
     if (w >= 3)
@@ -198,7 +199,8 @@ inline float weight_function_clique(weight_t w)
 }
 
 // This function grows a possible too small index_t buffer.
-inline void resize_buf_index (index_buffer_t *buf, size_t min_buf) {
+static inline
+void resize_buf_index (index_buffer_t *buf, size_t min_buf) {
   if (UNLIKELY(buf->current + min_buf >= buf->end)) {
     size_t ind_current = buf->current - buf->begin,
       new_lg = (buf->end - buf->begin) << 1;
