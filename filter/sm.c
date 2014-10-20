@@ -330,6 +330,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "smexp1", "(required) sm-exponent");
   param_list_decl_usage(pl, "nsm1", "number of SM on the 1-side, default deg(polynomial))");
   param_list_decl_usage(pl, "t", "number of threads (default 1)");
+  verbose_decl_usage(pl);
 }
 
 static void usage (const char *argv, const char * missing, param_list pl)

@@ -142,6 +142,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
   param_list_decl_usage(pl, "ratq", "(switch) use rational special-q");
   param_list_decl_usage(pl, "mt",   "number of threads to use");
+  verbose_decl_usage(pl);
 }
 
 static void

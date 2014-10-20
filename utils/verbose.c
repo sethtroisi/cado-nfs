@@ -97,6 +97,12 @@ void verbose_set_enabled_flags(param_list pl)
     free(w);
 }
 
+int verbose_decl_usage(param_list pl)
+{
+    param_list_decl_usage(pl, "verbose_flags", "fine grained control on which messages get printed");
+    return 1;
+}
+
 /* returns true if the following verbose flag is enabled */
 int verbose_enabled(int flag) {
     return verbose_flag_word & (UINT64_C(1) << flag);

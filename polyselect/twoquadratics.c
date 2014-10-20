@@ -304,6 +304,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "Bf", str);
   snprintf (str, 200, "rational smoothness bound (default %.2e)", BOUND_G);
   param_list_decl_usage(pl, "Bg", str);
+  verbose_decl_usage(pl);
 }
 
 static void usage (const char *argv, param_list pl)

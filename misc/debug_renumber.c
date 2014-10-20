@@ -18,6 +18,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lpb0", "large prime bound on side 0");
   param_list_decl_usage(pl, "lpb1", "large prime bound on side 1");
   param_list_decl_usage(pl, "check", "(switch) check the renumbering table");
+  verbose_decl_usage(pl);
 }
 
 static void

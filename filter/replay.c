@@ -749,6 +749,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
   param_list_decl_usage(pl, "for_msieve", "output matrix in msieve format");
   param_list_decl_usage(pl, "Nmax", "stop at Nmax number of rows (default 0)");
+  verbose_decl_usage(pl);
 }
 
 static void

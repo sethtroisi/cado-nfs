@@ -193,6 +193,7 @@ static void declare_usage(param_list pl)
                                   "(switch) read a and b as hexa not decimal");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  verbose_decl_usage(pl);
 }
 
 static void

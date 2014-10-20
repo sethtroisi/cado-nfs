@@ -2552,6 +2552,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "traceij", "Relation to trace, in i,j format");
   param_list_decl_usage(pl, "traceNx", "Relation to trace, in N,x format");
 #endif
+  verbose_decl_usage(pl);
 }
 
 int main (int argc0, char *argv0[])/*{{{*/

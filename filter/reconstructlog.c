@@ -1268,6 +1268,7 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "wanted", "file containing list of wanted logs");
   param_list_decl_usage(pl, "force-posix-threads", "(switch)");
   param_list_decl_usage(pl, "path_antebuffer", "path to antebuffer program");
+  verbose_decl_usage(pl);
 }
 
 static void
