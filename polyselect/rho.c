@@ -40,14 +40,8 @@ dickman_rho (double x)
 
   if (x <= 2.0) /* 1 < x <= 2 */
     {
-      x = 2 * x - 3.0; /* -1 <= x <= 1 */
-      /* the following approximation was computed with Sage:
-	 f1 = dickman_rho.power_series(1, 64)
-	 then using Maple:
-	 p:=numapprox[minimax](f1,x=-1..1,10,1/f1).
-	 It gives a relative error less than 1.2e-9
-	 (numapprox[infnorm](f1/p-1,x=-1..1)) */
-      return .59453489206592253066+(-.33333334045356381396+(.55555549124525324224e-1+(-.12345536626584334599e-1+(.30864445307049269724e-2+(-.82383544119364408582e-3+(.22867526556051420719e-3+(-.63554707267886054080e-4+(.18727717457043009514e-4+(-.73223168705152723341e-5+.21206262864513086463e-5*x)*x)*x)*x)*x)*x)*x)*x)*x)*x;
+      /* In this interval, rho(x) =  1 - log(x) */
+      return 1. - log(x);
     }
 
   if (x <= 3.0) /* 2 < x <= 3 */
