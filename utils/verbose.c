@@ -201,22 +201,27 @@ add_output(struct outputs_s *output, FILE * const out, const int verbosity)
     return 1;
 }
 
-/* Print a string to each output attached to this channel whose verbosity
-   is at least the "verbosity" parameter.
+/* Print formatted output to each output attached to this channel whose
+   verbosity is at least the "verbosity" parameter.
+   The "func" function is called with format string "fmt" and variable
+   parameter list "va" for each output.
    If any output operation returns with an error, no further output is
    performed, and the error code of the failed operation is returned.
    Otherwise returns the return code of the last output operation.
    If no outputs are attached to this channel, returns 0. */
 static int
-print_output(const struct outputs_s * const output, const int verbosity,
-             const char * const str)
+vfprint_output(const struct outputs_s * const output, const int verbosity,
+               vfprintf_func_t func, const char * const fmt, va_list va)
 {
     int rc = 0;
     /* For each output attached to this channel */
     for (size_t i = 0; i < output->nr_outputs; i++) {
         /* print string if output verbosity is at least "verbosity" */
         if (output->verbosity[i] >= verbosity) {
-            rc = fprintf(output->outputs[i], "%s", str);
+            va_list va_copied;
+            va_copy(va_copied, va);
+            rc = func(output->outputs[i], fmt, va_copied);
+            va_end(va_copied);
             if (rc < 0)
                 return rc;
         }
@@ -297,12 +302,8 @@ verbose_output_print(const size_t channel, const int verbose,
         }
     } else {
         ASSERT_ALWAYS(channel < _nr_channels);
-        char *str;
-        rc = vasprintf(&str, fmt, ap);
-        if (rc != -1) {
-            rc = print_output(&_channel_outputs[channel], verbose, str);
-            free (str);
-        }
+        rc = vfprint_output(&_channel_outputs[channel], verbose, &vfprintf,
+                            fmt, ap);
     }
     va_end(ap);
     if (pthread_mutex_unlock(io_mutex) != 0)
@@ -351,4 +352,32 @@ verbose_output_get(const size_t channel, const int verbose, const size_t index)
     if (pthread_mutex_unlock(io_mutex) != 0)
         return NULL;
     return output;
+}
+
+int
+verbose_output_vfprint(const size_t channel, const int verbose,
+                       vfprintf_func_t func, const char * const fmt, ...)
+{
+    va_list ap;
+    int rc = 0;
+
+    if (pthread_mutex_lock(io_mutex) != 0)
+        return -1;
+    va_start(ap, fmt);
+    if (_channel_outputs == NULL) {
+        /* Default behaviour: print to stdout or stderr */
+        ASSERT_ALWAYS(channel < 2);
+        if (verbose <= 1) {
+            FILE *out = (channel == 0) ? stdout : stderr;
+            rc = func(out, fmt, ap);
+        }
+    } else {
+        ASSERT_ALWAYS(channel < _nr_channels);
+        rc = vfprint_output(&_channel_outputs[channel], verbose, func, fmt,
+                            ap);
+    }
+    va_end(ap);
+    if (pthread_mutex_unlock(io_mutex) != 0)
+        return -1;
+    return rc;
 }

@@ -27,6 +27,8 @@ extern "C" {
 #define CADO_VERBOSE_PRINT_BWC_CACHE_MAJOR_INFO         10
 #define CADO_VERBOSE_PRINT_BWC_LOADING_MKSOL_FILES      11
 
+typedef int (*vfprintf_func_t)(FILE *, const char *, va_list);
+
 /* This must be called in single-threaded context, preferably at program
  * start */
 extern void verbose_set_enabled_flags(param_list pl);
@@ -42,6 +44,7 @@ int verbose_output_add(size_t, FILE *, int);
 int verbose_output_print(size_t, int, const char *, ...);
 int verbose_decl_usage(param_list pl);
 FILE *verbose_output_get(size_t, int, size_t);
+int verbose_output_vfprint(size_t, int, vfprintf_func_t, const char *, ...);
 
 #ifdef __cplusplus
 }
