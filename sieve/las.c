@@ -724,11 +724,23 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 	}
     }
 
+    las->verbose = param_list_parse_switch(pl, "-v");
+
+    verbose_output_init(3);
+    verbose_output_add(0, las->output, las->verbose + 1);
+    verbose_output_add(1, stderr, 1);
+
+    /* Channel 2 is for statistics. We always print them to las' normal output */
+    verbose_output_add(2, las->output, 1);
+    if (param_list_parse_switch(pl, "-stats-stderr")) {
+        /* If we should also print stats to stderr, add stderr to channel 2 */
+        verbose_output_add(2, stderr, 1);
+    }
+
     verbose_set_enabled_flags(pl);
     param_list_print_command_line(las->output, pl);
     las_display_config_flags(las->output);
 
-    las->verbose = param_list_parse_switch(pl, "-v");
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->nb_threads = 1;		/* default value */
     param_list_parse_int(pl, "t", &las->nb_threads);
@@ -883,8 +895,10 @@ void las_info_clear(las_info_ptr las)/*{{{*/
         sieve_info_clear(las, si);
     }
     free(las->sievers);
-    if (las->outputname)
+    if (las->outputname) {
         fclose_maybe_compressed(las->output, las->outputname);
+    }
+    verbose_output_clear();
     mpz_clear(las->todo_q0);
     mpz_clear(las->todo_q1);
     if (las->todo_list_fd)
