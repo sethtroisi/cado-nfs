@@ -150,7 +150,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                fbcfilename);
         if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
                         &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
-                        fbcfilename, las->nb_threads, las->verbose ? las->output : NULL)) {
+                        fbcfilename, las->nb_threads)) {
             si->sides[0]->fb_is_mmapped = 1;
             si->sides[1]->fb_is_mmapped = 1;
             fprintf(las->output, "# Finished mapping memory image of factor base\n");
@@ -172,7 +172,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->conf->bucket_thresh, las->nb_threads,
-                              lim, si->conf->sides[side]->powlim, las->verbose ? las->output : NULL);
+                              lim, si->conf->sides[side]->powlim);
             FATAL_ERROR_CHECK(!ok, "Error reading factor base file");
             ASSERT_ALWAYS(sis->fb != NULL);
             sis->fb_is_mmapped = 0;
@@ -186,8 +186,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             int ok = fb_make_linear (&sis->fb, &sis->fb_bucket_threads,
                                      (const mpz_t *) pol->coeff, (fbprime_t) lim,
                                      si->conf->bucket_thresh, las->nb_threads,
-                                     si->conf->sides[side]->powlim, 1,
-                                     las->verbose ? las->output : NULL);
+                                     si->conf->sides[side]->powlim, 1);
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
@@ -201,7 +200,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                     (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
                     si->sides[1]->fb,
                     (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
-                    fbcfilename, las->nb_threads, las->verbose ? las->output : NULL);
+                    fbcfilename, las->nb_threads);
         fprintf(las->output, "# Finished writing memory image of factor base\n");
     }
 }

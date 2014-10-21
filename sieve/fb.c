@@ -113,7 +113,7 @@ fb_buffer_extend(fb_buffer_t *fb_buf, const size_t addsize)
       newfb = (factorbase_degn_t *) realloc (fb_buf->fb, newalloc);
       if (newfb == NULL)
 	{
-	  fprintf (stderr,
+	  verbose_output_print (1, 0,
 		   "Could not reallocate factor base to %zu bytes\n",
 		   fb_buf->alloc);
 	  return 0;
@@ -244,7 +244,7 @@ fb_split_init (fb_split_t *split, const fbprime_t smalllim,
   }
   split->fb_bufs = (fb_buffer_t *) malloc (split->nr_buffers * sizeof(fb_buffer_t));
   if (split->fb_bufs == NULL) {
-    fprintf (stderr, "# %s(): could not allocate memory for fb_bufs\n",
+    verbose_output_print (1, 0, "# %s(): could not allocate memory for fb_bufs\n",
              __func__);
     return 0;
   }
@@ -491,7 +491,7 @@ int
 fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
                 const mpz_t *poly, const fbprime_t bound, 
                 const fbprime_t smalllim, const size_t nr_pieces, 
-		const fbprime_t powbound, const int projective, FILE *output)
+		const fbprime_t powbound, const int projective)
 {
   fb_split_t split;
   fbprime_t p;
@@ -515,6 +515,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     return 0;
   }
 
+  FILE * const output = verbose_output_get(0, 1, 0);
   if (output != NULL)
     gmp_fprintf (output,
 		 "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
@@ -585,14 +586,14 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	continue; /* If root is projective and we don't want those,
 		     skip to next prime */
 
-      if (output != NULL && fb_cur->p > q)
+      if (fb_cur->p > q)
 	{
 	  if (!had_proj_root)
 	    {
-	      fprintf (output, "# Primes with projective roots:");
+	      verbose_output_print (0, 1, "# Primes with projective roots:");
 	      had_proj_root = 1;
 	    }
-	  fprintf (output, " " FBPRIME_FORMAT , q);
+	  verbose_output_print (0, 1, " " FBPRIME_FORMAT , q);
 	}
 
       if (!fb_split_add (&split, fb_cur))
@@ -632,8 +633,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   free (fb_cur);
   free (powers);
 
-  if (had_proj_root) /* Implies output != NULL */
-    fprintf (output, "\n");
+  if (had_proj_root)
+    verbose_output_print (0, 1, "\n");
 
   rdtscll (tsc2);
 
@@ -887,7 +888,7 @@ int
 fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces, 
          const char * const filename, const fbprime_t smalllim, 
          const size_t nr_pieces, const fbprime_t lim,
-         const fbprime_t powlim, FILE *output)
+         const fbprime_t powlim)
 {
     fb_split_t split;
     factorbase_degn_t *fb_cur;
@@ -975,8 +976,8 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
         fb_split_clear (&split);
     }
 
-    if (!error && output != NULL) {
-        fprintf (output, "# Factor base successfully read, %lu primes, largest was "
+    if (!error) {
+        verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, largest was "
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 
@@ -1067,13 +1068,13 @@ static int
 fb_dump_data(const size_t offset, const size_t size, FILE *f, const void *fb)
 {
     if (fseek(f, cast_size_long(offset), SEEK_SET) != 0) {
-        fprintf (stderr, "Could not seek to position %zu: %s\n",
+        verbose_output_print (1, 0, "Could not seek to position %zu: %s\n",
                  offset, strerror(errno));
         return 0;
     }
     size_t written = fwrite (fb, 1, size, f);
     if (written != size) {
-        fprintf (stderr, "Could not write %zu bytes: %s\n",
+        verbose_output_print (1, 0, "Could not write %zu bytes: %s\n",
                  size, strerror(errno));
         return 0;
     }
@@ -1093,7 +1094,7 @@ fb_dump_piece(fb_file_header_t *header, const size_t idx, const size_t offset,
 int
 fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pieces_1,
             const factorbase_degn_t *fb_small_2, const factorbase_degn_t **fb_pieces_2,
-            const char * const filename, const size_t nr_pieces, FILE *output)
+            const char * const filename, const size_t nr_pieces)
 {
     fb_file_header_t *header;
     size_t offset, size, headersize;
@@ -1106,14 +1107,14 @@ fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pi
     headersize = fb_header_size(nr_pieces);
     header = malloc(headersize);
     if (header == NULL) {
-        fprintf(stderr, "Could not allocate memory\n");
+        verbose_output_print (1, 0, "Could not allocate memory\n");
         returncode = 0;
         goto freemem;
     }
 
     FILE *f = fopen(filename, "wb");
     if (f == NULL) {
-        fprintf(stderr, "Could not open %s for writing: %s\n",
+        verbose_output_print (1, 0, "Could not open %s for writing: %s\n",
                  filename, strerror(errno));
         returncode = 0;
         goto freemem;
@@ -1128,9 +1129,8 @@ fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pi
     for (int side = 0; side < 2; side++) {
         offset = round_up(size + offset, psize);
         size = fb_size (fb_small[side]);
-        if (output != NULL)
-            fprintf(output, "# Writing small-primes FB of side %d to file offset %zu\n",
-                    side, offset);
+        verbose_output_print (0, 2, "# Writing small-primes FB of side %d to file offset %zu\n",
+                side, offset);
 
         if (fb_dump_piece(header, idx++, offset, size, f, fb_small[side]) == 0) {
             returncode = 0;
@@ -1140,9 +1140,8 @@ fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pi
         for (size_t i = 0; i < nr_pieces; i++) {
             offset = round_up (size + offset, psize);
             size = fb_size (fb_pieces[side][i]);
-            if (output != NULL)
-                fprintf(output, "# Writing large-primes FB of side %d, part %zu, to file offset %zu\n",
-                        side, i, offset);
+            verbose_output_print (0, 2, "# Writing large-primes FB of side %d, part %zu, to file offset %zu\n",
+                    side, i, offset);
             if (fb_dump_piece(header, idx++, offset, size, f, fb_pieces[side][i]) == 0) {
                 returncode = 0;
                 goto closefile;
@@ -1150,8 +1149,7 @@ fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pi
         }
     }
 
-    if (output != NULL)
-        fprintf(output, "# Writing header\n");
+    verbose_output_print (0, 2, "# Writing header\n");
     if (fb_dump_data(0, headersize, f, header) == 0) {
         returncode = 0;
         goto closefile;
@@ -1159,7 +1157,7 @@ fb_dump_fbc(const factorbase_degn_t *fb_small_1, const factorbase_degn_t **fb_pi
 
 closefile:
     if (fclose(f) != 0) {
-        fprintf(stderr, "Could not close file %s: %s\n",
+        verbose_output_print (1, 0, "Could not close file %s: %s\n",
                  filename, strerror(errno));
     }
 
@@ -1177,8 +1175,7 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
             factorbase_degn_t **fb_small_2 MAYBE_UNUSED,
             factorbase_degn_t ***fb_pieces_2 MAYBE_UNUSED,
             const char * const filename MAYBE_UNUSED, 
-            const size_t nr_pieces MAYBE_UNUSED,
-            FILE *output MAYBE_UNUSED)
+            const size_t nr_pieces MAYBE_UNUSED)
 {
 #ifdef HAVE_MMAP
     fb_file_header_t *header;
@@ -1194,37 +1191,36 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
     fb_pieces[1] = (factorbase_degn_t **)
         malloc(nr_pieces * sizeof(factorbase_degn_t *));
     if (header == NULL || fb_pieces[0] == NULL || fb_pieces[1] == NULL) {
-        fprintf(stderr, "Could not allocate memory\n");
+        verbose_output_print (1, 0, "Could not allocate memory\n");
         returncode = 0;
         goto freemem;
     }
 
     FILE *f = fopen(filename, "rb");
     if (f == NULL) {
-        fprintf(stderr, "Could not open %s for reading: %s\n",
+        verbose_output_print (1, 0, "Could not open %s for reading: %s\n",
                  filename, strerror(errno));
         returncode = 0;
         goto freemem;
     }
 
-    if (output != NULL)
-        fprintf(output, "# Reading header\n");
+    verbose_output_print (0, 2, "# Reading header\n");
     size_t items_read = fread(header, headersize, 1, f);
     if (items_read != 1) {
-        fprintf(stderr, "Could not read header from %s: %s\n", 
+        verbose_output_print (1, 0, "Could not read header from %s: %s\n",
                 filename, strerror(errno));
         returncode = 0;
         goto closefile;
     }
 
     if (header->magic != FB_MAGIC) {
-        fprintf(stderr, "File %s has wrong magic number\n", filename);
+        verbose_output_print (1, 0, "File %s has wrong magic number\n", filename);
         returncode = 0;
         goto closefile;
     }
 
     if (header->nr_pieces != nr_pieces) {
-        fprintf(stderr, "File %s has wrong number of pieces (has %zu, I use %zu)\n",
+        verbose_output_print (1, 0, "File %s has wrong number of pieces (has %zu, I use %zu)\n",
                 filename, header->nr_pieces, nr_pieces);
         returncode = 0;
         goto closefile;
@@ -1232,13 +1228,13 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
 
     /* Get file size */
     if (fseek (f, 0, SEEK_END) != 0) {
-        fprintf(stderr, "fseek on %s failed: %s", filename, strerror(errno));
+        verbose_output_print (1, 0, "fseek on %s failed: %s", filename, strerror(errno));
         returncode = 0;
         goto closefile;
     }
     int64_t size = ftell (f);
     if (size < 0) {
-        fprintf(stderr, "ftell on %s failed: %s", filename, strerror(errno));
+        verbose_output_print (1, 0, "ftell on %s failed: %s", filename, strerror(errno));
         returncode = 0;
         goto closefile;
     }
@@ -1246,7 +1242,7 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
     int fd = fileno (f);
     void *fb = mmap (NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (fb == MAP_FAILED) {
-        fprintf(stderr, "mmap on %s failed: %s", filename, strerror(errno));
+        verbose_output_print (1, 0, "mmap on %s failed: %s", filename, strerror(errno));
         returncode = 0;
         goto closefile;
     }
@@ -1257,22 +1253,21 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
            allocated memory */
         const size_t offset = header->ranges[idx].offset;
         const size_t small_size = header->ranges[idx++].size;
-        if (output != NULL)
-            fprintf(output, "# Reading small-primes FB of side %d from file offset %zu\n",
-                    side, offset);
+        verbose_output_print (0, 1 , "# Reading small-primes FB of side %d from file offset %zu\n",
+                side, offset);
         factorbase_degn_t *fb_small_mem = (factorbase_degn_t *) malloc(small_size);
         if (fb_small_mem == NULL) {
-          fprintf(stderr, "# Could not allocate memory for small factor base\n");
+          verbose_output_print (1, 0, "# Could not allocate memory for small factor base\n");
           returncode = 0;
           goto unmap;
         }
         if (fseek(f, offset, SEEK_SET) != 0) {
-            fprintf(stderr, "fseek on %s failed: %s", filename, strerror(errno));
+            verbose_output_print (1, 0, "fseek on %s failed: %s", filename, strerror(errno));
             returncode = 0;
             goto unmap;
         }
         if (fread(fb_small_mem, 1, small_size, f) != small_size) {
-            fprintf(stderr, "ftell on %s failed: %s", filename, strerror(errno));
+            verbose_output_print (1, 0, "ftell on %s failed: %s", filename, strerror(errno));
             returncode = 0;
             goto unmap;
         }
@@ -1280,16 +1275,15 @@ fb_mmap_fbc(factorbase_degn_t **fb_small_1 MAYBE_UNUSED,
 
         for (size_t i = 0; i < nr_pieces; i++) {
             const size_t offset = header->ranges[idx++].offset;
-            if (output != NULL)
-                fprintf(output, "# Mapping large-primes FB of side %d, part %zu at file offset %zu\n",
-                        side, i, offset);
+            verbose_output_print (0, 1, "# Mapping large-primes FB of side %d, part %zu at file offset %zu\n",
+                    side, i, offset);
             fb_pieces[side][i] = (factorbase_degn_t *) ((char *)fb + offset);
         }
     }
 
    if (returncode == 0) {
        if (munmap(fb, size) != 0) {
-            fprintf(stderr, "munmap on %s failed: %s", filename, strerror(errno));
+            verbose_output_print (1, 0, "munmap on %s failed: %s", filename, strerror(errno));
        }
    }
 
@@ -1300,7 +1294,7 @@ unmap:
 
 closefile:
     if (fclose(f) != 0) {
-        fprintf(stderr, "Could not close file %s: %s\n",
+        verbose_output_print (1, 0, "Could not close file %s: %s\n",
                  filename, strerror(errno));
     }
 
