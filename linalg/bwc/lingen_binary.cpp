@@ -247,7 +247,7 @@ struct checker {
         using namespace globals;
         printf("Checking %u..%u\n",t0,t);
         multiply_slow(e,e,pi);
-        unsigned int v = e.valuation();
+        unsigned long v = e.valuation();
         ASSERT(v == t-t0);
         e.xdiv_resize(t-t0, e.ncoef-(t-t0));
         return v == t-t0;
@@ -516,9 +516,9 @@ void write_polmat(polmat const& P, const char * fn)/*{{{*/
     size_t rz;
     size_t nw = ( P.ncoef + ULONG_BITS - 1) / ULONG_BITS;
 
-    fprintf(f, "%u %u %u\n", P.nrows, P.ncols, P.ncoef);
+    fprintf(f, "%u %u %lu\n", P.nrows, P.ncols, P.ncoef);
     for(unsigned int j = 0 ; j < P.ncols ; j++) {
-        fprintf(f, "%s%d", j?" ":"", P.deg(j));
+        fprintf(f, "%s%ld", j?" ":"", P.deg(j));
     }
     fprintf(f, "\n");
 
@@ -829,7 +829,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     if (!overflowed.empty()) {
         std::string s = intlist_to_string(overflowed.begin(), overflowed.end());
 
-        printf("%-8u** %zu cols (%s) exceed maxdeg=%d (normal at the end) **\n",
+        printf("%-8u** %zu cols (%s) exceed maxdeg=%ld (normal at the end) **\n",
                 t, overflowed.size(), s.c_str(), PI.ncoef - 1);
         unsigned ctot = 0;
         for (unsigned int j = 0; j < m + n; j++) {
@@ -1323,7 +1323,7 @@ static bool go_quadratic(polmat& pi)/*{{{*/
 #ifdef  DO_EXPENSIVE_CHECKS
     printf("Checking\n");
     multiply_slow(E_saved,E_saved,pi);
-    unsigned int v = E_saved.valuation();
+    unsigned long v = E_saved.valuation();
     ASSERT(v == t-tstart);
     E_saved.xdiv_resize(t-tstart, E_saved.ncoef-(t-tstart));
     for (uint j = 0; j < E_saved.ncols; j++) {
@@ -1641,7 +1641,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 #endif
 
     if (finished_early) {
-        printf("%-8u" "deg(pi_r) = %d ; escaping\n",
+        printf("%-8u" "deg(pi_r) = %ld ; escaping\n",
                 t, pi.maxdeg());
     }
     return finished_early;
@@ -1925,7 +1925,7 @@ int main(int argc, char *argv[])
     using namespace globals;
     using namespace std;
 
-    printf("E: %d coeffs, t=%u\n", E.ncoef, t);
+    printf("E: %ld coeffs, t=%u\n", E.ncoef, t);
 
     { bmat tmp_e0(m,m + n); e0.swap(tmp_e0); }
 
