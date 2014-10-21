@@ -346,7 +346,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
         struct stat sbuf[1];
         int rc = stat(input_file, sbuf);
         DIE_ERRNO_DIAG(rc<0,"stat",input_file);
-        ssize_t expected = m * n / CHAR_BIT * ondisk_length;
+        ssize_t expected = m * n / CHAR_BIT * (ssize_t) ondisk_length;
 
         if (sbuf->st_size != expected) {
             fprintf(stderr, "%s does not have expected size %zu\n",
