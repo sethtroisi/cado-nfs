@@ -9,6 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <stdarg.h>
 #define rdtscll(x)
 #include "fb.h"
 #include "portability.h"
@@ -515,14 +516,12 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     return 0;
   }
 
-  FILE * const output = verbose_output_get(0, 1, 0);
-  if (output != NULL)
-    gmp_fprintf (output,
-		 "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
-		 "# including primes up to " FBPRIME_FORMAT
-		 " and prime powers up to " FBPRIME_FORMAT ".\n",
-		 poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
-                 poly[0], bound, powbound);
+  verbose_output_vfprint(0, 1, gmp_vfprintf,
+               "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
+               "# including primes up to " FBPRIME_FORMAT
+               " and prime powers up to " FBPRIME_FORMAT ".\n",
+               poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
+               poly[0], bound, powbound);
 
   p = 2;
   while (p <= bound)
