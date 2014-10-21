@@ -739,7 +739,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     verbose_set_enabled_flags(pl);
     param_list_print_command_line(las->output, pl);
-    las_display_config_flags(las->output);
+    las_display_config_flags();
 
     las->suppress_duplicates = param_list_parse_switch(pl, "-dup");
     las->nb_threads = 1;		/* default value */

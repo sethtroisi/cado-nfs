@@ -241,7 +241,7 @@
 extern "C" {
 #endif
 
-void las_display_config_flags(FILE * stream);
+void las_display_config_flags();
 
 #ifdef __cplusplus
 }
