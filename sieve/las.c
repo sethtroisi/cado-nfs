@@ -146,17 +146,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         /* Try to read the factor base cache file. If that fails, because
            the file does not exist or is not compatible with our parameters,
            it will be written after we generate the factor bases. */
-        fprintf(las->output, "# Mapping memory image of factor base from file %s\n", 
+        verbose_output_print(0, 1, "# Mapping memory image of factor base from file %s\n",
                fbcfilename);
         if (fb_mmap_fbc(&si->sides[0]->fb, &si->sides[0]->fb_bucket_threads,
                         &si->sides[1]->fb, &si->sides[1]->fb_bucket_threads,
                         fbcfilename, las->nb_threads)) {
             si->sides[0]->fb_is_mmapped = 1;
             si->sides[1]->fb_is_mmapped = 1;
-            fprintf(las->output, "# Finished mapping memory image of factor base\n");
+            verbose_output_print(0, 1, "# Finished mapping memory image of factor base\n");
             return;
         } else {
-            fprintf(las->output, "# Could not map memory image of factor base\n");
+            verbose_output_print(0, 1, "# Could not map memory image of factor base\n");
         }
     }
 
@@ -169,7 +169,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             char fbparamname[4];
             snprintf(fbparamname, sizeof(fbparamname), "fb%d", side);
             const char * fbfilename = param_list_lookup_string(pl, fbparamname);
-            fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
+            verbose_output_print(0, 1, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             int ok = fb_read (&sis->fb, &sis->fb_bucket_threads, fbfilename,
                               si->conf->bucket_thresh, las->nb_threads,
                               lim, si->conf->sides[side]->powlim);
@@ -177,7 +177,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             ASSERT_ALWAYS(sis->fb != NULL);
             sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
-            fprintf (las->output, 
+            verbose_output_print(0, 1,
                     "# Reading %s factor base of %zuMb took %1.1fs\n",
                     sidenames[side],
                     fb_size (sis->fb) >> 20, tfb);
@@ -190,18 +190,18 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             FATAL_ERROR_CHECK(!ok, "Error creating rational factor base");
             sis->fb_is_mmapped = 0;
             tfb = seconds () - tfb;
-            fprintf (las->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
+            verbose_output_print(0, 1, "# Creating rational factor base of %zuMb took %1.1fs\n",
                      fb_size (sis->fb) >> 20, tfb);
         }
     }
     if (fbcfilename != NULL) {
-        fprintf(las->output, "# Writing memory image of factor base to file %s\n", fbcfilename);
+        verbose_output_print(0, 1, "# Writing memory image of factor base to file %s\n", fbcfilename);
         fb_dump_fbc(si->sides[0]->fb,
                     (const factorbase_degn_t **) (si->sides[0]->fb_bucket_threads),
                     si->sides[1]->fb,
                     (const factorbase_degn_t **) (si->sides[1]->fb_bucket_threads),
                     fbcfilename, las->nb_threads);
-        fprintf(las->output, "# Finished writing memory image of factor base\n");
+        verbose_output_print(0, 1, "# Finished writing memory image of factor base\n");
     }
 }
 /*}}}*/
@@ -330,7 +330,7 @@ void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int sid
     sieve_side_info_ptr s = si->sides[side];
     double bucket_fill_ratio[n];
 
-    fprintf (las->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
+    verbose_output_print(0, 1, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
     /* Counting the bucket-sieved primes per thread.  */
     unsigned long * nn = (unsigned long *) malloc(n * sizeof(unsigned long));
@@ -344,13 +344,13 @@ void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int sid
             bucket_fill_ratio[i] += fb->nr_roots / (double) fb->p;
         }
     }
-    fprintf (las->output, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
+    verbose_output_print(0, 1, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
     for(int i = 0 ; i < n ; i++)
-        fprintf (las->output, " %lu", nn[i]);
-    fprintf(las->output, "\n");
-    fprintf (las->output, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
+        verbose_output_print(0, 1, " %lu", nn[i]);
+    verbose_output_print(0, 1, "\n");
+    verbose_output_print(0, 1, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
     for(int i = 0 ; i < n ; i++)
-        fprintf (las->output, " %.5f", bucket_fill_ratio[i]);
+        verbose_output_print(0, 1, " %.5f", bucket_fill_ratio[i]);
 
     double min_bucket_fill_ratio = bucket_fill_ratio[n-1];
     double max_bucket_fill_ratio = bucket_fill_ratio[0];
@@ -359,7 +359,7 @@ void sieve_info_print_fb_statistics(las_info_ptr las, sieve_info_ptr si, int sid
         if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
         if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
     }
-    fprintf(las->output, " [hit jitter %g]\n",
+    verbose_output_print(0, 1, " [hit jitter %g]\n",
             (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
     /* enable some margin in the bucket size */
     s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.07;
@@ -400,13 +400,13 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* this is the maximal value of the number of buckets (might be less
        for a given special-q if J is smaller) */
     si->nb_buckets_max = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
-    fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
+    verbose_output_print(0, 1, "# bucket_region = %u\n", BUCKET_REGION);
     if (si->nb_buckets_max < THRESHOLD_K_BUCKETS)
-      fprintf(las->output, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
+      verbose_output_print(0, 1, "# nb_buckets_max = %u, one pass for the buckets sort\n", si->nb_buckets_max);
     else if (si->nb_buckets_max < THRESHOLD_M_BUCKETS)
-      fprintf(las->output, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
+      verbose_output_print(0, 1, "# nb_buckets_max = %u, two passes for the buckets sort\n", si->nb_buckets_max);
     else
-      fprintf(las->output, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
+      verbose_output_print(0, 1, "# nb_buckets_max = %u, three passes for the buckets sort\n", si->nb_buckets_max);
 
     si->j_div = init_j_div(si->J);
     si->us = init_unsieve_data(si->I);
@@ -436,7 +436,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         ASSERT_ALWAYS(las->sievers->conf->sides[1]->lim == si->conf->sides[1]->lim);
         ASSERT_ALWAYS(las->sievers->conf->sides[1]->powlim == si->conf->sides[1]->powlim);
         // Then, copy relevant data from the first sieve_info
-        fprintf(las->output, "# Do not regenerate factor base data: copy it from first siever\n");
+        verbose_output_print(0, 1, "# Do not regenerate factor base data: copy it from first siever\n");
         for (int side = 0; side < 2; side++) {
             sieve_side_info_ptr sis = si->sides[side];
             sieve_side_info_ptr sis0 = las->sievers->sides[side];
@@ -467,29 +467,28 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
         /* The strategies also depend on the special-q used within the
          * descent, assuming lim / lpb depend on the sq bitsize */
-        fprintf(las->output, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
+        verbose_output_print(0, 1, "# Creating strategy for %d%c/%s [lim=%lu lpb=%u]\n",
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
-        fprintf(las->output, "# Using %d+3 P-1/P+1/ECM curves\n",
+        verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
                 nb_curves (sc->sides[s]->lpb));
         si->sides[s]->strategy = facul_make_strategy(
                 sc->sides[s]->lim, sc->sides[s]->lpb, 0);
         reorder_fb(si, s);
-        if (las->verbose) {
-            fprintf(las->output, "# small %s factor base", sidenames[s]);
-            factorbase_degn_t ** q;
-            q = si->sides[s]->fb_parts->pow2;
-            fprintf(las->output, ": %d pow2", fb_diff(q[1], q[0]));
-            q = si->sides[s]->fb_parts->pow3;
-            fprintf(las->output, ", %d pow3", fb_diff(q[1], q[0]));
-            q = si->sides[s]->fb_parts->td;
-            fprintf(las->output, ", %d td", fb_diff(q[1], q[0]));
-            q = si->sides[s]->fb_parts->rs;
-            fprintf(las->output, ", %d rs", fb_diff(q[1], q[0]));
-            q = si->sides[s]->fb_parts->rest;
-            fprintf(las->output, ", %d rest", fb_diff(q[1], q[0]));
-            fprintf(las->output, " (total %zu)\n", fb_nroots_total(si->sides[s]->fb));
-        }
+
+        verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
+        factorbase_degn_t ** q;
+        q = si->sides[s]->fb_parts->pow2;
+        verbose_output_print(0, 2, ": %d pow2", fb_diff(q[1], q[0]));
+        q = si->sides[s]->fb_parts->pow3;
+        verbose_output_print(0, 2, ", %d pow3", fb_diff(q[1], q[0]));
+        q = si->sides[s]->fb_parts->td;
+        verbose_output_print(0, 2, ", %d td", fb_diff(q[1], q[0]));
+        q = si->sides[s]->fb_parts->rs;
+        verbose_output_print(0, 2, ", %d rs", fb_diff(q[1], q[0]));
+        q = si->sides[s]->fb_parts->rest;
+        verbose_output_print(0, 2, ", %d rest", fb_diff(q[1], q[0]));
+        verbose_output_print(0, 2, " (total %zu)\n", fb_nroots_total(si->sides[s]->fb));
     }
 }
 /* }}} */
@@ -839,7 +838,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     sc->unsieve_thresh = 100;
     if (param_list_parse_uint(pl, "unsievethresh", &(sc->unsieve_thresh))) {
-        fprintf(las->output, "# Un-sieving primes > %u\n",
+        verbose_output_print(0, 1, "# Un-sieving primes > %u\n",
                 sc->unsieve_thresh);
     }
 
@@ -851,11 +850,11 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     for (int side = 0; side < 2; side++) {
         if (!param_list_parse_ulong(pl, powlim_params[side], &sc->sides[side]->powlim)) {
             sc->sides[side]->powlim = sc->bucket_thresh - 1;
-            fprintf (las->output, "# Using default value of %lu for -%s\n",
+            verbose_output_print(0, 1, "# Using default value of %lu for -%s\n",
                      sc->sides[side]->powlim, powlim_params[side]);
         } else if (sc->sides[side]->powlim >= sc->bucket_thresh) {
             sc->sides[side]->powlim = sc->bucket_thresh - 1;
-            fprintf (las->output, "# -%s reduced to %lu\n",
+            verbose_output_print(0, 1, "# -%s reduced to %lu\n",
                     powlim_params[side], sc->sides[side]->powlim);
         }
     }
@@ -920,7 +919,7 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     /* We've hit the end marker. Need to add a new config. */
     las->sievers = realloc(las->sievers, (n+2) * sizeof(sieve_info));
     si = las->sievers + n;
-    fprintf(las->output, "# Creating new sieve configuration for q~2^%d on the %s side\n",
+    verbose_output_print(0, 1, "# Creating new sieve configuration for q~2^%d on the %s side\n",
             sc->bitsize, sidenames[sc->side]);
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
@@ -1436,11 +1435,9 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
               p += BUCKET_P_WRAP;
           }
           if (UNLIKELY(p > fbb)) {
-              pthread_mutex_lock(&io_mutex);
-              fprintf (stderr,
+              verbose_output_print(1, 0,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
                        (unsigned long) prime.p, N, x);
-              pthread_mutex_unlock(&io_mutex);
               abort();
           }
           do {
@@ -1752,7 +1749,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #else
                 SS_lw = (const unsigned long *)(SS + BUCKET_REGION);
 #endif
-                fprintf(las->output, "# [descent] Aborting, deadline passed\n");
+                verbose_output_print(0, 1, "# [descent] Aborting, deadline passed\n");
                 break;
             }
 #endif  /* DLP_DESCENT */
@@ -1909,12 +1906,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     cpt++;
                 pthread_mutex_lock(&io_mutex);
                 if (create_descent_hints) {
-                    fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
+                    verbose_output_print(0, 1, "(%1.4f) ", seconds() - tt_qstart);
                 }
-                if (las->verbose >= 2) {
-                  fprintf(las->output, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
-                          i, j, S[0][x], S[1][x]);
-                }
+                verbose_output_print(0, 3, "# i=%d, j=%u, lognorms = %hhu, %hhu\n",
+                        i, j, S[0][x], S[1][x]);
                 fprint_relation(las->output, rel, comment);
                 pthread_mutex_unlock(&io_mutex);
             }
@@ -1959,14 +1954,14 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                              * which the virtual log has been saved
                              * already (factor base extension can enter
                              * into play here). */
-                            // fprintf(las->output, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                            // verbose_output_print(0, 1, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
                             continue;
                         }
                         descent_hint_ptr h = las->hint_table[k];
                         time_left += h->expected_time;
                     }
                 }
-                // fprintf(las->output, "# [descent] This relation entails an additional time of %.2f for the smoothing process\n", time_left);
+                // verbose_output_print(0, 1, "# [descent] This relation entails an additional time of %.2f for the smoothing process\n", time_left);
 
                 double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
                 if (new_deadline < deadline) {
@@ -1976,7 +1971,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     deadline = new_deadline;
                     relation_copy(winner, rel);
                     if (time_left == 0) {
-                        fprintf(las->output, "# [descent] Yiippee, splitting done\n");
+                        verbose_output_print(0, 1, "# [descent] Yiippee, splitting done\n");
                         /* break both loops */
 #if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
                 SS_lw = (const __m128i *)(SS + BUCKET_REGION);
@@ -1986,7 +1981,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                         relation_clear(rel);
                         break;
                     } else if (delta != DBL_MAX) {
-                        fprintf(las->output, "# [descent] Improved ETA by %.2f\n", delta);
+                        verbose_output_print(0, 1, "# [descent] Improved ETA by %.2f\n", delta);
                     }
                 }
             }
@@ -2451,17 +2446,15 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         for (int side = 0; side < 2; side++)
             checksum_post_sieve[side] = combine_checksum(checksum_post_sieve[side], thrs[i]->checksum_post_sieve[side]);
     }
-    if (las->verbose) {
-        fprintf (las->output, "# ");
-      /* fprintf (las->output, "%lu survivors after rational sieve,", rep->survivors0); */
-        fprintf (las->output, "%lu survivors after algebraic sieve, ", rep->survivors1);
-        fprintf (las->output, "coprime: %lu\n", rep->survivors2);
-        fprintf (las->output, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
-    }
+    verbose_output_print(0, 2, "# ");
+    /* verbose_output_print(0, 2, "%lu survivors after rational sieve,", rep->survivors0); */
+    verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
+    verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
+    verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {
-        fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
+        verbose_output_print(0, 1, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
 #ifdef HAVE_RUSAGE_THREAD
     int dont_print_tally = 0;
@@ -2469,9 +2462,9 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     int dont_print_tally = 1;
 #endif
     if (dont_print_tally && las->nb_threads > 1) {
-        fprintf (las->output, "# Time for this special-q: %1.4fs [tally only available in mono-thread]\n", qt0);
+        verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread]\n", qt0);
     } else {
-        fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
+        verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
             rep->tn[RATIONAL_SIDE],
@@ -2644,7 +2637,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     extern size_t max_cache, min_stos;
     max_cache = direct_write_vs_stos ();
     min_stos = stos_vs_write128 ();
-    fprintf (las->output, "# Las normalisation memset: movaps from 33(0x21) to %zu(0x%zx); rep stosq until %zu(0x%zx); movntps after\n", min_stos, min_stos, max_cache, max_cache);
+    verbose_output_print(0, 1, "# Las normalisation memset: movaps from 33(0x21) to %zu(0x%zx); rep stosq until %zu(0x%zx); movntps after\n", min_stos, min_stos, max_cache, max_cache);
 #endif
     
     thread_data * thrs = thread_data_alloc(las, las->nb_threads);
@@ -2654,7 +2647,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds ();
     wct = wct_seconds();
-    fprintf (las->output, "#\n");
+    verbose_output_print(0, 1, "#\n");
 
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
@@ -2697,7 +2690,7 @@ int main (int argc0, char *argv0[])/*{{{*/
             for(descent_hint_ptr h = las->hint_table[0] ; h->conf->bitsize ; h++) {
                 siever_config_ptr sc = h->conf;
                 if (!siever_config_match(sc, current_config)) continue;
-                fprintf(las->output, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
+                verbose_output_print(0, 1, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
                 memcpy(current_config, sc, sizeof(siever_config));
             }
         }
@@ -2777,9 +2770,9 @@ int main (int argc0, char *argv0[])/*{{{*/
                 sidenames[si->conf->side],
                 si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
         if (si->doing->depth) {
-            fprintf(las->output, " # within descent, currently at depth %d", si->doing->depth);
+            verbose_output_print(0, 1, " # within descent, currently at depth %d", si->doing->depth);
         }
-        fprintf(las->output, "\n");
+        verbose_output_print(0, 1, "\n");
         nr_sq_processed ++;
 
         /* checks the value of J,
@@ -2787,8 +2780,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * their floating-point versions */
         sieve_info_update (las->output, si, las->nb_threads);
         totJ += (double) si->J;
-        if (las->verbose)
-            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
+        verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {
             fprintf (las->output, "# f_0'(x) = ");
             mpz_poly_fprintf(las->output, si->sides[0]->fij);
@@ -2888,7 +2880,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     thread_buckets_free(thrs, las->nb_threads);
 
     if (descent_lower) {
-        fprintf(las->output, "# Now displaying again the results of all descents\n");
+        verbose_output_print(0, 1, "# Now displaying again the results of all descents\n");
         las_descent_helper_display_all_trees(las->descent_helper, las->output);
         las_descent_helper_free(las->descent_helper);
     }
