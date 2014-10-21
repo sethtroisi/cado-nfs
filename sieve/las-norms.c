@@ -19,6 +19,7 @@
 #include "las-norms.h"
 #include "utils.h"
 #include "portability.h"
+#include "verbose.h"
 
 static long lg_page;
 
@@ -1598,7 +1599,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads)/*{{{*/
 */
 
 void
-sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
+sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
   int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
 
@@ -1650,9 +1651,8 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
   maxlog2 = rat->logmax;
-  if (output != NULL)
-    fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-             maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  verbose_output_print (0, 1, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
@@ -1663,12 +1663,11 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
      rational side */
   r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat->bound = (unsigned char) (r * rat->scale + GUARD);
-  if (output != NULL)
-    fprintf (output, " bound=%u\n", rat->bound);
+  verbose_output_print (0, 1, " bound=%u\n", rat->bound);
   double max_rlambda = (maxlog2 - GUARD / rat->scale) /
       si->conf->sides[RATIONAL_SIDE]->lpb;
-  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda && output != NULL)
-    fprintf (output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  if (si->conf->sides[RATIONAL_SIDE]->lambda > max_rlambda)
+    verbose_output_print (0, 1, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
 
   /************************** algebraic side *********************************/
 
@@ -1692,9 +1691,8 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
   alg->logmax += 2.0;
   maxlog2 = alg->logmax;
 
-  if (output != NULL)
-    fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-             alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  verbose_output_print (0, 1, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+      alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
@@ -1706,12 +1704,11 @@ sieve_info_update_norm_data (FILE * output, sieve_info_ptr si, int nb_threads)
      y >= GUARD + lambda * lpb * scale */
   r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, maxlog2 - GUARD / alg->scale);
   alg->bound = (unsigned char) (r * alg->scale + GUARD);
-  if (output != NULL)
-    fprintf (output, " bound=%u\n", alg->bound);
+  verbose_output_print (0, 1, " bound=%u\n", alg->bound);
   double max_alambda = (maxlog2 - GUARD / alg->scale) /
       si->conf->sides[ALGEBRAIC_SIDE]->lpb;
-  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda && output != NULL)
-    fprintf (output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  if (si->conf->sides[ALGEBRAIC_SIDE]->lambda > max_alambda)
+    verbose_output_print (0, 1, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
 
   /* improve bound on J if possible */
   unsigned int Jmax;

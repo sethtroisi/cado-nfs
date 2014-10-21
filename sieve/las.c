@@ -516,10 +516,10 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
-static void sieve_info_update (FILE *output, sieve_info_ptr si, int nb_threads)/*{{{*/
+static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 {
   /* essentially update the fij polynomials and J value */
-  sieve_info_update_norm_data(output, si, nb_threads);
+  sieve_info_update_norm_data(si, nb_threads);
 
   /* update number of buckets */
   si->nb_buckets = 1 + ((si->J << si->conf->logI) - 1) / BUCKET_REGION;
@@ -2764,7 +2764,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (las->output, si, las->nb_threads);
+        sieve_info_update (si, las->nb_threads);
         totJ += (double) si->J;
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {

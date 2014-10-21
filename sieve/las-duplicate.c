@@ -303,7 +303,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     goto clear_and_exit;
   }
 
-  sieve_info_update_norm_data(NULL, si, nb_threads);
+  sieve_info_update_norm_data(si, nb_threads);
 
   if (verbose) {
     fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);

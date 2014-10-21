@@ -33,7 +33,7 @@ void sieve_info_init_norm_data(sieve_info_ptr si);
 
 void sieve_info_clear_norm_data(sieve_info_ptr si);
 
-void sieve_info_update_norm_data (FILE *, sieve_info_ptr, int);
+void sieve_info_update_norm_data (sieve_info_ptr, int);
 
 int sieve_info_adjust_IJ(sieve_info_ptr si, int nb_threads);
 
