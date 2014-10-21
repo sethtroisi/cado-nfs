@@ -15,7 +15,7 @@ fill_in_sieve_info(const mpz_t q, const mpz_t rho,
                    const unsigned long limits[2], facul_strategy_t *strategy[2],
                    cado_poly_ptr cpoly, siever_config_srcptr conf);
 void clear_sieve_info(sieve_info_ptr);
-int relation_is_duplicate(FILE *, relation_t *, int, sieve_info_srcptr);
+int relation_is_duplicate(relation_t *, int, sieve_info_srcptr);
 
 #ifdef __cplusplus
 }

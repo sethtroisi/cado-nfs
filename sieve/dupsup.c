@@ -239,7 +239,7 @@ main (int argc, char * argv[])
                                   limits, strategy, cpoly, conf);
         } else if (read_relation(&rel, line)) {
           ASSERT_ALWAYS(si != NULL);
-          int is_dupe = relation_is_duplicate(stdout, &rel, nb_threads, si);
+          int is_dupe = relation_is_duplicate(&rel, nb_threads, si);
           dupsup(stdout, &rel, sq, rho, side, is_dupe);
         } else {
         }

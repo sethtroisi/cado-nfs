@@ -61,6 +61,7 @@ Thus the function to check for duplicates needs the following information:
 
 #include "cado.h"
 #include <stdio.h>
+#include <stdarg.h>
 #include <gmp.h>
 #include <string.h>
 #include "gmp_aux.h"
@@ -253,7 +254,7 @@ subtract_fb_log(const unsigned char lognorm, const relation_t *relation,
    when sieving the sq described by si. Return 0 if it is probably not a
    duplicate */
 int
-sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
+sq_finds_relation(const unsigned long sq, const int sq_side,
                   const relation_t *relation,
                   const int nb_threads, sieve_info_srcptr old_si)
 {
@@ -297,7 +298,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
      this special-q gets skipped, so relation is not a duplicate */
   if (sieve_info_adjust_IJ(si, nb_threads) == 0) {
     if (verbose) {
-      fprintf(output, "# DUPECHECK J too small\n");
+      verbose_output_print(0, 1, "# DUPECHECK J too small\n");
     }
     is_dupe = 0;
     goto clear_and_exit;
@@ -306,8 +307,8 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   sieve_info_update_norm_data(si, nb_threads);
 
   if (verbose) {
-    fprintf(output, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
-    fprintf(output, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
+    verbose_output_print(0, 1, "# DUPECHECK Checking if relation (a,b) = (%" PRId64 ",%" PRIu64 ") is a dupe of sieving special-q -q0 %lu -rho %lu\n", relation->a, relation->b, sq, r);
+    verbose_output_print(0, 1, "# DUPECHECK Using special-q basis a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "\n", si->a0, si->b0, si->a1, si->b1);
   }
 
   const uint32_t I = si->I, J = si->J;
@@ -315,7 +316,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   unsigned int j;
 
   if (verbose && (oldI != I || oldJ != J)) {
-    fprintf (output, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
+    verbose_output_print(0, 1, "# DUPECHECK oldI = %u, I = %u, oldJ = %u, J = %u\n", oldI, I, oldJ, J);
   }
   
   /* Compute i,j-coordinates of this relation in the special-q lattice when
@@ -329,7 +330,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
      the special-q described in si, then it's not a duplicate */
   if ((i < 0 && (uint32_t)(-i) > I/2) || (i > 0 && (uint32_t)i > I/2-1) || (j >= J)) {
     if (verbose) {
-      fprintf(output, "# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
+      verbose_output_print(0, 1, "# DUPECHECK (i,j) = (%d, %u) is outside sieve region\n", i, j);
     }
     is_dupe = 0;
     goto clear_and_exit;
@@ -340,12 +341,12 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
     const unsigned char lognorm = estimate_lognorm(si, i, j, side);
     remaining_lognorm[side] = subtract_fb_log(lognorm, relation, si, side);
     if (remaining_lognorm[side] > si->sides[side]->bound) {
-      fprintf(output, "# DUPECHECK On side %d, remaining lognorm = %hhu > bound = %hhu\n",
+      verbose_output_print(0, 1, "# DUPECHECK On side %d, remaining lognorm = %hhu > bound = %hhu\n",
               side, remaining_lognorm[side], si->sides[side]->bound);
       is_dupe = 0;
     }
   }
-  fprintf (output, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hhu, %hhu\n",
+  verbose_output_print(0, 1, "# DUPECHECK relation had i=%d, j=%u, remaining lognorms %hhu, %hhu\n",
            i, j, remaining_lognorm[0], remaining_lognorm[1]);
   if (!is_dupe) {
     goto clear_and_exit;
@@ -354,7 +355,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
   /* Check that the cofactor is within the mfb bound */
   if (!check_leftover_norm (cof[sq_side], si, sq_side)) {
     if (verbose) {
-      gmp_fprintf(output, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
+      verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK cofactor %Zd is outside bounds\n", cof);
     }
     is_dupe = 0;
     goto clear_and_exit;
@@ -373,7 +374,7 @@ sq_finds_relation(FILE *output, const unsigned long sq, const int sq_side,
 
   if (pass <= 0) {
     if (verbose) {
-      gmp_fprintf(output, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
+      verbose_output_vfprint(0, 1, gmp_vfprintf, "# DUPECHECK norms not both smooth, left over factors: %Zd, %Zd\n", cof[0], cof[1]);
     }
   }
 
@@ -429,15 +430,15 @@ sq_cmp(const unsigned long sq, const int side, sieve_info_srcptr si)
    parameters specified in si->conf. */ 
 
 int
-check_one_prime(FILE *output, const unsigned long sq, const int side,
+check_one_prime(const unsigned long sq, const int side,
                 const relation_t *relation, const int nb_threads,
                 sieve_info_srcptr si)
 {
   int is_dupe = 0;
   if (sq_is_sieved(sq, side, si) && sq_cmp(sq, side, si) < 0) {
-    is_dupe = sq_finds_relation(output, sq, side, relation, nb_threads, si);
+    is_dupe = sq_finds_relation(sq, side, relation, nb_threads, si);
     if (verbose) {
-      fprintf(output, "# DUPECHECK relation is probably%s a dupe\n",
+      verbose_output_print(0, 1, "# DUPECHECK relation is probably%s a dupe\n",
              is_dupe ? "" : " not");
     }
   }
@@ -447,7 +448,7 @@ check_one_prime(FILE *output, const unsigned long sq, const int side,
 /* Return 1 if the relation is probably a duplicate of a relation found
    "earlier", and 0 if it is probably not a duplicate */
 int
-relation_is_duplicate(FILE *output, relation_t *relation, const int nb_threads,
+relation_is_duplicate(relation_t *relation, const int nb_threads,
                       sieve_info_srcptr si)
 {
   /* If the special-q does not fit in an unsigned long, we assume it's not a
@@ -461,13 +462,13 @@ relation_is_duplicate(FILE *output, relation_t *relation, const int nb_threads,
      both sides in a loop (int side=0; side<2; side++) but the relation_t
      stores primes on the rational and algebraic sides differently... */
   for (unsigned int i = 0; i < relation->nb_rp && !is_dupe; i++) {
-    is_dupe = check_one_prime(output, relation->rp[i].p, RATIONAL_SIDE,
+    is_dupe = check_one_prime(relation->rp[i].p, RATIONAL_SIDE,
                               relation, nb_threads, si);
   }
 
   /* Now the primes on the algebraic side */
   for (unsigned int i = 0; i < relation->nb_ap && !is_dupe; i++) {
-    is_dupe = check_one_prime(output, relation->ap[i].p, ALGEBRAIC_SIDE,
+    is_dupe = check_one_prime(relation->ap[i].p, ALGEBRAIC_SIDE,
                               relation, nb_threads, si);
   }
 
