@@ -41,7 +41,7 @@ def run(param_file, problem):
         "mfba": 22,
         "rlambda": 1.2,
         "alambda": 1.2,
-        "mt": 2
+        "t": 2
     }
     makefb_params = {
         "poly" : las_params["poly"],
