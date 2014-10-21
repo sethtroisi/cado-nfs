@@ -313,8 +313,17 @@ verbose_output_print(const size_t channel, const int verbose,
 
 /* Get the index-th FILE handle attached to a channel, counting only those
    outputs whose output verbosity is at least "verbose."
+   If there are fewer than index such handles, returns NULL.
+
    This is rather hackish, but we need it to be able to pass a FILE handle
-   to functions that, e.g., print complex data to a stream. */
+   to functions that, e.g., print complex data to a stream.
+
+   The idiom to use to print to every attached output would be something like
+
+   FILE *out;
+   for (size_t i=0; (out=verbose_output_get(c, v, i)) != NULL; i++)
+       print_something(out, ...);
+*/
 
 FILE *
 verbose_output_get(const size_t channel, const int verbose, const size_t index)
@@ -353,6 +362,14 @@ verbose_output_get(const size_t channel, const int verbose, const size_t index)
         return NULL;
     return output;
 }
+
+/* Print to every attached output, using a print function with a vfprintf()-
+   like interface. E.g.,
+
+   verbose_output_vfprint(0, 1, gmp_vfprintf, "%Zd\n", bigint);
+
+   Note that GMP requires stdarg.h to be included BEFORE gmp.h to be able
+   to declare prototypes for functions that take va_list */
 
 int
 verbose_output_vfprint(const size_t channel, const int verbose,
