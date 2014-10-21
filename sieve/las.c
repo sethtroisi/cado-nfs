@@ -72,24 +72,24 @@ uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
 
 /* siever_config stuff */
 
-void siever_config_display(FILE * o, siever_config_srcptr sc)/*{{{*/
+void siever_config_display(siever_config_srcptr sc)/*{{{*/
 {
-    fprintf(o, "# Sieving parameters for q~2^%d on the %s side\n",
+    verbose_output_print(0, 1, "# Sieving parameters for q~2^%d on the %s side\n",
             sc->bitsize, sidenames[sc->side]);
     /* Strive to keep these output lines untouched */
-    fprintf(o,
+    verbose_output_print(0, 1,
 	    "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
 	    sc->sides[RATIONAL_SIDE]->lim,
             sc->sides[ALGEBRAIC_SIDE]->lim,
             sc->sides[RATIONAL_SIDE]->lpb,
 	    sc->sides[ALGEBRAIC_SIDE]->lpb);
-    fprintf(o,
+    verbose_output_print(0, 1,
 	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
 	    sc->sides[RATIONAL_SIDE]->mfb,
             sc->sides[ALGEBRAIC_SIDE]->mfb,
             sc->sides[RATIONAL_SIDE]->lambda,
 	    sc->sides[ALGEBRAIC_SIDE]->lambda);
-    fprintf(o, "#                     skewness=%1.1f\n",
+    verbose_output_print(0, 1, "#                     skewness=%1.1f\n",
 	    sc->skewness);
 }/*}}}*/
 
@@ -925,7 +925,7 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
             sc->bitsize, sidenames[sc->side]);
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
-    siever_config_display(las->output, sc);
+    siever_config_display(sc);
     return si;
 }/*}}}*/
 
@@ -2768,9 +2768,9 @@ int main (int argc0, char *argv0[])/*{{{*/
         totJ += (double) si->J;
         verbose_output_print(0, 2, "# I=%u; J=%u\n", si->I, si->J);
         if (las->verbose >= 2) {
-            fprintf (las->output, "# f_0'(x) = ");
+            verbose_output_print (0, 1, "# f_0'(x) = ");
             mpz_poly_fprintf(las->output, si->sides[0]->fij);
-            fprintf (las->output, "# f_1'(x) = ");
+            verbose_output_print (0, 1, "# f_1'(x) = ");
             mpz_poly_fprintf(las->output, si->sides[1]->fij);
         }
 
