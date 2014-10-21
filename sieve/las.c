@@ -2487,30 +2487,6 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
 }/*}}}*/
 
 
-static FILE *stats_output = NULL;
-/* Print statistics both to the passed-in file handle, and to stats_output 
-   if non-NULL. This is to allow scripts to get stats from stderr rather
-   than having to decompress the whole relation file. */
-static int
-print_stats (FILE *file, char* fmt, ...)
-{
-    int retval;
-    char *msg;
-    va_list ap;
-
-    va_start(ap, fmt);
-    retval = vasprintf(&msg, fmt, ap);
-    if (retval != -1) {
-        fprintf (file, "%s", msg);
-        if (stats_output != NULL)
-            fprintf (stats_output, "%s", msg);
-        free (msg);
-    }
-    va_end(ap);
-
-    return retval;
-}
-
 /*************************** main program ************************************/
 
 
@@ -2627,9 +2603,6 @@ int main (int argc0, char *argv0[])/*{{{*/
         param_list_print_usage(pl, argv0[0], stderr);
         exit(EXIT_FAILURE);
     }
-
-    if (param_list_parse_switch(pl, "-stats-stderr"))
-        stats_output = stderr;
 
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
@@ -2922,7 +2895,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     t0 = seconds () - t0;
     wct = wct_seconds() - wct;
-    print_stats (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
+    verbose_output_print (2, 1, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
             totJ / (double) nr_sq_processed, nr_sq_processed, max_full);
     tts = t0;
     tts -= report->tn[0];
@@ -2938,14 +2911,14 @@ int main (int argc0, char *argv0[])/*{{{*/
     int dont_print_tally = 1;
 #endif
     if (bucket_prime_stats) {
-        fprintf (las->output, "# nr_bucket_primes = %lu, nr_div_tests = %lu, nr_composite_tests = %lu, nr_wrap_was_composite = %lu\n",
+        verbose_output_print(2, 1, "# nr_bucket_primes = %lu, nr_div_tests = %lu, nr_composite_tests = %lu, nr_wrap_was_composite = %lu\n",
                  nr_bucket_primes, nr_div_tests, nr_composite_tests, nr_wrap_was_composite);
     }
 
     if (dont_print_tally && las->nb_threads > 1) 
-        print_stats (las->output, "# Total cpu time %1.2fs [tally only available in mono-thread]\n", t0);
+        verbose_output_print (2, 1, "# Total cpu time %1.2fs [tally available only in mono-thread]\n", t0);
     else
-        print_stats (las->output, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
+        verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
@@ -2956,9 +2929,9 @@ int main (int argc0, char *argv0[])/*{{{*/
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
                 report->ttf);
 
-    print_stats (las->output, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
+    verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
-    print_stats (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
+    verbose_output_print (2, 1, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) nr_sq_processed);
     
