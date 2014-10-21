@@ -9,6 +9,7 @@
 #include <float.h>
 #include <pthread.h>
 #include <fcntl.h>   /* for _O_BINARY */
+#include <stdarg.h> /* Required so that GMP defines gmp_vfprintf() */
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -508,7 +509,8 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     si->doing->next = 0;
     /* sanity check */
     if (!mpz_probab_prime_p(si->doing->p, 1)) {
-        gmp_fprintf(stderr, "Error, %Zd is not prime\n", si->doing->p);
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "Error, %Zd is not prime\n",
+                               si->doing->p);
         exit(1);
     }
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
@@ -1000,9 +1002,12 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
                     exit(EXIT_FAILURE);
                 }
                 if (!mpz_probab_prime_p(q, 2)) {
-                    gmp_fprintf(stderr, "Warning: fixing q=%Zd to next prime", q);
-                    mpz_nextprime(q, q);
-                    gmp_fprintf(stderr, " q=%Zd\n", q);
+                    mpz_t q2;
+                    mpz_init(q2);
+                    mpz_nextprime(q2, q);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "Warning: fixing q=%Zd to next prime q=%Zd\n", q, q2);
+                    mpz_set(q, q2);
+                    mpz_clear(q2);
                 }
                 /* Arrange so that the normal code handles this q and
                  * computes rho. */
@@ -1459,12 +1464,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     int nr_factors;
     fl->n = 0; /* reset factor list */
 
-    if (trial_div_very_verbose) {
-        pthread_mutex_lock(&io_mutex);
-        gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n",
-                x, norm);
-        pthread_mutex_unlock(&io_mutex);
-    }
+    if (trial_div_very_verbose)
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "# trial_div() entry, x = %d, norm = %Zd\n", x, norm);
 
     // handle 2 separately, if it is in fb
     if (fb->p == 2) {
@@ -1474,12 +1475,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
             fl->fac[fl->n] = 2;
             fl->n++;
         }
-        if (trial_div_very_verbose) {
-            pthread_mutex_lock(&io_mutex);
-            gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n",
-                    x, bit, norm);
-            pthread_mutex_unlock(&io_mutex);
-        }
+        if (trial_div_very_verbose)
+            verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, dividing out 2^%d, norm = %Zd\n", x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
@@ -1488,49 +1485,38 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
     divide_primes_from_bucket (fl, norm, N, x, primes, fbb);
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_ab(a,b) && fl->n) {
-        fprintf(stderr, "# divided by 2 + primes from bucket that map to %u: ", x);
-        if (!factor_list_fprint(stderr, *fl)) fprintf(stderr, "(none)");
-        gmp_fprintf(stderr, ", remaining norm is %Zd\n", norm);
+        verbose_output_print(1, 0, "# divided by 2 + primes from bucket that map to %u: ", x);
+        if (!factor_list_fprint(stderr, *fl))
+            verbose_output_print(1, 0, "(none)");
+        verbose_output_vfprint(1, 0, gmp_vfprintf, ", remaining norm is %Zd\n", norm);
     }
 #endif /* }}} */
-    if (trial_div_very_verbose) {
-        pthread_mutex_lock(&io_mutex);
-        gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
-                x, norm);
-        pthread_mutex_unlock(&io_mutex);
-    }
+    if (trial_div_very_verbose)
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "# x = %d, after dividing out bucket/resieved norm = %Zd\n", x, norm);
 
     do {
       /* Trial divide primes with precomputed tables */
 #define TRIALDIV_MAX_FACTORS 32
       int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
-      if (trial_div_very_verbose)
-      {
-          pthread_mutex_lock(&io_mutex);
-          fprintf (stderr, "# Trial division by ");
+      if (trial_div_very_verbose) {
+          /* FIXME: Multi-threading can garble this */
+          verbose_output_print(1, 0, "# Trial division by ");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-              fprintf (stderr, " %lu", trialdiv_data[i].p);
-          fprintf (stderr, "\n");
-          pthread_mutex_unlock(&io_mutex);
+              verbose_output_print(1, 0, " %lu", trialdiv_data[i].p);
+          verbose_output_print(1, 0, "\n");
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
 
       for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
-          if (trial_div_very_verbose) {
-              pthread_mutex_lock(&io_mutex);
-              fprintf (stderr, " %lu", factors[i]);
-              pthread_mutex_unlock(&io_mutex);
-          }
+          if (trial_div_very_verbose)
+              verbose_output_print (1, 0, " %lu", factors[i]);
           factor_list_add (fl, factors[i]);
       }
-      if (trial_div_very_verbose) {
-          pthread_mutex_lock(&io_mutex);
-          gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
-          pthread_mutex_unlock(&io_mutex);
-      }
+      if (trial_div_very_verbose)
+          verbose_output_vfprint(1, 0, gmp_vfprintf, "\n# After trialdiv(): norm = %Zd\n", norm);
     } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
 }
 /* }}} */
@@ -1629,7 +1615,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
         fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
                 trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
-        gmp_fprintf(stderr, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
+        verbose_output_vfprint(1, 0, gmp_vfprintf, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -1809,7 +1795,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# start trial division for norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 ")\n",norm[side],sidenames[side],a,b);
                 }
 #endif
                 trial_div (&factors[side], norm[side], N, x,
@@ -1820,7 +1806,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pass = check_leftover_norm (norm[side], si, side);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
-                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
+                    verbose_output_vfprint(1, 0, gmp_vfprintf, "# checked leftover norm=%Zd on %s side for (%" PRId64 ",%" PRIu64 "): %d\n",norm[side],sidenames[side],a,b,pass);
                 }
 #endif
             }
@@ -1855,7 +1841,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0)
-              gmp_fprintf (stderr, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n", 
+              verbose_output_vfprint(1, 0, gmp_vfprintf, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n",
                            a, b, norm[0], norm[1]);
 #endif
 
@@ -2027,7 +2013,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             /* Beware, cpoly->m mod p would be wrong ! */
             /* This can't work on 32-bits */
             mpz_set_ui(rho, relation_compute_r (winner->a, winner->b, p));
-            gmp_fprintf(las->output, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
             las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
         }
         relation_compute_all_r(winner);
@@ -2055,7 +2041,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (k < 0) continue;
             mpz_set_ui(q, p);
             mpz_set_ui(rho, winner->ap[i].r);
-            gmp_fprintf(las->output, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
             las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
         }
         mpz_clear(q);
@@ -2451,7 +2437,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     verbose_output_print(0, 2, "%lu survivors after algebraic sieve, ", rep->survivors1);
     verbose_output_print(0, 2, "coprime: %lu\n", rep->survivors2);
     verbose_output_print(0, 2, "# Checksums over sieve region: after all sieving: %u, %u\n", checksum_post_sieve[0], checksum_post_sieve[1]);
-    gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
+    verbose_output_vfprint(0, 1, gmp_vfprintf, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     if (rep->both_even) {
         verbose_output_print(0, 1, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
@@ -2758,7 +2744,7 @@ int main (int argc0, char *argv0[])/*{{{*/
          * extreme cases, see bug 15617
          */
         if (sieve_info_adjust_IJ(si, las->nb_threads) == 0) {
-            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
+            verbose_output_vfprint(0, 1, gmp_vfprintf, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 "; raw_J=%u;\n",
                     sidenames[si->conf->side],
                     si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
                     si->J);
@@ -2766,7 +2752,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 
 
-        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
+        verbose_output_vfprint(0, 1, gmp_vfprintf, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%" PRId64 "; b0=%" PRId64 "; a1=%" PRId64 "; b1=%" PRId64 ";",
                 sidenames[si->conf->side],
                 si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
         if (si->doing->depth) {
