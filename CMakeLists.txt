@@ -223,6 +223,7 @@ endif(ENABLE_SHARED)
 
 include (${CADO_NFS_SOURCE_DIR}/config/pthreads.cmake)
 include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
+include (${CADO_NFS_SOURCE_DIR}/config/openmp.cmake)
 
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 

@@ -14,6 +14,13 @@
 #include <gmp.h>
 
 #include <algorithm>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#define OMP_ROUND(k) (k % omp_get_num_threads() == omp_get_thread_num())
+#else
+#define OMP_ROUND(k) (1)
+#endif
+
 #include "bwc_config.h"
 #include "alloc_proxy.h"
 #include "utils.h"
@@ -835,9 +842,16 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
     src.clear_highbits();
-    for(unsigned int j = 0 ; j < src.ncols ; j++) {
-        for(unsigned int i = 0 ; i < src.nrows ; i++) {
-            o.dft(tmp.poly(i,j), src.poly(i,j), d);
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int j = 0 ; j < src.ncols ; j++) {
+            for(unsigned int i = 0 ; i < src.nrows ; i++) {
+                if (OMP_ROUND(k++))
+                    o.dft(tmp.poly(i,j), src.poly(i,j), d);
+            }
         }
     }
     dst.swap(tmp);
@@ -861,16 +875,22 @@ void glue4(
 {
     unsigned int nr2 = dst.nrows >> 1;
     unsigned int nc2 = dst.ncols >> 1;
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst.poly(i,j), s00.poly(i,j));
-            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
-        }
-    }
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
-            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0; i < nr2; ++i) {
+            for(unsigned int j = 0; j < nc2; ++j) {
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i,j), s00.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+            }
         }
     }
 }
@@ -888,16 +908,22 @@ void splitin4(
     ASSERT((s.ncols & 1) == 0);
     unsigned int nr2 = s.nrows >> 1;
     unsigned int nc2 = s.ncols >> 1;
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst00.poly(i,j), s.poly(i,j));
-            o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
-        }
-    }
-    for(unsigned int i = 0; i < nr2; ++i) {
-        for(unsigned int j = 0; j < nc2; ++j) {
-            o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
-            o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0; i < nr2; ++i) {
+            for(unsigned int j = 0; j < nc2; ++j) {
+                if (OMP_ROUND(k++))
+                    o.cpy(dst00.poly(i,j), s.poly(i,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
+                if (OMP_ROUND(k++))
+                    o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+            }
         }
     }
 }
@@ -911,9 +937,16 @@ void add(
 {
     ASSERT(s1.nrows == s2.nrows);
     ASSERT(s1.ncols == s2.ncols);
-    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-        for(unsigned int j = 0 ; j < s1.ncols ; j++) {
-            o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+            for(unsigned int j = 0 ; j < s1.ncols ; j++) {
+                if (OMP_ROUND(k++))
+                    o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+            }
         }
     }
 }
@@ -1041,18 +1074,25 @@ void compose_inner(
     if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
         compose_strassen(tmp, s1, s2, o, s);
     } else {
-        typename fft_type::t * x = o.alloc(1);
         tmp.zero();
-        for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-            for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+        {
+            typename fft_type::t * x = o.alloc(1);
+            for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+                for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+                    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+                        if (OMP_ROUND((int) (i * s2.ncols + j))) {
+                            o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                            o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+                        }
+                    }
                 }
             }
+            o.free(x,1);
+            x = NULL;
         }
-        o.free(x,1);
-        x = NULL;
     }
     dst.swap(tmp);
 }
@@ -1098,20 +1138,29 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
     // clock_t t = clock();
     polmat tmp(src.nrows, src.ncols, d + 1);
-    for(unsigned int j = 0 ; j < src.ncols ; j++) {
-        for(unsigned int i = 0 ; i < src.nrows ; i++) {
-            o.ift(tmp.poly(i,j), d, src.poly(i,j));
+#ifdef  HAVE_OPENMP
+#pragma omp parallel
+#endif  /* HAVE_OPENMP */
+    {
+        int k MAYBE_UNUSED = 0;
+        for(unsigned int j = 0 ; j < src.ncols ; j++) {
+            for(unsigned int i = 0 ; i < src.nrows ; i++) {
+                if (OMP_ROUND(k++))
+                    o.ift(tmp.poly(i,j), d, src.poly(i,j));
+            }
         }
+    }
+    for(unsigned int j = 0 ; j < src.ncols ; j++) {
         tmp.setdeg(j);
     }
     dst.swap(tmp);
     /*
-    if (o.size() > 10) {
-        printf("i(%u,%u,%u,%u): %.2fs\n",
-                src.nrows,src.ncols,d,o.size(),
-                (double)(clock()-t)/CLOCKS_PER_SEC);
-    }
-    */
+       if (o.size() > 10) {
+       printf("i(%u,%u,%u,%u): %.2fs\n",
+       src.nrows,src.ncols,d,o.size(),
+       (double)(clock()-t)/CLOCKS_PER_SEC);
+       }
+       */
 }
 
 

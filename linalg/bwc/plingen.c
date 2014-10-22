@@ -311,8 +311,14 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
     mpz_t p;
     mpz_init(p);
     abfield_characteristic(ab, p);
-    unsigned int l = mpz_sizeinbase(p, 2);
-    l *= abfield_degree(ab);    /* roughtly log_2(#K) */
+    unsigned int l;
+    if (mpz_cmp_ui(p, 1024) >= 0) {
+        l = mpz_sizeinbase(p, 2);
+        l *= abfield_degree(ab);    /* roughly log_2(#K) */
+    } else {
+        mpz_pow_ui(p, p, abfield_degree(ab));
+        l = mpz_sizeinbase(p, 2);
+    }
     mpz_clear(p);
     // unsigned int safety = iceildiv(abgroupsize(ab), m * sizeof(abelt));
     unsigned int safety = iceildiv(64, m * l);
@@ -328,6 +334,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
  * that E*pi is divisible by X^len.
  */
 
+/* TODO: adapt for GF(2) */
 static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     tree_stats_enter(__func__, E->size);
@@ -602,6 +609,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
 
 /*}}}*/
 
+/* TODO: adapt for GF(2) */
 double avg_matsize(abdst_field ab, unsigned int m, unsigned int n, int ascii)/*{{{*/
 {
     if (!ascii) {
@@ -644,6 +652,7 @@ double avg_matsize(abdst_field ab, unsigned int m, unsigned int n, int ascii)/*{
 }/*}}}*/
 
 /* {{{ I/O helpers */
+/* TODO: adapt for GF(2) */
 /* {{{ matpoly_write
  * writes some of the matpoly data to f, either in ascii or binary
  * format. This can be used to write only part of the data (degrees
@@ -852,6 +861,7 @@ int cp_load_aux_file(struct cp_info * cp, size_t * p_pi_size, unsigned int *delt
     return rc == 0;
 }
 
+/* TODO: adapt for GF(2) */
 int cp_load_data_file(struct cp_info * cp, matpoly pi, size_t pi_size)
 {
     dims * d = cp->bm->d;
@@ -872,6 +882,7 @@ int cp_load_data_file(struct cp_info * cp, matpoly pi, size_t pi_size)
     return rc == 0;
 }
 
+/* TODO: adapt for GF(2) */
 /* I think we always have pi_size == pi->size, the only questionable
  * situation is when we're saving part of a big matrix */
 int cp_save_data_file(struct cp_info * cp, matpoly pi, size_t pi_size)

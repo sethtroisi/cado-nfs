@@ -23,6 +23,7 @@
 #cmakedefine    HAVE_SSE3
 #cmakedefine    HAVE_SSSE3
 #cmakedefine    HAVE_SSE41
+#cmakedefine    HAVE_OPENMP
 #cmakedefine    HAVE_ALLOCA_H
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2

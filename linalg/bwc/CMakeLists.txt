@@ -339,9 +339,11 @@ install(TARGETS lingen RUNTIME DESTINATION ${BINSUFFIX}/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 add_dependencies(lingen gf2x-build)
 
+# It's ugly. FindOpenMP.cmake doesn't know how to differentiate between
+# required compile-time flags and required link-time flags...
 set_target_properties(lingen PROPERTIES
-        COMPILE_FLAGS "--mpi"
-        LINK_FLAGS "--mpi")
+    COMPILE_FLAGS "--mpi ${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "--mpi ${OpenMP_CXX_FLAGS}")
 
 add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
 target_link_libraries(short_matmul bwc_base)
