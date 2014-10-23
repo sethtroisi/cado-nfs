@@ -5,6 +5,9 @@ include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
 add_executable(bench_polmatmul EXCLUDE_FROM_ALL bench_polmatmul.cpp)
+set_target_properties(bench_polmatmul PROPERTIES
+    COMPILE_FLAGS "${OpenMP_CXX_FLAGS}"
+    LINK_FLAGS "${OpenMP_CXX_FLAGS}")
 target_link_libraries(bench_polmatmul utils gf2x-fft gf2x cantor128)
 add_dependencies(bench_polmatmul gf2x-build)
 

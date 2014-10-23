@@ -26,6 +26,12 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#ifdef  HAVE_OPENMP
+#include <omp.h>
+#define OMP_ROUND(k) (k % omp_get_num_threads() == omp_get_thread_num())
+#else
+#define OMP_ROUND(k) (1)
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -383,9 +389,8 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
         rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
         ASSERT_ALWAYS(rz == ulongs_per_mat);
 
-        unsigned long * v = buf;
+        const unsigned long * v = buf;
         unsigned long lmask = 1UL;
-
         for(unsigned int i = 0 ; i < m ; i++) {
             for(unsigned int j = 0 ; j < n ; j++) {
                 a.poly(i,j)[offset] |= mask & -((*v & lmask) != 0);
