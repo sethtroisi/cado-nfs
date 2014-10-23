@@ -6,9 +6,10 @@ set -e
 : ${REPO=git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git}
 : ${WEBDIR=$HOME/.webdir}
 export DIR=`mktemp -d /tmp/cado-cov.XXXXXXXXXXXX`
+export TMPDIR="$DIR"
 export CADO_DEBUG=1
 export COV=1
-F=`mktemp /tmp/cado-cov.local.XXXXXXXXX.sh`
+F="$TMPDIR/local.sh"
 cat > $F <<EOF
 CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
 CXXFLAGS="-O0 -g -fprofile-arcs -ftest-coverage"
@@ -95,5 +96,5 @@ EOF
 chmod 755 $DIR/genhtml
 $DIR/genhtml --html-epilog $DIR/epilog.html  -o $WEBDIR/cado-unit-tests/ $DIR/cado-nfs.info
 cp $DIR/make-test.txt $WEBDIR/cado-unit-tests
-[ "$NOWIPE" ] || rm -rf $DIR $F
+[ "$NOWIPE" ] || rm -rf $DIR
 
