@@ -25,7 +25,8 @@ dotest() {
     REFERENCE_SHA1="$1"
     shift
 
-    TMPDIR=`mktemp -d /tmp/plingen-test.XXXXXXXXXX`
+    : ${TMPDIR:=/tmp}
+    TMPDIR=`mktemp -d $TMPDIR/plingen-test.XXXXXXXXXX`
 
     m="$1"; shift
     n="$1"; shift
