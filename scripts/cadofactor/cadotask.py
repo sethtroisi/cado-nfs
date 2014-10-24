@@ -2984,6 +2984,10 @@ class PurgeTask(Task):
 
         nprimes = self.send_request(Request.GET_RENUMBER_PRIMECOUNT)
         minindex = int(nprimes / 20.0)
+        # For small cases, we want to avoid degenerated cases, so let's
+        # keep most of the ideals: memory is not an issue in that case.
+        if (minindex < 10000):
+            minindex = 500
         
         if "purgedfile" in self.state and not self.have_new_input_files() and \
                 input_nrels == self.state["input_nrels"]:
