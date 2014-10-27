@@ -102,6 +102,7 @@ misc/README
 misc/cachesim.c
 misc/contains_zerochar.c
 misc/phi.c
+misc/psi.c
 misc/cacheline.c
 misc/get_valid_lines.c
 filter/out-of-core/Makefile
