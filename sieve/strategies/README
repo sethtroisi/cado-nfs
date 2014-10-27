@@ -1,35 +1,55 @@
-Prepare a database of small primes grouped by bitsize and class modulo 12:
-==========================================================================
+Two binaries are available in this directory :
+  1- gfm
+  2- benchfm
 
-- compile primedb.c:
-  gcc -std=c99 primedb.c -o primedb -lgmp
+Firstly, gfm allows to choose the optimal parameters (B1, B2) for each factoring 
+methods (PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12) to find a prime number 
+in [2^lb, 2^ub]. Potentially, there are innumerable couples of parameters. 
+So, you can specify the sieve region that you want to test with several options : 
+   - b1min, b1_max, b1step and cmin, cmax, cstep (where c equal to B2/B1).
 
-- run the script with a given location for the primeDB:
-  ./prepare_primedb.sh /localdisk/primes
+Now, you have got our optimal parameters for each type of factoring methods for 
+different intervals of prime numbers. In the contex of the sieving step, the
+goal is to define strategies to find quickly the most relations. Before choosing these strategies,
+you must do a benchmark over our factoring methods to know
+exatly what is the probability and the cost to find a prime number of certain bit size. 
+To do this, the binary benchfm is available. In input, you give a file with 
+factoring methods, and you could compute the probabilities and/or the time 
+for each one of them. 
 
-Run the benchmark / statistic generator for your favorite method:
-=================================================================
+file format :
+-------------
+m c B1 B2 | p propa_p proba_(p+1) ... 0 | c1 c2 c3 c4
+etc... one line equal to one factoring method.
+where:
+  - m design a type of method.
+  - c design the curve.
+  - B1 et B2 are the parameters of the previous factoring method.
+  - p is the bit size of prime number that we start to bench
+  - p_i is the probabiliy to find a prime number of i bits size.
+  - ci is a time depend on the size of the global integer.
+(c1 (resp. c2 c3 c4) for an integer to MODREDCUL_MAXBITS, (resp. 
+MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and 3*MODREDCUL_MAXBITS) bits size.
+The last one is to know the time when we use the type mpz_t.
 
-- Edit the run_stat.sh script and modify the following variables:
-    CADO        Path where Cado-nfs was compiled
-    PRIME_DB    The location where you prepared the database of primes
 
-- run the script:
-  ./run_stat.sh <method> <B1> <B2> <sigma>
 
-  Examples:
-    ./run_stat.sh ecm 500 10000 17
-    ./run_stat.sh ecmm12 500 10000 2
-    ./run_stat.sh pm1 200 4000 1
-    ./run_stat.sh pp1_27 200 4000 1
-    ./run_stat.sh pp1_65 200 4000 1
+In what follows, we give usage examples :
 
-  Notes:
-  * for pm1 and pp1, the parameter sigma is ignored.
-  * pp1_27 uses 2/7 as starting point, whereas pp1_65 uses 6/5.
-  * ecm corresponds to the BRENT12 curves in facul.c.
-  * ecmm12 corresponds to the MONTY12 curves in facul.c.
+For examples, you could search optimal parameters to find 
+./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 100 -b1max 500 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_1;
+./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 500 -b1max 2000 -b1step 50 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_2;
+./gfm -m PM1 -lb 20 -ub 25 -n 150 -b1min 2000 -b1max 5000 -b1step 100 -cmin 10 -cmax 200 -cstep 10 -out Data_PM1_3;
 
-  If you have a file all.st containing all methods you want to test, you
-  can create a file of statistics with:
-    while read m b1 b2 p; do ./run_stat.sh $m $b1 $b2 $p; done < all.st
+Then, we concatenate our datas, and compute the convex hull:
+cat Data_PM1_1 Data_PM1_2 Data_PM1_3 > Data_PM1
+./gfm -fch -fch_in Data_PM1 -fch_out Data_PM1_ch
+
+Finally, to bench the found methods, you could use the following command :
+./benchfm -in Data_PM1_ch -p -t Data_PM1_ch_pt
+
+Note that these commands are just an example to illustrate the differents usefullness 
+of our binaries.
+
+
+
