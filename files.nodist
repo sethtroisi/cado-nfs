@@ -67,7 +67,6 @@ sieve/ecm/getprime.c
 sieve/ecm/ecm_check.c
 sieve/ecm/issmooth.c
 sieve/hist.rsa155.3lp.png
-sieve/strategies/optimize.sage
 sqrt/CMakeLists-nodist.txt
 sqrt/lift.c
 sqrt/magma-manu/
@@ -115,14 +114,6 @@ ffs/archives/modprecomp.mag
 ffs/archives/skewgauss.mag
 ffs/archives/test.mag
 ffs/test.mag
-sieve/strategies/Makefile
-sieve/strategies/README
-sieve/strategies/buildchain.c
-sieve/strategies/methods.c
-sieve/strategies/methods.h
-sieve/strategies/prepare_primedb.sh
-sieve/strategies/primedb.c
-sieve/strategies/run_stat.sh
 scripts/cadofactor/README.OAR
 scripts/plot_params.sh
 linalg/bwc/update-flint.sh
