@@ -17,6 +17,10 @@ To do this, the binary benchfm is available. In input, you give a file with
 factoring methods, and you could compute the probabilities and/or the time 
 for each one of them. 
 
+TODO : a filter is doing to allow to keep only a number of factoring methods!!!
+
+
+
 file format :
 -------------
 m c B1 B2 | p propa_p proba_(p+1) ... 0 | c1 c2 c3 c4

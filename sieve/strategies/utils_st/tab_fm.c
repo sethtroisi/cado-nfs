@@ -7,6 +7,8 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include "facul.h"
+
 static const double EPSILON_DBL = 0.000001;
 
 tabular_fm_t*
@@ -131,7 +133,7 @@ extract_fm_method (tabular_fm_t* t, int method, int curve)
       fm_t* el = t->tab[i];
       if ((int) el->method[0] == method)
 	{
-	  if (method == ECM)
+	  if (method == EC_METHOD)
 	    {
 	      if ((int)el->method[1] == curve)
 		tabular_fm_add_fm (res, el);

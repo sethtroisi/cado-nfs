@@ -9,12 +9,13 @@
 #include <sys/resource.h>
 #include <time.h>
 
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
 #include "facul.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
-#include "modredc_ul.h"
-#include "modredc_ul_default.h"
 #include "getprime.h"
 
 #include "generate_factoring_method.h"
@@ -325,14 +326,12 @@ sub_routine_bench_time (facul_strategy_t *method, gmp_randstate_t state,
       generate_prime_factor (N, state, len_n);
 
       //compute the the time of execution
-      struct timeval t_before, t_after;
-      gettimeofday(&t_before,NULL);
-      
+      double starttime, endtime;
+      starttime = microseconds ();
       facul (f, N, method);
 
-      gettimeofday(&t_after,NULL);
-      tps += (t_after.tv_sec - t_before.tv_sec)*1000000L +
-	t_after.tv_usec - t_before.tv_usec;
+      endtime = microseconds ();
+      tps += endtime - starttime; 
     }
   //clear
   mpz_clear(N);
@@ -492,9 +491,8 @@ sub_routine_bench_proba_cost_interval (facul_strategy_t *strategy,
 	    }
 	}
       //compute the the time of execution
-      struct timeval t_before, t_after;
-      gettimeofday(&t_before,NULL);
-      
+      double starttime, endtime;
+      starttime = microseconds ();
       /* 
 	 f will contain the prime factor of N that the strategy found.
 	 Note that N is composed by two prime factors by the previous function.
@@ -507,10 +505,9 @@ sub_routine_bench_proba_cost_interval (facul_strategy_t *strategy,
       if (f[0] != 0)
 	nb_succes++;
 
-      gettimeofday(&t_after,NULL);
-      tps += (t_after.tv_sec - t_before.tv_sec)*1000000L 
-	+ t_after.tv_usec - t_before.tv_usec;
-
+      endtime = microseconds ();
+      tps += endtime - starttime;
+      
       nb_test++;
     }
 
@@ -1013,7 +1010,7 @@ filtering (tabular_fm_t* fm, int len_p_min, int nb_prime_nb)
       double* proba_i = fm_get_proba (elem);
       double* temps_i = fm_get_time (elem);
       int len_i = fm_get_len_proba (elem);
-      if (method_i[0] == ECM && method_i[1] != MONTY16)
+      if (method_i[0] == EC_METHOD && method_i[1] != MONTY16)
 	{
 	  for (int j = i+1; j < len; j++)
 	    {
@@ -1023,7 +1020,7 @@ filtering (tabular_fm_t* fm, int len_p_min, int nb_prime_nb)
 	      double* temps_j = fm_get_time (elem);
 	      int len_j = fm_get_len_proba (elem);
 	      int nb_min = (len_i < len_j)?len_i:len_j;
-	      if (method_j[0] == ECM)
+	      if (method_j[0] == EC_METHOD)
 		{
 		  int cpt_b = 0;
 		  //becarefull: the data t isn't sorted!!! so we need to know which is better than the other.

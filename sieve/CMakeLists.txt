@@ -46,6 +46,7 @@ add_executable(freerel freerel.c fb.c)
 target_link_libraries(freerel utils)
 
 add_subdirectory(ecm)
+add_subdirectory(strategies)
 
 add_executable(dupsup dupsup.c las-duplicate.c las-qlattice.c las-coordinates.c las-cofactor.c fb.c)
 target_link_libraries(dupsup utils_with_io facul las-norms)

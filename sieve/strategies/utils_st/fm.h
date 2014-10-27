@@ -4,40 +4,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#ifndef BRENT12
-#define BRENT12 0
-#endif
-
-#ifndef MONTY12
-#define MONTY12 1
-#endif
-
-#ifndef MONTY16
-#define MONTY16 2
-#endif
-
-#ifndef PM1_METHOD
-#define PM1_METHOD 1
-#endif
-
-#ifndef PP1_27_METHOD
-#define PP1_27_METHOD 2
-#endif
-
-#ifndef PP1_65_METHOD
-#define PP1_65_METHOD 3
-#endif
-
-#ifndef EC_METHOD
-#define EC_METHOD 4
-#endif
-
-//todo: clean it in the future!
-
-#define PM1 1
-#define PP1 2
-#define ECM 3
-
 #define NB_METHOD 4
 #define NB_CURVE 3
 
