@@ -4,9 +4,9 @@
 #include "point.h"
 
 typedef struct tabular_point {
-	point_t **tab;
-	int index;
-	int size;
+    point_t **tab;
+    int index;
+    int size;
 } tabular_point_t;
 
 tabular_point_t *tabular_point_create(void);

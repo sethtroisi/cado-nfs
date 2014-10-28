@@ -6,9 +6,9 @@
 #include "strategy.h"
 
 typedef struct tabular_strategy {
-	strategy_t **tab;
-	int index;
-	int size;
+    strategy_t **tab;
+    int index;
+    int size;
 } tabular_strategy_t;
 
 tabular_strategy_t *tabular_strategy_create(void);

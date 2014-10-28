@@ -4,9 +4,9 @@
 #include <stdio.h>
 
 typedef struct point {
-	int number;
-	double x;
-	double y;
+    int number;
+    double x;
+    double y;
 } point_t;
 
 point_t *point_create(int numero, double x, double y);

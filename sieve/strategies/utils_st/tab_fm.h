@@ -6,9 +6,9 @@
 #include "fm.h"
 
 typedef struct tabular_fm {
-	fm_t **tab;
-	int index;
-	int size;
+    fm_t **tab;
+    int index;
+    int size;
 } tabular_fm_t;
 
 tabular_fm_t *tabular_fm_create(void);

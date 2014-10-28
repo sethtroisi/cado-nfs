@@ -8,18 +8,18 @@
 #define NB_CURVE 3
 
 typedef struct fm {
-	unsigned long *method;	//contain: METHOD, CURVE, B1, B2
-	double *proba;
-	double *time;
-	int len_method;		//lenght of the method (default:4)
-	int len_proba;		//index of array proba 
-	int len_time;		//index of array time
-	int len_p_min;
-	/*
-	   The prime number such that : proba[i] and time[i] equal to 
-	   the probability and the time to find a prime number of 
-	   len_p_min+i bits with our nmethod.
-	 */
+    unsigned long *method;	//contain: METHOD, CURVE, B1, B2
+    double *proba;
+    double *time;
+    int len_method;		//lenght of the method (default:4)
+    int len_proba;		//index of array proba 
+    int len_time;		//index of array time
+    int len_p_min;
+    /*
+       The prime number such that : proba[i] and time[i] equal to 
+       the probability and the time to find a prime number of 
+       len_p_min+i bits with our nmethod.
+     */
 } fm_t;
 
 fm_t *fm_create(void);

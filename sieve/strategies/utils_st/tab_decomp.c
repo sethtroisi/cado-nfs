@@ -10,172 +10,147 @@
 
 #include "tab_decomp.h"
 
-
-tabular_decomp_t*
-tabular_decomp_create (void)
+tabular_decomp_t *tabular_decomp_create(void)
 {
-  tabular_decomp_t* t = malloc(sizeof(*t));
-  ASSERT_ALWAYS (t != NULL);
-  
-  t->index = 0;
-  t->size = 2;
+    tabular_decomp_t *t = malloc(sizeof(*t));
+    ASSERT_ALWAYS(t != NULL);
 
-  t->tab = malloc (t->size * sizeof(decomp_t*));
-  ASSERT_ALWAYS (t->tab != NULL);
-  
-  return t;
+    t->index = 0;
+    t->size = 2;
+
+    t->tab = malloc(t->size * sizeof(decomp_t *));
+    ASSERT_ALWAYS(t->tab != NULL);
+
+    return t;
 }
 
-void
-tabular_decomp_free (tabular_decomp_t* t)
+void tabular_decomp_free(tabular_decomp_t * t)
 {
-  for (int i =0; i < t->index; i++)
-    decomp_free (t->tab[i]);
-  free (t->tab);
-  free (t);
+    for (int i = 0; i < t->index; i++)
+	decomp_free(t->tab[i]);
+    free(t->tab);
+    free(t);
 
 }
 
-void
-tabular_decomp_realloc (tabular_decomp_t *t)
+void tabular_decomp_realloc(tabular_decomp_t * t)
 {
-  t->tab = realloc(t->tab, t->size*2  *( sizeof(decomp_t*)));
-  ASSERT_ALWAYS (t->tab!=NULL);
-  t->size*=2;
+    t->tab = realloc(t->tab, t->size * 2 * (sizeof(decomp_t *)));
+    ASSERT_ALWAYS(t->tab != NULL);
+    t->size *= 2;
 }
 
-
-void
-tabular_decomp_add (tabular_decomp_t *t, 
-		    int len, int* tab, double nb_elem)
+void tabular_decomp_add(tabular_decomp_t * t, int len, int *tab, double nb_elem)
 {
-  if (t->index >= t->size)
-    tabular_decomp_realloc (t);
-  t->tab[t->index] = decomp_create (len, tab, nb_elem);
-  t->index++;
+    if (t->index >= t->size)
+	tabular_decomp_realloc(t);
+    t->tab[t->index] = decomp_create(len, tab, nb_elem);
+    t->index++;
 }
 
-void
-tabular_decomp_add_decomp (tabular_decomp_t *t, decomp_t* decomp)
+void tabular_decomp_add_decomp(tabular_decomp_t * t, decomp_t * decomp)
 {
-  tabular_decomp_add (t, decomp->len, decomp->tab, decomp->nb_elem);
+    tabular_decomp_add(t, decomp->len, decomp->tab, decomp->nb_elem);
 }
 
-void
-tabular_decomp_concat (tabular_decomp_t *t1, tabular_decomp_t *t2)
+void tabular_decomp_concat(tabular_decomp_t * t1, tabular_decomp_t * t2)
 {
-  int len = t2->index;
-  for (int i = 0; i < len; i++)
-    tabular_decomp_add_decomp (t1, t2->tab[i]);
+    int len = t2->index;
+    for (int i = 0; i < len; i++)
+	tabular_decomp_add_decomp(t1, t2->tab[i]);
 }
 
-decomp_t*
-tabular_decomp_get_decomp (tabular_decomp_t *t, int index)
+decomp_t *tabular_decomp_get_decomp(tabular_decomp_t * t, int index)
 {
-  return t->tab[index];
+    return t->tab[index];
 }
 
-void
-tabular_decomp_print_file (tabular_decomp_t* t, FILE* output_file)
+void tabular_decomp_print_file(tabular_decomp_t * t, FILE * output_file)
 {
-  fprintf (output_file, "******************\n");
-  for (int i =0; i < t->index; i++)
-    decomp_print_file (t->tab[i], output_file);
-  fprintf (output_file, "******************\n");
+    fprintf(output_file, "******************\n");
+    for (int i = 0; i < t->index; i++)
+	decomp_print_file(t->tab[i], output_file);
+    fprintf(output_file, "******************\n");
 }
 
-
-void
-tabular_decomp_print (tabular_decomp_t* t)
+void tabular_decomp_print(tabular_decomp_t * t)
 {
-  tabular_decomp_print_file (t, stdout);
+    tabular_decomp_print_file(t, stdout);
 }
 
-static decomp_t*
-analyse_line (char* line)
+static decomp_t *analyse_line(char *line)
 {
-  regex_t preg_decomp;
-  const char *str_preg_decomp = "([[:digit:]]+.[[:digit:]]*)";
-  regcomp (&preg_decomp, str_preg_decomp, REG_ICASE|REG_EXTENDED);
-  
-  //process the ligne
-  const char * str_process = &line[0];
-  const int len_max = 10;
-  char** res = malloc (sizeof(*res) * len_max);
-  int ind_res = -1;
-  while (str_process[0] != '\0' )
-    {
-      //printf ("line-->'%s'\n", str_process);
-      /*TEST REGULAR EXPRESSION  'preg_decomp*/
-      size_t nmatch = 2;
-      regmatch_t* pmatch = calloc (sizeof(*pmatch), nmatch);
-      regexec (&preg_decomp, str_process, nmatch, pmatch, 0);
-      if ( pmatch[0].rm_so != pmatch[0].rm_eo)
-	{
-	  int start = pmatch[1].rm_so;
-	  int end = pmatch[1].rm_eo;
-	  if (start != -1)
-	    {
-	      int size = end-start;
-	      char* el = malloc (sizeof(*el)*(size+1));
-	      ASSERT_ALWAYS (el != NULL);
-	      strncpy (el, &str_process[start], size);
-	      el[size] = '\0';
-	      ind_res++;
-	      res[ind_res] = el;//strtoul (el, NULL, 10);
-	      //printf ("el = %s\n", el);
+    regex_t preg_decomp;
+    const char *str_preg_decomp = "([[:digit:]]+.[[:digit:]]*)";
+    regcomp(&preg_decomp, str_preg_decomp, REG_ICASE | REG_EXTENDED);
+
+    //process the ligne
+    const char *str_process = &line[0];
+    const int len_max = 10;
+    char **res = malloc(sizeof(*res) * len_max);
+    int ind_res = -1;
+    while (str_process[0] != '\0') {
+	//printf ("line-->'%s'\n", str_process);
+	/*TEST REGULAR EXPRESSION  'preg_decomp */
+	size_t nmatch = 2;
+	regmatch_t *pmatch = calloc(sizeof(*pmatch), nmatch);
+	regexec(&preg_decomp, str_process, nmatch, pmatch, 0);
+	if (pmatch[0].rm_so != pmatch[0].rm_eo) {
+	    int start = pmatch[1].rm_so;
+	    int end = pmatch[1].rm_eo;
+	    if (start != -1) {
+		int size = end - start;
+		char *el = malloc(sizeof(*el) * (size + 1));
+		ASSERT_ALWAYS(el != NULL);
+		strncpy(el, &str_process[start], size);
+		el[size] = '\0';
+		ind_res++;
+		res[ind_res] = el;	//strtoul (el, NULL, 10);
+		//printf ("el = %s\n", el);
 	    }
+	} else {
+	    free(pmatch);
+	    break;
 	}
-      else
-	{
-	  free (pmatch);
-	  break;
-	}
-      str_process = &str_process[pmatch[0].rm_eo];
-      free (pmatch);
+	str_process = &str_process[pmatch[0].rm_eo];
+	free(pmatch);
     }
-  decomp_t* dec = NULL;
-  //create decomp_t* dec
-  if (ind_res != -1)
-    {
-      int tab[ind_res];
-      for (int i = 0; i < ind_res; i++)
-	{
-	  tab[i] =atoi (res[i]);
-	  free (res[i]);
+    decomp_t *dec = NULL;
+    //create decomp_t* dec
+    if (ind_res != -1) {
+	int tab[ind_res];
+	for (int i = 0; i < ind_res; i++) {
+	    tab[i] = atoi(res[i]);
+	    free(res[i]);
 	}
-      double nb_elem = strtod (res[ind_res], NULL);
-      free (res[ind_res]);
-      dec = decomp_create (ind_res, tab, nb_elem);
+	double nb_elem = strtod(res[ind_res], NULL);
+	free(res[ind_res]);
+	dec = decomp_create(ind_res, tab, nb_elem);
     }
-  //free
-  regfree(&preg_decomp);
-  free (res);
-  return dec;
+    //free
+    regfree(&preg_decomp);
+    free(res);
+    return dec;
 }
 
 /*
   This function extracts all decompositions of a cofactor from a file.
  */
-tabular_decomp_t* 
-tabular_decomp_fscan (FILE* file)
+tabular_decomp_t *tabular_decomp_fscan(FILE * file)
 {
-  tabular_decomp_t* res = tabular_decomp_create();  
+    tabular_decomp_t *res = tabular_decomp_create();
 
-  if (file== NULL)
-    return NULL;
+    if (file == NULL)
+	return NULL;
 
-
-  const int len_line = 1000;
-  char line[len_line];
-  while (fgets (line, len_line, file) != 0)
-    {
-      decomp_t* dec = analyse_line (line);
-      if (dec != NULL)
-	{
-	  tabular_decomp_add_decomp (res, dec); 
-	  decomp_free (dec);
+    const int len_line = 1000;
+    char line[len_line];
+    while (fgets(line, len_line, file) != 0) {
+	decomp_t *dec = analyse_line(line);
+	if (dec != NULL) {
+	    tabular_decomp_add_decomp(res, dec);
+	    decomp_free(dec);
 	}
     }
-  return res;
+    return res;
 }
