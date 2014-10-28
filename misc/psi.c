@@ -266,6 +266,7 @@ int main(int argc, char **argv)
     printf("Computes Psi_k(x, y, z), the number of intgers in [1, x] with exactly k prime\n"
            "factors in ]y, z], and all others in [1, y]\n");
     printf("Default for k is 0,1; i.e., integers with at most one large prime.\n");
+    printf("The -k parameter takes a comma-separated list of k-values to process.\n");
     printf("With -print, prints each smooth integer as a list of primes\n");
     exit(EXIT_FAILURE);
   }
