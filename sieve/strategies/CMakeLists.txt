@@ -6,7 +6,7 @@ set (SRC_UTILS ${SUF_UTILS}point.c ${SUF_UTILS}tab_point.c
     ${SUF_UTILS}convex_hull.c ${SUF_UTILS}fm.c ${SUF_UTILS}tab_fm.c
     ${SUF_UTILS}strategy.c ${SUF_UTILS}tab_strategy.c)
 
-set (LIB_EXEC m gmp facul utils)
+set (LIB_EXEC m facul utils)
 
 add_executable(gfm gfm_exec.c generate_factoring_method.c ${SRC_UTILS})
 target_link_libraries(gfm ${LIB_EXEC})
