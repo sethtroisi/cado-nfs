@@ -684,9 +684,6 @@ bench_proba_cost_interval (int method, int curve, gmp_randstate_t state,
   double zero = 0;
   tabular_fm_add (tab_fusion, tmp_method, 4, &zero,1, &zero, 1, len_p_min);
 
-  double max_tps = INFINITY;
-
-
   for (int c = c_min; c <= c_max; c+=c_pas)
     {
       int B1;
@@ -699,7 +696,7 @@ bench_proba_cost_interval (int method, int curve, gmp_randstate_t state,
       unsigned long elem[4];
       double proba = 0;
       double tps = 0;
-      while (B1 < b1_max && proba < max_proba && tps < max_tps)
+      while (B1 < b1_max && proba < max_proba)
 	{
 	  facul_strategy_t *fm = generate_fm (method, curve, B1, B2);
 
@@ -729,11 +726,6 @@ bench_proba_cost_interval (int method, int curve, gmp_randstate_t state,
 
 	}
       //merge arrays
-      
-      if (max_tps == INFINITY)
-	{	    
-	  max_tps = tps;
-	}
       tabular_fm_concat (tab_fusion, tab);
       tabular_fm_free (tab);
     }
