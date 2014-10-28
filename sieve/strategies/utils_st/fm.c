@@ -1,8 +1,12 @@
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
+
 #include "fm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+
 #include <math.h>
 #include <stdbool.h>
 
@@ -10,16 +14,16 @@ fm_t*
 fm_create (void)
 {
   fm_t* t = malloc(sizeof(*t));
-  assert (t != NULL);
+  ASSERT_ALWAYS (t != NULL);
   t->len_method = 4;
   t->len_proba = 1;
   t->len_time = 1;
   t->method = calloc (t->len_method, sizeof(unsigned long));
-  assert (t->method != NULL);
+  ASSERT_ALWAYS (t->method != NULL);
   t->proba = calloc (t->len_proba, sizeof(double));
-  assert (t->proba != NULL);
+  ASSERT_ALWAYS (t->proba != NULL);
   t->time = calloc (t->len_time, sizeof(double));
-  assert (t->time != NULL);
+  ASSERT_ALWAYS (t->time != NULL);
   t->len_p_min = 0;
   return t;
 }
@@ -85,7 +89,7 @@ fm_set_method(fm_t* t, unsigned long* value, int len)
   if (len != t->len_method)
     {//realloc
       t->method = realloc(t->method, len  *(sizeof(unsigned long)));
-      assert (t->method!=NULL);
+      ASSERT (t->method!=NULL);
       t->len_method = len;
     }
 
@@ -102,7 +106,7 @@ fm_set_proba(fm_t* t, double* value, int len, int len_p_min)
   if (len != t->len_proba)
     {//realloc
       t->proba = realloc(t->proba, len  *(sizeof(double)));
-      assert (t->proba!=NULL);
+      ASSERT (t->proba!=NULL);
       t->len_proba = len;
     }
   
@@ -120,7 +124,7 @@ fm_set_time(fm_t* t, double* value, int len)
   if (len != t->len_time)
     {//realloc
       t->time = realloc(t->time, len  *(sizeof(double)));
-      assert (t->time!=NULL);
+      ASSERT (t->time!=NULL);
       t->len_time = len;
     }
 

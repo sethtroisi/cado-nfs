@@ -311,12 +311,13 @@ bench_proba_fm (facul_strategy_t *strategy,
 }
 
 
+
 static double
 sub_routine_bench_time (facul_strategy_t *method, gmp_randstate_t state, 
 			int len_n)
 {
   double tps = 0;
-  int nb_test = 10;
+  int nb_test = 10000;
   mpz_t N;
   mpz_init(N);
   unsigned long f[2];
@@ -324,26 +325,26 @@ sub_routine_bench_time (facul_strategy_t *method, gmp_randstate_t state,
   for (int i = 0; i < nb_test; i++)
     {
       generate_prime_factor (N, state, len_n);
-
       //compute the the time of execution
-      double starttime, endtime;
+      uint64_t starttime, endtime;
       starttime = microseconds ();
+
       facul (f, N, method);
 
       endtime = microseconds ();
+
       tps += endtime - starttime; 
     }
   //clear
   mpz_clear(N);
 
-  return tps/nb_test;
+  return tps/(nb_test);
 
 }
 /*
   This function collects the times to run the strategy st.
   These time are computed for integers of bits size MODREDCUL_MAXBITS, 
   MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and 3*MODREDCUL_MAXBITS.
-  The last one is to know the time when we use the type mpz_t.
  */
 static double*
 bench_time_fm (facul_strategy_t *st, gmp_randstate_t state)
@@ -354,7 +355,6 @@ bench_time_fm (facul_strategy_t *st, gmp_randstate_t state)
   res[1] = sub_routine_bench_time (st, state, MODREDC15UL_MAXBITS-1);
   res[2] = sub_routine_bench_time (st, state, MODREDC2UL2_MAXBITS-1);
   res[3] = sub_routine_bench_time (st, state, MODREDC15UL_MAXBITS * 2);
-
   return res;
 }
 
@@ -471,7 +471,7 @@ sub_routine_bench_proba_cost_interval (facul_strategy_t *strategy,
 
   mpz_t N;
   mpz_init(N);
-  unsigned long tps = 0;
+  double tps = 0;
   double * disp = distribution_prime_number (len_p_min, len_p_max);
 
   while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max))
@@ -680,7 +680,7 @@ bench_proba_cost_interval (int method, int curve, gmp_randstate_t state,
   tabular_fm_t *tab_fusion = tabular_fm_create ();
 
   //add zero method
-  unsigned long tmp_method[4] = {PM1_METHOD, 0, 0, 0};
+  unsigned long tmp_method[4] = {method, 0, 0, 0};
   double zero = 0;
   tabular_fm_add (tab_fusion, tmp_method, 4, &zero,1, &zero, 1, len_p_min);
 

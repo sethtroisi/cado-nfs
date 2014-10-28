@@ -1,9 +1,11 @@
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
 #include "tab_fm.h"
 
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -15,13 +17,13 @@ tabular_fm_t*
 tabular_fm_create (void)
 {
   tabular_fm_t* t = malloc(sizeof(*t));
-  assert (t != NULL);
+  ASSERT_ALWAYS (t != NULL);
   
   t->index = 0;
   t->size = 2;
     
   t->tab = malloc (t->size * sizeof(fm_t*));
-  assert (t->tab != NULL);
+  ASSERT_ALWAYS (t->tab != NULL);
 
   return t;
 }
@@ -39,7 +41,7 @@ void
 tabular_fm_realloc (tabular_fm_t *t)
 {
   t->tab = realloc(t->tab, t->size*2  *( sizeof(fm_t*)));
-  assert (t->tab!=NULL);
+  ASSERT_ALWAYS (t->tab!=NULL);
   t->size *=2;
 }
 
@@ -78,7 +80,7 @@ tabular_fm_set_index (tabular_fm_t *t, unsigned long* method, int len_method, do
   if (ind >= t->index)
     {
       t->tab[ind] = fm_create ();
-      assert (t->tab[ind] != NULL);
+      ASSERT_ALWAYS (t->tab[ind] != NULL);
     }
   
   fm_set_method (t->tab[ind], method, len_method);
@@ -91,7 +93,7 @@ tabular_fm_set_index (tabular_fm_t *t, unsigned long* method, int len_method, do
 fm_t*
 tabular_fm_get_fm (tabular_fm_t *t, int index)
 {
-  assert (index <= t->index);
+  ASSERT_ALWAYS (index <= t->index);
   return t->tab[index];
 }
 
@@ -108,14 +110,14 @@ tabular_fm_concat(tabular_fm_t* t1, tabular_fm_t* t2)
 void
 tabular_fm_put_zero (tabular_fm_t* t, int index)
 {
-  assert (index <= t->index);
+  ASSERT_ALWAYS (index <= t->index);
   fm_put_zero (t->tab[index]);
 }
 
 bool
 tabular_fm_is_zero (tabular_fm_t *t, int index)
 {
-  assert (index <= t->index);
+  ASSERT_ALWAYS (index <= t->index);
   return fm_is_zero (t->tab[index]);
 }
 

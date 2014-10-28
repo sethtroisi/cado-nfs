@@ -31,16 +31,16 @@ declare_usage(param_list pl)
   "to find a prime number in [2^lb, 2^ub]. Note that you can : \n"
   "-make your study only with one method (-m).\n"
   "-specify the sieving region of B1 and c instead of using default values.\n"
-  "Then, You can apply the convex hull to keep only the best methods "
-  "(-fch from a file or just -ch if you want to apply it after the bench)."
-  "Lastly, a new option (-f) is doing to allow to keep only a number "
+  "Then, You can apply the convex hull to keep only the best methods\n "
+  "(-fch from a file or just -ch if you want to apply it after the bench\n)."
+  "Lastly, a new option (-f) is doing to allow to keep only a number\n "
   "of factoring methods\n\n");
 
   param_list_decl_usage (pl, "ub",  "to set large prime bound to 2^ub.");
   param_list_decl_usage (pl, "lb",  "to set factor base bound to 2^lb.");
   param_list_decl_usage (pl, "n",   "to give the lenght of n.");
   param_list_decl_usage (pl, "out", "to specify the file which contain our factoring methods.");
-  param_list_decl_usage (pl, "m",   "to specify the method : PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12. By default, we use all methods one after the other.");
+  param_list_decl_usage (pl, "m",   "to specify the method : PM1, PP1-27, PP1-65, ECM-M12, ECM-M16,\n ECM-B12. By default, we use all methods one after the other.");
   param_list_decl_usage (pl, "ch",   "(switch) to apply the convex hull.");
 
   param_list_decl_usage (pl, "b1min", "to set b1_min (sieve region).");
@@ -51,8 +51,8 @@ declare_usage(param_list pl)
   param_list_decl_usage (pl, "cstep", "to set c_step (sieve region).");
 
   param_list_decl_usage (pl, "fch", "(switch) to apply the convex hull");
-  param_list_decl_usage (pl, "fch_in", "to specify the input file which contains the factoring methods (default name :'default_fch_in').");
-  param_list_decl_usage (pl, "fch_out", "to specify the output file which contain the convex hull (default name :'default_fch_out').");
+  param_list_decl_usage (pl, "fch_in", "to specify the input file which contains \n the factoring methods (default name :'default_fch_in').");
+  param_list_decl_usage (pl, "fch_out", "to specify the output file which contains \n the convex hull (default name :'default_fch_out').");
 
 }
 

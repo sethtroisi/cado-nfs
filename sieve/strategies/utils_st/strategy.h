@@ -3,14 +3,15 @@
 
 #include "tab_fm.h"
 
-enum { RATIONNAL_SIDE, ALGEBRAIC_SIDE };
 
 typedef struct strategy {
-	tabular_fm_t *tab_fm;
-	double proba;
-	double time;
-	int *side;
-	int len_side;		//we allocate this function only one time. So the real and physical size are the same.
+  tabular_fm_t *tab_fm;
+  double proba;
+  double time;
+  int *side;
+  int len_side;		
+  //we allocate this function only one time. So the real and physical size are the same.
+
 } strategy_t;
 
 strategy_t *strategy_create();

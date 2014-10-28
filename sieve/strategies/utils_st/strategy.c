@@ -1,14 +1,18 @@
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
+
 #include "strategy.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+
 
 strategy_t*
 strategy_create ()
 {
   strategy_t* t = malloc(sizeof(*t));
-  assert (t!=NULL);
+  ASSERT_ALWAYS (t!=NULL);
   t->tab_fm = tabular_fm_create ();
   t->proba = 0;
   t->time = 0;
@@ -76,6 +80,7 @@ strategy_add_fm_side (strategy_t* t, fm_t* elem, int side)
     {
       t->len_side = 1;
       t->side = malloc (sizeof(int)*(t->len_side));
+      ASSERT_ALWAYS (t->side != NULL);
     }
   else
     {

@@ -1,7 +1,6 @@
 #include <stdlib.h>
-
 #include "convex_hull.h"
-#include "math.h"
+#include <math.h>
 
 
 /*

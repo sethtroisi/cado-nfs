@@ -1,15 +1,18 @@
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
+
 #include "point.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 
 point_t*
 point_create (int numero, double x, double y)
 {
   point_t* t = malloc(sizeof(*t));
-  assert (t != NULL);
+  ASSERT_ALWAYS (t != NULL);
   t->number = numero;
   t->x = x;
   t->y = y;
