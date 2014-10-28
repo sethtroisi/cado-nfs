@@ -14,3 +14,11 @@ target_link_libraries(gfm ${LIB_EXEC})
 add_executable(benchfm benchfm_exec.c generate_factoring_method.c ${SRC_UTILS})
 target_link_libraries(benchfm ${LIB_EXEC})
 
+add_executable(gst 
+  gst_exec.c 
+  generate_strategies.c 
+  ${SUF_UTILS}/decomp.c
+  ${SUF_UTILS}/tab_decomp.c
+  ${SRC_UTILS})
+
+target_link_libraries(gst ${LIB_EXEC})
