@@ -337,7 +337,6 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
     }
     tabular_strategy_free(all_strat);
     strategy_free(strat);
-    tabular_decomp_free(init_tab);
     return res;
 }
 
@@ -482,6 +481,7 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
      */
     tabular_strategy_t ***matrix = malloc(sizeof(*matrix) * (rmfb + 1));
     assert(matrix != NULL);
+
     for (int r1 = 0; r1 <= rmfb; r1++) {
 	matrix[r1] = malloc(sizeof(*matrix[r1]) * (amfb + 1));
 	assert(matrix[r1] != NULL);
@@ -503,22 +503,27 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
     fm_set_method(zero, method_zero, 4);
 
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (rmfb + 1));
+    ASSERT_ALWAYS (data_rat);
 
+    int lim1 = 2 * rlb - 1;
     for (int r1 = 0; r1 <= rmfb; r1++) {
-	char name_file[200];
-	sprintf(name_file,
-		"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
-		r1, rlb);
-	FILE *file = fopen(name_file, "r");
+	tabular_decomp_t *tab_decomp = NULL;
+	if (r1 >= lim1)
+	    {
+		char name_file[200];
+		sprintf(name_file,
+			"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
+			r1, rlb);
+		FILE *file = fopen(name_file, "r");
 
-	tabular_decomp_t *tab_decomp = tabular_decomp_fscan(file);
+		tab_decomp = tabular_decomp_fscan(file);
 
-	if (tab_decomp == NULL) {
-	    fprintf(stderr, "impossible to read '%s'\n", name_file);
-	    exit(EXIT_FAILURE);
-	}
-	fclose(file);
-	
+		if (tab_decomp == NULL) {
+		    fprintf(stderr, "impossible to read '%s'\n", name_file);
+		    exit(EXIT_FAILURE);
+		}
+		fclose(file);
+	    }
 	data_rat[r1] =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
 					ecm_rc, rlb, rub, r1);
@@ -530,21 +535,25 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
       read good elements for r_2 in the array data_r2 and compute the
       data for each r_1. So :
     */
+    int lim2 = 2 * alb - 1;
     for (int r2 = 0; r2 <= amfb; r2++) {
-	char name_file[200];
-	sprintf(name_file,
-		"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
-		r2, alb);
-	FILE *file = fopen(name_file, "r");
-
-	tabular_decomp_t *tab_decomp = tabular_decomp_fscan(file);
-
-	if (tab_decomp == NULL) {
-	    fprintf(stderr, "impossible to read '%s'\n", name_file);
-	    exit(EXIT_FAILURE);
-	}
-	fclose(file);
-
+	tabular_decomp_t *tab_decomp = NULL;
+	if (r2 >= lim2)
+	    {
+		char name_file[200];
+		sprintf(name_file,
+			"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
+			r2, alb);
+		FILE *file = fopen(name_file, "r");
+		
+		tab_decomp = tabular_decomp_fscan(file);
+		
+		if (tab_decomp == NULL) {
+		    fprintf(stderr, "impossible to read '%s'\n", name_file);
+		    exit(EXIT_FAILURE);
+		}
+		fclose(file);
+	    }
 
 	tabular_strategy_t *strat_r2 = 
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,

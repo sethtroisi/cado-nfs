@@ -29,11 +29,13 @@ fm_t *fm_create(void)
 
 void fm_free(fm_t * t)
 {
-    free(t->time);
-    free(t->proba);
-    free(t->method);
-
-    free(t);
+    if (t != NULL)
+	{
+	    free(t->time);
+	    free(t->proba);
+	    free(t->method);
+	    free(t);
+	}
 }
 
 unsigned long *fm_get_method(fm_t * t)

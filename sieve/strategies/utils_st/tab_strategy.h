@@ -31,8 +31,11 @@ void tabular_strategy_concat(tabular_strategy_t * t1, tabular_strategy_t * t2);
 tabular_strategy_t *tabular_strategy_concat_st(tabular_strategy_t * t1,
 					       tabular_strategy_t * t2);
 
-void tabular_strategy_print_file(tabular_strategy_t * t, FILE * output_file);
+void tabular_strategy_fprint (FILE* file, tabular_strategy_t * t);
 
 void tabular_strategy_print(tabular_strategy_t * t);
+
+tabular_strategy_t* tabular_strategy_fscan (FILE* file);
+
 
 #endif				/* TAB_STRATEGY_H */

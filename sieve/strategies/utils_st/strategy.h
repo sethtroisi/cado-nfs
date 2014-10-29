@@ -33,7 +33,7 @@ void strategy_add_fm_side(strategy_t * t, fm_t * elem, int side);
 
 strategy_t *strategy_copy(strategy_t * t);
 
-void strategy_print_file(strategy_t * t, FILE * output_file);
+void strategy_fprint(FILE * file, strategy_t * t);
 
 void strategy_print(strategy_t * t);
 

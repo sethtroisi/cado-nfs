@@ -26,11 +26,13 @@ tabular_decomp_t *tabular_decomp_create(void)
 
 void tabular_decomp_free(tabular_decomp_t * t)
 {
-    for (int i = 0; i < t->index; i++)
-	decomp_free(t->tab[i]);
-    free(t->tab);
-    free(t);
-
+    if (t != NULL)
+	{
+	    for (int i = 0; i < t->index; i++)
+		decomp_free(t->tab[i]);
+	    free(t->tab);
+	    free(t);
+	}
 }
 
 void tabular_decomp_realloc(tabular_decomp_t * t)

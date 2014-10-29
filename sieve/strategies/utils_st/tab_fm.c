@@ -29,10 +29,13 @@ tabular_fm_t *tabular_fm_create(void)
 
 void tabular_fm_free(tabular_fm_t * t)
 {
-    for (int i = 0; i < t->index; i++)	//size
-	fm_free(t->tab[i]);
-    free(t->tab);
-    free(t);
+    if (t != NULL)
+	{
+	    for (int i = 0; i < t->index; i++)	//size
+		fm_free(t->tab[i]);
+	    free(t->tab);
+	    free(t);
+	}
 }
 
 void tabular_fm_realloc(tabular_fm_t * t)

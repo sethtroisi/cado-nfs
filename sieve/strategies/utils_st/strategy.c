@@ -89,7 +89,7 @@ strategy_t *strategy_copy(strategy_t * t)
     return elem;
 }
 
-void strategy_print_file(strategy_t * t, FILE * output_file)
+void strategy_fprint (FILE * output_file, strategy_t * t)
 {
     tabular_fm_t *tmp = t->tab_fm;
     //test if the varaible side is used!
@@ -111,7 +111,7 @@ void strategy_print_file(strategy_t * t, FILE * output_file)
 
 void strategy_print(strategy_t * t)
 {
-    strategy_print_file(t, stdout);
+    strategy_fprint (stdout, t);
 }
 
 /* //test strategy */

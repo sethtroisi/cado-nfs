@@ -24,8 +24,11 @@ decomp_t *decomp_create(int len, int *tab, double nb_elem)
 
 void decomp_free(decomp_t * t)
 {
-    free(t->tab);
-    free(t);
+    if (t != NULL)
+	{
+	    free(t->tab);
+	    free(t);
+	}
 }
 
 double decomp_get_nb_elem(decomp_t * t)
