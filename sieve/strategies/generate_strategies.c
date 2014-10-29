@@ -213,32 +213,44 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
   'r'.  It allows to avoid to full the RAM when we generated
   strategies!
 */
-tabular_strategy_t *generate_strategies_oneside(fm_t * zero, tabular_fm_t * pm1,
+tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
+						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
 						tabular_fm_t * ecm_rc, int lb,
 						int ub, int r)
 {
+   tabular_strategy_t *res = tabular_strategy_create();
+    //contains the final result
+
+    //check the cases where r is trivial!!
+    //{{
+   int lim = 2 * lb - 1;
+   //in this case, r is already a prime number!
+   if ( r < lim)
+       {
+	   strategy_t *st_zero = strategy_create();
+	   strategy_add_fm(st_zero, zero);
+	   strategy_set_time(st_zero, 0.0);
+
+	   if (r != 1 && (r < lb || r > ub))
+	       tabular_strategy_add_strategy(res, st_zero);
+	   else		// r==1 or lb<= r1 <= ub 
+	       strategy_set_proba(st_zero, 1.0);
+
+	   tabular_strategy_add_strategy(res, st_zero);
+	   strategy_free (st_zero);
+	   return res;
+       }   
+   //}}
+
+
+    //todo: find an other method to get back the decompositions of our
+    //cofactor r 
     //tabular_decomp_t *init_tab = decomposition_of_cofactor (lb, r);
-    char name_file[200];
-    sprintf(name_file,
-	    "/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d", r,
-	    lb);
-    FILE *file = fopen(name_file, "r");
-
-    tabular_decomp_t *init_tab = tabular_decomp_fscan(file);
-
-    if (init_tab == NULL) {
-	fprintf(stderr, "impossible to read '%s'\n", name_file);
-	exit(EXIT_FAILURE);
-    }
-    fclose(file);
 
     tabular_strategy_t *all_strat = tabular_strategy_create();
     //contains strategies which will be processed.
-
-    tabular_strategy_t *res = tabular_strategy_create();
-    //contains the final result
 
     int len_pm1 = pm1->index;
     int len_pp1 = pp1->index;
@@ -490,63 +502,55 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
     unsigned long method_zero[4] = { 0, 0, 0, 0 };
     fm_set_method(zero, method_zero, 4);
 
-    strategy_t *st_zero_0 = strategy_create();
-    strategy_add_fm(st_zero_0, zero);
-    strategy_set_proba(st_zero_0, 0.0);
-    strategy_set_time(st_zero_0, 0.0);
-
-    strategy_t *st_zero_1 = strategy_create();
-    strategy_add_fm(st_zero_1, zero);
-    strategy_set_proba(st_zero_1, 1.0);
-    strategy_set_time(st_zero_1, 0.0);
-
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (rmfb + 1));
-    int lim_rat = rlb * 2 - 1;
+
     for (int r1 = 0; r1 <= rmfb; r1++) {
-	/*
-	   process the collect for the different cases.
-	 */
-	tabular_strategy_t *strat_r1;
-	if (r1 < lim_rat)	//in this case, r1 is prime or equal
-	    //to 1. So no cofactorization is
-	    //necessary.
-	{
-	    strat_r1 = tabular_strategy_create();
-	    if (r1 != 1 && (r1 < rlb || r1 > rub))
-		tabular_strategy_add_strategy(strat_r1, st_zero_0);
-	    else		// r1==1 or rlb<= r1 <= rub 
-		tabular_strategy_add_strategy(strat_r1, st_zero_1);
-	} else {		//in this case, the cofactor is
-	    //composite. So let's go to work!
-	    strat_r1 =
-		generate_strategies_oneside(zero, pm1, pp1, ecm_m16,
-					    ecm_rc, rlb, rub, r1);
+	char name_file[200];
+	sprintf(name_file,
+		"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
+		r1, rlb);
+	FILE *file = fopen(name_file, "r");
+
+	tabular_decomp_t *tab_decomp = tabular_decomp_fscan(file);
+
+	if (tab_decomp == NULL) {
+	    fprintf(stderr, "impossible to read '%s'\n", name_file);
+	    exit(EXIT_FAILURE);
 	}
-	data_rat[r1] = strat_r1;
+	fclose(file);
+	
+	data_rat[r1] =
+	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
+					ecm_rc, rlb, rub, r1);
+	tabular_decomp_free (tab_decomp);
     }
-    //todo: warning duplicate code!!!
+
     printf("\n COLLECT DATA : step 2\n\n");
     /*
-       read good elements for r_2 in the array data_r2 and compute the
-       data for each r_1. So :
-     */
-    int lim_alg = alb * 2 - 1;
+      read good elements for r_2 in the array data_r2 and compute the
+      data for each r_1. So :
+    */
     for (int r2 = 0; r2 <= amfb; r2++) {
-	tabular_strategy_t *strat_r2;
-	if (r2 < lim_alg)	//in this case, r2 is prime or equal
-	    //to 1. So no cofactorization is
-	    //necessary.
-	{
-	    strat_r2 = tabular_strategy_create();
-	    if (r2 != 1 && (r2 < alb || r2 > aub))
-		tabular_strategy_add_strategy(strat_r2, st_zero_0);
-	    else		// r2==1 or alb<= r2 < aub
-		tabular_strategy_add_strategy(strat_r2, st_zero_1);
-	} else {		//in this case the cofactor is composite.
-	    strat_r2 =
-		generate_strategies_oneside(zero, pm1, pp1, ecm_m16,
-					    ecm_rc, alb, aub, r2);
+	char name_file[200];
+	sprintf(name_file,
+		"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
+		r2, alb);
+	FILE *file = fopen(name_file, "r");
+
+	tabular_decomp_t *tab_decomp = tabular_decomp_fscan(file);
+
+	if (tab_decomp == NULL) {
+	    fprintf(stderr, "impossible to read '%s'\n", name_file);
+	    exit(EXIT_FAILURE);
 	}
+	fclose(file);
+
+
+	tabular_strategy_t *strat_r2 = 
+	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
+					ecm_rc, alb, aub, r2);
+	tabular_decomp_free (tab_decomp);
+
 	for (int r1 = 0; r1 <= rmfb; r1++) {
 	    tabular_strategy_t *res =
 		generate_strategy_r1_r2(data_rat[r1], strat_r2);
@@ -560,8 +564,6 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
 	tabular_strategy_free(data_rat[r1]);
     free(data_rat);
 
-    strategy_free(st_zero_0);
-    strategy_free(st_zero_1);
     fm_free(zero);
     return matrix;
 }

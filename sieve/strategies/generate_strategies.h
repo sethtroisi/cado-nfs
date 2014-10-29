@@ -28,7 +28,8 @@ collect_data_all_strategy_r1_r2(tabular_strategy_t * tab_strat,
 /*                   GENERATE MATRIX                                    */
 /************************************************************************/
 
-tabular_strategy_t *generate_strategies_oneside(fm_t * zero, tabular_fm_t * pm1,
+tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t* tab_decomp,
+						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
 						tabular_fm_t * ecm_rc, int lb,
