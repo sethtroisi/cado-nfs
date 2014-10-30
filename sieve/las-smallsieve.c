@@ -243,9 +243,9 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
             if (verbose && (fb->roots[nr] >= p || r >= p))
-                verbose_output_print(0, 1, "# small_sieve_init: %s side, prime " 
-                        FBPRIME_FORMAT " root " FBPRIME_FORMAT " -> " 
-                        FBPRIME_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
+                verbose_output_print(0, 1, "# small_sieve_init: %s side, prime %"
+                        FBPRIME_FORMAT " root %" FBROOT_FORMAT " -> %" 
+                        FBROOT_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
 
             /* Handle projective roots */
             if (r >= p) {
@@ -263,7 +263,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
                     if (verbose) {
                         verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding bad prime"
-                                " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
+                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
                                 " to small sieve because do_bad_primes = 0\n",
                                 r-p, p);
                     }
@@ -272,7 +272,7 @@ void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbas
                     if (verbose) {
                         verbose_output_print(0, 1,
                                 "# small_sieve_init: not adding bad prime"
-                                " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
+                                " (1:%" FBROOT_FORMAT ") mod %" FBPRIME_FORMAT ")"
                                 " to small sieve  because g=%d >= si->J = %d\n",
                                 r-p, p, ssp->g, si->J);
                     }
@@ -996,8 +996,8 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                     bucket_prime_t prime;
                     unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {
-                        verbose_output_print(0, 1, "resieve_small_bucket_region: root "
-                                FBPRIME_FORMAT ",%d divides at x = "
+                        verbose_output_print(0, 1, "resieve_small_bucket_region: root %"
+                                FBROOT_FORMAT ",%d divides at x = "
                                 "%d = %lu * %u + %d\n",
                                 p, r, x, j, 1 << si->conf->logI, i);
                     }
@@ -1042,7 +1042,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             ASSERT (i0 % I == 0); /* make sure ssdpos points at start
                                      of line */
             if (resieve_very_verbose_bad) {
-                verbose_output_print(0, 1, "# resieving bad prime " FBPRIME_FORMAT
+                verbose_output_print(0, 1, "# resieving bad prime %" FBPRIME_FORMAT
                         ", i0 = %u\n", g, i0);
             }
             while (i0 < (unsigned int) bucket_region) {
@@ -1054,8 +1054,8 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             bucket_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
-                                verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root "
-                                        FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                verbose_output_print(0, 1, "# resieve_small_bucket_region even j: root %"
+                                        FBROOT_FORMAT ",inf divides at x = %u\n",
                                         g, x);
                             }
                             prime.p = g;
@@ -1071,8 +1071,8 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                             bucket_prime_t prime;
                             const unsigned int x = i0 + ii;
                             if (resieve_very_verbose_bad) {
-                                verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root "
-                                        FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                verbose_output_print(0, 1, "# resieve_small_bucket_region odd j: root %"
+                                        FBROOT_FORMAT ",inf divides at x = %u\n",
                                         g, x);
                             }
                             prime.p = g;

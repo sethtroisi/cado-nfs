@@ -131,7 +131,7 @@ int test_divisible(where_am_I_ptr w)
     if (rc)
         mpz_divexact_ui (traced_norms[w->side], traced_norms[w->side], (unsigned long) q);
     else
-        gmp_fprintf(stderr, "# FAILED test_divisible(p=" FBPRIME_FORMAT
+        gmp_fprintf(stderr, "# FAILED test_divisible(p=%" FBPRIME_FORMAT
                 ", N=%d, x=%lu, %.3s): i = %ld, j = %lu, norm = %Zd\n",
                 w->p, w->N, w->x, sidenames[w->side], i, j, traced_norms[w->side]);
 
@@ -171,7 +171,7 @@ void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, 
     const char * caller = "";
 #endif
     if (w->p) 
-        fprintf(stderr, "# Add log(" FBPRIME_FORMAT ",%.3s) = %u to "
+        fprintf(stderr, "# Add log(%" FBPRIME_FORMAT ",%.3s) = %u to "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
             w->p, sidenames[w->side], logp, w->x, *S, w->N, (unsigned char)(*S+logp), caller);
     else
@@ -220,7 +220,7 @@ void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, w
       {
         maxdiff = logp - *S;
         fprintf(stderr, "# Error, underflow at (N,x)=(%u, %u), "
-                "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log("
+                "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log(%"
                 FBPRIME_FORMAT ") = %hhu\n",
                 w->N, w->x, i, j, a, b, *S, w->p, logp);
       }
