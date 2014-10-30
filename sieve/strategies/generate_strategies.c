@@ -9,8 +9,8 @@
 /*todo: I know :)! In few days, you will never see the words
   rationnal and algebraic :)
 */
-#define RATIONNAL_SIDE 0
-#define ALGEBRAIC_SIDE 1
+#define SIDE_0 0
+#define SIDE_1 1
 static double EPSILON_DBL = LDBL_EPSILON;
 
 static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
@@ -184,13 +184,13 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 			     int ind_ecm_rc, strategy_t * strat, int ind_tab,
 			     int index_iter, int len_iteration,
 			     tabular_decomp_t * init_tab,
-			     tabular_strategy_t * res, int lb, int ub)
+			     tabular_strategy_t * res, int fbb, int lpb)
 {
     if (index_iter >= len_iteration) {
 	tabular_strategy_add_strategy_without_zero(res, strat);
 	int nb_strat = res->index - 1;
 	double proba =
-	    compute_proba_strategy(init_tab, res->tab[nb_strat], lb, ub);
+	    compute_proba_strategy(init_tab, res->tab[nb_strat], fbb, lpb);
 	double time = compute_time_strategy(init_tab, res->tab[nb_strat]);
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
@@ -202,7 +202,7 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 		tabular_fm_set_fm_index(strat->tab_fm, zero, ind_tab);
 	    generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat, ind_tab + 1,
 					 index_iter + 1, len_iteration,
-					 init_tab, res, lb, ub);
+					 init_tab, res, fbb, lpb);
 	}
     }
 }
@@ -213,41 +213,39 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
   'r'.  It allows to avoid to full the RAM when we generated
   strategies!
 */
-tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
+tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						fm_t * zero, tabular_fm_t * pm1,
 						tabular_fm_t * pp1,
 						tabular_fm_t * ecm_m16,
-						tabular_fm_t * ecm_rc, int lb,
-						int ub, int r)
+						tabular_fm_t * ecm_rc, int fbb,
+						int lpb, int r)
 {
-   tabular_strategy_t *res = tabular_strategy_create();
     //contains the final result
+    tabular_strategy_t *res = tabular_strategy_create();
 
     //check the cases where r is trivial!!
     //{{
-   int lim = 2 * lb - 1;
-   //in this case, r is already a prime number!
-   if ( r < lim)
-       {
-	   strategy_t *st_zero = strategy_create();
-	   strategy_add_fm(st_zero, zero);
-	   strategy_set_time(st_zero, 0.0);
+    int lim = 2 * fbb - 1;
+    //in this case, r is already a prime number!
+    if (r < lim) {
+	strategy_t *st_zero = strategy_create();
+	strategy_add_fm(st_zero, zero);
+	strategy_set_time(st_zero, 0.0);
 
-	   if (r != 1 && (r < lb || r > ub))
-	       tabular_strategy_add_strategy(res, st_zero);
-	   else		// r==1 or lb<= r1 <= ub 
-	       strategy_set_proba(st_zero, 1.0);
+	if (r != 1 && (r < fbb || r > lpb))
+	    tabular_strategy_add_strategy(res, st_zero);
+	else			// r==1 or fbb<= r0 <= lpb
+	    strategy_set_proba(st_zero, 1.0);
 
-	   tabular_strategy_add_strategy(res, st_zero);
-	   strategy_free (st_zero);
-	   return res;
-       }   
-   //}}
-
+	tabular_strategy_add_strategy(res, st_zero);
+	strategy_free(st_zero);
+	return res;
+    }
+    //}}
 
     //todo: find an other method to get back the decompositions of our
     //cofactor r 
-    //tabular_decomp_t *init_tab = decomposition_of_cofactor (lb, r);
+    //tabular_decomp_t *init_tab = decomposition_of_cofactor (fbb, r);
 
     tabular_strategy_t *all_strat = tabular_strategy_create();
     //contains strategies which will be processed.
@@ -288,8 +286,9 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
 	    else
 		tabular_fm_set_fm_index(tab_strat, zero, 1);
 
-	    for (int ind_ecm_m16 = -1; ind_ecm_m16 < 
-		   len_ecm_m16; ind_ecm_m16++) {
+	    for (int ind_ecm_m16 = -1;
+		 ind_ecm_m16 < len_ecm_m16; ind_ecm_m16++) {
+
 		if (ind_ecm_m16 != -1)
 		    tabular_fm_set_fm_index(tab_strat,
 					    ecm_m16->tab[ind_ecm_m16], 2);
@@ -306,7 +305,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
 
 		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
 					     3, 0, nb_iteration, init_tab,
-					     all_strat, lb, ub);
+					     all_strat, fbb, lpb);
 
 		//process data to avoid to full the RAM!!!
 		//{{
@@ -346,10 +345,9 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t *init_tab,
   first_side and st2 the other side.
 */
 
-static strategy_t *first_concat_strategy(strategy_t * st1, strategy_t * st2,
-					 int first_side)
+static strategy_t *concat_strategies(strategy_t * st1, strategy_t * st2,
+				     int first_side)
 {
-    int side = (first_side == 0) ? RATIONNAL_SIDE : ALGEBRAIC_SIDE;
     strategy_t *st = strategy_create();
     int len1 = st1->tab_fm->index;
     int len2 = st2->tab_fm->index;
@@ -358,12 +356,12 @@ static strategy_t *first_concat_strategy(strategy_t * st1, strategy_t * st2,
 	st->side = malloc(sizeof(int) * (st->len_side));
     else
 	st->side = realloc(st->side, sizeof(int) * (st->len_side));
-
+    int side = first_side;
     for (int i = 0; i < len1; i++) {
 	strategy_add_fm(st, st1->tab_fm->tab[i]);
 	st->side[i] = side;
     }
-    side = first_side ? RATIONNAL_SIDE : ALGEBRAIC_SIDE;
+    side = first_side ? SIDE_0 : SIDE_1;
     for (int i = 0; i < len2; i++) {
 	strategy_add_fm(st, st2->tab_fm->tab[i]);
 	st->side[len1 + i] = side;
@@ -372,18 +370,18 @@ static strategy_t *first_concat_strategy(strategy_t * st1, strategy_t * st2,
 }
 
 /*
-  returns the best strategies to factor a couple (r1, r2), from a set
+  returns the best strategies to factor a couple (r0, r1), from a set
   of factoring methods for each side. Note that, the probability and
   the time o find a non-trivial for its side must be previously
   computed!
  */
-tabular_strategy_t *generate_strategy_r1_r2(tabular_strategy_t * strat_r1,
-					    tabular_strategy_t * strat_r2)
+tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
+					    tabular_strategy_t * strat_r1)
 {
+    int len_r0 = strat_r0->index;
     int len_r1 = strat_r1->index;
-    int len_r2 = strat_r2->index;
 
-    tabular_strategy_t *strat_r1_r2 = tabular_strategy_create();
+    tabular_strategy_t *strat_r0_r1 = tabular_strategy_create();
     tabular_strategy_t *ch = tabular_strategy_create();
     unsigned long nb_strat = 0;
 
@@ -398,72 +396,71 @@ tabular_strategy_t *generate_strategy_r1_r2(tabular_strategy_t * strat_r1,
        have several unless methods with a zero probability.
      */
 
-    if (strat_r1->tab[0]->proba < EPSILON_DBL)
+    if (strat_r0->tab[0]->proba < EPSILON_DBL)
 	r_init = 1;
-    if (strat_r2->tab[0]->proba < EPSILON_DBL)
+    if (strat_r1->tab[0]->proba < EPSILON_DBL)
 	a_init = 1;
 
     // the first strategy is the zero strategy, so we add there directly
     // in the convex hull.
     strategy_t *st;
-    if (strat_r1->tab[0]->proba < EPSILON_DBL ||
-	strat_r2->tab[0]->proba < EPSILON_DBL) {
-	st = first_concat_strategy(strat_r1->tab[0], strat_r2->tab[0],
-				   RATIONNAL_SIDE);
+    if (strat_r0->tab[0]->proba < EPSILON_DBL ||
+	strat_r1->tab[0]->proba < EPSILON_DBL) {
+	st = concat_strategies(strat_r0->tab[0], strat_r1->tab[0], SIDE_0);
 	tabular_strategy_add_strategy(ch, st);
 	strategy_free(st);
     }
 
-    for (int r = r_init; r < len_r1; r++)	//rationnal side
+    for (int r = r_init; r < len_r0; r++)	//rationnal side
     {
-	double p1 = strat_r1->tab[r]->proba;
-	double c1 = strat_r1->tab[r]->time;
-	for (int a = a_init; a < len_r2; a++)	//algebraic side : len
+	double p1 = strat_r0->tab[r]->proba;
+	double c1 = strat_r0->tab[r]->time;
+	for (int a = a_init; a < len_r1; a++)	//algebraic side : len
 	{
 	    nb_strat++;
 	    //compute success ans cost:
-	    double p2 = strat_r2->tab[a]->proba;
-	    double c2 = strat_r2->tab[a]->time;
+	    double p2 = strat_r1->tab[a]->proba;
+	    double c2 = strat_r1->tab[a]->time;
 	    double proba = p1 * p2;
 	    double tps1 = c1 + p1 * c2;
-	    //mean time when we begin by the RATIONNAL_SIDE
+	    //mean time when we begin by the SIDE_0
 	    double tps2 = c2 + p2 * c1;
-	    //mean time when we begin by the ALGEBRAIC_SIDE
+	    //mean time when we begin by the SIDE_1
 	    if (tps1 < tps2) {
-		st = first_concat_strategy(strat_r1->tab[r], strat_r2->tab[a],
-					   RATIONNAL_SIDE);
+		st = concat_strategies(strat_r0->tab[r], strat_r1->tab[a],
+				       SIDE_0);
 		strategy_set_proba(st, proba);
 		strategy_set_time(st, tps1);
 	    } else {
-		st = first_concat_strategy(strat_r2->tab[a], strat_r1->tab[r],
-					   ALGEBRAIC_SIDE);
+		st = concat_strategies(strat_r1->tab[a], strat_r0->tab[r],
+				       SIDE_1);
 		strategy_set_proba(st, proba);
 		strategy_set_time(st, tps2);
 	    }
-	    tabular_strategy_add_strategy(strat_r1_r2, st);
+	    tabular_strategy_add_strategy(strat_r0_r1, st);
 	    strategy_free(st);
 	}
 
 	//process data to avoid to full the RAM!!!
-	if (nb_strat > 100000 || r == (len_r1 - 1)) {
+	if (nb_strat > 100000 || r == (len_r0 - 1)) {
 	    //add strategies of the old convexhull and recompute the new
 	    //convex hull
 
-	    tabular_strategy_concat(strat_r1_r2, ch);
+	    tabular_strategy_concat(strat_r0_r1, ch);
 	    tabular_strategy_free(ch);
 	    /* printf( "avant CH\n"); */
-	    /* tabular_strategy_print (strat_r1_r2); */
+	    /* tabular_strategy_print (strat_r0_r1); */
 
-	    ch = convex_hull_strategy(strat_r1_r2);
+	    ch = convex_hull_strategy(strat_r0_r1);
 	    //clear previous collect and start a new collect.
-	    tabular_strategy_free(strat_r1_r2);
-	    strat_r1_r2 = tabular_strategy_create();
+	    tabular_strategy_free(strat_r0_r1);
+	    strat_r0_r1 = tabular_strategy_create();
 	    nb_strat = 0;
 	}
     }
 
 //free
-    tabular_strategy_free(strat_r1_r2);
+    tabular_strategy_free(strat_r0_r1);
 
     return ch;
 }
@@ -471,8 +468,8 @@ tabular_strategy_t *generate_strategy_r1_r2(tabular_strategy_t * strat_r1,
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 				      tabular_fm_t * pm1, tabular_fm_t * pp1,
 				      tabular_fm_t * ecm_m16,
-				      tabular_fm_t * ecm_rc, int rlb, int rub,
-				      int rmfb, int alb, int aub, int amfb)
+				      tabular_fm_t * ecm_rc, int fbb0, int lpb0,
+				      int mfb0, int fbb1, int lpb1, int mfb1)
 {
     /*
        allocate the matrix res which contains all good strategies for
@@ -480,17 +477,17 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
        the rationnal side.  r_2 is the lenght of the cofactor in the
        algebraic side.
      */
-    tabular_strategy_t ***matrix = malloc(sizeof(*matrix) * (rmfb + 1));
+    tabular_strategy_t ***matrix = malloc(sizeof(*matrix) * (mfb0 + 1));
     assert(matrix != NULL);
 
-    for (int r1 = 0; r1 <= rmfb; r1++) {
-	matrix[r1] = malloc(sizeof(*matrix[r1]) * (amfb + 1));
-	assert(matrix[r1] != NULL);
+    for (int r0 = 0; r0 <= mfb0; r0++) {
+	matrix[r0] = malloc(sizeof(*matrix[r0]) * (mfb1 + 1));
+	assert(matrix[r0] != NULL);
     }
 
     printf("\n COLLECT DATA\n\n");
     /*
-       for each r_1 in [lbr..rmfb], we precompute the data for all
+       for each r_1 in [fbb0..mfb0], we precompute the data for all
        strategy.  for each r_2, the values will be computed
        sequentially.  define two zero strategies to manage the case
        where r is prime or the case r is impossible (r<lb): - st_zero_0
@@ -503,75 +500,71 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
     unsigned long method_zero[4] = { 0, 0, 0, 0 };
     fm_set_method(zero, method_zero, 4);
 
-    tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (rmfb + 1));
-    ASSERT_ALWAYS (data_rat);
+    tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
+    ASSERT_ALWAYS(data_rat);
 
-    int lim1 = 2 * rlb - 1;
-    for (int r1 = 0; r1 <= rmfb; r1++) {
+    int lim1 = 2 * fbb0 - 1;
+    for (int r0 = 0; r0 <= mfb0; r0++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r1 >= lim1)
-	    {
-		char name_file[200];
-		sprintf(name_file,
-			"%s/decomp_%d_%d",
-			name_directory_decomp, rlb,r1);
-		FILE *file = fopen(name_file, "r");
+	if (r0 >= lim1) {
+	    char name_file[200];
+	    sprintf(name_file,
+		    "%s/decomp_%d_%d", name_directory_decomp, fbb0, r0);
+	    FILE *file = fopen(name_file, "r");
 
-		tab_decomp = tabular_decomp_fscan(file);
+	    tab_decomp = tabular_decomp_fscan(file);
 
-		if (tab_decomp == NULL) {
-		    fprintf(stderr, "impossible to read '%s'\n", name_file);
-		    exit(EXIT_FAILURE);
-		}
-		fclose(file);
+	    if (tab_decomp == NULL) {
+		fprintf(stderr, "impossible to read '%s'\n", name_file);
+		exit(EXIT_FAILURE);
 	    }
-	data_rat[r1] =
+	    fclose(file);
+	}
+	data_rat[r0] =
 	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, rlb, rub, r1);
-	tabular_decomp_free (tab_decomp);
+					ecm_rc, fbb0, lpb0, r0);
+	tabular_decomp_free(tab_decomp);
     }
 
     printf("\n COLLECT DATA : step 2\n\n");
     /*
-      read good elements for r_2 in the array data_r2 and compute the
-      data for each r_1. So :
-    */
-    int lim2 = 2 * alb - 1;
-    for (int r2 = 0; r2 <= amfb; r2++) {
+       read good elements for r_2 in the array data_r1 and compute the
+       data for each r_1. So :
+     */
+    int lim2 = 2 * fbb1 - 1;
+    for (int r1 = 0; r1 <= mfb1; r1++) {
 	tabular_decomp_t *tab_decomp = NULL;
-	if (r2 >= lim2)
-	    {
-		char name_file[200];
-		sprintf(name_file,
-			"%s/decomp_%d_%d",
-			name_directory_decomp, alb, r2);
-		FILE *file = fopen(name_file, "r");
-		
-		tab_decomp = tabular_decomp_fscan(file);
-		
-		if (tab_decomp == NULL) {
-		    fprintf(stderr, "impossible to read '%s'\n", name_file);
-		    exit(EXIT_FAILURE);
-		}
-		fclose(file);
+	if (r1 >= lim2) {
+	    char name_file[200];
+	    sprintf(name_file,
+		    "%s/decomp_%d_%d", name_directory_decomp, fbb1, r1);
+	    FILE *file = fopen(name_file, "r");
+
+	    tab_decomp = tabular_decomp_fscan(file);
+
+	    if (tab_decomp == NULL) {
+		fprintf(stderr, "impossible to read '%s'\n", name_file);
+		exit(EXIT_FAILURE);
 	    }
-
-	tabular_strategy_t *strat_r2 = 
-	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
-					ecm_rc, alb, aub, r2);
-	tabular_decomp_free (tab_decomp);
-
-	for (int r1 = 0; r1 <= rmfb; r1++) {
-	    tabular_strategy_t *res =
-		generate_strategy_r1_r2(data_rat[r1], strat_r2);
-	    matrix[r1][r2] = res;
+	    fclose(file);
 	}
-	tabular_strategy_free(strat_r2);
+
+	tabular_strategy_t *strat_r1 =
+	    generate_strategies_oneside(tab_decomp, zero, pm1, pp1, ecm_m16,
+					ecm_rc, fbb1, lpb1, r1);
+	tabular_decomp_free(tab_decomp);
+
+	for (int r0 = 0; r0 <= mfb0; r0++) {
+	    tabular_strategy_t *res =
+		generate_strategy_r0_r1(data_rat[r0], strat_r1);
+	    matrix[r0][r1] = res;
+	}
+	tabular_strategy_free(strat_r1);
     }
 
     //free
-    for (int r1 = 0; r1 <= rmfb; r1++)
-	tabular_strategy_free(data_rat[r1]);
+    for (int r0 = 0; r0 <= mfb0; r0++)
+	tabular_strategy_free(data_rat[r0]);
     free(data_rat);
 
     fm_free(zero);

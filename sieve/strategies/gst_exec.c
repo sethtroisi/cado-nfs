@@ -21,45 +21,45 @@
 static void declare_usage(param_list pl)
 {
     param_list_usage_header(pl,
-			    "This binary allows to build the best strategies for each couple (r0, r1)\n"
-			    "where (r0,r1) are the bits size for our couple of cofactors.\n");
+			    "This binary allows to build the best strategies for each couple (r0, r0)\n"
+			    "where (r0,r0) are the bits size for our couple of cofactors.\n");
 
     param_list_decl_usage(pl, "r",
 			  "specify the bit size of the studied cofactor.\n");
     param_list_decl_usage(pl, "gdc",
-			  "(switch)  to precompute all decompositions of cofactors in the \n "
-			  "sieve region. So, you must specify the sieve region with these options:\n"
-			  "\t-afb, -amfb, -rfb, -rmfb\n");
+    "(switch)  to precompute all decompositions of cofactors in the \n "
+"\t \t sieve region. So, you must specify the sieve region with these options:\n"
+			  "\t \t -afb, -mfb1, -rfb, -mfb0\n");
     param_list_decl_usage(pl, "gst_r",
-			  "(switch)  to precompute the best strategies for one bit size cofactor.\n "
-			  "You must specify these options:\n"
-			  "\t-rfb, -rlpb, -r -decomp\n");
+			  "(switch)  to precompute the best strategies \n"
+			  "\t \t for one bit size cofactor.\n "
+			  "\t \t You must specify these options:\n"
+			  "\t \t -rfb, -lpb0, -r -decomp\n");
     param_list_decl_usage(pl, "gst",
-			  "(switch)  to merge all precomputes did by the option 'gst_r',\n "
-			  "and thus find the best strategies for each couple (r0,r1).\n"
-			  " So, you must specify these options:\n"
-			  "\t -rmfb, -amfb, -in \n");
+	"(switch)  to merge all precomputes did by the option 'gst_r',\n "
+	"\t \t and thus find the best strategies for each couple (r0,r0).\n"
+	"\t \t So, you must specify these options:\n"
+	"\t \t -mfb0, -mfb1, -in \n");
 
-    param_list_decl_usage(pl, "afbb",
-			  "set algebraic factor base bound to 2^afbb\n");
-    param_list_decl_usage(pl, "rfbb",
-			  "set rationnal factor base bound to 2^rfbb\n");
-    param_list_decl_usage(pl, "rlpb",
-			  "set rational large prime bound to 2^rlpb");
-    param_list_decl_usage(pl, "alpb",
-			  "set algebraic large prime bound to 2^alpb");
-    param_list_decl_usage(pl, "rmfb", "set rational cofactor bound to 2^rmfb");
-    param_list_decl_usage(pl, "amfb", "set algebraic cofactor bound to 2^amfb");
-    param_list_decl_usage(pl, "in", "to locate the file which contains "
-			  "our factoring methods, or locate the directory \n"
-			  "where the precomputed files for option 'gst' are stored");
+    param_list_decl_usage(pl, "fbb1",
+			  "set algebraic factor base bound to 2^fbb1\n");
+    param_list_decl_usage(pl, "fbb0",
+			  "set rationnal factor base bound to 2^fbb0\n");
+    param_list_decl_usage(pl, "lpb0",
+			  "set rational large prime bound to 2^lpb0");
+    param_list_decl_usage(pl, "lpb1",
+			  "set algebraic large prime bound to 2^lpb1");
+    param_list_decl_usage(pl, "mfb0", "set rational cofactor bound to 2^mfb0");
+    param_list_decl_usage(pl, "mfb1", "set algebraic cofactor bound to 2^mfb1");
+    param_list_decl_usage(pl, "in", "to locate the file which contains\n "
+	  "\t \t our factoring methods, or locate the directory \n"
+	  "\t \t where the precomputed files for option 'gst' are stored");
     param_list_decl_usage(pl, "out", "to locate the directory where the "
 			  "file(s) will be stored.");
-    param_list_decl_usage(pl, "out", "to locate the directory where the "
-			  "file(s) will be stored.");
-    param_list_decl_usage(pl, "decomp", "to locate the file or the directory , according to\n"
-			  " if you need one or several files,\n"
-			  " which contain(s) the file(s) of cofactors decompositions.");
+    param_list_decl_usage(pl, "decomp",
+	  "to locate the file or the directory , according to\n"
+	  "\t \t if you need one or several files,\n"
+	  "\t \t which contain(s) the file(s) of cofactors decompositions.");
 }
 
 /************************************************************************/
@@ -105,19 +105,19 @@ int main(int argc, char *argv[])
     }
 
     /*default values */
-    int afbb = -1;
-    int amfb = -1;
-    int rfbb = -1;
-    int rmfb = -1;
-    int rlpb = -1;
-    int alpb = -1;
+    int fbb1 = -1;
+    int mfb1 = -1;
+    int fbb0 = -1;
+    int mfb0 = -1;
+    int lpb0 = -1;
+    int lpb1 = -1;
     int r = -1;
-    param_list_parse_int(pl, "rlpb", &rlpb);
-    param_list_parse_int(pl, "alpb", &alpb);
-    param_list_parse_int(pl, "afbb", &afbb);
-    param_list_parse_int(pl, "amfb", &amfb);
-    param_list_parse_int(pl, "rfbb", &rfbb);
-    param_list_parse_int(pl, "rmfb", &rmfb);
+    param_list_parse_int(pl, "lpb0", &lpb0);
+    param_list_parse_int(pl, "lpb1", &lpb1);
+    param_list_parse_int(pl, "fbb1", &fbb1);
+    param_list_parse_int(pl, "mfb1", &mfb1);
+    param_list_parse_int(pl, "fbb0", &fbb0);
+    param_list_parse_int(pl, "mfb0", &mfb0);
     param_list_parse_int(pl, "r", &r);
 
     //store data
@@ -125,7 +125,6 @@ int main(int argc, char *argv[])
     if ((directory_out = param_list_lookup_string(pl, "out")) == NULL) {
 	directory_out = "./";
     }
-
 
     int gdc = param_list_parse_switch(pl, "-gdc");
     int gst_r = param_list_parse_switch(pl, "-gst_r");
@@ -138,89 +137,92 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "This feature isn't avaliable. Wait few days!!!\n");
 	exit(EXIT_SUCCESS);
 	/*   //check parameters */
-	/*   if (afbb == -1 || amfb == -1 || */
-	/*          rfbb == -1 || rmfb == -1)  */
+	/*   if (fbb1 == -1 || mfb1 == -1 || */
+	/*          fbb0 == -1 || mfb0 == -1)  */
 	/*        { */
 	/*          fprintf (stderr,"for this option '-gdc', you must also " */
-	/*                   "specify these options:\t -afbb, -amfb, -rfbb, -rmfb\n"); */
+	/*                   "specify these options:\t -fbb1, -mfb1, -fbb0, -mfb0\n"); */
 	/*          exit (EXIT_FAILURE); */
 	/*        } */
-	/*   if (afbb !=rfbb) */
+	/*   if (fbb1 !=fbb0) */
 	/*        { */
-	/*          precompute_tabular_decomp_files (2*afbb-1, amfb, afbb); */
-	/*          precompute_tabular_decomp_files (2*rfbb-1, rmfb, rfbb); */
+	/*          precompute_tabular_decomp_files (2*fbb1-1, mfb1, fbb1); */
+	/*          precompute_tabular_decomp_files (2*fbb0-1, mfb0, fbb0); */
 	/*        } */
 	/*   else */
 	/*        { */
-	/*          int max_cof = (rmfb > amfb)? rmfb : amfb; */
-	/*          precompute_tabular_decomp_files (2*rfbb-1, max_cof, rfbb); */
+	/*          int max_cof = (mfb0 > mfb1)? mfb0 : mfb1; */
+	/*          precompute_tabular_decomp_files (2*fbb0-1, max_cof, fbb0); */
 	/*        } */
-    } else if (gst){
+    } else if (gst) {
 	//todo: check this function:: wait today!
 	/* For the both side and each size of cofactor the best
 	   strategies had been choosed. Now, it stays to merge these
-	   datas to compute the best strategies for each couple (r0, r1)!
-	*/
+	   datas to compute the best strategies for each couple (r0, r0)!
+	 */
 	//check parameters!
-	ASSERT_ALWAYS(rfbb < rmfb &&  afbb < amfb && 
-		      rfbb != -1 && rmfb != -1 &&
-		      afbb != -1 && amfb != -1 );
+	ASSERT_ALWAYS(fbb0 < mfb0 && fbb1 < mfb1 &&
+		      fbb0 != -1 && mfb0 != -1 && fbb1 != -1 && mfb1 != -1);
 
 	const char *directory_in;
 	if ((directory_in = param_list_lookup_string(pl, "in")) == NULL) {
 	    fputs("Parser error: Please re-run with the option -in"
-		  "with a directory which contains the precomputed files.\n", 
+		  "with a directory which contains the precomputed files.\n",
 		  stderr);
 	    exit(EXIT_FAILURE);
 	}
 
-	tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (rmfb + 1));
-	ASSERT_ALWAYS (data_rat);
+	tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
+	ASSERT_ALWAYS(data_rat);
 	char name_file_in[strlen(directory_in) + 20];
-	for (int r1 = 0; r1 <= rmfb; r1++)
-	    {
-		sprintf(name_file_in, "%s/strategies(%d)_%d", 
-			directory_in, rfbb, r1);
-		FILE* file_in = fopen (name_file_in, "r");
-		data_rat[r1] = tabular_strategy_fscan (file_in);
-		if (data_rat[r1] == NULL)
-		    {
-			fprintf(stderr,
-				"Parser error: can't read the file '%s'\n",
-			      name_file_in);
-			exit(EXIT_FAILURE);
-		    }
-		//todo: data_rat== NULL-->error when you would read data!
-		fclose (file_in);
+	for (int r0 = 0; r0 <= mfb0; r0++) {
+	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+		    directory_in, fbb0, r0);
+	    FILE *file_in = fopen(name_file_in, "r");
+	    data_rat[r0] = tabular_strategy_fscan(file_in);
+	    if (data_rat[r0] == NULL) {
+		fprintf(stderr,
+			"Parser error: impossible to read '%s'\n",
+			name_file_in);
+		exit(EXIT_FAILURE);
 	    }
-	for (int r2 = 0; r2 <= amfb; r2++) {
-		sprintf(name_file_in, "%s/strategies(%d)_%d", 
-			directory_in, afbb, r2);
-		FILE* file_in = fopen (name_file_in, "r");
-		//todo: data_rat== NULL-->error when you would read data!
-		tabular_strategy_t *strat_r2 = tabular_strategy_fscan (file_in);
-		if (strat_r2 == NULL)
-		    {
-			fprintf(stderr,
-				"Parser error: can't read the file '%s'\n",
-			      name_file_in);
-			exit(EXIT_FAILURE);
-		    }
-
-		fclose (file_in);
-
-	    for (int r1 = 0; r1 <= rmfb; r1++) {
-		tabular_strategy_t *res =
-		    generate_strategy_r1_r2(data_rat[r1], strat_r2);
-		//print
-		tabular_strategy_free (res);
-	    }
-	    tabular_strategy_free (strat_r2);
+	    //todo: data_rat== NULL-->error when you would read data!
+	    fclose(file_in);
 	}
-	for (int r1 = 0; r1 <= rmfb; r1++)
-	    tabular_strategy_free(data_rat[r1]);
+
+	for (int r1 = 0; r1 <= mfb1; r1++) {
+	    sprintf(name_file_in, "%s/strategies(%d)_%d",
+		    directory_in, fbb1, r1);
+	    FILE *file_in = fopen(name_file_in, "r");
+	    //todo: data_rat== NULL-->error when you would read data!
+	    tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
+	    if (strat_r1 == NULL) {
+		fprintf(stderr,
+			"Parser error: can't read the file '%s'\n",
+			name_file_in);
+		exit(EXIT_FAILURE);
+	    }
+
+	    fclose(file_in);
+
+	    for (int r0 = 0; r0 <= mfb0; r0++) {
+		char res_file[200];
+		tabular_strategy_t *res =
+		    generate_strategy_r0_r1(data_rat[r0], strat_r1);
+		//print
+		sprintf(res_file, "%s/strategies_%d_%d", directory_out, r0, r1);
+		FILE *file = fopen(res_file, "w");
+		tabular_strategy_fprint(file, res);
+		fclose(file);
+
+		tabular_strategy_free(res);
+	    }
+	    tabular_strategy_free(strat_r1);
+	}
+	for (int r0 = 0; r0 <= mfb0; r0++)
+	    tabular_strategy_free(data_rat[r0]);
 	free(data_rat);
-	
+
     } else {
 
 	const char *name_file_in;
@@ -271,92 +273,101 @@ int main(int argc, char *argv[])
 	printf("ecm_m16: (%d)\n", data_ecm_m16->index);
 	printf("ecm_rc: (%d)\n", data_ecm_rc->index);
 
-	if (gst_r)
-	    {
-		ASSERT_ALWAYS(rfbb < rlpb && r != -1 && 
-			      rfbb != -1 && rlpb != -1 );
+	if (gst_r) {
+	    ASSERT_ALWAYS(fbb0 < lpb0 && r != -1 && fbb0 != -1 && lpb0 != -1);
 
-		//precompute the convex hull for one bit size of cofactor
-		int lim = 2 * rfbb - 1;
-		tabular_decomp_t *tab_decomp = NULL;
-		if (r >=lim)
-		    {
-			const char *name_file_decomp;
-			if ((name_file_decomp =
-			     param_list_lookup_string(pl, "decomp")) == NULL) {
-			    fputs("Parser error: Please re-run with the option "
-				  "-decomp and a valid file name.\n", stderr);
-			    exit(EXIT_FAILURE);
-			}
-			FILE *file_decomp = fopen(name_file_decomp, "r");
-			
-			tab_decomp = tabular_decomp_fscan(file_decomp);
-			
-			if (tab_decomp == NULL) {
-			    fprintf(stderr, "impossible to read '%s'\n", name_file_decomp);
-			    exit(EXIT_FAILURE);
-			}
-			fclose(file_decomp);
-		    }
-		fm_t *zero = fm_create();
-		unsigned long method_zero[4] = { 0, 0, 0, 0 };
-		fm_set_method(zero, method_zero, 4);
-
-		tabular_strategy_t* res =
-		    generate_strategies_oneside(tab_decomp, zero, data_pm1, 
-						data_pp1, data_ecm_m16,
-						data_ecm_rc, rfbb, rlpb, r);
-		tabular_decomp_free (tab_decomp);
-		//print res;
-
-		char name_file[200];
-		sprintf(name_file, "%s/strategies(%d)_%d", directory_out, rfbb, r);
-		FILE* file_out = fopen(name_file, "w");
-		tabular_strategy_fprint (file_out, res);
-		fclose(file_out);
-		tabular_strategy_free (res);
-		fm_free (zero);
-	    }
-	else
-	    {
-		ASSERT_ALWAYS(afbb < alpb && alpb < amfb && 
-			      rfbb < rlpb && rlpb < rmfb);
-		//compute the matrix of strategies where for each
-		//couple (r0, r1) we will optain the best strategies
-		//to find a relation.
-
-		const char *name_directory_decomp;
-		if ((name_directory_decomp =
+	    //precompute the convex hull for one bit size of cofactor
+	    int lim = 2 * fbb0 - 1;
+	    tabular_decomp_t *tab_decomp = NULL;
+	    if (r >= lim) {
+		const char *name_file_decomp;
+		if ((name_file_decomp =
 		     param_list_lookup_string(pl, "decomp")) == NULL) {
 		    fputs("Parser error: Please re-run with the option "
-			  "-decomp and a valid directory name.\n", stderr);
+			  "-decomp and a valid file name.\n", stderr);
 		    exit(EXIT_FAILURE);
 		}
+		FILE *file_decomp = fopen(name_file_decomp, "r");
 
-		tabular_strategy_t ***matrix = 
-		    generate_matrix(name_directory_decomp,
-				    data_pm1, data_pp1, data_ecm_m16,
-				    data_ecm_rc, rfbb, rlpb,
-				    rmfb, afbb, alpb, amfb);
+		tab_decomp = tabular_decomp_fscan(file_decomp);
 
-		char res_file[200];
-		for (int r1 = 0; r1 <= rmfb; r1++)
-		    for (int r2 = 0; r2 <= amfb; r2++) {
-			sprintf(res_file, "%s/strategies_%d_%d", directory_out,
-				r1, r2);
-			FILE *file = fopen(res_file, "w");
-			tabular_strategy_fprint(file, matrix[r1][r2]);
-			fclose(file);
-		    }
-
-		//free
-		for (int r1 = 0; r1 <= rmfb; r1++) {
-		    for (int r2 = 0; r2 <= amfb; r2++)
-			tabular_strategy_free(matrix[r1][r2]);
-		    free(matrix[r1]);
+		if (tab_decomp == NULL) {
+		    fprintf(stderr, "impossible to read '%s'\n",
+			    name_file_decomp);
+		    exit(EXIT_FAILURE);
 		}
-		free(matrix);
+		fclose(file_decomp);
+		/* printf ("%s\n", */
+		/*      name_file_decomp); */
+
 	    }
+	    fm_t *zero = fm_create();
+	    unsigned long method_zero[4] = { 0, 0, 0, 0 };
+	    fm_set_method(zero, method_zero, 4);
+
+	    tabular_strategy_t *res =
+		generate_strategies_oneside(tab_decomp, zero, data_pm1,
+					    data_pp1, data_ecm_m16,
+					    data_ecm_rc, fbb0, lpb0, r);
+	    /* if (r >=lim)//Debug mode */
+	    /*     { */
+	    /*      tabular_strategy_print (res); */
+	    /*      printf ("r0 = %d, lb= %d\n", r, fbb0); */
+	    /*      getchar (); */
+	    /*     } */
+
+	    tabular_decomp_free(tab_decomp);
+	    //print res;
+
+	    char name_file[200];
+	    sprintf(name_file, "%s/strategies(%d)_%d", directory_out, fbb0, r);
+	    FILE *file_out = fopen(name_file, "w");
+	    tabular_strategy_fprint(file_out, res);
+	    fclose(file_out);
+	    tabular_strategy_free(res);
+	    fm_free(zero);
+	} else {
+	    ASSERT_ALWAYS(fbb1 < lpb1 && lpb1 < mfb1 &&
+			  fbb0 < lpb0 && lpb0 < mfb0);
+	    //compute the matrix of strategies where for each
+	    //couple (r0, r0) we will optain the best strategies
+	    //to find a relation.
+
+	    const char *name_directory_decomp;
+	    if ((name_directory_decomp =
+		 param_list_lookup_string(pl, "decomp")) == NULL) {
+		fputs("Parser error: Please re-run with the option "
+		      "-decomp and a valid directory name.\n", stderr);
+		exit(EXIT_FAILURE);
+	    }
+
+	    tabular_strategy_t ***matrix =
+		generate_matrix(name_directory_decomp,
+				data_pm1, data_pp1,
+				data_ecm_m16,
+				data_ecm_rc, fbb0,
+				lpb0,
+				mfb0, fbb1, lpb1,
+				mfb1);
+
+	    char res_file[200];
+	    for (int r0 = 0; r0 <= mfb0; r0++)
+		for (int r1 = 0; r1 <= mfb1; r1++) {
+		    sprintf(res_file, "%s/strategies_%d_%d", directory_out,
+			    r0, r1);
+		    FILE *file = fopen(res_file, "w");
+		    tabular_strategy_fprint(file, matrix[r0][r1]);
+		    fclose(file);
+		}
+
+	    //free
+	    for (int r0 = 0; r0 <= mfb0; r0++) {
+		for (int r1 = 0; r1 <= mfb1; r1++)
+		    tabular_strategy_free(matrix[r0][r1]);
+		free(matrix[r0]);
+	    }
+	    free(matrix);
+	}
 	//free
 	printf("free!!\n");
 	tabular_fm_free(data_pp1_65);
