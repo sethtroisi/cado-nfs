@@ -45,11 +45,11 @@ void
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
 {
   int i;
-  fprintf (fd, "Prime " FBPRIME_FORMAT " with exponent %d, old exponent %d, and roots ",
+  fprintf (fd, "Prime %" FBPRIME_FORMAT " with exponent %d, old exponent %d, and roots ",
 	   fb->p, (int) fb->exp, (int) fb->oldexp);
   for (i = 0; i < fb->nr_roots; i++)
     {
-      fprintf (fd, FBROOT_FORMAT, fb->roots[i]);
+      fprintf (fd, "%" FBROOT_FORMAT, fb->roots[i]);
       if (i + 1 < fb->nr_roots)
 	fprintf (fd, ", ");
     }
@@ -518,8 +518,8 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 
   verbose_output_vfprint(0, 1, gmp_vfprintf,
                "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
-               "# including primes up to " FBPRIME_FORMAT
-               " and prime powers up to " FBPRIME_FORMAT ".\n",
+               "# including primes up to %" FBPRIME_FORMAT
+               " and prime powers up to %" FBPRIME_FORMAT ".\n",
                poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
                poly[0], bound, powbound);
 
@@ -592,7 +592,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	      verbose_output_print (0, 1, "# Primes with projective roots:");
 	      had_proj_root = 1;
 	    }
-	  verbose_output_print (0, 1, " " FBPRIME_FORMAT , q);
+	  verbose_output_print (0, 1, " %" FBPRIME_FORMAT , q);
 	}
 
       if (!fb_split_add (&split, fb_cur))
@@ -746,7 +746,7 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
     {
         if (fb_entry->nr_roots == MAXDEGREE) {
             fprintf (stderr,
-                    "# Error, too many roots for prime " FBPRIME_FORMAT
+                    "# Error, too many roots for prime %" FBPRIME_FORMAT
                     " in factor base line %lu\n", fb_entry->p, linenr);
             exit(EXIT_FAILURE);
         }
@@ -772,7 +772,7 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
     }
 
     if (fb_entry->nr_roots == 0) {
-        fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
+        fprintf (stderr, "# Error, no root for prime %" FBPRIME_FORMAT
                 " in factor base line %lu\n", fb_entry->p, linenr - 1);
         exit(EXIT_FAILURE);
     }
@@ -829,7 +829,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
         nlogp = strtoul_const (lineptr, &lineptr, 10);
         /*
         if (nlogp == 0) {
-            fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime " FBPRIME_FORMAT "\n", q);
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime %" FBPRIME_FORMAT "\n", q);
             exit (EXIT_FAILURE);
         }*/
         if (*lineptr != ',') {
@@ -840,7 +840,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
         oldlogp = strtoul_const (lineptr, &lineptr, 10);
         /*
         if (oldlogp == 0) {
-            fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime " FBPRIME_FORMAT "\n", q);
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime %" FBPRIME_FORMAT "\n", q);
             exit (EXIT_FAILURE);
         }*/
         if (*lineptr != ':') {
@@ -976,7 +976,7 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
     }
 
     if (!error) {
-        verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, largest was "
+        verbose_output_print (0, 2, "# Factor base successfully read, %lu primes, largest was %"
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 

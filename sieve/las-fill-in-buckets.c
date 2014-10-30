@@ -782,8 +782,8 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     plattice_info_t pli;
     if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
       pthread_mutex_lock(&io_mutex);
-      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
-	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+	       FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
 	pthread_mutex_unlock(&io_mutex);
 	continue; /* Simply don't consider that (p,r) for now.
 		     FIXME: can we find the locations to sieve? */
@@ -936,8 +936,8 @@ fill_in_k_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     plattice_info_t pli;
     if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
       pthread_mutex_lock(&io_mutex);
-      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
-	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+	       FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
 	pthread_mutex_unlock(&io_mutex);
 	continue; /* Simply don't consider that (p,r) for now.
 		     FIXME: can we find the locations to sieve? */
@@ -1182,8 +1182,8 @@ fill_in_m_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     plattice_info_t pli;
     if (UNLIKELY(!reduce_plattice(&pli, p, r, si))) {
       pthread_mutex_lock(&io_mutex);
-      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = "
-	       FBPRIME_FORMAT ", r = " FBPRIME_FORMAT "\n", p, r);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() returned 0 for p = %"
+	       FBPRIME_FORMAT ", r = %" FBPRIME_FORMAT "\n", p, r);
 	pthread_mutex_unlock(&io_mutex);
 	continue; /* Simply don't consider that (p,r) for now.
 		     FIXME: can we find the locations to sieve? */
