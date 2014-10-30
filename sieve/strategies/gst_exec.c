@@ -21,26 +21,34 @@
 static void declare_usage(param_list pl)
 {
     param_list_usage_header(pl,
-			    "This binary allows to build the best strategies for each couple (r0, r0)\n"
-			    "where (r0,r0) are the bits size for our couple of cofactors.\n");
+			    "This binary allows to build the best strategies for each couple (r0, r1)\n"
+			    "where (r0,r1) are the bits size for our couple of cofactors.\n");
 
-    param_list_decl_usage(pl, "r",
-			  "specify the bit size of the studied cofactor.\n");
     param_list_decl_usage(pl, "gdc",
     "(switch)  to precompute all decompositions of cofactors in the \n "
 "\t \t sieve region. So, you must specify the sieve region with these options:\n"
-			  "\t \t -afb, -mfb1, -rfb, -mfb0\n");
+			  "\t \t -fbb1, -mfb1, -fbb0, -mfb0\n");
     param_list_decl_usage(pl, "gst_r",
 			  "(switch)  to precompute the best strategies \n"
 			  "\t \t for one bit size cofactor.\n "
 			  "\t \t You must specify these options:\n"
-			  "\t \t -rfb, -lpb0, -r -decomp\n");
+			  "\t \t -fbb0, -lpb0, -r -decomp\n");
     param_list_decl_usage(pl, "gst",
-	"(switch)  to merge all precomputes did by the option 'gst_r',\n "
-	"\t \t and thus find the best strategies for each couple (r0,r0).\n"
+	"(switch)  to merge two (or all) precomputing did by the option 'gst_r',\n "
+	"\t \t and thus find the best strategie(s) for one (or each) couple (r0,r1).\n"
 	"\t \t So, you must specify these options:\n"
-	"\t \t -mfb0, -mfb1, -in \n");
+	"\t \t -mfb0, -mfb1, -fbb0, -fbb1 ,-in, (-r0 -r1)\n");
 
+    param_list_decl_usage(pl, "r0",
+			  "with r1 specify the bit sizes of the cofactor couple"
+			  " that you want to find the best strategies.\n");
+    param_list_decl_usage(pl, "r1",
+			  "with r0 specify the bit sizes of the cofactor couple"
+			  " that you want to find the best strategies.\n");
+    param_list_decl_usage(pl, "r",
+			  "specify the bit size of the studied cofactor.\n");
+    param_list_decl_usage(pl, "r",
+			  "specify the bit size of the studied cofactor.\n");
     param_list_decl_usage(pl, "fbb1",
 			  "set algebraic factor base bound to 2^fbb1\n");
     param_list_decl_usage(pl, "fbb0",
@@ -154,15 +162,9 @@ int main(int argc, char *argv[])
 	/*          int max_cof = (mfb0 > mfb1)? mfb0 : mfb1; */
 	/*          precompute_tabular_decomp_files (2*fbb0-1, max_cof, fbb0); */
 	/*        } */
+
     } else if (gst) {
-	//todo: check this function:: wait today!
-	/* For the both side and each size of cofactor the best
-	   strategies had been choosed. Now, it stays to merge these
-	   datas to compute the best strategies for each couple (r0, r0)!
-	 */
 	//check parameters!
-	ASSERT_ALWAYS(fbb0 < mfb0 && fbb1 < mfb1 &&
-		      fbb0 != -1 && mfb0 != -1 && fbb1 != -1 && mfb1 != -1);
 
 	const char *directory_in;
 	if ((directory_in = param_list_lookup_string(pl, "in")) == NULL) {
@@ -172,57 +174,119 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
 	}
 
-	tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
-	ASSERT_ALWAYS(data_rat);
-	char name_file_in[strlen(directory_in) + 20];
-	for (int r0 = 0; r0 <= mfb0; r0++) {
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
-		    directory_in, fbb0, r0);
-	    FILE *file_in = fopen(name_file_in, "r");
-	    data_rat[r0] = tabular_strategy_fscan(file_in);
-	    if (data_rat[r0] == NULL) {
-		fprintf(stderr,
-			"Parser error: impossible to read '%s'\n",
-			name_file_in);
-		exit(EXIT_FAILURE);
-	    }
-	    //todo: data_rat== NULL-->error when you would read data!
-	    fclose(file_in);
-	}
 
-	for (int r1 = 0; r1 <= mfb1; r1++) {
-	    sprintf(name_file_in, "%s/strategies(%d)_%d",
-		    directory_in, fbb1, r1);
-	    FILE *file_in = fopen(name_file_in, "r");
-	    //todo: data_rat== NULL-->error when you would read data!
-	    tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
-	    if (strat_r1 == NULL) {
-		fprintf(stderr,
-			"Parser error: can't read the file '%s'\n",
-			name_file_in);
-		exit(EXIT_FAILURE);
-	    }
+	//todo: add two options to allow to compute the
+	//best_strategies for one couple or only a sub set!
+	int r0 = -1, r1 = -1;
+	param_list_parse_int(pl, "r0", &r0);
+	param_list_parse_int(pl, "r1", &r1);
 
-	    fclose(file_in);
+	if (r0 != -1 && r1 != -1)
+	    {
+		ASSERT_ALWAYS(fbb0 != -1 && fbb1 != -1 );
+		//just one couple will be studied!
+		char name_file_in[strlen(directory_in) + 20];
+		FILE * file_in;
+		//get back the best strategies for r0!
+		sprintf(name_file_in, "%s/strategies(%d)_%d",
+			directory_in, fbb0, r0);
+		file_in = fopen(name_file_in, "r");
+		tabular_strategy_t *strat_r0 = tabular_strategy_fscan(file_in);
+		if (strat_r0 == NULL) {
+		    fprintf(stderr,
+			    "Parser error: can't read the file '%s'\n",
+			    name_file_in);
+		    exit(EXIT_FAILURE);
+		}
+		fclose(file_in);
 
-	    for (int r0 = 0; r0 <= mfb0; r0++) {
+		//get back the best strategies for r1!
+		sprintf(name_file_in, "%s/strategies(%d)_%d",
+			directory_in, fbb0, r1);
+		file_in = fopen(name_file_in, "r");
+		tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
+		if (strat_r1 == NULL) {
+		    fprintf(stderr,
+			    "Parser error: can't read the file '%s'\n",
+			    name_file_in);
+		    exit(EXIT_FAILURE);
+		}
+
+		fclose(file_in);
+
+		//computethe best strategies for (r0, r1)!
 		char res_file[200];
 		tabular_strategy_t *res =
-		    generate_strategy_r0_r1(data_rat[r0], strat_r1);
+		    generate_strategy_r0_r1(strat_r0, strat_r1);
 		//print
-		sprintf(res_file, "%s/strategies_%d_%d", directory_out, r0, r1);
+		sprintf(res_file, 
+			"%s/strategies_%d_%d", directory_out, r0, r1);
 		FILE *file = fopen(res_file, "w");
 		tabular_strategy_fprint(file, res);
 		fclose(file);
+		//free
+		tabular_strategy_free (strat_r0);
+		tabular_strategy_free (strat_r1);
+		tabular_strategy_free (res);
 
-		tabular_strategy_free(res);
+	    } else {
+	    ASSERT_ALWAYS(fbb0 != -1 && fbb1 != -1 &&
+			  mfb0 != -1 && mfb1 != -1 &&
+			  fbb0 < mfb0 && fbb1 < mfb1);
+	    /* For the both side and each size of cofactor the best
+	       strategies had been choosed. Now, it stays to merge these
+	       datas to compute the best strategies for each couple (r0, r1)!
+	    */
+
+	    tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
+	    ASSERT_ALWAYS(data_rat);
+	    char name_file_in[strlen(directory_in) + 20];
+	    for (int r0 = 0; r0 <= mfb0; r0++) {
+		sprintf(name_file_in, "%s/strategies(%d)_%d",
+			directory_in, fbb0, r0);
+		FILE *file_in = fopen(name_file_in, "r");
+		data_rat[r0] = tabular_strategy_fscan(file_in);
+		if (data_rat[r0] == NULL) {
+		    fprintf(stderr,
+			    "Parser error: impossible to read '%s'\n",
+			    name_file_in);
+		    exit(EXIT_FAILURE);
+		}
+		fclose(file_in);
 	    }
-	    tabular_strategy_free(strat_r1);
-	}
-	for (int r0 = 0; r0 <= mfb0; r0++)
-	    tabular_strategy_free(data_rat[r0]);
-	free(data_rat);
 
+	    for (int r1 = 0; r1 <= mfb1; r1++) {
+		sprintf(name_file_in, "%s/strategies(%d)_%d",
+			directory_in, fbb1, r1);
+		FILE *file_in = fopen(name_file_in, "r");
+		tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
+		if (strat_r1 == NULL) {
+		    fprintf(stderr,
+			    "Parser error: can't read the file '%s'\n",
+			    name_file_in);
+		    exit(EXIT_FAILURE);
+		}
+
+		fclose(file_in);
+
+		for (int r0 = 0; r0 <= mfb0; r0++) {
+		    char res_file[200];
+		    tabular_strategy_t *res =
+			generate_strategy_r0_r1(data_rat[r0], strat_r1);
+		    //print
+		    sprintf(res_file, "%s/strategies_%d_%d", directory_out, r0, r1);
+		    FILE *file = fopen(res_file, "w");
+		    tabular_strategy_fprint(file, res);
+		    fclose(file);
+
+		    tabular_strategy_free(res);
+		}
+		tabular_strategy_free(strat_r1);
+	    }
+	    for (int r0 = 0; r0 <= mfb0; r0++)
+		tabular_strategy_free(data_rat[r0]);
+	    free(data_rat);
+	}
     } else {
 
 	const char *name_file_in;
@@ -309,12 +373,6 @@ int main(int argc, char *argv[])
 		generate_strategies_oneside(tab_decomp, zero, data_pm1,
 					    data_pp1, data_ecm_m16,
 					    data_ecm_rc, fbb0, lpb0, r);
-	    /* if (r >=lim)//Debug mode */
-	    /*     { */
-	    /*      tabular_strategy_print (res); */
-	    /*      printf ("r0 = %d, lb= %d\n", r, fbb0); */
-	    /*      getchar (); */
-	    /*     } */
 
 	    tabular_decomp_free(tab_decomp);
 	    //print res;
@@ -330,7 +388,7 @@ int main(int argc, char *argv[])
 	    ASSERT_ALWAYS(fbb1 < lpb1 && lpb1 < mfb1 &&
 			  fbb0 < lpb0 && lpb0 < mfb0);
 	    //compute the matrix of strategies where for each
-	    //couple (r0, r0) we will optain the best strategies
+	    //couple (r0, r1) we will optain the best strategies
 	    //to find a relation.
 
 	    const char *name_directory_decomp;
@@ -344,11 +402,9 @@ int main(int argc, char *argv[])
 	    tabular_strategy_t ***matrix =
 		generate_matrix(name_directory_decomp,
 				data_pm1, data_pp1,
-				data_ecm_m16,
-				data_ecm_rc, fbb0,
-				lpb0,
-				mfb0, fbb1, lpb1,
-				mfb1);
+				data_ecm_m16, data_ecm_rc,
+				fbb0, lpb0, mfb0,
+				fbb1, lpb1,mfb1);
 
 	    char res_file[200];
 	    for (int r0 = 0; r0 <= mfb0; r0++)
