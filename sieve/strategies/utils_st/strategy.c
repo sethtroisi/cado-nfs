@@ -103,6 +103,9 @@ void strategy_fprint (FILE * output_file, strategy_t * t)
 	    fprintf(output_file, "%lu\t", fm->method[j]);
 	if (is_alloced_side)
 	    fprintf(output_file, "side = %d", t->side[i]);
+	else
+	    fprintf(output_file, "side = %d", 0);
+
 	fprintf(output_file, "\n");
     }
     fprintf(output_file, "\t Probability: %1.10lf\n", t->proba);

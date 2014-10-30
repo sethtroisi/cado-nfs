@@ -468,7 +468,8 @@ tabular_strategy_t *generate_strategy_r1_r2(tabular_strategy_t * strat_r1,
     return ch;
 }
 
-tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
+tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
+				      tabular_fm_t * pm1, tabular_fm_t * pp1,
 				      tabular_fm_t * ecm_m16,
 				      tabular_fm_t * ecm_rc, int rlb, int rub,
 				      int rmfb, int alb, int aub, int amfb)
@@ -512,8 +513,8 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
 	    {
 		char name_file[200];
 		sprintf(name_file,
-			"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
-			r1, rlb);
+			"%s/decomp_%d_%d",
+			name_directory_decomp, rlb,r1);
 		FILE *file = fopen(name_file, "r");
 
 		tab_decomp = tabular_decomp_fscan(file);
@@ -542,8 +543,8 @@ tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
 	    {
 		char name_file[200];
 		sprintf(name_file,
-			"/localdisk/trichard/strategies/decomp_cofactor/decomp_%d_%d",
-			r2, alb);
+			"%s/decomp_%d_%d",
+			name_directory_decomp, alb, r2);
 		FILE *file = fopen(name_file, "r");
 		
 		tab_decomp = tabular_decomp_fscan(file);

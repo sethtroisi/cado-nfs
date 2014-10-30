@@ -39,7 +39,8 @@ tabular_strategy_t *generate_strategy_r1_r2(tabular_strategy_t * strat_r1,
 					    tabular_strategy_t * strat_r2);
 
 
-tabular_strategy_t ***generate_matrix(tabular_fm_t * pm1, tabular_fm_t * pp1,
+tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
+				      tabular_fm_t * pm1, tabular_fm_t * pp1,
 				      tabular_fm_t * ecm_m16,
 				      tabular_fm_t * ecm_rc, int rlb, int rub,
 				      int rmfb, int alb, int aub, int amfb);

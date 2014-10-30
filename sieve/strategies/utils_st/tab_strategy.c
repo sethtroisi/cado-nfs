@@ -216,7 +216,6 @@ tabular_strategy_fscan (FILE* file)
       tabular_strategy_add_strategy (tab, strat);
       strategy_free (strat);
     }
-  fclose(file);
   return tab;
 }
 
