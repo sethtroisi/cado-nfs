@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include <float.h>
 
-/*todo: I know :)! In few days, you will never see the words
-  rationnal and algebraic :)
-*/
+
 #define SIDE_0 0
 #define SIDE_1 1
 static double EPSILON_DBL = LDBL_EPSILON;
@@ -25,6 +23,30 @@ static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
 /************************************************************************/
 /*                      COLLECT DATA FOR ONLY ONE COFACTOR              */
 /************************************************************************/
+/*
+  Compute the probability to doesn't find a non-trivial factor when we
+  use this method.
+ */
+double
+compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm)
+{
+    double *proba_suc = fm_get_proba(fm);
+    int len_proba = fm_get_len_proba(fm);
+    double proba_fail = 1; 
+    for (int i = 0; i < dec->len; i++) {
+	int j = dec->tab[i] - fm->len_p_min;
+	if (j < 0) {//todo: clean it--->when the script will be ok!!!
+	    printf("%d, %d\n", dec->tab[i], fm->len_p_min);
+	    fprintf(stderr, 
+		    "This probability wasn't computed in the benchmark!\n");
+	    exit(EXIT_FAILURE);
+	}
+	if (j < len_proba)
+	    proba_fail *= (1 - proba_suc[j]);
+	//else //the probability seems closest to 0.
+    }   
+    return proba_fail;
+}
 
 /*
   Compute the percent of good decomposition which is detected by the strategy.
@@ -42,34 +64,21 @@ compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
     for (int index_decomp = 0; index_decomp < nb_decomp; index_decomp++) {
 	decomp_t *dec = init_tab->tab[index_decomp];
 	if (is_good_decomp(dec, len_p_min, len_p_max)) {
-	    double res = 1;
+	    //the probability to doesn't find a non trivial factor
+	    //with all methods in our strategy.
+	    double p_fail_all = 1;
 	    for (int index_fm = 0; index_fm < nb_fm; index_fm++) {
-		fm_t *elem = tab_fm->tab[index_fm];
-		double *proba = fm_get_proba(elem);
-		int len_proba = fm_get_len_proba(elem);
-		double proba_method = 1;
-		for (int i = 0; i < dec->len; i++) {
-		    int j = dec->tab[i] - elem->len_p_min;
-		    if (j < 0) {
-			printf("%d, %d\n", dec->tab[i], elem->len_p_min);
-			fprintf(stderr, "ATTENTION A NOTRE VALEUR DE LB\n");
-			exit(1);
-		    }
-
-		    if (j < len_proba) {
-			proba_method *= (1 - proba[j]);
-		    }
-		    //else //the probability seems closest to 0.
-		}
-		res *= proba_method;
+		fm_t* elem = tabular_fm_get_fm(tab_fm, index_fm);
+		double p_fail_one = compute_proba_method_one_decomp (dec, elem);
+		p_fail_all *= p_fail_one;
 		if (elem->method[0] == PM1_METHOD ||
 		    elem->method[0] == PP1_27_METHOD ||
 		    elem->method[0] == PP1_65_METHOD)
 		    //because if you chain PP1||PM1 to PM1||PP1-->they are
 		    //not independant.
-		    res = (proba_method + res) / 2;
+		    p_fail_all = (p_fail_one + p_fail_all) / 2;
 	    }
-	    nb_found_elem += (1 - res) * dec->nb_elem;
+	    nb_found_elem += (1 - p_fail_all) * dec->nb_elem;
 	}
 	all += dec->nb_elem;
     }
@@ -77,78 +86,57 @@ compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 }
 
 /*
-Compute the mean cost of the strategy! 
- */
-double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat)
+  Compute the mean cost of the strategy! 
+*/
+double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, int r)
 {
-
-    double cost = 0;
-    double all = 0;
     int nb_fm = tabular_fm_get_index(strat->tab_fm);
     int nb_decomp = init_tab->index;
+    tabular_fm_t *tab_fm = strat->tab_fm;
+    //{{
+    /*
+      We add 0.5 to the lenght of one word, because for our times the
+      lenght is inclusive. For example, if MODREDCUL_MAXBITS = 64
+      bits, a cofactor is in one word if is lenght is less OR equal to
+      64 bits. So, if you doesn't add 0.5 to MODREDCUL_MAXBITS, you
+      lost the equal and thus insert a n error in your maths. 
+    */
+    double half_word = (MODREDCUL_MAXBITS+0.5)/2.0;
+    int number_half_wd = floor(r /half_word);
+    //the next computation is necessary in the relation with the
+    //benchmark in gfm!
+    int ind_time = (number_half_wd <2)? 0: number_half_wd - 1;
+    //}}
 
+    int time_average = 0;
+    double all = 0.0;//store the nunlber of all decompositions!
     for (int index_decomp = 0; index_decomp < nb_decomp; index_decomp++) {
 	decomp_t *dec = init_tab->tab[index_decomp];
-	double t = 0, p = 0;
-	double num = 0, denom = 0;
-	double nb_elem = dec->nb_elem;	//the number of elements remaining.
+	double time_dec = 0;
+	double proba_fail_previous_method = 1;
+	double time_method = 0;
 	//compute the time of each decomposition
 	for (int index_fm = 0; index_fm < nb_fm; index_fm++) {
-	    num = 0;
-	    denom = 0;
-	    tabular_fm_t *tab_fm = strat->tab_fm;
-	    fm_t *elem = tab_fm->tab[index_fm];
-	    double *time = fm_get_time(elem);
-	    int len_time = fm_get_len_time(elem);
-	    double *proba = fm_get_proba(elem);
-	    int len_proba = fm_get_len_proba(elem);
-	    double moy_proba = 1;
-	    //compute the time of each decomposition and for one FM
-	    for (int i = 0; i < dec->len; i++) {
-		//temps
-		int j = dec->tab[i] - elem->len_p_min;
-		if (j < 0) {
-		    fprintf(stderr, "ATTENTION A NOTRE VALEUR DE LB\n");
-		    exit(1);
-		}
-		if (j >= len_time)
-		    t = time[len_time - 1];
-		else
-		    t = time[j];
-		if (j >= len_proba)
-		    p = 0;
-		else
-		    p = proba[j];
-		denom += p;
-		num += t * p;
-		//moy_proba
-		moy_proba *= (1 - p);
-	    }
+	    fm_t* elem = tabular_fm_get_fm(tab_fm, index_fm);
+	    int len_time = fm_get_len_time (elem);
+	    if (ind_time >= len_time)
+		time_method = elem->time[len_time-1];
+	    else
+		time_method = elem->time[ind_time];
+	    time_dec += time_method * proba_fail_previous_method;
 
-	    if (denom < EPSILON_DBL)	//denom == 0
-	    {
-		cost += t * nb_elem;
-		//here, the method give zero succes percent for all 
-		//factors and the cost is the same for all of this. So cost = t
-	    } else {
-		//num/denom = mean cost of the method[index_fm]
-		cost += num / denom * nb_elem;
-	    }
-	    nb_elem *= moy_proba;
-	    if (elem->method[0] == PM1_METHOD ||
-		elem->method[0] == PP1_27_METHOD ||
-		elem->method[0] == PP1_65_METHOD) {
-		nb_elem = (dec->nb_elem * moy_proba + nb_elem) / 2;
-	    }
+	    proba_fail_previous_method = 
+		compute_proba_method_one_decomp (dec, elem);
 	}
+	time_average += time_dec * dec->nb_elem;
 	all += dec->nb_elem;
     }
-    return cost / all;
+    return time_average / all;
 }
 
 /*
-  As its name suggests, this function add one strategy to our array
-  't' without the zero method.
+  As its name suggests, this function adds one strategy to our array
+  't' without the zero methods.
 */
 static void
 tabular_strategy_add_strategy_without_zero(tabular_strategy_t * t,
@@ -183,15 +171,15 @@ static void
 generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 			     int ind_ecm_rc, strategy_t * strat, int ind_tab,
 			     int index_iter, int len_iteration,
-			     tabular_decomp_t * init_tab,
-			     tabular_strategy_t * res, int fbb, int lpb)
+			     tabular_decomp_t *init_tab, tabular_strategy_t*res,
+			     int fbb, int lpb, int r)
 {
     if (index_iter >= len_iteration) {
 	tabular_strategy_add_strategy_without_zero(res, strat);
 	int nb_strat = res->index - 1;
 	double proba =
 	    compute_proba_strategy(init_tab, res->tab[nb_strat], fbb, lpb);
-	double time = compute_time_strategy(init_tab, res->tab[nb_strat]);
+	double time = compute_time_strategy(init_tab, res->tab[nb_strat], r);
 	strategy_set_proba(res->tab[nb_strat], proba);
 	strategy_set_time(res->tab[nb_strat], time);
     } else {
@@ -202,7 +190,7 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 		tabular_fm_set_fm_index(strat->tab_fm, zero, ind_tab);
 	    generate_collect_iter_ecm_rc(zero, ecm_rc, i, strat, ind_tab + 1,
 					 index_iter + 1, len_iteration,
-					 init_tab, res, fbb, lpb);
+					 init_tab, res, fbb, lpb, r);
 	}
     }
 }
@@ -242,10 +230,6 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 	return res;
     }
     //}}
-
-    //todo: find an other method to get back the decompositions of our
-    //cofactor r 
-    //tabular_decomp_t *init_tab = decomposition_of_cofactor (fbb, r);
 
     tabular_strategy_t *all_strat = tabular_strategy_create();
     //contains strategies which will be processed.
@@ -305,7 +289,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 
 		generate_collect_iter_ecm_rc(zero, ecm_rc, ind_ecm_rc, strat,
 					     3, 0, nb_iteration, init_tab,
-					     all_strat, fbb, lpb);
+					     all_strat, fbb, lpb, r);
 
 		//process data to avoid to full the RAM!!!
 		//{{
@@ -478,11 +462,11 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
        algebraic side.
      */
     tabular_strategy_t ***matrix = malloc(sizeof(*matrix) * (mfb0 + 1));
-    assert(matrix != NULL);
+    ASSERT(matrix != NULL);
 
     for (int r0 = 0; r0 <= mfb0; r0++) {
 	matrix[r0] = malloc(sizeof(*matrix[r0]) * (mfb1 + 1));
-	assert(matrix[r0] != NULL);
+	ASSERT(matrix[r0] != NULL);
     }
 
     printf("\n COLLECT DATA\n\n");
@@ -501,7 +485,7 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
     fm_set_method(zero, method_zero, 4);
 
     tabular_strategy_t **data_rat = malloc(sizeof(*data_rat) * (mfb0 + 1));
-    ASSERT_ALWAYS(data_rat);
+    ASSERT (data_rat);
 
     int lim1 = 2 * fbb0 - 1;
     for (int r0 = 0; r0 <= mfb0; r0++) {

@@ -13,7 +13,8 @@
 double compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 			      int len_p_min, int len_p_max);
 
-double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat);
+double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, 
+			     int r);
 
 /************************************************************************/
 /*                   GENERATE MATRIX                                    */
