@@ -100,16 +100,16 @@ void strategy_fprint (FILE * output_file, strategy_t * t)
     for (int i = 0; i < tmp->index; i++) {
 	fm_t *fm = tmp->tab[i];
 	for (int j = 0; j < fm->len_method; j++)
-	    fprintf(output_file, "%lu\t", fm->method[j]);
+	    fprintf(output_file, "%lu ", fm->method[j]);
 	if (is_alloced_side)
-	    fprintf(output_file, "side = %d", t->side[i]);
+	    fprintf(output_file, "%d", t->side[i]);
 	else
-	    fprintf(output_file, "side = %d", 0);
+	    fprintf(output_file, "%d", 0);//default side!
 
 	fprintf(output_file, "\n");
     }
-    fprintf(output_file, "\t Probability: %1.10lf\n", t->proba);
-    fprintf(output_file, "\t Time: %lf\n", t->time);
+    fprintf(output_file, "Probability: %1.10lf\n", t->proba);
+    fprintf(output_file, "Time: %lf\n", t->time);
 }
 
 void strategy_print(strategy_t * t)

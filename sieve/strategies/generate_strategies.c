@@ -25,7 +25,7 @@ static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
 /************************************************************************/
 /*
   Compute the probability to doesn't find a non-trivial factor when we
-  use this method.
+  use this method 'fm'.
  */
 double
 compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm)
@@ -35,12 +35,13 @@ compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm)
     double proba_fail = 1; 
     for (int i = 0; i < dec->len; i++) {
 	int j = dec->tab[i] - fm->len_p_min;
-	if (j < 0) {//todo: clean it--->when the script will be ok!!!
-	    printf("%d, %d\n", dec->tab[i], fm->len_p_min);
-	    fprintf(stderr, 
-		    "This probability wasn't computed in the benchmark!\n");
-	    exit(EXIT_FAILURE);
-	}
+	ASSERT (j >= 0);
+	/* if (j < 0) {//todo: clean it--->when the script will be ok!!! */
+	/*     printf("%d, %d\n", dec->tab[i], fm->len_p_min); */
+	/*     fprintf(stderr,  */
+	/* 	    "This probability wasn't computed in the benchmark!\n"); */
+	/*     exit(EXIT_FAILURE); */
+	/* } */
 	if (j < len_proba)
 	    proba_fail *= (1 - proba_suc[j]);
 	//else //the probability seems closest to 0.
@@ -49,7 +50,7 @@ compute_proba_method_one_decomp (decomp_t* dec, fm_t* fm)
 }
 
 /*
-  Compute the percent of good decomposition which is detected by the strategy.
+  Compute the probability to find a non-trivial factor in a good decomposition.
  */
 double
 compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
@@ -86,7 +87,8 @@ compute_proba_strategy(tabular_decomp_t * init_tab, strategy_t * strat,
 }
 
 /*
-  Compute the mean cost of the strategy! 
+  Compute the average time when we apply our strategy 'strat' in a
+  cofactor of r bits!
 */
 double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, int r)
 {
@@ -108,8 +110,9 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
     int ind_time = (number_half_wd <2)? 0: number_half_wd - 1;
     //}}
 
-    int time_average = 0;
-    double all = 0.0;//store the nunlber of all decompositions!
+    double time_average = 0;
+    //store the number of elements in the different decompositions!
+    double all = 0.0;
     for (int index_decomp = 0; index_decomp < nb_decomp; index_decomp++) {
 	decomp_t *dec = init_tab->tab[index_decomp];
 	double time_dec = 0;
@@ -135,7 +138,7 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
 }
 
 /*
-  As its name suggests, this function adds one strategy to our array
+  As their name suggests, this function adds one strategy to our array
   't' without the zero methods.
 */
 static void
@@ -196,10 +199,15 @@ generate_collect_iter_ecm_rc(fm_t * zero, tabular_fm_t * ecm_rc,
 }
 
 /*
-  This function allows to generate strategies, compute their data, and
-  select the convex hull of these strategies for one size of cofactor
-  'r'.  It allows to avoid to full the RAM when we generated
-  strategies!
+  This function allows to generate strategies, computes their data,
+  and selects the convex hull of these strategies for one size of
+  cofactor 'r'.  It allows to avoid to full the RAM when we generated
+  strategies!  
+  Moreover, this generator chains our factoring methods
+  such that: 
+       PM1 (0/1) + PP1 (0/1) + ECM-M16 (0/1) + ECM-RC(0/1/2/3/4) 
+  todo: reconsider this scheme according the different
+  results can be considered!
 */
 tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 						fm_t * zero, tabular_fm_t * pm1,
@@ -214,15 +222,23 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     //check the cases where r is trivial!!
     //{{
     int lim = 2 * fbb - 1;
-    //in this case, r is already a prime number!
+    /*
+      In this case, r is already a prime number!
+      We define two zero strategies to manage:
+      - the case where r is a good prime number (fbb<r<lpb)
+      |-> the probability is equal to 1.
+      - the case where r is a prime number too big (lpb < r <
+      fbb^2) or because the lenght of r is impossible (r<fbb).
+      - |-> the probability is equal to 0.
+    */ 
     if (r < lim) {
 	strategy_t *st_zero = strategy_create();
 	strategy_add_fm(st_zero, zero);
 	strategy_set_time(st_zero, 0.0);
 
 	if (r != 1 && (r < fbb || r > lpb))
-	    tabular_strategy_add_strategy(res, st_zero);
-	else			// r==1 or fbb<= r0 <= lpb
+	    strategy_set_proba(st_zero, 0);
+	else	// r==1 or fbb<= r0 <= lpb
 	    strategy_set_proba(st_zero, 1.0);
 
 	tabular_strategy_add_strategy(res, st_zero);
@@ -231,8 +247,8 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
     }
     //}}
 
-    tabular_strategy_t *all_strat = tabular_strategy_create();
     //contains strategies which will be processed.
+    tabular_strategy_t *all_strat = tabular_strategy_create();
 
     int len_pm1 = pm1->index;
     int len_pp1 = pp1->index;
@@ -310,13 +326,14 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 	    ind_pp1++;
 	}
     }
-    if (nb_strat != 0)		//process data
+    if (nb_strat != 0)	//process data
     {
 	//add strategies of the old convexhull and recompute the new
 	//convex hull
 	tabular_strategy_concat(all_strat, res);
 	tabular_strategy_free(res);
 	res = convex_hull_strategy(all_strat);
+
     }
     tabular_strategy_free(all_strat);
     strategy_free(strat);
@@ -324,7 +341,7 @@ tabular_strategy_t *generate_strategies_oneside(tabular_decomp_t * init_tab,
 }
 
 /*
-  As its name suggests, this function concatenates two strategies but
+  As their name suggests, this function concatenates two strategies but
   take into account the side of each strategy: st1 will be the
   first_side and st2 the other side.
 */
@@ -355,8 +372,8 @@ static strategy_t *concat_strategies(strategy_t * st1, strategy_t * st2,
 
 /*
   returns the best strategies to factor a couple (r0, r1), from a set
-  of factoring methods for each side. Note that, the probability and
-  the time o find a non-trivial for its side must be previously
+  of optimal strategies for each side. Note that, the probability and
+  the time to find a non-trivial for each side must be previously
   computed!
  */
 tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
@@ -395,11 +412,11 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 	strategy_free(st);
     }
 
-    for (int r = r_init; r < len_r0; r++)	//rationnal side
+    for (int r = r_init; r < len_r0; r++)	//first side
     {
 	double p1 = strat_r0->tab[r]->proba;
 	double c1 = strat_r0->tab[r]->time;
-	for (int a = a_init; a < len_r1; a++)	//algebraic side : len
+	for (int a = a_init; a < len_r1; a++)	//second side
 	{
 	    nb_strat++;
 	    //compute success ans cost:
@@ -443,23 +460,30 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 	}
     }
 
-//free
+    //free
     tabular_strategy_free(strat_r0_r1);
 
     return ch;
 }
 
+/*
+  returns the best strategies for each couple of cofactors of lenght
+  (r0, r1), from a set of factoring methods. Note that this function
+  use the previous functions, and only need all probabilities and
+  times for each method must be previously computed. (to do that, you
+  could use the binary gfm).
+ */
+
 tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
-				      tabular_fm_t * pm1, tabular_fm_t * pp1,
-				      tabular_fm_t * ecm_m16,
-				      tabular_fm_t * ecm_rc, int fbb0, int lpb0,
-				      int mfb0, int fbb1, int lpb1, int mfb1)
+				      tabular_fm_t* pm1, tabular_fm_t* pp1,
+				      tabular_fm_t*ecm_m16, tabular_fm_t*ecm_rc,
+				      int fbb0, int lpb0, int mfb0,
+				      int fbb1, int lpb1, int mfb1)
 {
     /*
-       allocate the matrix res which contains all good strategies for
-       each couple (r_1, r_2).  r_1 is the lenght of the cofactor in
-       the rationnal side.  r_2 is the lenght of the cofactor in the
-       algebraic side.
+       allocates the matrix which contains all optimal strategies for
+       each couple (r0, r1): r0 is the lenght of the cofactor in
+       the first side, and r1 for the second side.
      */
     tabular_strategy_t ***matrix = malloc(sizeof(*matrix) * (mfb0 + 1));
     ASSERT(matrix != NULL);
@@ -469,16 +493,10 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	ASSERT(matrix[r0] != NULL);
     }
 
-    printf("\n COLLECT DATA\n\n");
     /*
-       for each r_1 in [fbb0..mfb0], we precompute the data for all
-       strategy.  for each r_2, the values will be computed
-       sequentially.  define two zero strategies to manage the case
-       where r is prime or the case r is impossible (r<lb): - st_zero_0
-       : process a zero method and the success is null because r<lb or r
-       is a big prime (ub < r < lb^2) - st_zero_1 : process a zero
-       method and the success is equal to 100% because r=1, and so this
-       cofactor is already factorised.
+       For each r0 in [fbb0..mfb0], we precompute and strore the data
+       for all strategies.  Whereas, for each r1, the values will be
+       computed sequentially. 
      */
     fm_t *zero = fm_create();
     unsigned long method_zero[4] = { 0, 0, 0, 0 };
@@ -510,7 +528,6 @@ tabular_strategy_t ***generate_matrix(const char *name_directory_decomp,
 	tabular_decomp_free(tab_decomp);
     }
 
-    printf("\n COLLECT DATA : step 2\n\n");
     /*
        read good elements for r_2 in the array data_r1 and compute the
        data for each r_1. So :

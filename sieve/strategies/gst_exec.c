@@ -144,6 +144,7 @@ int main(int argc, char *argv[])
     {
 	fprintf(stdout, "This feature isn't avaliable. Wait few days!!!\n");
 	exit(EXIT_SUCCESS);
+	//todo: do this for only one side!!!
 	/*   //check parameters */
 	/*   if (fbb1 == -1 || mfb1 == -1 || */
 	/*          fbb0 == -1 || mfb0 == -1)  */
@@ -175,8 +176,6 @@ int main(int argc, char *argv[])
 	}
 
 
-	//todo: add two options to allow to compute the
-	//best_strategies for one couple or only a sub set!
 	int r0 = -1, r1 = -1;
 	param_list_parse_int(pl, "r0", &r0);
 	param_list_parse_int(pl, "r1", &r1);
@@ -202,7 +201,7 @@ int main(int argc, char *argv[])
 
 		//get back the best strategies for r1!
 		sprintf(name_file_in, "%s/strategies(%d)_%d",
-			directory_in, fbb0, r1);
+			directory_in, fbb1, r1);
 		file_in = fopen(name_file_in, "r");
 		tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
 		if (strat_r1 == NULL) {
@@ -214,7 +213,7 @@ int main(int argc, char *argv[])
 
 		fclose(file_in);
 
-		//computethe best strategies for (r0, r1)!
+		//compute the best strategies for (r0, r1)!
 		char res_file[200];
 		tabular_strategy_t *res =
 		    generate_strategy_r0_r1(strat_r0, strat_r1);
@@ -234,7 +233,7 @@ int main(int argc, char *argv[])
 			  mfb0 != -1 && mfb1 != -1 &&
 			  fbb0 < mfb0 && fbb1 < mfb1);
 	    /* For the both side and each size of cofactor the best
-	       strategies had been choosed. Now, it stays to merge these
+	       strategies had been choosed. Now, it's time to merge these
 	       datas to compute the best strategies for each couple (r0, r1)!
 	    */
 
@@ -331,11 +330,11 @@ int main(int argc, char *argv[])
 	tabular_fm_sort(data_ecm_m16);
 	tabular_fm_sort(data_ecm_rc);
 
-	printf("all: (%d)\n", c->index);
-	printf("pp1: (%d)\n", data_pp1->index);
-	printf("pm1: (%d)\n", data_pm1->index);
-	printf("ecm_m16: (%d)\n", data_ecm_m16->index);
-	printf("ecm_rc: (%d)\n", data_ecm_rc->index);
+	/* printf("all: (%d)\n", c->index); */
+	/* printf("pp1: (%d)\n", data_pp1->index); */
+	/* printf("pm1: (%d)\n", data_pm1->index); */
+	/* printf("ecm_m16: (%d)\n", data_ecm_m16->index); */
+	/* printf("ecm_rc: (%d)\n", data_ecm_rc->index); */
 
 	if (gst_r) {
 	    ASSERT_ALWAYS(fbb0 < lpb0 && r != -1 && fbb0 != -1 && lpb0 != -1);
@@ -361,9 +360,6 @@ int main(int argc, char *argv[])
 		    exit(EXIT_FAILURE);
 		}
 		fclose(file_decomp);
-		/* printf ("%s\n", */
-		/*      name_file_decomp); */
-
 	    }
 	    fm_t *zero = fm_create();
 	    unsigned long method_zero[4] = { 0, 0, 0, 0 };
@@ -375,22 +371,24 @@ int main(int argc, char *argv[])
 					    data_ecm_rc, fbb0, lpb0, r);
 
 	    tabular_decomp_free(tab_decomp);
-	    //print res;
 
-	    char name_file[200];
+	    char name_file[strlen (directory_out) + 20];
 	    sprintf(name_file, "%s/strategies(%d)_%d", directory_out, fbb0, r);
 	    FILE *file_out = fopen(name_file, "w");
 	    tabular_strategy_fprint(file_out, res);
 	    fclose(file_out);
 	    tabular_strategy_free(res);
 	    fm_free(zero);
+
 	} else {
+
 	    ASSERT_ALWAYS(fbb1 < lpb1 && lpb1 < mfb1 &&
 			  fbb0 < lpb0 && lpb0 < mfb0);
-	    //compute the matrix of strategies where for each
-	    //couple (r0, r1) we will optain the best strategies
-	    //to find a relation.
-
+	    /*
+	      computes the matrix of strategies where for each couple
+	      (r0, r1) we will optain the best strategies to find a
+	      relation.
+	    */
 	    const char *name_directory_decomp;
 	    if ((name_directory_decomp =
 		 param_list_lookup_string(pl, "decomp")) == NULL) {
@@ -406,7 +404,7 @@ int main(int argc, char *argv[])
 				fbb0, lpb0, mfb0,
 				fbb1, lpb1,mfb1);
 
-	    char res_file[200];
+	    char res_file[strlen(directory_out) + 20];
 	    for (int r0 = 0; r0 <= mfb0; r0++)
 		for (int r1 = 0; r1 <= mfb1; r1++) {
 		    sprintf(res_file, "%s/strategies_%d_%d", directory_out,
@@ -425,7 +423,6 @@ int main(int argc, char *argv[])
 	    free(matrix);
 	}
 	//free
-	printf("free!!\n");
 	tabular_fm_free(data_pp1_65);
 	tabular_fm_free(data_pp1_27);
 	tabular_fm_free(data_pp1);
