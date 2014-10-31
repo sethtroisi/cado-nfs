@@ -778,15 +778,17 @@ fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
     }
 }
 
-/* Parse a factor base line. Return 1 if the line could be parsed and,
-   if the FB entry is for a prime power, the power does not exceed powlim.
+/* Parse a factor base line.
+   Return 1 if the line could be parsed and was a "short version", i.e.,
+   without explicit old and new exponent.
+   Return 2 if the line could be parsed and was a "long version".
    Otherwise return 0. */
 static int
 fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
-               const unsigned long linenr, const fbprime_t powlim)
+               const unsigned long linenr)
 {
     unsigned long nlogp, oldlogp = 0;
-    fbprime_t p, q; /* q is factor base entry q = p^k */
+    fbprime_t q; /* q is factor base entry q = p^k */
 
     q = strtoul_const (lineptr, &lineptr, 10);
     if (q == 0) {
@@ -807,18 +809,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     else
         longversion = 1;
 
-    /* we assume q is a prime or a prime power */
-    /* NB: a short version is not possible for a prime power, so we
-     * do the test only for !longversion */
-    p = (longversion) ? fb_is_power (q, NULL) : 0;
-    ASSERT(ulong_isprime(p != 0 ? p : q));
     fb_cur->p = q;
-    if (p != 0) {
-        if (powlim && fb_cur->p >= powlim)
-            return 0;
-    } else {
-        p = q; /* If q is prime, p = q */
-    }
 
     /* read the multiple of logp, if any */
     /* this must be of the form  q:nlogp,oldlogp: ... */
@@ -864,7 +855,7 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     /* Read roots */
     fb_read_roots(fb_cur, lineptr, linenr);
 
-    return 1;
+    return longversion ? 2 : 1;
 }
 
 /* Read a factor base file, splitting it into pieces.
@@ -931,8 +922,20 @@ fb_read (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
             continue;
         }
 
-        if (fb_parse_line (fb_cur, line, linenr, powlim) == 0)
+        int parsed_rc = fb_parse_line (fb_cur, line, linenr);
+        if (parsed_rc == 0)
             continue;
+
+        /* We assume q is a prime or a prime power */
+        /* NB: a short version is not permitted for a prime power, so we
+         * do the test only for longversion */
+        if (parsed_rc == 2) {
+            fbprime_t p = fb_is_power (fb_cur->p, NULL);
+            ASSERT(ulong_isprime(p != 0 ? p : fb_cur->p));
+            if (p != 0 && powlim != 0 && fb_cur->p >= powlim)
+                continue;
+        }
+
         if (lim && fb_cur->p >= lim)
             break;
 
