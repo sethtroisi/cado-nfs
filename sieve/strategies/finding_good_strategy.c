@@ -99,36 +99,45 @@ unsigned long **extract_matrix_C(FILE * file, int len_abs, int len_ord)
 
 static int
 subroutine_dicho(const tabular_strategy_t * tab_strat, double s, int ind_min,
-		 int ind_max, double ratio_min, double ratio_max)
+		 int ind_max, double slope_min, double slope_max)
 {
     if (ind_max - ind_min <= 1)
 	return ind_min;
 
     int middle = floor((ind_max + ind_min) / 2);
-    strategy_t *elem = tab_strat->tab[middle];
-    double ratio_middle = elem->time / elem->proba;
-
-    if (ratio_middle > s)
-	return subroutine_dicho(tab_strat, s, ind_min, middle, ratio_min,
-				ratio_middle);
+    double slope_middle;
+    if (middle == 0)
+	slope_middle = INFINITY;
     else
-	return subroutine_dicho(tab_strat, s, middle, ind_max, ratio_middle,
-				ratio_max);
+	{
+	    strategy_t *elem1 = tab_strat->tab[middle-1];
+	    strategy_t *elem2 = tab_strat->tab[middle];
+	    slope_middle = 
+		(elem2->proba - elem1->proba) / (elem2->time - elem1->time)*1000000;
+	}
+
+    if (slope_middle < s)
+	return subroutine_dicho(tab_strat, s, ind_min, middle, slope_min,
+				slope_middle);
+    else
+	return subroutine_dicho(tab_strat, s, middle, ind_max, slope_middle,
+				slope_max);
 }
 
 static int
-subroutine_compute_ratio_yt_dicho(const tabular_strategy_t * tab_strat,
+subroutine_compute_slope_yt_dicho(const tabular_strategy_t * tab_strat,
 				  double s)
 {
     int len = tab_strat->index;
     if (len == 1)
 	return 0;
     else
-	return subroutine_dicho(tab_strat, s, 0, len, 0, INFINITY);
+	return subroutine_dicho(tab_strat, s, 0, len, INFINITY, 0);
 }
 
+
 static double
-compute_ratio_yt(tabular_strategy_t *** matrix_strat, unsigned long **distrib_C,
+compute_slope_yt(tabular_strategy_t *** matrix_strat, unsigned long **distrib_C,
 		 int len_abs, int len_ord, double s, double C0)
 {
     double Y = 0, T = C0;
@@ -137,7 +146,7 @@ compute_ratio_yt(tabular_strategy_t *** matrix_strat, unsigned long **distrib_C,
 	for (int r2 = 0; r2 < len_ord; r2++) {
 	    if (distrib_C[r1][r2] > EPSILON_DBL) {
 		int index =
-		    subroutine_compute_ratio_yt_dicho(matrix_strat[r1][r2], s);
+		    subroutine_compute_slope_yt_dicho(matrix_strat[r1][r2], s);
 		Y += distrib_C[r1][r2] *
 		    matrix_strat[r1][r2]->tab[index]->proba;
 		T += distrib_C[r1][r2] * matrix_strat[r1][r2]->tab[index]->time;
@@ -146,6 +155,7 @@ compute_ratio_yt(tabular_strategy_t *** matrix_strat, unsigned long **distrib_C,
     }
     return Y / T;
 }
+
 
 static double
 sampling_function_interval(tabular_strategy_t *** matrix_strat,
@@ -160,7 +170,7 @@ sampling_function_interval(tabular_strategy_t *** matrix_strat,
     double max_s = 0, max_yt = 0;
     for (double s = init_s; s < maxi_s; s += pas) {
 	double yt =
-	    compute_ratio_yt(matrix_strat, distrib_C, len_abs, len_ord, s, C0);
+	    compute_slope_yt(matrix_strat, distrib_C, len_abs, len_ord, s, C0);
 	if (yt > max_yt) {
 	    max_s = s;
 	    max_yt = yt;
@@ -174,6 +184,7 @@ sampling_function_interval(tabular_strategy_t *** matrix_strat,
     fclose(result_file);
 #endif
 }
+
 
 static double
 sampling_function(tabular_strategy_t *** matrix_strat,
@@ -190,7 +201,7 @@ sampling_function(tabular_strategy_t *** matrix_strat,
     int chronos = 0;
     while (chronos < 100) {
 	double yt =
-	    compute_ratio_yt(matrix_strat, distrib_C, len_abs, len_ord, s, C0);
+	    compute_slope_yt(matrix_strat, distrib_C, len_abs, len_ord, s, C0);
 	if (yt > max_yt) {
 	    chronos = 0;
 	    max_s = s;
@@ -210,30 +221,32 @@ sampling_function(tabular_strategy_t *** matrix_strat,
 }
 
 /*
+  //todo: change the comment!!
   This function looks for the best choice of s!  
-  s is the slope which means the time per relation in the cofactorisation 
+  s is the slope which means the time (ms) per relation in the cofactorisation 
   step (so no count C0 the precompution time of our cofactors pair).
   And the goal is to choice a good value for s that optimates the 
-  number of relations per seconde in the sieving step 
+  number of relations per seconde in the sieving step.
   (cofactor + precomputation sieve).
 */
+//change the sense of s s 
 strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 				    unsigned long **distrib_C, int len_abs,
 				    int len_ord, double C0)
 {
-    double step_s = 10000;
+    double step_s = 1;
     //find a interesting interval to search optimal value for s.
     double max_s = sampling_function(matrix_strat, distrib_C,
 				     len_abs, len_ord, C0, 0, step_s);
 
     //search the optimal value of s.
     double min = (max_s - step_s > 0) ? max_s - step_s : 0;
+
     max_s = sampling_function_interval(matrix_strat, distrib_C,
 				       len_abs, len_ord,
-				       C0, min, min + 10000, 10);
+				       C0, min, min + 2*step_s, 0.00010);
 
-    printf("Our choice for the slope s: %lf\n", max_s);
-
+    printf("Our choice for the slope s: %lf (rel/s)\n", max_s);
     double Y = 0, T = C0;
     //build the matrix with the optimal strategies.
     strategy_t ***matrix_res = malloc(sizeof(*matrix_res) * len_abs);
@@ -246,7 +259,7 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 		matrix_res[r1][r2] = NULL;
 	    else {
 		int index =
-		    subroutine_compute_ratio_yt_dicho(matrix_strat[r1][r2],
+		    subroutine_compute_slope_yt_dicho(matrix_strat[r1][r2],
 						      max_s);
 
 		matrix_res[r1][r2] =
@@ -261,6 +274,7 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
     }
     printf(" Y = %lf relations, T = %lf s., yt = %1.10lf rel/s\n", Y,
 	   T / 1000000, Y / T * 1000000);
+
     return matrix_res;
 }
 
