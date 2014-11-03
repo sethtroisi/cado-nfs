@@ -22,3 +22,10 @@ add_executable(gst
   ${SRC_UTILS})
 
 target_link_libraries(gst ${LIB_EXEC})
+
+add_executable(finalst 
+  final_exec.c
+  finding_good_strategy.c 
+  ${SRC_UTILS})
+
+target_link_libraries(finalst ${LIB_EXEC})

@@ -3,6 +3,9 @@
 
 #include "tab_fm.h"
 
+#define SIDE_0 0
+#define SIDE_1 1
+
 typedef struct strategy {
     tabular_fm_t *tab_fm;
     double proba;

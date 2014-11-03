@@ -7,8 +7,6 @@
 #include <float.h>
 
 
-#define SIDE_0 0
-#define SIDE_1 1
 static double EPSILON_DBL = LDBL_EPSILON;
 
 static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)

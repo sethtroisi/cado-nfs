@@ -15,9 +15,9 @@
 #include "generate_strategies.h"
 
 /************************************************************************/
-/*             USAGE   + CHECK_PARAMETERS                              */
+/*                            USAGE                                     */
 /************************************************************************/
-//todo: indent the usage messages.
+
 static void declare_usage(param_list pl)
 {
     param_list_usage_header(pl,
@@ -57,8 +57,8 @@ static void declare_usage(param_list pl)
 			  "set rational large prime bound to 2^lpb0");
     param_list_decl_usage(pl, "lpb1",
 			  "set algebraic large prime bound to 2^lpb1");
-    param_list_decl_usage(pl, "mfb0", "set rational cofactor bound to 2^mfb0");
-    param_list_decl_usage(pl, "mfb1", "set algebraic cofactor bound to 2^mfb1");
+    param_list_decl_usage(pl, "mfb0", "set the first cofactor bound to 2^mfb0");
+    param_list_decl_usage(pl, "mfb1", "set the second cofactor bound to 2^mfb1");
     param_list_decl_usage(pl, "in", "to locate the file which contains\n "
 	  "\t \t our factoring methods, or locate the directory \n"
 	  "\t \t where the precomputed files for option 'gst' are stored");
@@ -120,6 +120,7 @@ int main(int argc, char *argv[])
     int lpb0 = -1;
     int lpb1 = -1;
     int r = -1;
+
     param_list_parse_int(pl, "lpb0", &lpb0);
     param_list_parse_int(pl, "lpb1", &lpb1);
     param_list_parse_int(pl, "fbb1", &fbb1);
@@ -261,7 +262,7 @@ int main(int argc, char *argv[])
 		tabular_strategy_t *strat_r1 = tabular_strategy_fscan(file_in);
 		if (strat_r1 == NULL) {
 		    fprintf(stderr,
-			    "Parser error: can't read the file '%s'\n",
+			    "Parser error: impossible read the file '%s'\n",
 			    name_file_in);
 		    exit(EXIT_FAILURE);
 		}
@@ -329,12 +330,6 @@ int main(int argc, char *argv[])
 	tabular_fm_sort(data_pp1);
 	tabular_fm_sort(data_ecm_m16);
 	tabular_fm_sort(data_ecm_rc);
-
-	/* printf("all: (%d)\n", c->index); */
-	/* printf("pp1: (%d)\n", data_pp1->index); */
-	/* printf("pm1: (%d)\n", data_pm1->index); */
-	/* printf("ecm_m16: (%d)\n", data_ecm_m16->index); */
-	/* printf("ecm_rc: (%d)\n", data_ecm_rc->index); */
 
 	if (gst_r) {
 	    ASSERT_ALWAYS(fbb0 < lpb0 && r != -1 && fbb0 != -1 && lpb0 != -1);
