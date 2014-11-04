@@ -6,6 +6,11 @@
 #include <assert.h>
 #include "getprime.h"
 
+/*
+  Results
+  -k 0 100000000000000000 1000 10000: 7991165172719
+*/
+
 uint64_t Psi(uint64_t x, uint64_t y);
 
 uint64_t *primes;
