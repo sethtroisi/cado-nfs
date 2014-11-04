@@ -388,7 +388,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (fbb, lpb, (verbose >= 3));
+      strategy = facul_make_strategy (fbb, lpb, 0, (verbose >= 3));
     }
   else
     {

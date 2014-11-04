@@ -62,14 +62,15 @@ nb_curves (const unsigned int lpb)
 */
 
 facul_strategy_t *
-facul_make_strategy (const unsigned long fbb,
-		     const unsigned int lpb, const int verbose)
+facul_make_strategy (const unsigned long fbb, const unsigned int lpb,
+                     int n, const int verbose)
 {
   facul_strategy_t *strategy;
   facul_method_t *methods;
-  int i, n;
+  int i;
 
-  n = nb_curves (lpb);
+  if (n == 0)
+    n = nb_curves (lpb);
   ASSERT_ALWAYS(n < STATS_LEN);
   strategy = malloc (sizeof (facul_strategy_t));
   strategy->lpb = lpb;

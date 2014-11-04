@@ -472,9 +472,12 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
         verbose_output_print(0, 1, "# Using %d+3 P-1/P+1/ECM curves\n",
-                nb_curves (sc->sides[s]->lpb));
+                             sc->sides[s]->ncurves > 0
+                             ? sc->sides[s]->ncurves
+                             : nb_curves (sc->sides[s]->lpb));
         si->sides[s]->strategy = facul_make_strategy(
-                sc->sides[s]->lim, sc->sides[s]->lpb, 0);
+                sc->sides[s]->lim, sc->sides[s]->lpb,
+                sc->sides[s]->ncurves, 0);
         reorder_fb(si, s);
 
         verbose_output_print(0, 2, "# small %s factor base", sidenames[s]);
@@ -860,6 +863,12 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
                     powlim_params[side], sc->sides[side]->powlim);
         }
     }
+
+    const char *ncurves_params[2] = {"ncurves0", "ncurves1"};
+    for (int side = 0; side < 2; side++)
+      if (!param_list_parse_int(pl, ncurves_params[side],
+                                &sc->sides[side]->ncurves))
+        sc->sides[side]->ncurves = 0;
 
     /* }}} */
 
@@ -2504,6 +2513,8 @@ static void declare_usage(param_list pl)
   param_list_decl_usage(pl, "lambda1", "(alias alambda) algebraic lambda value");
   param_list_decl_usage(pl, "powlim0", "(alias rpowlim) limit on powers on rat side");
   param_list_decl_usage(pl, "powlim1", "(alias apowlim) limit on powers on alg side");
+  param_list_decl_usage(pl, "ncurves0", "controls number of curves on side 0\n");
+  param_list_decl_usage(pl, "ncurves1", "controls number of curves on side 1\n");
   param_list_decl_usage(pl, "tdthresh", "trial-divide primes p/r <= ththresh (r=number of roots)");
   param_list_decl_usage(pl, "bkthresh", "bucket-sieve primes p >= bkthresh");
   param_list_decl_usage(pl, "unsievethresh", "Unsieve all p > unsievethresh where p|gcd(a,b)");

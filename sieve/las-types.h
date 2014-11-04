@@ -48,6 +48,7 @@ struct siever_config_s {
         int lpb;           /* large prime bound is 2^lpbr */
         int mfb;           /* bound for residuals is 2^mfbr */
         double lambda;     /* lambda sieve parameter */
+        int ncurves;       /* number of cofactorization curves */
     } sides[2][1];
 };
 typedef struct siever_config_s siever_config[1];

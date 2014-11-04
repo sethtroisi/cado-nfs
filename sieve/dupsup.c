@@ -215,7 +215,7 @@ main (int argc, char * argv[])
 
     for (int side = 0; side < 2; side++)
       strategy[side] = facul_make_strategy(conf->sides[side]->lim,
-                                           conf->sides[side]->lpb, 0);
+                                           conf->sides[side]->lpb, 0, 0);
 
     mpz_t sq, rho;
     mpz_init(sq);
