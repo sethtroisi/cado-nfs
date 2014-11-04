@@ -24,7 +24,7 @@ def run(param_file, problem):
     "Run las with given parameters until the required number of relations is found."
 
     home_dir = os.environ["HOME"]
-    build_dir = "%s/build/cado-nfs/normal/" % home_dir
+    build_dir = "%s/build/cado-nfs/normal" % home_dir
 
     makefb = "%s/sieve/makefb" % build_dir
     las = "%s/sieve/las" % build_dir
@@ -56,6 +56,9 @@ def run(param_file, problem):
     las_params["mfbr"] = max(las_params["mfbr"], las_params["lpbr"])
     las_params["mfba"] = max(las_params["mfba"], las_params["lpba"])
     
+    las_params["alambda"] = 1.0 * las_params["mfba"] / las_params["lpba"] + 0.1
+    las_params["rlambda"] = 1.0 * las_params["mfbr"] / las_params["lpbr"] + 0.1
+
     to_print = ["I", "alim", "lpba", "mfba", "alambda", "rlim", "lpbr", "mfbr", "rlambda"]
     sys.stderr.write("Using parameters %s\n" % " ".join(["%s:%s" % (key, las_params[key]) for key in to_print]))
 
@@ -74,7 +77,7 @@ def run(param_file, problem):
     q_range = 1000
     q_inc = 0
     rels_wanted = int(primepi(las_params["lpba"]) + primepi(las_params["lpbr"]))
-    # sys.stderr.write("Estimate %f relations needed\n" % rels_wanted)
+    # sys.stderr.write("Estimate %u relations needed\n" % rels_wanted)
     
     while stats.get_rels() < rels_wanted:
         # Set q0, q1
@@ -92,9 +95,11 @@ def run(param_file, problem):
         if not stats.parse_one_file(outputfile):
             raise Exception("Could not read statistics from %s" % outputfile)
         os.unlink(outputfile)
+        sys.stderr.write("   Up to q=%u, estimate %u/%u relations\n" % (q0, stats.get_rels(), rels_wanted))
         # set q_inc so that we do about 10 sieving tests of length q_range
         if q_inc == 0:
-           q_inc = int(rels_wanted / (10.0 * stats.relations_int.lastvalue[0]))
+           v = stats.relations_int.lastvalue[0]
+           q_inc = int(rels_wanted / (10.0 * v))
         q0 += q_inc
     qmax = stats.get_qmax(rels_wanted)
     sievetime = stats.get_time(rels_wanted)
