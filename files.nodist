@@ -121,3 +121,6 @@ linalg/bwc/update-flint.sh
 linalg/bwc/parse-flint-fft-doc.pl
 linalg/bwc/creating-sm-example.m
 linalg/bwc/sm-outside-matrix.m
+sieve/strategies/final_exec.c
+sieve/strategies/finding_good_strategy.c
+sieve/strategies/finding_good_strategy.h
