@@ -1145,3 +1145,6 @@ sieve/strategies/utils_st/tab_decomp.h
 sieve/strategies/gst_exec.c
 sieve/strategies/generate_strategies.c
 sieve/strategies/generate_strategies.h
+sieve/strategies/final_exec.c
+sieve/strategies/finding_good_strategy.c
+sieve/strategies/finding_good_strategy.h
