@@ -38,7 +38,8 @@ int tab_fm_are_equals (tabular_fm_t* t1, tabular_fm_t* t2){
 int strategies_are_equals (strategy_t* t1, strategy_t* t2)
 {
     //equality between two tab_fm
-    if ( !tab_fm_are_equals (strategy_get_tab_fm (t1), strategy_get_tab_fm (t2)))
+    if ( !tab_fm_are_equals (strategy_get_tab_fm (t1),
+			     strategy_get_tab_fm (t2)))
 	return 0;
 
     //equality probab. and time
@@ -51,7 +52,8 @@ int strategies_are_equals (strategy_t* t1, strategy_t* t2)
 }
 
 //test equality between two tabular_strategy_t!
-int tabular_strategies_are_equals (tabular_strategy_t* t1, tabular_strategy_t* t2)
+int tabular_strategies_are_equals (tabular_strategy_t* t1,
+				   tabular_strategy_t* t2)
 {
     //equality between two tab_strategy
     int len1 = t1->index;

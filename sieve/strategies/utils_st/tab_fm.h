@@ -35,6 +35,7 @@ tabular_fm_set_index(tabular_fm_t * t, unsigned long *method, int len_method,
 		     double *proba, int len_proba, double *time, int len_time,
 		     int len_p_min, int ind);
 
+/* concatenate t2 at the end of t1 */
 void tabular_fm_concat(tabular_fm_t * t1, tabular_fm_t * t2);
 
 void tabular_fm_put_zero(tabular_fm_t * t, int index);
@@ -43,22 +44,21 @@ bool tabular_fm_is_zero(tabular_fm_t * t, int index);
 
 tabular_fm_t *extract_fm_method(tabular_fm_t * t, int method, int curve);
 
-/*
-  check if the factoring method f is in c.
-*/
-int tab_fm_is_exist(tabular_fm_t * c, fm_t * f);
-
 int tabular_fm_fprint(FILE * output_file, tabular_fm_t * t);
 
 int tabular_fm_print(tabular_fm_t * t);
 
-int fm_fscan(FILE * file, tabular_fm_t * res);
+ tabular_fm_t * tabular_fm_fscan(FILE * file);
 
 /************************************************************************/
 /*                      SORT_TAB_FM                                     */
 /************************************************************************/
+/* the comparative is according to the probabilities! */
+int fm_cmp(fm_t * el1, fm_t * el2);
+
 void fm_swap(tabular_fm_t * t, int index1, int index2);
 
+//according to the probabilities!
 void tabular_fm_sort(tabular_fm_t * t);
 
 #endif				/* TAB_FM */

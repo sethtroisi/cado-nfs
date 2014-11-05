@@ -107,9 +107,8 @@ int main(int argc, char *argv[])
     gmp_randseed(state, seedtest);
 
     FILE *file_in = fopen(pathname_in, "r");
-    tabular_fm_t *c = tabular_fm_create();
-    int err = fm_fscan(file_in, c);
-    if (err < 0) {
+    tabular_fm_t *c = tabular_fm_fscan(file_in);
+    if (c == NULL) {
 	fprintf(stderr, "impossible to read %s\n", pathname_in);
 	param_list_clear(pl);
 	exit(EXIT_FAILURE);
@@ -123,7 +122,7 @@ int main(int argc, char *argv[])
 	bench_time(state, c);
 
     FILE *file_out = fopen(pathname_out, "w");
-    err = tabular_fm_fprint(file_out, c);
+    int err = tabular_fm_fprint(file_out, c);
     if (err < 0) {
 	fprintf(stderr, "error:: try to write in the file %s.\n", pathname_out);
 	param_list_clear(pl);

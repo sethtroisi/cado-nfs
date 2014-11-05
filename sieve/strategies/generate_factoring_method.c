@@ -760,16 +760,15 @@ tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
  */
 tabular_fm_t *convex_hull_from_file(FILE * file_in, FILE * file_out)
 {
-    tabular_fm_t *all_st = tabular_fm_create();
-    int err = fm_fscan(file_in, all_st);
-    if (err < 0)
+    tabular_fm_t *all_st = tabular_fm_fscan(file_in);
+    if (all_st == NULL)
 	return NULL;
 
     tabular_fm_t *res = convex_hull_fm(all_st);
 
     tabular_fm_free(all_st);
 
-    err = tabular_fm_fprint(file_out, res);
+    int err = tabular_fm_fprint(file_out, res);
     if (err < 0)
 	return NULL;
 
