@@ -29,6 +29,14 @@ test_usp ()
   ASSERT_ALWAYS (mpz_cmp_ui (R[0].a, 0) <= 0);
   ASSERT_ALWAYS (0 <= mpz_cmp_ui (R[0].b, 0));
 
+  /* polynomial 2*x */
+  mpz_set_ui (p[0], 0);
+  mpz_set_ui (p[1], 2);
+  n = numberOfRealRoots (p, 1, 2, 1, R);
+  ASSERT_ALWAYS (n == 1);
+  root = rootRefine (R, p, 1, 1e-9);
+  ASSERT_ALWAYS(-0.000001 <= root && root <= 0.000001);
+
   /* polynomial x+1 */
   mpz_set_ui (p[0], 1);
   mpz_set_ui (p[1], 1);
@@ -43,6 +51,13 @@ test_usp ()
 
   /* polynomial x^2+1 */
   mpz_set_si (p[0], 1);
+  mpz_set_ui (p[1], 0);
+  mpz_set_ui (p[2], 1);
+  n = numberOfRealRoots (p, 2, 0, 0, NULL);
+  ASSERT_ALWAYS (n == 0);
+
+  /* polynomial x^2+2 */
+  mpz_set_si (p[0], 2);
   mpz_set_ui (p[1], 0);
   mpz_set_ui (p[2], 1);
   n = numberOfRealRoots (p, 2, 0, 0, NULL);
@@ -223,4 +238,3 @@ main (int argc, const char *argv[])
   tests_common_clear();
   exit (EXIT_SUCCESS);
 }
-
