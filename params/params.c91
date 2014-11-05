@@ -182,7 +182,7 @@ tasks.sieve.mfba = 48
     # to split into large primes.
 
 tasks.sieve.rlambda = 2.1
-tasks.sieve.alambda = 2.2
+tasks.sieve.alambda = 2.1
     # rlambda/alambda is the early-abort ratio: if after sieving, and
     # subtracting from the log of the norm the contribution of the
     # sieved primes, the approximation of the log of the remaining
@@ -190,8 +190,19 @@ tasks.sieve.alambda = 2.2
     # Note that this has in particular the effect that if e.g. rlambda <
     # some integer k+1, then at most k large primes are allowed on the
     # rational side. It is customary, when at most k large primes are
-    # allowed, to set rlambda to e.g. k + 0.2, in order to compensate for
+    # allowed, to set rlambda to e.g. k + 0.1, in order to compensate for
     # inaccuracies due to sieving.
+
+tasks.sieve.ncurves0 = 3
+tasks.sieve.ncurves1 = 3
+    # ncurves0 controls the number of P-1/P+1/ECM curves used in the
+    # cofactorization on side 0 (i.e., rational side), more precisely we
+    # use 3+ncurves0 curves. If one increases ncurves0, one will find more
+    # relations, but the cofactorization cost will increase.
+    # Same for ncurves1 on side 1 (algebraic side).
+    # If unspecified, the number of curves is deduced from the value of lpbr
+    # or lpba, see function nb_curves() in file sieve/ecm/facul.c.
+
 
 tasks.I = 11		# Sieving range in lattice siever
     # The lattice siever sieves over a range in the (i,j) plane which is
