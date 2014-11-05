@@ -57,7 +57,7 @@ typedef struct {
   unsigned char nr_roots; /* how many roots there are for this prime */
   unsigned char exp;      /* Let p=P^k, then P^exp || norm where a=br (mod p) */
   unsigned char oldexp;   /* P^oldexp || norm where a=br (mod p/P) */
-  unsigned char size;     /* The length of the struct in bytes */
+  unsigned char _dummy;
   redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
   /* Note that invp may have a stronger alignment constraint than p, thus must
    * not appear before the tiny fields exp and nr_roots which can easily
@@ -106,17 +106,17 @@ fb_skip (const factorbase_degn_t *fb, const size_t s)
 }
   
 __attribute__ ((unused))
-static inline factorbase_degn_t *
-fb_next (const factorbase_degn_t *fb)
-{
-  return (factorbase_degn_t *)((char *)fb + fb->size);
-}
-
-__attribute__ ((unused))
 static size_t
 fb_entrysize (const factorbase_degn_t *fb)
 {
   return (sizeof (factorbase_degn_t) + fb->nr_roots * sizeof (fbroot_t));
+}
+
+__attribute__ ((unused))
+static inline factorbase_degn_t *
+fb_next (const factorbase_degn_t *fb)
+{
+  return (factorbase_degn_t *)((char *)fb + fb_entrysize(fb));
 }
 
 __attribute__ ((unused))

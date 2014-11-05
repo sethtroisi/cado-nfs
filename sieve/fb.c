@@ -140,7 +140,6 @@ fb_buffer_add (fb_buffer_t *fb_buf, const factorbase_degn_t *fb_add)
   /* Append the new entry at the end of the factor base */
   factorbase_degn_t *fb_end_ptr = fb_skip(fb_buf->fb, fb_buf->size);
   memcpy (fb_end_ptr, fb_add, fb_addsize);
-  fb_end_ptr->size = cast_size_uchar(fb_addsize);
 
   fb_buf->size += fb_addsize;
   fb_buf->nr_primes++;
@@ -510,7 +509,6 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   ASSERT (fb_cur != NULL);
 
   fb_cur->nr_roots = 1;
-  fb_cur->size = cast_size_uchar (fb_entrysize_uc (1));
   if (!fb_split_init (&split, smalllim, nr_pieces, allocblocksize)) {
     free (fb_cur);
     return 0;
