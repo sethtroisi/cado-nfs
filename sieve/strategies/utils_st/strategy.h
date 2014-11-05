@@ -12,7 +12,8 @@ typedef struct strategy {
     double time;
     int *side;
     int len_side;
-    //we allocate side only one time. So the real and physical size are the same.
+    //In practice, we use side only one time. So the real and physical
+    //size are the same, and it's not necessary to allocate it for now.
 
 } strategy_t;
 
@@ -36,8 +37,8 @@ void strategy_add_fm_side(strategy_t * t, fm_t * elem, int side);
 
 strategy_t *strategy_copy(strategy_t * t);
 
-void strategy_fprint(FILE * file, strategy_t * t);
+int strategy_fprint(FILE * file, strategy_t * t);
 
-void strategy_print(strategy_t * t);
+int strategy_print(strategy_t * t);
 
 #endif				/* STRATEGY_H */

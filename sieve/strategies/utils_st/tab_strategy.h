@@ -1,8 +1,6 @@
 #ifndef TAB_STRATEGY_H
 #define TAB_STRATEGY_H
 
-#include <stdbool.h>
-
 #include "strategy.h"
 
 typedef struct tabular_strategy {
@@ -31,9 +29,9 @@ void tabular_strategy_concat(tabular_strategy_t * t1, tabular_strategy_t * t2);
 tabular_strategy_t *tabular_strategy_concat_st(tabular_strategy_t * t1,
 					       tabular_strategy_t * t2);
 
-void tabular_strategy_fprint (FILE* file, tabular_strategy_t * t);
+int tabular_strategy_fprint (FILE* file, tabular_strategy_t * t);
 
-void tabular_strategy_print(tabular_strategy_t * t);
+int tabular_strategy_print(tabular_strategy_t * t);
 
 tabular_strategy_t* tabular_strategy_fscan (FILE* file);
 
