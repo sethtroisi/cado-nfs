@@ -2044,7 +2044,7 @@ Next sieve 7, 11 the same way.#</dia:string>
         <dia:point val="31,20.4"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="31,20.1375;40.1575,21.8786"/>
+        <dia:rectangle val="31,20.1292;40.1657,21.8951"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">
@@ -2052,8 +2052,8 @@ Next sieve 7, 11 the same way.#</dia:string>
             <dia:string>#Sum 1/p over primes 11 &lt; p &lt; 65536 is ~1.4.
 Assuming exactly 1 root per prime,
 total number of byte read/writes with old sieve: ~1.94I.
-total number of byte read/writes with expanding wheel: ~1.84I.
-Relative saving: ~5.2%.#</dia:string>
+total number of byte read/writes with expanding wheel: ~1.54I.
+Relative saving: ~20%.#</dia:string>
           </dia:attribute>
           <dia:attribute name="font">
             <dia:font family="serif" style="0" name="Times-Roman"/>
