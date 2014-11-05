@@ -18,6 +18,7 @@ to deduce the log of the target element.
 WARNING: We assume that these not-too-large integers are a few bits below
 64 bits. Even for record-scale computations, this should not be a problem
 to initialize the descent up to 55 bits smooth elements.
+TODO: still true?
 
 Recompiling las
 ---------------
@@ -44,13 +45,14 @@ example:
   55r 0.028 1.00 I=15 400000,47,65,1.4 400000,48,94,2.0
 means (in order):
   55r   : this line is about a 55-bit special-q on the rational side
-  28.2  : expected time in seconds to find a relation
+  0.028 : expected time in seconds to find a relation
   1.00  : probability of success
   I=15  : the I to use
-  400000,47,65,1.4 : parameters for the rational side lim,lpb,mfb,lambda
-  400000,48,94,2.0 : same for the other side.
+  400000,47,65,1.4 : parameters for the rational side (0 side) 
+  		     lim0,lpb0,mfb0,lambda0
+  400000,48,94,2.0 : same for the other side (1).
 
-At the moment, it *mandatory* to have the same values for I, lim0, lim1
+At the moment, it is *mandatory* to have the same values for I, lim0, lim1
 on each line. This might change if we see a clear need to make them vary.
 
 There must be one line for each size that can occur during the descent,
@@ -58,6 +60,8 @@ and the parameters must be so that there is a high chance to get at least
 one relation.
 
 An example hint-file will be given as example in the future.
+TODO: explain mkhint?
+TODO: how to replace r and a for "55r"...? Say "55 0"?
 
 Preparing the Todo file
 -----------------------
@@ -68,6 +72,7 @@ polynomial in the *.poly file modulo q. All of those must be put in a
 "todo file", each on one line, with the format
   r <q> <root>
 where "r" stands for "rational".
+TODO: can be make this 0/1?
 
 Running las with appropriate arguments
 --------------------------------------
@@ -76,7 +81,7 @@ The command line for las must be something like (assuming the prefix name
 for files is p120):
 
 /buildpath/sieve/las -poly p120.poly -fb p120.roots.gz -I 15 \
-  -rlim 4000000 -alim 4000000 -lpbr 25 -lpba 26 -mfbr 100 -mfba 100 \
+  -lim0 4000000 -lim1 4000000 -lpb0 25 -lpb1 26 -mfb0 100 -mfb1 100 \
   -todo p120.todo -allow-largesq -descent-hint p120.hints
 
 Note that:

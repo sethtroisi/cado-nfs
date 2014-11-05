@@ -9,6 +9,7 @@
 /*
   Results
   -k 0 100000000000000000 1000 10000: 7991165172719
+  -k 0 1000000000000000000 1000 10000: 30538908889103
 */
 
 uint64_t Psi(uint64_t x, uint64_t y);
@@ -44,11 +45,13 @@ intlog2(const uint64_t x)
    Psi(x, y) function (which for this purposed is computed without referencing
    the LUT) */
 
+/* To use LUT_X > 256 or LUT_Y > 256, the data type of a table entry must
+   be changed to short in order to avoid overflow  */
 #define LUT_X 256
 #define LUT_Y 128
 static const int use_LUT = 1; /* enable or disable LUT for speed comparison */
 static int in_check_LUT = 0; /* disable use of LUT in Psi() while checking correctness */
-static unsigned char Psi_LUT[LUT_X][LUT_Y];
+static unsigned short Psi_LUT[LUT_X][LUT_Y];
 
 /* Return the largest prime factor of x.
    For x == 0 or x == 1, returns 0.
@@ -108,7 +111,7 @@ Psi(const uint64_t x, const uint64_t y)
     r = 0; /* [1, 0] is the empty interval */
   } else if (x <= y) {
     r = x; /* All integers in [1, x] are smooth */
-  } else if (y == 1) {
+  } else if (y <= 1) {
     r = 1; /* Only 1 is smooth */
   } else if (use_LUT && !in_check_LUT && x < LUT_X && y < LUT_Y) {
     r = Psi_LUT[x][y];
@@ -129,31 +132,41 @@ Psi(const uint64_t x, const uint64_t y)
       i++;
     }
 
-    /* floor(x / p) == 1 iff p <= x < 2p iff x/2 < p <= x */
-    uint64_t l1 = min_u64(x / 2, y);
+    const uint64_t m_max = 1;
+    uint64_t l_max, m;
 
-    /* floor(x / p) == 2 iff p/2 <= x < 3p iff x/3 < p <= x/2 */
-    uint64_t l2 = min_u64(x / 3, y);
+    if (m_max == 1) {
+      m = 1;
+      l_max = y;
+    } else {
+      m = min_u64(m_max, y);
+
+      /* At first, we process all p such that floor(x/p) >= m
+         which is true iff x/p >= m */
+
+      l_max = min_u64(x / m, y);
+    }
 
     /* We partition the set of y-smooth integers up to x according to their
        largest prime factor, p_1. For each such p_1 <= y, we count the
        elements in it partition, which is Psi(x / p_1, p_1) */
-    for ( ; primes[i] <= l2; i++) {
+    for ( ; primes[i] <= l_max; i++) {
       /* This integer division is where we spend most of the time */
-      uint64_t t = Psi(x / primes[i], primes[i]);
-      // assert(t >= 3);
-      r += t;
+      const uint64_t t = x / primes[i];
+      assert(t >= m);
+      r += Psi(t, primes[i]);
     }
 
-    /* Count Psi(x/p, p) where floor(x/p) = 2.
-       Could use a primepi() function here that does bisect search,
-       but this part of the code is currently not the bottleneck */
-    for ( ; primes[i] <= l1; i++)
-      r += 2; /* With y >= 2, Psi(2, y) = 2 */
-
-    /* Count Psi(x/p, p) where floor(x/p) = 1 */
-    for ( ; primes[i] <= y; i++)
-      r++; /* Psy(1, y) = 1 */
+    for (m-- ; m > 0; m--) {
+      /* Count Psi(x/p, p) where floor(x/p) = m.
+         Could use a primepi() function here that does bisect search,
+         but this part of the code is currently not the bottleneck */
+      l_max = min_u64(x / m, y);
+      for ( ; primes[i] <= l_max; i++) {
+        assert (x / primes[i] == m);
+        r += m; /* With y >= l_max, Psi(m, y) = m */
+      }
+    }
   }
 
   if (0 && !in_check_LUT)
