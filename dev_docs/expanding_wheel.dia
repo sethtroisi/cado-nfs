@@ -1887,7 +1887,7 @@ Sieving 5, 7, 9, 11: I/5 + I/9 + I/7 + I/ 11 = 0.54I byte read/write#</dia:strin
         <dia:point val="31,12.4"/>
       </dia:attribute>
       <dia:attribute name="obj_bb">
-        <dia:rectangle val="31,12.1293;41.4207,19.8923"/>
+        <dia:rectangle val="31,12.1375;41.4125,19.8758"/>
       </dia:attribute>
       <dia:attribute name="text">
         <dia:composite type="text">
@@ -2026,6 +2026,43 @@ Next sieve 7, 11 the same way.#</dia:string>
           </dia:attribute>
           <dia:attribute name="pos">
             <dia:point val="31,1"/>
+          </dia:attribute>
+          <dia:attribute name="color">
+            <dia:color val="#000000"/>
+          </dia:attribute>
+          <dia:attribute name="alignment">
+            <dia:enum val="0"/>
+          </dia:attribute>
+        </dia:composite>
+      </dia:attribute>
+      <dia:attribute name="valign">
+        <dia:enum val="3"/>
+      </dia:attribute>
+    </dia:object>
+    <dia:object type="Standard - Text" version="1" id="O68">
+      <dia:attribute name="obj_pos">
+        <dia:point val="31,20.4"/>
+      </dia:attribute>
+      <dia:attribute name="obj_bb">
+        <dia:rectangle val="31,20.1375;40.1575,21.8786"/>
+      </dia:attribute>
+      <dia:attribute name="text">
+        <dia:composite type="text">
+          <dia:attribute name="string">
+            <dia:string>#Sum 1/p over primes 11 &lt; p &lt; 65536 is ~1.4.
+Assuming exactly 1 root per prime,
+total number of byte read/writes with old sieve: ~1.94I.
+total number of byte read/writes with expanding wheel: ~1.84I.
+Relative saving: ~5.2%.#</dia:string>
+          </dia:attribute>
+          <dia:attribute name="font">
+            <dia:font family="serif" style="0" name="Times-Roman"/>
+          </dia:attribute>
+          <dia:attribute name="height">
+            <dia:real val="0.35277776420116425"/>
+          </dia:attribute>
+          <dia:attribute name="pos">
+            <dia:point val="31,20.4"/>
           </dia:attribute>
           <dia:attribute name="color">
             <dia:color val="#000000"/>
