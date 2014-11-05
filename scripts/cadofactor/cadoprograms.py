@@ -712,6 +712,8 @@ class Las(Program):
                  mfba: Parameter(checktype=int)=None,
                  rlambda: Parameter(checktype=float)=None,
                  alambda: Parameter(checktype=float)=None,
+                 ncurves0: Parameter(checktype=int)=None,
+                 ncurves1: Parameter(checktype=int)=None,
                  skewness: Parameter("S", checktype=float)=None,
                  verbose: Toggle("v")=None,
                  rpowlim: Parameter(checktype=int)=None,
