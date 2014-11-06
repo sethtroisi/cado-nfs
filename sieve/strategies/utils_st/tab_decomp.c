@@ -2,7 +2,6 @@
 #include <regex.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
 
 #include "cado.h"
 #include "portability.h"
@@ -67,17 +66,20 @@ decomp_t *tabular_decomp_get_decomp(tabular_decomp_t * t, int index)
     return t->tab[index];
 }
 
-void tabular_decomp_print_file(tabular_decomp_t * t, FILE * output_file)
+int tabular_decomp_fprint(FILE * output_file, tabular_decomp_t * t)
 {
-    fprintf(output_file, "******************\n");
     for (int i = 0; i < t->index; i++)
-	decomp_print_file(t->tab[i], output_file);
-    fprintf(output_file, "******************\n");
+	{
+	    int err = decomp_fprint(output_file, t->tab[i]);
+	    if (err < 0)
+		return err;
+	}
+    return 0;
 }
 
-void tabular_decomp_print(tabular_decomp_t * t)
+int tabular_decomp_print(tabular_decomp_t * t)
 {
-    tabular_decomp_print_file(t, stdout);
+    return tabular_decomp_fprint(stdout, t);
 }
 
 static decomp_t *analyse_line(char *line)

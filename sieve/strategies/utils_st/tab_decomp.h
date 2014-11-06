@@ -24,9 +24,9 @@ decomp_t *tabular_decomp_get_decomp(tabular_decomp_t * t, int index);
 
 void tabular_decomp_concat(tabular_decomp_t * t1, tabular_decomp_t * t2);
 
-void tabular_decomp_print_file(tabular_decomp_t * t, FILE * output_file);
+int tabular_decomp_fprint(FILE * output_file, tabular_decomp_t * t);
 
-void tabular_decomp_print(tabular_decomp_t * t);
+int tabular_decomp_print(tabular_decomp_t * t);
 
 tabular_decomp_t *tabular_decomp_fscan(FILE * file);
 
