@@ -36,7 +36,7 @@ double decomp_get_nb_elem(decomp_t * t)
     return t->nb_elem;
 }
 
-int *decomp_get_decomp(decomp_t * t)
+int *decomp_get_tab(decomp_t * t)
 {
     return t->tab;
 }
@@ -49,6 +49,7 @@ int decomp_get_len(decomp_t * t)
 void decomp_set_decomp(decomp_t * t, int *tab, int len)
 {
     t->len = len;
+    t->tab = realloc (t->tab, t->len * sizeof(int));
     for (int i = 0; i < t->len; i++)
 	t->tab[i] = tab[i];
 }
@@ -58,17 +59,20 @@ void decomp_set_nb_elem(decomp_t * t, double nb_elem)
     t->nb_elem = nb_elem;
 }
 
-void decomp_print_file(decomp_t * t, FILE * output_file)
+int decomp_fprint(FILE * output_file, decomp_t * t)
 {
-    if (t == NULL || t->len == 0)
-	return;
+    if (output_file == NULL)
+	return -1;
+    if (t == NULL)
+	return -2;
     fprintf(output_file, "[ ");
     for (int l = 0; l < t->len - 1; l++)
 	fprintf(output_file, "%d, ", t->tab[l]);
     fprintf(output_file, "%d ] : %f\n", t->tab[t->len - 1], t->nb_elem);
+    return 0;
 }
 
-void decomp_print(decomp_t * t)
+int decomp_print(decomp_t * t)
 {
-    decomp_print_file(t, stdout);
+    return decomp_fprint(stdout, t);
 }

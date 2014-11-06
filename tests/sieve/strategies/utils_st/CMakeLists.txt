@@ -17,3 +17,12 @@ add_executable(test_strategy
   ${SUF_SRC}tab_fm.c)
 
 run_test (test_strategy test_strategy)
+
+add_executable(test_decomp
+  test_decomp.c
+  ${SUF_SRC}tab_decomp.c
+  ${SUF_SRC}decomp.c)
+
+run_test (test_decomp test_decomp)
+
+
