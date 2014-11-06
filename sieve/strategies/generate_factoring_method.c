@@ -47,11 +47,11 @@ const double BENCH_MIN_PROBA = 0.03;
 
 /*
   this function allows to compute an array with the probability of 
-  scoring of each size of prime number.
+  scoring of each size of prime number in [min, ..., max].
  */
 double *distribution_prime_number(int min, int max)
 {
-    int len = max - min;
+    int len = max - min +1;
     ASSERT(len >= 0);
 
     double *tab = malloc(len * sizeof(double));
@@ -64,9 +64,6 @@ double *distribution_prime_number(int min, int max)
 	elem *= 2;
 	log_elem++;
     }
-    double all = 0;
-    for (int i = 0; i < len; i++)
-	all += tab[i];
 
     double proba = 1;
     double sum = 0;
@@ -96,10 +93,8 @@ void generate_prime_factor(mpz_t res, gmp_randstate_t state, int lenFact)
     mpz_init(max);
     mpz_init(diff);
     mpz_ui_pow_ui(min, 2, lenFact - 1);
-    mpz_mul_ui(max, min, 2);
-    mpz_sub(diff, max, min);
     do {
-	mpz_urandomm(res, state, diff);
+	mpz_urandomm(res, state, min);
 	mpz_add(res, res, min);
 
     }
@@ -107,9 +102,6 @@ void generate_prime_factor(mpz_t res, gmp_randstate_t state, int lenFact)
 
     //clear
     mpz_clear(min);
-    mpz_clear(max);
-    mpz_clear(diff);
-
 }
 
 /*
@@ -150,31 +142,36 @@ generate_composite_integer(mpz_t res, gmp_randstate_t state,
     mpz_clear(bound_min);
 }
 
+
+int
+select_random_index_according_dist(double *dist, int len)
+{
+    int precision = 100000;
+    //100000 to consider approximation of distribution
+    int alea = rand() % precision;
+    int i = 0;
+    int bound = (int)(dist[0] * precision);
+    while (i < (len-1) && alea > bound) {
+	i++;
+	bound += (int)(dist[i] * precision);
+    }
+    return i;
+}
+
 /*
   This function generates in 'res' a random composite number of 'lenFactall' 
   bits with a prime factor where this size depends to the distrubution 
   of prime numbers (in 'dist')!
 */
-
 int
 generate_composite_integer_interval(mpz_t res, gmp_randstate_t state,
 				    double *dist, int lenFact1_min,
 				    int lenFact1_max, int lenFactall)
 {
-    //distribution 
-    int len = lenFact1_max - lenFact1_min - 1;
-    int precision = 10000;
-    //10000 to consider approximation of distribution
-    int alea = rand() % precision;
-    int i = 0;
-    int bound = (int)(dist[0] * precision);
-    while (i < len && alea > bound) {
-	i++;
-	bound += (int)(dist[i] * precision);
-    }
-
-    generate_composite_integer(res, state, lenFact1_min + i, lenFactall);
-    return lenFact1_min + i;
+    int len = lenFact1_max -lenFact1_min +1;
+    int index = select_random_index_according_dist(dist, len);
+    generate_composite_integer(res, state, lenFact1_min + index, lenFactall);
+    return lenFact1_min + index;
 }
 
 /************************************************************************/
@@ -822,7 +819,9 @@ tabular_fm_t *filtering(tabular_fm_t * fm, int len_p_min, int nb_prime_nb)
 	    for (int p = 0; p < nb_prime_nb; p++) {
 		double tmp = 0;
 		if (compromis[i][p] != INFINITY && compromis[j][p] != INFINITY) {
-		    tmp = compromis[i][p] - compromis[j][p];	//etablir un pourcentage!!!tmp/compromis[i][p]
+		    tmp = compromis[i][p] - compromis[j][p];	//etablir
+								//un
+								//pourcentage!!!tmp/compromis[i][p]
 		    nb_el++;
 		}
 		if (tmp < 0)
