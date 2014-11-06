@@ -1153,3 +1153,4 @@ tests/sieve/strategies/utils_st/CMakeLists.txt
 tests/sieve/strategies/utils_st/test_strategy.c
 tests/sieve/strategies/utils_st/test_fm.c
 tests/sieve/strategies/utils_st/test_decomp.c
+tests/sieve/strategies/utils_st/test_convex_hull.c
