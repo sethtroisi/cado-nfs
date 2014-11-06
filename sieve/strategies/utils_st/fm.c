@@ -87,8 +87,7 @@ void fm_set_method(fm_t * t, unsigned long *value, int len)
 
 void fm_set_proba(fm_t * t, double *value, int len, int len_p_min)
 {
-    if (len == 0)
-	return;
+    ASSERT (len >= 0);
     t->len_p_min = len_p_min;
     if (len != t->len_proba) {	//realloc
 	t->proba = realloc(t->proba, len * (sizeof(double)));
@@ -179,51 +178,3 @@ int fm_fprint(FILE * file, fm_t * elem)
     fputs("|\n", file);
     return 0;
 }
-
-/* /\* gcc -std=c99 -Wall fm.c -o fm *\/ */
-/* int */
-/* main() */
-/* { */
-/*   fm_t* t = fm_create(); */
-
-/*   unsigned long elem[4]; */
-/*   for (int i=0; i < 4; i++) */
-/*     { */
-/*       elem[i] = i; */
-/*     } */
-/*   fm_set_method (t, elem, 4); */
-
-/*   double* elem2 = malloc (sizeof(double)*10); */
-
-/*   for (int i=0; i < 10; i++) */
-/*     { */
-/*       elem2[i] = i*10; */
-/*     } */
-/*   fm_set_proba (t, elem2, 10); */
-/*   free (elem2); */
-
-/*   double elem3[10]; */
-/*   for (int i=0; i < 10; i++) */
-/*     { */
-/*       elem3[i] = i*100; */
-/*     } */
-
-/*   fm_set_time (t, elem3, 10); */
-
-/*   fm_print (t); */
-
-/*   double elem4[15]; */
-/*   for (int i=0; i < 15; i++) */
-/*     { */
-/*       elem4[i] = i*100; */
-/*     } */
-
-/*   fm_set_time (t, elem4, 15); */
-/*   //fm_set_proba (t, elem4, 15); */
-
-/*   fm_print (t); */
-
-/*   fm_free (t); */
-
-/*   exit(1); */
-/* } */

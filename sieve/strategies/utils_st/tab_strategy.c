@@ -1,21 +1,24 @@
+#include "cado.h"
+#include "portability.h"
+#include "utils.h"
+
 #include "tab_strategy.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 
 tabular_strategy_t *tabular_strategy_create(void)
 {
     tabular_strategy_t *t = malloc(sizeof(*t));
-    assert(t != NULL);
+    ASSERT(t != NULL);
 
     t->index = 0;
     t->size = 2;
 
     t->tab = malloc(t->size * sizeof(strategy_t *));
-    assert(t->tab != NULL);
+    ASSERT(t->tab != NULL);
 
     return t;
 }
@@ -34,7 +37,7 @@ void tabular_strategy_free(tabular_strategy_t * t)
 void tabular_strategy_realloc(tabular_strategy_t * t)
 {
     t->tab = realloc(t->tab, t->size * 2 * (sizeof(strategy_t *)));
-    assert(t->tab != NULL);
+    ASSERT(t->tab != NULL);
     t->size *= 2;
 }
 
@@ -55,7 +58,7 @@ int tabular_strategy_get_index(tabular_strategy_t * t)
 
 strategy_t *tabular_strategy_get_strategy(tabular_strategy_t * t, int index)
 {
-    assert(index <= t->index);
+    ASSERT(index <= t->index);
     return t->tab[index];
 }
 
@@ -89,15 +92,17 @@ tabular_strategy_t *tabular_strategy_concat_st(tabular_strategy_t * t1,
 /*           PRINT AND SCAN OUR FILES OF FACTORING METHODS              */
 /************************************************************************/
 
-void tabular_strategy_fprint(FILE * output_file, tabular_strategy_t * t)
+int tabular_strategy_fprint(FILE * output_file, tabular_strategy_t * t)
 {
     for (int i = 0; i < t->index; i++)
-	strategy_fprint (output_file, t->tab[i]);
+	if (strategy_fprint (output_file, t->tab[i]) == -1)
+	    return -1;
+    return 0;
 }
 
-void tabular_strategy_print(tabular_strategy_t * t)
+int tabular_strategy_print(tabular_strategy_t * t)
 {
-    tabular_strategy_fprint (stdout, t);
+    return tabular_strategy_fprint (stdout, t);
 }
 
 
@@ -218,43 +223,3 @@ tabular_strategy_fscan (FILE* file)
     }
   return tab;
 }
-
-
- /* //test strategy */
- /*  strategy_t* t = strategy_create (); */
- /*  fm_t* elem = fm_create (); */
- /*  unsigned long value[4] = {1,2,3,4}; */
- /*  double p = 0.5; */
- /*  double a = 2; */
- /*  fm_set_method (elem, value,4); */
- /*  fm_set_proba (elem, &p, 1); */
- /*  fm_set_time (elem, &a, 1); */
-
- /*  strategy_add_fm (t, elem); */
- /*  p = 2.5; */
- /*  a = 21; */
- /*  fm_set_method (elem, value,4); */
- /*  fm_set_proba (elem, &p, 1); */
- /*  fm_set_time (elem, &a, 1); */
- /*  strategy_add_fm (t, elem); */
- /*  unsigned long value2[6] = {6,5,4,3,2,1}; */
- /*  p = 4.5; */
- /*  a = 221; */
- /*  fm_set_method (elem, value2,6); */
- /*  fm_set_proba (elem, &p, 1); */
- /*  fm_set_time (elem, &a, 1); */
-
- /*  strategy_add_fm (t, elem); */
- /*  strategy_print (t); */
-
- /*  tabular_strategy_t* s = tabular_strategy_create (); */
- /*  tabular_strategy_add_strategy (s, t); */
- /*  /\* tabular_strategy_add_strategy (s, t); *\/ */
- /*  tabular_strategy_print (s); */
-
- /*  tabular_strategy_free (s); */
- /*  strategy_free (t); */
- /*  fm_free (elem); */
- /*  exit (1); */
-
-//print and scan: test on ecrit et on relit et on doit avoir la meme chose

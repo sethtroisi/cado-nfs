@@ -81,3 +81,4 @@ add_executable(test_fb_make_step test_fb_make_step.c "${CADO_NFS_SOURCE_DIR}/sie
 target_link_libraries(test_fb_make_step utils tests)
 
 add_subdirectory (ecm)
+add_subdirectory (strategies)

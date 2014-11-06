@@ -3,8 +3,8 @@
 #include <math.h>
 
 /*
-  The following model has been simplified, because the first point is (0,0) : 
-  the most left and down point.
+  The following model begin from the most left point and finish by the
+  most right point.
 */
 
 
@@ -14,11 +14,11 @@ static int cmp_double (double a, double b)
     double precision = 0.0000000001;
 
     if ( diff < precision && diff > -1*precision)
-    	return 0;
+	return 0;
     else if (diff < precision)
-    	return -1;
+	return -1;
     else
-    	return 1;
+	return 1;
 }
 
 static double convertEnDegre(const double angle)
@@ -29,7 +29,7 @@ static double convertEnDegre(const double angle)
 double CST_MUL = 1;
 
 //we suppose that the coordinates of pt2 are highter than those of pt1
-double compute_angle(point_t * pt1, point_t * pt2)
+static double compute_angle(point_t * pt1, point_t * pt2)
 {
     double op = pt2->y - pt1->y;
     double adj = (pt2->x - pt1->x)* CST_MUL;
@@ -79,8 +79,9 @@ int search_init_point(tabular_point_t * t)
     point_t *elem;
     for (int i = 1; i < len; i++) {
 	elem = tabular_point_get_point(t, i);
-	if (cmp_double(pt_min->x, elem->x) >= 0
-	    && cmp_double(pt_min->y, elem->y) == 1){
+	if (cmp_double(pt_min->x, elem->x) > 0
+	    || (cmp_double(pt_min->x, elem->x) == 0
+		&& cmp_double(pt_min->y, elem->y) > 0)){
 	    res = i;
 	    pt_min = elem;
 	}
@@ -123,49 +124,3 @@ tabular_point_t *convex_hull(tabular_point_t * t)
 
     return convex_hull;
 }
-
-/* /\* ______________ test convex hull __________________ *\/ */
-/* int main() */
-/* { */
-/*   //srand(time(NULL)); */
-/*   //init file */
-/*   FILE *graph_file; */
-/*   char init[6] = "lata1"; */
-/*   graph_file = fopen (init, "w"); */
-
-/*   tabular_point_t* list = tabular_point_create (); */
-
-/*   int j = 0; */
-/*   while (j < 100) */
-/*     { */
-/*       int num = rand() %100; */
-/*       double y = rand() %1000; */
-/*       double x = rand() %100; */
-
-/*       tabular_point_add (list, num, x, y); */
-
-/*       fprintf(graph_file,  "%f \t %f\n",x,y); */
-/*       j++; */
-/*     } */
-/*   fclose(graph_file); */
-/*   /\*________test _______*\/ */
-/*   char init2[6] = "lata2"; */
-/*   graph_file = fopen (init2, "w"); */
-
-/*   printf ("LEN = %d\n", tabular_point_get_index (list)); */
-/*   tabular_point_t* res = convex_hull (list); */
-
-/*   int len = tabular_point_get_index (res); */
-/*   point_t *el; */
-/*   for (int i=0; i < len; i++) */
-/*     { */
-/*       el = tabular_point_get_point(res, i); */
-/*       fprintf(graph_file,  "%f \t %f\n", el->x, el->y); */
-/*     } */
-/*   tabular_point_free (res); */
-/*   tabular_point_free (list); */
-
-/*   fclose(graph_file); */
-/*   exit(1); */
-/* } */
-/*   /\*______________ test convex hull __________________ *\/ */

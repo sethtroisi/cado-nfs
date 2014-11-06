@@ -221,11 +221,8 @@ sampling_function(tabular_strategy_t *** matrix_strat,
 }
 
 /*
-  //todo: change the comment!!
   This function looks for the best choice of s!  
-  s is the slope which means the time (ms) per relation in the cofactorisation 
-  step (so no count C0 the precompution time of our cofactors pair).
-  And the goal is to choice a good value for s that optimates the 
+  And Our goal is to choice a good value for s that optimates the 
   number of relations per seconde in the sieving step.
   (cofactor + precomputation sieve).
 */

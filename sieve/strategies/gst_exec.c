@@ -296,11 +296,10 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
 	}
 
-	tabular_fm_t *c = tabular_fm_create();
 
 	FILE *file_in = fopen(name_file_in, "r");
-	int err = fm_fscan(file_in, c);
-	if (err < 0) {
+	tabular_fm_t *c = tabular_fm_fscan(file_in);
+	if (c == NULL) {
 	    fprintf(stderr, "impossible to read %s\n", name_file_in);
 	    param_list_clear(pl);
 	    exit(EXIT_FAILURE);

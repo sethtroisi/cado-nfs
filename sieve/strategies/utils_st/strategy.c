@@ -10,7 +10,7 @@
 strategy_t *strategy_create()
 {
     strategy_t *t = malloc(sizeof(*t));
-    ASSERT_ALWAYS(t != NULL);
+    ASSERT (t != NULL);
     t->tab_fm = tabular_fm_create();
     t->proba = 0;
     t->time = 0;
@@ -63,9 +63,9 @@ void strategy_add_fm_side(strategy_t * t, fm_t * elem, int side)
 {
     tabular_fm_add_fm(t->tab_fm, elem);
     if (t->side == NULL) {
-	t->len_side = 1;
-	t->side = malloc(sizeof(int) * (t->len_side));
-	ASSERT_ALWAYS(t->side != NULL);
+	t->len_side = t->tab_fm->index;
+	t->side = calloc(t->len_side, sizeof(int));
+	ASSERT(t->side != NULL);
     } else {
 	t->len_side++;
 	t->side = realloc(t->side, sizeof(int) * (t->len_side));
@@ -89,8 +89,11 @@ strategy_t *strategy_copy(strategy_t * t)
     return elem;
 }
 
-void strategy_fprint (FILE * output_file, strategy_t * t)
+int strategy_fprint (FILE * output_file, strategy_t * t)
 {
+    if (output_file == NULL)
+	return -1;
+    
     tabular_fm_t *tmp = t->tab_fm;
     //test if the varaible side is used!
     int is_alloced_side = false;
@@ -110,40 +113,11 @@ void strategy_fprint (FILE * output_file, strategy_t * t)
     }
     fprintf(output_file, "Probability: %1.10lf\n", t->proba);
     fprintf(output_file, "Time: %lf\n", t->time);
+    return 0;
 }
 
-void strategy_print(strategy_t * t)
+int strategy_print(strategy_t * t)
 {
-    strategy_fprint (stdout, t);
+    return strategy_fprint (stdout, t);
 }
 
-/* //test strategy */
-/* strategy_t* t = strategy_create (); */
-/* fm_t* elem = fm_create (); */
-/* unsigned long value[4] = {1,2,3,4}; */
-/* double p = 0.5; */
-/* double a = 2; */
-/* fm_set_method (elem, value,4); */
-/* fm_set_proba (elem, &p, 1); */
-/* fm_set_time (elem, &a, 1); */
-
-/* strategy_add_fm (t, elem); */
-/* p = 2.5; */
-/* a = 21; */
-/* fm_set_method (elem, value,4); */
-/* fm_set_proba (elem, &p, 1); */
-/* fm_set_time (elem, &a, 1); */
-/* strategy_add_fm (t, elem); */
-/* unsigned long value2[6] = {6,5,4,3,2,1}; */
-/* p = 4.5; */
-/* a = 221; */
-/* fm_set_method (elem, value2,6); */
-/* fm_set_proba (elem, &p, 1); */
-/* fm_set_time (elem, &a, 1); */
-
-/* strategy_add_fm (t, elem); */
-/* strategy_print (t); */
-
-/* strategy_free (t); */
-/* fm_free (elem); */
-/* exit (1); */

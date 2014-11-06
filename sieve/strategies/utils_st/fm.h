@@ -16,9 +16,8 @@ typedef struct fm {
     int len_time;		//index of array time
     int len_p_min;
     /*
-       The prime number such that : proba[i] and time[i] equal to 
-       the probability and the time to find a prime number of 
-       len_p_min+i bits with our nmethod.
+       The prime number such that : proba[i] equals to the probability
+       to find a prime number of len_p_min+i bits with our nmethod.
      */
 } fm_t;
 
