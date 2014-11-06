@@ -427,7 +427,8 @@ fb_is_power (fbprime_t q, unsigned long *final_k)
 static int
 fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 		 const fbprime_t p, const unsigned char newexp,
-		 const unsigned char oldexp, const int do_projective)
+		 const unsigned char oldexp, const unsigned char k,
+		 const int do_projective)
 {
   modulusul_t m;
   residueul_t r0, r1;
@@ -436,6 +437,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   fb_entry->p = p;
   fb_entry->exp = newexp;
   fb_entry->oldexp = oldexp;
+  fb_entry->k = k;
 
   modul_initmod_ul (m, p);
   modul_init_noset0 (r0, m);
@@ -500,6 +502,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
   const size_t allocblocksize = 1 << 20;
   unsigned char newexp, oldexp;
   int had_proj_root = 0, error = 0;
+  unsigned char k;
   fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
 					    need to be included, and the
 					    minimum among them */
@@ -529,19 +532,20 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       if (pow_len > 0 && min_pow < p)
 	{
 	  size_t i;
-	  unsigned long k;
+	  unsigned long k_ulong;
 	  /* Find this p^k in the list of prime powers and replace it
 	     by p^(k+1) if p^(k+1) does not exceed powbound, otherwise
 	     remove p^k from the list */
 	  for (i = 0; i < pow_len && powers[i] != min_pow; i++);
 	  ASSERT_ALWAYS (i < pow_len);
-	  q = fb_is_power (min_pow, &k);
+	  q = fb_is_power (min_pow, &k_ulong);
 	  ASSERT_ALWAYS(q > 0);
-	  ASSERT_ALWAYS(k > 1);
+	  ASSERT_ALWAYS(k_ulong > 1);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
 	  
-	  newexp = cast_ulong_uchar(k);
-	  oldexp = cast_ulong_uchar(k - 1U);
+	  k = cast_ulong_uchar(k_ulong);
+	  newexp = k;
+	  oldexp = k - 1U;
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
 	  else
@@ -561,6 +565,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
       else
 	{
 	  q = p;
+	  k = 1;
 	  newexp = 1;
 	  oldexp = 0;
 	  /* Do we need to add this prime to the prime powers list? */
@@ -579,7 +584,7 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  p = getprime (p);
 	}
 
-      if (!fb_make_linear1 (fb_cur, poly, q, newexp, oldexp, projective))
+      if (!fb_make_linear1 (fb_cur, poly, q, newexp, oldexp, k, projective))
 	continue; /* If root is projective and we don't want those,
 		     skip to next prime */
 
@@ -599,8 +604,6 @@ fb_make_linear (factorbase_degn_t **fb_small, factorbase_degn_t ***fb_pieces,
 	  break;
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
-
-      /* FIXME: handle prime powers */
     }
 
   getprime (0); /* free prime iterator */

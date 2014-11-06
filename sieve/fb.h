@@ -57,7 +57,7 @@ typedef struct {
   unsigned char nr_roots; /* how many roots there are for this prime */
   unsigned char exp;      /* Let p=P^k, then P^exp || norm where a=br (mod p) */
   unsigned char oldexp;   /* P^oldexp || norm where a=br (mod p/P) */
-  unsigned char _dummy;
+  unsigned char k;        /* The exponent of this prime power (k=1 if p is prime) */
   redc_invp_t invp;       /* -1/p (mod 2^wordsize) for REDC */
   /* Note that invp may have a stronger alignment constraint than p, thus must
    * not appear before the tiny fields exp and nr_roots which can easily
