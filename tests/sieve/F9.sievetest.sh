@@ -9,11 +9,10 @@ CHECKSUM_FILE="$4"
 SOURCE_TEST_DIR="`dirname "$0"`"
 shift 4
 
-REFERENCE_SHA1="e04ae591795ff30af703a2235a4f9fd09d17b380"
+REFERENCE_SHA1="c12c10808914fb445dd32e6801ffb8f320db36e6"
 # The Git revision that created the REFERENCE_SHA1 hash
-REFERENCE_REVISION="40eacd9f8914d9b8586204ed6751825873caf560" # 431 relations
+REFERENCE_REVISION="0bd0c87d93c709279cc5c3dd471292b28ae04198" # 430 relations
 # Previous revisions and number of relations found (most recent first):
-# 0bd0c87d93c709279cc5c3dd471292b28ae04198 (430 relations)
 # 9253f54766c5438fe3198053f9edd811ee254a17 (421 relations)
 
 rlim=2300000

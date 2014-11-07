@@ -1,7 +1,7 @@
 #ifndef GENERATE_FACTORING_METHOD
 #define  GENERATE_FACTORING_METHOD
-#include <gmp.h>
 
+#include <gmp.h>
 #include "facul.h"
 #include "tab_fm.h"
 #include "tab_point.h"
@@ -17,6 +17,9 @@ void generate_prime_factor(mpz_t res, gmp_randstate_t state, int lenFact);
 void
 generate_composite_integer(mpz_t res, gmp_randstate_t state,
 			   int lenFact1, int lenFactall);
+
+int
+select_random_index_according_dist(double *dist, int len);
 
 int
 generate_composite_integer_interval(mpz_t res, gmp_randstate_t state,

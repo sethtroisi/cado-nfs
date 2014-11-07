@@ -35,6 +35,8 @@ tasks.sieve.mfbr = 54
 tasks.sieve.mfba = 53
 tasks.sieve.rlambda = 2.18
 tasks.sieve.alambda = 2.14
+tasks.sieve.ncurves0 = 6
+tasks.sieve.ncurves1 = 9
 tasks.I = 12
 
 tasks.sieve.qrange = 10000

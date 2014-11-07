@@ -31,10 +31,10 @@ rlim = 17246811
 alim = 30940624
 lpbr = 29
 lpba = 29
-tasks.sieve.mfbr = 60
-tasks.sieve.mfba = 90
-tasks.sieve.rlambda = 2.2
-tasks.sieve.alambda = 2.2
+tasks.sieve.mfbr = 61
+tasks.sieve.mfba = 61
+tasks.sieve.rlambda = 2.20
+tasks.sieve.alambda = 2.20
 tasks.I = 14
 
 tasks.sieve.qrange = 10000
