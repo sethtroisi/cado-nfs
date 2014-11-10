@@ -196,6 +196,7 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
        facul_clear_strategy (strategy) failed!
      */
     strategy->methods[1].method = 0;
+    strategy->methods[1].plan = NULL;
 
     strategy->lpb = ULONG_MAX;
     strategy->assume_prime_thresh = 0;
@@ -212,9 +213,6 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 	pp1_make_plan(strategy->methods[0].plan, B1, B2, 0);
     } else if (method == EC_METHOD) {
 	long sigma;
-	if (curve == 3) {
-	    curve = rand() % 3;
-	}
 	if (curve == MONTY16) {
 	    sigma = 1;
 	} else
@@ -227,6 +225,7 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
     } else {
 	exit(EXIT_FAILURE);
     }
+
     return strategy;
 }
 
@@ -240,7 +239,7 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
   with the strategy.
 */
 
-static double
+double
 bench_proba_fm(facul_strategy_t * strategy,
 	       gmp_randstate_t state, unsigned long len_p, unsigned long len_n)
 {
@@ -283,8 +282,8 @@ bench_proba_fm(facul_strategy_t * strategy,
     return nb_succes / ((double)nb_test);
 }
 
-static double
-sub_routine_bench_time(facul_strategy_t * method, gmp_randstate_t state,
+double
+bench_time_fm_onelength(facul_strategy_t * method, gmp_randstate_t state,
 		       int len_n)
 {
     double tps = 0;
@@ -317,14 +316,14 @@ sub_routine_bench_time(facul_strategy_t * method, gmp_randstate_t state,
   These time are computed for integers of bits size MODREDCUL_MAXBITS, 
   MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and 3*MODREDCUL_MAXBITS.
  */
-static double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state)
+double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state)
 {
     double *res = calloc(4, sizeof(double));
     ASSERT(res != NULL);
-    res[0] = sub_routine_bench_time(st, state, MODREDCUL_MAXBITS - 1);
-    res[1] = sub_routine_bench_time(st, state, MODREDC15UL_MAXBITS - 1);
-    res[2] = sub_routine_bench_time(st, state, MODREDC2UL2_MAXBITS - 1);
-    res[3] = sub_routine_bench_time(st, state, MODREDC15UL_MAXBITS * 2);
+    res[0] = bench_time_fm_onelength(st, state, MODREDCUL_MAXBITS - 1);
+    res[1] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS - 1);
+    res[2] = bench_time_fm_onelength(st, state, MODREDC2UL2_MAXBITS - 1);
+    res[3] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS * 2);
     return res;
 }
 
@@ -333,6 +332,7 @@ static double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state)
   the probability to find a prime number of a certain size, 
   from 'len_p_min' until the probability become null. 
 */
+
 void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
 {
     int len = fm->index;	//number of methods!
@@ -369,7 +369,7 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
 	} while ((proba[ind_proba - 1] - BENCH_MIN_PROBA) > EPSILON_DBL
 		 && ind_proba < p_max);
 
-	fm_set_proba(elem, proba, ind_proba - 1, len_p_min);
+	fm_set_proba(elem, proba, ind_proba, len_p_min);
 	//free
 	facul_clear_strategy(st);
     }

@@ -95,11 +95,11 @@ double compute_time_strategy(tabular_decomp_t * init_tab, strategy_t * strat, in
     tabular_fm_t *tab_fm = strat->tab_fm;
     //{{
     /*
-      We add 0.5 to the lenght of one word, because for our times the
+      We add 0.5 to the length of one word, because for our times the
       lenght is inclusive. For example, if MODREDCUL_MAXBITS = 64
       bits, a cofactor is in one word if is lenght is less OR equal to
-      64 bits. So, if you doesn't add 0.5 to MODREDCUL_MAXBITS, you
-      lost the equal and thus insert a n error in your maths. 
+      64 bits. So, if you don't add 0.5 to MODREDCUL_MAXBITS, you
+      lost the equal and thus insert an error in your maths. 
     */
     double half_word = (MODREDCUL_MAXBITS+0.5)/2.0;
     int number_half_wd = floor(r /half_word);
@@ -421,9 +421,9 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 	    double p2 = strat_r1->tab[a]->proba;
 	    double c2 = strat_r1->tab[a]->time;
 	    double proba = p1 * p2;
-	    double tps1 = c1 + p1 * c2;
+	    double tps1 = c1 + (1-p1) * c2;
 	    //mean time when we begin by the SIDE_0
-	    double tps2 = c2 + p2 * c1;
+	    double tps2 = c2 + (1-p2) * c1;
 	    //mean time when we begin by the SIDE_1
 	    if (tps1 < tps2) {
 		st = concat_strategies(strat_r0->tab[r], strat_r1->tab[a],
@@ -467,7 +467,7 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 /*
   returns the best strategies for each couple of cofactors of lenght
   (r0, r1), from a set of factoring methods. Note that this function
-  use the previous functions, and only need all probabilities and
+  use the previous functions, and need all probabilities and
   times for each method must be previously computed. (to do that, you
   could use the binary gfm).
  */

@@ -52,9 +52,19 @@ tabular_fm_t *generate_factoring_methods_mc(gmp_randstate_t state,
 /*                      ANALYSE AND FILTER */
 /************************************************************************/
 
+double bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
+		      unsigned long len_p, unsigned long len_n);
+
 void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min);
 
+
+double bench_time_fm_onelength(facul_strategy_t * method,
+			       gmp_randstate_t state, int len_n);
+
+double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state);
+
 void bench_time(gmp_randstate_t state, tabular_fm_t * fm);
+
 
 tabular_fm_t *filtering(tabular_fm_t * fm, int len_p_min, int nb_prime_nb);
 
