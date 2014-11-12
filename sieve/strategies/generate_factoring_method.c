@@ -306,8 +306,8 @@ bench_time_fm_onelength(facul_strategy_t * method, gmp_randstate_t state,
     }
     //clear
     mpz_clear(N);
-
-    return tps / (nb_test);
+    
+    return tps / ((double)nb_test);
 
 }
 
@@ -476,7 +476,6 @@ static double *sub_routine_bench_proba_cost_interval(facul_strategy_t *
 
     res[0] = nb_succes / ((double)nb_test);
     res[1] = tps / ((double)nb_test);
-
     return res;
 }
 
@@ -776,237 +775,170 @@ tabular_fm_t *convex_hull_from_file(FILE * file_in, FILE * file_out)
 /*                      FILTERING                                       */
 /************************************************************************/
 
-//this function filter methods in fm!
-//nb_prime_nb is the max of len_proba!
-// TODO: modify his content!!! unused in this moment
-tabular_fm_t *filtering(tabular_fm_t * fm, int len_p_min, int nb_prime_nb)
+static int
+get_nb_word (int r)
 {
-    int len = fm->index;
-    //create compromis
-    double **compromis = malloc((len) * sizeof(double *));
-    ASSERT(compromis != NULL);
-    for (int i = 0; i < len; i++) {
-	compromis[i] = malloc((nb_prime_nb) * sizeof(double));
-	ASSERT(compromis[i] != NULL);
+    /*
+      We add 0.5 to the length of one word, because for our times the
+      lenght is inclusive. For example, if MODREDCUL_MAXBITS = 64
+      bits, a cofactor is in one word if is lenght is less OR equal to
+      64 bits. So, if you don't add 0.5 to MODREDCUL_MAXBITS, you
+      lost the equal and thus insert an error in your maths. 
+    */
+    double half_word = (MODREDCUL_MAXBITS+0.5)/2.0;
+    int number_half_wd = floor(r /half_word);
+    int ind = (number_half_wd <2)? 0: number_half_wd - 1;
+    return ind;
+}
 
-	fm_t *el = tabular_fm_get_fm(fm, i);
-	if (fm_is_zero(el))
-	    for (int j = 0; j < nb_prime_nb; j++)
-		compromis[i][j] = 0;
-	else {
-	    for (int j = 0; j < nb_prime_nb; j++) {
-		if (el->proba[j] == 0 || j > el->len_proba) {
-		    compromis[i][j] = INFINITY;
-		} else {
-		    compromis[i][j] = el->time[j] / el->proba[j];
-		}
-	    }
-	}
-    }
 
-    double **dist = malloc(len * sizeof(double *));
+/*
+filtering: most homegenous method that allows to keep
+methods of differents probabilities. With a classic version, the
+remaining methods tend to have very high probabilities, and it's not
+necessarily that we want!
+*/
+tabular_fm_t *filtering(tabular_fm_t * tab, int fbb, int lpb,
+			int final_nb_methods)
+{
+    int nb_prime_nb = lpb-fbb+1;
+    //create the matrix with the average dist between a pair of methods!
+    int nb_methods = tab->index;
+    double **dist = malloc(nb_methods * sizeof(double *));
     ASSERT(dist != NULL);
-    for (int i = 0; i < len; i++) {
-	dist[i] = malloc((len) * sizeof(double));
+    for (int i = 0; i < nb_methods; i++) {
+	dist[i] = malloc((nb_methods) * sizeof(double));
 	ASSERT(dist[i] != NULL);
     }
-    //compute the matrix
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < nb_methods; i++) {
 	dist[i][i] = 0;
-	for (int j = i + 1; j < len; j++) {
+	//trade off for i.
+	fm_t *eli = tabular_fm_get_fm(tab, i);
+	double compromis_i[nb_prime_nb];
+	for (int p = 0; p < nb_prime_nb; p++) {
+	    if (eli->proba[p] > EPSILON_DBL)
+		compromis_i[p] = eli->time[get_nb_word(p)] / eli->proba[p];
+	    else
+		compromis_i[p] = 0;
+	}
+	for (int j = i + 1; j < nb_methods; j++) {
+	    //trade off for j.
+	    fm_t *elj = tabular_fm_get_fm(tab, j);
+	    double compromis_j[nb_prime_nb];
+	    for (int p = 0; p < nb_prime_nb; p++) {
+		if (elj->proba[p] > EPSILON_DBL)
+		    compromis_j[p] = elj->time[get_nb_word(p)] / elj->proba[p];
+		else
+		    compromis_j[p] = 0;
+	    }
+
+	    //compute dist
 	    double moy_dist = 0;
 	    int nb_el = 0;
 	    for (int p = 0; p < nb_prime_nb; p++) {
-		double tmp = 0;
-		if (compromis[i][p] != INFINITY && compromis[j][p] != INFINITY) {
-		    tmp = compromis[i][p] - compromis[j][p];	//etablir
-								//un
-								//pourcentage!!!tmp/compromis[i][p]
-		    nb_el++;
-		}
-		if (tmp < 0)
-		    tmp *= -1;
+		double tmp = compromis_i[p] - compromis_j[p];
+		tmp *=tmp;
+		nb_el++;
 		moy_dist += tmp;
 	    }
-	    if (nb_el == 0)
-		moy_dist = INFINITY;
-	    moy_dist /= nb_el;
+
+	    moy_dist = sqrt(moy_dist)/nb_el;
+	    
 	    dist[i][j] = moy_dist;
 	    dist[j][i] = moy_dist;
 	}
     }
-    double seuil = BOUND_FILTER;
-    double min;
-    int curve_near[2];
-    curve_near[0] = 0;
-    curve_near[1] = 0;
-    double *disp =
-	distribution_prime_number(len_p_min, len_p_min + nb_prime_nb);
-
-    do {
-	min = INFINITY;
-	for (int i = 0; i < len; i++) {
-	    for (int j = i + 1; j < len; j++) {
-		if (dist[i][j] < min) {
-		    curve_near[0] = i;
-		    curve_near[1] = j;
-		    min = dist[i][j];
-		}
-	    }
-	}
-	if (min <= seuil) {
-	    /* //keep the curve wich have the best probability */
-	    printf("les deux courbes proches sont: %d, %d\n valeur de min %f\n",
-		   curve_near[0], curve_near[1], min);
-
-	    double moy_proba_0 = 0;
-	    double moy_proba_1 = 0;
-	    fm_t *el0 = tabular_fm_get_fm(fm, curve_near[0]);
-	    fm_t *el1 = tabular_fm_get_fm(fm, curve_near[1]);
-	    double *proba0 = fm_get_proba(el0);
-	    double *proba1 = fm_get_proba(el1);
-	    int nb_min =
-		(el0->len_proba <
-		 el0->len_proba) ? el0->len_proba : el1->len_proba;
-	    for (int p = 0; p < nb_min; p++) {
-		moy_proba_0 += proba0[p] * disp[p];
-		moy_proba_1 += proba1[p] * disp[p];
-	    }
-	    printf("moy_proba = %f\t, %f\n", moy_proba_0, moy_proba_1);
-	    if (moy_proba_0 < moy_proba_1) {
-		//cancel the method curve_near[0]
-		tabular_fm_put_zero(fm, curve_near[0]);
-		for (int i = 0; i < len; i++) {
-		    dist[i][curve_near[0]] = INFINITY;
-		    dist[curve_near[0]][i] = INFINITY;
-		}
-	    } else {
-		//cancel the method curve_near[1]
-		tabular_fm_put_zero(fm, curve_near[1]);
-		for (int i = 0; i < len; i++) {
-		    dist[i][curve_near[1]] = INFINITY;
-		    dist[curve_near[1]][i] = INFINITY;
-		}
-	    }
-	}
-    } while (min <= seuil);
-
-    //filter ECM METHODS:: take advantage that ECM can be repeat over
-    //several curves!!!!
-    for (int i = 0; i < len; i++) {
-	fm_t *elem = tabular_fm_get_fm(fm, i);
-	unsigned long *method_i = fm_get_method(elem);
-	double *proba_i = fm_get_proba(elem);
-	double *temps_i = fm_get_time(elem);
-	int len_i = fm_get_len_proba(elem);
-	if (method_i[0] == EC_METHOD && method_i[1] != MONTY16) {
-	    for (int j = i + 1; j < len; j++) {
-		elem = tabular_fm_get_fm(fm, j);
-		unsigned long *method_j = fm_get_method(elem);
-		double *proba_j = fm_get_proba(elem);
-		double *temps_j = fm_get_time(elem);
-		int len_j = fm_get_len_proba(elem);
-		int nb_min = (len_i < len_j) ? len_i : len_j;
-		if (method_j[0] == EC_METHOD) {
-		    int cpt_b = 0;
-		    //becarefull: the data t isn't sorted!!! so we
-		    //need to know which is better than the other.
-		    int min = (temps_i[0] < temps_j[0]) ? i : j;
-		    int max = (min == i) ? j : i;
-		    double comp_min = 0;
-		    double comp_max = 0;
-		    double p1, p2, t1, t2;
-		    for (int p = 0; p < nb_min; p++) {	//gestion des min/max
-			if (min == i) {
-			    //printf ("1---> %d\n", i);
-			    p1 = proba_i[p];
-			    t1 = temps_i[p];
-			    p2 = proba_j[p];
-			    t2 = temps_j[p];
-			} else {
-			    //printf ("1---> %d\n", j);
-			    p1 = proba_j[p];
-			    t1 = temps_j[p];
-			    p2 = proba_i[p];
-			    t2 = temps_i[p];
-			}
-			int ratio = round(t2 / t1);
-			/* printf ("numero des courbes: %d, %d\n", i,j); */
-			/* printf ("t2 = %f, t1 = %f\n", t2, t1); */
-			/* printf("ratio = %d, %f, %f\n",ratio,
-			   pow(1-p1, ratio), 1-p2); */
-			/* printf ("p1 = %f, t1= %f, p2 = %f, t2 =
-			   %f\n", p1, t1, p2, t2); */
-			/* getchar(); */
-			if (pow(1 - p1, ratio) < 1 - p2)
-			    cpt_b++;
-			comp_min += ratio * t1 / (1 - pow(1 - p1, ratio));
-			comp_max += t2 / p2;
+    
+    //sort the pairs of methods according to the dist!
+    int nb_pair = (nb_methods-1)*(nb_methods)/2;
+    int sort_dist[nb_pair][2];
+    //todo: improve this method! For now, it's a naive method
+    int k = 0;
+    while (k < nb_pair) {
+	int i_min = -1;
+	int j_min = -1;
+	double ratio = INFINITY;
+	for (int i = 0; i < nb_methods; i++) {
+	    for (int j = i + 1; j < nb_methods; j++) {
+		if (dist[i][j] < ratio)
+		    {
+			i_min = i;
+			j_min = j;
+			ratio = dist[i][j];
 		    }
-		    //delete the method max!
-		    //printf("compromis = %f, %f\n", comp_min, comp_max);
-		    if (cpt_b > floor(nb_min / 2) &&
-			comp_min <= comp_max + seuil) {
-			tabular_fm_put_zero(fm, max);
-			//printf ("supprimer: %d\n", max);
-		    }
-		    /* printf ("numero des courbes: %d, %d\n", i,j); */
-		    /* printf ("succés: %d/%d\n", cpt_b, nb_prime_nb); */
-		    //getchar();
-		}
 	    }
 	}
+	if (i_min == -1 || j_min == -1)
+	    break;
+	sort_dist[k][0] = i_min;
+	sort_dist[k][1] = j_min;
+	dist[i_min][j_min] = INFINITY;
+	k++;
     }
-    // collect the best methods!!!
-    //tabular_fm_print (t);
+    nb_pair = k;
+    
+    //clear method until you have the good numbers of methods.
+    int* tab_fm_is_removed = calloc (nb_methods, sizeof (int));
+    int nb_rem_methods = nb_methods;
 
-    printf("cleaning up!!!!\n");
-
+    while(nb_rem_methods > final_nb_methods){
+	int ind = 0;
+	while (ind < nb_pair && nb_rem_methods > final_nb_methods)
+	    {
+		if (tab_fm_is_removed[sort_dist[ind][0]] == 0 &&
+		    tab_fm_is_removed[sort_dist[ind][1]] == 0)
+		    {
+			fm_t* el0 = tabular_fm_get_fm(tab, sort_dist[ind][0]);
+			fm_t* el1 = tabular_fm_get_fm(tab, sort_dist[ind][1]);
+			double ratio0 = (el0->proba[0] < EPSILON_DBL)?
+			    0:el0->time[0]/el0->proba[0];
+			double ratio1 = (el1->proba[0] < EPSILON_DBL)?
+			    0:el1->time[0]/el1->proba[0];
+		    
+			if ( ratio0 > ratio1)
+			    {
+				tab_fm_is_removed[sort_dist[ind][0]] = -1;
+				tab_fm_is_removed[sort_dist[ind][1]] = 1;
+			    }
+			else
+			    {
+				tab_fm_is_removed[sort_dist[ind][1]] = -1;
+				tab_fm_is_removed[sort_dist[ind][0]] = 1;
+			    }
+			nb_rem_methods--;
+		    }
+		ind++;
+	    }
+	for (int i = 0; i < nb_methods; i++)
+	    if (tab_fm_is_removed[i] == 1)
+		tab_fm_is_removed[i] = 0;
+    }
+    //build the final tab_fm with the remaining factoring methods!
     tabular_fm_t *res = tabular_fm_create();
-    int nb_zero = 0;
-
-    char res_file[] = "filtering_iii";
-    int len_str = strlen(res_file);
-    FILE *select_fm;
-    fm_t *elem;
-
-    for (int i = 0; i < len; i++) {
-	if (!tabular_fm_is_zero(fm, i)) {
-	    printf("i = %d\n", i);
-	    elem = tabular_fm_get_fm(fm, i);
-	    int nb_prime = fm_get_len_proba(elem);
-	    tabular_fm_add_fm(res, elem);
-	    int c100 = (i) / 100;
-	    int c10 = (i - 100 * c100) / 10;
-	    int c1 = i - 10 * c10 - 100 * c100;
-	    res_file[len_str - 3] = c100 + 48;
-	    res_file[len_str - 2] = c10 + 48;
-	    res_file[len_str - 1] = c1 + 48;
-	    select_fm = fopen(res_file, "w");
-	    fprintf(select_fm,
-		    "#filtering fm[%d]: [%d, ...]\n # len_p\t proba\t tps \t compromis\n",
-		    i, len_p_min);
-
-	    for (int k = 0; k < nb_prime; k++)
-		fprintf(select_fm, "%d \t %f\t %f\t %f\n", len_p_min + k,
-			elem->proba[k], elem->time[k], compromis[i][k]);
-	    /* fclose (select_fm); */
-	} else if (nb_zero == 0) {
-	    tabular_fm_add_fm(res, tabular_fm_get_fm(fm, i));
-	    nb_zero++;
+    for (int i = 0; i < nb_methods; i++)
+	{
+	    if (tab_fm_is_removed[i] != -1)
+		tabular_fm_add_fm (res, tabular_fm_get_fm(tab, i));
 	}
-    }
-
     //free
-    free(disp);
-    for (int i = 0; i < len; i++) {
-	free(dist[i]);
-	free(compromis[i]);
-    }
-    free(dist);
-    free(compromis);
+    free (tab_fm_is_removed);
+    for (int i = 0; i < nb_methods; i++)
+	free (dist[i]);
+    free (dist);
+
+    tabular_fm_sort (res);
+
     return res;
 }
+
+
+
+
+
+
+
+
+
 
 /************************************************************************/
 /*                      CONVEX_HULL_FM                                  */

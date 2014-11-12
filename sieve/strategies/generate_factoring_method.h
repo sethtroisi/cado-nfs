@@ -66,7 +66,8 @@ double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state);
 void bench_time(gmp_randstate_t state, tabular_fm_t * fm);
 
 
-tabular_fm_t *filtering(tabular_fm_t * fm, int len_p_min, int nb_prime_nb);
+tabular_fm_t *filtering(tabular_fm_t * fm, int fbb, int lpb,
+			int final_nb_methods);
 
 /************************************************************************/
 /*                      CONVEX_HULL_FM                                  */

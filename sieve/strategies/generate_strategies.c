@@ -412,29 +412,29 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 
     for (int r = r_init; r < len_r0; r++)	//first side
     {
-	double p1 = strat_r0->tab[r]->proba;
-	double c1 = strat_r0->tab[r]->time;
+	double p0 = strat_r0->tab[r]->proba;
+	double c0 = strat_r0->tab[r]->time;
 	for (int a = a_init; a < len_r1; a++)	//second side
 	{
 	    nb_strat++;
 	    //compute success ans cost:
-	    double p2 = strat_r1->tab[a]->proba;
-	    double c2 = strat_r1->tab[a]->time;
-	    double proba = p1 * p2;
-	    double tps1 = c1 + (1-p1) * c2;
+	    double p1 = strat_r1->tab[a]->proba;
+	    double c1 = strat_r1->tab[a]->time;
+	    double proba = p0 * p1;
+	    double tps0 = c0 + (1-p0) * c1;
 	    //mean time when we begin by the SIDE_0
-	    double tps2 = c2 + (1-p2) * c1;
+	    double tps1 = c1 + (1-p1) * c0;
 	    //mean time when we begin by the SIDE_1
-	    if (tps1 < tps2) {
+	    if (tps0 < tps1) {
 		st = concat_strategies(strat_r0->tab[r], strat_r1->tab[a],
 				       SIDE_0);
 		strategy_set_proba(st, proba);
-		strategy_set_time(st, tps1);
+		strategy_set_time(st, tps0);
 	    } else {
 		st = concat_strategies(strat_r1->tab[a], strat_r0->tab[r],
 				       SIDE_1);
 		strategy_set_proba(st, proba);
-		strategy_set_time(st, tps2);
+		strategy_set_time(st, tps1);
 	    }
 	    tabular_strategy_add_strategy(strat_r0_r1, st);
 	    strategy_free(st);
