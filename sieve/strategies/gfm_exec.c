@@ -28,10 +28,7 @@ static void declare_usage(param_list pl)
 			    "-make your study only with one method (-m).\n"
 			    "-specify the sieving region of B1 and c instead of using default values.\n"
 			    "Then, You can apply the convex hull to keep only the best methods\n "
-			    "(-fch from a file or just -ch if you want to apply it after the bench\n)."
-			    "Lastly, a new option (-f) is doing to allow to keep only a number\n "
-			    "of factoring methods\n\n");
-
+			    "(-fch from a file or just -ch if you want to apply it after the bench\n).");
     param_list_decl_usage(pl, "ub", "to set large prime bound to 2^ub.");
     param_list_decl_usage(pl, "lb", "to set factor base bound to 2^lb.");
     param_list_decl_usage(pl, "n", "to give the lenght of n.");
