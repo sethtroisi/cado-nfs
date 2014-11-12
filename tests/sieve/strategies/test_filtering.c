@@ -29,36 +29,33 @@ int check_filt (tabular_fm_t* res, int init_nb_method)
 
 int main ()
 {
-    int fbb = 15;
-    int lpb = 18;
     int nb_fm = 10;
-    int final_nb_fm = 5;
-    
+    int final_nb_fm = 4;
+
     tabular_fm_t* tab = tabular_fm_create ();
-    
+
     fm_t* fm = fm_create();
     for (int i = 0; i < nb_fm; i++)
-    	{
-    	    unsigned long elem[4] = {i, 0, 0, 0};
-    	    fm_set_method (fm, elem, 4);
-    	    //proba
-    	    int len_proba = lpb - fbb + 1;
-    	    double proba[len_proba];
-    	    for (int j = 0; j < len_proba; j++)
-    		proba[j] = i/((double)nb_fm+1)+0.01*j*i;
-    	    fm_set_proba (fm, proba, len_proba, fbb);
-    	    //time
-    	    double time[4];
-    	    for (int j = 0; j < 4; j++)
-    		time[j] = (i*i*i)*(pow(10,j));
-    	    fm_set_time (fm, time, 4);
-    	    //add
-    	    tabular_fm_add_fm (tab, fm);
-    	}
+	{
+	    unsigned long elem[4] = {i, 0, i*(1+rand()%10),  i*(1+rand()%10)};
+	    fm_set_method (fm, elem, 4);
+	    //proba
+	    int len_proba = 4;
+	    double proba[len_proba];
+	    for (int j = 0; j < len_proba; j++)
+		proba[j] = i/((double)nb_fm+1)+0.01*j*i;
+	    fm_set_proba (fm, proba, len_proba, 0);
+	    //time
+	    double time[4];
+	    for (int j = 0; j < 4; j++)
+		time[j] = (i*i*i)*(pow(10,j));
+	    fm_set_time (fm, time, 4);
+	    //add
+	    tabular_fm_add_fm (tab, fm);
+	}
     fm_free (fm);
-
-    tabular_fm_t* res = filtering (tab, fbb, lpb, final_nb_fm);
-
+    tabular_fm_t* res = filtering (tab, final_nb_fm);
+    tabular_fm_print (res);
     int err = 0;
     if (!check_filt (res, nb_fm))
 	err = 1;

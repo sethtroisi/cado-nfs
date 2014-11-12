@@ -306,7 +306,7 @@ bench_time_fm_onelength(facul_strategy_t * method, gmp_randstate_t state,
     }
     //clear
     mpz_clear(N);
-    
+
     return tps / ((double)nb_test);
 
 }
@@ -798,10 +798,8 @@ methods of differents probabilities. With a classic version, the
 remaining methods tend to have very high probabilities, and it's not
 necessarily that we want!
 */
-tabular_fm_t *filtering(tabular_fm_t * tab, int fbb, int lpb,
-			int final_nb_methods)
+tabular_fm_t *filtering(tabular_fm_t * tab, int final_nb_methods)
 {
-    int nb_prime_nb = lpb-fbb+1;
     //create the matrix with the average dist between a pair of methods!
     int nb_methods = tab->index;
     double **dist = malloc(nb_methods * sizeof(double *));
@@ -814,41 +812,41 @@ tabular_fm_t *filtering(tabular_fm_t * tab, int fbb, int lpb,
 	dist[i][i] = 0;
 	//trade off for i.
 	fm_t *eli = tabular_fm_get_fm(tab, i);
-	double compromis_i[nb_prime_nb];
-	for (int p = 0; p < nb_prime_nb; p++) {
+	double compromis_i[eli->len_proba];
+	for (int p = 0; p < eli->len_proba; p++) {
 	    if (eli->proba[p] > EPSILON_DBL)
 		compromis_i[p] = eli->time[get_nb_word(p)] / eli->proba[p];
-	    else
+	    else //if (eli->time[p] < EPSILON_DBL): fm zero!
 		compromis_i[p] = 0;
+
 	}
 	for (int j = i + 1; j < nb_methods; j++) {
 	    //trade off for j.
 	    fm_t *elj = tabular_fm_get_fm(tab, j);
-	    double compromis_j[nb_prime_nb];
-	    for (int p = 0; p < nb_prime_nb; p++) {
+	    double compromis_j[elj->len_proba];
+	    for (int p = 0; p < elj->len_proba; p++) {
 		if (elj->proba[p] > EPSILON_DBL)
 		    compromis_j[p] = elj->time[get_nb_word(p)] / elj->proba[p];
-		else
+		else //if (elj->time[p] < EPSILON_DBL): fm zero!
 		    compromis_j[p] = 0;
 	    }
 
 	    //compute dist
 	    double moy_dist = 0;
-	    int nb_el = 0;
-	    for (int p = 0; p < nb_prime_nb; p++) {
+	    int nb_elem = (elj->len_proba < eli->len_proba)?
+		elj->len_proba:eli->len_proba;
+	    for (int p = 0; p < nb_elem; p++) {
 		double tmp = compromis_i[p] - compromis_j[p];
 		tmp *=tmp;
-		nb_el++;
 		moy_dist += tmp;
 	    }
+	    moy_dist = sqrt(moy_dist)/nb_elem;
 
-	    moy_dist = sqrt(moy_dist)/nb_el;
-	    
 	    dist[i][j] = moy_dist;
 	    dist[j][i] = moy_dist;
 	}
     }
-    
+
     //sort the pairs of methods according to the dist!
     int nb_pair = (nb_methods-1)*(nb_methods)/2;
     int sort_dist[nb_pair][2];
@@ -876,7 +874,7 @@ tabular_fm_t *filtering(tabular_fm_t * tab, int fbb, int lpb,
 	k++;
     }
     nb_pair = k;
-    
+
     //clear method until you have the good numbers of methods.
     int* tab_fm_is_removed = calloc (nb_methods, sizeof (int));
     int nb_rem_methods = nb_methods;
@@ -894,7 +892,7 @@ tabular_fm_t *filtering(tabular_fm_t * tab, int fbb, int lpb,
 			    0:el0->time[0]/el0->proba[0];
 			double ratio1 = (el1->proba[0] < EPSILON_DBL)?
 			    0:el1->time[0]/el1->proba[0];
-		    
+
 			if ( ratio0 > ratio1)
 			    {
 				tab_fm_is_removed[sort_dist[ind][0]] = -1;

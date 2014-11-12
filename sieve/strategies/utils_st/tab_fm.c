@@ -241,34 +241,23 @@ tabular_fm_t* tabular_fm_fscan(FILE * file)
 //value otherwise.
 int fm_cmp(fm_t * el1, fm_t * el2)
 {
+    if (fm_is_zero(el1))
+	return -1;
+    else if (fm_is_zero(el2))
+	return 1;
     /*assume that the variable len_p_min is the same for the both
       fm_t.*/
     //compare the probabilities!
     int len1 = el1->len_proba;
     int len2 = el2->len_proba;
 
-    int len_min = (len1 < len2) ? len1 : len2;
-    int tot1 = 0, tot2 = 0;
-    int non_zero;
-    for (int i = 0; i < len_min; i++) {
-	non_zero = true;
-	if (el1->proba[i] < EPSILON_DBL) {
-	    tot2++;
-	    non_zero = false;
-	}
-	if (el2->proba[i] < EPSILON_DBL) {
-	    tot1++;
-	    non_zero = false;
-	}
-	if (non_zero) {
-	    double diff_proba = el1->proba[i] - el2->proba[i];
-	    if (diff_proba < EPSILON_DBL)
-		tot2++;
-	    else if (diff_proba > EPSILON_DBL)
-		tot1++;
-	}
-    }
-    return tot1 - tot2;
+    int len = (len1 < len2) ? len1 : len2;
+    double diff_proba = 0;
+    for (int i = 0; i < len; i++) 
+	if (el1->proba[i] > EPSILON_DBL && el2->proba[i] > EPSILON_DBL) 
+	    diff_proba += el1->proba[i] - el2->proba[i];
+
+    return (diff_proba>EPSILON_DBL)? 1: -1;
 }
 
 void fm_swap(tabular_fm_t * t, int index1, int index2)
