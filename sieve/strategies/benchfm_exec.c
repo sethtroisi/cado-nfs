@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 	    c = res;
 	}
     
-    FILE *file_out = fopen(pathname_aout, "w");
+    FILE *file_out = fopen(pathname_out, "w");
     int err = tabular_fm_fprint(file_out, c);
     if (err < 0) {
 	fprintf(stderr, "error:: try to write in the file %s.\n", pathname_out);
