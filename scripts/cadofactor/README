@@ -149,3 +149,13 @@ the current number of relations. For example if you have say 1000000 relations
 (grep "is now" in the log file), just add in the cadofactor.py line:
 
 tasks.sieve.rels_wanted=1000001
+
+Printing the database
+=====================
+
+The wudb.py script can be used to print info on the workunits. For example,
+
+./wudb.py -dbname /tmp/work/testrun.db -dump -assigned
+
+prints all currently assigned work units.
+
