@@ -243,7 +243,7 @@ strategy_t ***compute_best_strategy(tabular_strategy_t *** matrix_strat,
 				       len_abs, len_ord,
 				       C0, min, min + 2*step_s, 0.00010);
 
-    printf("Our choice for the slope s: %lf (rel/s)\n", max_s);
+    //printf("Our choice for the slope s: %lf (rel/s)\n", max_s);
     double Y = 0, T = C0;
     //build the matrix with the optimal strategies.
     strategy_t ***matrix_res = malloc(sizeof(*matrix_res) * len_abs);

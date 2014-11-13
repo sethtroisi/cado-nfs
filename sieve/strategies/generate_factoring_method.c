@@ -87,16 +87,11 @@ double *distribution_prime_number(int min, int max)
 void generate_prime_factor(mpz_t res, gmp_randstate_t state, int lenFact)
 {
     mpz_t min;
-    mpz_t max;
-    mpz_t diff;
     mpz_init(min);
-    mpz_init(max);
-    mpz_init(diff);
     mpz_ui_pow_ui(min, 2, lenFact - 1);
     do {
 	mpz_urandomm(res, state, min);
 	mpz_add(res, res, min);
-
     }
     while (mpz_probab_prime_p(res, NB_PRIMALITY_TEST) == 0);
 
@@ -291,16 +286,19 @@ bench_time_fm_onelength(facul_strategy_t * method, gmp_randstate_t state,
     mpz_t N;
     mpz_init(N);
     unsigned long f[2];
-
+    /* double tps2 = 0; */
+    /* struct timeval st_test, end_test; */
     for (int i = 0; i < nb_test; i++) {
 	generate_prime_factor(N, state, len_n);
 	//compute the the time of execution
 	uint64_t starttime, endtime;
 	starttime = microseconds();
-
+	//gettimeofday (&st_test, NULL);
 	facul(f, N, method);
-
+	//gettimeofday (&end_test, NULL);
 	endtime = microseconds();
+	/* tps2 += (end_test.tv_sec - st_test.tv_sec)*1000000L */
+	/*     + end_test.tv_usec - st_test.tv_usec; */
 
 	tps += endtime - starttime;
     }

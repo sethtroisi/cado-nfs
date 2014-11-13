@@ -7,8 +7,6 @@
 #include <float.h>
 
 
-static double EPSILON_DBL = LDBL_EPSILON;
-
 static int is_good_decomp(decomp_t * dec, int len_p_min, int len_p_max)
 {
     int len = dec->len;
@@ -374,6 +372,7 @@ static strategy_t *concat_strategies(strategy_t * st1, strategy_t * st2,
   the time to find a non-trivial for each side must be previously
   computed!
  */
+//todo: test this function!
 tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 					    tabular_strategy_t * strat_r1)
 {
@@ -384,8 +383,6 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
     tabular_strategy_t *ch = tabular_strategy_create();
     unsigned long nb_strat = 0;
 
-    int r_init = 0;
-    int a_init = 0;
     /*
        for each array of strategies, the first one is the zero strategy.
        There are two cases : 
@@ -395,35 +392,21 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
        have several unless methods with a zero probability.
      */
 
-    if (strat_r0->tab[0]->proba < EPSILON_DBL)
-	r_init = 1;
-    if (strat_r1->tab[0]->proba < EPSILON_DBL)
-	a_init = 1;
-
-    // the first strategy is the zero strategy, so we add there directly
-    // in the convex hull.
     strategy_t *st;
-    if (strat_r0->tab[0]->proba < EPSILON_DBL ||
-	strat_r1->tab[0]->proba < EPSILON_DBL) {
-	st = concat_strategies(strat_r0->tab[0], strat_r1->tab[0], SIDE_0);
-	tabular_strategy_add_strategy(ch, st);
-	strategy_free(st);
-    }
-
-    for (int r = r_init; r < len_r0; r++)	//first side
+    for (int r = 0; r < len_r0; r++)	//first side
     {
 	double p0 = strat_r0->tab[r]->proba;
 	double c0 = strat_r0->tab[r]->time;
-	for (int a = a_init; a < len_r1; a++)	//second side
+	for (int a = 0; a < len_r1; a++)	//second side
 	{
 	    nb_strat++;
 	    //compute success ans cost:
 	    double p1 = strat_r1->tab[a]->proba;
 	    double c1 = strat_r1->tab[a]->time;
 	    double proba = p0 * p1;
-	    double tps0 = c0 + (1-p0) * c1;
+	    double tps0 = c0 + p0 * c1;
 	    //mean time when we begin by the SIDE_0
-	    double tps1 = c1 + (1-p1) * c0;
+	    double tps1 = c1 + p1 * c0;
 	    //mean time when we begin by the SIDE_1
 	    if (tps0 < tps1) {
 		st = concat_strategies(strat_r0->tab[r], strat_r1->tab[a],
@@ -447,8 +430,6 @@ tabular_strategy_t *generate_strategy_r0_r1(tabular_strategy_t * strat_r0,
 
 	    tabular_strategy_concat(strat_r0_r1, ch);
 	    tabular_strategy_free(ch);
-	    /* printf( "avant CH\n"); */
-	    /* tabular_strategy_print (strat_r0_r1); */
 
 	    ch = convex_hull_strategy(strat_r0_r1);
 	    //clear previous collect and start a new collect.

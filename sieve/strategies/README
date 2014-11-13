@@ -2,10 +2,11 @@
 /*                    to generate our factoring methods                       */
 /******************************************************************************/
 
-Two binaries are available in this directory :
+Some binaries are available in this directory :
   1- gfm
   2- benchfm
-
+  3- gst
+  4- finalst
 Firstly, gfm allows to choose the optimal parameters (B1, B2) for each
 factoring methods (PM1, PP1-27, PP1-65, ECM-M12, ECM-M16, ECM-B12) to
 find a prime number in [2^lb, 2^ub]. Potentially, there are innumerable

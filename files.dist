@@ -1156,3 +1156,4 @@ tests/sieve/strategies/utils_st/test_decomp.c
 tests/sieve/strategies/utils_st/test_convex_hull.c
 tests/sieve/strategies/test_generate_composite_numbers.c
 tests/sieve/strategies/test_filtering.c
+tests/sieve/strategies/test_generate_strategies.c

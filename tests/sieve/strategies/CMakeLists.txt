@@ -22,13 +22,13 @@ target_link_libraries(test_generate_composite_numbers ${LIB_EXEC})
 run_test (test_generate_composite_numbers test_generate_composite_numbers)
 
 
-# add_executable(test_generate_strategies
-#   test_generate_strategies.c
-#   ${SUF_SRC}/generate_factoring_method.c
-#   ${SUF_SRC}/generate_strategies.c
-#   ${SRC_UTILS})
-# target_link_libraries(test_generate_strategies ${LIB_EXEC})
-# run_test (test_generate_strategies test_generate_strategies)
+add_executable(test_generate_strategies
+  test_generate_strategies.c
+  ${SUF_SRC}/generate_factoring_method.c
+  ${SUF_SRC}/generate_strategies.c
+  ${SRC_UTILS})
+target_link_libraries(test_generate_strategies ${LIB_EXEC})
+run_test (test_generate_strategies test_generate_strategies)
 
 add_executable(test_filtering
   test_filtering.c

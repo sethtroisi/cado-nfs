@@ -1,15 +1,5 @@
-#include <dirent.h>
-#include <sys/types.h>
-
-#include <getopt.h>
-
-#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <gmp.h>
 #include <time.h>
 
 #include "cado.h"
