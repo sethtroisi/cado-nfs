@@ -734,6 +734,7 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
             exit(1);
         }
         r->rhs->f = fopen(rhsname, "w");
+        DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
         fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
     }
     /* }}} */
