@@ -722,6 +722,8 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
     if (!r->seed) r->seed = time(NULL);
     param_list_parse_int(pl, "c", &r->maxcoeff);
 
+    r->ascii = !binary;
+
     /* {{{ try to parse the rhs info */
     if ((tmp = param_list_lookup_string(pl, "rhs")) != NULL) {
         ASSERT_ALWAYS(r->maxcoeff > 0);
@@ -735,11 +737,11 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
         }
         r->rhs->f = fopen(rhsname, "w");
         DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
-        fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
+        if (r->ascii)
+            fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
     }
     /* }}} */
 
-    r->ascii = !binary;
     r->out = stdout;
 
     const char * ofilename = NULL;
@@ -1139,7 +1141,7 @@ static inline void write_in_32bit_limbs(FILE * out, mpz_srcptr x, mpz_srcptr p)
 #else
     memcpy(temp, x->_mp_d, mpz_size(x) * sizeof(mp_limb_t));
 #endif
-    fwrite(temp, n32*sizeof(uint32_t), mpz_size(x), out);
+    fwrite(temp, sizeof(uint32_t), n32, out);
     ASSERT_ALWAYS(temp[n32]==0);
 }
 
@@ -1204,7 +1206,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
             if (r->maxcoeff) {
                 int32_t co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
                 WS32(out, ":", co, "");
-                if (r->rhs->n) v += co * (1+ptr[j]);
+                if (r->rhs->n) v += (long) co * (long) (1+ptr[j]);
             }
         }
         if (ascii) { fprintf(out, "\n"); }
