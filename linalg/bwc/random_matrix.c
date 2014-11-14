@@ -522,7 +522,7 @@ void punched_interval_print(FILE * f, punched_interval_ptr c)
 
 typedef int (*sortfunc_t)(const void *, const void *);
 
-int cmp_ulong(unsigned long * a, unsigned long * b)
+int cmp_u32(uint32_t * a, uint32_t * b)
 {
     return (*a > *b) - (*b > *a);
 }
@@ -543,7 +543,7 @@ uint32_t generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, uint32_
         uint32_t k = pick_and_punch(f, pool, range, x);
         ptr[i] = k;
     }
-    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_ulong);
+    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
     // punched_interval_free(range);
     return weight;
 }
@@ -1013,7 +1013,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
          * still needs the pick-and-punch thing */
         G->alpha=0;
         G->ncols = r->nrows; /* yes */
-        /* Then in fact it's easier, as we can avoid inverse transfor
+        /* Then in fact it's easier, as we can avoid inverse transform
          * sampling for the computation of the coefficients */
         // int heavy = 1;
         punched_interval_ptr pool = NULL;
@@ -1032,7 +1032,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 for(unsigned long i = 0 ; i < weight ; i++) {
                     ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
                 }
-                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                 unsigned long nw = 0;
                 for(unsigned long i = 0, j ; i < weight ; i=j) {
                     for(j = i + 1; j < weight && ptr[i] == ptr[j] ; j++) ;
@@ -1066,13 +1066,13 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 punched_interval_free(range, &pool);
                 punched_interval_pre_free_pool(&pool, 2 * weight,
                         pi->m->jrank == 0 && pi->m->trank == 0);
-                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
             } else {
                 for(int ok = 0 ; !ok ; ) {
                     for(unsigned long i = 0 ; i < weight ; i++) {
                         ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
                     }
-                    qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                     ok=1;
                     for(unsigned long i = 1 ; i < weight ; i++) {
                         if (ptr[i] == ptr[i-1]) {
