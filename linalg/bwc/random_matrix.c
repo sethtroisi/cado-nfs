@@ -522,7 +522,7 @@ void punched_interval_print(FILE * f, punched_interval_ptr c)
 
 typedef int (*sortfunc_t)(const void *, const void *);
 
-int cmp_ulong(unsigned long * a, unsigned long * b)
+int cmp_u32(uint32_t * a, uint32_t * b)
 {
     return (*a > *b) - (*b > *a);
 }
@@ -543,7 +543,7 @@ uint32_t generate_row(gmp_randstate_t rstate, random_matrix_ddata_ptr f, uint32_
         uint32_t k = pick_and_punch(f, pool, range, x);
         ptr[i] = k;
     }
-    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_ulong);
+    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
     // punched_interval_free(range);
     return weight;
 }
@@ -722,6 +722,8 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
     if (!r->seed) r->seed = time(NULL);
     param_list_parse_int(pl, "c", &r->maxcoeff);
 
+    r->ascii = !binary;
+
     /* {{{ try to parse the rhs info */
     if ((tmp = param_list_lookup_string(pl, "rhs")) != NULL) {
         ASSERT_ALWAYS(r->maxcoeff > 0);
@@ -734,11 +736,12 @@ int random_matrix_process_data_set_from_args(random_matrix_process_data_ptr r,
             exit(1);
         }
         r->rhs->f = fopen(rhsname, "w");
-        fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
+        DIE_ERRNO_DIAG(r->rhs->f == NULL, "fopen", rhsname);
+        if (r->ascii)
+            fprintf(r->rhs->f, "%lu %d\n", r->nrows, r->rhs->n);
     }
     /* }}} */
 
-    r->ascii = !binary;
     r->out = stdout;
 
     const char * ofilename = NULL;
@@ -1013,7 +1016,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
          * still needs the pick-and-punch thing */
         G->alpha=0;
         G->ncols = r->nrows; /* yes */
-        /* Then in fact it's easier, as we can avoid inverse transfor
+        /* Then in fact it's easier, as we can avoid inverse transform
          * sampling for the computation of the coefficients */
         // int heavy = 1;
         punched_interval_ptr pool = NULL;
@@ -1032,7 +1035,7 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 for(unsigned long i = 0 ; i < weight ; i++) {
                     ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
                 }
-                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                 unsigned long nw = 0;
                 for(unsigned long i = 0, j ; i < weight ; i=j) {
                     for(j = i + 1; j < weight && ptr[i] == ptr[j] ; j++) ;
@@ -1066,13 +1069,13 @@ void * random_matrix_get_u32(parallelizing_info_ptr pi, param_list pl, matrix_u3
                 punched_interval_free(range, &pool);
                 punched_interval_pre_free_pool(&pool, 2 * weight,
                         pi->m->jrank == 0 && pi->m->trank == 0);
-                qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
             } else {
                 for(int ok = 0 ; !ok ; ) {
                     for(unsigned long i = 0 ; i < weight ; i++) {
                         ptr[i] = gmp_urandomm_ui(rstate, r->nrows);
                     }
-                    qsort(ptr, weight, sizeof(unsigned long), (sortfunc_t) &cmp_ulong);
+                    qsort(ptr, weight, sizeof(uint32_t), (sortfunc_t) &cmp_u32);
                     ok=1;
                     for(unsigned long i = 1 ; i < weight ; i++) {
                         if (ptr[i] == ptr[i-1]) {
@@ -1138,7 +1141,7 @@ static inline void write_in_32bit_limbs(FILE * out, mpz_srcptr x, mpz_srcptr p)
 #else
     memcpy(temp, x->_mp_d, mpz_size(x) * sizeof(mp_limb_t));
 #endif
-    fwrite(temp, n32*sizeof(uint32_t), mpz_size(x), out);
+    fwrite(temp, sizeof(uint32_t), n32, out);
     ASSERT_ALWAYS(temp[n32]==0);
 }
 
@@ -1203,7 +1206,7 @@ void random_matrix_process_print(random_matrix_process_data_ptr r, random_matrix
             if (r->maxcoeff) {
                 int32_t co = gmp_urandomm_ui(rstate, 2 * r->maxcoeff + 1) - r->maxcoeff;
                 WS32(out, ":", co, "");
-                if (r->rhs->n) v += co * (1+ptr[j]);
+                if (r->rhs->n) v += (long) co * (long) (1+ptr[j]);
             }
         }
         if (ascii) { fprintf(out, "\n"); }

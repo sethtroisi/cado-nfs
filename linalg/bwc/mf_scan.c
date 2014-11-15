@@ -30,7 +30,7 @@ void usage(int rc)
     "produce only the frequency files corresponding to an existing binary\n"
     "matrix.\n"
     "\n"
-    "./mf-scan --binary-in mfile=<infile>\n"
+    "./mf-scan --binary-in mfile=<infile> --freq\n"
     "\n"
     "\n"
             "Recognized options"
