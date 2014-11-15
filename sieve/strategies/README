@@ -43,7 +43,7 @@ where:
   - p_i is the probabiliy to find a prime number of i bits size.
   - ci is the runtime for various input sizes:
 (c1 (resp. c2 c3 c4) for an integer to MODREDCUL_MAXBITS, (resp. 
-MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and 3*MODREDCUL_MAXBITS) bits size.
+MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30) bits size.
 
 In what follows, we give usage examples :
 

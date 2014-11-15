@@ -152,6 +152,23 @@ bench_proba_time_st(gmp_randstate_t state, facul_strategy_t* strategy,
     return res;
 }
 
+
+int
+get_nb_word (int r)
+{
+    /*
+      We add 0.5 to the length of one word, because for our times the
+      lenght is inclusive. For example, if MODREDCUL_MAXBITS = 64
+      bits, a cofactor is in one word if is lenght is less OR equal to
+      64 bits. So, if you don't add 0.5 to MODREDCUL_MAXBITS, you
+      lost the equal and thus insert an error in your maths. 
+    */
+    double half_word = (MODREDCUL_MAXBITS+0.5)/2.0;
+    int number_half_wd = floor(r /half_word);
+    int ind = (number_half_wd <2)? 0: number_half_wd - 1;
+    return ind;
+}
+
 /*
   This function is like bench_time() but only compute the time for one
   length. In fact, i remove the unnecessary computation to reduce the
@@ -162,7 +179,25 @@ void bench_time_mini(gmp_randstate_t state, tabular_fm_t * fm, int r)
     unsigned long *param;
     fm_t *elem;
     int len = fm->index;	//number of methods!
-
+    //precompute 4 arrays for our bench_time!
+    //{{
+    int len_n;
+    if (r <= MODREDCUL_MAXBITS)
+	len_n = MODREDCUL_MAXBITS;
+    else if (r <= MODREDC15UL_MAXBITS)
+	len_n = MODREDC15UL_MAXBITS;
+    else if (r <= MODREDC2UL2_MAXBITS)
+	len_n = MODREDC2UL2_MAXBITS;
+    else
+	len_n = MODREDC2UL2_MAXBITS +30;
+    int nb_test = 100000;
+    mpz_t* N = malloc(sizeof(mpz_t) * nb_test);
+    for (int i = 0; i < nb_test; i++) {
+	mpz_init(N[i]);
+	generate_prime_factor(N[i], state, len_n);
+    }
+    //}}
+    int ind = get_nb_word(r);
     for (int i = 0; i < len; i++) {
 	elem = tabular_fm_get_fm(fm, i);
 	param = fm_get_method(elem);
@@ -175,15 +210,8 @@ void bench_time_mini(gmp_randstate_t state, tabular_fm_t * fm, int r)
 
 	    double *res = calloc(4, sizeof(double));
 	    ASSERT(res != NULL);
-	    
-	    if (r <= MODREDCUL_MAXBITS)
-		res[0] = bench_time_fm_onelength(st, state, MODREDCUL_MAXBITS - 1);
-	    else if (r <= MODREDC15UL_MAXBITS)
-		res[1] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS - 1);
-	    else if (r <= MODREDC2UL2_MAXBITS)
-		res[2] = bench_time_fm_onelength(st, state, MODREDC2UL2_MAXBITS - 1);
-	    else
-		res[3] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS * 2);
+	    res[ind] = bench_time_fm_onelength(st, N, nb_test);
+
 	    fm_set_time(elem, res, 4);
 	    free (res);
 	    facul_clear_strategy(st);
@@ -193,6 +221,10 @@ void bench_time_mini(gmp_randstate_t state, tabular_fm_t * fm, int r)
 	}
 	
     }
+    //free
+    for (int i = 0; i < nb_test; i++)
+	mpz_clear(N[i]);
+    free (N);
 }
 /*
   This function is like bench_proba() but only compute the necessary
@@ -210,6 +242,20 @@ void bench_proba_mini(gmp_randstate_t state, tabular_fm_t * fm, int* val_p,
 
     unsigned long *param;
     fm_t *elem;
+    //{{Will contain the precomputes of composite integer!
+    mpz_t*N[len_val_p];
+    int nb_test_max = 10000;
+    for (int i = 0; i < len_val_p; i++)
+	{
+	    N[i] = NULL;
+	    N[i] = malloc(sizeof (mpz_t) * (nb_test_max+1));
+	    ASSERT (N[i] != NULL);
+	    mpz_init(N[i][0]);
+	    mpz_set_ui (N[i][0], 0);
+	}
+
+    //}}
+
     for (int i = 0; i < len; i++) {
 	elem = tabular_fm_get_fm(fm, i);
 	param = fm_get_method(elem);
@@ -221,15 +267,17 @@ void bench_proba_mini(gmp_randstate_t state, tabular_fm_t * fm, int* val_p,
 	facul_strategy_t *st = generate_fm(method, curve, B1, B2);
 
 	int max_index = 0;
-	for (int i = 0; i < len_val_p; i++)
+	for (int j = 0; j < len_val_p; j++)
 	    {
-		int ind_proba = val_p[i] - len_p_min;
+		int ind_proba = val_p[j] - len_p_min;
 		if (B1 == 0 && B2 == 0)
 		    proba[ind_proba] = 0;
 		else {
 		    int len_p = len_p_min + ind_proba;
 		    int len_n = 60 + len_p;
-		    proba[ind_proba] = bench_proba_fm(st, state, len_p, len_n);
+		    proba[ind_proba] = bench_proba_fm(st, state, len_p,
+						      len_n, N[j],
+						      nb_test_max);
 		}
 		if (ind_proba > max_index)
 		    max_index = ind_proba;
@@ -238,7 +286,19 @@ void bench_proba_mini(gmp_randstate_t state, tabular_fm_t * fm, int* val_p,
 	//free
 	facul_clear_strategy(st);
     }
-
+    //free
+    for (int i = 0; i < len_val_p; i++) {
+	if (N[i] != NULL) {
+	    int j = 0;
+	    while(mpz_cmp_ui(N[i][j], 0) != 0)
+		{
+		    mpz_clear(N[i][j]);
+		    j++;
+		}
+	    mpz_clear(N[i][j]);
+	}
+	free (N[i]);
+    }
     free(proba);
 }
 
@@ -287,9 +347,14 @@ int main()
     tabular_fm_add_fm (tab, ecm);
     //bench our method
     bench_proba_mini(state, tab, val_factor, len_val_factor, fbb);
-    
-    //bench_time_mini(state, tab,r);
+    //bench_time_mini (state, tab, r);
+    /* printf ("mini\n"); */
+    /* tabular_fm_print (tab); */
 
+    /* bench_proba (state, tab, fbb); */
+    /* bench_time(state, tab); */
+    /* printf ("\n all \n"); */
+    /* tabular_fm_print (tab); */
     //generate some examples of strategies!
     strategy_t* strat1 =strategy_create ();
     strategy_add_fm (strat1, tab->tab[0]);//pm1
@@ -312,10 +377,10 @@ int main()
     
     double precision_p = 0.05;
     if ((prob1 - prob2) > precision_p || (prob2 - prob1) > precision_p)
-	{
-	    fprintf (stderr, "error with the test(1)\n");
-	    return EXIT_FAILURE;
-	}
+    	{
+    	    fprintf (stderr, "error with the test(1)\n");
+    	    return EXIT_FAILURE;
+    	}
     
     //test the generation of our strategy for one element!!!
     //{{

@@ -187,9 +187,9 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
     strategy = malloc(sizeof(facul_strategy_t));
     strategy->methods = malloc(2 * sizeof(facul_method_t));
     /*
-       without this second method, the function
-       facul_clear_strategy (strategy) failed!
-     */
+      without this second method, the function
+      facul_clear_strategy (strategy) failed!
+    */
     strategy->methods[1].method = 0;
     strategy->methods[1].plan = NULL;
 
@@ -235,19 +235,15 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 */
 
 double
-bench_proba_fm(facul_strategy_t * strategy,
-	       gmp_randstate_t state, unsigned long len_p, unsigned long len_n)
+bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
+	       unsigned long len_p, unsigned long len_n, mpz_t* N,
+	       int nb_test_max)
+
 {
-    int nb_succes_max = 1000, nb_succes = 0;
+    int nb_success_max = 1000, nb_success = 0;
     int nb_test = 0;
-    int nb_test_max = 10 * nb_succes_max;
-    mpz_t N;
-    mpz_init(N);
 
-    while (nb_succes < nb_succes_max && (nb_test < nb_test_max)) {
-	/* generation of the integer N (which will be factoring) */
-	generate_composite_integer(N, state, len_p, len_n);
-
+    while (nb_success < nb_success_max && (nb_test < nb_test_max)) {
 	if (strategy->methods[0].method == EC_METHOD) {
 	    ecm_plan_t *plan = strategy->methods[0].plan;
 	    //RANDOM_SIGMA
@@ -260,69 +256,41 @@ bench_proba_fm(facul_strategy_t * strategy,
 	   f will contain the prime factor of N that the strategy
 	   found.  Note that N is composed by two prime factors by the
 	   previous function.
-	 */
+	*/
 	unsigned long f[2];
+	if (mpz_cmp_ui (N[nb_test], 0) == 0) {
+	    generate_composite_integer(N[nb_test], state, len_p, len_n);
+	    mpz_init (N[nb_test+1]);
+	    mpz_set_ui (N[nb_test+1], 0);
+	}
 	f[0] = 0;
-
-	facul(f, N, strategy);
+	facul(f, N[nb_test], strategy);
 
 	if (f[0] != 0)
-	    nb_succes++;
+	    nb_success++;
 	nb_test++;
     }
 
-    //clear
-    mpz_clear(N);
-
-    return nb_succes / ((double)nb_test);
+    return nb_success / ((double)nb_test);
 }
 
 double
-bench_time_fm_onelength(facul_strategy_t * method, gmp_randstate_t state,
-		       int len_n)
+bench_time_fm_onelength(facul_strategy_t * method, mpz_t* N, int nb_test)
 {
     double tps = 0;
-    int nb_test = 10000;
-    mpz_t N;
-    mpz_init(N);
     unsigned long f[2];
-    /* double tps2 = 0; */
-    /* struct timeval st_test, end_test; */
-    for (int i = 0; i < nb_test; i++) {
-	generate_prime_factor(N, state, len_n);
-	//compute the the time of execution
-	uint64_t starttime, endtime;
-	starttime = microseconds();
-	//gettimeofday (&st_test, NULL);
-	facul(f, N, method);
-	//gettimeofday (&end_test, NULL);
-	endtime = microseconds();
-	/* tps2 += (end_test.tv_sec - st_test.tv_sec)*1000000L */
-	/*     + end_test.tv_usec - st_test.tv_usec; */
 
-	tps += endtime - starttime;
-    }
-    //clear
-    mpz_clear(N);
+    uint64_t starttime, endtime;
+    starttime = microseconds();
+
+    for (int i = 0; i < nb_test; i++)
+	facul(f, N[i], method);
+    
+    endtime = microseconds();
+    tps += endtime - starttime;
 
     return tps / ((double)nb_test);
 
-}
-
-/*
-  This function collects the times to run the strategy st.
-  These time are computed for integers of bits size MODREDCUL_MAXBITS, 
-  MODREDC15UL_MAXBITS, MODREDC2UL2_MAXBITS and 3*MODREDCUL_MAXBITS.
- */
-double *bench_time_fm(facul_strategy_t * st, gmp_randstate_t state)
-{
-    double *res = calloc(4, sizeof(double));
-    ASSERT(res != NULL);
-    res[0] = bench_time_fm_onelength(st, state, MODREDCUL_MAXBITS - 1);
-    res[1] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS - 1);
-    res[2] = bench_time_fm_onelength(st, state, MODREDC2UL2_MAXBITS - 1);
-    res[3] = bench_time_fm_onelength(st, state, MODREDC15UL_MAXBITS * 2);
-    return res;
 }
 
 /*
@@ -340,6 +308,19 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
 
     unsigned long *param;
     fm_t *elem;
+    //{{Will contain the our composite integers!
+    int nb_test_max = 10000;
+    mpz_t*N[p_max];
+    for (int i = 0; i < p_max; i++)
+	{
+	    N[i] = NULL;
+	    N[i] = malloc(sizeof (mpz_t) * (nb_test_max+1));
+	    ASSERT (N[i] != NULL);
+	    mpz_init(N[i][0]);
+	    mpz_set_ui (N[i][0], 0);
+	}
+    //}}
+    
     for (int i = 0; i < len; i++) {
 	elem = tabular_fm_get_fm(fm, i);
 	param = fm_get_method(elem);
@@ -356,12 +337,10 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
 		proba[ind_proba] = 0;
 	    else {
 		int len_p = len_p_min + ind_proba;
-		/*
-		   TODO: check if it's sufficient to don't be disturbed by
-		   the second factor of n.
-		 */
 		int len_n = 60 + len_p;
-		proba[ind_proba] = bench_proba_fm(st, state, len_p, len_n);
+		proba[ind_proba] = bench_proba_fm(st, state, len_p,
+						  len_n, N[ind_proba],
+						  nb_test_max);
 	    }
 	    ind_proba++;
 	} while ((proba[ind_proba - 1] - BENCH_MIN_PROBA) > EPSILON_DBL
@@ -371,21 +350,51 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
 	//free
 	facul_clear_strategy(st);
     }
-
+    //free
+    for (int i = 0; i < p_max; i++) {
+	if (N[i] != NULL) {
+	    int j = 0;
+	    while(mpz_cmp_ui(N[i][j], 0) != 0)
+		{
+		    mpz_clear(N[i][j]);
+		    j++;
+		}
+	    mpz_clear(N[i][j]);
+	}
+	free(N[i]);
+    }
     free(proba);
 }
 
 /*
-  This function allows to collect for each factoring methods, 
-  the differents time to find a prime number in a interger
-  of differentbits size.
+  This function allows to collect for each factoring methods, the
+  differents time to find a prime number in a interger of different
+  bits size (MODREDCUL_MAXBITS, MODREDC15UL_MAXBITS,
+  MODREDC2UL2_MAXBITS and MODREDC2UL2_MAXBITS+30).
 */
 void bench_time(gmp_randstate_t state, tabular_fm_t * fm)
 {
     unsigned long *param;
     fm_t *elem;
     int len = fm->index;	//number of methods!
-
+    //precompute 4 arrays for our bench_time!
+    //{{
+    int nb_test = 100000;
+    mpz_t* N1 = malloc(sizeof(mpz_t) * nb_test);
+    mpz_t* N2 = malloc(sizeof(mpz_t) * nb_test);
+    mpz_t* N3 = malloc(sizeof(mpz_t) * nb_test);
+    mpz_t* N4 = malloc(sizeof(mpz_t) * nb_test);
+    for (int i = 0; i < nb_test; i++) {
+	mpz_init(N1[i]);
+	mpz_init(N2[i]);
+	mpz_init(N3[i]);
+	mpz_init(N4[i]);
+	generate_prime_factor(N1[i], state, MODREDCUL_MAXBITS);
+	generate_prime_factor(N2[i], state, MODREDC15UL_MAXBITS);
+	generate_prime_factor(N3[i], state, MODREDC2UL2_MAXBITS);
+	generate_prime_factor(N4[i], state, MODREDC2UL2_MAXBITS +30);
+    }
+    //}}
     for (int i = 0; i < len; i++) {
 	elem = tabular_fm_get_fm(fm, i);
 	param = fm_get_method(elem);
@@ -395,16 +404,30 @@ void bench_time(gmp_randstate_t state, tabular_fm_t * fm)
 	unsigned long B2 = param[3];
 	if (B1 != 0 || B2 != 0) {
 	    facul_strategy_t *st = generate_fm(method, curve, B1, B2);
-	    double *time = bench_time_fm(st, state);
+	    double time[4];
+	    time[0]= bench_time_fm_onelength(st, N1, nb_test);
+	    time[1]= bench_time_fm_onelength(st, N2, nb_test);
+	    time[2]= bench_time_fm_onelength(st, N3, nb_test);
+	    time[3]= bench_time_fm_onelength(st, N4, nb_test);
 	    fm_set_time(elem, time, 4);
 	    //free
-	    free(time);
 	    facul_clear_strategy(st);
 	} else {
 	    double time[4] = { 0, 0, 0, 0 };
 	    fm_set_time(elem, time, 4);
 	}
     }
+    //free
+    for (int i = 0; i < nb_test; i++) {
+	mpz_clear (N1[i]);
+	mpz_clear (N2[i]);
+	mpz_clear (N3[i]);
+	mpz_clear (N4[i]);
+    }
+    free (N1);
+    free (N2);
+    free (N3);
+    free (N4);
 }
 
 /************************************************************************/
@@ -415,7 +438,7 @@ void bench_time(gmp_randstate_t state, tabular_fm_t * fm)
   This function allows to compute the probability and the time of a strategy
   to find a prime number in an interval [2**len_p_min, 2**len_p_max].
 */
-
+//todo:  will be optimize!
 static double *sub_routine_bench_proba_cost_interval(facul_strategy_t *
 						     strategy,
 						     gmp_randstate_t state,
