@@ -53,12 +53,9 @@ double tt_qstart;
 #define BUCKET_REGION (1 << LOG_BUCKET_REGION)
 
 /* {{{ for cofactorization statistics */
-int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
-                  the stats file can be used with gnuplot, for example:
-                  splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4 */
-double stats_prob = 2e-4;
-FILE *stats_file;
-FILE *sievestats_file;
+
+int cof_stats = 0; /* write stats file: necessary to generate our strategy.*/
+FILE *cof_stats_file;
 uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         cofactorization routine with a cofactor of r bits on
                         the rational side, and a bits on the algebraic side */
@@ -827,6 +824,9 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         exit(EXIT_FAILURE);
     }
 
+
+
+
     /* compute lambda0 from mfb0 and lpb0 if not given */
     if (sc->sides[RATIONAL_SIDE]->lambda == 0.0)
       sc->sides[RATIONAL_SIDE]->lambda = (double) sc->sides[RATIONAL_SIDE]->mfb
@@ -872,6 +872,35 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
     /* }}} */
 
+
+    //{{parse option stats_cofact
+    const char *statsfilename = param_list_lookup_string (pl, "stats-cofact");
+    if (statsfilename != NULL) /* a file was given */
+      {
+	  cof_stats_file = fopen (statsfilename, "w");
+	  if (cof_stats_file == NULL)
+              {
+		  fprintf (stderr, "Error, cannot create file %s\n",
+			   statsfilename);
+		  exit (EXIT_FAILURE);
+              }
+	  cof_stats = 1;
+	  //allocate cof_call and cof_succ
+	  int mfbr = sc->sides[RATIONAL_SIDE]->mfb;
+	  int mfba = sc->sides[ALGEBRAIC_SIDE]->mfb;
+	  cof_call = (uint32_t**) malloc ((mfbr+1) * sizeof(uint32_t*));
+	  cof_succ = (uint32_t**) malloc ((mfbr+1) * sizeof(uint32_t*));
+	  for (int i = 0; i <= mfbr; i++)
+	      {
+		  cof_call[i] = (uint32_t*) malloc ((mfba+1) * sizeof(uint32_t));
+		  cof_succ[i] = (uint32_t*) malloc ((mfba+1) * sizeof(uint32_t));
+		  for (int j = 0; j <= mfba; j++)
+		      cof_call[i][j] = cof_succ[i][j] = 0;
+	      }
+      }
+    //}}
+
+    
     /* {{{ Init and parse info regarding work to be done by the siever */
     /* Actual parsing of the command-line fragments is done within
      * las_todo_feed, but this is an admittedly contrived way to work */
@@ -1821,30 +1850,18 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             }
             if (!pass) continue;
 
-            if (stats != 0)
+            if (cof_stats == 1)
             {
                 cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
                 cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
-                if (stats == 1) /* learning phase */
-                    /* no need to use a mutex here: either we use one thread only
-                       to compute the cofactorization data and if several threads
-                       the order is irrelevant. The only problem that can happen
-                       is when two threads increase the value at the same time,
-                       and it is increased by 1 instead of 2, but this should
-                       happen rarely. */
-                    cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
-                else /* stats == 2: we use the learning data */
-                {
-                    /* we store the initial number of cofactorization calls in
-                       cof_call[0][0] and the remaining nb in cof_succ[0][0] */
-                    cof_call[0][0] ++;
-                    /* Warning: the <= also catches cases when succ=call=0 */
-                    if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
-                            (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] *
-                            stats_prob)
-                        continue;
-                    cof_succ[0][0] ++;
-                }
+                /* learning phase */
+		/* no need to use a mutex here: either we use one thread only
+		   to compute the cofactorization data and if several threads
+		   the order is irrelevant. The only problem that can happen
+		   is when two threads increase the value at the same time,
+		   and it is increased by 1 instead of 2, but this should
+		   happen rarely. */
+		cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
             }
 
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
@@ -1859,7 +1876,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             /* yippee: we found a relation! */
 
-            if (stats == 1) /* learning phase */
+            if (cof_stats == 1) /* learning phase */
                 cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
             // ASSERT (bin_gcd_int64_safe (a, b) == 1);
@@ -2521,6 +2538,7 @@ static void declare_usage(param_list pl)
 
   param_list_decl_usage(pl, "allow-largesq", "(switch) allows large special-q, e.g. for a DL descent");
   param_list_decl_usage(pl, "stats-stderr", "(switch) print stats to stderr in addition to stdout/out file");
+  param_list_decl_usage(pl, "stats-cofact", "write statistics about the cofactorisation step in file xxx");
   param_list_decl_usage(pl, "todo", "provide file with a list of special-q to sieve instead of qrange");
   param_list_decl_usage(pl, "descent-hint", "filename with tuned data for the descent, for each special-q bitsize");
   param_list_decl_usage(pl, "mkhint", "(switch) _create_ a descent file, instead of reading one");
@@ -2926,6 +2944,22 @@ int main (int argc0, char *argv0[])/*{{{*/
     
     /*}}}*/
 
+    //{{print the stats of the cofactorization.
+    if (cof_stats == 1) {
+	int mfbr = las->default_config->sides[RATIONAL_SIDE]->mfb;
+	int mfba = las->default_config->sides[ALGEBRAIC_SIDE]->mfb;
+	for (int i = 0; i <= mfbr; i++) {
+	    for (int j = 0; j <= mfba; j++)
+		fprintf (cof_stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
+			 cof_succ[i][j]);
+	    free (cof_call[i]);
+	    free (cof_succ[i]);
+	}
+	free (cof_call);
+	free (cof_succ);
+	fclose (cof_stats_file);
+    }
+    //}}
     thread_data_free(thrs, las->nb_threads);
 
     las_report_clear(report);
