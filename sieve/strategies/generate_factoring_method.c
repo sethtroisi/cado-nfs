@@ -238,7 +238,6 @@ double
 bench_proba_fm(facul_strategy_t * strategy, gmp_randstate_t state,
 	       unsigned long len_p, unsigned long len_n, mpz_t* N,
 	       int nb_test_max)
-
 {
     int nb_success_max = 1000, nb_success = 0;
     int nb_test = 0;
@@ -313,7 +312,6 @@ void bench_proba(gmp_randstate_t state, tabular_fm_t * fm, int len_p_min)
     mpz_t*N[p_max];
     for (int i = 0; i < p_max; i++)
 	{
-	    N[i] = NULL;
 	    N[i] = malloc(sizeof (mpz_t) * (nb_test_max+1));
 	    ASSERT (N[i] != NULL);
 	    mpz_init(N[i][0]);
@@ -434,72 +432,6 @@ void bench_time(gmp_randstate_t state, tabular_fm_t * fm)
 /*       BENCH according to an interval of size of prime numbers        */
 /************************************************************************/
 
-/*
-  This function allows to compute the probability and the time of a strategy
-  to find a prime number in an interval [2**len_p_min, 2**len_p_max].
-*/
-//todo:  will be optimize!
-static double *sub_routine_bench_proba_cost_interval(facul_strategy_t *
-						     strategy,
-						     gmp_randstate_t state,
-						     int len_p_min,
-						     int len_p_max, int len_n)
-{
-    double *res = malloc(2 * sizeof(double));
-    ASSERT(res != NULL);
-    int nb_succes_lim = 1000, nb_succes = 0;
-    int nb_test = 0;
-    int nb_test_max = 10 * nb_succes_lim;
-
-    mpz_t N;
-    mpz_init(N);
-    double tps = 0;
-    double *disp = distribution_prime_number(len_p_min, len_p_max);
-
-    while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max)) {
-	/* generation of the integer N (which will be factoring) */
-	generate_composite_integer_interval(N, state, disp,
-					    len_p_min, len_p_max, len_n);
-
-	if (strategy->methods[0].method == EC_METHOD) {
-	    ecm_plan_t *plan = strategy->methods[0].plan;
-	    //RANDOM_SIGMA
-	    if (plan->parameterization != MONTY16) {
-		plan->sigma = 2 + rand() % BOUND_SIGMA;
-		strategy->methods[0].plan = plan;
-	    }
-	}
-	//compute the the time of execution
-	double starttime, endtime;
-	starttime = microseconds();
-	/* 
-	   f will contain the prime factor of N that the strategy
-	   found.  Note that N is composed by two prime factors by the
-	   previous function.
-	 */
-	unsigned long f[2];
-	f[0] = 0;
-
-	facul(f, N, strategy);
-
-	if (f[0] != 0)
-	    nb_succes++;
-
-	endtime = microseconds();
-	tps += endtime - starttime;
-
-	nb_test++;
-    }
-
-    //clear
-    mpz_clear(N);
-    free(disp);
-
-    res[0] = nb_succes / ((double)nb_test);
-    res[1] = tps / ((double)nb_test);
-    return res;
-}
-
 /* 
    This function returns default parameters for the collection of 
    factoring methods and stores their in 'res' such that: 
@@ -509,38 +441,38 @@ static double *sub_routine_bench_proba_cost_interval(facul_strategy_t *
    res[3]=c_min 
    res[4]=c_max 
    res[5]=c_step 
-   TODO: these parameters could be certainly increased :)
+   TODO: these parameters will be improved :)
 */
-double *choice_parameters(int method, int len_p_min)
+int *choice_parameters(int method, int len_p_min)
 {
-    double b1_min, b1_max, b1_step, c_min, c_max, c_step;
+    int b1_min, b1_max, b1_step, c_min, c_max, c_step;
     if (method == PM1_METHOD ||
 	method == PP1_27_METHOD || method == PP1_65_METHOD) {
 	if (len_p_min < 20) {
 	    b1_min = 20;
 	    b1_max = 1000;
-	    b1_step = 1.2;
+	    b1_step = 10;
 	    c_min = 10;
 	    c_max = 50;
 	    c_step = 5;
 	} else if (len_p_min <= 25) {
 	    b1_min = 20;
 	    b1_max = 4500;
-	    b1_step = 1.4;
+	    b1_step = 20;
 	    c_min = 40;
 	    c_max = 80;
 	    c_step = 5;
 	} else if (len_p_min < 30) {
 	    b1_min = 100;
 	    b1_max = 10000;
-	    b1_step = 1.4;
+	    b1_step = 50;
 	    c_min = 20;
 	    c_max = 200;
 	    c_step = 10;
 	} else {
 	    b1_min = 100;
 	    b1_max = 30000;
-	    b1_step = 1.4;
+	    b1_step = 100;
 	    c_min = 20;
 	    c_max = 500;
 	    c_step = 10;
@@ -550,7 +482,7 @@ double *choice_parameters(int method, int len_p_min)
 	if (len_p_min < 20) {
 	    b1_min = 20;
 	    b1_max = 5000;
-	    b1_step = 1.2;
+	    b1_step = 10;
 	    c_min = 10;
 	    c_max = 100;
 	    c_step = 10;
@@ -564,14 +496,14 @@ double *choice_parameters(int method, int len_p_min)
 	} else if (len_p_min < 30) {
 	    b1_min = 100;
 	    b1_max = 13000;
-	    b1_step = 1.4;
+	    b1_step = 100;
 	    c_min = 10;
 	    c_max = 500;
 	    c_step = 20;
 	} else {
 	    b1_min = 200;
 	    b1_max = 30000;
-	    b1_step = 1.4;
+	    b1_step = 100;
 	    c_min = 10;
 	    c_max = 1000;
 	    c_step = 20;
@@ -580,7 +512,7 @@ double *choice_parameters(int method, int len_p_min)
     } else {
 	return NULL;
     }
-    double *result = malloc(6 * sizeof(double));
+    int *result = malloc(6 * sizeof(int));
     ASSERT(result != NULL);
     result[0] = b1_min;
     result[1] = b1_max;
@@ -589,6 +521,57 @@ double *choice_parameters(int method, int len_p_min)
     result[4] = c_max;
     result[5] = c_step;
     return result;
+}
+/*
+  This function allows to compute the probability and the time of a strategy
+  to find a prime number in an interval [2**len_p_min, 2**len_p_max].
+*/
+//todo:  will be optimize!
+static double *bench_proba_time_pset_onefm(facul_strategy_t *strategy,
+					   mpz_t* N, int nb_test_max)
+{
+    double *res = malloc(2 * sizeof(double));
+    ASSERT(res != NULL);
+    int nb_succes_lim = 1000, nb_succes = 0;
+    int nb_test = 0;
+
+    double starttime, endtime;
+    starttime = microseconds();
+
+    while ((nb_succes < nb_succes_lim) && (nb_test < nb_test_max)) {
+
+
+	if (strategy->methods[0].method == EC_METHOD) {
+	    ecm_plan_t *plan = strategy->methods[0].plan;
+	    //RANDOM_SIGMA
+	    if (plan->parameterization != MONTY16) {
+		plan->sigma = 2 + rand() % BOUND_SIGMA;
+		strategy->methods[0].plan = plan;
+	    }
+	}
+	//compute the the time of execution
+	/*
+	   f will contain the prime factor of N that the strategy
+	   found.  Note that N is composed by two prime factors by the
+	   previous function.
+	 */
+	unsigned long f[2];
+	f[0] = 0;
+
+	facul(f, N[nb_test], strategy);
+
+	if (f[0] != 0)
+	    nb_succes++;
+	nb_test++;
+    }
+    endtime = microseconds();
+    double tps = endtime - starttime;
+
+    //clear
+
+    res[0] = nb_succes / ((double)nb_test);
+    res[1] = tps / ((double)nb_test);
+    return res;
 }
 
 /*
@@ -599,15 +582,15 @@ double *choice_parameters(int method, int len_p_min)
   given by 'param_region' or, if it's equal to NULL, use the default sieve.
 */
 
-static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
-					       gmp_randstate_t state,
-					       int len_p_min, int len_p_max,
-					       int len_n, double *param_region)
+tabular_fm_t *bench_proba_time_pset(int method, int curve,
+				    gmp_randstate_t state,
+				    int len_p_min, int len_p_max,
+				    int len_n, int *param_region)
 {
     //define the sieve region
     int c_min, c_max;
     int b1_min, b1_max;
-    double c_pas, b1_pas;
+    int c_pas, b1_pas;
     if (param_region != NULL) {
 	b1_min = param_region[0];
 	b1_max = param_region[1];
@@ -618,7 +601,7 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 	c_pas = param_region[5];
     } else {
 	//default parameters for the sieve region.
-	double *param = choice_parameters(method, len_p_min);
+	int *param = choice_parameters(method, len_p_min);
 	b1_min = param[0];
 	b1_max = param[1];
 	b1_pas = param[2];
@@ -628,9 +611,23 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 	c_pas = param[5];
 	free(param);
     }
-
-    double *result;
-    double max_proba = 0.9;
+    
+    //{{Will contain the our composite integers!
+    int nb_test_max = 10000;
+    mpz_t*N = malloc(sizeof (mpz_t) * (nb_test_max));
+    ASSERT (N != NULL);
+    double *disp = distribution_prime_number(len_p_min, len_p_max);
+    for (int i = 0; i < nb_test_max; i++)
+	{
+	    /* generation of the integers N[i] (which will be
+	       factoring). To avoid to waste time, we precompute these
+	       values only one time 
+	    */
+	    mpz_init(N[i]);
+	    generate_composite_integer_interval(N[i], state, disp, len_p_min,
+						len_p_max, len_n);
+	}
+    //}}
 
     tabular_fm_t *tab_fusion = tabular_fm_create();
 
@@ -650,15 +647,15 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 	unsigned long elem[4];
 	double proba = 0;
 	double tps = 0;
-	while (B1 < b1_max && proba < max_proba) {
+	double max_proba = 0.9;
+
+	while (B1 <= b1_max && proba < max_proba) {
 	    facul_strategy_t *fm = generate_fm(method, curve, B1, B2);
-
-	    result = sub_routine_bench_proba_cost_interval
-		(fm, state, len_p_min, len_p_max, len_n);
-
-	    proba = result[0];
-	    tps = result[1];
-
+	    double* res = bench_proba_time_pset_onefm(fm, N, nb_test_max);
+	    proba = res[0];
+	    tps = res[1];
+	    free (res);
+	    
 	    elem[0] = method;
 	    elem[1] = curve;
 	    elem[2] = B1;
@@ -668,12 +665,7 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 
 	    facul_clear_strategy(fm);
 
-	    free(result);
-
-	    if (b1_pas <= 2)	//that is a percent.
-		B1 = (B1 * b1_pas);
-	    else
-		B1 = B1 + b1_pas;
+	    B1 = B1 + b1_pas;
 	    B2 = B1 * c;
 
 	}
@@ -681,6 +673,12 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 	tabular_fm_concat(tab_fusion, tab);
 	tabular_fm_free(tab);
     }
+    //free
+    free (disp);
+    for (int i = 0; i < nb_test_max; i++)
+	mpz_clear(N[i]);
+    free(N);
+   
     return tab_fusion;
 }
 
@@ -698,35 +696,21 @@ static tabular_fm_t *bench_proba_cost_interval(int method, int curve,
 tabular_fm_t *generate_factoring_methods_mc(gmp_randstate_t state,
 					    int len_p_min, int len_p_max,
 					    int len_n, int method, int curve,
-					    int opt_ch, double *param_sieve)
+					    int opt_ch, int *param_sieve)
 {
     ASSERT(len_p_min <= len_p_max);
 
     tabular_fm_t *gfm;
 
-    tabular_fm_t *collect = bench_proba_cost_interval
+    tabular_fm_t *collect = bench_proba_time_pset
 	(method, curve, state, len_p_min, len_p_max, len_n, param_sieve);
 
     if (opt_ch) {
 	//apply the convex hull
 	gfm = convex_hull_fm(collect);
-
 	tabular_fm_free(collect);
-    } else {
-	double *param;
-	if (param_sieve == NULL)
-	    param = choice_parameters(method, len_p_min);
-	else
-	    param = param_sieve;
-
+    } else 
 	gfm = collect;
-	/*
-	   Warning: the function choice_parameters() allocate dynamic
-	   memory. So, don't forget to free it!
-	 */
-	if (param_sieve == NULL)
-	    free(param);
-    }
 
     return gfm;
 }
@@ -738,7 +722,7 @@ tabular_fm_t *generate_factoring_methods_mc(gmp_randstate_t state,
 
 tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
 					 int len_p_max, int len_n, int opt_ch,
-					 double *param_sieve)
+					 int *param_sieve)
 {
 
     tabular_fm_t *gfm = tabular_fm_create();

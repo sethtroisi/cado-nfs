@@ -37,16 +37,21 @@ facul_strategy_t *generate_fm(int method, int curve, unsigned long B1,
 /*                      Create Factoring Methods */
 /************************************************************************/
 
-double *choice_parameters(int method, int len_p_min);
+int *choice_parameters(int method, int len_p_min);
+
+tabular_fm_t *bench_proba_time_pset(int method, int curve,
+				    gmp_randstate_t state,
+				    int len_p_min, int len_p_max,
+				    int len_n, int *param_region);
 
 tabular_fm_t *generate_factoring_methods(gmp_randstate_t state, int len_p_min,
 					 int len_p_max, int len_n, int opt_ch,
-					 double *param_sieve);
+					 int *param_sieve);
 
 tabular_fm_t *generate_factoring_methods_mc(gmp_randstate_t state,
 					    int len_p_min, int len_p_max,
 					    int len_n, int method, int curve,
-					    int opt_ch, double *param_sieve);
+					    int opt_ch, int *param_sieve);
 
 /************************************************************************/
 /*                      ANALYSE AND FILTER */

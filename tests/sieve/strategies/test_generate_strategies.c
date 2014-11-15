@@ -319,8 +319,8 @@ int main()
 
     //input decomp!
     tabular_decomp_t* init_tab = tabular_decomp_create ();
-    int tmp[2] = {17,18};
-    decomp_t* el1 = decomp_create (2, tmp, 100);
+    int tmp1[2] = {17,18};
+    decomp_t* el1 = decomp_create (2, tmp1, 100);
     tabular_decomp_add_decomp (init_tab, el1);
     decomp_free (el1);
     int tmp2[2] = {15,20};
@@ -381,8 +381,32 @@ int main()
     	    fprintf (stderr, "error with the test(1)\n");
     	    return EXIT_FAILURE;
     	}
+
+    //{{test the function: bench_proba_time_pset()
+    int c = tab->tab[0]->method[3]/tab->tab[0]->method[2];
+    int param[6] = {tab->tab[0]->method[2], tab->tab[0]->method[2], 1, c,c,1};
+
+    tabular_fm_t* tmp =
+    	bench_proba_time_pset (tab->tab[0]->method[0], tab->tab[0]->method[1], state,
+    			       17, 20, 18*3, param);
+
+    /*check this probability: the probability to find a prime number
+    of length 17 or 18 bits must be more than this to find 18 bits and
+    less than this for 18 bits.*/
+    fm_t* pm1_bis = tmp->tab[1];
+    /* fm_print (tab->tab[0]); */
+    /* fm_print (tmp->tab[1]); */
+    if (pm1_bis->proba[0] < tab->tab[0]->proba[20-fbb] ||
+	pm1_bis->proba[0] > tab->tab[0]->proba[17-fbb])
+	{
+    	    fprintf (stderr, "error with the test(2)\n");
+    	    return EXIT_FAILURE;
+	}
+    tabular_fm_free (tmp);
     
-    //test the generation of our strategy for one element!!!
+    //}}
+    
+    //test the generation of our strategy for one pair of cofactor!!!
     //{{
     strategy_set_proba(strat1, 0.4);
     strategy_set_time(strat1, 40);    
@@ -406,7 +430,7 @@ int main()
     if (!(res2->index == 1 && res2->tab[0]->proba < EPSILON_DBL
 	  && res2->tab[0]->time < EPSILON_DBL))
 	{
-	    fprintf (stderr, "error with the test(2)\n");
+	    fprintf (stderr, "error with the test(3)\n");
 	    return EXIT_FAILURE;
 	}
     strategy_set_proba(strat_r1->tab[0], 1.0);

@@ -111,19 +111,19 @@ int main(int argc, char *argv[])
 	//default values
 	int lb = -1, ub = -1, len_n = -1, method = -1, curve = 0;
 	// {b1min, b1max, b1step, cmin, cmax, cstep}
-	double *param = calloc(sizeof(double), 6);
+	int *param = calloc(sizeof(int), 6);
 	ASSERT(param != NULL);
 
 	int opt_ch = param_list_parse_switch(pl, "-ch");
 	param_list_parse_int(pl, "ub", &ub);
 	param_list_parse_int(pl, "lb", &lb);
 	param_list_parse_int(pl, "n", &len_n);
-	param_list_parse_double(pl, "b1min", &param[0]);
-	param_list_parse_double(pl, "b1max", &param[1]);
-	param_list_parse_double(pl, "b1step", &param[2]);
-	param_list_parse_double(pl, "cmin", &param[3]);
-	param_list_parse_double(pl, "cmax", &param[4]);
-	param_list_parse_double(pl, "cstep", &param[5]);
+	param_list_parse_int(pl, "b1min", &param[0]);
+	param_list_parse_int(pl, "b1max", &param[1]);
+	param_list_parse_int(pl, "b1step", &param[2]);
+	param_list_parse_int(pl, "cmin", &param[3]);
+	param_list_parse_int(pl, "cmax", &param[4]);
+	param_list_parse_int(pl, "cstep", &param[5]);
 
 	if (lb == -1 || ub == -1 || ub <= lb) {
 	    fprintf(stderr, "Error: options -lb, -ub are mandatory here,\n"
@@ -188,14 +188,14 @@ int main(int argc, char *argv[])
 
 	tabular_fm_t *res;
 
-	double *param_sieve = NULL;
+	int *param_sieve = NULL;
 	if (!(param[0] == 0 || param[1] == 0 || param[2] == 0 ||
 	      param[3] == 0 || param[4] == 0 || param[5] == 0)) {
 	    param_sieve = param;
-	    printf("param_sieve: b1min= %d, b1max=%d, b1step=%lf"
-		   "       cmin= %d, cmax=%d, cstep=%lf\n",
-		   (int)param_sieve[0], (int)param_sieve[1], param_sieve[2],
-		   (int)param_sieve[3], (int)param_sieve[4], param_sieve[5]);
+	    printf("param_sieve: b1min= %d, b1max=%d, b1step=%d"
+		   "       cmin= %d, cmax=%d, cstep=%d\n",
+		   param_sieve[0], param_sieve[1], param_sieve[2],
+		   param_sieve[3], param_sieve[4], param_sieve[5]);
 	}
 
 	if (method == -1)
@@ -220,10 +220,10 @@ int main(int argc, char *argv[])
 		sprintf(tmp, "Data_%s", name_fm);
 
 	    if (param_sieve != NULL)
-		sprintf(tmp2, "%s[%.2d_%.2d]_[%d_%d_%.2lf]_[%d_%d_%.2lf]",
-			tmp, lb, ub, (int)param_sieve[0], (int)param_sieve[1],
-			param_sieve[2], (int)param_sieve[3],
-			(int)param_sieve[4], param_sieve[5]);
+		sprintf(tmp2, "%s[%.2d_%.2d]_[%d_%d_%d]_[%d_%d_%d]",
+			tmp, lb, ub, param_sieve[0], param_sieve[1],
+			param_sieve[2], param_sieve[3],
+			param_sieve[4], param_sieve[5]);
 	    else
 		sprintf(tmp2, "%s[%.2d_%.2d]", tmp, lb, ub);
 	    name_file_out = tmp2;
