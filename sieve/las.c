@@ -1617,6 +1617,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 {
     las_info_ptr las = th->las;
     sieve_info_ptr si = th->si;
+    las_report_ptr rep = th->rep;
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2];
@@ -1863,8 +1864,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 		   happen rarely. */
 		cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
             }
-
+	    rep->ttcof -= microseconds_thread ();
             pass = factor_both_leftover_norms(norm, BLPrat, f, m, si);
+	    rep->ttcof += microseconds_thread ();
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b) && pass == 0)
               verbose_output_vfprint(1, 0, gmp_vfprintf, "# factor_leftover_norm failed for (%" PRId64 ",%" PRIu64 "), remains %Zd, %Zd unfactored\n",
@@ -2476,16 +2478,18 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     if (dont_print_tally && las->nb_threads > 1) {
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [tally available only in mono-thread]\n", qt0);
     } else {
+	//convert ttcof from microseconds to seconds
+	rep->ttcof *= 0.000001;
         verbose_output_print(0, 1, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
-            " (%1.4f + %1.4f + %1.4f),"
-            " factor %1.4f]\n", qt0,
+	    " (%1.4f + %1.4f + %1.4f),"
+            " factor %1.4f (%1.4f + %1.4f)]\n", qt0,
             rep->tn[RATIONAL_SIDE],
             rep->tn[ALGEBRAIC_SIDE],
             qtts,
             rep->ttbuckets_fill,
             rep->ttbuckets_apply,
-            qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
-            rep->ttf);
+	    qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
+	    rep->ttf, rep->ttf - rep->ttcof, rep->ttcof);
     }
     las_report_accumulate(report, rep);
     las_report_clear(rep);
@@ -2927,14 +2931,14 @@ int main (int argc0, char *argv0[])/*{{{*/
     else
         verbose_output_print (2, 1, "# Total cpu time %1.2fs [norm %1.2f+%1.1f, sieving %1.1f"
                 " (%1.1f + %1.1f + %1.1f),"
-                " factor %1.1f]\n", t0,
+                " factor %1.1f (%1.1f + %1.1f)]\n", t0,
                 report->tn[RATIONAL_SIDE],
                 report->tn[ALGEBRAIC_SIDE],
                 tts,
                 report->ttbuckets_fill,
                 report->ttbuckets_apply,
                 tts-report->ttbuckets_fill-report->ttbuckets_apply,
-                report->ttf);
+		report->ttf, report->ttf - report->ttcof, report->ttcof);
 
     verbose_output_print (2, 1, "# Total elapsed time %1.2fs, per special-q %gs, per relation %gs\n",
                  wct, wct / (double) nr_sq_processed, wct / (double) report->reports);
