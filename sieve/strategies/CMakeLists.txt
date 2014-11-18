@@ -29,3 +29,6 @@ add_executable(finalst
   ${SRC_UTILS})
 
 target_link_libraries(finalst ${LIB_EXEC})
+
+add_executable(gen_decomp gen_decomp.c)
+target_link_libraries(gen_decomp m)
