@@ -245,6 +245,23 @@ function mpol_eval(y,M,P)
     return s;
 end function;
 
+/* Same, but for y a sequence of starting vectors (in the form of a matrix)
+ * and P a vector of polynomials */
+function mpol_eval_several(y,M,P)
+    /* compute y * P(M) */
+    assert BaseRing(CoefficientRing(P)) eq CoefficientRing(M);
+    s:=Parent(y)!0;
+    if Degree(P) lt 0 then return s; end if;
+    i:=Degree(P);
+    s:=mcoeff(P, i) * y;
+    while i gt 0 do
+        s:=s*M;
+        i:=i-1;
+        s+:=mcoeff(P, i) * y;
+    end while;
+    return s;
+end function;
+
 
 
 load "A.m";
@@ -318,7 +335,7 @@ else
     assert Fx0 eq rhscoeffs + X*Submatrix(F, 1, 1, r, n);
     assert Fx1 eq Submatrix(F, r+1, 1, n-r, n);
 
-    Frx:=Parent(Fx)![reciprocal(x,degF):x in Eltseq(Fx)];
+    Frx :=Parent(Fx)![reciprocal(x,degF):x in Eltseq(Fx)];
     Frx0:=Parent(Fx0)![reciprocal(x,degF):x in Eltseq(Fx0)];
     Frx1:=Parent(Fx1)![reciprocal(x,degF):x in Eltseq(Fx1)];
     /* A has an inherent O(X^(degA+1)). Since we've shifted a few columns,
@@ -412,7 +429,11 @@ load "S.m";
 assert #vars mod (n*nblocks) eq 0;
 nsols:=#vars div (n*nblocks);
 printf "Computed %o solution vectors with mksol\n", nsols;
-assert nsols ge #RHS;
+
+// we no longer impose that we compute #RHS solutions. One should be enough
+// for everybody.
+// assert nsols ge #RHS;
+
 SS:=[[[(Vector(GF(p),g(vars[(k*nsols+i)*n+j+1]))):j in [0..n-1]]:i in [0..nsols-1]]:k in [0..nblocks-1]];
 
 SS:=[[&+[SS[k+1,i+1,j+1]:k in [0..nblocks-1]]:j in [0..n-1]]:i in [0..nsols-1]];
@@ -449,13 +470,13 @@ print "Check that we have w such that (M||RHS) * w = 0: ",
 
 print "Checking that gather has computed what we expect";
 load "K.m";
-assert #vars eq #RHS;
+// see above. this is no longer required.
+// assert #vars eq #RHS;
 ker:=[Vector(GF(p),g(x)):x in vars];
 print "Checking that gather has computed what we expect: done";
 
 assert IsZero(Matrix(ker)*Transpose(HorizontalJoin(Msmall, Transpose(Matrix(RHS)))));
 
-exit;
 
 // rest is utter crap.
 
@@ -476,14 +497,14 @@ if not IsZero(W*Transpose(Mx*Q)) then
     notinker:=true;
 end if;
 */
-    notinker:=true;
-
-assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
-print Mt eq P*S*Mx*Q*S^-1, " (true only for shuffled product)";
-Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
-// Mx eq Cr*M*Transpose(Cc);
-Mx eq M;
-
+//        notinker:=true;
+//    
+//    assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
+//    print Mt eq P*S*Mx*Q*S^-1, " (true only for shuffled product)";
+//    Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
+//    // Mx eq Cr*M*Transpose(Cc);
+//    Mx eq M;
+//    
 // IsZero(W*Transpose(Q)*Cc*Transpose(M)*Transpose(Cr));
 // sol:=Vector(Eltseq(W*Transpose(Q)*Cc)[1..nc]);
 
@@ -644,23 +665,24 @@ end if;
 //     Transpose(Xt)*TM^i*Y0;
 // end for;
 // 
-K:=GF(p);
-b:=m+n;
-N:=nr;
-// KR<x>:=PowerSeriesRing(K);
-KR<x>:=PolynomialAlgebra(K);
-KRmn:=RMatrixSpace(KR,m,n);
-KRbb:=RMatrixSpace(KR,b,b);
-KRmb:=RMatrixSpace(KR,m,b);
-KRnb:=RMatrixSpace(KR,n,b);
-KRn1:=RMatrixSpace(KR,n,1);
-KRnn:=RMatrixSpace(KR,n,n);
-KRmn:=RMatrixSpace(KR,m,n);
-KRNm:=RMatrixSpace(KR,N,m);
-KRNn:=RMatrixSpace(KR,N,n);
-KRN:=RMatrixSpace(KR,N,N);
-KNn:=KMatrixSpace(K,N,n);
 
+//    K:=GF(p);
+//    b:=m+n;
+//    N:=nr;
+//    // KR<x>:=PowerSeriesRing(K);
+//    KR<x>:=PolynomialAlgebra(K);
+//    KRmn:=RMatrixSpace(KR,m,n);
+//    KRbb:=RMatrixSpace(KR,b,b);
+//    KRmb:=RMatrixSpace(KR,m,b);
+//    KRnb:=RMatrixSpace(KR,n,b);
+//    KRn1:=RMatrixSpace(KR,n,1);
+//    KRnn:=RMatrixSpace(KR,n,n);
+//    KRmn:=RMatrixSpace(KR,m,n);
+//    KRNm:=RMatrixSpace(KR,N,m);
+//    KRNn:=RMatrixSpace(KR,N,n);
+//    KRN:=RMatrixSpace(KR,N,N);
+//    KNn:=KMatrixSpace(K,N,n);
+//    
 
 // 
 // // beware -- we're using the sequence starting at 1.

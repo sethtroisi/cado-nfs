@@ -58,6 +58,9 @@ wordsize=64
 # This has to be provided as auxiliary data for the GF(p) case (or we'll
 # do without any rhs whatsoever).
 : ${rhs=}
+# This is an experimental mode.
+: ${replace_sm_with_zero_block=}
+
 # For the rest of this script, we'll prefer the variable name "rhsfile"
 rhsfile="$rhs"
 : ${nullspace=right}
@@ -139,6 +142,13 @@ derived_variables() {
     else
         splitwidth=1
     fi
+    if ! [ "$nsolvecs" ] ; then
+        if [ "$prime" = 2 ] ; then
+            nsolvecs=$n
+        else
+            nsolvecs=1
+        fi
+    fi
 }
 
 prepare_wdir() {
@@ -181,16 +191,37 @@ create_test_matrix_if_needed() {
     # random_matrix for that (not mandatory though, since
     # nrows,ncols,density, may be specified in full).
 
-    rmargs=(${random_matrix_size} -s $seed)
+    rmargs=()
+    # defaults, some of the subcases below tweak that.
+    nrows=${random_matrix_size}
+    ncols=${random_matrix_size}
+    outer_nrows=${random_matrix_size}
+    outer_ncols=${random_matrix_size}
     if [ "$prime" = 2 ] ; then
         basename=$mats/t${random_matrix_size}
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}"  --k$nullspace ${random_matrix_minkernel})
+        ncols=
     elif ! [ "$nrhs" ] ; then
         basename=$mats/t${random_matrix_size}p
         matrix="$basename.matrix.bin"
         rmargs=("${rmargs[@]}" --k$nullspace ${random_matrix_minkernel})
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
+    elif [ "$replace_sm_with_zero_block" ] ; then
+        # This is an experimental mode. In the DLP context, we have a
+        # matrix with N rows, N-r ideal columns, and r Schirokauer maps.   
+        # let's say random_matrix_size is N and nrhs is r. We'll generate
+        # a matrix with N rows and N-r columns, and later pad the column
+        # width data with r zeroes.
+        ncols=$((nrows-nrhs))
+        basename=$mats/t${random_matrix_size}p+${nrhs}
+        density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
+        if [ "$density" -lt 12 ] ; then density=12; fi
+        rmargs=("${rmargs[@]}" -d $density)
+        matrix="$basename.matrix.bin"
+        rhsfile="$basename.rhs.bin"
+        rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
+        rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
     else
         basename=$mats/t${random_matrix_size}p+${nrhs}
         density=`echo "l($random_matrix_size)^2/2" | bc -l | cut -d. -f1`
@@ -201,12 +232,22 @@ create_test_matrix_if_needed() {
         rmargs=("${rmargs[@]}" -c ${random_matrix_maxcoeff})
         rmargs=("${rmargs[@]}" rhs="$nrhs,$prime,$rhsfile")
     fi
-    rmargs=("${rmargs[@]}" --freq --binary --output "$matrix")
+    rmargs=($nrows $ncols -s $seed "${rmargs[@]}" --freq --binary --output "$matrix")
     ${bindir}/random_matrix "${rmargs[@]}"
     rwfile=${matrix%%bin}rw.bin
     cwfile=${matrix%%bin}cw.bin
-    ncols=$((`wc -c < $cwfile` / 4))
-    nrows=$((`wc -c < $rwfile` / 4))
+    ncols=$outer_ncols
+    nrows=$outer_nrows
+    data_ncols=$((`wc -c < $cwfile` / 4))
+    data_nrows=$((`wc -c < $rwfile` / 4))
+    if [ "$data_ncols" -lt "$ncols" ] ; then
+        echo "padding $cwfile with $((ncols-data_ncols)) zero columns"
+        dd if=/dev/zero bs=4 count=$((ncols-data_ncols)) >> $cwfile
+    fi
+    if [ "$data_nrows" -lt "$nrows" ] ; then
+        echo "padding $cwfile with $((nrows-data_nrows)) zero rows"
+        dd if=/dev/zero bs=4 count=$((nrows-data_nrows)) >> $rwfile
+    fi
 }
 
 # This is only useful in the situation where an input matrix has been
@@ -289,10 +330,19 @@ if [ "$magma" ] ; then
     set "$@" save_submatrices=1 interval=1
 fi
 
-$bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
-
 if ! [ "$magma" ] ; then
+    $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}"
     exit 0
+else
+    if $bindir/bwc.pl :complete "$@" "${pass_bwcpl_args[@]}" ; then
+        echo " ========== SUCCESS ! bwc.pl returned true ========== "
+        echo " ========== SUCCESS ! bwc.pl returned true ========== "
+        echo " ========== SUCCESS ! bwc.pl returned true ========== "
+    else
+        echo " ########## FAILURE ! bwc.pl returned false ########## "
+        echo " ########## FAILURE ! bwc.pl returned false ########## "
+        echo " ########## FAILURE ! bwc.pl returned false ########## "
+    fi
 fi
 
 set +x
@@ -326,7 +376,7 @@ echo "m:=$m;n:=$n;interval:=$interval;nrhs:=$nrhs;" > $mdir/mn.m
 echo "Saving matrix to magma format"
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
-$cmd bpmatrix < $matrix > $mdir/t.m
+$cmd bpmatrix_${nrows}_${ncols} < $matrix > $mdir/t.m
 $cmd balancing < "$bfile" > $mdir/b.m
 
 placemats() {
@@ -493,7 +543,7 @@ save_s_j() {
     for j in `seq 0 $((n-1))` ; do
         if ! save_s $i $j $k ; then
             if [ $i != 0 ] || [ $j != 0 ] ; then
-                echo "Weird. Short of S files not at i,j=0 ?" >&2
+                echo "Weird. Short of S files not at i,j=($i,$j)!=(0,0) ?" >&2
                 exit 1
             fi
             echo "nblocks:=$((k/interval-1));" >> $mdir/S.m
@@ -505,7 +555,7 @@ save_s_j() {
 
 save_s_ij() {
     k="$1"
-    for i in `seq 0 $((nrhs-1))` ; do
+    for i in `seq 0 $((nsolvecs-1))` ; do
         if ! save_s_j $i $k ; then
             return 1
         fi

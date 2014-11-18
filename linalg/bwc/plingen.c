@@ -272,7 +272,7 @@ int tree_stats_leave(int rc)
 
 typedef int (*sortfunc_t) (const void*, const void*);
 
-static int col_cmp(const int x[2], const int y[2])
+static int lexcmp2(const int x[2], const int y[2])
 {
     for(int i = 0 ; i < 2 ; i++) {
         int d = x[i] - y[i];
@@ -470,7 +470,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
             ctable[j][0] = delta[j];
             ctable[j][1] = j;
         }
-        qsort(ctable, b, 2 * sizeof(int), (sortfunc_t) & col_cmp);
+        qsort(ctable, b, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
         /* }}} */
 
         /* {{{ Now do Gaussian elimination */
@@ -1601,12 +1601,6 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
     matpoly_init(ab, pi, b, b, B);
 
 
-    matpoly rhs;
-    if (d->nrhs) {
-        matpoly_init(ab, rhs, d->nrhs, n, 1);
-        rhs->size = 1;
-    }
-
     unsigned int window = aa->F->alloc;
 
     /* Which columns of F*pi will make the final generator ? */
@@ -1712,13 +1706,156 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
         bm_io_write_one_F_coeff(aa, kpi - window);
 #endif /* }}} */
 
+    /*
+     * first compute the rhscontribs. Use that to decide on a renumbering
+     * of the columns, because we'd like to get the "primary" solutions
+     * first, in a sense. Those are the ones with fewer zeroes in the
+     * rhscontrib part. So we would want that matrix to have its columns
+     * sorted in decreasing weight order
+     *
+     * An alternative, possibly easier, is to have a function which
+     * decides the solution ordering precisely based on the inspection of
+     * this rhscoeffs matrix (?). But how should spell that info when we
+     * give it to mksol ??
+     */
+
+    /* This **modifies** the "sols" array */
+    if (d->nrhs) {
+        matpoly rhs;
+        matpoly_init(ab, rhs, d->nrhs, n, 1);
+        rhs->size = 1;
+
+        unsigned int rhscontribs = 0;
+
+        /* determine which are the coefficients of pi which contribute
+         * to the rhs coeffs. See the full logic for F (which comes
+         * afterwards) in order to track down what appears here.
+         */
+        unsigned int kpi_rhs_max = 0;
+        unsigned int kpi_rhs_min = UINT_MAX;
+        for(unsigned int ipi = 0 ; ipi < m + n ; ipi++) {
+            for(unsigned int jF = 0 ; jF < n ; jF++) {
+                unsigned int jpi = sols[jF];
+                unsigned int iF, offset;
+                if (ipi < n) {
+                    iF = ipi;
+                    offset = 0;
+                } else {
+                    iF = aa->fdesc[ipi-n][1];
+                    offset = aa->t0 - aa->fdesc[ipi-n][0];
+                }
+                if (iF >= d->nrhs) continue;
+                ASSERT_ALWAYS(delta[jpi] >= offset);
+                unsigned kpi = delta[jpi] - offset;
+                kpi_rhs_max = MAX(kpi_rhs_max, kpi);
+                kpi_rhs_min = MIN(kpi_rhs_min, kpi);
+            }
+        }
+        /* Now compute explicitly the rhs coefficients matrix */
+        if (!rank) {
+            printf("RHS coefficients are affected by coefficients of pi within degree range [%u..%u]\n", kpi_rhs_min, kpi_rhs_max);
+        }
+
+        /* If this ever fails, it's because I'm lazy. There is no real
+         * obstruction in doing several I/O passes. I'm pretty confident
+         * that this will be unnecessary though. */
+        ASSERT_ALWAYS(kpi_rhs_max - kpi_rhs_min < B);
+        matpoly_zero(ab, pi);
+        pi->size = B;
+        bigmatpoly_gather_mat_partial(ab, pi, xpi, kpi_rhs_min,
+                MIN(kpi_rhs_max - kpi_rhs_min + 1, pilen - kpi_rhs_min));
+        /* Now redo the exact same loop as above, this time
+         * adding the contributions to the rhs matrix. */
+        for(unsigned int ipi = 0 ; ipi < m + n ; ipi++) {
+            for(unsigned int jF = 0 ; jF < n ; jF++) {
+                unsigned int jpi = sols[jF];
+                unsigned int iF, offset;
+                if (ipi < n) {
+                    iF = ipi;
+                    offset = 0;
+                } else {
+                    iF = aa->fdesc[ipi-n][1];
+                    offset = aa->t0 - aa->fdesc[ipi-n][0];
+                }
+                if (iF >= d->nrhs) continue;
+                ASSERT_ALWAYS(delta[jpi] >= offset);
+                unsigned kpi = delta[jpi] - offset;
+
+
+                rhscontribs++;
+                ASSERT_ALWAYS(d->nrhs);
+                ASSERT_ALWAYS(iF < d->nrhs);
+                ASSERT_ALWAYS(jF < n);
+                abdst_elt dst = matpoly_coeff(ab, rhs, iF, jF, 0);
+                absrc_elt src = matpoly_coeff_const(ab, pi, ipi, jpi, kpi - kpi_rhs_min);
+                abadd(ab, dst, dst, src);
+            }
+        }
+
+        printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
+        /* Now comes the time to prioritize the different solutions. Our
+         * goal is to get the unessential solutions last ! */
+        int (*sol_score)[2];
+        sol_score = malloc(n * 2 * sizeof(int));
+        memset(sol_score, 0, n * 2 * sizeof(int));
+        /* score per solution is the number of non-zero coefficients,
+         * that's it. Since we have access to lexcmp2, we want to use it.
+         * Therefore, desiring the highest scoring solutions first, we
+         * negate the hamming weight.
+         */
+        for(unsigned int jF = 0 ; jF < n ; jF++) {
+            sol_score[jF][1] = jF;
+            for(unsigned int iF = 0 ; iF < d->nrhs ; iF++) {
+                int z = !abis_zero(ab, matpoly_coeff(ab, rhs, iF, jF, 0));
+                sol_score[jF][0] -= z;
+            }
+        }
+        qsort(sol_score, n, 2 * sizeof(int), (sortfunc_t) & lexcmp2);
+
+        if (!rank) {
+            printf("Reordered solutions:\n");
+            for(unsigned int i = 0 ; i < n ; i++) {
+                printf(" %d (col %d in pi, weight %d on rhs vectors)\n", sol_score[i][1], sols[sol_score[i][1]], -sol_score[i][0]);
+            }
+        }
+
+        /* We'll now modify the sols[] array, so that we get a reordered
+         * F, too (and mksol/gather don't have to care about our little
+         * tricks */
+        {
+            matpoly rhs2;
+            matpoly_init(ab, rhs2, d->nrhs, n, 1);
+            rhs2->size = 1;
+            for(unsigned int i = 0 ; i < n ; i++) {
+                matpoly_extract_column(ab, rhs2, i, 0, rhs, sol_score[i][1], 0);
+            }
+            matpoly_swap(rhs2, rhs);
+            matpoly_clear(ab, rhs2);
+            /* ugly: use sol_score[i][0] now to provide the future
+             * "sols" array. We'll get rid of sol_score right afterwards
+             * anyway.
+             */
+            for(unsigned int i = 0 ; i < n ; i++) {
+                sol_score[i][0] = sols[sol_score[i][1]];
+            }
+            for(unsigned int i = 0 ; i < n ; i++) {
+                sols[i] = sol_score[i][0];
+            }
+        }
+        free(sol_score);
+
+
+        FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
+        matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
+        fclose(f);
+        matpoly_clear(ab, rhs);
+    }
+
     /* we need to read pi backwards. The number of coefficients in pi is
      * pilen = maxdelta + 1 - t0. Hence the first interesting index is
      * maxdelta - t0. However, for notational ease, we'll access
      * coefficients from index maxdelta downwards.
      */
-
-    unsigned int rhscontribs = 0;
 
     unsigned int kpi = maxdelta;
     /* index kpi1 is end fence for window */
@@ -1798,46 +1935,40 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
                 continue;
             }
 
-            for(unsigned int i = 0 ; i < n ; i++) {
+            for(unsigned int ipi = 0 ; ipi < m + n ; ipi++) {
                 for(unsigned int jF = 0 ; jF < n ; jF++) {
                     unsigned int jpi = sols[jF];
-                    unsigned int subtract = maxdelta - delta[jpi];
-                    ASSERT(subtract < window);
-                    if (maxdelta < kpi + subtract) continue;
-                    unsigned int kF = (maxdelta - kpi) - subtract;
-                    absrc_elt src = matpoly_coeff_const(ab, pi, i, jpi, s);
-                    unsigned int kF1 = kF - (i < d->nrhs);
-                    abdst_elt dst;
-                    if (kF1 == UINT_MAX) {
-                        rhscontribs++;
-                        ASSERT_ALWAYS(d->nrhs);
-                        ASSERT_ALWAYS(i < d->nrhs);
-                        ASSERT_ALWAYS(jF < n);
-                        dst = matpoly_coeff(ab, rhs, i, jF, 0);
+                    unsigned int iF, offset;
+                    if (ipi < n) {
+                        /* Left part of the initial F is x^0 times
+                         * identity. Therefore, the first n rows of pi
+                         * get multiplied by this identity matrix, this
+                         * is pretty simple.
+                         */
+                        iF = ipi;
+                        offset = 0;
                     } else {
-                        dst = matpoly_coeff(ab, aa->F, i, jF, kF1 % window);
+                        /* next m rows of the initial F are of the form
+                         * x^(some value) times some canonical basis
+                         * vector. Therefore, the corresponding row in pi
+                         * ends up contributing to some precise row in F,
+                         * and with an offset which is dictated by the
+                         * exponent of x.
+                         */
+                        iF = aa->fdesc[ipi-n][1];
+                        offset = aa->t0 - aa->fdesc[ipi-n][0];
                     }
-                    ASSERT_ALWAYS(kF <= delta[jpi] || abis_zero(ab, src));
-                    abadd(ab, dst, dst, src);
-                }
-            }
-            for(unsigned int ipi = n ; ipi < m + n ; ipi++) {
-                for(unsigned int jF = 0 ; jF < n ; jF++) {
-                    unsigned int jpi = sols[jF];
-                    unsigned int iF = aa->fdesc[ipi-n][1];
-                    unsigned int offset = aa->t0 - aa->fdesc[ipi-n][0];
                     unsigned int subtract = maxdelta - delta[jpi] + offset;
                     ASSERT(subtract < window);
                     if (maxdelta < kpi + subtract) continue;
-                    unsigned int kF = (maxdelta-kpi) - subtract;
+                    unsigned int kF = (maxdelta - kpi) - subtract;
                     unsigned int kF1 = kF - (iF < d->nrhs);
                     abdst_elt dst;
                     if (kF1 == UINT_MAX) {
-                        rhscontribs++;
-                        ASSERT_ALWAYS(d->nrhs);
-                        ASSERT_ALWAYS(iF < d->nrhs);
-                        ASSERT_ALWAYS(jF < n);
-                        dst = matpoly_coeff(ab, rhs, iF, jF, 0);
+                        /* this has been addressed in the first pass,
+                         * earlier.
+                         */
+                        continue;
                     } else {
                         dst = matpoly_coeff(ab, aa->F, iF, jF, kF1 % window);
                     }
@@ -1866,17 +1997,7 @@ void bm_io_compute_final_F(bm_io_ptr aa, bigmatpoly_ptr xpi, unsigned int * delt
             bm_io_write_one_F_coeff(aa, maxdelta - kpi - window);
     }
 
-    if (rhscontribs) {
-        printf("Note: %u contributions to RHS coefficients have been added into the rhs file %s\n", rhscontribs, aa->rhs_output_file);
-    }
-
     matpoly_clear(ab, pi);
-    if (d->nrhs) {
-        FILE * f = fopen(aa->rhs_output_file, aa->ascii ? "w" : "wb");
-        matpoly_write(ab, f, rhs, 0, 1, aa->ascii, 0);
-        fclose(f);
-        matpoly_clear(ab, rhs);
-    }
 
     free(sols);
 }/*}}}*/
@@ -2233,8 +2354,9 @@ void bm_io_compute_initial_F(bm_io_ptr aa) /*{{{ */
 
                 // if (r == m)
                     printf
-                        ("[X^%d] A, col %d increases rank to %d (head row %d)\n",
-                         k + (j >= bm->d->nrhs), j, r, u);
+                        ("[X^%d] A, col %d increases rank to %d (head row %d)%s\n",
+                         k + (j >= bm->d->nrhs), j, r, u,
+                         (j < bm->d->nrhs) ? " (column not shifted because of the RHS)":"");
             }
         }
 
@@ -2348,6 +2470,15 @@ void bm_io_compute_E(bm_io_ptr aa, bigmatpoly_ptr xE)/*{{{*/
                 }
 
                 for(unsigned int j = 0 ; j < n ; j++) {
+                    /* If the first columns of F are the identity matrix, then
+                     * in E we get data from coefficient kE+t0 in A. More
+                     * generally, if it's x^q*identity, we read
+                     * coeficient of index kE + t0 - q.
+                     *
+                     * Note that we prefer to take q=0 anyway, since a
+                     * choice like q=t0 would create duplicate rows in E,
+                     * and that would be bad.
+                     */
                     unsigned int kA = kE + aa->t0;
                     kA += (j >= bm->d->nrhs);
                     matpoly_extract_column(ab, E, j, s, aa->A, j, kA % window);

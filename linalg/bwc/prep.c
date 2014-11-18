@@ -262,7 +262,7 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     if (rhs_name) {
         if (!bw->nrhs) {
             fprintf(stderr, "Missing argument nrhs\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         rhs = fopen(rhs_name, "rb");
         ASSERT_ALWAYS(rhs != NULL);
@@ -329,8 +329,23 @@ void * prep_prog_gfp(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         /* initialize x -- make it completely deterministic. */
         unsigned int my_nx = 1;
         uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
-        for(int i = 0 ; i < bw->m ; i++) {
-            xvecs[i] = i;
+        /* with rhs, consider the strategy where the matrix is kept with
+         * its full size, but the SM block is replaced with zeros. Here
+         * we just force the x vectors to have data there, so as to avoid
+         * the possibility that a solution vector found by BW still has
+         * non-zero coordinates at these locations.
+         */
+        if (bw->m < bw->nrhs) {
+            fprintf(stderr, "m < nrhs is not supported\n");
+            exit(EXIT_FAILURE);
+        }
+        for(int i = 0 ; i < bw->nrhs ; i++) {
+            xvecs[i] = balancing_pre_shuffle(mmt->bal, mmt->n0[!bw->dir]-bw->nrhs+i);
+            printf("Forced %d-th x vector to be the %"PRIu32"-th canonical basis vector\n", i, xvecs[i]);
+            ASSERT_ALWAYS(xvecs[i] >= (uint32_t) (bw->m - bw->nrhs));
+        }
+        for(int i = bw->nrhs ; i < bw->m ; i++) {
+            xvecs[i] = i - bw->nrhs;
         }
         /* save_x operates only on the leader thread */
         save_x(xvecs, bw->m, my_nx, pi);
@@ -348,7 +363,7 @@ void usage()
     fprintf(stderr, "Usage: ./prep <options>\n");
     fprintf(stderr, "%s", bw_common_usage_string());
     fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char * argv[])

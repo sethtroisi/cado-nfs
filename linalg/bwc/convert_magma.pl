@@ -65,7 +65,9 @@ if ($mode eq 'bmatrix') {
     exit;
 }
 
-if ($mode eq 'bpmatrix') {
+if ($mode =~ /^bpmatrix(?:_(\d+)_(\d+))?$/) {
+    my $nr0=$1;
+    my $nc0=$2;
     my $nr=0;
     my $nc=0;
     my $curr=0;
@@ -81,6 +83,13 @@ if ($mode eq 'bpmatrix') {
             my $w=unpack("l", $x);
             push @coeffs, [$nr, $v+1, $w];
         }
+    }
+    if (defined($nr0) && defined($nc0)) {
+        if ($nr > $nr0 || $nc > $nc0) {
+            die "Unexpected: $mode is incompatible with seeing $nr rows and $nc cols";
+        }
+        $nr = $nr0;
+        $nc = $nc0;
     }
     print "var:=SparseMatrix($nr,$nc,[\n";
     print join(", ", map { "<$_->[0], $_->[1], $_->[2]>" } @coeffs);

@@ -1382,6 +1382,9 @@ sub subtask_krylov_mksol_todo {
 # }}}
 
 # {{{ solution blocks relevant to lingen mksol gather cleanup
+#
+# Those are _all_ solutions one can consider computing. However, we have
+# no obligation to do so.
 sub subtask_solution_blocks {
     my @sols;
     if ($prime eq '2') {
@@ -1389,13 +1392,35 @@ sub subtask_solution_blocks {
         # nsolvecs solutions. Those should be split in chunks of width
         # 64.
         @sols = ("0..$n");
-    } elsif ($nrhs) {
-        @sols = map {"$_..".($_+1);} (0..$nrhs-1);
     } else {
         @sols = map {"$_..".($_+1);} (0..$n-1);
     }
     print "## $current_task considering the following solution blocks: @sols\n";
     return @sols;
+}
+
+sub subtask_default_nsolvecs {
+    # those are the solutions we compute by default, split in chunks
+    # whose sizes are prescribed by the lists above.
+    my $nsolvecs;
+    if ($nrhs) {
+        # we used to force nsolvecs = nrhs. In fact, if we order
+        # the solutions appropriately, it seems that we don't
+        # have to, and one solution suffices.
+        # $nsolvecs = $nrhs;
+        $nsolvecs = 1;
+    } elsif ($prime == 2) {
+        # This is just a default. Either $n or $splitwidth could
+        # be considered reasonable defaults here.
+        $nsolvecs = $n;
+    } else {
+        # I'm not sure whether I really mean splitwidth or 1,
+        # since splitwidth *is* equal to 1 in that case. If I
+        # were to loosen this relationship, I probably would have
+        # to define splitwidth more accurately.
+        $nsolvecs = $splitwidth;
+    }
+    return $nsolvecs;
 }
 # }}}
 
@@ -1744,6 +1769,9 @@ sub task_lingen {
         @args=();
         push @args, "splits=" . join(",",@splits);
         push @args, grep { /^(?:m|n|wdir|prime|verbose_flags)=/ } @main_args;
+        if (-f "$wdir/$concatenated_A.gen" && -z "$wdir/$concatenated_A.gen") {
+            die "generating sequence file has size zero";
+        }
         task_common_run "split", @args,
                 "ifile=$concatenated_A.gen", "ofile-fmt=F.%u-%u";
         for my $j (0..$n/$splitwidth-1) {
@@ -1827,7 +1855,7 @@ sub task_mksol {
         my @args = grep { !/^(ys|n?rhs)/ } @main_args;
         push @args, split(' ', $t);
         if (!grep { /^nsolvecs/} @args) {
-            my $nsolvecs = $nrhs || ($prime ne '2' ? $splitwidth : $n);
+            my $nsolvecs = subtask_default_nsolvecs;
             push @args, "nsolvecs=$nsolvecs";
         }
 
@@ -1885,12 +1913,25 @@ sub task_gather {
     my $c0 = 4;
     my $c = 0;
     for (@all_ys) { my $l = length($_); $c = $l if $l > $c; }
+
+    # we need to decide which solution blocks are optional, and which are
+    # mandatory. This all depends on what we asked in the first place...
+    my $nsolvecs;
+    if (grep { /^nsolvecs=(\d+)/} @main_args) {
+        $nsolvecs = $1;
+    } else {
+        $nsolvecs = subtask_default_nsolvecs;
+    }
+    
     for my $s (@sols) {
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
         my $l = 4+length($s); $c0 = $l if $l > $c0;
         for my $y (@all_ys) {
             my $key = "$s,$y";
             my $n = $cmat->{$key} || 'NONE'; $cmat->{$key} = $n;
             my $l = length($n); $c = $l if $l > $c;
+            next if $optional;
             push @missing, "S.sols$s.$y" if $n eq 'NONE' || $n =~ /\*$/; 
         }
     }
@@ -1898,8 +1939,12 @@ sub task_gather {
     print "##    " . " "x$c0 . "|" . join(" ", map { sprintf "%${c}s", $_ } @all_ys) . "\n";
     print "##    " . "-"x$c0 . "|" . "-" x (($c+1)*scalar @all_ys) . "\n";
     for my $s (@sols) { 
+        $s =~ /^(\d+)-(\d+)$/ or die;
+        my $optional = $1 >= $nsolvecs;
         print "##    " . sprintf("%${c0}s","sols$s") . "|" .
-            join(" ", map { sprintf "%${c}s", $cmat->{"$s,$_"} } @all_ys) . "\n";
+            join(" ", map { sprintf "%${c}s", $cmat->{"$s,$_"} } @all_ys)
+            . ($optional ? " (optional)" : "")
+            . "\n";
     }
     # }}}
     if (@missing) {
