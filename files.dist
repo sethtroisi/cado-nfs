@@ -1148,6 +1148,7 @@ sieve/strategies/generate_strategies.h
 sieve/strategies/final_exec.c
 sieve/strategies/finding_good_strategy.c
 sieve/strategies/finding_good_strategy.h
+sieve/strategies/gen_decomp.c
 tests/sieve/strategies/CMakeLists.txt
 tests/sieve/strategies/utils_st/CMakeLists.txt
 tests/sieve/strategies/utils_st/test_strategy.c
