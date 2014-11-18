@@ -85,22 +85,23 @@ fb_is_power (fbprime_t q, unsigned long *final_k)
    use the simple struct to conserve memory and to decide algorithms (batch
    inversion, etc.) statically. */
 class fb_general_entry {
-    void read_roots (const char *, unsigned long);
-    public:
-    fbprime_t q, p; /* q = p^k */
-    redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
-                         the size of redc_invp_t */
-    fbroot_t roots[MAXDEGREE];
-    unsigned char exp[MAXDEGREE], oldexp[MAXDEGREE];
-    bool projective[MAXDEGREE];
-
-    /* exp and oldexp are maximal such that:
-       If not projective and a == br (mod p^k), then p^exp | F(a,b)
-           -"-               a == br (mod p^(k-1)), then p^oldexp | F(a,b)
-       If projective and ar == b  -"- */
-
-    unsigned char k, nr_roots;
-    void parse_line (const char *line, unsigned long linenr);
+  void read_roots (const char *, unsigned long);
+public:
+  fbprime_t q, p; /* q = p^k */
+  redc_invp_t invq; /* invq = -1/q (mod 2^32), or (mod 2^64), depending on
+		       the size of redc_invp_t */
+  fbroot_t roots[MAXDEGREE];
+  unsigned char exp[MAXDEGREE], oldexp[MAXDEGREE];
+  bool projective[MAXDEGREE];
+  
+  /* exp and oldexp are maximal such that:
+     If not projective and a == br (mod p^k), then p^exp | F(a,b)
+     -"-               a == br (mod p^(k-1)), then p^oldexp | F(a,b)
+     If projective and ar == b  -"- */
+  
+  unsigned char k, nr_roots;
+  void parse_line (const char *line, unsigned long linenr);
+  void fprint(FILE *out);
 };
 
 
@@ -231,6 +232,24 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
       this->oldexp[i] = oldexp;      
     }
 }
+
+void
+fb_general_entry::fprint(FILE *out)
+{
+  fprintf(out, "%" FBPRIME_FORMAT ": ", this->q);
+  for (unsigned char i_root = 0; i_root < this->nr_roots; i_root++) {
+    unsigned long long t = this->roots[i_root];
+    if (this->projective[i_root])
+      t += this->q;
+    fprintf(out, "%llu", t);
+    if (this->oldexp[i_root] != 0 || this->exp[i_root] != 1)
+      fprintf(out, ":%hhu:%hhu", this->oldexp[i_root], this->exp[i_root]);
+    if (i_root + 1 < this->nr_roots)
+      fprintf(out, ",");
+  }
+  fprintf(out, "\n");
+}
+
 
 
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
@@ -434,6 +453,9 @@ fb_part::fprint(FILE *out)
   this->fb6_slices->fprint(out);
   this->fb7_slices->fprint(out);
   this->fb8_slices->fprint(out);
+
+  for (size_t i = 0; i < this->general_vector.size(); i++)
+    this->general_vector[i].fprint(out);
 }
 
 /* Splits the factor base for a polynomial into disjoint parts which are
