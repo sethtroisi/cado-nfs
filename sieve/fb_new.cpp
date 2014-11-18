@@ -236,10 +236,34 @@ fb_general_entry::parse_line (const char * lineptr, const unsigned long linenr)
 /* "Simple" factor base entries. We imply q=p, k=1, oldexp=0, exp=1,
    and projective=false for all roots. */
 template <int Nr_roots>
-struct fb_entry_x_roots_s {
-    fbprime_t p;
-    fbroot_t roots[Nr_roots];
+class fb_entry_x_roots_s {
+public:
+  fbprime_t p;
+  fbroot_t roots[Nr_roots];
+  fb_entry_x_roots_s(const fb_general_entry &);
+  void fprint(FILE *);
 };
+
+template <int Nr_roots>
+fb_entry_x_roots_s<Nr_roots>::fb_entry_x_roots_s(const fb_general_entry &fb_cur)
+{
+  // ASSERT(Nr_roots == fb_cur->nr_roots);
+  this->p = fb_cur.p;
+  for (size_t i = 0; i < Nr_roots; i++)
+    this->roots[i] = fb_cur.roots[i];
+}
+
+template <int Nr_roots>
+void
+fb_entry_x_roots_s<Nr_roots>::fprint(FILE *out)
+{
+  fprintf(out, "%" FBPRIME_FORMAT ": ", this->p);
+  for (size_t i = 0; i < Nr_roots; i++) {
+    fprintf(out, "%" FBROOT_FORMAT "%s", this->roots[i],
+	    (i + 1 < Nr_roots) ? "," : "");
+  }
+  fprintf(out, "\n");
+}
 
 
 template <int Nr_roots>
@@ -251,25 +275,71 @@ class fb_vector: public std::vector<fb_entry_x_roots_s<Nr_roots> > {
      converted to this vector's fb_entry_x_roots_s type before adding it */
   void push_back(const fb_general_entry &fb_cur)
   {
-    fb_entry_x_roots_s<Nr_roots> f;
-    // ASSERT(Nr_roots == fb_cur->nr_roots);
-    f.p = fb_cur.p;
-    for (size_t i = 0; i < Nr_roots; i++)
-      f.roots[i] = fb_cur.roots[i];
-     this->push_back(f);
+    fb_entry_x_roots_s<Nr_roots> f = fb_cur;
+    this->push_back(f);
   }
+  void fprint(FILE *);
 };
+
+template <int Nr_roots>
+void
+fb_vector<Nr_roots>::fprint(FILE *out)
+{
+  for (size_t i = 0; i < this->size(); i++)
+    (*this)[i].fprint(out);
+}
 
 typedef std::vector<fb_general_entry> fb_general_vector;
 
 /* http://stackoverflow.com/questions/24130093/gdb-could-not-find-operator */
 template class std::vector<fb_general_entry>;
 
+
+/* The fb_slices class has nr_slices vectors; when appending elements with
+   append(), it appends to these vectors in a round-robin fashion. */
 template <int Nr_roots>
-struct fb_slice_x_roots_s {
-  size_t nr_entries;
-  fb_entry_x_roots_s<Nr_roots> *entries;
+class fb_slices {
+  fb_vector<Nr_roots> *vectors;
+  size_t nr_slices, next_slice;
+public:
+  fb_slices(size_t nr_slices);
+  void append(const fb_general_entry &);
+  fb_entry_x_roots_s<Nr_roots> *get_slice(size_t slice);
+  void fprint(FILE *);
 };
+
+template <int Nr_roots>
+fb_slices<Nr_roots>::fb_slices(const size_t nr_slices)
+{
+  this->nr_slices = nr_slices;
+  this->vectors = new fb_vector<Nr_roots>[nr_slices];
+  this->next_slice = 0;
+}
+
+template <int Nr_roots>
+void
+fb_slices<Nr_roots>::append(const fb_general_entry &fb_cur)
+{
+  this->vectors[this->next_slice++].push_back(fb_cur);
+  if (this->next_slice == this->nr_slices)
+    this->next_slice = 0;
+}
+
+template <int Nr_roots>
+fb_entry_x_roots_s<Nr_roots> *
+fb_slices<Nr_roots>::get_slice(size_t slice)
+{
+  ASSERT_ALWAYS(slice < this->nr_slices);
+  return this->vectors[slice];
+}
+
+template <int Nr_roots>
+void
+fb_slices<Nr_roots>::fprint(FILE *out)
+{
+  for (size_t slice = 0; slice < this->nr_slices; slice++)
+    this->vectors[slice].fprint(out);
+}
 
 /* A "part" is the set of all factor base primes that get sieved over a given
    bucket region size.
@@ -281,32 +351,37 @@ class fb_part {
      size_t nr_entries[9];
      here, or let each array end with a "magic value", such as a slice with
      0 entries, or a NULL pointer? */
-  fb_slice_x_roots_s<0> *fb0;
-  fb_slice_x_roots_s<1> *fb1;
-  fb_slice_x_roots_s<2> *fb2;
-  fb_slice_x_roots_s<3> *fb3;
-  fb_slice_x_roots_s<4> *fb4;
-  fb_slice_x_roots_s<5> *fb5;
-  fb_slice_x_roots_s<6> *fb6;
-  fb_slice_x_roots_s<7> *fb7;
-  fb_slice_x_roots_s<8> *fb8;
-  fb_general_entry *general;
 
   /* These vectors are filled when we read or generate the factor base.
      The slices point into the vectors' storage. */
-  fb_vector<0> fb_0_vector;
-  fb_vector<1> fb_1_vector;
-  fb_vector<2> fb_2_vector;
-  fb_vector<3> fb_3_vector;
-  fb_vector<4> fb_4_vector;
-  fb_vector<5> fb_5_vector;
-  fb_vector<6> fb_6_vector;
-  fb_vector<7> fb_7_vector;
-  fb_vector<8> fb_8_vector;
+  fb_slices<0> *fb0_slices; /* From 0 to MAXDEGREE */
+  fb_slices<1> *fb1_slices;
+  fb_slices<2> *fb2_slices;
+  fb_slices<3> *fb3_slices;
+  fb_slices<4> *fb4_slices;
+  fb_slices<5> *fb5_slices;
+  fb_slices<6> *fb6_slices;
+  fb_slices<7> *fb7_slices;
+  fb_slices<8> *fb8_slices;
   fb_general_vector general_vector;
   public:
+  fb_part(size_t nr_slices);
   void append(const fb_general_entry &);
+  void fprint(FILE *);
 };
+
+fb_part::fb_part(const size_t nr_slices) {
+  this->fb0_slices = new fb_slices<0>(nr_slices);
+  this->fb1_slices = new fb_slices<1>(nr_slices);
+  this->fb2_slices = new fb_slices<2>(nr_slices);
+  this->fb3_slices = new fb_slices<3>(nr_slices);
+  this->fb4_slices = new fb_slices<4>(nr_slices);
+  this->fb5_slices = new fb_slices<5>(nr_slices);
+  this->fb6_slices = new fb_slices<6>(nr_slices);
+  this->fb7_slices = new fb_slices<7>(nr_slices);
+  this->fb8_slices = new fb_slices<8>(nr_slices);
+}
+
 
 /* Append a factor base entry given in fb_cur to the
    correct vector, as determined by the number of roots.
@@ -334,17 +409,31 @@ fb_part::append(const fb_general_entry &fb_cur)
   /* Simple ones go in the simple vector with the corresponding number of
      roots */
   switch (fb_cur.nr_roots) {
-    case 0: this->fb_0_vector.push_back(fb_cur); break;
-    case 1: this->fb_1_vector.push_back(fb_cur); break;
-    case 2: this->fb_2_vector.push_back(fb_cur); break;
-    case 3: this->fb_3_vector.push_back(fb_cur); break;
-    case 4: this->fb_4_vector.push_back(fb_cur); break;
-    case 5: this->fb_5_vector.push_back(fb_cur); break;
-    case 6: this->fb_6_vector.push_back(fb_cur); break;
-    case 7: this->fb_7_vector.push_back(fb_cur); break;
-    case 8: this->fb_8_vector.push_back(fb_cur); break;
+    case 0: this->fb0_slices->append(fb_cur); break;
+    case 1: this->fb1_slices->append(fb_cur); break;
+    case 2: this->fb2_slices->append(fb_cur); break;
+    case 3: this->fb3_slices->append(fb_cur); break;
+    case 4: this->fb4_slices->append(fb_cur); break;
+    case 5: this->fb5_slices->append(fb_cur); break;
+    case 6: this->fb6_slices->append(fb_cur); break;
+    case 7: this->fb7_slices->append(fb_cur); break;
+    case 8: this->fb8_slices->append(fb_cur); break;
     default: abort();
   }
+}
+
+void
+fb_part::fprint(FILE *out)
+{
+  this->fb0_slices->fprint(out);
+  this->fb1_slices->fprint(out);
+  this->fb2_slices->fprint(out);
+  this->fb3_slices->fprint(out);
+  this->fb4_slices->fprint(out);
+  this->fb5_slices->fprint(out);
+  this->fb6_slices->fprint(out);
+  this->fb7_slices->fprint(out);
+  this->fb8_slices->fprint(out);
 }
 
 /* Splits the factor base for a polynomial into disjoint parts which are
@@ -355,19 +444,23 @@ fb_part::append(const fb_general_entry &fb_cur)
    (i.e., hits get sorted into bucket regions of size 2^16)
 */
 class fb_factorbase {
-  fb_part parts[FB_MAX_PARTS];
+  fb_part *parts[FB_MAX_PARTS];
   void append(const fb_general_entry &);
   fbprime_t thresholds[FB_MAX_PARTS];
   public:
-  fb_factorbase(const fbprime_t *thresholds);
+  fb_factorbase(const fbprime_t *thresholds, const size_t *nr_slices);
   void read(const char * const filename);
   void make_linear (const mpz_t *poly, fbprime_t powbound, bool do_projective);
+  void fprint(FILE *);
 };
 
-fb_factorbase::fb_factorbase(const fbprime_t *thresholds)
+fb_factorbase::fb_factorbase(const fbprime_t *thresholds,
+			     const size_t *nr_slices)
 {
-  for (size_t i = 0; i < FB_MAX_PARTS; i++)
+  for (size_t i = 0; i < FB_MAX_PARTS; i++) {
     this->thresholds[i] = thresholds[i];
+    this->parts[i] = new fb_part(nr_slices[i]);
+  }
 }
 
 /* Append a factor base entry to the factor base.
@@ -392,7 +485,7 @@ fb_factorbase::append(const fb_general_entry &fb_cur)
     }
     return; /* silently skip this entry */
   }
-  this->parts[i].append(fb_cur);
+  this->parts[i]->append(fb_cur);
 }
 
 /* Remove newline, comment, and trailing space from a line. Write a
@@ -652,13 +745,22 @@ fb_factorbase::make_linear (const mpz_t *poly, const fbprime_t powbound,
   delete (powers);
 }
 
+void
+fb_factorbase::fprint(FILE *out)
+{
+  for (size_t part = 0; part < FB_MAX_PARTS; part++)
+    this->parts[part]->fprint(out);
+}
+
+
 
 int main(int argc, char **argv)
 {
   fbprime_t thresholds[4] = {200, 1000, 1000, 1000};
+  size_t nr_slices[4] = {3, 5, 0, 0};
   fbprime_t powbound = 100;
-  fb_factorbase *fb1 = new fb_factorbase(thresholds),
-    *fb2 = new fb_factorbase(thresholds);
+  fb_factorbase *fb1 = new fb_factorbase(thresholds, nr_slices),
+    *fb2 = new fb_factorbase(thresholds, nr_slices);
 
   mpz_t poly[2];
 
@@ -669,8 +771,13 @@ int main(int argc, char **argv)
   mpz_set_ui(poly[1], 210); /* Bunch of projective primes */
 
   fb1->make_linear(poly, powbound, true);
-  if (argc > 1)
+  fprintf (stdout, "Linear factor base:\n");
+  fb1->fprint(stdout);
+  if (argc > 1) {
     fb2->read(argv[1]);
+    fprintf (stdout, "Factor base from file:\n");
+    fb2->fprint(stdout);
+  }
 
   mpz_clear(poly[0]);
   mpz_clear(poly[1]);
