@@ -1971,7 +1971,7 @@ sub task_gather {
         push @args, "nsolvecs=$nsolvecs";
     }
     if ($param->{'rhs'}) {
-        push @args, "rhs=$rhs_companion";
+        push @args, "rhscoeffs=$rhs_companion";
     }
     task_common_run 'gather', @args;
 }

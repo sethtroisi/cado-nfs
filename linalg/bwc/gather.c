@@ -205,12 +205,12 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     vec_init_generic(pi->m, A, svec, 0, ii1-ii0);
     vec_init_generic(pi->m, A, tvec, 0, ii1-ii0);
 
-    const char * rhs_name = param_list_lookup_string(pl, "rhs");
-    FILE * rhs = NULL;
+    const char * rhs_name = param_list_lookup_string(pl, "rhscoeffs");
+    FILE * rhscoeffs_file = NULL;
     mmt_vec rhsvec;
     if (rhs_name) {
         if (!pi->m->trank && !pi->m->jrank)
-            rhs = fopen(rhs_name, "rb");
+            rhscoeffs_file = fopen(rhs_name, "rb");
         matmul_top_vec_init_generic(mmt, A, rhsvec, bw->dir, 0);
     }
 
@@ -239,15 +239,15 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             if (tcan_print) {
                 printf("Reading rhs coefficients for solution %u\n", sf->s0);
             }
-            if (rhs) {      /* main thread */
+            if (rhscoeffs_file) {      /* main thread */
                 for(int j = 0 ; j < bw->nrhs ; j++) {
                     /* We're implicitly supposing that elements are stored
                      * alone, not grouped à la SIMD (which does happen for
                      * GF(2), of course). */
                     ASSERT_ALWAYS(sf->s1 == sf->s0 + 1);
-                    rc = fseek(rhs, A->vec_elt_stride(A, j * bw->n + sf->s0), SEEK_SET);
+                    rc = fseek(rhscoeffs_file, A->vec_elt_stride(A, j * bw->n + sf->s0), SEEK_SET);
                     ASSERT_ALWAYS(rc >= 0);
-                    rc = fread(A->vec_coeff_ptr(A, rhscoeffs, j), A->vec_elt_stride(A,1), 1, rhs);
+                    rc = fread(A->vec_coeff_ptr(A, rhscoeffs, j), A->vec_elt_stride(A,1), 1, rhscoeffs_file);
                     if (A->is_zero(A, A->vec_coeff_ptr_const(A, rhscoeffs, j))) {
                         printf("Notice: coefficient for vector " V_FILE_BASE_PATTERN " in solution %d is zero\n", j, j+1, sf->s0);
                     }
@@ -350,7 +350,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 ASSERT_ALWAYS(rc >= 0);
                 matmul_top_load_vector_generic(mmt, rhsvec, tmp, bw->dir, 0, unpadded);
                 free(tmp);
-                if (rhs) {
+                if (rhscoeffs_file) {
                     /* Now get rid of the R file, we don't need it */
                     rc = asprintf(&tmp, R_FILE_BASE_PATTERN ".%u", sf->s0, sf->s1, 0);
                     ASSERT_ALWAYS(rc >= 0);
@@ -393,7 +393,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             pthread_mutex_unlock(pi->m->th->m);
             return NULL;
         }
-        if (rhs) {
+        if (rhscoeffs_file) {
             /* We now append the rhs coefficients to the vector we
              * have just saved. Of course only the I/O thread does this. */
             char * tmp;
@@ -415,7 +415,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         if (rhs_name) A->vec_clear(A, &rhscoeffs, bw->nrhs);
     }
 
-    if (rhs) fclose(rhs);
+    if (rhscoeffs_file) fclose(rhscoeffs_file);
     if (rhs_name) matmul_top_vec_clear_generic(mmt, rhsvec, bw->dir);
 
     vec_clear_generic(pi->m, svec, ii1-ii0);
