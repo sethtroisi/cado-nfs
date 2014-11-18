@@ -12,6 +12,7 @@ struct las_report_s {
     double ttbuckets_fill;
     double ttbuckets_apply;
     double ttf;                 /* factor_survivors */
+    double ttcof;                /* cofactorisation */
     unsigned long (*survivor_sizes)[256]; /* First index: rational side */
     unsigned long (*report_sizes)[256];
     unsigned long both_even;
