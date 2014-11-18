@@ -319,6 +319,9 @@ print "$my_cmdline\n" if $my_verbose_flags->{'cmdline'};
         push @miss, grep { !defined $param->{$_}; } (qw/prime matrix interval/);
     }
     die "Missing argument(s): @miss" if @miss;
+    if (!defined($m) || !defined($n)) {
+        die "Missing parameters: m and/or n";
+    }
 }
 
 $param->{'matrix'} =~ s/~/$ENV{HOME}/g;
@@ -1766,7 +1769,7 @@ sub task_lingen {
         push @args, "lingen-threshold=$lt";
         push @args, "lingen-mpi-threshold=$lt";
         push @args, "afile=$concatenated_A";
-        push @args, grep { /^(?:m|n|wdir|prime|rhs|mpi|thr)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|rhs|mpi|thr)=/ } @main_args;
         if (!$mpi_needed && ($thr_split[0]*$thr_split[1] != 1)) {
             print "## non-MPI build, avoiding multithreaded plingen\n";
             @args = grep { !/^(mpi|thr)=/ } @args;
@@ -1776,7 +1779,7 @@ sub task_lingen {
         # Some splitting work needed...
         @args=();
         push @args, "splits=" . join(",",@splits);
-        push @args, grep { /^(?:m|n|wdir|prime|verbose_flags)=/ } @main_args;
+        push @args, grep { /^(?:mn|m|n|wdir|prime|verbose_flags)=/ } @main_args;
         if (-f "$wdir/$concatenated_A.gen" && -z "$wdir/$concatenated_A.gen") {
             die "generating sequence file has size zero";
         }

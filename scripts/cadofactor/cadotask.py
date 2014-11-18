@@ -406,6 +406,8 @@ class Statistics(object):
         """
         for (key, types, defaults, combine, regex) in self.conversions:
             if key in stats:
+                if key in self.stats:
+                    print("duplicate %s\n" % key)
                 assert not key in self.stats
                 self.stats[key] = self._from_str(stats.get(key, defaults),
                                                  types)
@@ -3338,7 +3340,7 @@ class MergeDLPTask(Task):
                 raise Exception("Program failed")
             
             indexfile = self.workdir.make_filename("index" + use_gz)
-            mergedfile = self.workdir.make_filename("sparse.txt")
+            mergedfile = self.workdir.make_filename("sparse.bin")
             (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.Replay.name)
             idealfile = self.workdir.make_filename("ideal")
             p = cadoprograms.ReplayDLP(ideals=idealfile,
@@ -3570,7 +3572,7 @@ class NmbrthryTask(Task):
         return (self.state["nmaps0"], self.state["nmaps1"])
 
 
-class LinAlgDLPTask(Task):
+class LinAlgDLPTask_Magma(Task):
     """ Runs the linear algebra step for dlp"""
     @property
     def name(self):
@@ -3621,8 +3623,79 @@ class LinAlgDLPTask(Task):
         self.logger.debug("Exit LinAlgDLPTask.run(" + self.name + ")")
         return True
     
-    def get_kernel_filename(self):
+    def get_virtual_logs_filename(self):
         return self.get_state_filename("kerfile")
+
+
+# I've just ditched the statistics bit, cause I don't know to make its
+# despair cry a little bit more useful.
+class LinAlgDLPTask(Task):
+    """ Runs the linear algebra step for DLP """
+    @property
+    def name(self):
+        return "bwc"
+    @property
+    def title(self):
+        return "Linear Algebra"
+    @property
+    def programs(self):
+        return ((cadoprograms.BWC, ("complete", "rhs", "prime", "matrix",  "wdir", "nullspace"),
+                 {"merged": Request.GET_MERGED_FILENAME,
+                  "sm": Request.GET_SM_FILENAME}),)
+    @property
+    def paramnames(self):
+        return super().paramnames
+
+    
+    def __init__(self, *, mediator, db, parameters, path_prefix):
+        super().__init__(mediator=mediator, db=db, parameters=parameters,
+                         path_prefix=path_prefix)
+    
+    def run(self):
+        super().run()
+
+        if not "virtual_logs" in self.state or self.have_new_input_files():
+            workdir = self.workdir.make_dirname()
+            workdir.mkdir(parent=True)
+            mergedfile = self.merged_args[0].pop("merged")
+            smfile = self.merged_args[0].pop("sm")
+            if mergedfile is None:
+                self.logger.critical("No merged file received.")
+                return False
+            (stdoutpath, stderrpath) = self.make_std_paths(cadoprograms.BWC.name)
+            matrix = mergedfile.realpath()
+            wdir = workdir.realpath()
+            nmaps = self.send_request(Request.GET_NMAPS)
+            p = cadoprograms.BWC(complete=True,
+                                 matrix=matrix,  wdir=wdir,
+                                 mn = nmaps[0] + nmaps[1],
+                                 prime=self.send_request(Request.GET_ELL),
+                                 rhs=smfile,
+                                 mm_impl="basicp",
+                                 nullspace="right",
+                                 stdout=str(stdoutpath),
+                                 stderr=str(stderrpath),
+                                 **self.progparams[0])
+            message = self.submit_command(p, "", log_errors=True)
+            if message.get_exitcode(0) != 0:
+                raise Exception("Program failed")
+            virtual_logs_filename = self.workdir.make_filename("K.sols0-1.0.truncated.txt", use_subdir=True)
+            if not virtual_logs_filename.isfile():
+                raise Exception("Kernel file %s does not exist" % virtual_logs_filename)
+            self.remember_input_versions(commit=False)
+            output_version = self.state.get("output_version", 0) + 1
+            update = {"virtual_logs": virtual_logs_filename.get_wdir_relative(),
+                      "output_version": output_version}
+            self.state.update(update, commit=True)
+        self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+        return True
+
+    def get_virtual_logs_filename(self):
+        return self.get_state_filename("virtual_logs")
+    
+    def get_prefix(self):
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
+                              self.params["name"], "dep")
 
 
 class LinAlgTask(Task, HasStatistics):
@@ -4498,6 +4571,7 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = object()
     GET_LINALG_PREFIX = object()
     GET_KERNEL_FILENAME = object()
+    GET_VIRTUAL_LOGS_FILENAME = object()
     GET_RELSDEL_FILENAME = object()
     GET_SM_FILENAME = object()
     GET_UNITS_DIRNAME = object()
@@ -4701,8 +4775,9 @@ class CompleteFactorization(HasState, wudb.DbAccess,
             self.request_map[Request.GET_ELL] = self.nmbrthry.get_ell
             self.request_map[Request.GET_SM_FILENAME] = self.sm.get_sm_filename
             self.request_map[Request.GET_UNITS_DIRNAME] = self.sm.get_abunits_dirname
-            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_kernel_filename
             self.request_map[Request.GET_RELSDEL_FILENAME] = self.purge.get_relsdel_filename
+            self.request_map[Request.GET_KERNEL_FILENAME] = self.linalg.get_virtual_logs_filename
+            self.request_map[Request.GET_VIRTUAL_LOGS_FILENAME] = self.linalg.get_virtual_logs_filename
         else:
             self.request_map[Request.GET_KERNEL_FILENAME] = self.characters.get_kernel_filename
             self.request_map[Request.GET_DEPENDENCY_FILENAME] = self.linalg.get_dependency_filename

@@ -934,6 +934,8 @@ class BWC(Program):
                  interval: ParameterEq()=None,
                  ys: ParameterEq()=None,
                  matrix: ParameterEq()=None,
+                 rhs: ParameterEq()=None,
+                 prime: ParameterEq()=None,
                  wdir: ParameterEq()=None,
                  mpiexec: ParameterEq()=None,
                  hosts: ParameterEq()=None,
@@ -941,6 +943,7 @@ class BWC(Program):
                  interleaving: ParameterEq()=None,
                  shuffled_product: ParameterEq()=None,
                  bwc_bindir: ParameterEq()=None,
+                 mm_impl: ParameterEq()=None,
                  cpubinding: ParameterEq()=None,
                  precmd: ParameterEq()=None,
                  **kwargs):
